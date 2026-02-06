@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"affilio-api/internal/database"
+
 	"github.com/gin-gonic/gin"
 )
 
