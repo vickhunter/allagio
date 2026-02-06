@@ -69,15 +69,26 @@ class Affilio_Admin {
 
     public function render_dashboard() {
         $status = $this->api->get_connection_status();
+        echo '<div class="wrap affilio-admin-page">';
         echo '<div id="affilio-dashboard-root"></div>';
         if (!$status['connected']) {
-            echo '<div class="notice notice-warning"><p><strong>Affilio is not connected.</strong> ' . esc_html($status['message']) . ' <a href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">Open settings</a>.</p></div>';
+            echo '<div class="affilio-panel affilio-panel-warning">';
+            echo '<h2>Affilio Dashboard</h2>';
+            echo '<p><strong>Not connected.</strong> ' . esc_html($status['message']) . '</p>';
+            echo '<p><a class="button button-primary" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">Open settings</a></p>';
+            echo '</div>';
+            echo '</div>';
             return;
         }
+        echo '<div class="affilio-panel affilio-panel-actions">';
+        echo '<h2>Scan</h2>';
+        echo '<p>Run a full scan to refresh article scores and recommendations.</p>';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         echo '<input type="hidden" name="action" value="affilio_scan_all">';
         submit_button('Scan All Posts');
         echo '</form>';
+        echo '</div>';
+        echo '</div>';
     }
 
     public function render_discovery() {
@@ -111,19 +122,22 @@ class Affilio_Admin {
         $override_api_url = esc_attr(get_option('affilio_api_url_override', ''));
         $admin_key = esc_attr(get_option('affilio_admin_api_key', ''));
 
-        echo '<div class="wrap"><h1>Affilio Settings</h1>';
-        echo '<p><strong>Status:</strong> ' . esc_html($status['label']) . ' - ' . esc_html($status['message']) . '</p>';
-        echo '<p><a class="button" target="_blank" rel="noopener noreferrer" href="https://app.affilio.io/signup">Create Affilio account</a> ';
+        echo '<div class="wrap affilio-admin-page"><h1>Affilio Settings</h1>';
+        echo '<div class="affilio-status-row">';
+        echo '<span class="affilio-status-pill affilio-status-' . esc_attr($status['state']) . '">' . esc_html($status['label']) . '</span>';
+        echo '<span class="affilio-status-message">' . esc_html($status['message']) . '</span>';
+        echo '</div>';
+        echo '<p class="affilio-cta-row"><a class="button button-primary" target="_blank" rel="noopener noreferrer" href="https://app.affilio.io/signup">Create Affilio account</a> ';
         echo '<a class="button button-secondary" target="_blank" rel="noopener noreferrer" href="https://app.affilio.io">Open Affilio app</a></p>';
 
         if ($status['state'] === 'missing_key') {
-            echo '<div class="notice notice-info"><p>Onboarding: create your account, generate an API key in the Affilio app, paste it below, then click Save Settings.</p></div>';
+            echo '<div class="affilio-panel affilio-panel-info"><p>Onboarding: create your account, generate an API key in the Affilio app, paste it below, then click Save Settings.</p></div>';
         }
 
-        echo '<form method="post">';
+        echo '<form class="affilio-settings-form" method="post">';
         wp_nonce_field('affilio_settings');
         echo '<table class="form-table">';
-        echo '<tr><th>API Key</th><td><input name="affilio_api_key" value="' . $api_key . '" class="regular-text" autocomplete="off" />';
+        echo '<tr><th>API Key</th><td><input name="affilio_api_key" value="' . $api_key . '" class="regular-text" autocomplete="off" spellcheck="false" />';
         echo '<p class="description">Required. Used to connect this WordPress site to your Affilio workspace.</p></td></tr>';
         echo '</table>';
 
@@ -151,8 +165,11 @@ class Affilio_Admin {
             return;
         }
         $is_affilio_screen = strpos((string) $screen->id, 'affilio') !== false;
+        if ($is_affilio_screen) {
+            return;
+        }
         $is_editor_screen = in_array($screen->base, array('post', 'site-editor'), true);
-        if (!$is_affilio_screen && !$is_editor_screen) {
+        if (!$is_editor_screen) {
             return;
         }
         $status = $this->api->get_connection_status();

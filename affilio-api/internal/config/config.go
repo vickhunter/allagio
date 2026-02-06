@@ -16,21 +16,21 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		Port:             envOr("PORT", "8080"),
-		DatabaseURL:      envOr("DATABASE_URL", "postgresql://affilio:password@localhost:5432/affilio"),
+		Port:             getEnvValue("PORT", "8080"),
+		DatabaseURL:      getEnvValue("DATABASE_URL", "postgresql://affilio:password@localhost:5432/affilio"),
 		ClaudeAPIKey:     os.Getenv("CLAUDE_API_KEY"),
-		ClaudeModel:      envOr("CLAUDE_MODEL", "claude-sonnet-4-5-20250929"),
-		ClaudeAPIURL:     envOr("CLAUDE_API_URL", ""),
-		ClaudeAPIVersion: envOr("CLAUDE_API_VERSION", ""),
-		AllowedOrigins:   envOr("ALLOWED_ORIGINS", "*"),
-		APIKeySecret:     envOr("API_KEY_SECRET", "dev-secret"),
-		AdminAPIKey:      envOr("ADMIN_API_KEY", ""),
+		ClaudeModel:      getEnvValue("CLAUDE_MODEL", "claude-sonnet-4-5-20250929"),
+		ClaudeAPIURL:     getEnvValue("CLAUDE_API_URL", ""),
+		ClaudeAPIVersion: getEnvValue("CLAUDE_API_VERSION", ""),
+		AllowedOrigins:   getEnvValue("ALLOWED_ORIGINS", "*"),
+		APIKeySecret:     getEnvValue("API_KEY_SECRET", "dev-secret"),
+		AdminAPIKey:      getEnvValue("ADMIN_API_KEY", ""),
 	}
 }
 
-func envOr(key, def string) string {
+func getEnvValue(key, defaultValue string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
-	return def
+	return defaultValue
 }

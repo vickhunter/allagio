@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"affilio-api/internal/database"
+
 	"github.com/gin-gonic/gin"
 )
 

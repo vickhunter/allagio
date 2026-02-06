@@ -1,12 +1,19 @@
 ( function() {
     const root = document.getElementById('affilio-dashboard-root');
     if (!root) return;
+    root.classList.add('affilio-dashboard-app');
     if (AffilioData.connectionStatus && !AffilioData.connectionStatus.connected) {
         const settings = AffilioData.settingsUrl || '/wp-admin/admin.php?page=affilio-settings';
-        root.innerHTML = `<h2>Affilio Dashboard</h2><p><strong>Not connected:</strong> ${AffilioData.connectionStatus.message || 'Configure your API key.'} <a href="${settings}">Open settings</a></p>`;
+        root.innerHTML = `
+            <div class="affilio-panel affilio-panel-warning">
+                <h2>Affilio Dashboard</h2>
+                <p><strong>Not connected.</strong> ${AffilioData.connectionStatus.message || 'Configure your API key.'}</p>
+                <p><a class="button button-primary" href="${settings}">Open settings</a></p>
+            </div>
+        `;
         return;
     }
-    root.innerHTML = '<h2>Affilio Dashboard</h2><p>Loading...</p>';
+    root.innerHTML = '<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>Loading data...</p></div>';
 
     const scoreColor = (score) => {
         if (score < 34) return '#d63638';
@@ -36,34 +43,40 @@
     };
 
     const render = (articles, programs) => {
-        let html = '<h2>Affilio Dashboard</h2>';
+        let html = '<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>Review article monetization and manage recommendations.</p></div>';
         if (!articles.length) {
-            html += '<p>No articles scanned yet.</p>';
+            html += '<div class="affilio-panel"><p>No articles scanned yet.</p></div>';
         } else {
             let rows = articles.map(a => {
                 const score = a.monetization_score || 0;
                 return `<tr data-article-id="${a.id}"><td>${a.title || ''}</td><td style="color:${scoreColor(score)};font-weight:bold;">${score}</td><td>${potentialLabel(score)}</td><td>${a.wp_post_id}</td></tr>`;
             }).join('');
             html += `
-                <table class="widefat" id="affilio-articles-table">
-                    <thead><tr><th>Title</th><th>Score</th><th>Potential</th><th>Post ID</th></tr></thead>
-                    <tbody>${rows}</tbody>
-                </table>
-                <div id="affilio-article-detail" style="margin-top:16px;"></div>
+                <div class="affilio-panel">
+                    <h3>Articles</h3>
+                    <table class="widefat" id="affilio-articles-table">
+                        <thead><tr><th>Title</th><th>Score</th><th>Potential</th><th>Post ID</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                    <div id="affilio-article-detail" class="affilio-detail"></div>
+                </div>
             `;
         }
         html += `
-            <h3>Analytics</h3>
-            <div id="affilio-analytics"></div>
+            <div class="affilio-panel">
+                <h3>Analytics</h3>
+                <div id="affilio-analytics"></div>
+            </div>
         `;
         html += `
-            <h3>My Affiliate Links</h3>
-            <form id="affilio-add-program" style="margin-bottom:12px;">
-                <input type="text" name="name" placeholder="Program name" required />
-                <input type="text" name="domain" placeholder="Domain" required />
-                <input type="text" name="link" placeholder="Affiliate link" />
-                <button class="button">Add</button>
-            </form>
+            <div class="affilio-panel">
+                <h3>My Affiliate Links</h3>
+                <form id="affilio-add-program" class="affilio-inline-form">
+                    <input type="text" name="name" placeholder="Program name" required />
+                    <input type="text" name="domain" placeholder="Domain" required />
+                    <input type="text" name="link" placeholder="Affiliate link" />
+                    <button class="button button-secondary">Add</button>
+                </form>
         `;
         if (!programs.length) {
             html += '<p>No affiliate links detected yet.</p>';
@@ -71,6 +84,7 @@
             let rows = programs.map(p => `<li>${p.name} (${p.domain || 'unknown'})</li>`).join('');
             html += `<ul>${rows}</ul>`;
         }
+        html += '</div>';
         root.innerHTML = html;
         setupAnalytics();
 
@@ -92,10 +106,7 @@
                             <button class="button" data-rec="${r.id}" data-action="dismiss">Dismiss</button>
                         </li>`;
                     }).join('');
-                    detail.innerHTML = `
-                        <h3>Reasons</h3>
-                        ${recs ? `<ul>${recs}</ul>` : '<p>No recommendations yet.</p>'}
-                    `;
+                    detail.innerHTML = `<h3>Recommendations</h3>${recs ? `<ul>${recs}</ul>` : '<p>No recommendations yet.</p>'}`;
                     detail.querySelectorAll('button[data-rec]').forEach(btn => {
                         btn.addEventListener('click', async () => {
                             const recId = btn.getAttribute('data-rec');
@@ -652,5 +663,5 @@
                 programsResp.programs || []
             );
         })
-        .catch(() => { root.innerHTML = '<h2>Affilio Dashboard</h2><p>Failed to load data.</p>'; });
+        .catch(() => { root.innerHTML = '<div class="affilio-panel affilio-panel-warning"><h2>Affilio Dashboard</h2><p>Failed to load data.</p></div>'; });
 } )();
