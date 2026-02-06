@@ -9,6 +9,7 @@ import (
 	"affilio-api/internal/handlers"
 	"affilio-api/internal/middleware"
 	"affilio-api/internal/services"
+
 	"github.com/gin-gonic/gin"
 )
 

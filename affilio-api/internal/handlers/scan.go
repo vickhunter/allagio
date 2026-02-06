@@ -4,10 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/services"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -36,7 +38,7 @@ func (h *ScanHandler) ScanFull(c *gin.Context) {
 	siteID := c.GetString("site_id")
 	jobID, err := h.DB.CreateScanJob(c.Request.Context(), siteID, len(req.Articles))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create scan job"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to create scan job with site ID %s", siteID)})
 		return
 	}
 	detected := 0
