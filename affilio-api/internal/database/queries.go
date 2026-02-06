@@ -1023,9 +1023,9 @@ WHERE a.site_id=$1 AND r.id=$2`, siteID, recID).Scan(&current)
 	}
 	_, err = d.Pool.Exec(ctx, `
 UPDATE recommendations r
-SET status=$1,
-    approved_at=CASE WHEN $1='approved' AND approved_at IS NULL THEN NOW() ELSE approved_at END,
-    inserted_at=CASE WHEN $1='inserted' AND inserted_at IS NULL THEN NOW() ELSE inserted_at END
+SET status=$1::text,
+    approved_at=CASE WHEN $1::text='approved' AND approved_at IS NULL THEN NOW() ELSE approved_at END,
+    inserted_at=CASE WHEN $1::text='inserted' AND inserted_at IS NULL THEN NOW() ELSE inserted_at END
 FROM articles a
 WHERE r.article_id=a.id AND a.site_id=$2 AND r.id=$3`, status, siteID, recID)
 	return err
