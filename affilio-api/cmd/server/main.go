@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
@@ -108,8 +109,13 @@ func main() {
 		admin.POST("/sites/rotate-key", siteKeys.Rotate)
 	}
 
-	log.Printf("Affilio API listening on :%s", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
+	addr := ":" + cfg.Port
+	log.Printf("Affilio API listening on %s", addr)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("listen error: %v", err)
+	}
+	if err := r.RunListener(ln); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }
