@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"log"
-	"strings"
 
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
@@ -18,7 +17,7 @@ func main() {
 	cfg := config.Load()
 	ctx := context.Background()
 
-	db, err := database.Connect(ctx, strings.ToLower(cfg.DatabaseURL))
+	db, err := database.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("database connection failed: %v", err)
 	}
