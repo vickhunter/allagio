@@ -1,9 +1,10 @@
 FROM golang:1.23-alpine AS build
+RUN apk add --no-cache gcc musl-dev
 WORKDIR /app
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 COPY . ./
-RUN CGO_ENABLED=0 go build -o /bin/affilio ./cmd/server
+RUN go build -o /bin/affilio ./cmd/server
 
 FROM alpine:3.19
 COPY --from=build /bin/affilio /bin/affilio
