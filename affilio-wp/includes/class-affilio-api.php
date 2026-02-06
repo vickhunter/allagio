@@ -2,12 +2,14 @@
 
 class Affilio_API {
     private $base_url;
-    private $api_key;
     private $status_cache_key = 'affilio_connection_status';
 
     public function __construct() {
         $this->base_url = self::resolve_base_url();
-        $this->api_key = get_option('affilio_api_key', '');
+    }
+
+    private function current_api_key() {
+        return trim((string) get_option('affilio_api_key', ''));
     }
 
     public function request($method, $path, $body = null) {
@@ -16,7 +18,7 @@ class Affilio_API {
             'method'  => $method,
             'headers' => array(
                 'Content-Type' => 'application/json',
-                'X-API-Key'    => $this->api_key,
+                'X-API-Key'    => $this->current_api_key(),
             ),
         );
         if ($body !== null) {
@@ -59,7 +61,7 @@ class Affilio_API {
             'http_code' => 0,
         );
 
-        if (trim($this->api_key) === '') {
+        if ($this->current_api_key() === '') {
             set_transient($this->status_cache_key, $status, 60);
             return $status;
         }
