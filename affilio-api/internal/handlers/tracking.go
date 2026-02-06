@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/csv"
 	"encoding/hex"
 	"fmt"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +19,30 @@ import (
 )
 
 type TrackingHandler struct {
-	DB *database.DB
+	DB              *database.DB
+	ClickRateLimit  int
+	ClickRateWindow time.Duration
+	DuplicateWindow time.Duration
+}
+
+type tuningInsightItem struct {
+	ProgramID   string  `json:"program_id"`
+	ProgramName string  `json:"program_name"`
+	ProgramType string  `json:"program_type"`
+	Multiplier  float64 `json:"multiplier"`
+	SampleSize  int     `json:"sample_size"`
+	Reason      string  `json:"reason"`
+}
+
+type tuningInsights struct {
+	TotalProfiles  int                 `json:"total_profiles"`
+	BoostedCount   int                 `json:"boosted_count"`
+	PenalizedCount int                 `json:"penalized_count"`
+	NeutralCount   int                 `json:"neutral_count"`
+	HighConfidence int                 `json:"high_confidence_profiles"`
+	TopBoosted     []tuningInsightItem `json:"top_boosted"`
+	TopPenalized   []tuningInsightItem `json:"top_penalized"`
+	Notes          []string            `json:"notes"`
 }
 
 type trackRequest struct {
@@ -32,17 +57,113 @@ func (h *TrackingHandler) TrackClick(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}
+	req.RecommendationID = strings.TrimSpace(req.RecommendationID)
+	req.ArticleID = strings.TrimSpace(req.ArticleID)
+	req.ProgramID = strings.TrimSpace(req.ProgramID)
+	if req.RecommendationID == "" && req.ArticleID == "" && req.ProgramID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one tracking identifier is required"})
+		return
+	}
+
 	siteID := c.GetString("site_id")
 	userAgent := c.GetHeader("User-Agent")
 	ref := c.GetHeader("Referer")
+	ipHash := hashIP(c.ClientIP())
+	if ipHash != "" {
+		limited, err := h.exceedsClickRate(c.Request.Context(), siteID, ipHash)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record"})
+			return
+		}
+		if limited {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
+			return
+		}
+		duplicate, err := h.isDuplicateClick(c.Request.Context(), siteID, req, ipHash)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record"})
+			return
+		}
+		if duplicate {
+			c.JSON(http.StatusOK, gin.H{"status": "duplicate_suppressed"})
+			return
+		}
+	}
+
 	_, err := h.DB.Pool.Exec(c.Request.Context(), `
 INSERT INTO clicks (site_id, article_id, recommendation_id, program_id, user_agent, referrer, ip_hash)
-VALUES ($1,$2,$3,$4,$5,$6,$7)`, siteID, nullIfEmpty(req.ArticleID), nullIfEmpty(req.RecommendationID), nullIfEmpty(req.ProgramID), userAgent, ref, hashIP(c.ClientIP()))
+VALUES ($1,$2,$3,$4,$5,$6,$7)`, siteID, nullIfEmpty(req.ArticleID), nullIfEmpty(req.RecommendationID), nullIfEmpty(req.ProgramID), userAgent, ref, ipHash)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "recorded"})
+}
+
+func (h *TrackingHandler) duplicateWindowSeconds() int {
+	window := h.DuplicateWindow
+	if window <= 0 {
+		window = 45 * time.Second
+	}
+	return int(window.Seconds())
+}
+
+func (h *TrackingHandler) clickRateWindowSeconds() int {
+	window := h.ClickRateWindow
+	if window <= 0 {
+		window = time.Minute
+	}
+	return int(window.Seconds())
+}
+
+func (h *TrackingHandler) clickRateLimit() int {
+	limit := h.ClickRateLimit
+	if limit <= 0 {
+		limit = 25
+	}
+	return limit
+}
+
+func (h *TrackingHandler) isDuplicateClick(ctx context.Context, siteID string, req trackRequest, ipHash string) (bool, error) {
+	windowSeconds := h.duplicateWindowSeconds()
+	if windowSeconds <= 0 {
+		return false, nil
+	}
+	var exists bool
+	err := h.DB.Pool.QueryRow(ctx, `
+SELECT EXISTS (
+    SELECT 1
+    FROM clicks
+    WHERE site_id=$1
+      AND ip_hash=$2
+      AND COALESCE(recommendation_id::text,'') = COALESCE($3,'')
+      AND COALESCE(article_id::text,'') = COALESCE($4,'')
+      AND COALESCE(program_id::text,'') = COALESCE($5,'')
+      AND clicked_at >= NOW() - ($6 * INTERVAL '1 second')
+)`, siteID, ipHash, req.RecommendationID, req.ArticleID, req.ProgramID, windowSeconds).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func (h *TrackingHandler) exceedsClickRate(ctx context.Context, siteID, ipHash string) (bool, error) {
+	windowSeconds := h.clickRateWindowSeconds()
+	limit := h.clickRateLimit()
+	if windowSeconds <= 0 || limit <= 0 {
+		return false, nil
+	}
+	var count int
+	err := h.DB.Pool.QueryRow(ctx, `
+SELECT COUNT(*)::int
+FROM clicks
+WHERE site_id=$1
+  AND ip_hash=$2
+  AND clicked_at >= NOW() - ($3 * INTERVAL '1 second')`, siteID, ipHash, windowSeconds).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count >= limit, nil
 }
 
 func (h *TrackingHandler) ArticleClickCounts(c *gin.Context) {
@@ -293,7 +414,91 @@ func (h *TrackingHandler) RecommendationTuning(c *gin.Context) {
 		rows[i].ClickRate = round2(rows[i].ClickRate * 100)
 		rows[i].Multiplier = round2(rows[i].Multiplier)
 	}
-	c.JSON(http.StatusOK, gin.H{"tuning": rows})
+	c.JSON(http.StatusOK, gin.H{
+		"tuning":   rows,
+		"insights": buildTuningInsights(rows),
+	})
+}
+
+func buildTuningInsights(rows []database.RecommendationTuneProfile) tuningInsights {
+	out := tuningInsights{
+		TopBoosted:   make([]tuningInsightItem, 0, 3),
+		TopPenalized: make([]tuningInsightItem, 0, 3),
+		Notes:        make([]string, 0, 3),
+	}
+	if len(rows) == 0 {
+		out.Notes = append(out.Notes, "No profile reached minimum sample size yet.")
+		return out
+	}
+	out.TotalProfiles = len(rows)
+	boosted := make([]database.RecommendationTuneProfile, 0, len(rows))
+	penalized := make([]database.RecommendationTuneProfile, 0, len(rows))
+	for _, row := range rows {
+		switch {
+		case row.Multiplier > 1.02:
+			out.BoostedCount++
+			boosted = append(boosted, row)
+		case row.Multiplier < 0.98:
+			out.PenalizedCount++
+			penalized = append(penalized, row)
+		default:
+			out.NeutralCount++
+		}
+		if row.SampleSize >= 10 {
+			out.HighConfidence++
+		}
+	}
+	if out.BoostedCount == 0 && out.PenalizedCount == 0 {
+		out.Notes = append(out.Notes, "Profiles are currently neutral; system has not found strong winners or weak performers yet.")
+	}
+	if out.HighConfidence == 0 {
+		out.Notes = append(out.Notes, "Collect more outcomes per program to increase tuning confidence.")
+	}
+	sort.Slice(boosted, func(i, j int) bool { return boosted[i].Multiplier > boosted[j].Multiplier })
+	sort.Slice(penalized, func(i, j int) bool { return penalized[i].Multiplier < penalized[j].Multiplier })
+	appendTop := func(src []database.RecommendationTuneProfile, target *[]tuningInsightItem, isBoost bool) {
+		limit := 3
+		if len(src) < limit {
+			limit = len(src)
+		}
+		for i := 0; i < limit; i++ {
+			row := src[i]
+			item := tuningInsightItem{
+				ProgramID:   row.ProgramID,
+				ProgramName: row.ProgramName,
+				ProgramType: "curated",
+				Multiplier:  row.Multiplier,
+				SampleSize:  row.SampleSize,
+				Reason:      tuningReason(row, isBoost),
+			}
+			if row.IsUserProgram {
+				item.ProgramType = "user"
+			}
+			*target = append(*target, item)
+		}
+	}
+	appendTop(boosted, &out.TopBoosted, true)
+	appendTop(penalized, &out.TopPenalized, false)
+	return out
+}
+
+func tuningReason(row database.RecommendationTuneProfile, isBoost bool) string {
+	if isBoost {
+		if row.ClickRate >= 25 {
+			return "Strong click-through outcomes."
+		}
+		if row.InsertRate >= 50 {
+			return "High insert conversion after recommendation."
+		}
+		return "Consistently positive acceptance outcomes."
+	}
+	if row.ApprovalRate <= 25 {
+		return "Low approval rate across outcomes."
+	}
+	if row.ClickRate <= 5 {
+		return "Low click-through outcomes after insertion."
+	}
+	return "Weak conversion outcomes vs other programs."
 }
 
 func parseDays(raw string) int {

@@ -46,6 +46,9 @@ type Recommendation struct {
 	UserProgramID     *string `json:"user_program_id"`
 	RelevanceScore    int     `json:"relevance_score"`
 	Reason            string  `json:"reason"`
+	ReasonSummary     string  `json:"reason_summary,omitempty"`
+	ExpectedImpact    string  `json:"expected_impact,omitempty"`
+	PlacementWhy      string  `json:"placement_why,omitempty"`
 	InsertionType     *string `json:"insertion_type"`
 	SuggestedPosition *string `json:"suggested_position"`
 	Status            string  `json:"status"`
@@ -190,6 +193,7 @@ type RecommendationQuality struct {
 
 type RecommendationTuneProfile struct {
 	ProgramID     string  `json:"program_id"`
+	ProgramName   string  `json:"program_name"`
 	IsUserProgram bool    `json:"is_user_program"`
 	SampleSize    int     `json:"sample_size"`
 	ApprovalRate  float64 `json:"approval_rate"`
@@ -217,6 +221,23 @@ WHERE api_key=$1 OR api_key_previous=$1`, apiKey)
 		return nil, err
 	}
 	return &s, nil
+}
+
+func (d *DB) GetSiteByID(ctx context.Context, siteID string) (*Site, error) {
+	row := d.Pool.QueryRow(ctx, `SELECT id, api_key, domain, COALESCE(name,'') FROM sites WHERE id=$1`, siteID)
+	var s Site
+	if err := row.Scan(&s.ID, &s.APIKey, &s.Domain, &s.Name); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+func (d *DB) DeleteSiteByID(ctx context.Context, siteID string) (bool, error) {
+	res, err := d.Pool.Exec(ctx, `DELETE FROM sites WHERE id=$1`, siteID)
+	if err != nil {
+		return false, err
+	}
+	return res.RowsAffected() > 0, nil
 }
 
 func (d *DB) CreateSite(ctx context.Context, apiKey, domain, name string) (string, error) {
@@ -886,6 +907,7 @@ func (d *DB) ListRecommendationTuneProfiles(ctx context.Context, siteID string, 
 WITH base AS (
     SELECT
         COALESCE(r.user_program_id::text, r.program_id::text) AS program_id,
+        COALESCE(up.name, ap.name, 'Unknown program') AS program_name,
         CASE WHEN r.user_program_id IS NOT NULL THEN TRUE ELSE FALSE END AS is_user_program,
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE r.status='approved')::int AS approved,
@@ -893,15 +915,18 @@ WITH base AS (
         COUNT(c.id)::int AS clicks
     FROM recommendations r
     JOIN articles a ON a.id = r.article_id
+    LEFT JOIN affiliate_programs ap ON ap.id = r.program_id
+    LEFT JOIN user_programs up ON up.id = r.user_program_id
     LEFT JOIN clicks c ON c.recommendation_id = r.id
     WHERE a.site_id=$1
       AND r.created_at >= NOW() - ($2 * INTERVAL '1 day')
       AND COALESCE(r.user_program_id::text, r.program_id::text) IS NOT NULL
-    GROUP BY 1,2
+    GROUP BY 1,2,3
 ),
 rated AS (
     SELECT
         program_id,
+        program_name,
         is_user_program,
         total,
         approved::float8 / GREATEST(total,1)::float8 AS approval_rate,
@@ -912,6 +937,7 @@ rated AS (
 )
 SELECT
     program_id,
+    program_name,
     is_user_program,
     total,
     approval_rate,
@@ -929,6 +955,7 @@ ORDER BY total DESC`, siteID, days)
 		var row RecommendationTuneProfile
 		if err := rows.Scan(
 			&row.ProgramID,
+			&row.ProgramName,
 			&row.IsUserProgram,
 			&row.SampleSize,
 			&row.ApprovalRate,

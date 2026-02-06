@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -228,6 +229,9 @@ VALUES ($1,$2,$3,$4,'test-agent','https://example.com','abc123')`, siteID, artic
 	if _, ok := tuningPayload["tuning"].([]interface{}); !ok {
 		t.Fatalf("expected tuning payload in response: %s", tuningRec.Body.String())
 	}
+	if _, ok := tuningPayload["insights"].(map[string]interface{}); !ok {
+		t.Fatalf("expected insights payload in recommendation tuning response: %s", tuningRec.Body.String())
+	}
 
 	exportJSONRec := httptest.NewRecorder()
 	exportJSONReq := httptest.NewRequest(http.MethodGet, "/track/export?days=7&format=json", nil)
@@ -257,5 +261,133 @@ VALUES ($1,$2,$3,$4,'test-agent','https://example.com','abc123')`, siteID, artic
 	}
 	if body := exportCSVRec.Body.String(); body == "" || !strings.HasPrefix(body, "section") {
 		t.Fatalf("expected csv body, got: %s", body)
+	}
+}
+
+func TestTrackClickDuplicateSuppression(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	articleID, err := db.UpsertArticle(context.Background(), siteID, 121, "Duplicate Guard Article", "https://example.com/dup", "hash")
+	if err != nil {
+		t.Fatalf("create article: %v", err)
+	}
+	programID := insertProgram(t, db, "Duplicate Guard Program", "Example", "duplicate-guard-program")
+	if err := db.CreateRecommendation(context.Background(), articleID, &programID, nil, 70, "Fit.", "inline_mention", "mid_article"); err != nil {
+		t.Fatalf("create recommendation: %v", err)
+	}
+	recID := lookupRecommendationID(t, db, articleID)
+
+	handler := &TrackingHandler{
+		DB:              db,
+		ClickRateLimit:  100,
+		DuplicateWindow: time.Minute,
+	}
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.POST("/track/click", func(c *gin.Context) {
+		setSiteID(c, siteID)
+		handler.TrackClick(c)
+	})
+
+	payload := map[string]interface{}{
+		"article_id":        articleID,
+		"recommendation_id": recID,
+		"program_id":        programID,
+	}
+	firstRec := httptest.NewRecorder()
+	firstReq := httptest.NewRequest(http.MethodPost, "/track/click", newJSONRequest(t, http.MethodPost, "/track/click", payload))
+	firstReq.RemoteAddr = "203.0.113.10:43121"
+	r.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", firstRec.Code)
+	}
+
+	secondRec := httptest.NewRecorder()
+	secondReq := httptest.NewRequest(http.MethodPost, "/track/click", newJSONRequest(t, http.MethodPost, "/track/click", payload))
+	secondReq.RemoteAddr = "203.0.113.10:43122"
+	r.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 duplicate suppression, got %d", secondRec.Code)
+	}
+	var secondPayload map[string]interface{}
+	if err := json.Unmarshal(secondRec.Body.Bytes(), &secondPayload); err != nil {
+		t.Fatalf("invalid JSON response: %v", err)
+	}
+	if secondPayload["status"] != "duplicate_suppressed" {
+		t.Fatalf("expected duplicate_suppressed status, got: %v", secondPayload["status"])
+	}
+
+	var count int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks WHERE site_id=$1 AND recommendation_id=$2`, siteID, recID).Scan(&count); err != nil {
+		t.Fatalf("count clicks: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 persisted click after duplicate suppression, got %d", count)
+	}
+}
+
+func TestTrackClickRateLimit(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
+	if err != nil {
+		t.Fatalf("create site: %v", err)
+	}
+	articleID, err := db.UpsertArticle(context.Background(), siteID, 122, "Rate Guard Article", "https://example.com/rate", "hash")
+	if err != nil {
+		t.Fatalf("create article: %v", err)
+	}
+	programID := insertProgram(t, db, "Rate Guard Program", "Example", "rate-guard-program")
+	if err := db.CreateRecommendation(context.Background(), articleID, &programID, nil, 72, "Fit.", "inline_mention", "mid_article"); err != nil {
+		t.Fatalf("create recommendation: %v", err)
+	}
+	recID := lookupRecommendationID(t, db, articleID)
+
+	handler := &TrackingHandler{
+		DB:              db,
+		ClickRateLimit:  1,
+		ClickRateWindow: time.Hour,
+		DuplicateWindow: time.Nanosecond, // disables duplicate suppression for this test
+	}
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.POST("/track/click", func(c *gin.Context) {
+		setSiteID(c, siteID)
+		handler.TrackClick(c)
+	})
+
+	payload := map[string]interface{}{
+		"article_id":        articleID,
+		"recommendation_id": recID,
+		"program_id":        programID,
+	}
+	firstRec := httptest.NewRecorder()
+	firstReq := httptest.NewRequest(http.MethodPost, "/track/click", newJSONRequest(t, http.MethodPost, "/track/click", payload))
+	firstReq.RemoteAddr = "198.51.100.44:50001"
+	r.ServeHTTP(firstRec, firstReq)
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", firstRec.Code)
+	}
+
+	secondRec := httptest.NewRecorder()
+	secondReq := httptest.NewRequest(http.MethodPost, "/track/click", newJSONRequest(t, http.MethodPost, "/track/click", payload))
+	secondReq.RemoteAddr = "198.51.100.44:50002"
+	r.ServeHTTP(secondRec, secondReq)
+	if secondRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 after rate limit, got %d", secondRec.Code)
+	}
+
+	var count int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks WHERE site_id=$1`, siteID).Scan(&count); err != nil {
+		t.Fatalf("count clicks: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 persisted click after rate-limit reject, got %d", count)
 	}
 }

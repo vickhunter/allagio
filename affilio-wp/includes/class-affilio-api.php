@@ -54,8 +54,8 @@ class Affilio_API {
 
         $status = array(
             'state' => 'missing_key',
-            'label' => 'Missing API Key',
-            'message' => 'Enter your Affilio API key to connect this site.',
+            'label' => $this->t('Missing API Key', 'Chiave API mancante'),
+            'message' => $this->t('Enter your Affilio API key to connect this site.', 'Inserisci la chiave API di Affilio per collegare questo sito.'),
             'connected' => false,
             'checked_at' => gmdate('c'),
             'http_code' => 0,
@@ -69,8 +69,8 @@ class Affilio_API {
         $health = wp_remote_get(trailingslashit($this->base_url) . 'health', array('timeout' => 8));
         if (is_wp_error($health)) {
             $status['state'] = 'network_error';
-            $status['label'] = 'Connection Error';
-            $status['message'] = 'Cannot reach Affilio API. Check network or API URL.';
+            $status['label'] = $this->t('Connection Error', 'Errore di connessione');
+            $status['message'] = $this->t('Cannot reach Affilio API. Check network or API URL.', 'Impossibile raggiungere l\'API di Affilio. Controlla rete o URL API.');
             set_transient($this->status_cache_key, $status, 60);
             return $status;
         }
@@ -78,8 +78,8 @@ class Affilio_API {
         $probe = $this->request('GET', '/articles');
         if (is_wp_error($probe)) {
             $status['state'] = 'network_error';
-            $status['label'] = 'Connection Error';
-            $status['message'] = 'Cannot reach Affilio API. Check network or API URL.';
+            $status['label'] = $this->t('Connection Error', 'Errore di connessione');
+            $status['message'] = $this->t('Cannot reach Affilio API. Check network or API URL.', 'Impossibile raggiungere l\'API di Affilio. Controlla rete o URL API.');
             set_transient($this->status_cache_key, $status, 60);
             return $status;
         }
@@ -88,27 +88,35 @@ class Affilio_API {
         $status['http_code'] = $code;
         if ($code >= 200 && $code < 300) {
             $status['state'] = 'connected';
-            $status['label'] = 'Connected';
-            $status['message'] = 'Affilio is connected and ready.';
+            $status['label'] = $this->t('Connected', 'Connesso');
+            $status['message'] = $this->t('Affilio is connected and ready.', 'Affilio è connesso e pronto.');
             $status['connected'] = true;
         } elseif ($code === 401 || $code === 403) {
             $status['state'] = 'invalid_key';
-            $status['label'] = 'Invalid API Key';
-            $status['message'] = 'API key rejected. Check or regenerate your key.';
+            $status['label'] = $this->t('Invalid API Key', 'Chiave API non valida');
+            $status['message'] = $this->t('API key rejected. Check or regenerate your key.', 'Chiave API rifiutata. Controllala o rigenerala.');
         } elseif ($code === 404) {
             $status['state'] = 'wrong_api_url';
-            $status['label'] = 'Invalid API URL';
-            $status['message'] = 'API URL does not match a valid Affilio backend.';
+            $status['label'] = $this->t('Invalid API URL', 'URL API non valido');
+            $status['message'] = $this->t('API URL does not match a valid Affilio backend.', 'L\'URL API non corrisponde a un backend Affilio valido.');
         } elseif ($code >= 500) {
             $status['state'] = 'api_error';
-            $status['label'] = 'API Error';
-            $status['message'] = 'Affilio API returned a server error.';
+            $status['label'] = $this->t('API Error', 'Errore API');
+            $status['message'] = $this->t('Affilio API returned a server error.', 'L\'API di Affilio ha restituito un errore server.');
         } else {
             $status['state'] = 'unknown_error';
-            $status['label'] = 'Connection Failed';
-            $status['message'] = 'Unexpected API response while validating credentials.';
+            $status['label'] = $this->t('Connection Failed', 'Connessione non riuscita');
+            $status['message'] = $this->t('Unexpected API response while validating credentials.', 'Risposta API inattesa durante la validazione delle credenziali.');
         }
         set_transient($this->status_cache_key, $status, 60);
         return $status;
+    }
+
+    private function t($en, $it) {
+        $locale = function_exists('get_user_locale') ? get_user_locale() : get_locale();
+        if (strpos(strtolower((string) $locale), 'it') === 0) {
+            return $it;
+        }
+        return $en;
     }
 }

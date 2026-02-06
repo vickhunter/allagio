@@ -22,20 +22,23 @@ class Affilio_Admin {
             array($this, 'render_dashboard'),
             'dashicons-analytics'
         );
-        add_submenu_page('affilio', 'Settings', 'Settings', 'manage_options', 'affilio-settings', array($this, 'render_settings'));
+        add_submenu_page('affilio', $this->t('Settings', 'Impostazioni'), $this->t('Settings', 'Impostazioni'), 'manage_options', 'affilio-settings', array($this, 'render_settings'));
         if ($this->is_advanced_mode()) {
-            add_submenu_page('affilio', 'Discovery Queue', 'Discovery Queue', 'manage_options', 'affilio-discovery', array($this, 'render_discovery'));
+            add_submenu_page('affilio', $this->t('Discovery Queue', 'Coda Discovery'), $this->t('Discovery Queue', 'Coda Discovery'), 'manage_options', 'affilio-discovery', array($this, 'render_discovery'));
         }
     }
 
     public function enqueue_sidebar_assets() {
+        if (!current_user_can('edit_posts')) {
+            return;
+        }
         wp_enqueue_script('affilio-sidebar', AFFILIO_PLUGIN_URL . 'admin/build/sidebar.js', array('wp-plugins', 'wp-edit-post', 'wp-element', 'wp-data'), AFFILIO_VERSION, true);
         wp_localize_script('affilio-sidebar', 'AffilioData', array(
-            'apiUrl' => Affilio_API::resolve_base_url(),
-            'apiKey' => get_option('affilio_api_key', ''),
+            'restBase' => rest_url('affilio/v1'),
             'nonce'  => wp_create_nonce('wp_rest'),
             'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
             'connectionStatus' => $this->api->get_connection_status(),
+            'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
         ));
     }
 
@@ -53,6 +56,7 @@ class Affilio_Admin {
                 'adminKey' => get_option('affilio_admin_api_key', ''),
                 'actor' => wp_get_current_user()->user_login,
                 'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
+                'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
             ));
         } else {
             wp_enqueue_script('affilio-dashboard', AFFILIO_PLUGIN_URL . 'admin/build/dashboard.js', array(), AFFILIO_VERSION, true);
@@ -62,6 +66,7 @@ class Affilio_Admin {
                 'nonce'  => wp_create_nonce('wp_rest'),
                 'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
                 'connectionStatus' => $this->api->get_connection_status(),
+                'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
             ));
         }
         wp_enqueue_style('affilio-admin', AFFILIO_PLUGIN_URL . 'admin/css/affilio-admin.css', array(), AFFILIO_VERSION);
@@ -74,18 +79,18 @@ class Affilio_Admin {
         if (!$status['connected']) {
             echo '<div class="affilio-panel affilio-panel-warning">';
             echo '<h2>Affilio Dashboard</h2>';
-            echo '<p><strong>Not connected.</strong> ' . esc_html($status['message']) . '</p>';
-            echo '<p><a class="button button-primary" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">Open settings</a></p>';
+            echo '<p><strong>' . esc_html($this->t('Not connected.', 'Non connesso.')) . '</strong> ' . esc_html($status['message']) . '</p>';
+            echo '<p><a class="button button-primary" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a></p>';
             echo '</div>';
             echo '</div>';
             return;
         }
         echo '<div class="affilio-panel affilio-panel-actions">';
-        echo '<h2>Scan</h2>';
-        echo '<p>Run a full scan to refresh article scores and recommendations.</p>';
+        echo '<h2>' . esc_html($this->t('Scan', 'Scansione')) . '</h2>';
+        echo '<p>' . esc_html($this->t('Run a full scan to refresh article scores and recommendations.', 'Esegui una scansione completa per aggiornare punteggi e raccomandazioni.')) . '</p>';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         echo '<input type="hidden" name="action" value="affilio_scan_all">';
-        submit_button('Scan All Posts');
+        submit_button($this->t('Scan All Posts', 'Scansiona tutti gli articoli'));
         echo '</form>';
         echo '</div>';
         echo '</div>';
@@ -93,11 +98,11 @@ class Affilio_Admin {
 
     public function render_discovery() {
         if (!$this->is_advanced_mode()) {
-            echo '<div class="wrap"><h1>Program Discovery Queue</h1><p>Discovery tools are available only in advanced mode.</p></div>';
+            echo '<div class="wrap"><h1>' . esc_html($this->t('Program Discovery Queue', 'Coda Discovery Programmi')) . '</h1><p>' . esc_html($this->t('Discovery tools are available only in advanced mode.', 'Gli strumenti discovery sono disponibili solo in modalità avanzata.')) . '</p></div>';
             return;
         }
         if (trim((string) get_option('affilio_admin_api_key', '')) === '') {
-            echo '<div class="wrap"><h1>Program Discovery Queue</h1><p>Add an Admin API Key in advanced settings to use this page.</p></div>';
+            echo '<div class="wrap"><h1>' . esc_html($this->t('Program Discovery Queue', 'Coda Discovery Programmi')) . '</h1><p>' . esc_html($this->t('Add an Admin API Key in advanced settings to use this page.', 'Aggiungi una chiave API Admin nelle impostazioni avanzate per usare questa pagina.')) . '</p></div>';
             return;
         }
         echo '<div id="affilio-discovery-root"></div>';
@@ -113,7 +118,7 @@ class Affilio_Admin {
             }
             $this->api->invalidate_status_cache();
             $this->api->get_connection_status(true);
-            echo '<div class="updated"><p>Settings saved.</p></div>';
+            echo '<div class="updated"><p>' . esc_html($this->t('Settings saved.', 'Impostazioni salvate.')) . '</p></div>';
         }
 
         $api_key = esc_attr(get_option('affilio_api_key', ''));
@@ -122,37 +127,37 @@ class Affilio_Admin {
         $override_api_url = esc_attr(get_option('affilio_api_url_override', ''));
         $admin_key = esc_attr(get_option('affilio_admin_api_key', ''));
 
-        echo '<div class="wrap affilio-admin-page"><h1>Affilio Settings</h1>';
+        echo '<div class="wrap affilio-admin-page"><h1>' . esc_html($this->t('Affilio Settings', 'Impostazioni Affilio')) . '</h1>';
         echo '<div class="affilio-status-row">';
         echo '<span class="affilio-status-pill affilio-status-' . esc_attr($status['state']) . '">' . esc_html($status['label']) . '</span>';
         echo '<span class="affilio-status-message">' . esc_html($status['message']) . '</span>';
         echo '</div>';
-        echo '<p class="affilio-cta-row"><a class="button button-primary" target="_blank" rel="noopener noreferrer" href="https://app.affilio.io/signup">Create Affilio account</a> ';
-        echo '<a class="button button-secondary" target="_blank" rel="noopener noreferrer" href="https://app.affilio.io">Open Affilio app</a></p>';
+        echo '<p class="affilio-cta-row"><a class="button button-primary" target="_blank" rel="noopener noreferrer" href="https://app.affilio.io/signup">' . esc_html($this->t('Create Affilio account', 'Crea account Affilio')) . '</a> ';
+        echo '<a class="button button-secondary" target="_blank" rel="noopener noreferrer" href="https://app.affilio.io">' . esc_html($this->t('Open Affilio app', 'Apri app Affilio')) . '</a></p>';
 
         if ($status['state'] === 'missing_key') {
-            echo '<div class="affilio-panel affilio-panel-info"><p>Onboarding: create your account, generate an API key in the Affilio app, paste it below, then click Save Settings.</p></div>';
+            echo '<div class="affilio-panel affilio-panel-info"><p>' . esc_html($this->t('Onboarding: create your account, generate an API key in the Affilio app, paste it below, then click Save Settings.', 'Onboarding: crea il tuo account, genera una chiave API nell\'app Affilio, incollala qui sotto e clicca Salva impostazioni.')) . '</p></div>';
         }
 
         echo '<form class="affilio-settings-form" method="post">';
         wp_nonce_field('affilio_settings');
         echo '<table class="form-table">';
-        echo '<tr><th>API Key</th><td><input name="affilio_api_key" value="' . $api_key . '" class="regular-text" autocomplete="off" spellcheck="false" />';
-        echo '<p class="description">Required. Used to connect this WordPress site to your Affilio workspace.</p></td></tr>';
+        echo '<tr><th>' . esc_html($this->t('API Key', 'Chiave API')) . '</th><td><input name="affilio_api_key" value="' . $api_key . '" class="regular-text" autocomplete="off" spellcheck="false" />';
+        echo '<p class="description">' . esc_html($this->t('Required. Used to connect this WordPress site to your Affilio workspace.', 'Obbligatoria. Serve per collegare questo sito WordPress al tuo workspace Affilio.')) . '</p></td></tr>';
         echo '</table>';
 
         if ($this->is_advanced_mode()) {
-            echo '<h2>Advanced</h2>';
+            echo '<h2>' . esc_html($this->t('Advanced', 'Avanzate')) . '</h2>';
             echo '<table class="form-table">';
-            echo '<tr><th>Default API URL</th><td><code>' . esc_html($default_api_url) . '</code></td></tr>';
-            echo '<tr><th>API URL Override</th><td><input name="affilio_api_url_override" value="' . $override_api_url . '" class="regular-text" />';
-            echo '<p class="description">Optional. For development/self-hosted backends only.</p></td></tr>';
-            echo '<tr><th>Admin API Key</th><td><input name="affilio_admin_api_key" value="' . $admin_key . '" class="regular-text" autocomplete="off" />';
-            echo '<p class="description">Advanced only. For internal discovery/admin endpoints, not normal customer setup.</p></td></tr>';
+            echo '<tr><th>' . esc_html($this->t('Default API URL', 'URL API predefinito')) . '</th><td><code>' . esc_html($default_api_url) . '</code></td></tr>';
+            echo '<tr><th>' . esc_html($this->t('API URL Override', 'Override URL API')) . '</th><td><input name="affilio_api_url_override" value="' . $override_api_url . '" class="regular-text" />';
+            echo '<p class="description">' . esc_html($this->t('Optional. For development/self-hosted backends only.', 'Opzionale. Solo per sviluppo/backend self-hosted.')) . '</p></td></tr>';
+            echo '<tr><th>' . esc_html($this->t('Admin API Key', 'Chiave API Admin')) . '</th><td><input name="affilio_admin_api_key" value="' . $admin_key . '" class="regular-text" autocomplete="off" />';
+            echo '<p class="description">' . esc_html($this->t('Advanced only. For internal discovery/admin endpoints, not normal customer setup.', 'Solo avanzato. Per endpoint interni discovery/admin, non per setup clienti standard.')) . '</p></td></tr>';
             echo '</table>';
         }
 
-        submit_button('Save Settings');
+        submit_button($this->t('Save Settings', 'Salva impostazioni'));
         echo '</form></div>';
     }
 
@@ -177,12 +182,12 @@ class Affilio_Admin {
             return;
         }
         echo '<div class="notice notice-warning"><p><strong>Affilio:</strong> ' . esc_html($status['message']) . ' ';
-        echo '<a href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">Open settings</a>.</p></div>';
+        echo '<a href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a>.</p></div>';
     }
 
     public function handle_scan_all() {
         if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
+            wp_die(esc_html($this->t('Unauthorized', 'Non autorizzato')));
         }
         $status = $this->api->get_connection_status();
         if (!$status['connected']) {
@@ -197,5 +202,13 @@ class Affilio_Admin {
     private function is_advanced_mode() {
         $enabled = (defined('AFFILIO_ADVANCED_MODE') && AFFILIO_ADVANCED_MODE) || (defined('WP_DEBUG') && WP_DEBUG);
         return (bool) apply_filters('affilio_advanced_mode', $enabled);
+    }
+
+    private function t($en, $it) {
+        $locale = function_exists('get_user_locale') ? get_user_locale() : get_locale();
+        if (strpos(strtolower((string) $locale), 'it') === 0) {
+            return $it;
+        }
+        return $en;
     }
 }

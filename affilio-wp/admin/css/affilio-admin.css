@@ -117,6 +117,216 @@
   padding-top: 10px;
 }
 
+.affilio-rec-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.affilio-rec-item {
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  padding: 10px;
+  background: #fff;
+}
+
+.affilio-rec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.affilio-rec-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.affilio-rec-status-pending {
+  background: #f0f6fc;
+  color: #0a4b78;
+  border: 1px solid #72aee6;
+}
+
+.affilio-rec-status-approved {
+  background: #edfaef;
+  color: #1e6f31;
+  border: 1px solid #4ab866;
+}
+
+.affilio-rec-status-dismissed {
+  background: #f6f7f7;
+  color: #50575e;
+  border: 1px solid #dcdcde;
+}
+
+.affilio-rec-status-inserted {
+  background: #edfaef;
+  color: #1e6f31;
+  border: 1px solid #4ab866;
+}
+
+.affilio-rec-reason {
+  margin: 8px 0;
+  color: #3c434a;
+}
+
+.affilio-rec-meta {
+  margin: 6px 0;
+  font-size: 12px;
+  color: #50575e;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.affilio-impact-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.affilio-impact-high {
+  background: #edfaef;
+  color: #1e6f31;
+  border-color: #4ab866;
+}
+
+.affilio-impact-medium {
+  background: #fff8e5;
+  color: #8a5700;
+  border-color: #dba617;
+}
+
+.affilio-impact-low {
+  background: #f6f7f7;
+  color: #50575e;
+  border-color: #dcdcde;
+}
+
+.affilio-rec-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.affilio-rec-preview {
+  margin-top: 10px;
+}
+
+.affilio-plan-card {
+  border: 1px dashed #72aee6;
+  border-radius: 6px;
+  padding: 10px;
+  background: #f6fbff;
+}
+
+.affilio-plan-meta {
+  font-size: 12px;
+  color: #3c434a;
+  margin-bottom: 6px;
+}
+
+.affilio-position-select {
+  margin-left: 8px;
+  min-width: 170px;
+}
+
+.affilio-plan-label {
+  display: block;
+  font-size: 12px;
+  color: #50575e;
+  margin: 8px 0 4px;
+}
+
+.affilio-plan-editor {
+  width: 100%;
+  min-height: 74px;
+  resize: vertical;
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.affilio-plan-preview-html {
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  background: #fff;
+  padding: 10px;
+  margin: 8px 0;
+}
+
+.affilio-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.affilio-rec-done {
+  margin: 0;
+  font-weight: 600;
+  color: #1e6f31;
+}
+
+.affilio-opportunity-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.affilio-opportunity-card {
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  padding: 10px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+}
+
+.affilio-opportunity-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.affilio-opportunity-score {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid #72aee6;
+  color: #0a4b78;
+  background: #f0f6fc;
+}
+
+.affilio-opportunity-sub {
+  color: #1d2327;
+  font-size: 13px;
+}
+
+.affilio-opportunity-meta {
+  color: #50575e;
+  font-size: 12px;
+}
+
 .affilio-num {
   font-weight: 700;
 }
@@ -173,6 +383,11 @@
   margin: 0 0 12px;
 }
 
+.affilio-muted {
+  color: #50575e;
+  font-size: 12px;
+}
+
 .affilio-trend-box {
   border: 1px solid #dcdcde;
   border-radius: 6px;
@@ -224,6 +439,44 @@
   margin-bottom: 12px;
 }
 
+.affilio-insight-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.affilio-insight-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.affilio-insight-list li {
+  margin: 0 0 8px;
+}
+
+.affilio-insight-reason {
+  font-size: 12px;
+  color: #50575e;
+  margin-top: 2px;
+}
+
+.affilio-insight-notes {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #dcdcde;
+  background: #f6f7f7;
+}
+
+.affilio-insight-notes h5 {
+  margin: 0 0 6px;
+}
+
+.affilio-insight-notes ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
 .affilio-split-grid {
   display: grid;
   gap: 16px;
@@ -262,6 +515,11 @@
 
 #affilio-articles-table tr[data-article-id]:hover {
   background: #f6f7f7;
+}
+
+#affilio-articles-table tr.affilio-row-focus {
+  background: #e8f4ff;
+  transition: background-color 0.3s ease;
 }
 
 @media (max-width: 960px) {

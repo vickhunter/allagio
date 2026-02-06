@@ -29,6 +29,7 @@ Run migrations in this exact order:
 3. `internal/migrations/003_add_user_program_id.sql`
 4. `internal/migrations/004_discovery_reviews.sql`
 5. `internal/migrations/005_api_key_rotation.sql`
+6. `internal/migrations/006_recommendation_status_guardrails.sql`
 
 Notes:
 - `002_seed_programs.sql` uses upsert semantics on `slug`.
@@ -45,7 +46,7 @@ Notes:
 ## Runtime Hardening
 - Restrict inbound access to:
   - Public API routes via `X-API-Key`.
-  - Admin routes via `X-Admin-Key` only (`/v1/program-discovery/*`).
+  - Admin routes via `X-Admin-Key` only (`/v1/program-discovery/*`, `DELETE /v1/sites`).
 - Rotate site API keys periodically:
   - `POST /v1/program-discovery/sites/rotate-key`
 - Store `ADMIN_API_KEY` outside source control.

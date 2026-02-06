@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
@@ -33,7 +34,11 @@ func main() {
 
 	v1 := r.Group("/v1")
 
-	sites := &handlers.SitesHandler{DB: db}
+	sites := &handlers.SitesHandler{
+		DB:              db,
+		AdminAPIKey:     cfg.AdminAPIKey,
+		RegisterLimiter: handlers.NewIPRateLimiter(8, time.Minute),
+	}
 	siteKeys := &handlers.SiteKeysHandler{DB: db}
 	classifier := &services.AIClassifier{
 		APIKey:     cfg.ClaudeAPIKey,

@@ -24,6 +24,9 @@ func (h *RecommendationsHandler) List(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load recommendations"})
 		return
 	}
+	for i := range recs {
+		annotateRecommendation(&recs[i])
+	}
 	c.JSON(http.StatusOK, gin.H{"recommendations": recs})
 }
 
@@ -34,6 +37,7 @@ func (h *RecommendationsHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+	annotateRecommendation(rec)
 	c.JSON(http.StatusOK, gin.H{"recommendation": rec})
 }
 
@@ -62,4 +66,65 @@ func (h *RecommendationsHandler) Patch(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "updated"})
+}
+
+func annotateRecommendation(rec *database.Recommendation) {
+	if rec == nil {
+		return
+	}
+	reason := strings.TrimSpace(rec.Reason)
+	if reason == "" {
+		reason = "Recommended for topical relevance."
+	}
+	rec.ReasonSummary = clampSentence(reason, 140)
+	rec.ExpectedImpact = expectedImpactLabel(rec.RelevanceScore, rec.ProgramType)
+	rec.PlacementWhy = placementWhy(rec.SuggestedPosition, rec.RelevanceScore, rec.ProgramType)
+}
+
+func clampSentence(input string, maxChars int) string {
+	text := strings.TrimSpace(input)
+	if len(text) <= maxChars {
+		return text
+	}
+	cut := strings.TrimSpace(text[:maxChars])
+	lastSpace := strings.LastIndex(cut, " ")
+	if lastSpace > 30 {
+		cut = strings.TrimSpace(cut[:lastSpace])
+	}
+	return cut + "..."
+}
+
+func expectedImpactLabel(score int, programType string) string {
+	effective := score
+	if strings.TrimSpace(strings.ToLower(programType)) == "user" {
+		effective += 5
+	}
+	switch {
+	case effective >= 75:
+		return "high"
+	case effective >= 45:
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
+func placementWhy(position *string, score int, programType string) string {
+	p := ""
+	if position != nil {
+		p = strings.TrimSpace(strings.ToLower(*position))
+	}
+	switch p {
+	case "after_intro":
+		return "Placed early to capture top-of-article attention."
+	case "before_conclusion":
+		return "Placed near decision points before the final takeaway."
+	case "end_of_article":
+		return "Placed at the end to reduce disruption."
+	default:
+		if expectedImpactLabel(score, programType) == "high" {
+			return "Placed mid-article near high-intent context for better click likelihood."
+		}
+		return "Placed mid-article near relevant explanatory context."
+	}
 }

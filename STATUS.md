@@ -35,6 +35,7 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 - **Recommendations**:
   - `user_program_id` or `program_id` populated.
   - Reasons provided by matcher.
+  - Explainable recommendation annotations in API (`reason_summary`, `expected_impact`, `placement_why`) for clearer operator decisions.
   - Max 5 per article, sorted by relevance.
   - Dedupe logic prioritizes user programs over curated duplicates.
   - Lightweight semantic token overlap for better matches.
@@ -51,6 +52,9 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
   - Promote flow to create curated programs from queue entries.
 - **API key rotation**:
   - Admin-only endpoint to rotate site keys with audit trail and previous-key fallback auth.
+- **Site lifecycle hardening**:
+  - `POST /v1/sites/register` now validates domain input and applies per-IP rate limiting.
+  - `DELETE /v1/sites` no longer accepts destructive deletes by `X-API-Key`; it requires `X-Admin-Key` plus explicit `site_id` and confirmation.
 - **Tracking analytics**:
   - Endpoints for click counts by article and recommendation (`/track/articles`, `/track/recommendations`).
   - Optional `days` query param for time-range analytics.
@@ -63,6 +67,8 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
   - Recommendation quality endpoint with accept/dismiss/insert outcome rates (`/track/recommendation-quality`).
   - Retention/churn cohorts by article cohort week (`/track/retention`).
   - Recommendation tuning profiles endpoint (`/track/recommendation-tuning`).
+  - Learning-insights payload for tuning (`insights` with boosted/penalized/neutral counts, high-confidence profiles, top movers, and notes).
+  - Click anti-abuse controls on `/track/click`: per-IP short-window rate limiting and duplicate-click suppression heuristics.
   - Closed-loop recommendation tuning in scan flow using outcome-based multipliers.
 - **Tests**:
   - Unit tests for services (Claude classifier + generator + matcher dedupe).
@@ -95,6 +101,7 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
   - “My Affiliate Links” list + manual add form.
 - **Editor Sidebar**:
   - Connection-aware sidebar state with settings CTA when not connected.
+  - Sidebar no longer sends/stores raw backend API key in browser calls; editor actions use nonce-protected WP REST proxy routes.
   - Analyze button; shows score + potential.
   - Shows detected affiliate link count.
   - Shows recommendations with “Approve & Insert.”
@@ -180,6 +187,15 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 - 2026-02-06: Set plugin production API default to Railway backend (`AFFILIO_API_URL`) and improved Gutenberg sidebar UX (clearer sections, connection CTA, insert confirmation feedback).
 - 2026-02-06: Refined dashboard analytics UX with class-based cards/sections/filters, responsive split panels, and reduced inline styling for easier maintenance.
 - 2026-02-06: Fixed plugin connection status freshness after saving API key (reads latest option value on each check/request) and added backend CORS middleware with `ALLOWED_ORIGINS` enforcement + preflight support for browser requests.
+- 2026-02-06: Added recommendation insert preview flow (generated copy + planned placement + rationale), structured generation response fields, smarter insertion placement handling in WP route, and per-post capability enforcement for insert endpoint.
+- 2026-02-06: Added human-in-the-loop insertion controls (editable generated text, position selector, regenerate action, and live preview/context updates before insert) with backend `link_url` support in generation response.
+- 2026-02-06: Added opportunity-first dashboard UX v1 (“Quick Wins” cards ranked by score + actionable recommendations), resilient data loading for dashboard essentials, and one-click jump-to-article review flow.
+- 2026-02-06: Added localized UX copy defaults (Italian/English) for connection states, settings onboarding, dashboard core actions, recommendation preview flow, and Gutenberg sidebar labels/messages.
+- 2026-02-06: Hardened site lifecycle endpoints with register domain validation + rate limiting and admin-key-only site deletion by `site_id` confirmation.
+- 2026-02-06: Added explainable recommendation UX data (`reason_summary`, `expected_impact`, `placement_why`) and surfaced it in the WP dashboard recommendation cards.
+- 2026-02-06: Added recommendation tuning learning-insights UX in analytics (top boosted/penalized programs, confidence counters, and operator-facing notes) plus program-name enriched tuning profiles.
+- 2026-02-06: Added click anti-abuse protection for tracking (basic per-IP rate limiting + duplicate suppression window) with handler tests.
+- 2026-02-06: Reduced API key exposure in Gutenberg editor/sidebar by replacing direct backend key calls with WP nonce + server-side proxy routes (`/affilio/v1/editor/*`) and capability checks.
 
 ## Next Suggested Tasks
 1. Complete security launch blockers listed in `MVP_CHECKLIST.md` (`P0` items first).

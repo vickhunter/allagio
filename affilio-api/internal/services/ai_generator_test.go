@@ -43,6 +43,47 @@ func TestAIContentGenerator_GenerateSnippet_ParsesJSONBlurb(t *testing.T) {
 	}
 }
 
+func TestAIContentGenerator_GeneratePlan_ParsesPlacementFields(t *testing.T) {
+	t.Parallel()
+	respBody, _ := json.Marshal(map[string]interface{}{
+		"content": []map[string]string{{
+			"type": "text",
+			"text": "{\"blurb\":\"Ottimo per creator.\",\"suggested_position\":\"before_conclusion\",\"placement_reason\":\"High intent near final decision.\"}",
+		}},
+	})
+	gen := &AIContentGenerator{
+		APIKey: "test-key",
+		Model:  "test-model",
+		APIURL: "https://example.invalid/v1/messages",
+		Client: &http.Client{
+			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{"Content-Type": []string{"application/json"}},
+					Body:       io.NopCloser(strings.NewReader(string(respBody))),
+				}, nil
+			}),
+		},
+	}
+	plan, err := gen.GeneratePlan(context.Background(), ContentRequest{
+		ProgramName:  "Later",
+		Reason:       "Match Instagram workflows",
+		ArticleTitle: "Guida Instagram",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if plan == nil {
+		t.Fatalf("expected plan")
+	}
+	if plan.SuggestedPosition != "before_conclusion" {
+		t.Fatalf("unexpected position: %q", plan.SuggestedPosition)
+	}
+	if plan.PlacementReason == "" {
+		t.Fatalf("expected placement reason")
+	}
+}
+
 func TestAIContentGenerator_GenerateSnippet_FallbackWithoutKey(t *testing.T) {
 	t.Parallel()
 	gen := &AIContentGenerator{Model: "test-model"}

@@ -32,15 +32,24 @@ Last Updated: February 06, 2026
 - [x] [P4] Program discovery enrichment automation
 - [x] [P4] Browser-level E2E tests for WP flows
 - [x] [P0] Validate and restrict recommendation status transitions (`pending -> approved/dismissed -> inserted`)
-- [ ] [P0][Next] Harden site lifecycle endpoints (`/sites/register`, `/sites` delete) with proper auth/rate limiting and remove destructive delete by API key alone
+- [x] [P0] Harden site lifecycle endpoints (`/sites/register`, `/sites` delete) with proper auth/rate limiting and remove destructive delete by API key alone
+- [x] [P0][Now] Recommendation insert preview UX v1 (show generated copy + planned placement + rationale before insert)
+- [x] [P0] Structured insertion plan response v1 (`generated_text`, `suggested_position`, `placement_reason`)
+- [x] [P0] Smart insertion placement strategy v1 (after intro / mid article / before conclusion / end fallback)
+- [x] [P0] Language + tone alignment guidance in generation prompt v1 (match article language + tone with context excerpt)
+- [x] [P1] Inline edit/regenerate flow before insert v1 (human-in-the-loop copy control)
+- [x] [P1] Opportunity-first dashboard UX v1 (prioritized “Quick Wins” cards + one-click review jump)
+- [x] [P1] Explainable recommendations (clear reason + expected impact + placement why)
+- [x] [P1] Localized UX/copy defaults v1 for non-technical bloggers (IT/EN ready for connection/settings/sidebar/dashboard core flows)
+- [x] [P2] Learning insights UX (show what recommendation tuning learned and why)
 
 ## Security + Launch Blockers
 - [x] [P0] Validate and restrict recommendation status transitions (`pending -> approved/dismissed -> inserted`)
-- [ ] [P0] Harden site lifecycle endpoints (`/sites/register`, `/sites` delete) with proper auth/rate limiting and remove destructive delete by API key alone
-- [ ] [P0] Add CORS allowlist enforcement using `ALLOWED_ORIGINS` for browser-based plugin calls
-- [ ] [P0] Enforce per-post capability check in WP insert route (`current_user_can('edit_post', $post_id)`)
-- [ ] [P1] Add click anti-abuse controls (basic rate limit + duplicate suppression heuristics) for public tracking route
-- [ ] [P1] Reduce API key exposure in WP editor/sidebar (role gating or short-lived scoped token exchange)
+- [x] [P0] Harden site lifecycle endpoints (`/sites/register`, `/sites` delete) with proper auth/rate limiting and remove destructive delete by API key alone
+- [x] [P0] Add CORS allowlist enforcement using `ALLOWED_ORIGINS` for browser-based plugin calls
+- [x] [P0] Enforce per-post capability check in WP insert route (`current_user_can('edit_post', $post_id)`)
+- [x] [P1] Add click anti-abuse controls (basic rate limit + duplicate suppression heuristics) for public tracking route
+- [x] [P1] Reduce API key exposure in WP editor/sidebar (role gating or short-lived scoped token exchange)
 - [ ] [P1] Key security hardening: hash/encrypt stored API keys and add previous-key expiry window after rotation
 - [ ] [P1] Add audit logs + alerts for auth failures and admin-key endpoint usage
 

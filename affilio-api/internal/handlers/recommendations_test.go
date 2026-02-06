@@ -55,6 +55,18 @@ func TestRecommendationsListAndPatch(t *testing.T) {
 	if !ok || len(recs) == 0 {
 		t.Fatalf("expected recommendations in response: %s", rec.Body.String())
 	}
+	firstRec, ok := recs[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected recommendation object payload")
+	}
+	expectedImpact, _ := firstRec["expected_impact"].(string)
+	if strings.TrimSpace(expectedImpact) == "" {
+		t.Fatalf("expected expected_impact field in recommendation payload")
+	}
+	placementWhy, _ := firstRec["placement_why"].(string)
+	if strings.TrimSpace(placementWhy) == "" {
+		t.Fatalf("expected placement_why field in recommendation payload")
+	}
 
 	patchRec := httptest.NewRecorder()
 	patchReq := httptest.NewRequest(http.MethodPatch, "/recommendations/"+recID, newJSONRequest(t, http.MethodPatch, "/recommendations/"+recID, map[string]interface{}{
