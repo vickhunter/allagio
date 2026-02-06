@@ -16,6 +16,7 @@
         const [score, setScore] = useState(null);
         const [potential, setPotential] = useState(null);
         const [status, setStatus] = useState('');
+        const [insertStatus, setInsertStatus] = useState('');
         const [detections, setDetections] = useState([]);
         const [recs, setRecs] = useState([]);
 
@@ -43,6 +44,10 @@
                 setPotential(data.potential || 'low');
                 setDetections(data.detections || []);
                 setRecs(data.recommendations || []);
+                if ((data.recommendations || []).length === 0) {
+                    setStatus('Analyzed. No recommendations yet.');
+                    return;
+                }
                 setStatus('');
             } catch (e) {
                 setStatus('Failed to analyze');
@@ -73,33 +78,49 @@
                     recommendation_id: rec.id,
                 }),
             });
+            setInsertStatus('Recommendation inserted.');
         };
+
+        const sectionStyle = { border: '1px solid #dcdcde', borderRadius: '6px', background: '#fff', padding: '10px', marginTop: '10px' };
+        const muted = { color: '#50575e', margin: '4px 0 0' };
+        const heading = { margin: '0 0 6px' };
+        const scoreStyle = score === null ? {} : { color: scoreColor(score), fontWeight: 'bold' };
 
         return createElement(
             PluginSidebar,
             { name: 'affilio-sidebar', title: 'Affilio' },
             createElement('div', { style: { padding: '16px' } },
                 !connected
-                    ? createElement('div', { style: { border: '1px solid #dba617', background: '#fff8e5', padding: '8px', marginBottom: '12px' } },
+                    ? createElement('div', { style: { border: '1px solid #dba617', borderLeft: '4px solid #dba617', background: '#fff8e5', padding: '10px', marginBottom: '12px' } },
                         createElement('strong', null, 'Affilio not connected'),
-                        createElement('p', null, connectionStatus && connectionStatus.message ? connectionStatus.message : 'Configure API key in settings.'),
-                        createElement('a', { href: AffilioData.settingsUrl || '/wp-admin/admin.php?page=affilio-settings' }, 'Open settings')
+                        createElement('p', { style: muted }, connectionStatus && connectionStatus.message ? connectionStatus.message : 'Configure API key in settings.'),
+                        createElement('p', { style: { margin: '8px 0 0' } },
+                            createElement('a', { className: 'button button-secondary', href: AffilioData.settingsUrl || '/wp-admin/admin.php?page=affilio-settings' }, 'Open settings')
+                        )
                     )
                     : null,
-                createElement('h3', null, 'Monetization Score'),
-                score === null
-                    ? createElement('p', null, 'Not analyzed')
-                    : createElement('p', { style: { color: scoreColor(score), fontWeight: 'bold' } }, `Score: ${score}/100`),
-                createElement('p', null, potential ? `Potential: ${potential}` : ''),
-                createElement('button', { className: 'button button-primary', onClick: analyze, disabled: !connected }, 'Analyze'),
+                createElement('div', { style: sectionStyle },
+                    createElement('h3', { style: heading }, 'Monetization'),
+                    score === null
+                        ? createElement('p', { style: muted }, 'Not analyzed yet.')
+                        : createElement('p', { style: scoreStyle }, `Score: ${score}/100`),
+                    createElement('p', { style: muted }, potential ? `Potential: ${potential}` : 'Potential: n/a'),
+                    createElement('p', { style: { margin: '10px 0 0' } },
+                        createElement('button', { className: 'button button-primary', onClick: analyze, disabled: !connected }, 'Analyze')
+                    )
+                ),
                 status ? createElement('p', null, status) : null,
-                detections.length ? createElement('p', null, `Found ${detections.length} affiliate links`) : null,
-                recs.length ? createElement('div', null,
-                    recs.map(rec => createElement('div', { key: rec.id, style: { border: '1px solid #ddd', padding: '8px', marginTop: '8px' } },
+                detections.length ? createElement('p', { style: muted }, `Detected affiliate links: ${detections.length}`) : null,
+                insertStatus ? createElement('p', { style: { color: '#1e6f31', fontWeight: '600' } }, insertStatus) : null,
+                recs.length ? createElement('div', { style: sectionStyle },
+                    createElement('h3', { style: heading }, 'Recommendations'),
+                    recs.map(rec => createElement('div', { key: rec.id, style: { border: '1px solid #dcdcde', borderRadius: '4px', padding: '8px', marginTop: '8px' } },
                         createElement('strong', null, rec.program_name || rec.id),
-                        createElement('p', null, rec.reason || 'Recommendation'),
-                        createElement('small', null, rec.program_type ? `Type: ${rec.program_type}` : ''),
-                        createElement('button', { className: 'button', onClick: () => approveAndInsert(rec), disabled: !connected }, 'Approve & Insert')
+                        createElement('p', { style: muted }, rec.reason || 'Recommendation'),
+                        createElement('small', { style: { color: '#50575e' } }, rec.program_type ? `Type: ${rec.program_type}` : ''),
+                        createElement('p', { style: { margin: '8px 0 0' } },
+                            createElement('button', { className: 'button', onClick: () => approveAndInsert(rec), disabled: !connected }, 'Approve & Insert')
+                        )
                     ))
                 ) : null
             )

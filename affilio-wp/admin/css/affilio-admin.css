@@ -1,4 +1,293 @@
-#affilio-dashboard-root {
+.affilio-admin-page {
+  max-width: 1180px;
+}
+
+#affilio-dashboard-root.affilio-dashboard-app {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.affilio-panel {
   background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
   padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.affilio-panel h2,
+.affilio-panel h3 {
+  margin-top: 0;
+}
+
+.affilio-panel h4 {
+  margin: 0 0 8px;
+}
+
+.affilio-panel-actions .button {
+  margin-bottom: 0;
+}
+
+.affilio-panel-warning {
+  border-left: 4px solid #dba617;
+}
+
+.affilio-panel-info {
+  border-left: 4px solid #72aee6;
+}
+
+.affilio-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 8px 0 14px;
+}
+
+.affilio-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+
+.affilio-status-connected {
+  background: #edfaef;
+  border-color: #4ab866;
+  color: #1e6f31;
+}
+
+.affilio-status-missing_key,
+.affilio-status-invalid_key,
+.affilio-status-api_error {
+  background: #fff9e6;
+  border-color: #dba617;
+  color: #7a5b00;
+}
+
+.affilio-status-network_error {
+  background: #fef1f1;
+  border-color: #d63638;
+  color: #8a2424;
+}
+
+.affilio-status-message {
+  color: #3c434a;
+}
+
+.affilio-cta-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 8px 0 16px;
+}
+
+.affilio-settings-form .form-table th {
+  width: 140px;
+}
+
+.affilio-settings-form input.regular-text {
+  width: 100%;
+  max-width: 480px;
+}
+
+.affilio-inline-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.affilio-inline-form input {
+  min-width: 0;
+}
+
+.affilio-inline-form .button {
+  justify-self: start;
+}
+
+.affilio-detail {
+  margin-top: 12px;
+  border-top: 1px solid #dcdcde;
+  padding-top: 10px;
+}
+
+.affilio-num {
+  font-weight: 700;
+}
+
+.affilio-controls-row {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.affilio-controls-row select {
+  min-width: 170px;
+}
+
+.affilio-metric-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-bottom: 12px;
+}
+
+.affilio-metric-grid-tight {
+  margin-bottom: 8px;
+}
+
+.affilio-metric-card {
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.affilio-metric-label {
+  font-size: 12px;
+  color: #50575e;
+}
+
+.affilio-metric-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.affilio-metric-value-sm {
+  font-size: 18px;
+}
+
+.affilio-empty-inline {
+  margin: 0;
+}
+
+.affilio-empty-block {
+  margin: 0 0 12px;
+}
+
+.affilio-trend-box {
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.affilio-trend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.affilio-trend-day {
+  display: inline-block;
+  width: 92px;
+  font-size: 12px;
+  color: #50575e;
+}
+
+.affilio-trend-track {
+  background: #f0f0f1;
+  flex: 1;
+  height: 8px;
+  border-radius: 10px;
+}
+
+.affilio-trend-fill {
+  background: #2271b1;
+  height: 8px;
+  border-radius: 10px;
+}
+
+.affilio-trend-value {
+  display: inline-block;
+  width: 26px;
+  text-align: right;
+  font-size: 12px;
+}
+
+.affilio-meta-line {
+  font-size: 12px;
+  color: #50575e;
+  margin-bottom: 8px;
+}
+
+.affilio-analytics-section {
+  margin-bottom: 12px;
+}
+
+.affilio-split-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.affilio-subpanel-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.affilio-subpanel-head h4 {
+  margin: 0;
+}
+
+.affilio-filter-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.affilio-subpanel {
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  padding: 10px;
+  background: #fff;
+}
+
+#affilio-articles-table tr[data-article-id] {
+  cursor: pointer;
+}
+
+#affilio-articles-table tr[data-article-id]:hover {
+  background: #f6f7f7;
+}
+
+@media (max-width: 960px) {
+  .affilio-inline-form {
+    grid-template-columns: 1fr;
+  }
+
+  .affilio-settings-form input.regular-text {
+    max-width: 100%;
+  }
+
+  .affilio-controls-row {
+    justify-content: flex-start;
+  }
+
+  .affilio-controls-row select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .affilio-filter-group {
+    width: 100%;
+  }
+
+  .affilio-filter-group select {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
 }

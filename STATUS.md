@@ -176,6 +176,9 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 - 2026-02-06: Improved WP onboarding/connection UX with built-in API URL default, connection status banners, and advanced-mode gating for discovery/admin key settings.
 - 2026-02-06: Added program discovery enrichment automation and Playwright browser E2E tests for core WP admin flows.
 - 2026-02-06: Hardened recommendation status transitions in handler logic and DB migration guardrails with tests.
+- 2026-02-06: Cleaned up WP admin UX for dashboard/settings (removed duplicate notices on Affilio pages, clearer connection status hierarchy, panelized layout, responsive form spacing, improved onboarding CTA presentation).
+- 2026-02-06: Set plugin production API default to Railway backend (`AFFILIO_API_URL`) and improved Gutenberg sidebar UX (clearer sections, connection CTA, insert confirmation feedback).
+- 2026-02-06: Refined dashboard analytics UX with class-based cards/sections/filters, responsive split panels, and reduced inline styling for easier maintenance.
 
 ## Next Suggested Tasks
 1. Complete security launch blockers listed in `MVP_CHECKLIST.md` (`P0` items first).

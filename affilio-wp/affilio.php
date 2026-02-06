@@ -13,6 +13,10 @@ if (!defined('ABSPATH')) {
 define('AFFILIO_VERSION', '0.1.0');
 define('AFFILIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AFFILIO_PLUGIN_URL', plugin_dir_url(__FILE__));
+if (!defined('AFFILIO_API_URL')) {
+    // Production API default for customer installs. Can still be overridden in advanced mode.
+    define('AFFILIO_API_URL', 'https://affilio-production.up.railway.app/v1');
+}
 
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-api.php';
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-scanner.php';
