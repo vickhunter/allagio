@@ -17,11 +17,16 @@ type GenerateHandler struct {
 }
 
 type generateRequest struct {
-	RecommendationID string `json:"recommendation_id"`
-	InsertionType    string `json:"insertion_type"`
-	ArticleContext   string `json:"article_context"`
-	PreferredTone    string `json:"preferred_tone"`
-	SiteLanguage     string `json:"site_language"`
+	RecommendationID string   `json:"recommendation_id"`
+	InsertionType    string   `json:"insertion_type"`
+	ArticleContext   string   `json:"article_context"`
+	PreferredTone    string   `json:"preferred_tone"`
+	SiteLanguage     string   `json:"site_language"`
+	ArticleContent   string   `json:"article_content"`
+	ArticleHeadings  []string `json:"article_headings"`
+	ExistingLinks    []string `json:"existing_links"`
+	ArticleWordCount int      `json:"article_word_count"`
+	ArticleCategory  string   `json:"article_category"`
 }
 
 type confirmRequest struct {
@@ -57,24 +62,35 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	if insertionType == "" {
 		insertionType = strings.TrimSpace(req.InsertionType)
 	}
+	transitionSentence := ""
+	suggestedParagraphIndex := -1
+	confidenceScore := 0.0
 	if h.Generator != nil {
 		if plan, err := h.Generator.GeneratePlan(c.Request.Context(), services.ContentRequest{
-			ProgramName:    rec.ProgramName,
-			Company:        rec.Company,
-			Reason:         rec.Reason,
-			InsertionType:  insertionType,
-			ProgramType:    rec.ProgramType,
-			ArticleTitle:   rec.ArticleTitle,
-			ArticleURL:     rec.ArticleURL,
-			ArticleContext: req.ArticleContext,
-			PreferredTone:  req.PreferredTone,
-			SiteLanguage:   req.SiteLanguage,
+			ProgramName:      rec.ProgramName,
+			Company:          rec.Company,
+			Reason:           rec.Reason,
+			InsertionType:    insertionType,
+			ProgramType:      rec.ProgramType,
+			ArticleTitle:     rec.ArticleTitle,
+			ArticleURL:       rec.ArticleURL,
+			ArticleContext:   req.ArticleContext,
+			PreferredTone:    req.PreferredTone,
+			SiteLanguage:     req.SiteLanguage,
+			ArticleContent:   req.ArticleContent,
+			ArticleHeadings:  req.ArticleHeadings,
+			ExistingLinks:    req.ExistingLinks,
+			ArticleWordCount: req.ArticleWordCount,
+			ArticleCategory:  req.ArticleCategory,
 		}); err == nil && plan != nil {
 			blurb = strings.TrimSpace(plan.Blurb)
 			if strings.TrimSpace(plan.SuggestedPosition) != "" {
 				position = strings.TrimSpace(plan.SuggestedPosition)
 			}
 			placementReason = strings.TrimSpace(plan.PlacementReason)
+			transitionSentence = strings.TrimSpace(plan.TransitionSentence)
+			suggestedParagraphIndex = plan.SuggestedParagraphIndex
+			confidenceScore = plan.ConfidenceScore
 		}
 	}
 	if blurb == "" {
@@ -94,14 +110,24 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	if placementReason == "" {
 		placementReason = defaultPlacementReason(position)
 	}
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"html":               html,
 		"generated_text":     blurb,
 		"suggested_position": position,
 		"placement_reason":   placementReason,
 		"program_name":       rec.ProgramName,
 		"link_url":           link,
-	})
+	}
+	if transitionSentence != "" {
+		resp["transition_sentence"] = transitionSentence
+	}
+	if suggestedParagraphIndex >= 0 {
+		resp["suggested_paragraph_index"] = suggestedParagraphIndex
+	}
+	if confidenceScore > 0 {
+		resp["confidence_score"] = confidenceScore
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func (h *GenerateHandler) ConfirmInsert(c *gin.Context) {

@@ -214,9 +214,9 @@ func scoreMatch(content string, tokens []string, terms []string, category string
 	if max == 0 {
 		return 0, ""
 	}
-	reason := "This article is related to “" + best + "”."
+	reason := "The article discusses \u201c" + best + "\u201d, making it a strong contextual fit for this recommendation."
 	if category != "" && categoryMatch(tokens, category) {
-		reason = "This article is related to “" + best + "” and aligns with the " + category + " category."
+		reason = "The article discusses \u201c" + best + "\u201d within the " + category + " space, making it a strong contextual fit."
 		max += 5
 	}
 	if max > 100 {

@@ -234,12 +234,6 @@
         }
         html += `
             <div class="affilio-panel">
-                <h3>${t('Analytics', 'Analitiche')}</h3>
-                <div id="affilio-analytics"></div>
-            </div>
-        `;
-        html += `
-            <div class="affilio-panel">
                 <h3>${t('My Affiliate Links', 'I miei link affiliati')}</h3>
                 <form id="affilio-add-program" class="affilio-inline-form">
                     <input type="text" name="name" placeholder="${t('Program name', 'Nome programma')}" required />
@@ -256,7 +250,6 @@
         }
         html += '</div>';
         root.innerHTML = html;
-        setupAnalytics();
 
         const table = document.getElementById('affilio-articles-table');
         const detail = document.getElementById('affilio-article-detail');
@@ -314,6 +307,11 @@
                     }).join('');
                     detail.innerHTML = `<h3>${t('Recommendations', 'Raccomandazioni')}</h3>${recs ? `<ul class="affilio-rec-list">${recs}</ul>` : `<p>${t('No recommendations yet.', 'Nessuna raccomandazione al momento.')}</p>`}`;
 
+                    let articleRawHTML = '';
+                    let articleHeadings = [];
+                    let articleExistingLinks = [];
+                    let articleWordCount = 0;
+
                     const loadArticleContext = async () => {
                         if (articleContextCache !== null) {
                             return articleContextCache;
@@ -325,9 +323,29 @@
                                 return articleContextCache;
                             }
                             const wpPost = await wpRes.json();
-                            const content = textFromHTML((wpPost && wpPost.content && wpPost.content.rendered) || '');
+                            const rawHTML = (wpPost && wpPost.content && wpPost.content.rendered) || '';
+                            articleRawHTML = rawHTML;
+                            const content = textFromHTML(rawHTML);
                             const excerpt = textFromHTML((wpPost && wpPost.excerpt && wpPost.excerpt.rendered) || '');
-                            articleContextCache = (content || excerpt).slice(0, 1400);
+                            articleContextCache = (content || excerpt).slice(0, 3000);
+                            articleWordCount = content.split(/\s+/).filter(Boolean).length;
+
+                            // Extract headings
+                            const headingMatches = rawHTML.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi) || [];
+                            articleHeadings = headingMatches.map(h => textFromHTML(h)).filter(Boolean);
+
+                            // Extract existing link domains
+                            const linkMatches = rawHTML.match(/href="(https?:\/\/[^"]+)"/gi) || [];
+                            const domains = new Set();
+                            linkMatches.forEach(match => {
+                                try {
+                                    const url = match.replace(/^href="/i, '').replace(/"$/, '');
+                                    const hostname = new URL(url).hostname.replace(/^www\./, '');
+                                    domains.add(hostname);
+                                } catch (_) {}
+                            });
+                            articleExistingLinks = Array.from(domains);
+
                             return articleContextCache;
                         } catch (_) {
                             articleContextCache = '';
@@ -373,6 +391,11 @@
                                     recommendation_id: recId,
                                     insertion_type: rec.insertion_type || 'inline_mention',
                                     article_context: articleContext,
+                                    article_content: articleContext,
+                                    article_headings: articleHeadings,
+                                    existing_links: articleExistingLinks,
+                                    article_word_count: articleWordCount,
+                                    article_category: data.article.category || '',
                                     preferred_tone: 'match article author voice',
                                     site_language: document.documentElement.lang || 'auto',
                                 }),
@@ -388,32 +411,60 @@
                             if (previewEl) {
                                 const suggestedPosition = normalizePosition(genData.suggested_position);
                                 const defaultText = genData.generated_text || textFromHTML(genData.html || '');
+                                const defaultTransition = genData.transition_sentence || '';
+                                const paragraphIndex = typeof genData.suggested_paragraph_index === 'number' ? genData.suggested_paragraph_index : -1;
+                                const confidence = typeof genData.confidence_score === 'number' ? genData.confidence_score : 0;
+
                                 const baseHTML = buildSnippetHTML(
                                     genData.program_name || rec.program_name || rec.id,
                                     genData.link_url || '#',
                                     defaultText
                                 );
-                                const around = placementContextLine(articleContext, suggestedPosition);
+
+                                // Build contextual diff preview with surrounding paragraphs
+                                const paragraphs = String(articleContext || '').split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+                                const totalParagraphs = paragraphs.length;
+                                let insertIdx = paragraphIndex >= 0 ? Math.min(paragraphIndex, totalParagraphs) : Math.floor(totalParagraphs / 2);
+                                const beforeParas = paragraphs.slice(Math.max(0, insertIdx - 2), insertIdx);
+                                const afterParas = paragraphs.slice(insertIdx, Math.min(totalParagraphs, insertIdx + 2));
+
+                                const confidenceLabel = confidence >= 0.7 ? t('High', 'Alta') : confidence >= 0.4 ? t('Medium', 'Media') : t('Low', 'Bassa');
+                                const confidenceColor = confidence >= 0.7 ? 'high' : confidence >= 0.4 ? 'medium' : 'low';
+
+                                const diffBefore = beforeParas.map(p => `<div class="affilio-preview-para">${esc(p)}</div>`).join('');
+                                const diffAfter = afterParas.map(p => `<div class="affilio-preview-para">${esc(p)}</div>`).join('');
+                                const insertLabel = totalParagraphs > 0
+                                    ? `${t('Inserting after paragraph', 'Inserimento dopo il paragrafo')} ${insertIdx} ${t('of', 'di')} ${totalParagraphs}`
+                                    : '';
+
                                 previewEl.innerHTML = `
                                     <div class="affilio-plan-card">
                                         <div class="affilio-plan-meta">
                                             <strong>${t('Planned position', 'Posizione prevista')}:</strong> ${esc(positionLabel(suggestedPosition))}
                                             <select class="affilio-position-select" data-rec="${esc(recId)}">
                                                 <option value="after_intro" ${suggestedPosition === 'after_intro' ? 'selected' : ''}>${t('After intro', 'Dopo introduzione')}</option>
-                                                <option value="mid_article" ${suggestedPosition === 'mid_article' ? 'selected' : ''}>${t('Mid article', 'Metà articolo')}</option>
+                                                <option value="mid_article" ${suggestedPosition === 'mid_article' ? 'selected' : ''}>${t('Mid article', 'Met\u00e0 articolo')}</option>
                                                 <option value="before_conclusion" ${suggestedPosition === 'before_conclusion' ? 'selected' : ''}>${t('Before conclusion', 'Prima della conclusione')}</option>
                                                 <option value="end_of_article" ${suggestedPosition === 'end_of_article' ? 'selected' : ''}>${t('End of article', 'Fine articolo')}</option>
                                             </select>
+                                            <span class="affilio-confidence-badge affilio-confidence-${confidenceColor}">${t('Confidence', 'Confidenza')}: ${confidenceLabel}</span>
                                         </div>
                                         <div class="affilio-plan-meta">
-                                            <strong>${t('Why here', 'Perché qui')}:</strong> ${esc(genData.placement_reason || t('Chosen for relevance and click potential.', 'Scelta per rilevanza e potenziale di click.'))}
+                                            <strong>${t('Why here', 'Perch\u00e9 qui')}:</strong> ${esc(genData.placement_reason || t('Chosen for relevance and click potential.', 'Scelta per rilevanza e potenziale di click.'))}
                                         </div>
-                                        <div class="affilio-plan-meta" id="affilio-plan-context-${esc(recId)}">
-                                            <strong>${t('Local context', 'Contesto locale')}:</strong> ${esc(around)}
+                                        ${insertLabel ? `<div class="affilio-plan-meta"><strong>${esc(insertLabel)}</strong></div>` : ''}
+                                        <div class="affilio-preview-diff" id="affilio-preview-diff-${esc(recId)}">
+                                            ${diffBefore}
+                                            <div class="affilio-preview-insertion" id="affilio-preview-insertion-${esc(recId)}">
+                                                ${defaultTransition ? `<div class="affilio-preview-transition">${esc(defaultTransition)}</div>` : ''}
+                                                ${baseHTML}
+                                            </div>
+                                            ${diffAfter}
                                         </div>
-                                        <label class="affilio-plan-label" for="affilio-generated-text-${esc(recId)}">${t('Edit generated text', 'Modifica testo generato')}</label>
+                                        <label class="affilio-plan-label" for="affilio-transition-text-${esc(recId)}">${t('Edit transition sentence', 'Modifica frase di transizione')}</label>
+                                        <textarea class="affilio-plan-editor affilio-plan-editor-sm" id="affilio-transition-text-${esc(recId)}" data-rec-transition="${esc(recId)}" rows="2">${esc(defaultTransition)}</textarea>
+                                        <label class="affilio-plan-label" for="affilio-generated-text-${esc(recId)}">${t('Edit recommendation text', 'Modifica testo raccomandazione')}</label>
                                         <textarea class="affilio-plan-editor" id="affilio-generated-text-${esc(recId)}" data-rec-text="${esc(recId)}" rows="3">${esc(defaultText)}</textarea>
-                                        <div class="affilio-plan-preview-html" id="affilio-plan-html-${esc(recId)}">${baseHTML}</div>
                                         <div class="affilio-plan-actions">
                                             <button class="button button-primary" data-rec="${esc(recId)}" data-action="confirm-insert">${t('Insert now', 'Inserisci ora')}</button>
                                             <button class="button" data-rec="${esc(recId)}" data-action="regenerate">${t('Regenerate', 'Rigenera')}</button>
@@ -421,30 +472,23 @@
                                     </div>
                                 `;
                                 const editorEl = previewEl.querySelector(`textarea[data-rec-text="${recId}"]`);
+                                const transitionEl = previewEl.querySelector(`textarea[data-rec-transition="${recId}"]`);
                                 const posEl = previewEl.querySelector(`select[data-rec="${recId}"]`);
-                                const htmlEl = previewEl.querySelector(`#affilio-plan-html-${recId}`);
-                                const contextEl = previewEl.querySelector(`#affilio-plan-context-${recId}`);
+                                const insertionEl = previewEl.querySelector(`#affilio-preview-insertion-${recId}`);
                                 const refreshPreview = () => {
-                                    if (!editorEl || !posEl || !htmlEl) {
-                                        return;
-                                    }
+                                    if (!editorEl || !insertionEl) return;
                                     const liveText = String(editorEl.value || '').trim();
-                                    const livePosition = normalizePosition(posEl.value);
-                                    htmlEl.innerHTML = buildSnippetHTML(
+                                    const liveTransition = transitionEl ? String(transitionEl.value || '').trim() : '';
+                                    const liveHTML = buildSnippetHTML(
                                         genData.program_name || rec.program_name || rec.id,
                                         genData.link_url || '#',
                                         liveText || defaultText
                                     );
-                                    if (contextEl) {
-                                        contextEl.innerHTML = `<strong>${t('Local context', 'Contesto locale')}:</strong> ${esc(placementContextLine(articleContext, livePosition))}`;
-                                    }
+                                    insertionEl.innerHTML = (liveTransition ? `<div class="affilio-preview-transition">${esc(liveTransition)}</div>` : '') + liveHTML;
                                 };
-                                if (editorEl) {
-                                    editorEl.addEventListener('input', refreshPreview);
-                                }
-                                if (posEl) {
-                                    posEl.addEventListener('change', refreshPreview);
-                                }
+                                if (editorEl) editorEl.addEventListener('input', refreshPreview);
+                                if (transitionEl) transitionEl.addEventListener('input', refreshPreview);
+                                if (posEl) posEl.addEventListener('change', refreshPreview);
                             }
                             return;
                         }
@@ -456,50 +500,87 @@
                                 return;
                             }
                             const textArea = detail.querySelector(`textarea[data-rec-text="${recId}"]`);
+                            const transitionArea = detail.querySelector(`textarea[data-rec-transition="${recId}"]`);
                             const positionSelect = detail.querySelector(`select[data-rec="${recId}"]`);
                             const editedText = textArea ? String(textArea.value || '').trim() : '';
+                            const editedTransition = transitionArea ? String(transitionArea.value || '').trim() : '';
                             const chosenPosition = normalizePosition(positionSelect ? positionSelect.value : (plan.suggested_position || 'mid_article'));
-                            const finalHTML = editedText !== ''
+                            const blurbHTML = editedText !== ''
                                 ? buildSnippetHTML(plan.program_name || rec.program_name || rec.id, plan.link_url || '#', editedText)
                                 : (plan.html || '');
-                            const approve = await fetch(`${AffilioData.apiUrl}/recommendations/${recId}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json', 'X-API-Key': AffilioData.apiKey },
-                                body: JSON.stringify({ status: 'approved' }),
-                            });
-                            if (!approve.ok && approve.status !== 409) {
-                                renderToast(t('Failed to approve recommendation', 'Impossibile approvare la raccomandazione'));
-                                return;
-                            }
-                            const insert = await fetch('/wp-json/affilio/v1/insert', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': AffilioData.nonce },
-                                body: JSON.stringify({
-                                    post_id: data.article.wp_post_id,
-                                    html: finalHTML,
-                                    recommendation_id: recId,
-                                    suggested_position: chosenPosition,
-                                }),
-                            });
-                            const insertData = await insert.json();
-                            if (!insert.ok || insertData.status !== 'ok') {
-                                renderToast((insertData && insertData.message) ? insertData.message : t('Insert failed', 'Inserimento non riuscito'));
-                                return;
-                            }
+                            const finalHTML = editedTransition
+                                ? `<p>${esc(editedTransition)}</p>` + blurbHTML
+                                : blurbHTML;
+
+                            // Show confirmation overlay
+                            const articleTitle = esc(data.article.title || t('this article', 'questo articolo'));
                             if (previewEl) {
-                                previewEl.innerHTML = `<p class="affilio-rec-done">${t('Inserted successfully.', 'Inserito con successo.')}</p>`;
+                                const confirmOverlay = document.createElement('div');
+                                confirmOverlay.className = 'affilio-confirm-overlay';
+                                confirmOverlay.innerHTML = `
+                                    <div class="affilio-confirm-dialog">
+                                        <h4>${t('Confirm insertion', 'Conferma inserimento')}</h4>
+                                        <p>${t('You are inserting this content into', 'Stai inserendo questo contenuto in')} <strong>${articleTitle}</strong> (${esc(positionLabel(chosenPosition))})</p>
+                                        <div class="affilio-confirm-preview">${finalHTML}</div>
+                                        <div class="affilio-confirm-actions">
+                                            <button class="button button-primary" data-confirm="yes">${t('Confirm & Insert', 'Conferma e Inserisci')}</button>
+                                            <button class="button" data-confirm="no">${t('Cancel', 'Annulla')}</button>
+                                        </div>
+                                    </div>
+                                `;
+                                previewEl.appendChild(confirmOverlay);
+
+                                const handleConfirm = async (e) => {
+                                    const confirmBtn = e.target.closest('button[data-confirm]');
+                                    if (!confirmBtn) return;
+                                    if (confirmBtn.getAttribute('data-confirm') === 'no') {
+                                        confirmOverlay.remove();
+                                        return;
+                                    }
+                                    confirmBtn.disabled = true;
+                                    confirmBtn.innerText = t('Inserting...', 'Inserimento in corso...');
+
+                                    const approve = await fetch(`${AffilioData.apiUrl}/recommendations/${recId}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json', 'X-API-Key': AffilioData.apiKey },
+                                        body: JSON.stringify({ status: 'approved' }),
+                                    });
+                                    if (!approve.ok && approve.status !== 409) {
+                                        renderToast(t('Failed to approve recommendation', 'Impossibile approvare la raccomandazione'));
+                                        confirmOverlay.remove();
+                                        return;
+                                    }
+                                    const insert = await fetch('/wp-json/affilio/v1/insert', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': AffilioData.nonce },
+                                        body: JSON.stringify({
+                                            post_id: data.article.wp_post_id,
+                                            html: finalHTML,
+                                            recommendation_id: recId,
+                                            suggested_position: chosenPosition,
+                                        }),
+                                    });
+                                    const insertData = await insert.json();
+                                    confirmOverlay.remove();
+                                    if (!insert.ok || insertData.status !== 'ok') {
+                                        renderToast((insertData && insertData.message) ? insertData.message : t('Insert failed', 'Inserimento non riuscito'));
+                                        return;
+                                    }
+                                    previewEl.innerHTML = `<p class="affilio-rec-done">${t('Inserted successfully.', 'Inserito con successo.')}</p>`;
+                                    const statusEl = detail.querySelector(`[data-rec-item="${recId}"] .affilio-rec-status`);
+                                    if (statusEl) {
+                                        statusEl.textContent = statusLabel('inserted');
+                                        statusEl.className = 'affilio-rec-status affilio-rec-status-inserted';
+                                    }
+                                    detail.querySelectorAll(`button[data-rec="${recId}"]`).forEach((actionBtn) => {
+                                        if (actionBtn.getAttribute('data-action') !== 'dismiss') {
+                                            actionBtn.disabled = true;
+                                        }
+                                    });
+                                    renderToast(t('Recommendation inserted', 'Raccomandazione inserita'));
+                                };
+                                confirmOverlay.addEventListener('click', handleConfirm);
                             }
-                            const statusEl = detail.querySelector(`[data-rec-item="${recId}"] .affilio-rec-status`);
-                            if (statusEl) {
-                                statusEl.textContent = statusLabel('inserted');
-                                statusEl.className = 'affilio-rec-status affilio-rec-status-inserted';
-                            }
-                            detail.querySelectorAll(`button[data-rec="${recId}"]`).forEach((actionBtn) => {
-                                if (actionBtn.getAttribute('data-action') !== 'dismiss') {
-                                    actionBtn.disabled = true;
-                                }
-                            });
-                            renderToast(t('Recommendation inserted', 'Raccomandazione inserita'));
                         }
                     };
                 });
@@ -526,555 +607,6 @@
                 location.reload();
             });
         }
-    };
-
-    const renderArticleClicks = (rows) => {
-        if (!rows.length) {
-            return `<p>${t('No click data yet.', 'Nessun click registrato al momento.')}</p>`;
-        }
-        const tableRows = rows.map(r => `
-            <tr>
-                <td>${r.title || 'Untitled'}</td>
-                <td>${r.wp_post_id}</td>
-                <td class="affilio-num">${r.clicks}</td>
-            </tr>
-        `).join('');
-        return `
-            <table class="widefat">
-                <thead><tr><th>${t('Article', 'Articolo')}</th><th>Post ID</th><th>${t('Clicks', 'Click')}</th></tr></thead>
-                <tbody>${tableRows}</tbody>
-            </table>
-        `;
-    };
-
-    const renderRecommendationClicks = (rows) => {
-        if (!rows.length) {
-            return `<p>${t('No click data yet.', 'Nessun click registrato al momento.')}</p>`;
-        }
-        const tableRows = rows.map(r => `
-            <tr>
-                <td>${r.program_name || r.recommendation_id}</td>
-                <td>${r.program_type || ''}</td>
-                <td class="affilio-num">${r.clicks}</td>
-            </tr>
-        `).join('');
-        return `
-            <table class="widefat">
-                <thead><tr><th>${t('Recommendation', 'Raccomandazione')}</th><th>${t('Type', 'Tipo')}</th><th>${t('Clicks', 'Click')}</th></tr></thead>
-                <tbody>${tableRows}</tbody>
-            </table>
-        `;
-    };
-
-    const renderSummary = (summary) => {
-        const total = summary && typeof summary.total_clicks === 'number' ? summary.total_clicks : 0;
-        const uniqueArticles = summary && typeof summary.unique_articles === 'number' ? summary.unique_articles : 0;
-        const uniqueRecs = summary && typeof summary.unique_recommendations === 'number' ? summary.unique_recommendations : 0;
-        return `
-            <div class="affilio-metric-grid">
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Total Clicks', 'Click totali')}</div>
-                    <div class="affilio-metric-value">${total}</div>
-                </div>
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Clicked Articles', 'Articoli con click')}</div>
-                    <div class="affilio-metric-value">${uniqueArticles}</div>
-                </div>
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Clicked Recs', 'Raccomandazioni con click')}</div>
-                    <div class="affilio-metric-value">${uniqueRecs}</div>
-                </div>
-            </div>
-        `;
-    };
-
-    const renderTrends = (rows) => {
-        if (!rows.length) {
-            return `<p class="affilio-empty-inline">${t('No trend data in this range.', 'Nessun dato trend in questo intervallo.')}</p>`;
-        }
-        const max = rows.reduce((acc, r) => Math.max(acc, r.clicks || 0), 0) || 1;
-        const points = rows.map(r => {
-            const width = Math.max(2, Math.round(((r.clicks || 0) / max) * 100));
-            return `
-                <div class="affilio-trend-row">
-                    <span class="affilio-trend-day">${r.day}</span>
-                    <div class="affilio-trend-track">
-                        <div class="affilio-trend-fill" style="width:${width}%;"></div>
-                    </div>
-                    <span class="affilio-trend-value">${r.clicks || 0}</span>
-                </div>
-            `;
-        }).join('');
-        return `<div class="affilio-trend-box">${points}</div>`;
-    };
-
-    const renderAttribution = (rows, meta) => {
-        if (!rows.length) {
-            return `<p class="affilio-empty-block">${t('No attribution data in this range.', 'Nessun dato attribuzione in questo intervallo.')}</p>`;
-        }
-        const totalRevenue = meta && typeof meta.estimated_total_revenue_usd === 'number' ? meta.estimated_total_revenue_usd : 0;
-        const tableRows = rows.map(r => `
-            <tr>
-                <td>${r.program_name || t('Unknown program', 'Programma sconosciuto')}</td>
-                <td>${r.program_type || ''}</td>
-                <td>${(r.attributed_clicks || 0).toFixed(2)}</td>
-                <td>${(r.click_share_percent || 0).toFixed(2)}%</td>
-                <td>$${(r.estimated_revenue_usd || 0).toFixed(2)}</td>
-            </tr>
-        `).join('');
-        const modelLabel = meta && meta.model ? meta.model : '';
-        return `
-            <div class="affilio-analytics-section">
-                <h4>${t('Attribution (Estimated)', 'Attribuzione (stimata)')}</h4>
-                <div class="affilio-meta-line">
-                    ${t('Estimated total revenue', 'Ricavo totale stimato')}: <strong>$${totalRevenue.toFixed(2)}</strong>
-                </div>
-                <div class="affilio-meta-line">
-                    ${t('Model', 'Modello')}: ${modelLabel}
-                </div>
-                <table class="widefat">
-                    <thead><tr><th>${t('Program', 'Programma')}</th><th>${t('Type', 'Tipo')}</th><th>${t('Attributed Clicks', 'Click attribuiti')}</th><th>${t('Share', 'Quota')}</th><th>${t('Est. Revenue', 'Ricavo stimato')}</th></tr></thead>
-                    <tbody>${tableRows}</tbody>
-                </table>
-            </div>
-        `;
-    };
-
-    const renderFunnel = (funnel) => {
-        if (!funnel) {
-            return `<p class="affilio-empty-block">${t('No funnel data in this range.', 'Nessun dato funnel in questo intervallo.')}</p>`;
-        }
-        const clicks = funnel.clicks || 0;
-        const inserted = funnel.inserted || 0;
-        const dismissed = funnel.dismissed || 0;
-        const tracked = funnel.tracked_suggestions || 0;
-        const clickRate = (funnel.insert_to_click_rate || 0).toFixed(2);
-        const dismissRate = (funnel.dismiss_rate || 0).toFixed(2);
-        return `
-            <div class="affilio-analytics-section">
-                <h4>${t('Funnel', 'Funnel')}</h4>
-                <div class="affilio-metric-grid">
-                    <div class="affilio-metric-card">
-                        <div class="affilio-metric-label">${t('Inserted', 'Inseriti')}</div>
-                        <div class="affilio-metric-value affilio-metric-value-sm">${inserted}</div>
-                    </div>
-                    <div class="affilio-metric-card">
-                        <div class="affilio-metric-label">${t('Clicks', 'Click')}</div>
-                        <div class="affilio-metric-value affilio-metric-value-sm">${clicks}</div>
-                    </div>
-                    <div class="affilio-metric-card">
-                        <div class="affilio-metric-label">${t('Dismissed', 'Scartati')}</div>
-                        <div class="affilio-metric-value affilio-metric-value-sm">${dismissed}</div>
-                    </div>
-                    <div class="affilio-metric-card">
-                        <div class="affilio-metric-label">${t('Tracked Recs', 'Raccomandazioni tracciate')}</div>
-                        <div class="affilio-metric-value affilio-metric-value-sm">${tracked}</div>
-                    </div>
-                    <div class="affilio-metric-card">
-                        <div class="affilio-metric-label">${t('Insert -> Click Rate', 'Tasso Inserimento -> Click')}</div>
-                        <div class="affilio-metric-value affilio-metric-value-sm">${clickRate}%</div>
-                    </div>
-                    <div class="affilio-metric-card">
-                        <div class="affilio-metric-label">${t('Dismiss Rate', 'Tasso di scarto')}</div>
-                        <div class="affilio-metric-value affilio-metric-value-sm">${dismissRate}%</div>
-                    </div>
-                </div>
-            </div>
-        `;
-    };
-
-    const renderCohorts = (rows) => {
-        if (!rows || !rows.length) {
-            return `<p class="affilio-empty-block">${t('No cohort data in this range.', 'Nessun dato coorte in questo intervallo.')}</p>`;
-        }
-        const tableRows = rows.map(r => `
-            <tr>
-                <td>${r.cohort_date || ''}</td>
-                <td>${r.articles || 0}</td>
-                <td>${r.inserted || 0}</td>
-                <td>${r.clicks || 0}</td>
-                <td>${(r.clicks_per_article || 0).toFixed(2)}</td>
-            </tr>
-        `).join('');
-        return `
-            <div class="affilio-analytics-section">
-                <h4>${t('Cohorts (By Article Publish Date)', 'Coorti (per data pubblicazione articolo)')}</h4>
-                <table class="widefat">
-                    <thead><tr><th>${t('Cohort Date', 'Data coorte')}</th><th>${t('Articles', 'Articoli')}</th><th>${t('Inserted', 'Inseriti')}</th><th>${t('Clicks', 'Click')}</th><th>${t('Clicks/Article', 'Click/Articolo')}</th></tr></thead>
-                    <tbody>${tableRows}</tbody>
-                </table>
-            </div>
-        `;
-    };
-
-    const renderRetention = (rows) => {
-        if (!rows || !rows.length) {
-            return `<p class="affilio-empty-block">${t('No retention data in this range.', 'Nessun dato retention in questo intervallo.')}</p>`;
-        }
-        const tableRows = rows.map(r => `
-            <tr>
-                <td>${r.cohort_week || ''}</td>
-                <td>${r.articles || 0}</td>
-                <td>${r.week0_active || 0}</td>
-                <td>${(r.week1_rate || 0).toFixed(2)}%</td>
-                <td>${(r.week2_rate || 0).toFixed(2)}%</td>
-                <td>${(r.week3_rate || 0).toFixed(2)}%</td>
-                <td>${(r.week3_churn || 0).toFixed(2)}%</td>
-            </tr>
-        `).join('');
-        return `
-            <div class="affilio-analytics-section">
-                <h4>${t('Retention/Churn (Weekly)', 'Retention/Churn (settimanale)')}</h4>
-                <table class="widefat">
-                    <thead><tr><th>${t('Cohort Week', 'Settimana coorte')}</th><th>${t('Articles', 'Articoli')}</th><th>Week0 ${t('Active', 'attivi')}</th><th>W1 ${t('Retention', 'Retention')}</th><th>W2 ${t('Retention', 'Retention')}</th><th>W3 ${t('Retention', 'Retention')}</th><th>W3 ${t('Churn', 'Churn')}</th></tr></thead>
-                    <tbody>${tableRows}</tbody>
-                </table>
-            </div>
-        `;
-    };
-
-    const renderRecommendationQuality = (summary, rows) => {
-        if (!summary && (!rows || !rows.length)) {
-            return `<p class="affilio-empty-block">${t('No recommendation quality data in this range.', 'Nessun dato qualità raccomandazioni in questo intervallo.')}</p>`;
-        }
-        const s = summary || {};
-        const totals = `
-            <div class="affilio-metric-grid affilio-metric-grid-tight">
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Total Recs', 'Raccomandazioni totali')}</div>
-                    <div class="affilio-metric-value affilio-metric-value-sm">${s.total || 0}</div>
-                </div>
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Approval Rate', 'Tasso approvazione')}</div>
-                    <div class="affilio-metric-value affilio-metric-value-sm">${(s.approval_rate || 0).toFixed(2)}%</div>
-                </div>
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Dismiss Rate', 'Tasso di scarto')}</div>
-                    <div class="affilio-metric-value affilio-metric-value-sm">${(s.dismiss_rate || 0).toFixed(2)}%</div>
-                </div>
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Insert Rate', 'Tasso inserimento')}</div>
-                    <div class="affilio-metric-value affilio-metric-value-sm">${(s.insert_rate || 0).toFixed(2)}%</div>
-                </div>
-            </div>
-        `;
-        const tableRows = (rows || []).map(r => `
-            <tr>
-                <td>${r.program_name || t('Unknown program', 'Programma sconosciuto')}</td>
-                <td>${r.program_type || ''}</td>
-                <td>${r.total || 0}</td>
-                <td>${(r.approval_rate || 0).toFixed(2)}%</td>
-                <td>${(r.dismiss_rate || 0).toFixed(2)}%</td>
-                <td>${(r.insert_rate || 0).toFixed(2)}%</td>
-                <td>${(r.click_rate || 0).toFixed(2)}%</td>
-            </tr>
-        `).join('');
-        return `
-            <div class="affilio-analytics-section">
-                <h4>${t('Recommendation Quality', 'Qualità raccomandazioni')}</h4>
-                ${totals}
-                <table class="widefat">
-                    <thead><tr><th>${t('Program', 'Programma')}</th><th>${t('Type', 'Tipo')}</th><th>${t('Total', 'Totale')}</th><th>${t('Approve %', 'Approva %')}</th><th>${t('Dismiss %', 'Scarta %')}</th><th>${t('Insert %', 'Inserisci %')}</th><th>${t('Click %', 'Click %')}</th></tr></thead>
-                    <tbody>${tableRows}</tbody>
-                </table>
-            </div>
-        `;
-    };
-
-    const renderRecommendationTuning = (rows) => {
-        if (!rows || !rows.length) {
-            return `<p class="affilio-empty-block">${t('No tuning profile data yet (needs at least 3 outcomes per program).', 'Nessun profilo tuning disponibile (servono almeno 3 esiti per programma).')}</p>`;
-        }
-        const tableRows = rows.map(r => `
-            <tr>
-                <td>${r.program_name || r.program_id || ''}</td>
-                <td class="affilio-muted">${r.program_id || ''}</td>
-                <td>${r.is_user_program ? 'user' : 'curated'}</td>
-                <td>${r.sample_size || 0}</td>
-                <td>${(r.approval_rate || 0).toFixed(2)}%</td>
-                <td>${(r.insert_rate || 0).toFixed(2)}%</td>
-                <td>${(r.click_rate || 0).toFixed(2)}%</td>
-                <td>${(r.multiplier || 0).toFixed(2)}x</td>
-            </tr>
-        `).join('');
-        return `
-            <div class="affilio-analytics-section">
-                <h4>${t('Recommendation Tuning Profiles', 'Profili tuning raccomandazioni')}</h4>
-                <table class="widefat">
-                    <thead><tr><th>${t('Program', 'Programma')}</th><th>Program ID</th><th>${t('Type', 'Tipo')}</th><th>${t('Sample', 'Campione')}</th><th>${t('Approve %', 'Approva %')}</th><th>${t('Insert %', 'Inserisci %')}</th><th>${t('Click %', 'Click %')}</th><th>${t('Multiplier', 'Moltiplicatore')}</th></tr></thead>
-                    <tbody>${tableRows}</tbody>
-                </table>
-            </div>
-        `;
-    };
-
-    const renderTuningInsights = (insights) => {
-        if (!insights || !insights.total_profiles) {
-            return `
-                <div class="affilio-analytics-section">
-                    <h4>${t('Learning Insights', 'Insight di apprendimento')}</h4>
-                    <p class="affilio-empty-block">${t('No learning insights yet. Keep approving/dismissing recommendations to train ranking.', 'Nessun insight disponibile. Continua ad approvare/scartare raccomandazioni per allenare il ranking.')}</p>
-                </div>
-            `;
-        }
-        const cards = `
-            <div class="affilio-metric-grid affilio-metric-grid-tight">
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Profiles', 'Profili')}</div>
-                    <div class="affilio-metric-value affilio-metric-value-sm">${insights.total_profiles || 0}</div>
-                </div>
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Boosted', 'Potenziati')}</div>
-                    <div class="affilio-metric-value affilio-metric-value-sm">${insights.boosted_count || 0}</div>
-                </div>
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Penalized', 'Penalizzati')}</div>
-                    <div class="affilio-metric-value affilio-metric-value-sm">${insights.penalized_count || 0}</div>
-                </div>
-                <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('High confidence', 'Alta confidenza')}</div>
-                    <div class="affilio-metric-value affilio-metric-value-sm">${insights.high_confidence_profiles || 0}</div>
-                </div>
-            </div>
-        `;
-        const boosted = (insights.top_boosted || []).map((item) => `
-            <li>
-                <strong>${esc(item.program_name || item.program_id || '')}</strong>
-                <span class="affilio-muted">(${esc(item.program_type || '')})</span>
-                <span> · ${(item.multiplier || 0).toFixed(2)}x</span>
-                <div class="affilio-insight-reason">${esc(item.reason || '')}</div>
-            </li>
-        `).join('');
-        const penalized = (insights.top_penalized || []).map((item) => `
-            <li>
-                <strong>${esc(item.program_name || item.program_id || '')}</strong>
-                <span class="affilio-muted">(${esc(item.program_type || '')})</span>
-                <span> · ${(item.multiplier || 0).toFixed(2)}x</span>
-                <div class="affilio-insight-reason">${esc(item.reason || '')}</div>
-            </li>
-        `).join('');
-        const notes = (insights.notes || []).map((n) => `<li>${esc(n)}</li>`).join('');
-        return `
-            <div class="affilio-analytics-section">
-                <h4>${t('Learning Insights', 'Insight di apprendimento')}</h4>
-                ${cards}
-                <div class="affilio-insight-grid">
-                    <div>
-                        <h5>${t('Top boosted programs', 'Programmi più potenziati')}</h5>
-                        ${boosted ? `<ul class="affilio-insight-list">${boosted}</ul>` : `<p class="affilio-empty-block">${t('No boosted programs yet.', 'Nessun programma potenziato al momento.')}</p>`}
-                    </div>
-                    <div>
-                        <h5>${t('Top penalized programs', 'Programmi più penalizzati')}</h5>
-                        ${penalized ? `<ul class="affilio-insight-list">${penalized}</ul>` : `<p class="affilio-empty-block">${t('No penalized programs yet.', 'Nessun programma penalizzato al momento.')}</p>`}
-                    </div>
-                </div>
-                ${notes ? `<div class="affilio-insight-notes"><h5>${t('System notes', 'Note del sistema')}</h5><ul>${notes}</ul></div>` : ''}
-            </div>
-        `;
-    };
-
-    const setupAnalytics = () => {
-        const container = document.getElementById('affilio-analytics');
-        if (!container) return;
-        let articleLimit = '10';
-        let recLimit = '10';
-        let articleSort = 'clicks';
-        let recSort = 'clicks';
-        let range = '30';
-        let articleClicks = [];
-        let recClicks = [];
-        let summary = null;
-        let trends = [];
-        let attribution = [];
-        let attributionMeta = null;
-        let funnel = null;
-        let cohorts = [];
-        let retention = [];
-        let qualitySummary = null;
-        let qualityPrograms = [];
-        let tuningProfiles = [];
-        let tuningInsights = null;
-        let attributionModel = 'last_click';
-
-        const downloadExport = async (format) => {
-            const query = new URLSearchParams();
-            if (range !== '0') query.set('days', range);
-            query.set('format', format);
-            query.set('model', attributionModel);
-            const res = await fetch(AffilioData.apiUrl + '/track/export?' + query.toString(), {
-                headers: { 'X-API-Key': AffilioData.apiKey },
-            });
-            if (!res.ok) {
-                throw new Error('export failed');
-            }
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `affilio-analytics.${format}`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-        };
-
-        const applySort = (rows, sortKey) => {
-            const sorted = rows.slice();
-            if (sortKey === 'title') {
-                sorted.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-            } else if (sortKey === 'name') {
-                sorted.sort((a, b) => (a.program_name || '').localeCompare(b.program_name || ''));
-            } else {
-                sorted.sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
-            }
-            return sorted;
-        };
-
-        const applyLimit = (rows, limit) => {
-            if (limit === 'all') return rows;
-            const n = parseInt(limit, 10);
-            if (Number.isNaN(n) || n <= 0) return rows;
-            return rows.slice(0, n);
-        };
-
-        const renderAnalytics = () => {
-            const sortedArticles = applyLimit(applySort(articleClicks, articleSort), articleLimit);
-            const sortedRecs = applyLimit(applySort(recClicks, recSort), recLimit);
-            container.innerHTML = `
-                <div class="affilio-controls-row">
-                    <select id="affilio-attribution-model">
-                        <option value="last_click">${t('Model: Last Click', 'Modello: ultimo click')}</option>
-                        <option value="first_click">${t('Model: First Click', 'Modello: primo click')}</option>
-                        <option value="linear_session">${t('Model: Linear Session', 'Modello: sessione lineare')}</option>
-                    </select>
-                    <button class="button" id="affilio-export-json">${t('Export JSON', 'Esporta JSON')}</button>
-                    <button class="button" id="affilio-export-csv">${t('Export CSV', 'Esporta CSV')}</button>
-                </div>
-                ${renderSummary(summary)}
-                ${renderTrends(trends)}
-                ${renderFunnel(funnel)}
-                ${renderCohorts(cohorts)}
-                ${renderRetention(retention)}
-                ${renderRecommendationQuality(qualitySummary, qualityPrograms)}
-                ${renderTuningInsights(tuningInsights)}
-                ${renderRecommendationTuning(tuningProfiles)}
-                ${renderAttribution(attribution, attributionMeta)}
-                <div class="affilio-split-grid">
-                    <div class="affilio-subpanel">
-                        <div class="affilio-subpanel-head">
-                            <h4>${t('Top Articles', 'Articoli top')}</h4>
-                            <div class="affilio-filter-group">
-                                <select id="affilio-analytics-range">
-                                    <option value="0">${t('All time', 'Sempre')}</option>
-                                    <option value="7">${t('Last 7 days', 'Ultimi 7 giorni')}</option>
-                                    <option value="30">${t('Last 30 days', 'Ultimi 30 giorni')}</option>
-                                </select>
-                                <select id="affilio-articles-sort">
-                                    <option value="clicks">${t('Sort: Clicks', 'Ordina: click')}</option>
-                                    <option value="title">${t('Sort: Title', 'Ordina: titolo')}</option>
-                                </select>
-                                <select id="affilio-articles-limit">
-                                    <option value="10">Top 10</option>
-                                    <option value="25">Top 25</option>
-                                    <option value="all">${t('All', 'Tutti')}</option>
-                                </select>
-                            </div>
-                        </div>
-                        ${renderArticleClicks(sortedArticles)}
-                    </div>
-                    <div class="affilio-subpanel">
-                        <div class="affilio-subpanel-head">
-                            <h4>${t('Top Recommendations', 'Raccomandazioni top')}</h4>
-                            <div class="affilio-filter-group">
-                                <select id="affilio-recs-sort">
-                                    <option value="clicks">${t('Sort: Clicks', 'Ordina: click')}</option>
-                                    <option value="name">${t('Sort: Name', 'Ordina: nome')}</option>
-                                </select>
-                                <select id="affilio-recs-limit">
-                                    <option value="10">Top 10</option>
-                                    <option value="25">Top 25</option>
-                                    <option value="all">${t('All', 'Tutti')}</option>
-                                </select>
-                            </div>
-                        </div>
-                        ${renderRecommendationClicks(sortedRecs)}
-                    </div>
-                </div>
-            `;
-            const rangeEl = document.getElementById('affilio-analytics-range');
-            const articleSortEl = document.getElementById('affilio-articles-sort');
-            const articleLimitEl = document.getElementById('affilio-articles-limit');
-            const recSortEl = document.getElementById('affilio-recs-sort');
-            const recLimitEl = document.getElementById('affilio-recs-limit');
-            const attributionModelEl = document.getElementById('affilio-attribution-model');
-            const exportJsonEl = document.getElementById('affilio-export-json');
-            const exportCsvEl = document.getElementById('affilio-export-csv');
-            if (rangeEl) rangeEl.value = range;
-            if (articleSortEl) articleSortEl.value = articleSort;
-            if (articleLimitEl) articleLimitEl.value = articleLimit;
-            if (recSortEl) recSortEl.value = recSort;
-            if (recLimitEl) recLimitEl.value = recLimit;
-            if (attributionModelEl) attributionModelEl.value = attributionModel;
-            if (rangeEl) rangeEl.addEventListener('change', (e) => {
-                range = e.target.value;
-                loadAnalytics();
-            });
-            if (articleSortEl) articleSortEl.addEventListener('change', (e) => { articleSort = e.target.value; renderAnalytics(); });
-            if (articleLimitEl) articleLimitEl.addEventListener('change', (e) => { articleLimit = e.target.value; renderAnalytics(); });
-            if (recSortEl) recSortEl.addEventListener('change', (e) => { recSort = e.target.value; renderAnalytics(); });
-            if (recLimitEl) recLimitEl.addEventListener('change', (e) => { recLimit = e.target.value; renderAnalytics(); });
-            if (attributionModelEl) attributionModelEl.addEventListener('change', (e) => {
-                attributionModel = e.target.value;
-                loadAnalytics();
-            });
-            if (exportJsonEl) exportJsonEl.addEventListener('click', async () => {
-                try {
-                    await downloadExport('json');
-                } catch (e) {
-                    renderToast(t('Failed to export JSON', 'Esportazione JSON non riuscita'));
-                }
-            });
-            if (exportCsvEl) exportCsvEl.addEventListener('click', async () => {
-                try {
-                    await downloadExport('csv');
-                } catch (e) {
-                    renderToast(t('Failed to export CSV', 'Esportazione CSV non riuscita'));
-                }
-            });
-        };
-
-        const loadAnalytics = async () => {
-            const rangeParam = range === '0' ? '' : `?days=${range}`;
-            const attributionParam = rangeParam ? `${rangeParam}&model=${attributionModel}` : `?model=${attributionModel}`;
-            const [articlesResp, recsResp, summaryResp, trendsResp, attributionResp, funnelResp, cohortsResp, retentionResp, qualityResp, tuningResp] = await Promise.all([
-                fetch(AffilioData.apiUrl + '/track/articles' + rangeParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-                fetch(AffilioData.apiUrl + '/track/recommendations' + rangeParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-                fetch(AffilioData.apiUrl + '/track/summary' + rangeParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-                fetch(AffilioData.apiUrl + '/track/trends' + rangeParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-                fetch(AffilioData.apiUrl + '/track/attribution' + attributionParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-                fetch(AffilioData.apiUrl + '/track/funnel' + rangeParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-                fetch(AffilioData.apiUrl + '/track/cohorts' + rangeParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-                fetch(AffilioData.apiUrl + '/track/retention' + rangeParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-                fetch(AffilioData.apiUrl + '/track/recommendation-quality' + rangeParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-                fetch(AffilioData.apiUrl + '/track/recommendation-tuning' + rangeParam, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => r.json()),
-            ]);
-            articleClicks = articlesResp.articles || [];
-            recClicks = recsResp.recommendations || [];
-            summary = summaryResp.summary || null;
-            trends = trendsResp.trends || [];
-            attribution = attributionResp.programs || [];
-            attributionMeta = attributionResp.meta || null;
-            funnel = funnelResp.funnel || null;
-            cohorts = cohortsResp.cohorts || [];
-            retention = retentionResp.retention || [];
-            qualitySummary = qualityResp.summary || null;
-            qualityPrograms = qualityResp.programs || [];
-            tuningProfiles = tuningResp.tuning || [];
-            tuningInsights = tuningResp.insights || null;
-            renderAnalytics();
-        };
-
-        loadAnalytics();
     };
 
     const fetchJSON = (path) => fetch(AffilioData.apiUrl + path, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => {

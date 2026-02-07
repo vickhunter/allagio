@@ -522,6 +522,125 @@
   transition: background-color 0.3s ease;
 }
 
+.affilio-preview-diff {
+  border: 1px solid #dcdcde;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 8px 0;
+  background: #fafafa;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.affilio-preview-para {
+  padding: 6px 0;
+  color: #3c434a;
+  font-size: 13px;
+  line-height: 1.5;
+  border-bottom: 1px dotted #e8e8e8;
+}
+
+.affilio-preview-para:last-child {
+  border-bottom: none;
+}
+
+.affilio-preview-insertion {
+  border-left: 3px solid #2271b1;
+  background: #f0f6fc;
+  padding: 10px 12px;
+  margin: 8px 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.affilio-preview-transition {
+  font-style: italic;
+  color: #50575e;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.affilio-confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 8px;
+  border: 1px solid transparent;
+}
+
+.affilio-confidence-high {
+  background: #edfaef;
+  color: #1e6f31;
+  border-color: #4ab866;
+}
+
+.affilio-confidence-medium {
+  background: #fff8e5;
+  color: #8a5700;
+  border-color: #dba617;
+}
+
+.affilio-confidence-low {
+  background: #f6f7f7;
+  color: #50575e;
+  border-color: #dcdcde;
+}
+
+.affilio-plan-editor-sm {
+  min-height: 48px;
+}
+
+.affilio-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+}
+
+.affilio-confirm-dialog {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  max-width: 560px;
+  width: 90%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.affilio-confirm-dialog h4 {
+  margin: 0 0 12px;
+}
+
+.affilio-confirm-preview {
+  border: 1px solid #dcdcde;
+  border-radius: 4px;
+  padding: 10px;
+  margin: 10px 0;
+  background: #f6fbff;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.affilio-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+#affilio-analytics-root.affilio-analytics-app {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
 @media (max-width: 960px) {
   .affilio-inline-form {
     grid-template-columns: 1fr;

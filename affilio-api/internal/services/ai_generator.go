@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -19,22 +20,30 @@ type AIContentGenerator struct {
 }
 
 type ContentRequest struct {
-	ProgramName    string
-	Company        string
-	Reason         string
-	InsertionType  string
-	ProgramType    string
-	ArticleTitle   string
-	ArticleURL     string
-	ArticleContext string
-	PreferredTone  string
-	SiteLanguage   string
+	ProgramName      string
+	Company          string
+	Reason           string
+	InsertionType    string
+	ProgramType      string
+	ArticleTitle     string
+	ArticleURL       string
+	ArticleContext   string
+	PreferredTone    string
+	SiteLanguage     string
+	ArticleContent   string
+	ArticleHeadings  []string
+	ExistingLinks    []string
+	ArticleWordCount int
+	ArticleCategory  string
 }
 
 type GeneratedSnippetPlan struct {
-	Blurb             string
-	SuggestedPosition string
-	PlacementReason   string
+	Blurb                   string
+	SuggestedPosition       string
+	PlacementReason         string
+	TransitionSentence      string
+	SuggestedParagraphIndex int
+	ConfidenceScore         float64
 }
 
 func (g *AIContentGenerator) GenerateSnippet(ctx context.Context, input ContentRequest) (string, error) {
@@ -86,9 +95,12 @@ type claudeGenResponse struct {
 }
 
 type blurbResponse struct {
-	Blurb             string `json:"blurb"`
-	SuggestedPosition string `json:"suggested_position"`
-	PlacementReason   string `json:"placement_reason"`
+	Blurb                   string  `json:"blurb"`
+	SuggestedPosition       string  `json:"suggested_position"`
+	PlacementReason         string  `json:"placement_reason"`
+	TransitionSentence      string  `json:"transition_sentence"`
+	SuggestedParagraphIndex int     `json:"suggested_paragraph_index"`
+	ConfidenceScore         float64 `json:"confidence_score"`
 }
 
 func (g *AIContentGenerator) generateWithClaude(ctx context.Context, input ContentRequest) (*GeneratedSnippetPlan, error) {
@@ -102,13 +114,13 @@ func (g *AIContentGenerator) generateWithClaude(ctx context.Context, input Conte
 	}
 	client := g.Client
 	if client == nil {
-		client = &http.Client{Timeout: 12 * time.Second}
+		client = &http.Client{Timeout: 20 * time.Second}
 	}
 	payload := claudeGenRequest{
 		Model:       g.Model,
-		MaxTokens:   220,
-		Temperature: 0.3,
-		System:      "You are a conversion-focused affiliate writing assistant. Output JSON only. No markdown.",
+		MaxTokens:   600,
+		Temperature: 0.4,
+		System:      "You are an expert content writer who seamlessly weaves affiliate recommendations into existing articles. You match the article's voice, tone, and language exactly. Output JSON only. No markdown, no commentary.",
 		Messages: []claudeMessage{
 			{
 				Role:    "user",
@@ -152,9 +164,12 @@ func (g *AIContentGenerator) generateWithClaude(ctx context.Context, input Conte
 	var out blurbResponse
 	if err := json.Unmarshal([]byte(text), &out); err == nil && strings.TrimSpace(out.Blurb) != "" {
 		return &GeneratedSnippetPlan{
-			Blurb:             strings.TrimSpace(out.Blurb),
-			SuggestedPosition: strings.TrimSpace(out.SuggestedPosition),
-			PlacementReason:   strings.TrimSpace(out.PlacementReason),
+			Blurb:                   strings.TrimSpace(out.Blurb),
+			SuggestedPosition:       strings.TrimSpace(out.SuggestedPosition),
+			PlacementReason:         strings.TrimSpace(out.PlacementReason),
+			TransitionSentence:      strings.TrimSpace(out.TransitionSentence),
+			SuggestedParagraphIndex: out.SuggestedParagraphIndex,
+			ConfidenceScore:         out.ConfidenceScore,
 		}, nil
 	}
 	return &GeneratedSnippetPlan{Blurb: text}, nil
@@ -188,23 +203,66 @@ func buildGenPrompt(input ContentRequest) string {
 	if language == "" {
 		language = "auto-detect from article context"
 	}
-	context := strings.TrimSpace(input.ArticleContext)
-	if context == "" {
-		context = "n/a"
+	articleContext := strings.TrimSpace(input.ArticleContext)
+	if articleContext == "" {
+		articleContext = "n/a"
 	}
-	return "Write one concise affiliate recommendation snippet that feels native to the article voice and language. " +
-		"Max 34 words, no hype, no disclosure text, no markdown, no emojis. " +
-		"Choose one suggested_position from: after_intro, mid_article, before_conclusion, end_of_article. " +
-		"Return JSON only: {\"blurb\":\"...\",\"suggested_position\":\"...\",\"placement_reason\":\"...\"}. placement_reason max 16 words.\n\n" +
+
+	// Use the richer ArticleContent if available, capped at 3000 chars
+	articleContent := strings.TrimSpace(input.ArticleContent)
+	if articleContent == "" {
+		articleContent = articleContext
+	}
+	if len(articleContent) > 3000 {
+		articleContent = articleContent[:3000]
+	}
+
+	headings := "none"
+	if len(input.ArticleHeadings) > 0 {
+		headings = strings.Join(input.ArticleHeadings, " | ")
+	}
+
+	existingLinks := "none"
+	if len(input.ExistingLinks) > 0 {
+		existingLinks = strings.Join(input.ExistingLinks, ", ")
+	}
+
+	wordCount := ""
+	if input.ArticleWordCount > 0 {
+		wordCount = fmt.Sprintf("approximately %d words", input.ArticleWordCount)
+	}
+
+	category := strings.TrimSpace(input.ArticleCategory)
+
+	prompt := "Write a natural affiliate recommendation that reads as if the original article author wrote it. " +
+		"Write 2-3 sentences that flow naturally within the article. No hype, no disclosure text, no markdown, no emojis. " +
+		"CRITICAL: Write in the SAME LANGUAGE as the article. If the article is in Italian, write in Italian. If in English, write in English. " +
+		"Also write a short transition sentence (1 sentence) that bridges from the surrounding article content to the recommendation.\n\n" +
+		"Choose suggested_position from: after_intro, mid_article, before_conclusion, end_of_article.\n" +
+		"Provide suggested_paragraph_index (0-based integer) for where to insert within the article.\n" +
+		"Provide confidence_score (0.0-1.0) indicating how confident you are this recommendation fits naturally.\n\n" +
+		"Return JSON only: {\"blurb\":\"...\",\"transition_sentence\":\"...\",\"suggested_position\":\"...\",\"suggested_paragraph_index\":N,\"confidence_score\":N.N,\"placement_reason\":\"...\"}.\n\n" +
 		"Article title: " + title + "\n" +
-		"Article URL: " + url + "\n" +
-		"Article context excerpt: " + context + "\n" +
+		"Article URL: " + url + "\n"
+
+	if wordCount != "" {
+		prompt += "Article length: " + wordCount + "\n"
+	}
+	if category != "" {
+		prompt += "Article category: " + category + "\n"
+	}
+
+	prompt += "Article headings: " + headings + "\n" +
+		"Existing affiliate links in article: " + existingLinks + "\n" +
+		"Article content:\n" + articleContent + "\n\n" +
 		"Preferred tone: " + tone + "\n" +
 		"Target language: " + language + "\n" +
 		"Product: " + input.ProgramName + company + "\n" +
-		"Reason: " + reason + "\n" +
+		"Reason this product fits: " + reason + "\n" +
 		"Insertion type: " + strings.TrimSpace(input.InsertionType) + "\n" +
 		"Program type: " + strings.TrimSpace(input.ProgramType)
+
+	return prompt
 }
 
 func normalizeSuggestedPosition(position string) string {

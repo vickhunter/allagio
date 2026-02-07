@@ -22,6 +22,7 @@ class Affilio_Admin {
             array($this, 'render_dashboard'),
             'dashicons-analytics'
         );
+        add_submenu_page('affilio', $this->t('Analytics', 'Analitiche'), $this->t('Analytics', 'Analitiche'), 'manage_options', 'affilio-analytics', array($this, 'render_analytics'));
         add_submenu_page('affilio', $this->t('Settings', 'Impostazioni'), $this->t('Settings', 'Impostazioni'), 'manage_options', 'affilio-settings', array($this, 'render_settings'));
         if ($this->is_advanced_mode()) {
             add_submenu_page('affilio', $this->t('Discovery Queue', 'Coda Discovery'), $this->t('Discovery Queue', 'Coda Discovery'), 'manage_options', 'affilio-discovery', array($this, 'render_discovery'));
@@ -43,7 +44,7 @@ class Affilio_Admin {
     }
 
     public function enqueue_dashboard_assets($hook) {
-        if ($hook !== 'toplevel_page_affilio' && $hook !== 'affilio_page_affilio-discovery') {
+        if ($hook !== 'toplevel_page_affilio' && $hook !== 'affilio_page_affilio-discovery' && $hook !== 'affilio_page_affilio-analytics') {
             return;
         }
         if ($hook === 'affilio_page_affilio-discovery') {
@@ -56,6 +57,16 @@ class Affilio_Admin {
                 'adminKey' => get_option('affilio_admin_api_key', ''),
                 'actor' => wp_get_current_user()->user_login,
                 'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
+                'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
+            ));
+        } elseif ($hook === 'affilio_page_affilio-analytics') {
+            wp_enqueue_script('affilio-analytics', AFFILIO_PLUGIN_URL . 'admin/build/analytics.js', array(), AFFILIO_VERSION, true);
+            wp_localize_script('affilio-analytics', 'AffilioData', array(
+                'apiUrl' => Affilio_API::resolve_base_url(),
+                'apiKey' => get_option('affilio_api_key', ''),
+                'nonce'  => wp_create_nonce('wp_rest'),
+                'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
+                'connectionStatus' => $this->api->get_connection_status(),
                 'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
             ));
         } else {
@@ -106,6 +117,21 @@ class Affilio_Admin {
             return;
         }
         echo '<div id="affilio-discovery-root"></div>';
+    }
+
+    public function render_analytics() {
+        $status = $this->api->get_connection_status();
+        echo '<div class="wrap affilio-admin-page">';
+        if (!$status['connected']) {
+            echo '<div class="affilio-panel affilio-panel-warning">';
+            echo '<h2>' . esc_html($this->t('Affilio Analytics', 'Analitiche Affilio')) . '</h2>';
+            echo '<p><strong>' . esc_html($this->t('Not connected.', 'Non connesso.')) . '</strong> ' . esc_html($status['message']) . '</p>';
+            echo '<p><a class="button button-primary" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a></p>';
+            echo '</div></div>';
+            return;
+        }
+        echo '<div id="affilio-analytics-root"></div>';
+        echo '</div>';
     }
 
     public function render_settings() {
