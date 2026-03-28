@@ -16,10 +16,7 @@ func TestTrackingSummaryAndTrends(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "test-key", "example.com", "Example Site")
 	articleID, err := db.UpsertArticle(context.Background(), siteID, 11, "Analytics Post", "https://example.com/a", "hash")
 	if err != nil {
 		t.Fatalf("create article: %v", err)
@@ -268,10 +265,7 @@ func TestTrackClickDuplicateSuppression(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "test-key", "example.com", "Example Site")
 	articleID, err := db.UpsertArticle(context.Background(), siteID, 121, "Duplicate Guard Article", "https://example.com/dup", "hash")
 	if err != nil {
 		t.Fatalf("create article: %v", err)
@@ -335,10 +329,7 @@ func TestTrackClickRateLimit(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "test-key", "example.com", "Example Site")
 	articleID, err := db.UpsertArticle(context.Background(), siteID, 122, "Rate Guard Article", "https://example.com/rate", "hash")
 	if err != nil {
 		t.Fatalf("create article: %v", err)

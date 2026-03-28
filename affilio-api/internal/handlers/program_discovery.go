@@ -14,6 +14,7 @@ import (
 type ProgramDiscoveryHandler struct {
 	DB         *database.DB
 	HTTPClient *http.Client
+	Audit      *services.AuditLogger
 }
 
 type reviewPayload struct {
@@ -107,6 +108,17 @@ func (h *ProgramDiscoveryHandler) Review(c *gin.Context) {
 	_, _ = h.DB.Pool.Exec(c.Request.Context(), `
 INSERT INTO program_discovery_reviews (discovery_id, status, note, reviewed_by)
 VALUES ($1,$2,$3,$4)`, c.Param("id"), status, payload.Note, payload.Actor)
+	if h.Audit != nil {
+		h.Audit.Log(database.AuditEvent{
+			EventType: "discovery_review",
+			Severity:  "info",
+			Actor:     payload.Actor,
+			IPAddress: strings.TrimSpace(c.ClientIP()),
+			Endpoint:  c.FullPath(),
+			Method:    c.Request.Method,
+			Details:   map[string]interface{}{"discovery_id": c.Param("id"), "status": status},
+		})
+	}
 	c.JSON(http.StatusOK, gin.H{"status": status})
 }
 
@@ -177,6 +189,17 @@ RETURNING id`, name, company, slug, description, website, category, signup).Scan
 	_, _ = h.DB.Pool.Exec(c.Request.Context(), `
 INSERT INTO program_discovery_reviews (discovery_id, status, note, reviewed_by)
 VALUES ($1,'promoted',$2,$3)`, c.Param("id"), note, actor)
+	if h.Audit != nil {
+		h.Audit.Log(database.AuditEvent{
+			EventType: "discovery_promote",
+			Severity:  "info",
+			Actor:     actor,
+			IPAddress: strings.TrimSpace(c.ClientIP()),
+			Endpoint:  c.FullPath(),
+			Method:    c.Request.Method,
+			Details:   map[string]interface{}{"discovery_id": c.Param("id"), "program_id": programID, "domain": domain},
+		})
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "promoted", "program_id": programID})
 }
 

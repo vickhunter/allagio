@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,6 +44,8 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"004_discovery_reviews.sql",
 		"005_api_key_rotation.sql",
 		"006_recommendation_status_guardrails.sql",
+		"007_audit_events.sql",
+		"008_hash_api_keys.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)
@@ -59,6 +62,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 func truncateAll(db *database.DB) error {
 	_, err := db.Pool.Exec(context.Background(), `
 TRUNCATE TABLE
+    audit_events,
     site_key_rotations,
     program_discovery_reviews,
     program_discovery_queue,
@@ -73,6 +77,16 @@ TRUNCATE TABLE
     affiliate_programs
 RESTART IDENTITY CASCADE`)
 	return err
+}
+
+// createTestSite is a helper that creates a site with a hashed key for tests.
+func createTestSite(t *testing.T, db *database.DB, plaintextKey, domain, name string) string {
+	t.Helper()
+	siteID, err := db.CreateSite(context.Background(), services.HashAPIKey(plaintextKey), services.KeyPrefix(plaintextKey), domain, name)
+	if err != nil {
+		t.Fatalf("create test site: %v", err)
+	}
+	return siteID
 }
 
 func newJSONRequest(t *testing.T, method, path string, payload interface{}) *bytes.Reader {

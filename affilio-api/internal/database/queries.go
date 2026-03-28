@@ -12,10 +12,11 @@ import (
 )
 
 type Site struct {
-	ID     string `json:"id"`
-	APIKey string `json:"api_key"`
-	Domain string `json:"domain"`
-	Name   string `json:"name"`
+	ID           string `json:"id"`
+	APIKeyHash   string `json:"-"`
+	APIKeyPrefix string `json:"-"`
+	Domain       string `json:"domain"`
+	Name         string `json:"name"`
 }
 
 type SiteKeyRotation struct {
@@ -191,6 +192,18 @@ type RecommendationQuality struct {
 	ClickRate    float64 `json:"click_rate"`
 }
 
+type AuditEvent struct {
+	ID        string                 `json:"id"`
+	EventType string                 `json:"event_type"`
+	Severity  string                 `json:"severity"`
+	Actor     string                 `json:"actor"`
+	IPAddress string                 `json:"ip_address"`
+	Endpoint  string                 `json:"endpoint"`
+	Method    string                 `json:"method"`
+	Details   map[string]interface{} `json:"details"`
+	CreatedAt string                 `json:"created_at"`
+}
+
 type RecommendationTuneProfile struct {
 	ProgramID     string  `json:"program_id"`
 	ProgramName   string  `json:"program_name"`
@@ -202,31 +215,38 @@ type RecommendationTuneProfile struct {
 	Multiplier    float64 `json:"multiplier"`
 }
 
-func (d *DB) GetSiteByAPIKey(ctx context.Context, apiKey string) (*Site, error) {
-	row := d.Pool.QueryRow(ctx, `SELECT id, api_key, domain, COALESCE(name,'') FROM sites WHERE api_key=$1`, apiKey)
+// GetSiteByKeyHash looks up a site by the SHA-256 hash of an API key (current key only).
+func (d *DB) GetSiteByKeyHash(ctx context.Context, keyHash, keyPrefix string) (*Site, error) {
+	row := d.Pool.QueryRow(ctx, `
+SELECT id, api_key_hash, COALESCE(api_key_prefix,''), domain, COALESCE(name,'')
+FROM sites
+WHERE api_key_prefix=$1 AND api_key_hash=$2`, keyPrefix, keyHash)
 	var s Site
-	if err := row.Scan(&s.ID, &s.APIKey, &s.Domain, &s.Name); err != nil {
+	if err := row.Scan(&s.ID, &s.APIKeyHash, &s.APIKeyPrefix, &s.Domain, &s.Name); err != nil {
 		return nil, err
 	}
 	return &s, nil
 }
 
-func (d *DB) GetSiteByAnyAPIKey(ctx context.Context, apiKey string) (*Site, error) {
+// GetSiteByAnyKeyHash looks up a site by hash of current or previous (non-expired) key.
+func (d *DB) GetSiteByAnyKeyHash(ctx context.Context, keyHash, keyPrefix string) (*Site, error) {
 	row := d.Pool.QueryRow(ctx, `
-SELECT id, api_key, domain, COALESCE(name,'')
+SELECT id, api_key_hash, COALESCE(api_key_prefix,''), domain, COALESCE(name,'')
 FROM sites
-WHERE api_key=$1 OR api_key_previous=$1`, apiKey)
+WHERE (api_key_prefix=$1 AND api_key_hash=$2)
+   OR (api_key_prev_prefix=$1 AND api_key_prev_hash=$2 AND (api_key_previous_expires_at IS NULL OR api_key_previous_expires_at > NOW()))`,
+		keyPrefix, keyHash)
 	var s Site
-	if err := row.Scan(&s.ID, &s.APIKey, &s.Domain, &s.Name); err != nil {
+	if err := row.Scan(&s.ID, &s.APIKeyHash, &s.APIKeyPrefix, &s.Domain, &s.Name); err != nil {
 		return nil, err
 	}
 	return &s, nil
 }
 
 func (d *DB) GetSiteByID(ctx context.Context, siteID string) (*Site, error) {
-	row := d.Pool.QueryRow(ctx, `SELECT id, api_key, domain, COALESCE(name,'') FROM sites WHERE id=$1`, siteID)
+	row := d.Pool.QueryRow(ctx, `SELECT id, COALESCE(api_key_hash,''), COALESCE(api_key_prefix,''), domain, COALESCE(name,'') FROM sites WHERE id=$1`, siteID)
 	var s Site
-	if err := row.Scan(&s.ID, &s.APIKey, &s.Domain, &s.Name); err != nil {
+	if err := row.Scan(&s.ID, &s.APIKeyHash, &s.APIKeyPrefix, &s.Domain, &s.Name); err != nil {
 		return nil, err
 	}
 	return &s, nil
@@ -240,19 +260,23 @@ func (d *DB) DeleteSiteByID(ctx context.Context, siteID string) (bool, error) {
 	return res.RowsAffected() > 0, nil
 }
 
-func (d *DB) CreateSite(ctx context.Context, apiKey, domain, name string) (string, error) {
+func (d *DB) CreateSite(ctx context.Context, keyHash, keyPrefix, domain, name string) (string, error) {
 	var id string
-	err := d.Pool.QueryRow(ctx, `INSERT INTO sites (api_key, domain, name) VALUES ($1,$2,$3) RETURNING id`, apiKey, domain, name).Scan(&id)
+	err := d.Pool.QueryRow(ctx, `INSERT INTO sites (api_key_hash, api_key_prefix, domain, name) VALUES ($1,$2,$3,$4) RETURNING id`, keyHash, keyPrefix, domain, name).Scan(&id)
 	return id, err
 }
 
-func (d *DB) RotateSiteAPIKey(ctx context.Context, siteID, newKey string) error {
+func (d *DB) RotateSiteAPIKey(ctx context.Context, siteID, newKeyHash, newKeyPrefix string, gracePeriod time.Duration) error {
+	graceInterval := fmt.Sprintf("%d hours", int(gracePeriod.Hours()))
 	_, err := d.Pool.Exec(ctx, `
 UPDATE sites
-SET api_key_previous=api_key,
-    api_key=$2,
-    api_key_rotated_at=NOW()
-WHERE id=$1`, siteID, newKey)
+SET api_key_prev_hash=api_key_hash,
+    api_key_prev_prefix=api_key_prefix,
+    api_key_hash=$2,
+    api_key_prefix=$3,
+    api_key_rotated_at=NOW(),
+    api_key_previous_expires_at=NOW() + ($4 || ' hours')::interval
+WHERE id=$1`, siteID, newKeyHash, newKeyPrefix, graceInterval)
 	return err
 }
 
@@ -1105,4 +1129,67 @@ func formatTimePtr(t *time.Time) *string {
 	}
 	s := t.Format(time.RFC3339)
 	return &s
+}
+
+func (d *DB) InsertAuditEvent(ctx context.Context, ev AuditEvent) error {
+	detailsJSON := ToJSON(ev.Details)
+	_, err := d.Pool.Exec(ctx, `
+INSERT INTO audit_events (event_type, severity, actor, ip_address, endpoint, method, details)
+VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+		ev.EventType, ev.Severity, ev.Actor, ev.IPAddress, ev.Endpoint, ev.Method, detailsJSON)
+	return err
+}
+
+func (d *DB) ListAuditEvents(ctx context.Context, eventType, severity string, limit, offset int) ([]AuditEvent, int, error) {
+	where := "1=1"
+	args := []interface{}{}
+	argN := 1
+	if eventType != "" {
+		where += fmt.Sprintf(" AND event_type=$%d", argN)
+		args = append(args, eventType)
+		argN++
+	}
+	if severity != "" {
+		where += fmt.Sprintf(" AND severity=$%d", argN)
+		args = append(args, severity)
+		argN++
+	}
+
+	var total int
+	countQ := "SELECT COUNT(*) FROM audit_events WHERE " + where
+	if err := d.Pool.QueryRow(ctx, countQ, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	listQ := fmt.Sprintf("SELECT id, event_type, severity, COALESCE(actor,''), COALESCE(ip_address,''), COALESCE(endpoint,''), COALESCE(method,''), COALESCE(details::text,'{}'), created_at FROM audit_events WHERE %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", where, argN, argN+1)
+	args = append(args, limit, offset)
+
+	rows, err := d.Pool.Query(ctx, listQ, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var events []AuditEvent
+	for rows.Next() {
+		var ev AuditEvent
+		var detailsStr string
+		var createdAt time.Time
+		if err := rows.Scan(&ev.ID, &ev.EventType, &ev.Severity, &ev.Actor, &ev.IPAddress, &ev.Endpoint, &ev.Method, &detailsStr, &createdAt); err != nil {
+			continue
+		}
+		ev.CreatedAt = createdAt.Format(time.RFC3339)
+		_ = json.Unmarshal([]byte(detailsStr), &ev.Details)
+		events = append(events, ev)
+	}
+	return events, total, nil
+}
+
+func (d *DB) CountRecentAuthFailures(ctx context.Context, ip string, minutes int) (int, error) {
+	var count int
+	err := d.Pool.QueryRow(ctx, `
+SELECT COUNT(*) FROM audit_events
+WHERE ip_address=$1 AND event_type IN ('auth_failure_api_key','auth_failure_admin_key')
+AND created_at > NOW() - ($2 || ' minutes')::interval`, ip, fmt.Sprintf("%d", minutes)).Scan(&count)
+	return count, err
 }

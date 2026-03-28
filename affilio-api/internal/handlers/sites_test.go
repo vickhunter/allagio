@@ -50,10 +50,7 @@ func TestSitesDeleteRequiresAdminKeyAndSiteID(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	siteID, err := db.CreateSite(context.Background(), "site-key", "example.com", "Example")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "site-key", "example.com", "Example")
 
 	handler := &SitesHandler{
 		DB:          db,
@@ -106,10 +103,7 @@ func TestSitesDeleteRejectsDomainMismatch(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	siteID, err := db.CreateSite(context.Background(), "site-key-2", "example.net", "Example Net")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "site-key-2", "example.net", "Example Net")
 
 	handler := &SitesHandler{
 		DB:          db,

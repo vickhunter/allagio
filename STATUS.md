@@ -21,7 +21,7 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 - **Database schema**:
   - Core tables: `affiliate_programs`, `sites`, `articles`, `recommendations`, `clicks`, `site_affiliate_accounts`.
   - New MVP tables: `user_programs`, `user_program_links`, `link_detections`, `program_discovery_queue`, `scan_jobs`, `program_discovery_reviews`.
-  - Migrations: `001_initial.sql`, `002_seed_programs.sql` (seed list), `003_add_user_program_id.sql`, `004_discovery_reviews.sql`, `005_api_key_rotation.sql`, `006_recommendation_status_guardrails.sql`.
+  - Migrations: `001_initial.sql`, `002_seed_programs.sql` (seed list), `003_add_user_program_id.sql`, `004_discovery_reviews.sql`, `005_api_key_rotation.sql`, `006_recommendation_status_guardrails.sql`, `007_audit_events.sql`, `008_hash_api_keys.sql`.
 - **Curated catalog**:
   - Seed data deduped and upserts on `slug` for safe re-runs.
 - **Scan pipeline**:
@@ -50,8 +50,16 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
   - Review validation (`reviewed`/`rejected`) + audit log.
   - Pagination supported via `limit` + `offset`.
   - Promote flow to create curated programs from queue entries.
-- **API key rotation**:
-  - Admin-only endpoint to rotate site keys with audit trail and previous-key fallback auth.
+- **API key security**:
+  - Keys stored as SHA-256 hashes with 8-char prefix for indexed lookup; plaintext never persisted.
+  - Admin-only endpoint to rotate site keys with audit trail and configurable grace period (`KEY_ROTATION_GRACE_HOURS`, default 24h).
+  - Previous key expires automatically after the grace window.
+- **Audit logging**:
+  - `audit_events` table records auth failures, admin actions, key rotations, site deletions, and discovery operations.
+  - Async non-blocking audit logger with buffered channel.
+  - Admin endpoints for viewing audit events (`/audit/events`) and alerts (`/audit/alerts`).
+  - Alerts surface IPs with repeated auth failures (>5 in 15 minutes).
+  - Admin key auth uses constant-time comparison.
 - **Site lifecycle hardening**:
   - `POST /v1/sites/register` now validates domain input and applies per-IP rate limiting.
   - `DELETE /v1/sites` no longer accepts destructive deletes by `X-API-Key`; it requires `X-Admin-Key` plus explicit `site_id` and confirmation.
@@ -135,6 +143,9 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 - `affilio-api/internal/services/link_detector.go`
 - `affilio-api/internal/services/matcher.go`
 - `affilio-api/internal/services/scorer.go`
+- `affilio-api/internal/services/audit.go`
+- `affilio-api/internal/services/keyhash.go`
+- `affilio-api/internal/handlers/audit.go`
 
 ### WordPress Plugin
 - `affilio-wp/affilio.php`
@@ -147,7 +158,6 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 ## What’s Missing / Stubbed
 - **Matching quality**: lightweight semantic overlap exists; no true intent or LLM semantic analysis.
 - **Program discovery pipeline**: enrichment automation exists, but full quality scoring/verification workflow is still lightweight.
-- **Auth hardening**: API keys are stored as plain strings; rotation now supported but no auto-revoke window.
 - **Tests**: browser-level E2E now covers onboarding/connected/disconnected states; still missing full insert + tracking + analytics end-to-end assertions.
 
 ## Known Issues / Constraints
@@ -159,7 +169,7 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 1. **Start DB + API**
    - `cd affilio-api`
    - `docker-compose up -d`
-   - Apply migrations in order: `001_initial.sql`, `002_seed_programs.sql`, `003_add_user_program_id.sql`, `004_discovery_reviews.sql`, `005_api_key_rotation.sql`, `006_recommendation_status_guardrails.sql`
+   - Apply migrations in order: `001_initial.sql`, `002_seed_programs.sql`, `003_add_user_program_id.sql`, `004_discovery_reviews.sql`, `005_api_key_rotation.sql`, `006_recommendation_status_guardrails.sql`, `007_audit_events.sql`, `008_hash_api_keys.sql`
    - Run API: `go run ./cmd/server`
 2. **Install Plugin**
    - Copy `affilio-wp/` into `wp-content/plugins/affilio/`
@@ -197,7 +207,9 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 - 2026-02-06: Added click anti-abuse protection for tracking (basic per-IP rate limiting + duplicate suppression window) with handler tests.
 - 2026-02-06: Reduced API key exposure in Gutenberg editor/sidebar by replacing direct backend key calls with WP nonce + server-side proxy routes (`/affilio/v1/editor/*`) and capability checks.
 
+- 2026-03-28: Implemented API key hashing (SHA-256 + prefix indexed lookup), previous-key expiry window with configurable grace period, audit logging for auth failures and admin actions, admin audit events/alerts endpoints, and fixed AdminKeyAuth to use constant-time comparison.
+
 ## Next Suggested Tasks
-1. Complete security launch blockers listed in `MVP_CHECKLIST.md` (`P0` items first).
-2. Improve semantic matching quality (LLM/intent).
-3. Extend browser E2E to full insert + tracking + analytics assertions on staging.
+1. Improve semantic matching quality (LLM/intent).
+2. Extend browser E2E to full insert + tracking + analytics assertions on staging.
+3. Add external alerting (Slack/email webhook) for critical audit events.

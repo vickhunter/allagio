@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -14,10 +13,7 @@ func TestRotateSiteKey(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "test-key-for-rotation-test", "example.com", "Example Site")
 
 	handler := &SiteKeysHandler{DB: db}
 	gin.SetMode(gin.TestMode)

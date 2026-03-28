@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,10 +12,7 @@ import (
 func TestScanSingleCreatesRecommendations(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "test-key", "example.com", "Example Site")
 	handler := &ScanHandler{DB: db, Classifier: nil}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

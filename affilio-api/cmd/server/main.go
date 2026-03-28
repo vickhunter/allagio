@@ -24,6 +24,9 @@ func main() {
 	}
 	defer db.Close()
 
+	audit := services.NewAuditLogger(db)
+	defer audit.Close()
+
 	r := gin.Default()
 	if err := r.SetTrustedProxies(nil); err != nil {
 		log.Fatalf("failed to set trusted proxies: %v", err)
@@ -38,8 +41,9 @@ func main() {
 		DB:              db,
 		AdminAPIKey:     cfg.AdminAPIKey,
 		RegisterLimiter: handlers.NewIPRateLimiter(8, time.Minute),
+		Audit:           audit,
 	}
-	siteKeys := &handlers.SiteKeysHandler{DB: db}
+	siteKeys := &handlers.SiteKeysHandler{DB: db, Audit: audit, GracePeriod: cfg.KeyRotationGracePeriod}
 	classifier := &services.AIClassifier{
 		APIKey:     cfg.ClaudeAPIKey,
 		Model:      cfg.ClaudeModel,
@@ -60,13 +64,14 @@ func main() {
 	tracking := &handlers.TrackingHandler{DB: db}
 	userPrograms := &handlers.UserProgramsHandler{DB: db}
 	detect := &handlers.DetectHandler{Classifier: classifier}
-	programDiscovery := &handlers.ProgramDiscoveryHandler{DB: db}
+	programDiscovery := &handlers.ProgramDiscoveryHandler{DB: db, Audit: audit}
+	auditHandler := &handlers.AuditHandler{DB: db}
 
 	v1.POST("/sites/register", sites.Register)
 	v1.DELETE("/sites", sites.Delete)
 
 	secured := v1.Group("/")
-	secured.Use(middleware.APIKeyAuth(db))
+	secured.Use(middleware.APIKeyAuth(db, audit))
 	{
 		secured.POST("/scan/full", scan.ScanFull)
 		secured.POST("/scan/single", scan.ScanSingle)
@@ -106,12 +111,14 @@ func main() {
 	}
 
 	admin := v1.Group("/program-discovery")
-	admin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey))
+	admin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
 	{
 		admin.GET("/queue", programDiscovery.List)
 		admin.POST("/queue/:id/review", programDiscovery.Review)
 		admin.POST("/queue/:id/promote", programDiscovery.Promote)
 		admin.POST("/sites/rotate-key", siteKeys.Rotate)
+		admin.GET("/audit/events", auditHandler.List)
+		admin.GET("/audit/alerts", auditHandler.Alerts)
 	}
 
 	log.Printf("Affilio API listening on :%s", cfg.Port)

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/services"
+
 	"github.com/jackc/pgx/v5"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +23,7 @@ type SitesHandler struct {
 	DB              *database.DB
 	AdminAPIKey     string
 	RegisterLimiter *IPRateLimiter
+	Audit           *services.AuditLogger
 }
 
 type siteRegisterRequest struct {
@@ -108,7 +111,9 @@ func (h *SitesHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate api key"})
 		return
 	}
-	_, err = h.DB.CreateSite(c.Request.Context(), apiKey, req.Domain, req.Name)
+	keyHash := services.HashAPIKey(apiKey)
+	keyPrefix := services.KeyPrefix(apiKey)
+	_, err = h.DB.CreateSite(c.Request.Context(), keyHash, keyPrefix, req.Domain, req.Name)
 	if err != nil {
 		log.Printf("sites.register db create failed domain=%s name=%s err=%v", req.Domain, req.Name, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register site"})
@@ -123,6 +128,16 @@ func (h *SitesHandler) Delete(c *gin.Context) {
 		return
 	}
 	if subtle.ConstantTimeCompare([]byte(c.GetHeader("X-Admin-Key")), []byte(h.AdminAPIKey)) != 1 {
+		if h.Audit != nil {
+			h.Audit.Log(database.AuditEvent{
+				EventType: "auth_failure_admin_key",
+				Severity:  "warn",
+				IPAddress: strings.TrimSpace(c.ClientIP()),
+				Endpoint:  "/v1/sites",
+				Method:    "DELETE",
+				Details:   map[string]interface{}{"reason": "invalid admin key on site delete"},
+			})
+		}
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid admin key"})
 		return
 	}
@@ -167,6 +182,16 @@ func (h *SitesHandler) Delete(c *gin.Context) {
 	if !deleted {
 		c.JSON(http.StatusNotFound, gin.H{"error": "site not found"})
 		return
+	}
+	if h.Audit != nil {
+		h.Audit.Log(database.AuditEvent{
+			EventType: "site_deleted",
+			Severity:  "info",
+			IPAddress: strings.TrimSpace(c.ClientIP()),
+			Endpoint:  "/v1/sites",
+			Method:    "DELETE",
+			Details:   map[string]interface{}{"site_id": siteID, "domain": site.Domain},
+		})
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "deleted", "site_id": siteID})
 }

@@ -13,10 +13,7 @@ import (
 func TestGenerateContentFallbackTemplate(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "test-key", "example.com", "Example Site")
 	articleID, err := db.UpsertArticle(context.Background(), siteID, 1, "Test", "https://example.com/post", "hash")
 	if err != nil {
 		t.Fatalf("create article: %v", err)
