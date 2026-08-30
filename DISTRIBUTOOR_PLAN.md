@@ -1,7 +1,11 @@
 # Distributoor — Architecture Plan
 
-**Status:** Draft v2 · **Scope:** DCP protocol layer + Distributoor network (supply-side extension of Affilio)
+**Status:** v2 · **Scope:** DCP protocol layer + Distributoor network (supply-side extension of Affilio)
 **Audience:** Anyone building or evaluating the Distributoor extension of this repo.
+**Implementation status (2026-08-30):** P0–P3 implemented and tested (migrations 007–008,
+maker/product/offer rails, readiness engine + listing gate, marketplace + tracked links,
+provider webhooks + conversion ledger, manual payout batches + earnings). P4 (Agent Plugin,
+DCP v0.1 extraction) and P5 not started.
 
 ---
 
