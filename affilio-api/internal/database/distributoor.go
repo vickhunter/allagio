@@ -237,6 +237,68 @@ LIMIT $1 OFFSET $2`, limit, offset)
 	return out, rows.Err()
 }
 
+type ReadinessAssessment struct {
+	ID         string
+	ProductID  string
+	Status     string
+	Score      int
+	ChecksJSON []byte
+	AISummary  string
+	CreatedAt  time.Time
+	FinishedAt *time.Time
+}
+
+func (d *DB) InsertReadinessAssessment(ctx context.Context, productID string, score int, checksJSON []byte, aiSummary string) (string, error) {
+	var id string
+	err := d.Pool.QueryRow(ctx, `
+INSERT INTO readiness_assessments (product_id, status, score, checks, ai_summary, finished_at)
+VALUES ($1,'complete',$2,$3,$4,NOW())
+RETURNING id`, productID, score, checksJSON, aiSummary).Scan(&id)
+	return id, err
+}
+
+func (d *DB) ListReadinessAssessments(ctx context.Context, makerID, productID string, limit int) ([]ReadinessAssessment, error) {
+	rows, err := d.Pool.Query(ctx, `
+SELECT a.id, a.product_id, a.status, COALESCE(a.score,0), a.checks, COALESCE(a.ai_summary,''), a.created_at, a.finished_at
+FROM readiness_assessments a
+JOIN products p ON p.id = a.product_id
+WHERE a.product_id=$1 AND p.maker_id=$2
+ORDER BY a.created_at DESC
+LIMIT $3`, productID, makerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ReadinessAssessment{}
+	for rows.Next() {
+		var a ReadinessAssessment
+		if err := rows.Scan(&a.ID, &a.ProductID, &a.Status, &a.Score, &a.ChecksJSON, &a.AISummary, &a.CreatedAt, &a.FinishedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) UpdateProductReadiness(ctx context.Context, productID string, score int, status string) error {
+	_, err := d.Pool.Exec(ctx, `
+UPDATE products SET readiness_score=$2, readiness_status=$3, updated_at=NOW() WHERE id=$1`, productID, score, status)
+	return err
+}
+
+// FillProductTaxonomy fills matcher fields from AI extraction, but only where
+// the maker left them empty — maker-provided taxonomy always wins.
+func (d *DB) FillProductTaxonomy(ctx context.Context, productID, category string, keywords, tags []string) error {
+	_, err := d.Pool.Exec(ctx, `
+UPDATE products
+SET primary_category = CASE WHEN COALESCE(primary_category,'')='' THEN $2 ELSE primary_category END,
+    keywords = CASE WHEN COALESCE(array_length(keywords,1),0)=0 THEN $3 ELSE keywords END,
+    tags = CASE WHEN COALESCE(array_length(tags,1),0)=0 THEN $4 ELSE tags END,
+    updated_at=NOW()
+WHERE id=$1`, productID, category, keywords, tags)
+	return err
+}
+
 // PromoteOffer lists a submitted offer in the curated catalog: it upserts an
 // affiliate_programs row sourced from the offer's product and links the offer
 // to it. From that point the existing matcher/recommendation pipeline serves it.

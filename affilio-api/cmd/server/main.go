@@ -68,6 +68,15 @@ func main() {
 	products := &handlers.ProductsHandler{DB: db}
 	offers := &handlers.OffersHandler{DB: db}
 	offerReview := &handlers.OfferReviewHandler{DB: db}
+	assessments := &handlers.AssessmentsHandler{
+		DB: db,
+		Engine: &services.ReadinessEngine{
+			APIKey:     cfg.ClaudeAPIKey,
+			Model:      cfg.ClaudeModel,
+			APIURL:     cfg.ClaudeAPIURL,
+			APIVersion: cfg.ClaudeAPIVersion,
+		},
+	}
 
 	v1.POST("/sites/register", sites.Register)
 	v1.DELETE("/sites", sites.Delete)
@@ -120,6 +129,8 @@ func main() {
 		maker.GET("/products", products.List)
 		maker.GET("/products/:id", products.Get)
 		maker.PATCH("/products/:id", products.Patch)
+		maker.POST("/products/:id/assess", assessments.Assess)
+		maker.GET("/products/:id/assessments", assessments.List)
 
 		maker.POST("/offers", offers.Create)
 		maker.GET("/offers", offers.List)

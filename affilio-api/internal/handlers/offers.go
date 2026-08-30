@@ -185,6 +185,19 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "only draft offers can be submitted", "status": offer.Status})
 		return
 	}
+	product, err := h.DB.GetProduct(c.Request.Context(), makerID(c), offer.ProductID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load product"})
+		return
+	}
+	if product.ReadinessStatus != "ready" {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":            "product has not passed readiness assessment",
+			"readiness_status": product.ReadinessStatus,
+			"hint":             "run POST /v1/maker/products/:id/assess and fix the failing checks",
+		})
+		return
+	}
 	if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 		return

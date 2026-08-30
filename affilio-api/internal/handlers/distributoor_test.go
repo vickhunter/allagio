@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/middleware"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,6 +20,10 @@ func newMakerRouter(db *database.DB) *gin.Engine {
 	r := gin.New()
 	products := &ProductsHandler{DB: db}
 	offers := &OffersHandler{DB: db}
+	assessments := &AssessmentsHandler{
+		DB:     db,
+		Engine: &services.ReadinessEngine{AllowPrivateHosts: true, Client: &http.Client{Timeout: 5 * time.Second}},
+	}
 	maker := r.Group("/v1/maker")
 	maker.Use(middleware.MakerKeyAuth(db))
 	{
@@ -25,6 +31,8 @@ func newMakerRouter(db *database.DB) *gin.Engine {
 		maker.GET("/products", products.List)
 		maker.GET("/products/:id", products.Get)
 		maker.PATCH("/products/:id", products.Patch)
+		maker.POST("/products/:id/assess", assessments.Assess)
+		maker.GET("/products/:id/assessments", assessments.List)
 		maker.POST("/offers", offers.Create)
 		maker.GET("/offers", offers.List)
 		maker.GET("/offers/:id", offers.Get)
@@ -50,6 +58,14 @@ func createTestMaker(t *testing.T, db *database.DB) (makerID, apiKey string) {
 		t.Fatalf("create maker: %v", err)
 	}
 	return id, apiKey
+}
+
+func markProductReady(t *testing.T, db *database.DB, productID string) {
+	t.Helper()
+	_, err := db.Pool.Exec(context.Background(), `UPDATE products SET readiness_status='ready', readiness_score=90 WHERE id=$1`, productID)
+	if err != nil {
+		t.Fatalf("mark product ready: %v", err)
+	}
 }
 
 func doJSON(t *testing.T, r *gin.Engine, method, path, makerKey string, payload interface{}) (*httptest.ResponseRecorder, map[string]interface{}) {
@@ -168,6 +184,13 @@ func TestProductOfferLifecycle(t *testing.T) {
 		t.Fatalf("expected 409 for draft->listed, got %d", rec.Code)
 	}
 
+	// Submit is gated on readiness: unassessed products cannot list.
+	rec, _ = doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409 for unassessed product submit, got %d", rec.Code)
+	}
+	markProductReady(t, db, productID)
+
 	rec, _ = doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("submit offer: expected 200, got %d", rec.Code)
@@ -261,6 +284,7 @@ func TestOfferRejectReturnsToDraft(t *testing.T) {
 		"commission_value": 5,
 	})
 	offerID := offer["id"].(string)
+	markProductReady(t, db, product["id"].(string))
 	doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/offer-review/"+offerID+"/reject", newJSONRequest(t, http.MethodPost, "", map[string]interface{}{
@@ -276,6 +300,102 @@ func TestOfferRejectReturnsToDraft(t *testing.T) {
 	grec, body := doJSON(t, r, http.MethodGet, "/v1/maker/offers/"+offerID, makerKey, nil)
 	if grec.Code != http.StatusOK || body["status"] != "draft" {
 		t.Fatalf("expected draft after reject, got %d %v", grec.Code, body["status"])
+	}
+}
+
+func TestAssessGatesOfferSubmitEndToEnd(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, makerKey := createTestMaker(t, db)
+	r := newMakerRouter(db)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		w.Write([]byte(`<html><body>Sign up <a href="/privacy">Privacy</a> for $9/month <script src="https://js.stripe.com/v3/"></script></body></html>`))
+	})
+	site := httptest.NewServer(mux)
+	defer site.Close()
+
+	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":             "ShipFast",
+		"website_url":      site.URL,
+		"pricing_url":      site.URL,
+		"product_type":     "saas",
+		"payment_provider": "stripe",
+	})
+	productID := product["id"].(string)
+
+	_, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       productID,
+		"commission_type":  "recurring",
+		"commission_value": 25,
+	})
+	offerID := offer["id"].(string)
+
+	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409 before assessment, got %d: %v", rec.Code, body)
+	}
+
+	rec, assessment := doJSON(t, r, http.MethodPost, "/v1/maker/products/"+productID+"/assess", makerKey, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("assess: expected 200, got %d: %v", rec.Code, assessment)
+	}
+	if assessment["readiness_status"] != "ready" {
+		t.Fatalf("expected ready product, got %v (checks: %v)", assessment["readiness_status"], assessment["checks"])
+	}
+
+	rec, _ = doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("submit after assess: expected 200, got %d", rec.Code)
+	}
+
+	rec, listBody := doJSON(t, r, http.MethodGet, "/v1/maker/products/"+productID+"/assessments", makerKey, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list assessments: expected 200, got %d", rec.Code)
+	}
+	assessments, _ := listBody["assessments"].([]interface{})
+	if len(assessments) != 1 {
+		t.Fatalf("expected 1 stored assessment, got %d", len(assessments))
+	}
+}
+
+func TestAssessFailingProductBlocksSubmit(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, makerKey := createTestMaker(t, db)
+	r := newMakerRouter(db)
+
+	// No checkout marker anywhere: the checkout_present gate must fail.
+	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.Write([]byte(`<html><body>Just a landing page</body></html>`))
+	}))
+	defer site.Close()
+
+	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":        "NoCheckout",
+		"website_url": site.URL,
+	})
+	productID := product["id"].(string)
+
+	rec, assessment := doJSON(t, r, http.MethodPost, "/v1/maker/products/"+productID+"/assess", makerKey, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("assess: expected 200, got %d", rec.Code)
+	}
+	if assessment["readiness_status"] != "failing" {
+		t.Fatalf("expected failing product, got %v", assessment["readiness_status"])
+	}
+
+	_, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       productID,
+		"commission_type":  "flat",
+		"commission_value": 10,
+	})
+	rec, _ = doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offer["id"].(string)+"/submit", makerKey, nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409 for failing product, got %d", rec.Code)
 	}
 }
 
