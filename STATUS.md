@@ -196,7 +196,7 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 - 2026-02-06: Added recommendation tuning learning-insights UX in analytics (top boosted/penalized programs, confidence counters, and operator-facing notes) plus program-name enriched tuning profiles.
 - 2026-02-06: Added click anti-abuse protection for tracking (basic per-IP rate limiting + duplicate suppression window) with handler tests.
 - 2026-02-06: Reduced API key exposure in Gutenberg editor/sidebar by replacing direct backend key calls with WP nonce + server-side proxy routes (`/affilio/v1/editor/*`) and capability checks.
-- 2026-08-30: Added `DISTRIBUTOOR_PLAN.md` — architecture plan for Distributoor, the supply-side extension of Affilio (maker onboarding, readiness assessment, offer rails into the curated catalog, conversion attribution + payout ledger, and an agentic layer of CLI/MCP/skills). Documentation only; no code changes.
+- 2026-08-30: Added `DISTRIBUTOOR_PLAN.md` (v2) — architecture plan for Distributoor, the supply-side extension of Affilio: DCP (Distribution Context Protocol) layer on top of MCP, maker onboarding, readiness assessment, offer rails into the curated catalog, conversion attribution + payout ledger, and an agentic layer shipped as an Agent Plugins 1.0.0 package (plugin.json + skills/ + mcp.json). Documentation only; no code changes.
 
 ## Next Suggested Tasks
 1. Complete security launch blockers listed in `MVP_CHECKLIST.md` (`P0` items first).

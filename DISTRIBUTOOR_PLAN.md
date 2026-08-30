@@ -1,6 +1,6 @@
 # Distributoor — Architecture Plan
 
-**Status:** Draft v1 · **Scope:** Supply-side extension of Affilio ("offer rails")
+**Status:** Draft v2 · **Scope:** DCP protocol layer + Distributoor network (supply-side extension of Affilio)
 **Audience:** Anyone building or evaluating the Distributoor extension of this repo.
 
 ---
@@ -11,6 +11,18 @@ Distributoor is an **AI-native distribution network for software makers**. It ta
 product built by an AI-native/vibe-coding maker — a SaaS app, game, Shopify app, or
 developer tool — and gets it distributed and monetized through publishers and
 affiliates, with agents doing the operational work.
+
+**Positioning in one line:** what Google Ads is to paid demand, this is to
+agent-driven distribution — the agent-native affiliate network. And as with ads, the
+durable asset is the rails, not any single campaign: the long-term product is
+**DCP, the Distribution Context Protocol** (§2), with Distributoor as the first
+network built on it.
+
+**This is a network product, not a personal tool.** It is multi-tenant and
+self-serve from day one, for *all* vibe coders on the supply side and *all*
+bloggers on the demand side — WordPress-first for publishers because that is where
+Affilio already has working rails, with other surfaces (newsletters, communities,
+link-in-bio) joining later through the protocol.
 
 Affilio already owns the **demand side** of this network: WordPress publishers whose
 content is scanned, whose affiliate opportunities are detected, and who insert
@@ -42,7 +54,73 @@ conversions and payouts.
 
 ---
 
-## 2. Core decision: extend affilio-api, don't build a second service
+## 2. The layer model: DCP is the protocol, Distributoor is the first network
+
+The system is built in three layers, so the protocol can outgrow any single
+implementation — "the MCP of distribution":
+
+```
+Agent clients            Claude Code · Cursor · ChatGPT/Codex · Copilot · Kiro · VS Code
+      │  installs
+      ▼
+Distributoor Agent Plugin     plugin.json + skills/ + mcp.json   (Agent Plugins 1.0.0)
+      │  speaks
+      ▼
+DCP — Distribution Context Protocol    entities · verbs · attribution semantics · discovery
+      │  implemented by
+      ▼
+Distributoor network (affilio-api)     ←→   future third-party DCP endpoints
+      │  delivers into
+      ▼
+Distribution surfaces          WordPress plugin today · newsletters/communities later
+```
+
+### What DCP actually is
+
+Not a new wire protocol — MCP already won that layer. DCP is a **vocabulary and
+semantics standard on top of MCP**, the way many domain protocols now ride MCP
+transport:
+
+- **Entities** — versioned JSON schemas for `Product`, `Assessment`, `Offer`,
+  `Campaign`, `Conversion`, `Payout`. These are exactly the domain objects in §4;
+  the schemas are extracted from the working implementation, not invented apart
+  from it.
+- **Verbs** — the MCP tool names and input/output shapes any DCP endpoint must
+  expose. Maker side: `register_product`, `run_assessment`, `get_assessment`,
+  `create_offer`, `submit_offer`, `list_matches`, `invite_publisher`,
+  `get_earnings`. Publisher side: `list_offers`, `join_offer`, `get_balance`.
+- **Attribution semantics** — the tracked-redirect contract, ref-param behavior,
+  conversion webhook shape, and refund-window ledger rules (§7), so "a conversion"
+  means the same thing on every DCP network and an agent can reason about earnings
+  across networks.
+- **Discovery** — a `/.well-known/dcp.json` manifest advertising the endpoint's MCP
+  URL, supported verbs, schema version, and payout methods, so agents can find and
+  qualify distribution networks the way MCP clients find servers.
+
+### Why protocol-first
+
+- **Agents are the users.** A maker's agent shouldn't learn N proprietary affiliate
+  dashboards; it learns DCP once and every compliant network becomes reachable.
+  That is the same bet MCP made for tools, and Agent Plugins made for packaging.
+- **The moat compounds at the protocol layer.** Networks compete on inventory and
+  payout terms; the protocol is where the ecosystem standardizes. Owning the
+  reference implementation of the standard is the durable position.
+- **It keeps the demand side open.** WordPress is the first surface, but any
+  surface that implements the publisher verbs — a newsletter tool, a community
+  platform, a link-in-bio service — can join the network without Distributoor
+  building it.
+
+### Rule of the roadmap: spec follows implementation
+
+DCP v0.1 is **extracted from the working Distributoor network in P4**, not designed
+in a vacuum — the same way MCP shipped alongside reference servers, and Agent
+Plugins 1.0.0 shipped with a canonical example repo. Until P4, DCP exists as
+internal discipline: the MCP tool names, schemas, and webhook shapes are written as
+if they were already public, so extraction is a documentation task, not a redesign.
+
+---
+
+## 3. Core decision: extend affilio-api, don't build a second service
 
 Distributoor ships **inside `affilio-api`** as new packages, handlers, and
 migrations — a modular monolith — not as a separate service.
@@ -64,9 +142,12 @@ prefixed by domain (no FKs from existing tables into new ones except the one
 `affiliate_programs.offer_id` column), new code lives in clearly separated files,
 and makers never share auth with sites or admins.
 
+Note the layering does not contradict the monolith: DCP is an *interface
+contract* over the same API — protocol-first doesn't mean service-first.
+
 ---
 
-## 3. Domain model
+## 4. Domain model
 
 New objects (all new tables; existing tables in *italics*):
 
@@ -85,6 +166,8 @@ Maker ──▶ Product ──▶ ReadinessAssessment (checks[])
                  ▼
              LedgerEntry ──▶ Payout
 ```
+
+These objects double as the DCP entity schemas (§2) — name and shape them once.
 
 ### Migration `007_distributoor_core.sql`
 
@@ -237,7 +320,7 @@ unique constraint makes webhook ingestion idempotent.
 
 ---
 
-## 4. Readiness engine
+## 5. Readiness engine
 
 **Purpose:** answer "is this product actually distributable?" before any publisher
 wastes traffic on it. This is a hard gate: an offer cannot leave `draft` until its
@@ -275,7 +358,7 @@ consumer of a failed assessment is usually the maker's coding agent, not the mak
 
 ---
 
-## 5. Matching: reusing the demand side, adding the reverse direction
+## 6. Matching: reusing the demand side, adding the reverse direction
 
 Nothing changes for article→program matching: a promoted offer is an
 `affiliate_programs` row with good keywords/tags, and `matcher.go` (substring
@@ -297,7 +380,7 @@ maker-side analytics:
 
 ---
 
-## 6. Attribution & payouts
+## 7. Attribution & payouts
 
 ### Design constraint discovered up front
 
@@ -313,7 +396,9 @@ None of the three named providers gives us affiliate rails to lean on:
   partner-shaped thing Polar wants to exist).
 
 **Conclusion: Distributoor owns the attribution ledger. Providers are
-conversion-signal adapters behind one interface, nothing more.**
+conversion-signal adapters behind one interface, nothing more.** The attribution
+semantics defined here are also what DCP standardizes (§2), so they must hold
+independent of any provider.
 
 ### Click → conversion flow
 
@@ -373,35 +458,40 @@ correctness is provable with tests; money movement is a compliance project.
 
 ---
 
-## 7. Agentic layer
+## 8. Agentic layer: ship it as an Agent Plugin
 
 Target user is an AI-native maker, so the primary interface is *their agent*, not a
-dashboard. Three surfaces, all thin wrappers over the same HTTP API:
-
-### CLI — `affilio-api/cmd/distributoor`
+dashboard. The maker toolchain is packaged and distributed per the
+**Agent Plugins 1.0.0 spec** (Vercel + OpenAI + Microsoft + Amazon + Cursor;
+launch clients include ChatGPT/Codex, Cursor, GitHub Copilot, Kiro, VS Code —
+Claude Code has native plugin support with the same shape):
 
 ```
-distributoor init                 # register maker + product (writes .distributoor.toml)
-distributoor assess               # run readiness, print checklist w/ remediation
-distributoor offer create|submit  # define terms, submit for listing
-distributoor snippet              # print the ref-capture JS + provider metadata wiring
-distributoor status               # campaigns, clicks, conversions, pending balance
+distributoor-plugin/
+├── plugin.json               # {"$schema": ..., "name": "distributoor"} — the only required fields
+├── mcp.json                  # config for the DCP MCP server (hosted; auth via maker key env)
+└── skills/
+    ├── distributoor-onboard/SKILL.md
+    ├── distributoor-instrument/SKILL.md
+    └── distributoor-launch/SKILL.md
 ```
 
-Same repo, same Go module, imports nothing from `internal/` except a small API
-client package — keeps the monolith boundary clean.
+One plugin install in whatever agent client the maker already uses = the full
+toolchain: the MCP server carries the DCP verbs, the skills carry the workflows.
+This is the go-to-market as much as the architecture — the maker-side product *is*
+a plugin, one install away in every major agent client, distributable through the
+plugin marketplaces those clients are standing up.
 
-### MCP server — `affilio-api/cmd/distributoor-mcp`
+### The MCP server (the DCP endpoint)
 
-Stdio MCP server exposing the maker API as tools:
-`register_product`, `run_assessment`, `get_assessment` (returns remediation strings
-written for agents), `create_offer`, `submit_offer`, `list_matches`,
-`invite_publisher`, `get_earnings`. Auth via `DISTRIBUTOOR_API_KEY` env var (maker
-key). This is what makes "create or update accounts, projects, campaigns, and
-listings through agents" real: a maker tells Claude "get my app listed on
-Distributoor" and the agent drives these tools end to end.
+`cmd/distributoor-mcp` exposes the DCP verb set (§2) over MCP: `register_product`,
+`run_assessment`, `get_assessment` (returns remediation strings written for
+agents), `create_offer`, `submit_offer`, `list_matches`, `invite_publisher`,
+`get_earnings`. Runs in two modes: stdio (local, spawned by the plugin's
+`mcp.json`) and hosted/streamable-HTTP (the network's public DCP endpoint,
+advertised in `/.well-known/dcp.json`). Auth via `DISTRIBUTOOR_API_KEY` (maker key).
 
-### Markdown skills — `.claude/skills/`
+### The skills
 
 - `distributoor-onboard` — walks an agent through registration → assessment →
   fixing failed checks in the maker's own codebase → resubmission. This is the
@@ -412,13 +502,27 @@ Distributoor" and the agent drives these tools end to end.
 - `distributoor-launch` — offer terms guidance, creative assets, publisher
   invitations.
 
+### CLI — `affilio-api/cmd/distributoor`
+
+Kept for CI pipelines and non-agent use; same API client underneath:
+
+```
+distributoor init | assess | offer create|submit | snippet | status
+```
+
+### Publisher side
+
+Bloggers keep the WordPress plugin as their surface — no agent required. A
+publisher-facing agent plugin (browse offers, join, check earnings from an agent)
+is a later, cheap addition: the publisher DCP verbs already exist as API routes.
+
 Agent-safety rails: all maker-side writes accept an `Idempotency-Key` header
 (agents retry), and destructive operations (retire offer, delete product) require
 an explicit `confirm=true` — protecting makers from their own agents.
 
 ---
 
-## 8. API surface
+## 9. API surface
 
 New route groups in `cmd/server/main.go`, following the existing middleware pattern:
 
@@ -427,6 +531,7 @@ Public (rate-limited, no auth):
   POST /v1/makers/register            # like /sites/register (8 req/min/IP)
   GET  /v1/go/:code                   # click redirect
   POST /v1/webhooks/:provider         # HMAC-verified per provider
+  GET  /.well-known/dcp.json          # DCP discovery manifest (P4)
 
 Maker (X-Maker-Key middleware — new, mirrors APIKeyAuth):
   GET|POST|PATCH /v1/maker/products[/:id]
@@ -462,7 +567,7 @@ matching the `CLAUDE_API_KEY` convention).
 
 ---
 
-## 9. Phased roadmap
+## 10. Phased roadmap
 
 | Phase | Ships | Reuses | Proves |
 |---|---|---|---|
@@ -470,20 +575,22 @@ matching the `CLAUDE_API_KEY` convention).
 | **P1 — Readiness engine** | Deterministic probes, AI rubric + keyword extraction, remediation output, listing gate | `ai_classifier.go` HTTP/fallback pattern, discovery enricher patterns | Assessment quality → matching quality; agents can fix failing checks |
 | **P2 — Tracked links + conversions** | `/v1/go/:code`, campaigns, ref snippet, webhook ingestion (Stripe first, then LS, Polar), conversions table | `clicks` table + tracking handlers | End-to-end attribution: post → click → purchase → conversion row |
 | **P3 — Ledger + payouts (manual)** | Ledger entries, refund clawbacks, holds, balances, admin payout batches, publisher earnings UI in WP plugin | Tracking analytics endpoints style | Publishers see real money attributable to real inserts |
-| **P4 — Agentic layer** | CLI, MCP server, three Markdown skills, idempotency keys | The whole API | A maker's Claude session takes a product from zero → listed → earning |
-| **P5 — Scale & automation** | Offer→publisher matching v2 (site profiles), Stripe Connect payouts, fraud scoring, auto-approve trusted makers | Scorer/tuning services | Marketplace runs without an admin in the loop |
+| **P4 — Agent Plugin + DCP v0.1** | `distributoor` Agent Plugin (plugin.json + skills/ + mcp.json), hosted MCP endpoint, `/.well-known/dcp.json`, DCP v0.1 spec extracted from the working verbs/schemas, CLI, idempotency keys | The whole API | A maker's Claude/Cursor/Codex session takes a product from zero → listed → earning, via one plugin install |
+| **P5 — Scale & network opening** | Offer→publisher matching v2 (site profiles), Stripe Connect payouts, fraud scoring, auto-approve trusted makers, publisher-side agent plugin, first non-WordPress surface speaking DCP | Scorer/tuning services | Marketplace runs without an admin in the loop; DCP has a second surface |
 
 P0–P2 are the MVP: they prove the thesis (a maker's product can reach a publisher's
 audience with working attribution) before any money-movement complexity exists.
 
 **Cold-start note:** demand side is seeded by definition — every existing Affilio
 publisher is a distribution endpoint on day one. Supply side is seeded by dogfooding
-(Affilio itself, plus maker communities where vibe-coded products launch). This is
-the structural advantage over building Distributoor standalone.
+(Affilio itself, plus maker communities where vibe-coded products launch), and the
+Agent Plugin turns supply acquisition into a plugin-marketplace install rather than
+a website signup. This is the structural advantage over building Distributoor
+standalone.
 
 ---
 
-## 10. Risks & open questions
+## 11. Risks & open questions
 
 1. **Marketplace trust** — a bad offer (broken product, unpaid commissions) burns
    publisher trust fast. Mitigation: readiness gate + human review + escrow-style
@@ -498,25 +605,32 @@ the structural advantage over building Distributoor standalone.
 4. **Attribution leakage** — SPAs, cross-device, ad blockers eat ref params. The
    `ref_param_survives` probe plus first-party snippet limits it; accept that some
    conversions land unattributed (`click_id NULL`) and report them honestly.
-5. **Tenancy** — makers and publishers share one Postgres and one API deployment.
+5. **Premature standardization** — a protocol published before the network works is
+   dead weight; one published too late invites a competitor to name the category.
+   Mitigation: spec-follows-implementation (§2) — internal discipline from P0,
+   public extraction at P4, semver'd schemas so early adopters aren't broken.
+6. **Protocol chicken-and-egg** — DCP only matters if the network is valuable
+   standalone first. Distributoor must win as a product (P0–P3) before DCP is
+   anything more than documentation.
+7. **Tenancy** — makers and publishers share one Postgres and one API deployment.
    Fine at this scale; the table prefixing and single FK touchpoint keep an
    extraction path open.
-6. **FTC compliance stays non-negotiable** — Distributoor-sourced insertions ride
+8. **FTC compliance stays non-negotiable** — Distributoor-sourced insertions ride
    the existing disclosure-once-per-post rule; offer terms must not incentivize
    removing it.
-7. **Open question — take rate**: fee on conversions (% of commission), listing
+9. **Open question — take rate**: fee on conversions (% of commission), listing
    fees, or SaaS subscription for makers. Affects whether the ledger needs a
    platform-fee entry kind (cheap to add now: `kind='platform_fee'`).
 
 ---
 
-## 11. New files at a glance
+## 12. New files at a glance
 
 ```
 affilio-api/
 ├── cmd/
 │   ├── distributoor/main.go            # maker CLI
-│   └── distributoor-mcp/main.go        # MCP server (stdio)
+│   └── distributoor-mcp/main.go        # DCP MCP server (stdio + hosted HTTP)
 ├── internal/
 │   ├── handlers/
 │   │   ├── makers.go, products.go, offers.go, campaigns.go
@@ -529,13 +643,30 @@ affilio-api/
 │   └── services/
 │       ├── readiness.go, site_profiler.go, attribution.go, ledger.go
 │       └── providers/{provider,stripe,lemonsqueezy,polar}.go
-.claude/skills/
-├── distributoor-onboard/SKILL.md
-├── distributoor-instrument/SKILL.md
-└── distributoor-launch/SKILL.md
+distributoor-plugin/                     # Agent Plugins 1.0.0 package
+├── plugin.json
+├── mcp.json
+└── skills/
+    ├── distributoor-onboard/SKILL.md
+    ├── distributoor-instrument/SKILL.md
+    └── distributoor-launch/SKILL.md
+docs/
+└── dcp/                                 # DCP v0.1 spec, extracted at P4
+    ├── entities.md                      # versioned JSON schemas
+    ├── verbs.md                         # MCP tool contract
+    ├── attribution.md                   # redirect/webhook/ledger semantics
+    └── discovery.md                     # /.well-known/dcp.json
 ```
 
 Existing code modified: `cmd/server/main.go` (route registration),
 `internal/config/config.go` (new env vars), `affiliate_programs` (+2 columns).
 Nothing existing is removed or behavior-changed — additive throughout, per the
 repo's development rules.
+
+---
+
+## References
+
+- Agent Plugins 1.0.0 spec: https://github.com/agentplugins/agent-plugins-spec
+  (announcement: https://vercel.com/blog/introducing-agent-plugins)
+- Canonical plugin example: https://github.com/agentplugins/agent-plugins-example
