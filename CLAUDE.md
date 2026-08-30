@@ -17,7 +17,7 @@ affilio/
 │   │   ├── database/               # DB connection, queries, types
 │   │   ├── handlers/               # HTTP handlers + tests
 │   │   ├── middleware/             # Auth (API key, admin key) + CORS
-│   │   ├── migrations/            # SQL migrations (001-008)
+│   │   ├── migrations/            # SQL migrations (001-009)
 │   │   └── services/              # Business logic (AI, matching, scoring)
 │   ├── Makefile                    # Build/test targets
 │   ├── Dockerfile                  # Production image
@@ -59,7 +59,7 @@ affilio/
 ```bash
 cd affilio-api
 docker compose up -d                # Start PostgreSQL on :5432
-# Apply migrations in order: 001_initial.sql through 008_attribution_payouts.sql
+# Apply migrations in order: 001_initial.sql through 009_scale_fraud_trust.sql
 go run ./cmd/server                 # Starts API on :8080
 ```
 
@@ -144,7 +144,7 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 
 **Maker** (requires `X-Maker-Key` header, Distributoor supply side):
 - `GET|POST|PATCH /maker/products[/:id]`, `POST /maker/products/:id/assess`, `GET /maker/products/:id/assessments`
-- `GET|POST|PATCH /maker/offers[/:id]`, `POST /maker/offers/:id/submit`
+- `GET|POST|PATCH /maker/offers[/:id]`, `POST /maker/offers/:id/submit`, `GET /maker/offers/:id/matches`
 - `GET /maker/earnings`
 
 **Admin** (requires `X-Admin-Key` header):
@@ -154,6 +154,8 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 - `GET /offer-review/queue`, `POST /offer-review/:id/approve|reject` — Distributoor offer review
 - `POST /payout-batches/run`, `POST /payout-batches/:id/mark-paid` — Manual payout batches
 - `POST /offer-review/makers/rotate-key` — Rotate maker API key
+- `POST /offer-review/makers/:id/trust` — Trusted-maker fast path (submit lists directly)
+- `GET /offer-review/flagged-conversions`, `POST /offer-review/conversions/:id/clear-flag` — Fraud flag review
 
 **Unauthenticated:**
 - `GET /health` — Health check
@@ -173,7 +175,7 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 
 PostgreSQL with pgcrypto extension. Key tables: `affiliate_programs`, `sites`, `articles`, `recommendations`, `clicks`, `link_detections`, `user_programs`, `scan_jobs`, `program_discovery_queue`, `program_discovery_reviews`. Distributoor tables: `makers`, `products`, `readiness_assessments`, `offers`, `campaigns`, `conversions`, `ledger_entries`, `payouts`, `webhook_events`.
 
-Migrations are in `affilio-api/internal/migrations/` and must be applied in numeric order (001-008).
+Migrations are in `affilio-api/internal/migrations/` and must be applied in numeric order (001-009).
 
 ## Conventions
 

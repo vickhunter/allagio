@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
@@ -19,15 +20,39 @@ func siteIDFrom(c *gin.Context) string {
 	return c.GetString("site_id")
 }
 
+// ListOffers returns listed offers ranked by fit with this site's topical
+// profile (built from its scanned articles); sites without scanned content
+// fall back to recency order with relevance 0.
 func (h *MarketplaceHandler) ListOffers(c *gin.Context) {
-	offers, err := h.DB.ListMarketplaceOffers(c.Request.Context(), siteIDFrom(c))
+	siteID := siteIDFrom(c)
+	offers, err := h.DB.ListMarketplaceOffers(c.Request.Context(), siteID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load offers"})
 		return
 	}
+	profileData, err := h.DB.GetSiteProfileData(c.Request.Context(), siteID, 200)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load site profile"})
+		return
+	}
+	profile := services.BuildSiteProfile(profileData.Titles, profileData.Categories)
+	terms := make([]services.OfferTerms, len(offers))
+	for i, offer := range offers {
+		terms[i] = services.OfferTerms{
+			Name:     offer.ProductName,
+			Tagline:  offer.ProductTagline,
+			Category: offer.PrimaryCategory,
+			Keywords: offer.Keywords,
+			Tags:     offer.Tags,
+		}
+	}
+	order, scores := services.RankOffersForProfile(profile, terms)
+
 	out := make([]gin.H, 0, len(offers))
-	for _, offer := range offers {
+	for _, idx := range order {
+		offer := offers[idx]
 		item := gin.H{
+			"relevance": scores[idx],
 			"offer_id":             offer.OfferID,
 			"product_name":         offer.ProductName,
 			"product_tagline":      offer.ProductTagline,

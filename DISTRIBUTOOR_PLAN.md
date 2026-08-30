@@ -6,7 +6,9 @@
 maker/product/offer rails, readiness engine + listing gate, marketplace + tracked links,
 provider webhooks + conversion ledger, manual payout batches + earnings, maker CLI, stdio
 MCP server, Agent Plugin package, DCP v0.1 spec in `docs/dcp/` + discovery manifest).
-P5 (scale: site-profile matching, Stripe Connect, fraud scoring) not started.
+P5 part 1 done (site-profile matching,
+fraud flags + velocity auto-pause, trusted makers); remaining: Stripe Connect, hosted MCP
+transport, publisher-side plugin, non-WordPress surfaces.
 
 ---
 

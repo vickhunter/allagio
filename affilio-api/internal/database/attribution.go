@@ -20,6 +20,8 @@ type MarketplaceOffer struct {
 	ProductTagline     string
 	WebsiteURL         string
 	PrimaryCategory    string
+	Keywords           []string
+	Tags               []string
 	CommissionType     string
 	CommissionValue    float64
 	CommissionCurrency string
@@ -34,6 +36,7 @@ type MarketplaceOffer struct {
 func (d *DB) ListMarketplaceOffers(ctx context.Context, siteID string) ([]MarketplaceOffer, error) {
 	rows, err := d.Pool.Query(ctx, `
 SELECT o.id, p.name, COALESCE(p.tagline,''), p.website_url, COALESCE(p.primary_category,''),
+       COALESCE(p.keywords,'{}'), COALESCE(p.tags,'{}'),
        o.commission_type, o.commission_value, o.commission_currency,
        o.cookie_duration_days, o.refund_window_days, COALESCE(o.terms,''),
        o.program_id, c.tracking_code, c.status
@@ -50,6 +53,7 @@ ORDER BY o.created_at DESC`, siteID)
 	for rows.Next() {
 		var m MarketplaceOffer
 		if err := rows.Scan(&m.OfferID, &m.ProductName, &m.ProductTagline, &m.WebsiteURL, &m.PrimaryCategory,
+			&m.Keywords, &m.Tags,
 			&m.CommissionType, &m.CommissionValue, &m.CommissionCurrency,
 			&m.CookieDurationDays, &m.RefundWindowDays, &m.Terms,
 			&m.ProgramID, &m.TrackingCode, &m.CampaignStatus); err != nil {
@@ -130,11 +134,22 @@ type SaleConversion struct {
 	SiteID       string
 	OfferID      string
 	Commission   float64
+	Flagged      bool
+	FlagReason   string
 }
+
+const (
+	// A purchase this soon after the click is a self-referral tell.
+	fraudFastPurchaseWindow = 30 * time.Second
+	// More conversions than this per campaign per hour pauses the campaign.
+	fraudVelocityCapPerHour = 20
+)
 
 // RecordSaleConversion joins a provider sale/renewal back to the click it came
 // from, computes the commission from the offer terms, and books a pending
-// ledger entry that clears after the offer's refund window.
+// ledger entry that clears after the offer's refund window. Fraud tells flag
+// the conversion — flagged commissions never clear until an admin clears the
+// flag — and a velocity spike pauses the campaign.
 func (d *DB) RecordSaleConversion(ctx context.Context, clickID, provider, eventID, objectID, kind string, amount float64, currency string, occurredAt time.Time) (*SaleConversion, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
@@ -146,12 +161,13 @@ func (d *DB) RecordSaleConversion(ctx context.Context, clickID, provider, eventI
 	var commissionType string
 	var commissionValue float64
 	var refundWindowDays int
+	var clickedAt time.Time
 	err = tx.QueryRow(ctx, `
-SELECT cam.id, cam.site_id, cam.offer_id, o.commission_type, o.commission_value, o.refund_window_days
+SELECT cam.id, cam.site_id, cam.offer_id, o.commission_type, o.commission_value, o.refund_window_days, cl.clicked_at
 FROM clicks cl
 JOIN campaigns cam ON cam.id = cl.campaign_id
 JOIN offers o ON o.id = cam.offer_id
-WHERE cl.id=$1`, clickID).Scan(&out.CampaignID, &out.SiteID, &out.OfferID, &commissionType, &commissionValue, &refundWindowDays)
+WHERE cl.id=$1`, clickID).Scan(&out.CampaignID, &out.SiteID, &out.OfferID, &commissionType, &commissionValue, &refundWindowDays, &clickedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrClickNotFound
@@ -160,11 +176,31 @@ WHERE cl.id=$1`, clickID).Scan(&out.CampaignID, &out.SiteID, &out.OfferID, &comm
 	}
 	out.Commission = commissionFor(commissionType, commissionValue, amount)
 
+	// A purchase before the click is as suspicious as one seconds after it
+	// (and provider timestamps truncate to seconds, so tiny negatives happen).
+	if interval := occurredAt.Sub(clickedAt); interval < fraudFastPurchaseWindow {
+		out.Flagged = true
+		out.FlagReason = "implausibly fast click-to-purchase"
+	}
+	var recentConversions int
+	if err := tx.QueryRow(ctx, `
+SELECT COUNT(*) FROM conversions
+WHERE campaign_id=$1 AND kind IN ('sale','renewal') AND created_at >= NOW() - INTERVAL '1 hour'`, out.CampaignID).Scan(&recentConversions); err != nil {
+		return nil, err
+	}
+	if recentConversions >= fraudVelocityCapPerHour {
+		out.Flagged = true
+		out.FlagReason = "campaign conversion velocity exceeded; campaign paused"
+		if _, err := tx.Exec(ctx, `UPDATE campaigns SET status='paused' WHERE id=$1`, out.CampaignID); err != nil {
+			return nil, err
+		}
+	}
+
 	err = tx.QueryRow(ctx, `
-INSERT INTO conversions (offer_id, campaign_id, click_id, provider, provider_event_id, provider_object_id, kind, amount, currency, commission_amount, occurred_at)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+INSERT INTO conversions (offer_id, campaign_id, click_id, provider, provider_event_id, provider_object_id, kind, amount, currency, commission_amount, occurred_at, flagged, flag_reason)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,''))
 ON CONFLICT (provider, provider_event_id) DO NOTHING
-RETURNING id`, out.OfferID, out.CampaignID, clickID, provider, eventID, objectID, kind, amount, currency, out.Commission, occurredAt).Scan(&out.ConversionID)
+RETURNING id`, out.OfferID, out.CampaignID, clickID, provider, eventID, objectID, kind, amount, currency, out.Commission, occurredAt, out.Flagged, out.FlagReason).Scan(&out.ConversionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Duplicate delivery raced past the webhook_events barrier; nothing to book.
@@ -245,6 +281,62 @@ VALUES ($1,$2,'clawback',$3,$4,'cleared',NOW())`, siteID, refundID, -commission,
 		}
 	}
 	return refundID, tx.Commit(ctx)
+}
+
+type FlaggedConversion struct {
+	ID          string
+	CampaignID  string
+	SiteID      string
+	OfferID     string
+	Provider    string
+	Kind        string
+	Amount      float64
+	Currency    string
+	Commission  float64
+	FlagReason  string
+	OccurredAt  time.Time
+	SiteDomain  string
+	ProductName string
+}
+
+func (d *DB) ListFlaggedConversions(ctx context.Context, limit int) ([]FlaggedConversion, error) {
+	rows, err := d.Pool.Query(ctx, `
+SELECT cv.id, cv.campaign_id, cam.site_id, cv.offer_id, cv.provider, cv.kind,
+       cv.amount, cv.currency, COALESCE(cv.commission_amount,0), COALESCE(cv.flag_reason,''), cv.occurred_at,
+       s.domain, p.name
+FROM conversions cv
+JOIN campaigns cam ON cam.id = cv.campaign_id
+JOIN sites s ON s.id = cam.site_id
+JOIN offers o ON o.id = cv.offer_id
+JOIN products p ON p.id = o.product_id
+WHERE cv.flagged
+ORDER BY cv.created_at DESC
+LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []FlaggedConversion{}
+	for rows.Next() {
+		var f FlaggedConversion
+		if err := rows.Scan(&f.ID, &f.CampaignID, &f.SiteID, &f.OfferID, &f.Provider, &f.Kind,
+			&f.Amount, &f.Currency, &f.Commission, &f.FlagReason, &f.OccurredAt, &f.SiteDomain, &f.ProductName); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+// ClearConversionFlag releases a flagged conversion: the commission resumes the
+// normal hold-and-clear lifecycle.
+func (d *DB) ClearConversionFlag(ctx context.Context, conversionID string) (bool, error) {
+	res, err := d.Pool.Exec(ctx, `
+UPDATE conversions SET flagged=false, flag_reason=NULL WHERE id=$1 AND flagged`, conversionID)
+	if err != nil {
+		return false, err
+	}
+	return res.RowsAffected() > 0, nil
 }
 
 func commissionFor(commissionType string, commissionValue, amount float64) float64 {

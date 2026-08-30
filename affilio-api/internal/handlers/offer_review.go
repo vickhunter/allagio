@@ -110,6 +110,70 @@ SELECT p.name FROM products p JOIN offers o ON o.product_id = p.id WHERE o.id=$1
 	return offer, item, nil
 }
 
+type makerTrustPayload struct {
+	Trusted *bool `json:"trusted"`
+}
+
+// SetMakerTrust toggles the trusted fast path: submissions from trusted makers
+// list without waiting for the review queue.
+func (h *OfferReviewHandler) SetMakerTrust(c *gin.Context) {
+	var payload makerTrustPayload
+	if err := c.ShouldBindJSON(&payload); err != nil || payload.Trusted == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "trusted (boolean) is required"})
+		return
+	}
+	updated, err := h.DB.SetMakerTrusted(c.Request.Context(), c.Param("id"), *payload.Trusted)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update maker"})
+		return
+	}
+	if !updated {
+		c.JSON(http.StatusNotFound, gin.H{"error": "maker not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"maker_id": c.Param("id"), "trusted": *payload.Trusted})
+}
+
+func (h *OfferReviewHandler) FlaggedConversions(c *gin.Context) {
+	flagged, err := h.DB.ListFlaggedConversions(c.Request.Context(), intQuery(c, "limit", 50))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load flagged conversions"})
+		return
+	}
+	out := make([]gin.H, 0, len(flagged))
+	for _, f := range flagged {
+		out = append(out, gin.H{
+			"conversion_id": f.ID,
+			"campaign_id":   f.CampaignID,
+			"site_domain":   f.SiteDomain,
+			"product_name":  f.ProductName,
+			"provider":      f.Provider,
+			"kind":          f.Kind,
+			"amount":        f.Amount,
+			"currency":      f.Currency,
+			"commission":    f.Commission,
+			"flag_reason":   f.FlagReason,
+			"occurred_at":   f.OccurredAt.Format(time.RFC3339),
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"flagged": out})
+}
+
+// ClearConversionFlag releases a flagged conversion so its commission resumes
+// the normal hold-and-clear lifecycle.
+func (h *OfferReviewHandler) ClearConversionFlag(c *gin.Context) {
+	cleared, err := h.DB.ClearConversionFlag(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear flag"})
+		return
+	}
+	if !cleared {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no flagged conversion with that id"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"conversion_id": c.Param("id"), "flagged": false})
+}
+
 func offerSlug(productName, offerID string) string {
 	base := slugCleanPattern.ReplaceAllString(strings.ToLower(strings.TrimSpace(productName)), "-")
 	base = strings.Trim(base, "-")
