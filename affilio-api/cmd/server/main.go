@@ -61,9 +61,17 @@ func main() {
 	userPrograms := &handlers.UserProgramsHandler{DB: db}
 	detect := &handlers.DetectHandler{Classifier: classifier}
 	programDiscovery := &handlers.ProgramDiscoveryHandler{DB: db}
+	makers := &handlers.MakersHandler{
+		DB:              db,
+		RegisterLimiter: handlers.NewIPRateLimiter(8, time.Minute),
+	}
+	products := &handlers.ProductsHandler{DB: db}
+	offers := &handlers.OffersHandler{DB: db}
+	offerReview := &handlers.OfferReviewHandler{DB: db}
 
 	v1.POST("/sites/register", sites.Register)
 	v1.DELETE("/sites", sites.Delete)
+	v1.POST("/makers/register", makers.Register)
 
 	secured := v1.Group("/")
 	secured.Use(middleware.APIKeyAuth(db))
@@ -105,6 +113,21 @@ func main() {
 		secured.GET("/track/recommendation-tuning", tracking.RecommendationTuning)
 	}
 
+	maker := v1.Group("/maker")
+	maker.Use(middleware.MakerKeyAuth(db))
+	{
+		maker.POST("/products", products.Create)
+		maker.GET("/products", products.List)
+		maker.GET("/products/:id", products.Get)
+		maker.PATCH("/products/:id", products.Patch)
+
+		maker.POST("/offers", offers.Create)
+		maker.GET("/offers", offers.List)
+		maker.GET("/offers/:id", offers.Get)
+		maker.PATCH("/offers/:id", offers.Patch)
+		maker.POST("/offers/:id/submit", offers.Submit)
+	}
+
 	admin := v1.Group("/program-discovery")
 	admin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey))
 	{
@@ -112,6 +135,15 @@ func main() {
 		admin.POST("/queue/:id/review", programDiscovery.Review)
 		admin.POST("/queue/:id/promote", programDiscovery.Promote)
 		admin.POST("/sites/rotate-key", siteKeys.Rotate)
+	}
+
+	offerAdmin := v1.Group("/offer-review")
+	offerAdmin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey))
+	{
+		offerAdmin.GET("/queue", offerReview.Queue)
+		offerAdmin.POST("/:id/approve", offerReview.Approve)
+		offerAdmin.POST("/:id/reject", offerReview.Reject)
+		offerAdmin.POST("/makers/rotate-key", makers.RotateKey)
 	}
 
 	log.Printf("Affilio API listening on :%s", cfg.Port)
