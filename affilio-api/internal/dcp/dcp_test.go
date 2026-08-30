@@ -92,6 +92,34 @@ func TestCallToolRoutesPathParams(t *testing.T) {
 	}
 }
 
+func TestPublisherToolsUseSiteKey(t *testing.T) {
+	server, lastReq, _ := stubAPI(t)
+	client := NewClient(server.URL, "maker-key-1")
+
+	// Without a site key, publisher verbs refuse with guidance.
+	if _, err := CallTool(client, "get_balance", nil); err == nil || !strings.Contains(err.Error(), "DISTRIBUTOOR_SITE_KEY") {
+		t.Fatalf("expected site-key guidance, got %v", err)
+	}
+
+	client.SiteKey = "site-key-9"
+	if _, err := CallTool(client, "list_marketplace_offers", nil); err != nil {
+		t.Fatalf("list offers: %v", err)
+	}
+	if lastReq.URL.Path != "/v1/marketplace/offers" || lastReq.Header.Get("X-API-Key") != "site-key-9" {
+		t.Fatalf("expected site-key marketplace call, got %s with key %q", lastReq.URL.Path, lastReq.Header.Get("X-API-Key"))
+	}
+	if lastReq.Header.Get("X-Maker-Key") != "" {
+		t.Fatalf("publisher call must not carry the maker key")
+	}
+
+	if _, err := CallTool(client, "join_offer", map[string]interface{}{"offer_id": "offer-7"}); err != nil {
+		t.Fatalf("join offer: %v", err)
+	}
+	if lastReq.URL.Path != "/v1/marketplace/offers/offer-7/join" || lastReq.Method != http.MethodPost {
+		t.Fatalf("unexpected join call %s %s", lastReq.Method, lastReq.URL.Path)
+	}
+}
+
 func rpc(t *testing.T, client *Client, message string) map[string]interface{} {
 	t.Helper()
 	raw := HandleMessage(client, []byte(message))
@@ -122,8 +150,8 @@ func TestMCPHandshakeAndToolFlow(t *testing.T) {
 
 	list := rpc(t, client, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
 	tools := list["result"].(map[string]interface{})["tools"].([]interface{})
-	if len(tools) != len(Tools) {
-		t.Fatalf("expected %d tools, got %d", len(Tools), len(tools))
+	if len(tools) != len(AllTools()) {
+		t.Fatalf("expected %d tools, got %d", len(AllTools()), len(tools))
 	}
 
 	call := rpc(t, client, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_assessment","arguments":{"product_id":"prod-1"}}}`)

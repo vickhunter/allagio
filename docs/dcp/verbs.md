@@ -26,16 +26,25 @@ Errors are returned as MCP tool results with `isError: true` and the reason as
 text (e.g. the readiness gate: *"product has not passed readiness
 assessment"*), so agents can react without protocol-level failures.
 
-## Publisher verbs (HTTP-bound in v0.1)
+## Publisher verbs (MCP tools + HTTP)
 
-The demand side is served by publisher platforms (WordPress plugin today), so
-v0.1 binds these to HTTP under the publisher's site key rather than MCP:
+The demand side is served by publisher platforms (WordPress plugin today) over
+HTTP under the publisher's site key, and the same verbs are exposed as MCP
+tools (site key via `DISTRIBUTOOR_SITE_KEY` on the stdio server, or the
+`X-API-Key` header on the hosted transport):
 
-- `list_offers` — `GET /v1/marketplace/offers` → listed offers with terms and
-  join state for this site.
-- `join_offer` — `POST /v1/marketplace/offers/{id}/join` → `{campaign_id,
-  tracking_code, tracked_link}`.
-- `get_balance` — `GET /v1/payouts/balance` → per-currency
-  `{pending, cleared_unpaid, paid}`; `GET /v1/payouts/history` for the trail.
+| Tool | HTTP binding | Result |
+|---|---|---|
+| `list_marketplace_offers` | `GET /v1/marketplace/offers` | Listed offers ranked by fit for this site, with terms, `relevance`, and join state |
+| `join_offer` | `POST /v1/marketplace/offers/{id}/join` | `{campaign_id, tracking_code, tracked_link}` |
+| `get_balance` | `GET /v1/payouts/balance` | Per-currency `{pending, cleared_unpaid, paid}` |
+| `get_payout_history` | `GET /v1/payouts/history` | Payouts and recent ledger entries |
 
-A publisher-facing MCP binding of the same verbs is planned but not part of v0.1.
+## Transports
+
+Both verb sets are served two ways: a **stdio** MCP server (`distributoor-mcp`,
+spawned by the Agent Plugin; env `DISTRIBUTOOR_API_URL`,
+`DISTRIBUTOOR_API_KEY`, `DISTRIBUTOOR_SITE_KEY`) and a **hosted
+streamable-HTTP** endpoint at `POST /v1/mcp` (one JSON-RPC message per POST;
+maker auth via `X-Maker-Key` or `Authorization: Bearer`, publisher auth via
+`X-API-Key`; notifications are acknowledged with 202).

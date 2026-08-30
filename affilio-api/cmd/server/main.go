@@ -37,19 +37,26 @@ func main() {
 		for _, tool := range dcp.Tools {
 			makerVerbs = append(makerVerbs, tool.Name)
 		}
+		publisherVerbs := make([]string, 0, len(dcp.PublisherTools))
+		for _, tool := range dcp.PublisherTools {
+			publisherVerbs = append(publisherVerbs, tool.Name)
+		}
 		c.JSON(200, gin.H{
 			"dcp_version": "0.1",
 			"name":        "distributoor",
 			"description": "Agent-native distribution network: makers publish offers, publishers earn commissions, agents do the operational work.",
 			"http_base":   "/v1",
 			"mcp": gin.H{
-				"transport": "stdio",
-				"command":   "distributoor-mcp",
-				"env":       []string{"DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY"},
+				"transport": "streamable-http",
+				"url":       "/v1/mcp",
+				"stdio": gin.H{
+					"command": "distributoor-mcp",
+					"env":     []string{"DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY", "DISTRIBUTOOR_SITE_KEY"},
+				},
 			},
 			"verbs": gin.H{
 				"maker":     makerVerbs,
-				"publisher": []string{"list_offers", "join_offer", "get_balance"},
+				"publisher": publisherVerbs,
 			},
 			"payout_methods": []string{"manual"},
 		})
@@ -121,6 +128,11 @@ func main() {
 	v1.POST("/makers/register", makers.Register)
 	v1.GET("/go/:code", redirects.Go)
 	v1.POST("/webhooks/:provider", webhooks.Receive)
+	mcp := &handlers.MCPHandler{
+		LoopbackURL: "http://127.0.0.1:" + cfg.Port,
+		RateLimiter: handlers.NewIPRateLimiter(240, time.Minute),
+	}
+	v1.POST("/mcp", mcp.Receive)
 
 	secured := v1.Group("/")
 	secured.Use(middleware.APIKeyAuth(db))

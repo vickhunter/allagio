@@ -10,15 +10,18 @@ and qualify distribution networks the way MCP clients find servers.
   "description": "Agent-native distribution network: makers publish offers, publishers earn commissions, agents do the operational work.",
   "http_base": "/v1",
   "mcp": {
-    "transport": "stdio",
-    "command": "distributoor-mcp",
-    "env": ["DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY"]
+    "transport": "streamable-http",
+    "url": "/v1/mcp",
+    "stdio": {
+      "command": "distributoor-mcp",
+      "env": ["DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY", "DISTRIBUTOOR_SITE_KEY"]
+    }
   },
   "verbs": {
     "maker": ["register_maker", "register_product", "list_products", "get_product",
               "update_product", "run_assessment", "list_assessments", "create_offer",
               "list_offers", "get_offer", "update_offer", "submit_offer", "get_earnings"],
-    "publisher": ["list_offers", "join_offer", "get_balance"]
+    "publisher": ["list_marketplace_offers", "join_offer", "get_balance", "get_payout_history"]
   },
   "payout_methods": ["manual"]
 }
@@ -27,9 +30,9 @@ and qualify distribution networks the way MCP clients find servers.
 Fields:
 
 - `dcp_version` — the spec version the endpoint implements.
-- `mcp` — how to reach the network's MCP server. v0.1 reference ships stdio
-  (the Agent Plugin spawns it locally); a hosted `streamable-http` transport
-  with a `url` field is the planned addition.
+- `mcp` — how to reach the network's MCP server: the hosted `streamable-http`
+  transport at `url` (relative to the endpoint's origin), with the `stdio`
+  block describing the locally spawned server the Agent Plugin uses.
 - `verbs` — the verb names actually served; agents SHOULD treat missing verbs
   as unsupported rather than failing the whole endpoint.
 - `payout_methods` — how publishers get paid (`manual`, `stripe_connect`,

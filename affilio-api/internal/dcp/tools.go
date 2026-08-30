@@ -250,11 +250,61 @@ var Tools = []Tool{
 	},
 }
 
+// PublisherTools is the publisher-side DCP verb set, authenticated by a site
+// key. Bloggers keep the WordPress plugin as their surface; these tools give
+// a publisher's agent the same verbs.
+var PublisherTools = []Tool{
+	{
+		Name:        "list_marketplace_offers",
+		Description: "List the offers this publisher site can join, ranked by how well each fits the site's content (relevance 0-100). Joined offers include their tracked link.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.DoSite(http.MethodGet, "/v1/marketplace/offers", nil)
+		},
+	},
+	{
+		Name:        "join_offer",
+		Description: "Join a listed offer for this publisher site. Returns the campaign and the stable tracked link to publish.",
+		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
+			"offer_id": str("Offer id from list_marketplace_offers"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "offer_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.DoSite(http.MethodPost, "/v1/marketplace/offers/"+id+"/join", nil)
+		},
+	},
+	{
+		Name:        "get_balance",
+		Description: "The publisher site's commission balance per currency: pending (inside refund windows), cleared awaiting payout, and paid to date.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.DoSite(http.MethodGet, "/v1/payouts/balance", nil)
+		},
+	},
+	{
+		Name:        "get_payout_history",
+		Description: "The publisher site's payouts and recent commission ledger entries.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.DoSite(http.MethodGet, "/v1/payouts/history", nil)
+		},
+	},
+}
+
+func AllTools() []Tool {
+	out := make([]Tool, 0, len(Tools)+len(PublisherTools))
+	out = append(out, Tools...)
+	return append(out, PublisherTools...)
+}
+
 func CallTool(c *Client, name string, args map[string]interface{}) (map[string]interface{}, error) {
 	if args == nil {
 		args = map[string]interface{}{}
 	}
-	for _, tool := range Tools {
+	for _, tool := range AllTools() {
 		if tool.Name == name {
 			return tool.call(c, args)
 		}

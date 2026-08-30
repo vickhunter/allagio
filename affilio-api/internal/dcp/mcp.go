@@ -56,8 +56,9 @@ func HandleMessage(client *Client, raw []byte) []byte {
 	case "ping":
 		resp.Result = map[string]interface{}{}
 	case "tools/list":
-		tools := make([]map[string]interface{}, 0, len(Tools))
-		for _, tool := range Tools {
+		all := AllTools()
+		tools := make([]map[string]interface{}, 0, len(all))
+		for _, tool := range all {
 			tools = append(tools, map[string]interface{}{
 				"name":        tool.Name,
 				"description": tool.Description,

@@ -163,6 +163,7 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 - `POST /v1/makers/register` — Maker registration (rate limited: 8 req/min per IP)
 - `GET /v1/go/:code` — Tracked redirect link (rate limited: 120 req/min per IP)
 - `POST /v1/webhooks/:provider` — Payment provider webhooks (HMAC-verified: stripe, lemonsqueezy, polar)
+- `POST /v1/mcp` — Hosted MCP transport for DCP verbs (per-request auth: `X-Maker-Key`/Bearer for maker tools, `X-API-Key` for publisher tools)
 
 ### Recommendation Matching
 

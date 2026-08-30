@@ -22,6 +22,8 @@ class Affilio_Admin {
             array($this, 'render_dashboard'),
             'dashicons-analytics'
         );
+        add_submenu_page('affilio', $this->t('Marketplace', 'Marketplace'), $this->t('Marketplace', 'Marketplace'), 'manage_options', 'affilio-marketplace', array($this, 'render_marketplace'));
+        add_submenu_page('affilio', $this->t('Earnings', 'Guadagni'), $this->t('Earnings', 'Guadagni'), 'manage_options', 'affilio-earnings', array($this, 'render_earnings'));
         add_submenu_page('affilio', $this->t('Analytics', 'Analitiche'), $this->t('Analytics', 'Analitiche'), 'manage_options', 'affilio-analytics', array($this, 'render_analytics'));
         add_submenu_page('affilio', $this->t('Settings', 'Impostazioni'), $this->t('Settings', 'Impostazioni'), 'manage_options', 'affilio-settings', array($this, 'render_settings'));
         if ($this->is_advanced_mode()) {
@@ -44,7 +46,8 @@ class Affilio_Admin {
     }
 
     public function enqueue_dashboard_assets($hook) {
-        if ($hook !== 'toplevel_page_affilio' && $hook !== 'affilio_page_affilio-discovery' && $hook !== 'affilio_page_affilio-analytics') {
+        $affilio_hooks = array('toplevel_page_affilio', 'affilio_page_affilio-discovery', 'affilio_page_affilio-analytics', 'affilio_page_affilio-marketplace', 'affilio_page_affilio-earnings');
+        if (!in_array($hook, $affilio_hooks, true)) {
             return;
         }
         if ($hook === 'affilio_page_affilio-discovery') {
@@ -57,6 +60,18 @@ class Affilio_Admin {
                 'adminKey' => get_option('affilio_admin_api_key', ''),
                 'actor' => wp_get_current_user()->user_login,
                 'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
+                'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
+            ));
+        } elseif ($hook === 'affilio_page_affilio-marketplace' || $hook === 'affilio_page_affilio-earnings') {
+            $handle = $hook === 'affilio_page_affilio-marketplace' ? 'affilio-marketplace' : 'affilio-earnings';
+            $script = $hook === 'affilio_page_affilio-marketplace' ? 'marketplace.js' : 'earnings.js';
+            wp_enqueue_script($handle, AFFILIO_PLUGIN_URL . 'admin/build/' . $script, array(), AFFILIO_VERSION, true);
+            wp_localize_script($handle, 'AffilioData', array(
+                'apiUrl' => Affilio_API::resolve_base_url(),
+                'apiKey' => get_option('affilio_api_key', ''),
+                'nonce'  => wp_create_nonce('wp_rest'),
+                'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
+                'connectionStatus' => $this->api->get_connection_status(),
                 'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
             ));
         } elseif ($hook === 'affilio_page_affilio-analytics') {
@@ -131,6 +146,36 @@ class Affilio_Admin {
             return;
         }
         echo '<div id="affilio-analytics-root"></div>';
+        echo '</div>';
+    }
+
+    public function render_marketplace() {
+        $status = $this->api->get_connection_status();
+        echo '<div class="wrap affilio-admin-page">';
+        echo '<h1>' . esc_html($this->t('Offer Marketplace', 'Marketplace Offerte')) . '</h1>';
+        if (!$status['connected']) {
+            echo '<div class="affilio-panel affilio-panel-warning">';
+            echo '<p><strong>' . esc_html($this->t('Not connected.', 'Non connesso.')) . '</strong> ' . esc_html($status['message']) . '</p>';
+            echo '<p><a class="button button-primary" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a></p>';
+            echo '</div></div>';
+            return;
+        }
+        echo '<div id="affilio-marketplace-root"></div>';
+        echo '</div>';
+    }
+
+    public function render_earnings() {
+        $status = $this->api->get_connection_status();
+        echo '<div class="wrap affilio-admin-page">';
+        echo '<h1>' . esc_html($this->t('Earnings', 'Guadagni')) . '</h1>';
+        if (!$status['connected']) {
+            echo '<div class="affilio-panel affilio-panel-warning">';
+            echo '<p><strong>' . esc_html($this->t('Not connected.', 'Non connesso.')) . '</strong> ' . esc_html($status['message']) . '</p>';
+            echo '<p><a class="button button-primary" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a></p>';
+            echo '</div></div>';
+            return;
+        }
+        echo '<div id="affilio-earnings-root"></div>';
         echo '</div>';
     }
 
