@@ -78,9 +78,25 @@ func main() {
 		},
 	}
 
+	marketplace := &handlers.MarketplaceHandler{DB: db}
+	redirects := &handlers.RedirectsHandler{
+		DB:          db,
+		RateLimiter: handlers.NewIPRateLimiter(120, time.Minute),
+	}
+	webhooks := &handlers.WebhooksHandler{
+		DB: db,
+		Secrets: map[string]string{
+			"stripe":       cfg.StripeWebhookSecret,
+			"lemonsqueezy": cfg.LemonSqueezyWebhookSecret,
+			"polar":        cfg.PolarWebhookSecret,
+		},
+	}
+
 	v1.POST("/sites/register", sites.Register)
 	v1.DELETE("/sites", sites.Delete)
 	v1.POST("/makers/register", makers.Register)
+	v1.GET("/go/:code", redirects.Go)
+	v1.POST("/webhooks/:provider", webhooks.Receive)
 
 	secured := v1.Group("/")
 	secured.Use(middleware.APIKeyAuth(db))
@@ -120,6 +136,9 @@ func main() {
 		secured.GET("/track/recommendation-quality", tracking.RecommendationQuality)
 		secured.GET("/track/retention", tracking.Retention)
 		secured.GET("/track/recommendation-tuning", tracking.RecommendationTuning)
+
+		secured.GET("/marketplace/offers", marketplace.ListOffers)
+		secured.POST("/marketplace/offers/:id/join", marketplace.JoinOffer)
 	}
 
 	maker := v1.Group("/maker")
