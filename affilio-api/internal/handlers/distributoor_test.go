@@ -38,6 +38,7 @@ func newMakerRouter(db *database.DB) *gin.Engine {
 		maker.GET("/offers/:id", offers.Get)
 		maker.PATCH("/offers/:id", offers.Patch)
 		maker.POST("/offers/:id/submit", offers.Submit)
+		maker.GET("/offers/:id/matches", offers.Matches)
 	}
 	review := &OfferReviewHandler{DB: db}
 	admin := r.Group("/v1/offer-review")
@@ -46,6 +47,9 @@ func newMakerRouter(db *database.DB) *gin.Engine {
 		admin.GET("/queue", review.Queue)
 		admin.POST("/:id/approve", review.Approve)
 		admin.POST("/:id/reject", review.Reject)
+		admin.POST("/makers/:id/trust", review.SetMakerTrust)
+		admin.GET("/flagged-conversions", review.FlaggedConversions)
+		admin.POST("/conversions/:id/clear-flag", review.ClearConversionFlag)
 	}
 	return r
 }

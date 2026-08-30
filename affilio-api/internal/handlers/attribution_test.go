@@ -107,9 +107,11 @@ func sendStripeEvent(t *testing.T, r *gin.Engine, payload map[string]interface{}
 
 func stripeSalePayload(eventID, paymentIntent, ref string, amountCents int) map[string]interface{} {
 	return map[string]interface{}{
-		"id":      eventID,
-		"type":    "checkout.session.completed",
-		"created": time.Now().Unix(),
+		"id":   eventID,
+		"type": "checkout.session.completed",
+		// Two hours after the click: an organic purchase, clear of the
+		// fast-click-to-purchase fraud window.
+		"created": time.Now().Add(2 * time.Hour).Unix(),
 		"data": map[string]interface{}{
 			"object": map[string]interface{}{
 				"id":                  "cs_" + eventID,

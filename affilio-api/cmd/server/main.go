@@ -183,6 +183,7 @@ func main() {
 		maker.GET("/offers/:id", offers.Get)
 		maker.PATCH("/offers/:id", offers.Patch)
 		maker.POST("/offers/:id/submit", offers.Submit)
+		maker.GET("/offers/:id/matches", offers.Matches)
 
 		maker.GET("/earnings", payouts.MakerEarnings)
 	}
@@ -203,6 +204,9 @@ func main() {
 		offerAdmin.POST("/:id/approve", offerReview.Approve)
 		offerAdmin.POST("/:id/reject", offerReview.Reject)
 		offerAdmin.POST("/makers/rotate-key", makers.RotateKey)
+		offerAdmin.POST("/makers/:id/trust", offerReview.SetMakerTrust)
+		offerAdmin.GET("/flagged-conversions", offerReview.FlaggedConversions)
+		offerAdmin.POST("/conversions/:id/clear-flag", offerReview.ClearConversionFlag)
 	}
 
 	payoutAdmin := v1.Group("/payout-batches")

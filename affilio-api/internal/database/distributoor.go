@@ -80,6 +80,20 @@ WHERE (api_key=$1 OR api_key_previous=$1) AND status='active'`, apiKey)
 	return &m, nil
 }
 
+func (d *DB) IsMakerTrusted(ctx context.Context, makerID string) (bool, error) {
+	var trusted bool
+	err := d.Pool.QueryRow(ctx, `SELECT COALESCE(trusted,false) FROM makers WHERE id=$1`, makerID).Scan(&trusted)
+	return trusted, err
+}
+
+func (d *DB) SetMakerTrusted(ctx context.Context, makerID string, trusted bool) (bool, error) {
+	res, err := d.Pool.Exec(ctx, `UPDATE makers SET trusted=$2 WHERE id=$1`, makerID, trusted)
+	if err != nil {
+		return false, err
+	}
+	return res.RowsAffected() > 0, nil
+}
+
 func (d *DB) RotateMakerAPIKey(ctx context.Context, makerID, newKey string) error {
 	_, err := d.Pool.Exec(ctx, `
 UPDATE makers

@@ -5,12 +5,17 @@ import (
 	"time"
 )
 
-// ClearMaturedLedgerEntries moves pending commissions whose refund window has
-// passed to cleared. Runs cheaply before balance reads and payout batches.
+// clearMaturedSQL moves pending commissions whose refund window has passed to
+// cleared — except entries whose conversion carries a fraud flag: those stay
+// pending until an admin clears the flag.
+const clearMaturedSQL = `
+UPDATE ledger_entries le SET status='cleared'
+WHERE le.status='pending' AND le.clears_at <= NOW()
+  AND NOT EXISTS (SELECT 1 FROM conversions cv WHERE cv.id = le.conversion_id AND cv.flagged)`
+
+// ClearMaturedLedgerEntries runs cheaply before balance reads and payout batches.
 func (d *DB) ClearMaturedLedgerEntries(ctx context.Context) (int64, error) {
-	res, err := d.Pool.Exec(ctx, `
-UPDATE ledger_entries SET status='cleared'
-WHERE status='pending' AND clears_at <= NOW()`)
+	res, err := d.Pool.Exec(ctx, clearMaturedSQL)
 	if err != nil {
 		return 0, err
 	}
@@ -129,9 +134,7 @@ func (d *DB) RunPayoutBatch(ctx context.Context, minPayout float64) ([]Payout, e
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if _, err := tx.Exec(ctx, `
-UPDATE ledger_entries SET status='cleared'
-WHERE status='pending' AND clears_at <= NOW()`); err != nil {
+	if _, err := tx.Exec(ctx, clearMaturedSQL); err != nil {
 		return nil, err
 	}
 

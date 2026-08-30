@@ -3,9 +3,11 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"strings"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
@@ -198,11 +200,81 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 		})
 		return
 	}
+	// Trusted makers skip the human review queue: their submissions list directly.
+	trusted, err := h.DB.IsMakerTrusted(c.Request.Context(), makerID(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
+		return
+	}
+	if trusted {
+		programID, err := h.DB.PromoteOffer(c.Request.Context(), offer.ID, offerSlug(product.Name, offer.ID))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list offer"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"id": offer.ID, "status": "listed", "program_id": programID})
+		return
+	}
 	if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"id": offer.ID, "status": "submitted"})
+}
+
+// Matches ranks the network's publishers by topical fit with the offer's
+// product, so a maker sees which sites are worth inviting.
+func (h *OffersHandler) Matches(c *gin.Context) {
+	offer, err := h.DB.GetOfferForMaker(c.Request.Context(), makerID(c), c.Param("id"))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "offer not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load offer"})
+		return
+	}
+	product, err := h.DB.GetProduct(c.Request.Context(), makerID(c), offer.ProductID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load product"})
+		return
+	}
+	sites, err := h.DB.ListMatchableSites(c.Request.Context(), offer.ID, 100, 50)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load sites"})
+		return
+	}
+	terms := services.OfferTerms{
+		Name:     product.Name,
+		Tagline:  product.Tagline,
+		Category: product.PrimaryCategory,
+		Keywords: product.Keywords,
+		Tags:     product.Tags,
+	}
+	type rankedSite struct {
+		site      database.MatchableSite
+		relevance int
+	}
+	ranked := make([]rankedSite, 0, len(sites))
+	for _, site := range sites {
+		profile := services.BuildSiteProfile(site.Titles, nil)
+		ranked = append(ranked, rankedSite{site: site, relevance: services.ScoreOfferForProfile(profile, terms)})
+	}
+	sort.SliceStable(ranked, func(a, b int) bool { return ranked[a].relevance > ranked[b].relevance })
+	limit := intQuery(c, "limit", 20)
+	if limit > len(ranked) {
+		limit = len(ranked)
+	}
+	out := make([]gin.H, 0, limit)
+	for _, r := range ranked[:limit] {
+		out = append(out, gin.H{
+			"site_domain": r.site.Domain,
+			"site_name":   r.site.Name,
+			"relevance":   r.relevance,
+			"joined":      r.site.Joined,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"offer_id": offer.ID, "matches": out})
 }
 
 func applyOfferPayload(o *database.Offer, req *offerPayload) error {
