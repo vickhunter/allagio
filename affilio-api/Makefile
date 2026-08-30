@@ -10,7 +10,7 @@ test:
 	GOTOOLCHAIN=local GO111MODULE=on GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod-cache AFFILIO_TEST_DATABASE_URL=postgresql://affilio:password@localhost:5433/affilio_test go test ./internal/handlers
 
 ci-test:
-	GOTOOLCHAIN=local GO111MODULE=on GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod-cache go test ./internal/services ./internal/services/providers ./internal/handlers -covermode=atomic -coverprofile=coverage.out
+	GOTOOLCHAIN=local GO111MODULE=on GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod-cache go test ./internal/services ./internal/services/providers ./internal/dcp ./internal/handlers -covermode=atomic -coverprofile=coverage.out
 	GOTOOLCHAIN=local GO111MODULE=on GOCACHE=/tmp/go-cache GOMODCACHE=/tmp/go-mod-cache go tool cover -func=coverage.out | awk -v min=$(COVERAGE_MIN) '/^total:/{gsub("%","",$$3); if (($$3+0) < min) {printf("coverage gate failed: %.1f%% < %s%%\\n", $$3+0, min); exit 1} else {printf("coverage gate passed: %.1f%% >= %s%%\\n", $$3+0, min)}}'
 
 status:

@@ -7,6 +7,7 @@ import (
 
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
+	"affilio-api/internal/dcp"
 	"affilio-api/internal/handlers"
 	"affilio-api/internal/middleware"
 	"affilio-api/internal/services"
@@ -31,6 +32,28 @@ func main() {
 	r.Use(middleware.CORS(cfg.AllowedOrigins))
 
 	r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
+	r.GET("/.well-known/dcp.json", func(c *gin.Context) {
+		makerVerbs := make([]string, 0, len(dcp.Tools))
+		for _, tool := range dcp.Tools {
+			makerVerbs = append(makerVerbs, tool.Name)
+		}
+		c.JSON(200, gin.H{
+			"dcp_version": "0.1",
+			"name":        "distributoor",
+			"description": "Agent-native distribution network: makers publish offers, publishers earn commissions, agents do the operational work.",
+			"http_base":   "/v1",
+			"mcp": gin.H{
+				"transport": "stdio",
+				"command":   "distributoor-mcp",
+				"env":       []string{"DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY"},
+			},
+			"verbs": gin.H{
+				"maker":     makerVerbs,
+				"publisher": []string{"list_offers", "join_offer", "get_balance"},
+			},
+			"payout_methods": []string{"manual"},
+		})
+	})
 
 	v1 := r.Group("/v1")
 

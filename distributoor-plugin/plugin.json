@@ -1,0 +1,6 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.json",
+  "name": "distributoor",
+  "description": "Distribute and monetize your product through the Distributoor affiliate network: readiness assessment, offer listing, attribution, and earnings — driven by your agent.",
+  "version": "0.1.0"
+}
