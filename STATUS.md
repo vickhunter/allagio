@@ -144,6 +144,17 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 - `affilio-wp/admin/build/sidebar.js`
 - `affilio-wp/admin/build/discovery.js`
 
+### Distributoor (supply side) — P0–P3 implemented
+See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
+- **Makers & products** (`007_distributoor_core.sql`): maker registration (rate‑limited) + `X-Maker-Key` auth with rotation, product/offer CRUD with status guardrails (`draft → submitted → listed` via admin approve only; `listed ↔ paused → retired`).
+- **Readiness engine**: deterministic probes (reachability, Stripe/Lemon Squeezy/Polar checkout markers, `ref_param_survives` redirect probe, pricing/docs/privacy/onboarding) + Claude rubric with no‑key fallback; AI extraction fills empty matcher taxonomy fields; agent‑readable remediation per check; private hosts blocked. Offer submit is gated on `readiness_status='ready'`.
+- **Offer rails**: admin review queue; approve promotes the offer into `affiliate_programs` (`source='distributoor'`, `offer_id` linked) so the existing matcher/recommendation/insertion pipeline serves it unchanged.
+- **Attribution** (`008_attribution_payouts.sql`): publisher marketplace (`GET /v1/marketplace/offers`, `POST /v1/marketplace/offers/:id/join`), tracked redirect `GET /v1/go/:code` (click + ref param carrying click id), `POST /v1/webhooks/:provider` for Stripe/Lemon Squeezy/Polar behind a `ProviderAdapter` interface with per‑provider HMAC verification, idempotent raw event storage, conversions joined to clicks, commissions booked as pending ledger entries clearing after the offer's refund window, refunds reversing/clawing back.
+- **Payouts**: publisher `GET /v1/payouts/balance|history`, admin `POST /v1/payout-batches/run` (manual payouts per site+currency over a minimum) + `:id/mark-paid`, maker `GET /v1/maker/earnings`.
+- New env vars (all optional, degrade off): `STRIPE_WEBHOOK_SECRET`, `LEMONSQUEEZY_WEBHOOK_SECRET`, `POLAR_WEBHOOK_SECRET`.
+- **Agentic layer (P4)**: `distributoor` maker CLI (`cmd/distributoor`: init/assess/offer/snippet/status), stdio MCP server (`cmd/distributoor-mcp`) exposing 13 DCP maker verbs, Agent Plugins 1.0.0 package (`distributoor-plugin/` with plugin.json + mcp.json + 3 skills), DCP v0.1 spec extracted to `docs/dcp/`, and `GET /.well-known/dcp.json` discovery manifest.
+- Not yet implemented: P5 scale items (site‑profile matching, Stripe Connect payouts, fraud scoring, hosted MCP transport, publisher‑side agent plugin).
+
 ## What’s Missing / Stubbed
 - **Matching quality**: lightweight semantic overlap exists; no true intent or LLM semantic analysis.
 - **Program discovery pipeline**: enrichment automation exists, but full quality scoring/verification workflow is still lightweight.
@@ -196,6 +207,9 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
 - 2026-02-06: Added recommendation tuning learning-insights UX in analytics (top boosted/penalized programs, confidence counters, and operator-facing notes) plus program-name enriched tuning profiles.
 - 2026-02-06: Added click anti-abuse protection for tracking (basic per-IP rate limiting + duplicate suppression window) with handler tests.
 - 2026-02-06: Reduced API key exposure in Gutenberg editor/sidebar by replacing direct backend key calls with WP nonce + server-side proxy routes (`/affilio/v1/editor/*`) and capability checks.
+- 2026-08-30: Added `DISTRIBUTOOR_PLAN.md` (v2) — architecture plan for Distributoor, the supply-side extension of Affilio: DCP (Distribution Context Protocol) layer on top of MCP, maker onboarding, readiness assessment, offer rails into the curated catalog, conversion attribution + payout ledger, and an agentic layer shipped as an Agent Plugins 1.0.0 package (plugin.json + skills/ + mcp.json). Documentation only; no code changes.
+- 2026-08-30: Implemented Distributoor P0–P3 (migrations 007–008): maker/product/offer supply side with admin offer review promoting into `affiliate_programs`, readiness engine with listing gate, publisher marketplace + tracked redirect links, Stripe/Lemon Squeezy/Polar webhook ingestion with conversion attribution and refund clawbacks, commission ledger with refund-window holds, and manual payout batches + maker earnings endpoints. Handler/services/provider tests added; ci-test now covers the providers package.
+- 2026-08-30: Implemented Distributoor P4 — agentic layer: `distributoor` maker CLI, `distributoor-mcp` stdio MCP server exposing the 13 DCP maker verbs, Agent Plugins 1.0.0 package under `distributoor-plugin/` (plugin.json + mcp.json + onboard/instrument/launch skills), DCP v0.1 spec extracted to `docs/dcp/`, and `/.well-known/dcp.json` discovery endpoint. `internal/dcp` client/tool-registry/JSON-RPC tests added and wired into ci-test.
 
 ## Next Suggested Tasks
 1. Complete security launch blockers listed in `MVP_CHECKLIST.md` (`P0` items first).

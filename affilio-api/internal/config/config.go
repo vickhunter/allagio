@@ -12,6 +12,10 @@ type Config struct {
 	AllowedOrigins   string
 	APIKeySecret     string
 	AdminAPIKey      string
+
+	StripeWebhookSecret       string
+	LemonSqueezyWebhookSecret string
+	PolarWebhookSecret        string
 }
 
 func Load() Config {
@@ -25,6 +29,10 @@ func Load() Config {
 		AllowedOrigins:   getEnvValue("ALLOWED_ORIGINS", "*"),
 		APIKeySecret:     getEnvValue("API_KEY_SECRET", "dev-secret"),
 		AdminAPIKey:      getEnvValue("ADMIN_API_KEY", ""),
+
+		StripeWebhookSecret:       os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		LemonSqueezyWebhookSecret: os.Getenv("LEMONSQUEEZY_WEBHOOK_SECRET"),
+		PolarWebhookSecret:        os.Getenv("POLAR_WEBHOOK_SECRET"),
 	}
 }
 

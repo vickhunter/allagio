@@ -17,7 +17,7 @@ affilio/
 │   │   ├── database/               # DB connection, queries, types
 │   │   ├── handlers/               # HTTP handlers + tests
 │   │   ├── middleware/             # Auth (API key, admin key) + CORS
-│   │   ├── migrations/            # SQL migrations (001-006)
+│   │   ├── migrations/            # SQL migrations (001-008)
 │   │   └── services/              # Business logic (AI, matching, scoring)
 │   ├── Makefile                    # Build/test targets
 │   ├── Dockerfile                  # Production image
@@ -59,7 +59,7 @@ affilio/
 ```bash
 cd affilio-api
 docker compose up -d                # Start PostgreSQL on :5432
-# Apply migrations in order: 001_initial.sql through 006_recommendation_status_guardrails.sql
+# Apply migrations in order: 001_initial.sql through 008_attribution_payouts.sql
 go run ./cmd/server                 # Starts API on :8080
 ```
 
@@ -74,6 +74,9 @@ go run ./cmd/server                 # Starts API on :8080
 | `ALLOWED_ORIGINS`  | No       | `*`                                              | CORS allowlist (comma-separated) |
 | `API_KEY_SECRET`   | No       | `dev-secret`                                     | Secret for site API key generation |
 | `ADMIN_API_KEY`    | No       | (empty)                                          | Admin-only endpoint auth key   |
+| `STRIPE_WEBHOOK_SECRET` | No  | (empty)                                          | Stripe webhook signature secret (Distributoor conversions) |
+| `LEMONSQUEEZY_WEBHOOK_SECRET` | No | (empty)                                     | Lemon Squeezy webhook signature secret |
+| `POLAR_WEBHOOK_SECRET` | No   | (empty)                                          | Polar webhook signature secret |
 
 *AI features fall back to safe defaults when `CLAUDE_API_KEY` is empty.
 
@@ -136,15 +139,28 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 - `POST /detect/links` — Affiliate link detection
 - `GET|POST|DELETE /user-programs/*` — User program management
 - `POST /track/click`, `GET /track/*` — Analytics (summary, trends, attribution, funnel, cohorts, etc.)
+- `GET /marketplace/offers`, `POST /marketplace/offers/:id/join` — Distributoor offer marketplace
+- `GET /payouts/balance`, `GET /payouts/history` — Publisher commission ledger
+
+**Maker** (requires `X-Maker-Key` header, Distributoor supply side):
+- `GET|POST|PATCH /maker/products[/:id]`, `POST /maker/products/:id/assess`, `GET /maker/products/:id/assessments`
+- `GET|POST|PATCH /maker/offers[/:id]`, `POST /maker/offers/:id/submit`
+- `GET /maker/earnings`
 
 **Admin** (requires `X-Admin-Key` header):
 - `GET /program-discovery/queue` — Discovery queue
 - `POST /program-discovery/queue/:id/review|promote` — Review/promote programs
 - `POST /sites/rotate-key` — Rotate site API key
+- `GET /offer-review/queue`, `POST /offer-review/:id/approve|reject` — Distributoor offer review
+- `POST /payout-batches/run`, `POST /payout-batches/:id/mark-paid` — Manual payout batches
+- `POST /offer-review/makers/rotate-key` — Rotate maker API key
 
 **Unauthenticated:**
 - `GET /health` — Health check
 - `POST /v1/sites/register` — Site registration (rate limited: 8 req/min per IP)
+- `POST /v1/makers/register` — Maker registration (rate limited: 8 req/min per IP)
+- `GET /v1/go/:code` — Tracked redirect link (rate limited: 120 req/min per IP)
+- `POST /v1/webhooks/:provider` — Payment provider webhooks (HMAC-verified: stripe, lemonsqueezy, polar)
 
 ### Recommendation Matching
 
@@ -155,9 +171,9 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 
 ### Database
 
-PostgreSQL with pgcrypto extension. Key tables: `affiliate_programs`, `sites`, `articles`, `recommendations`, `clicks`, `link_detections`, `user_programs`, `scan_jobs`, `program_discovery_queue`, `program_discovery_reviews`.
+PostgreSQL with pgcrypto extension. Key tables: `affiliate_programs`, `sites`, `articles`, `recommendations`, `clicks`, `link_detections`, `user_programs`, `scan_jobs`, `program_discovery_queue`, `program_discovery_reviews`. Distributoor tables: `makers`, `products`, `readiness_assessments`, `offers`, `campaigns`, `conversions`, `ledger_entries`, `payouts`, `webhook_events`.
 
-Migrations are in `affilio-api/internal/migrations/` and must be applied in numeric order (001-006).
+Migrations are in `affilio-api/internal/migrations/` and must be applied in numeric order (001-008).
 
 ## Conventions
 
