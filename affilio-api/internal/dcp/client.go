@@ -17,6 +17,7 @@ import (
 type Client struct {
 	BaseURL  string
 	MakerKey string
+	SiteKey  string // publisher-side verbs authenticate as a site
 	HTTP     *http.Client
 }
 
@@ -28,10 +29,23 @@ func NewClient(baseURL, makerKey string) *Client {
 	}
 }
 
-// Do performs one API call and returns the decoded JSON object. Paths are
-// relative to the API root (e.g. "/v1/maker/products"). A nil payload sends
-// no body. Non-2xx responses come back as errors carrying the API's message.
+// Do performs one maker-authenticated API call and returns the decoded JSON
+// object. Paths are relative to the API root (e.g. "/v1/maker/products").
+// A nil payload sends no body. Non-2xx responses come back as errors carrying
+// the API's message.
 func (c *Client) Do(method, path string, payload interface{}) (map[string]interface{}, error) {
+	return c.request(method, path, payload, "X-Maker-Key", c.MakerKey)
+}
+
+// DoSite performs one publisher-authenticated API call (site key).
+func (c *Client) DoSite(method, path string, payload interface{}) (map[string]interface{}, error) {
+	if c.SiteKey == "" {
+		return nil, fmt.Errorf("publisher verbs need a site key: set DISTRIBUTOOR_SITE_KEY (the Affilio site api key)")
+	}
+	return c.request(method, path, payload, "X-API-Key", c.SiteKey)
+}
+
+func (c *Client) request(method, path string, payload interface{}, authHeader, authKey string) (map[string]interface{}, error) {
 	var body io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
@@ -47,8 +61,8 @@ func (c *Client) Do(method, path string, payload interface{}) (map[string]interf
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if c.MakerKey != "" {
-		req.Header.Set("X-Maker-Key", c.MakerKey)
+	if authKey != "" {
+		req.Header.Set(authHeader, authKey)
 	}
 	client := c.HTTP
 	if client == nil {

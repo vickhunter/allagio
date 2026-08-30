@@ -4,8 +4,9 @@
 //
 // Configuration via environment:
 //
-//	DISTRIBUTOOR_API_URL  base URL of the Distributoor network (default http://localhost:8080)
-//	DISTRIBUTOOR_API_KEY  maker api key (obtain one with the register_maker tool)
+//	DISTRIBUTOOR_API_URL   base URL of the Distributoor network (default http://localhost:8080)
+//	DISTRIBUTOOR_API_KEY   maker api key (obtain one with the register_maker tool)
+//	DISTRIBUTOOR_SITE_KEY  publisher site api key (enables the publisher-side tools)
 package main
 
 import (
@@ -22,6 +23,7 @@ func main() {
 		apiURL = "http://localhost:8080"
 	}
 	client := dcp.NewClient(apiURL, os.Getenv("DISTRIBUTOOR_API_KEY"))
+	client.SiteKey = os.Getenv("DISTRIBUTOOR_SITE_KEY")
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
