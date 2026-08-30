@@ -79,6 +79,7 @@ func main() {
 	}
 
 	marketplace := &handlers.MarketplaceHandler{DB: db}
+	payouts := &handlers.PayoutsHandler{DB: db}
 	redirects := &handlers.RedirectsHandler{
 		DB:          db,
 		RateLimiter: handlers.NewIPRateLimiter(120, time.Minute),
@@ -139,6 +140,9 @@ func main() {
 
 		secured.GET("/marketplace/offers", marketplace.ListOffers)
 		secured.POST("/marketplace/offers/:id/join", marketplace.JoinOffer)
+
+		secured.GET("/payouts/balance", payouts.Balance)
+		secured.GET("/payouts/history", payouts.History)
 	}
 
 	maker := v1.Group("/maker")
@@ -156,6 +160,8 @@ func main() {
 		maker.GET("/offers/:id", offers.Get)
 		maker.PATCH("/offers/:id", offers.Patch)
 		maker.POST("/offers/:id/submit", offers.Submit)
+
+		maker.GET("/earnings", payouts.MakerEarnings)
 	}
 
 	admin := v1.Group("/program-discovery")
@@ -174,6 +180,13 @@ func main() {
 		offerAdmin.POST("/:id/approve", offerReview.Approve)
 		offerAdmin.POST("/:id/reject", offerReview.Reject)
 		offerAdmin.POST("/makers/rotate-key", makers.RotateKey)
+	}
+
+	payoutAdmin := v1.Group("/payout-batches")
+	payoutAdmin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey))
+	{
+		payoutAdmin.POST("/run", payouts.RunBatch)
+		payoutAdmin.POST("/:id/mark-paid", payouts.MarkPaid)
 	}
 
 	log.Printf("Affilio API listening on :%s", cfg.Port)
