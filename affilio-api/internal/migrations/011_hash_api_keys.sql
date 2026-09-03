@@ -12,15 +12,18 @@ ALTER TABLE sites ADD COLUMN IF NOT EXISTS api_key_previous_expires_at TIMESTAMP
 -- SHA-256 hex digest of existing keys
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-UPDATE sites
-SET api_key_hash = encode(digest(api_key, 'sha256'), 'hex'),
-    api_key_prefix = LEFT(api_key, 8)
-WHERE api_key IS NOT NULL AND api_key_hash IS NULL;
+DO $$
+BEGIN
+    -- Backfill from plaintext api_key if it still exists
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='sites' AND column_name='api_key') THEN
+        EXECUTE 'UPDATE sites SET api_key_hash = encode(digest(api_key, ''sha256''), ''hex''), api_key_prefix = LEFT(api_key, 8) WHERE api_key IS NOT NULL AND api_key_hash IS NULL';
+    END IF;
 
-UPDATE sites
-SET api_key_prev_hash = encode(digest(api_key_previous, 'sha256'), 'hex'),
-    api_key_prev_prefix = LEFT(api_key_previous, 8)
-WHERE api_key_previous IS NOT NULL AND api_key_prev_hash IS NULL;
+    -- Backfill from plaintext api_key_previous if it still exists
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='sites' AND column_name='api_key_previous') THEN
+        EXECUTE 'UPDATE sites SET api_key_prev_hash = encode(digest(api_key_previous, ''sha256''), ''hex''), api_key_prev_prefix = LEFT(api_key_previous, 8) WHERE api_key_previous IS NOT NULL AND api_key_prev_hash IS NULL';
+    END IF;
+END $$;
 
 -- Drop plaintext key columns
 ALTER TABLE sites DROP COLUMN IF EXISTS api_key;
@@ -37,10 +40,12 @@ ALTER TABLE sites ADD CONSTRAINT uq_sites_api_key_hash UNIQUE (api_key_hash);
 ALTER TABLE site_key_rotations ADD COLUMN IF NOT EXISTS old_key_prefix VARCHAR(8);
 ALTER TABLE site_key_rotations ADD COLUMN IF NOT EXISTS new_key_prefix VARCHAR(8);
 
-UPDATE site_key_rotations
-SET old_key_prefix = LEFT(old_key, 8),
-    new_key_prefix = LEFT(new_key, 8)
-WHERE old_key_prefix IS NULL;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='site_key_rotations' AND column_name='old_key') THEN
+        EXECUTE 'UPDATE site_key_rotations SET old_key_prefix = LEFT(old_key, 8), new_key_prefix = LEFT(new_key, 8) WHERE old_key_prefix IS NULL';
+    END IF;
+END $$;
 
 ALTER TABLE site_key_rotations DROP COLUMN IF EXISTS old_key;
 ALTER TABLE site_key_rotations DROP COLUMN IF EXISTS new_key;
