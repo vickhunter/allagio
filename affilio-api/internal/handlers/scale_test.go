@@ -49,10 +49,7 @@ func TestMarketplaceRanksOffersBySiteProfile(t *testing.T) {
 
 	// An email-focused blog.
 	siteKey := "site-key-profile"
-	siteID, err := db.CreateSite(context.Background(), siteKey, "emailblog.example.com", "Email Blog")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, siteKey, "emailblog.example.com", "Email Blog")
 	titles := []string{
 		"How I organize my email inbox for productivity",
 		"The best email tools for busy founders",
@@ -143,9 +140,7 @@ func TestFraudFlagsHoldCommissionsUntilCleared(t *testing.T) {
 	offerID := listedOffer(t, db, r, makerKey)
 
 	siteKey := "site-key-fraud"
-	if _, err := db.CreateSite(context.Background(), siteKey, "fraudblog.example.com", "Blog"); err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	createTestSite(t, db, siteKey, "fraudblog.example.com", "Blog")
 	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
 	code := join["tracking_code"].(string)
 
@@ -219,9 +214,7 @@ func TestVelocityCapPausesCampaign(t *testing.T) {
 	offerID := listedOffer(t, db, r, makerKey)
 
 	siteKey := "site-key-velocity"
-	if _, err := db.CreateSite(context.Background(), siteKey, "velocityblog.example.com", "Blog"); err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	createTestSite(t, db, siteKey, "velocityblog.example.com", "Blog")
 	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
 	code := join["tracking_code"].(string)
 	campaignID := join["campaign_id"].(string)
