@@ -36,6 +36,15 @@ func setupTestDB(t *testing.T) (*database.DB, func()) {
 
 func applyMigrations(t *testing.T, db *database.DB) {
 	t.Helper()
+	// Reset public schema so destructive migrations (e.g. column drops) can
+	// be re-applied cleanly when multiple tests share the same database.
+	if _, err := db.Pool.Exec(context.Background(), `
+		DROP SCHEMA IF EXISTS public CASCADE;
+		CREATE SCHEMA public;
+		GRANT ALL ON SCHEMA public TO PUBLIC;
+	`); err != nil {
+		t.Fatalf("reset schema: %v", err)
+	}
 	root := filepath.Join("..", "migrations")
 	files := []string{
 		"001_initial.sql",
