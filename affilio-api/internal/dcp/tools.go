@@ -1,0 +1,313 @@
+package dcp
+
+import (
+	"fmt"
+	"net/http"
+)
+
+// Tool is one DCP verb exposed to agents over MCP.
+type Tool struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	InputSchema map[string]interface{} `json:"inputSchema"`
+	call        func(c *Client, args map[string]interface{}) (map[string]interface{}, error)
+}
+
+func schema(required []string, props map[string]interface{}) map[string]interface{} {
+	s := map[string]interface{}{
+		"type":       "object",
+		"properties": props,
+	}
+	if len(required) > 0 {
+		s["required"] = required
+	}
+	return s
+}
+
+func str(desc string) map[string]interface{} {
+	return map[string]interface{}{"type": "string", "description": desc}
+}
+
+func num(desc string) map[string]interface{} {
+	return map[string]interface{}{"type": "number", "description": desc}
+}
+
+func strList(desc string) map[string]interface{} {
+	return map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": desc}
+}
+
+func pathArg(args map[string]interface{}, key string) (string, error) {
+	value, _ := args[key].(string)
+	if value == "" {
+		return "", fmt.Errorf("%s is required", key)
+	}
+	return value, nil
+}
+
+// bodyWithout returns the args minus the keys already consumed as path params.
+func bodyWithout(args map[string]interface{}, keys ...string) map[string]interface{} {
+	out := map[string]interface{}{}
+	for k, v := range args {
+		out[k] = v
+	}
+	for _, k := range keys {
+		delete(out, k)
+	}
+	return out
+}
+
+// Tools is DCP v0.1's maker verb set. Order is presentation order in agents.
+var Tools = []Tool{
+	{
+		Name:        "register_maker",
+		Description: "Register a new maker account on the Distributoor network. Returns the maker_id and the api_key to use for every other tool (set it as DISTRIBUTOOR_API_KEY).",
+		InputSchema: schema([]string{"email"}, map[string]interface{}{
+			"email": str("Maker's email address (unique)"),
+			"name":  str("Display name"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.Do(http.MethodPost, "/v1/makers/register", args)
+		},
+	},
+	{
+		Name:        "register_product",
+		Description: "Register a product to distribute. website_url must be the live landing page; the readiness assessment probes it.",
+		InputSchema: schema([]string{"name", "website_url"}, map[string]interface{}{
+			"name":             str("Product name"),
+			"tagline":          str("One-line description"),
+			"website_url":      str("Live landing page URL (http/https)"),
+			"docs_url":         str("Documentation URL"),
+			"pricing_url":      str("Pricing page URL"),
+			"product_type":     str("One of: saas, game, shopify_app, dev_tool, other"),
+			"payment_provider": str("One of: stripe, lemonsqueezy, polar, none"),
+			"primary_category": str("Lowercase category used for matching"),
+			"tags":             strList("Tags used for matching"),
+			"keywords":         strList("Keywords used for matching"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.Do(http.MethodPost, "/v1/maker/products", args)
+		},
+	},
+	{
+		Name:        "list_products",
+		Description: "List the maker's registered products with their readiness status.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.Do(http.MethodGet, "/v1/maker/products", nil)
+		},
+	},
+	{
+		Name:        "get_product",
+		Description: "Get one product by id.",
+		InputSchema: schema([]string{"product_id"}, map[string]interface{}{
+			"product_id": str("Product id"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "product_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.Do(http.MethodGet, "/v1/maker/products/"+id, nil)
+		},
+	},
+	{
+		Name:        "update_product",
+		Description: "Update product fields (same fields as register_product).",
+		InputSchema: schema([]string{"product_id"}, map[string]interface{}{
+			"product_id":       str("Product id"),
+			"name":             str("Product name"),
+			"tagline":          str("One-line description"),
+			"website_url":      str("Live landing page URL"),
+			"docs_url":         str("Documentation URL"),
+			"pricing_url":      str("Pricing page URL"),
+			"product_type":     str("One of: saas, game, shopify_app, dev_tool, other"),
+			"payment_provider": str("One of: stripe, lemonsqueezy, polar, none"),
+			"primary_category": str("Lowercase category used for matching"),
+			"tags":             strList("Tags used for matching"),
+			"keywords":         strList("Keywords used for matching"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "product_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.Do(http.MethodPatch, "/v1/maker/products/"+id, bodyWithout(args, "product_id"))
+		},
+	},
+	{
+		Name:        "run_assessment",
+		Description: "Run the distribution-readiness assessment against the product's live pages. Fix every failing gate check using each check's remediation field, then run again; offers can only be submitted while the product is 'ready'.",
+		InputSchema: schema([]string{"product_id"}, map[string]interface{}{
+			"product_id": str("Product id"),
+			"ref_param":  str("Query parameter the product preserves for attribution (default: via)"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "product_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.Do(http.MethodPost, "/v1/maker/products/"+id+"/assess", bodyWithout(args, "product_id"))
+		},
+	},
+	{
+		Name:        "list_assessments",
+		Description: "List the product's stored readiness assessments, newest first.",
+		InputSchema: schema([]string{"product_id"}, map[string]interface{}{
+			"product_id": str("Product id"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "product_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.Do(http.MethodGet, "/v1/maker/products/"+id+"/assessments", nil)
+		},
+	},
+	{
+		Name:        "create_offer",
+		Description: "Create a draft offer (commission terms) for a product.",
+		InputSchema: schema([]string{"product_id", "commission_type", "commission_value"}, map[string]interface{}{
+			"product_id":           str("Product id"),
+			"commission_type":      str("One of: percentage, flat, recurring"),
+			"commission_value":     num("Commission value (percent for percentage/recurring, currency units for flat)"),
+			"commission_currency":  str("3-letter currency code (default USD)"),
+			"cookie_duration_days": num("Attribution window in days (default 30)"),
+			"refund_window_days":   num("Hold period before commissions clear (default 30)"),
+			"landing_url":          str("Offer landing URL (defaults to the product website)"),
+			"ref_param":            str("Query parameter carrying the click id (default via)"),
+			"terms":                str("Human-readable offer terms"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.Do(http.MethodPost, "/v1/maker/offers", args)
+		},
+	},
+	{
+		Name:        "list_offers",
+		Description: "List the maker's offers with their statuses.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.Do(http.MethodGet, "/v1/maker/offers", nil)
+		},
+	},
+	{
+		Name:        "get_offer",
+		Description: "Get one offer by id.",
+		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
+			"offer_id": str("Offer id"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "offer_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.Do(http.MethodGet, "/v1/maker/offers/"+id, nil)
+		},
+	},
+	{
+		Name:        "update_offer",
+		Description: "Update a draft offer's terms, or change status: listed offers can be 'paused'/'retired', paused ones re-'listed'.",
+		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
+			"offer_id":             str("Offer id"),
+			"status":               str("Status transition: submitted->draft, listed->paused|retired, paused->listed|retired"),
+			"commission_type":      str("One of: percentage, flat, recurring"),
+			"commission_value":     num("Commission value"),
+			"commission_currency":  str("3-letter currency code"),
+			"cookie_duration_days": num("Attribution window in days"),
+			"refund_window_days":   num("Hold period in days"),
+			"landing_url":          str("Offer landing URL"),
+			"ref_param":            str("Attribution query parameter"),
+			"terms":                str("Human-readable offer terms"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "offer_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.Do(http.MethodPatch, "/v1/maker/offers/"+id, bodyWithout(args, "offer_id"))
+		},
+	},
+	{
+		Name:        "submit_offer",
+		Description: "Submit a draft offer for listing review. Requires the product's readiness to be 'ready'; after human approval the offer is listed in the publisher catalog.",
+		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
+			"offer_id": str("Offer id"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "offer_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.Do(http.MethodPost, "/v1/maker/offers/"+id+"/submit", nil)
+		},
+	},
+	{
+		Name:        "get_earnings",
+		Description: "Per-offer clicks, sales, refunds, gross revenue, and commission owed to publishers.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.Do(http.MethodGet, "/v1/maker/earnings", nil)
+		},
+	},
+}
+
+// PublisherTools is the publisher-side DCP verb set, authenticated by a site
+// key. Bloggers keep the WordPress plugin as their surface; these tools give
+// a publisher's agent the same verbs.
+var PublisherTools = []Tool{
+	{
+		Name:        "list_marketplace_offers",
+		Description: "List the offers this publisher site can join, ranked by how well each fits the site's content (relevance 0-100). Joined offers include their tracked link.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.DoSite(http.MethodGet, "/v1/marketplace/offers", nil)
+		},
+	},
+	{
+		Name:        "join_offer",
+		Description: "Join a listed offer for this publisher site. Returns the campaign and the stable tracked link to publish.",
+		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
+			"offer_id": str("Offer id from list_marketplace_offers"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "offer_id")
+			if err != nil {
+				return nil, err
+			}
+			return c.DoSite(http.MethodPost, "/v1/marketplace/offers/"+id+"/join", nil)
+		},
+	},
+	{
+		Name:        "get_balance",
+		Description: "The publisher site's commission balance per currency: pending (inside refund windows), cleared awaiting payout, and paid to date.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.DoSite(http.MethodGet, "/v1/payouts/balance", nil)
+		},
+	},
+	{
+		Name:        "get_payout_history",
+		Description: "The publisher site's payouts and recent commission ledger entries.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.DoSite(http.MethodGet, "/v1/payouts/history", nil)
+		},
+	},
+}
+
+func AllTools() []Tool {
+	out := make([]Tool, 0, len(Tools)+len(PublisherTools))
+	out = append(out, Tools...)
+	return append(out, PublisherTools...)
+}
+
+func CallTool(c *Client, name string, args map[string]interface{}) (map[string]interface{}, error) {
+	if args == nil {
+		args = map[string]interface{}{}
+	}
+	for _, tool := range AllTools() {
+		if tool.Name == name {
+			return tool.call(c, args)
+		}
+	}
+	return nil, fmt.Errorf("unknown tool %q", name)
+}

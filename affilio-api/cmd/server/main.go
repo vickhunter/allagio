@@ -7,6 +7,7 @@ import (
 
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
+	"affilio-api/internal/dcp"
 	"affilio-api/internal/handlers"
 	"affilio-api/internal/middleware"
 	"affilio-api/internal/services"
@@ -34,6 +35,35 @@ func main() {
 	r.Use(middleware.CORS(cfg.AllowedOrigins))
 
 	r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
+	r.GET("/.well-known/dcp.json", func(c *gin.Context) {
+		makerVerbs := make([]string, 0, len(dcp.Tools))
+		for _, tool := range dcp.Tools {
+			makerVerbs = append(makerVerbs, tool.Name)
+		}
+		publisherVerbs := make([]string, 0, len(dcp.PublisherTools))
+		for _, tool := range dcp.PublisherTools {
+			publisherVerbs = append(publisherVerbs, tool.Name)
+		}
+		c.JSON(200, gin.H{
+			"dcp_version": "0.1",
+			"name":        "distributoor",
+			"description": "Agent-native distribution network: makers publish offers, publishers earn commissions, agents do the operational work.",
+			"http_base":   "/v1",
+			"mcp": gin.H{
+				"transport": "streamable-http",
+				"url":       "/v1/mcp",
+				"stdio": gin.H{
+					"command": "distributoor-mcp",
+					"env":     []string{"DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY", "DISTRIBUTOOR_SITE_KEY"},
+				},
+			},
+			"verbs": gin.H{
+				"maker":     makerVerbs,
+				"publisher": publisherVerbs,
+			},
+			"payout_methods": []string{"manual"},
+		})
+	})
 
 	v1 := r.Group("/v1")
 
@@ -66,9 +96,48 @@ func main() {
 	detect := &handlers.DetectHandler{Classifier: classifier}
 	programDiscovery := &handlers.ProgramDiscoveryHandler{DB: db, Audit: audit}
 	auditHandler := &handlers.AuditHandler{DB: db}
+	makers := &handlers.MakersHandler{
+		DB:              db,
+		RegisterLimiter: handlers.NewIPRateLimiter(8, time.Minute),
+	}
+	products := &handlers.ProductsHandler{DB: db}
+	offers := &handlers.OffersHandler{DB: db}
+	offerReview := &handlers.OfferReviewHandler{DB: db}
+	assessments := &handlers.AssessmentsHandler{
+		DB: db,
+		Engine: &services.ReadinessEngine{
+			APIKey:     cfg.ClaudeAPIKey,
+			Model:      cfg.ClaudeModel,
+			APIURL:     cfg.ClaudeAPIURL,
+			APIVersion: cfg.ClaudeAPIVersion,
+		},
+	}
+
+	marketplace := &handlers.MarketplaceHandler{DB: db}
+	payouts := &handlers.PayoutsHandler{DB: db}
+	redirects := &handlers.RedirectsHandler{
+		DB:          db,
+		RateLimiter: handlers.NewIPRateLimiter(120, time.Minute),
+	}
+	webhooks := &handlers.WebhooksHandler{
+		DB: db,
+		Secrets: map[string]string{
+			"stripe":       cfg.StripeWebhookSecret,
+			"lemonsqueezy": cfg.LemonSqueezyWebhookSecret,
+			"polar":        cfg.PolarWebhookSecret,
+		},
+	}
 
 	v1.POST("/sites/register", sites.Register)
 	v1.DELETE("/sites", sites.Delete)
+	v1.POST("/makers/register", makers.Register)
+	v1.GET("/go/:code", redirects.Go)
+	v1.POST("/webhooks/:provider", webhooks.Receive)
+	mcp := &handlers.MCPHandler{
+		LoopbackURL: "http://127.0.0.1:" + cfg.Port,
+		RateLimiter: handlers.NewIPRateLimiter(240, time.Minute),
+	}
+	v1.POST("/mcp", mcp.Receive)
 
 	secured := v1.Group("/")
 	secured.Use(middleware.APIKeyAuth(db, audit))
@@ -108,6 +177,32 @@ func main() {
 		secured.GET("/track/recommendation-quality", tracking.RecommendationQuality)
 		secured.GET("/track/retention", tracking.Retention)
 		secured.GET("/track/recommendation-tuning", tracking.RecommendationTuning)
+
+		secured.GET("/marketplace/offers", marketplace.ListOffers)
+		secured.POST("/marketplace/offers/:id/join", marketplace.JoinOffer)
+
+		secured.GET("/payouts/balance", payouts.Balance)
+		secured.GET("/payouts/history", payouts.History)
+	}
+
+	maker := v1.Group("/maker")
+	maker.Use(middleware.MakerKeyAuth(db))
+	{
+		maker.POST("/products", products.Create)
+		maker.GET("/products", products.List)
+		maker.GET("/products/:id", products.Get)
+		maker.PATCH("/products/:id", products.Patch)
+		maker.POST("/products/:id/assess", assessments.Assess)
+		maker.GET("/products/:id/assessments", assessments.List)
+
+		maker.POST("/offers", offers.Create)
+		maker.GET("/offers", offers.List)
+		maker.GET("/offers/:id", offers.Get)
+		maker.PATCH("/offers/:id", offers.Patch)
+		maker.POST("/offers/:id/submit", offers.Submit)
+		maker.GET("/offers/:id/matches", offers.Matches)
+
+		maker.GET("/earnings", payouts.MakerEarnings)
 	}
 
 	admin := v1.Group("/program-discovery")
@@ -119,6 +214,25 @@ func main() {
 		admin.POST("/sites/rotate-key", siteKeys.Rotate)
 		admin.GET("/audit/events", auditHandler.List)
 		admin.GET("/audit/alerts", auditHandler.Alerts)
+	}
+
+	offerAdmin := v1.Group("/offer-review")
+	offerAdmin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
+	{
+		offerAdmin.GET("/queue", offerReview.Queue)
+		offerAdmin.POST("/:id/approve", offerReview.Approve)
+		offerAdmin.POST("/:id/reject", offerReview.Reject)
+		offerAdmin.POST("/makers/rotate-key", makers.RotateKey)
+		offerAdmin.POST("/makers/:id/trust", offerReview.SetMakerTrust)
+		offerAdmin.GET("/flagged-conversions", offerReview.FlaggedConversions)
+		offerAdmin.POST("/conversions/:id/clear-flag", offerReview.ClearConversionFlag)
+	}
+
+	payoutAdmin := v1.Group("/payout-batches")
+	payoutAdmin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
+	{
+		payoutAdmin.POST("/run", payouts.RunBatch)
+		payoutAdmin.POST("/:id/mark-paid", payouts.MarkPaid)
 	}
 
 	log.Printf("Affilio API listening on :%s", cfg.Port)

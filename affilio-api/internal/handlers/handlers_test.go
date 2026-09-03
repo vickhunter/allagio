@@ -44,8 +44,11 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"004_discovery_reviews.sql",
 		"005_api_key_rotation.sql",
 		"006_recommendation_status_guardrails.sql",
-		"007_audit_events.sql",
-		"008_hash_api_keys.sql",
+		"007_distributoor_core.sql",
+		"008_attribution_payouts.sql",
+		"009_scale_fraud_trust.sql",
+		"010_audit_events.sql",
+		"011_hash_api_keys.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)
@@ -63,6 +66,15 @@ func truncateAll(db *database.DB) error {
 	_, err := db.Pool.Exec(context.Background(), `
 TRUNCATE TABLE
     audit_events,
+    payouts,
+    ledger_entries,
+    conversions,
+    webhook_events,
+    campaigns,
+    offers,
+    readiness_assessments,
+    products,
+    makers,
     site_key_rotations,
     program_discovery_reviews,
     program_discovery_queue,

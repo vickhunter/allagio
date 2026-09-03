@@ -641,6 +641,43 @@
   margin-top: 12px;
 }
 
+.affilio-fit-low {
+  border-color: #dcdcde;
+  color: #50575e;
+  background: #f6f7f7;
+}
+
+.affilio-code-chip {
+  background: #f6f7f7;
+  border: 1px solid #dcdcde;
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #2c3338;
+}
+
+.affilio-balance-note {
+  font-size: 12px;
+  color: #50575e;
+}
+
+.affilio-amount-negative {
+  color: #8a2424;
+}
+
+.affilio-payout-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f1;
+}
+
+.affilio-payout-row:last-child {
+  border-bottom: none;
+}
+
 @media (max-width: 960px) {
   .affilio-inline-form {
     grid-template-columns: 1fr;
