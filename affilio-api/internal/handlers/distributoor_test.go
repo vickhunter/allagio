@@ -42,7 +42,7 @@ func newMakerRouter(db *database.DB) *gin.Engine {
 	}
 	review := &OfferReviewHandler{DB: db}
 	admin := r.Group("/v1/offer-review")
-	admin.Use(middleware.AdminKeyAuth("admin-secret"))
+	admin.Use(middleware.AdminKeyAuth("admin-secret", services.NewAuditLogger(db)))
 	{
 		admin.GET("/queue", review.Queue)
 		admin.POST("/:id/approve", review.Approve)

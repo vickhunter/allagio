@@ -15,6 +15,7 @@ import (
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/middleware"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,7 +30,7 @@ func newAttributionRouter(db *database.DB) *gin.Engine {
 	r.GET("/v1/go/:code", redirects.Go)
 	r.POST("/v1/webhooks/:provider", webhooks.Receive)
 	site := r.Group("/v1")
-	site.Use(middleware.APIKeyAuth(db))
+	site.Use(middleware.APIKeyAuth(db, services.NewAuditLogger(db)))
 	{
 		site.GET("/marketplace/offers", marketplace.ListOffers)
 		site.POST("/marketplace/offers/:id/join", marketplace.JoinOffer)
@@ -133,9 +134,7 @@ func TestAttributionEndToEnd(t *testing.T) {
 	offerID := listedOffer(t, db, r, makerKey)
 
 	siteKey := "site-key-attribution"
-	if _, err := db.CreateSite(context.Background(), siteKey, "blog.example.com", "Blog"); err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	createTestSite(t, db, siteKey, "blog.example.com", "Blog")
 
 	// Marketplace shows the listed offer.
 	rec, body := doSiteJSON(t, r, http.MethodGet, "/v1/marketplace/offers", siteKey, nil)
@@ -275,9 +274,7 @@ func TestRedirectStopsAttributingWhenPaused(t *testing.T) {
 	offerID := listedOffer(t, db, r, makerKey)
 
 	siteKey := "site-key-paused"
-	if _, err := db.CreateSite(context.Background(), siteKey, "blog2.example.com", "Blog 2"); err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	createTestSite(t, db, siteKey, "blog2.example.com", "Blog 2")
 	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
 	code := join["tracking_code"].(string)
 

@@ -50,8 +50,8 @@ Last Updated: February 06, 2026
 - [x] [P0] Enforce per-post capability check in WP insert route (`current_user_can('edit_post', $post_id)`)
 - [x] [P1] Add click anti-abuse controls (basic rate limit + duplicate suppression heuristics) for public tracking route
 - [x] [P1] Reduce API key exposure in WP editor/sidebar (role gating or short-lived scoped token exchange)
-- [ ] [P1] Key security hardening: hash/encrypt stored API keys and add previous-key expiry window after rotation
-- [ ] [P1] Add audit logs + alerts for auth failures and admin-key endpoint usage
+- [x] [P1] Key security hardening: hash/encrypt stored API keys and add previous-key expiry window after rotation
+- [x] [P1] Add audit logs + alerts for auth failures and admin-key endpoint usage
 
 ## Testing
 - [x] Service unit tests (classifier/generator/matcher)

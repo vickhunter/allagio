@@ -1,40 +1,100 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"net/http"
+	"strings"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
-func APIKeyAuth(db *database.DB) gin.HandlerFunc {
+func APIKeyAuth(db *database.DB, audit *services.AuditLogger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey := c.GetHeader("X-API-Key")
 		if apiKey == "" {
+			if audit != nil {
+				audit.Log(database.AuditEvent{
+					EventType: "auth_failure_api_key",
+					Severity:  "warn",
+					IPAddress: clientIP(c),
+					Endpoint:  c.FullPath(),
+					Method:    c.Request.Method,
+					Details:   map[string]interface{}{"reason": "missing api key"},
+				})
+			}
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing api key"})
 			return
 		}
-		site, err := db.GetSiteByAnyAPIKey(c.Request.Context(), apiKey)
+		keyHash := services.HashAPIKey(apiKey)
+		keyPrefix := services.KeyPrefix(apiKey)
+		site, err := db.GetSiteByAnyKeyHash(c.Request.Context(), keyHash, keyPrefix)
 		if err != nil {
+			if audit != nil {
+				audit.Log(database.AuditEvent{
+					EventType: "auth_failure_api_key",
+					Severity:  "warn",
+					IPAddress: clientIP(c),
+					Endpoint:  c.FullPath(),
+					Method:    c.Request.Method,
+					Details:   map[string]interface{}{"reason": "invalid api key", "key_prefix": safePrefix(apiKey)},
+				})
+			}
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid api key"})
 			return
 		}
-		c.Set("api_key", apiKey)
+		c.Set("api_key_hash", keyHash)
 		c.Set("site_id", site.ID)
 		c.Next()
 	}
 }
 
-func AdminKeyAuth(adminKey string) gin.HandlerFunc {
+func AdminKeyAuth(adminKey string, audit *services.AuditLogger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if adminKey == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "admin key not configured"})
 			return
 		}
-		if c.GetHeader("X-Admin-Key") != adminKey {
+		provided := c.GetHeader("X-Admin-Key")
+		if subtle.ConstantTimeCompare([]byte(provided), []byte(adminKey)) != 1 {
+			if audit != nil {
+				audit.Log(database.AuditEvent{
+					EventType: "auth_failure_admin_key",
+					Severity:  "warn",
+					IPAddress: clientIP(c),
+					Endpoint:  c.FullPath(),
+					Method:    c.Request.Method,
+					Details:   map[string]interface{}{"reason": "invalid admin key"},
+				})
+			}
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid admin key"})
 			return
 		}
+		if audit != nil {
+			audit.Log(database.AuditEvent{
+				EventType: "admin_action",
+				Severity:  "info",
+				IPAddress: clientIP(c),
+				Endpoint:  c.FullPath(),
+				Method:    c.Request.Method,
+			})
+		}
 		c.Next()
 	}
+}
+
+func clientIP(c *gin.Context) string {
+	ip := strings.TrimSpace(c.ClientIP())
+	if ip == "" {
+		return "unknown"
+	}
+	return ip
+}
+
+func safePrefix(key string) string {
+	if len(key) <= 8 {
+		return "***"
+	}
+	return key[:8] + "..."
 }

@@ -4,14 +4,18 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"strings"
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
 type SiteKeysHandler struct {
-	DB *database.DB
+	DB          *database.DB
+	Audit       *services.AuditLogger
+	GracePeriod time.Duration
 }
 
 type rotateKeyRequest struct {
@@ -35,21 +39,41 @@ func (h *SiteKeysHandler) Rotate(c *gin.Context) {
 	if req.Actor == "" {
 		req.Actor = "admin"
 	}
-	if err := h.DB.RotateSiteAPIKey(c.Request.Context(), req.SiteID, newKey); err != nil {
+	newKeyHash := services.HashAPIKey(newKey)
+	newKeyPrefix := services.KeyPrefix(newKey)
+	gracePeriod := h.GracePeriod
+	if gracePeriod <= 0 {
+		gracePeriod = 24 * time.Hour
+	}
+	if err := h.DB.RotateSiteAPIKey(c.Request.Context(), req.SiteID, newKeyHash, newKeyPrefix, gracePeriod); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "rotation failed"})
 		return
 	}
 	_, _ = h.DB.Pool.Exec(c.Request.Context(), `
-INSERT INTO site_key_rotations (site_id, old_key, new_key, rotated_by, note)
-SELECT id, api_key_previous, api_key, $2, $3
+INSERT INTO site_key_rotations (site_id, old_key_prefix, new_key_prefix, rotated_by, note)
+SELECT id, api_key_prev_prefix, api_key_prefix, $2, $3
 FROM sites
 WHERE id=$1`, req.SiteID, req.Actor, req.Note)
+
+	if h.Audit != nil {
+		h.Audit.Log(database.AuditEvent{
+			EventType: "key_rotation",
+			Severity:  "info",
+			Actor:     req.Actor,
+			IPAddress: strings.TrimSpace(c.ClientIP()),
+			Endpoint:  c.FullPath(),
+			Method:    c.Request.Method,
+			Details:   map[string]interface{}{"site_id": req.SiteID, "note": req.Note},
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"site_id":    req.SiteID,
-		"api_key":    newKey,
-		"rotated_at": time.Now().UTC().Format(time.RFC3339),
-		"rotated_by": req.Actor,
-		"note":       "previous key remains valid until manually revoked",
+		"site_id":        req.SiteID,
+		"api_key":        newKey,
+		"rotated_at":     time.Now().UTC().Format(time.RFC3339),
+		"rotated_by":     req.Actor,
+		"grace_period_h": int(gracePeriod.Hours()),
+		"note":           "previous key valid for grace period",
 	})
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/middleware"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +19,7 @@ func newPayoutsRouter(db *database.DB) *gin.Engine {
 	r := newAttributionRouter(db)
 	payouts := &PayoutsHandler{DB: db}
 	site := r.Group("/v1/payouts")
-	site.Use(middleware.APIKeyAuth(db))
+	site.Use(middleware.APIKeyAuth(db, services.NewAuditLogger(db)))
 	{
 		site.GET("/balance", payouts.Balance)
 		site.GET("/history", payouts.History)
@@ -27,7 +28,7 @@ func newPayoutsRouter(db *database.DB) *gin.Engine {
 	makerGroup.Use(middleware.MakerKeyAuth(db))
 	makerGroup.GET("", payouts.MakerEarnings)
 	admin := r.Group("/v1/payout-batches")
-	admin.Use(middleware.AdminKeyAuth("admin-secret"))
+	admin.Use(middleware.AdminKeyAuth("admin-secret", services.NewAuditLogger(db)))
 	{
 		admin.POST("/run", payouts.RunBatch)
 		admin.POST("/:id/mark-paid", payouts.MarkPaid)
@@ -70,9 +71,7 @@ func TestPayoutLifecycle(t *testing.T) {
 	offerID := listedOffer(t, db, r, makerKey)
 
 	siteKey := "site-key-payouts"
-	if _, err := db.CreateSite(context.Background(), siteKey, "blog3.example.com", "Blog 3"); err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	createTestSite(t, db, siteKey, "blog3.example.com", "Blog 3")
 	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
 	code := join["tracking_code"].(string)
 

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -35,6 +36,15 @@ func setupTestDB(t *testing.T) (*database.DB, func()) {
 
 func applyMigrations(t *testing.T, db *database.DB) {
 	t.Helper()
+	// Reset public schema so destructive migrations (e.g. column drops) can
+	// be re-applied cleanly when multiple tests share the same database.
+	if _, err := db.Pool.Exec(context.Background(), `
+		DROP SCHEMA IF EXISTS public CASCADE;
+		CREATE SCHEMA public;
+		GRANT ALL ON SCHEMA public TO PUBLIC;
+	`); err != nil {
+		t.Fatalf("reset schema: %v", err)
+	}
 	root := filepath.Join("..", "migrations")
 	files := []string{
 		"001_initial.sql",
@@ -46,6 +56,8 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"007_distributoor_core.sql",
 		"008_attribution_payouts.sql",
 		"009_scale_fraud_trust.sql",
+		"010_audit_events.sql",
+		"011_hash_api_keys.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)
@@ -62,6 +74,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 func truncateAll(db *database.DB) error {
 	_, err := db.Pool.Exec(context.Background(), `
 TRUNCATE TABLE
+    audit_events,
     payouts,
     ledger_entries,
     conversions,
@@ -85,6 +98,16 @@ TRUNCATE TABLE
     affiliate_programs
 RESTART IDENTITY CASCADE`)
 	return err
+}
+
+// createTestSite is a helper that creates a site with a hashed key for tests.
+func createTestSite(t *testing.T, db *database.DB, plaintextKey, domain, name string) string {
+	t.Helper()
+	siteID, err := db.CreateSite(context.Background(), services.HashAPIKey(plaintextKey), services.KeyPrefix(plaintextKey), domain, name)
+	if err != nil {
+		t.Fatalf("create test site: %v", err)
+	}
+	return siteID
 }
 
 func newJSONRequest(t *testing.T, method, path string, payload interface{}) *bytes.Reader {

@@ -69,9 +69,7 @@ func TestHostedMCPTransport(t *testing.T) {
 
 	// A publisher verb rides the X-API-Key header.
 	siteKey := "site-key-mcp"
-	if _, err := db.CreateSite(context.Background(), siteKey, "mcpblog.example.com", "Blog"); err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	createTestSite(t, db, siteKey, "mcpblog.example.com", "Blog")
 	rec, body = post(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_balance"}}`, map[string]string{"X-API-Key": siteKey})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("get_balance: expected 200, got %d", rec.Code)

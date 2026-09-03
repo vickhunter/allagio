@@ -15,10 +15,7 @@ func TestInsertConfirmAndTrackClick(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "test-key", "example.com", "Example Site")
 	articleID, err := db.UpsertArticle(context.Background(), siteID, 10, "Test Article", "https://example.com/post", "hash")
 	if err != nil {
 		t.Fatalf("create article: %v", err)
@@ -73,10 +70,7 @@ func TestInsertConfirmRequiresApprovedStatus(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
-	siteID, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	siteID := createTestSite(t, db, "test-key", "example.com", "Example Site")
 	articleID, err := db.UpsertArticle(context.Background(), siteID, 11, "Pending Insert Article", "https://example.com/pending", "hash")
 	if err != nil {
 		t.Fatalf("create article: %v", err)

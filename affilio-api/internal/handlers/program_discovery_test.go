@@ -33,12 +33,9 @@ func TestProgramDiscoveryPromote(t *testing.T) {
 		}),
 	}
 
-	_, err := db.CreateSite(context.Background(), "test-key", "example.com", "Example Site")
-	if err != nil {
-		t.Fatalf("create site: %v", err)
-	}
+	_ = createTestSite(t, db, "test-key", "example.com", "Example Site")
 	var discoveryID string
-	err = db.Pool.QueryRow(context.Background(), `
+	err := db.Pool.QueryRow(context.Background(), `
 INSERT INTO program_discovery_queue (domain, sample_url, sites_count, status)
 VALUES ('example.com',$1,1,'pending')
 RETURNING id`, "https://example.com/affiliates").Scan(&discoveryID)
