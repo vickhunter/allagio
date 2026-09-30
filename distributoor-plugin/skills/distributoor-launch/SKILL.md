@@ -10,10 +10,10 @@ landing page. It rides the network's rails into publisher content once listed.
 
 ## Terms that convert
 
-- `commission_type`: `percentage` (share of each sale), `recurring` (share of
-  renewals too — strongest for SaaS), `flat` (fixed amount per sale).
-- `commission_value`: 20–30% is the credible SaaS range; under 10% rarely
-  motivates a publisher. For flat, price it near one month of revenue.
+- `commission_type`: the Stripe pilot supports `percentage` or `flat` on the
+  first paid Checkout. Recurring commissions are outside this pilot.
+- `commission_value`: use the maker's agreed amount. Do not infer a financial
+  commitment from the product's price or industry averages.
 - `cookie_duration_days` (default 30): how long after a click a purchase still
   attributes. Longer is more attractive to publishers.
 - `refund_window_days` (default 30): commissions stay pending this long before

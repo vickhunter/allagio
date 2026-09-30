@@ -1,5 +1,15 @@
 # Affilio — Project Status
 
+## One-entry setup · 2026-09-30
+
+- Added `packages/distributoor-setup`: portable Node CLI, manifest detection, hosted OAuth preflight, Codex agent handoff and Cursor/Claude MCP + skill installation. Configuration and custom skills are preserved on conflicts. The npm package is prepared, not published.
+- Hosted explicit maker OAuth and `/owner?setup=maker` create a new owned maker without an API key; existing email/account conflicts still require proof of ownership.
+- Fresh WordPress activation opens setup. One Connect action provisions a site credential and scans published posts in resumable batches; settings show progress and retry. The backend accepts hashed, idempotent installation registration. New plugin needs the updated backend; no deployment occurred.
+- Fixed missing editor proxy that prevented activation, with post access and recommendation ownership checks.
+- WordPress cron drives scans. Native WordPress connection remains separate from hosted publisher-agent identity. Builder code wiring, Stripe connection and real purchase verification remain distinct from installing files.
+- See `docs/ONE-STEP-SETUP.md` for release gates and `packages/distributoor-setup/README.md` for runnable local commands.
+- Verification: full Go suite, handler/database race tests and vet passed; seven installer tests and the portable npm archive ran successfully. WordPress 6.6/PHP 8.2 activated and completed keyless Connect → scan → dashboard in Playwright (3 passed, 1 optional legacy-key test skipped). PHP setup tests cover lost responses, permissions, unsupported backends, batch failure and resume. The local browser fixture used an explicit cron run.
+
 ## Hosted pilot · 2026-09-30
 
 Implemented hosted Streamable HTTP MCP with OIDC owner sign-in, OAuth discovery/DCR/S256 PKCE, hashed single-use codes, scoped access tokens, rotating refresh tokens and owner revocation. Browser approval now records verified issuer/subject authority for the exact placement; agent tokens cannot approve or confirm receipt of money. New accounts need no API key, and OAuth maker accounts have no legacy key stored. Legacy ownership requires an owner key once, never an email match.
@@ -212,9 +222,9 @@ See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
 2. **Install Plugin**
    - Copy `affilio-wp/` into `wp-content/plugins/affilio/`
    - Activate “Affilio” plugin in WP admin
-   - Open **Affilio → Settings**, create an account if needed, and set **API Key**
+   - Open **Affilio → Settings** and click **Connect and find opportunities**. This requires the updated backend; manual keys remain available under the settings accordion.
 3. **Test Flow**
-   - Click **Scan All Posts** in **Affilio** dashboard
+   - Review the automatic first scan; **Scan All Posts** in the dashboard refreshes it later.
    - Open a post → sidebar → **Analyze**
    - Approve & insert a recommendation
 

@@ -32,7 +32,10 @@ to a page carrying this snippet — that is exactly what the
 
 ## 2. Pass it into checkout
 
-Read the value back at checkout time and attach it:
+Read the value back at checkout time and attach it to the existing server-side
+checkout request. Merge existing metadata. If `client_reference_id` already has
+a business purpose, use `metadata.dtr` rather than overwriting it. Keep
+`metadata.dtr_product_id` fixed by the server, not supplied by the browser.
 
 | Provider | Where the click id goes |
 |---|---|
@@ -42,15 +45,19 @@ Read the value back at checkout time and attach it:
 
 ## 3. Register webhooks
 
-Point the provider's webhook at the network (each is verified with the
-provider's signature scheme; the network operator configures the secrets):
+The hosted pilot supports Stripe first paid Checkout purchases. The owner
+connects it at `<api>/owner/products/<product_id>/connection`; the form verifies
+the Stripe account, price, endpoint, mode and currency. The API key is used once
+and discarded. The signing secret is encrypted. Never ask for either in chat.
+Prepare the existing checkout integration and tests while this form is pending.
 
-- Stripe: `POST <api>/v1/webhooks/stripe/<product_id>` — events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`. The pilot operator creates an encrypted per-product signing-secret connection with fixed test/live mode and USD/EUR/GBP currency. The old global Stripe route is disabled. Only positive paid first checkouts are eligible; renewals are outside this POC.
-- Lemon Squeezy: `POST <api>/v1/webhooks/lemonsqueezy` — events `order_created`, `order_refunded`
-- Polar: `POST <api>/v1/webhooks/polar` — events `order.created`, `order.refunded`
+Provider endpoints:
+
+- Stripe: `POST <api>/v1/webhooks/stripe/<product_id>` — events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`. Fixed test/live mode and USD/EUR/GBP currency. Only positive paid first checkouts are eligible; renewals are outside this POC.
+- Legacy Lemon Squeezy and Polar adapters exist, but do not have the verified hosted connection flow. Do not enable them or present their configuration as equivalent to the Stripe pilot.
 
 ## 4. Verify
 
 Run `run_assessment` and confirm `ref_param_survives` passes. After a test
-purchase, verify paid status, product metadata, mode, currency and the click's attribution window. `get_earnings` should show an eligible sale within a minute; an
+purchase, verify paid status, product metadata, mode, currency and the click's attribution window. `get_earnings` must show the actual eligible sale; an
 "unattributed" webhook usually means step 2 isn't reaching the provider.

@@ -47,7 +47,8 @@ func main() {
 		}
 		r.GET("/pilot", func(c *gin.Context) { c.File(cfg.POCReportPath) })
 	}
-	r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
+	health := func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok", "site_installation_registration": true}) }
+	r.GET("/health", health)
 	r.GET("/.well-known/dcp.json", func(c *gin.Context) {
 		mcpURL, mcpTransport := "/v1/mcp", "legacy-http-jsonrpc"
 		if cfg.PublicBaseURL != "" {
@@ -179,6 +180,7 @@ func main() {
 		placements.Find(c)
 	})
 	v1.POST("/sites/register", sites.Register)
+	v1.GET("/health", health)
 	v1.DELETE("/sites", sites.Delete)
 	v1.POST("/makers/register", makers.Register)
 	v1.GET("/go/:code", redirects.Go)

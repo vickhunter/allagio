@@ -7,4 +7,9 @@ affilio-api/distributoor-mcp
 affilio-api/affilio-server
 .codegraph/
 .cursor/
+packages/distributoor-setup/skills/
+packages/distributoor-setup/*.tgz
+**/node_modules/
+affilio-wp/e2e/test-results/
+affilio-wp/e2e/playwright-report/
 __pycache__/

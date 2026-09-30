@@ -9,6 +9,7 @@ module.exports = defineConfig({
   use: {
     baseURL: process.env.WP_BASE_URL || 'http://localhost:8080',
     headless: true,
+    launchOptions: { args: process.env.AFFILIO_E2E_HOSTMAP ? ['--host-resolver-rules=' + process.env.AFFILIO_E2E_HOSTMAP, '--no-proxy-server'] : [] },
     trace: 'on-first-retry',
   },
   retries: 1,

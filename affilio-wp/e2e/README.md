@@ -29,3 +29,16 @@ npm test
 - Settings/onboarding page visibility.
 - Disconnected banner path.
 - Connected dashboard render path (when API key env is provided).
+
+The settings test now checks the Connect workflow and opens the manual-settings
+accordion only for the legacy credential tests. Tests run serially because they
+share WordPress options. Use an isolated WordPress fixture.
+
+`AFFILIO_E2E_SETUP=1` additionally verifies Connect, published-post scan progress
+and the resulting dashboard without copying a credential. Only enable it for a
+fresh isolated site with this branch's backend. The fixture needs a post titled
+`Best developer hosting tools`. WordPress cron must run; an optional
+`AFFILIO_E2E_CRON_COMPOSE` points at the isolated `affilio-onboarding-qa` Docker
+Compose file and runs the queued event through its `cli` service. An optional
+`AFFILIO_E2E_HOSTMAP` supplies Chromium host-resolution rules for a local test
+domain. No live publishing or payments occur in this test.

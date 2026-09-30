@@ -205,6 +205,47 @@ func TestHostedLoginClaimsAndCSRF(t *testing.T) {
 	}
 }
 
+func TestHostedMakerSetupCreatesOnlyNewOwnedAccount(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, r, _ := hostedTestServer(t, db)
+	o, cookie := testOwnerSession(t, h, "setup-maker", "setup-maker@example.com")
+	values, _ := authorizeTestAgent(t, h, r, o, cookie, "maker")
+	rec, token := exchangeTestToken(t, h, r, values)
+	if rec.Code != 200 {
+		t.Fatal("maker setup did not reach token exchange")
+	}
+	grant, err := db.AgentToken(context.Background(), services.HashAPIKey(token["access_token"].(string)), h.resource())
+	if err != nil || grant.MakerID == "" || grant.SiteID != "" {
+		t.Fatal("maker setup did not bind exactly the maker account")
+	}
+	var key *string
+	if err = db.Pool.QueryRow(context.Background(), `SELECT api_key FROM makers WHERE id=$1`, grant.MakerID).Scan(&key); err != nil || key != nil {
+		t.Fatal("hosted setup created an unnecessary legacy key")
+	}
+	authorizeTestAgent(t, h, r, o, cookie, "maker")
+	var count int
+	if err = db.Pool.QueryRow(context.Background(), `SELECT count(*) FROM makers WHERE email=$1`, o.Email).Scan(&count); err != nil || count != 1 {
+		t.Fatal("rerun duplicated maker")
+	}
+	foreign, err := db.CreateMaker(context.Background(), "existing-maker-owner", "existing-setup@example.com", "Existing maker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, foreignCookie := testOwnerSession(t, h, "other-identity", "existing-setup@example.com")
+	request := httptest.NewRequest("GET", "/owner?setup=maker", nil)
+	request.AddCookie(foreignCookie)
+	dashboard := httptest.NewRecorder()
+	r.ServeHTTP(dashboard, request)
+	if dashboard.Code != 200 {
+		t.Fatal("existing-account recovery form missing")
+	}
+	var ownerID *string
+	if err = db.Pool.QueryRow(context.Background(), `SELECT id::text FROM owners WHERE maker_id=$1`, foreign).Scan(&ownerID); err == nil {
+		t.Fatal("matching email claimed another maker")
+	}
+}
+
 type bearerTransport struct {
 	token string
 	base  http.RoundTripper

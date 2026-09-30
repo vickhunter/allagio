@@ -266,6 +266,13 @@ func (d *DB) CreateSite(ctx context.Context, keyHash, keyPrefix, domain, name st
 	return id, err
 }
 
+func (d *DB) RegisterInstallation(ctx context.Context, keyHash, keyPrefix, domain, name string) (string, error) {
+	var id string
+	err := d.Pool.QueryRow(ctx, `INSERT INTO sites (api_key_hash, api_key_prefix, domain, name) VALUES ($1,$2,$3,$4)
+ON CONFLICT (api_key_hash) DO UPDATE SET domain=sites.domain WHERE sites.domain=EXCLUDED.domain RETURNING id`, keyHash, keyPrefix, domain, name).Scan(&id)
+	return id, err
+}
+
 func (d *DB) RotateSiteAPIKey(ctx context.Context, siteID, newKeyHash, newKeyPrefix string, gracePeriod time.Duration) error {
 	graceInterval := fmt.Sprintf("%d hours", int(gracePeriod.Hours()))
 	_, err := d.Pool.Exec(ctx, `

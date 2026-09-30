@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/subtle"
+	"encoding/hex"
 	"errors"
 	"log"
 	"net/http"
@@ -27,8 +28,9 @@ type SitesHandler struct {
 }
 
 type siteRegisterRequest struct {
-	Domain string `json:"domain"`
-	Name   string `json:"name"`
+	Domain          string `json:"domain"`
+	Name            string `json:"name"`
+	InstallationKey string `json:"installation_key"`
 }
 
 type siteDeleteRequest struct {
@@ -90,6 +92,7 @@ func (h *SitesHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 		return
 	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16384)
 	var req siteRegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
@@ -105,7 +108,17 @@ func (h *SitesHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name too long"})
 		return
 	}
-	apiKey, err := generateAPIKey()
+	apiKey := req.InstallationKey
+	var err error
+	if apiKey != "" {
+		decoded, decodeErr := hex.DecodeString(apiKey)
+		if decodeErr != nil || len(decoded) != 32 || apiKey != strings.ToLower(apiKey) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "installation_key must be 32 random bytes encoded as lowercase hex"})
+			return
+		}
+	} else {
+		apiKey, err = generateAPIKey()
+	}
 	if err != nil {
 		log.Printf("sites.register key generation failed domain=%s err=%v", req.Domain, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate api key"})
@@ -113,7 +126,16 @@ func (h *SitesHandler) Register(c *gin.Context) {
 	}
 	keyHash := services.HashAPIKey(apiKey)
 	keyPrefix := services.KeyPrefix(apiKey)
-	siteID, err := h.DB.CreateSite(c.Request.Context(), keyHash, keyPrefix, req.Domain, req.Name)
+	var siteID string
+	if req.InstallationKey != "" {
+		siteID, err = h.DB.RegisterInstallation(c.Request.Context(), keyHash, keyPrefix, req.Domain, req.Name)
+	} else {
+		siteID, err = h.DB.CreateSite(c.Request.Context(), keyHash, keyPrefix, req.Domain, req.Name)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusConflict, gin.H{"error": "installation is already connected to a different domain"})
+		return
+	}
 	if err != nil {
 		log.Printf("sites.register db create failed domain=%s name=%s err=%v", req.Domain, req.Name, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register site"})

@@ -1,0 +1,13 @@
+{
+  "name": "@distributoor/setup",
+  "version": "0.1.0",
+  "description": "Connect your coding agent and let it set up Distributoor in your product.",
+  "type": "module",
+  "bin": { "distributoor-setup": "bin/setup.mjs" },
+  "engines": { "node": ">=20" },
+  "files": ["bin", "lib", "skills", "README.md"],
+  "scripts": {
+    "test": "node --test",
+    "prepack": "node scripts/package-skills.mjs"
+  }
+}

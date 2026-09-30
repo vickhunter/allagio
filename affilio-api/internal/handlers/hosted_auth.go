@@ -342,6 +342,13 @@ func (h *HostedHandler) Authorize(c *gin.Context) {
 			scope = "maker"
 		}
 	}
+	if scope == "maker" && o.MakerID == "" {
+		o, err = h.ensureMakerAccount(c, o)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+	}
 	if strings.Contains(scope, "publisher") && o.SiteID == "" || strings.Contains(scope, "maker") && o.MakerID == "" {
 		h.render(c, "Connect your account", "Choose the account your agent will use.", template.HTML(fmt.Sprintf(`<p><a href="/owner?return_to=%s">Set up your account and continue</a></p>`, template.HTMLEscapeString(url.QueryEscape(c.Request.URL.RequestURI())))))
 		return
@@ -608,8 +615,31 @@ func (h *HostedHandler) render(c *gin.Context, title, message string, body any) 
 	}
 }
 
+func (h *HostedHandler) ensureMakerAccount(c *gin.Context, o *database.Owner) (*database.Owner, error) {
+	err := h.DB.CreateOwnerAccount(c.Request.Context(), o, "maker", "", "", "")
+	if isUniqueViolation(err) {
+		return o, nil
+	}
+	fresh, loadErr := h.currentOwner(c)
+	if loadErr != nil {
+		return nil, loadErr
+	}
+	if err != nil && fresh.MakerID == "" {
+		return nil, err
+	}
+	return fresh, nil
+}
+
 func (h *HostedHandler) Dashboard(c *gin.Context) {
 	o := ownerFrom(c)
+	if c.Query("setup") == "maker" && o.MakerID == "" {
+		var err error
+		o, err = h.ensureMakerAccount(c, o)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+	}
 	csrf := template.HTMLEscapeString(o.CSRF)
 	var body strings.Builder
 	returnTo := c.Query("return_to")
