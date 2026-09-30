@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"time"
 
 	"affilio-api/internal/config"
@@ -34,6 +35,12 @@ func main() {
 	}
 	r.Use(middleware.CORS(cfg.AllowedOrigins))
 
+	if cfg.POCReportPath != "" {
+		if cfg.Host != "127.0.0.1" {
+			log.Fatal("POC report requires HOST=127.0.0.1")
+		}
+		r.GET("/pilot", func(c *gin.Context) { c.File(cfg.POCReportPath) })
+	}
 	r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
 	r.GET("/.well-known/dcp.json", func(c *gin.Context) {
 		makerVerbs := make([]string, 0, len(dcp.Tools))
@@ -41,7 +48,7 @@ func main() {
 			makerVerbs = append(makerVerbs, tool.Name)
 		}
 		publisherVerbs := make([]string, 0, len(dcp.PublisherTools))
-		for _, tool := range dcp.PublisherTools {
+		for _, tool := range append(dcp.PublisherTools, dcp.RevenueTools...) {
 			publisherVerbs = append(publisherVerbs, tool.Name)
 		}
 		c.JSON(200, gin.H{
@@ -58,6 +65,7 @@ func main() {
 				},
 			},
 			"verbs": gin.H{
+				"public":    []string{"preview_revenue"},
 				"maker":     makerVerbs,
 				"publisher": publisherVerbs,
 			},
@@ -114,13 +122,23 @@ func main() {
 	}
 
 	marketplace := &handlers.MarketplaceHandler{DB: db}
+	placements := &handlers.PlacementsHandler{DB: db}
 	payouts := &handlers.PayoutsHandler{DB: db}
 	redirects := &handlers.RedirectsHandler{
 		DB:          db,
 		RateLimiter: handlers.NewIPRateLimiter(120, time.Minute),
 	}
+	var connectionCipher *services.ConnectionCipher
+	if cfg.ConnectionEncryptionKey != "" {
+		connectionCipher, err = services.NewConnectionCipher(cfg.ConnectionEncryptionKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	connections := &handlers.PaymentConnectionsHandler{DB: db, Cipher: connectionCipher}
 	webhooks := &handlers.WebhooksHandler{
-		DB: db,
+		Cipher: connectionCipher,
+		DB:     db,
 		Secrets: map[string]string{
 			"stripe":       cfg.StripeWebhookSecret,
 			"lemonsqueezy": cfg.LemonSqueezyWebhookSecret,
@@ -128,11 +146,23 @@ func main() {
 		},
 	}
 
+	previewLimiter := handlers.NewIPRateLimiter(30, time.Minute)
+	v1.POST("/revenue/preview", func(c *gin.Context) {
+		if !previewLimiter.Allow(c.ClientIP()) {
+			c.JSON(429, gin.H{"error": "preview rate limit exceeded"})
+			return
+		}
+		placements.Find(c)
+	})
 	v1.POST("/sites/register", sites.Register)
 	v1.DELETE("/sites", sites.Delete)
 	v1.POST("/makers/register", makers.Register)
 	v1.GET("/go/:code", redirects.Go)
 	v1.POST("/webhooks/:provider", webhooks.Receive)
+	v1.POST("/webhooks/:provider/:product_id", webhooks.Receive)
+	workerCtx, cancelWorker := context.WithCancel(ctx)
+	defer cancelWorker()
+	go webhooks.RunWorker(workerCtx)
 	mcp := &handlers.MCPHandler{
 		LoopbackURL: "http://127.0.0.1:" + cfg.Port,
 		RateLimiter: handlers.NewIPRateLimiter(240, time.Minute),
@@ -178,11 +208,19 @@ func main() {
 		secured.GET("/track/retention", tracking.Retention)
 		secured.GET("/track/recommendation-tuning", tracking.RecommendationTuning)
 
+		secured.POST("/revenue/opportunities", placements.Find)
+		secured.POST("/placements", placements.Prepare)
+		secured.GET("/placements", placements.List)
+		secured.GET("/placements/:id", placements.Get)
+		secured.POST("/placements/:id/commit", placements.Commit)
+		secured.POST("/placements/:id/receipt", placements.RecordReceipt)
+		secured.POST("/placements/:id/revoke", placements.Revoke)
 		secured.GET("/marketplace/offers", marketplace.ListOffers)
 		secured.POST("/marketplace/offers/:id/join", marketplace.JoinOffer)
 
 		secured.GET("/payouts/balance", payouts.Balance)
 		secured.GET("/payouts/history", payouts.History)
+		secured.POST("/payouts/:id/confirm-received", payouts.ConfirmReceived)
 	}
 
 	maker := v1.Group("/maker")
@@ -220,6 +258,10 @@ func main() {
 	offerAdmin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
 	{
 		offerAdmin.GET("/queue", offerReview.Queue)
+		offerAdmin.POST("/placements/:id/approve", placements.Approve)
+		offerAdmin.POST("/agent-access/sites/:site_id", placements.CreateAgentAccess)
+		offerAdmin.POST("/agent-access/:id/revoke", placements.RevokeAgentAccess)
+		offerAdmin.POST("/products/:id/connection", connections.Create)
 		offerAdmin.POST("/:id/approve", offerReview.Approve)
 		offerAdmin.POST("/:id/reject", offerReview.Reject)
 		offerAdmin.POST("/makers/rotate-key", makers.RotateKey)
@@ -235,8 +277,8 @@ func main() {
 		payoutAdmin.POST("/:id/mark-paid", payouts.MarkPaid)
 	}
 
-	log.Printf("Affilio API listening on :%s", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
+	log.Printf("Affilio API listening on %s", net.JoinHostPort(cfg.Host, cfg.Port))
+	if err := r.Run(net.JoinHostPort(cfg.Host, cfg.Port)); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }

@@ -14,7 +14,8 @@ type PayoutsHandler struct {
 }
 
 type payoutBatchRequest struct {
-	MinPayout float64 `json:"min_payout"`
+	MinPayout   float64 `json:"min_payout"`
+	IncludeTest bool    `json:"include_test_mode"`
 }
 
 type markPaidRequest struct {
@@ -36,10 +37,13 @@ func (h *PayoutsHandler) Balance(c *gin.Context) {
 	out := make([]gin.H, 0, len(balances))
 	for _, b := range balances {
 		out = append(out, gin.H{
-			"currency":       b.Currency,
-			"pending":        b.Pending,
-			"cleared_unpaid": b.ClearedUnpaid,
-			"paid":           b.Paid,
+			"currency":         b.Currency,
+			"mode":             b.Mode,
+			"pending":          b.Pending,
+			"cleared_unpaid":   b.ClearedUnpaid,
+			"paid":             b.Paid,
+			"reserved":         b.Reserved,
+			"payment_reported": b.PaymentReported,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"balances": out})
@@ -68,6 +72,7 @@ func (h *PayoutsHandler) History(c *gin.Context) {
 			"kind":         e.Kind,
 			"amount":       e.Amount,
 			"currency":     e.Currency,
+			"mode":         e.Mode,
 			"status":       e.Status,
 			"product_name": e.ProductName,
 			"created_at":   e.CreatedAt.Format(time.RFC3339),
@@ -88,7 +93,7 @@ func (h *PayoutsHandler) RunBatch(c *gin.Context) {
 	if req.MinPayout <= 0 {
 		req.MinPayout = 25
 	}
-	payouts, err := h.DB.RunPayoutBatch(c.Request.Context(), req.MinPayout)
+	payouts, err := h.DB.RunPayoutBatch(c.Request.Context(), req.MinPayout, req.IncludeTest)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "payout batch failed"})
 		return
@@ -102,7 +107,10 @@ func (h *PayoutsHandler) RunBatch(c *gin.Context) {
 
 func (h *PayoutsHandler) MarkPaid(c *gin.Context) {
 	var req markPaidRequest
-	_ = c.ShouldBindJSON(&req)
+	if !uuidPattern.MatchString(c.Param("id")) || c.ShouldBindJSON(&req) != nil || strings.TrimSpace(req.ProviderReference) == "" || len(req.ProviderReference) > 255 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "valid payout id and payment reference required"})
+		return
+	}
 	updated, err := h.DB.MarkPayoutPaid(c.Request.Context(), c.Param("id"), strings.TrimSpace(req.ProviderReference))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to mark payout paid"})
@@ -134,11 +142,13 @@ func (h *PayoutsHandler) MakerEarnings(c *gin.Context) {
 			"revenue":      e.Revenue,
 			"commission":   e.Commission,
 			"currency":     e.Currency,
+			"mode":         e.Mode,
 		})
-		total, ok := totals[e.Currency]
+		key := e.Currency + ":" + e.Mode
+		total, ok := totals[key]
 		if !ok {
-			total = gin.H{"currency": e.Currency, "revenue": 0.0, "commission": 0.0}
-			totals[e.Currency] = total
+			total = gin.H{"currency": e.Currency, "mode": e.Mode, "revenue": 0.0, "commission": 0.0}
+			totals[key] = total
 		}
 		total["revenue"] = total["revenue"].(float64) + e.Revenue
 		total["commission"] = total["commission"].(float64) + e.Commission
@@ -152,13 +162,16 @@ func (h *PayoutsHandler) MakerEarnings(c *gin.Context) {
 
 func payoutJSON(p database.Payout) gin.H {
 	item := gin.H{
-		"id":         p.ID,
-		"site_id":    p.SiteID,
-		"amount":     p.Amount,
-		"currency":   p.Currency,
-		"method":     p.Method,
-		"status":     p.Status,
-		"created_at": p.CreatedAt.Format(time.RFC3339),
+		"id":          p.ID,
+		"site_id":     p.SiteID,
+		"amount":      p.Amount,
+		"currency":    p.Currency,
+		"maker_id":    p.MakerID,
+		"mode":        p.Mode,
+		"received_at": p.ReceivedAt,
+		"method":      p.Method,
+		"status":      p.Status,
+		"created_at":  p.CreatedAt.Format(time.RFC3339),
 	}
 	if p.ProviderReference != "" {
 		item["provider_reference"] = p.ProviderReference
@@ -167,4 +180,21 @@ func payoutJSON(p database.Payout) gin.H {
 		item["paid_at"] = p.PaidAt.Format(time.RFC3339)
 	}
 	return item
+}
+
+func (h *PayoutsHandler) ConfirmReceived(c *gin.Context) {
+	if !uuidPattern.MatchString(c.Param("id")) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payout id"})
+		return
+	}
+	updated, err := h.DB.ConfirmPayoutReceived(c.Request.Context(), siteIDFrom(c), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "confirmation failed"})
+		return
+	}
+	if !updated {
+		c.JSON(http.StatusConflict, gin.H{"error": "payout not awaiting receipt confirmation"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "received", "payout_id": c.Param("id")})
 }

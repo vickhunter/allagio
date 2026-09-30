@@ -1,0 +1,10 @@
+.local/
+.env
+.env.*
+!.env.example
+affilio-api/coverage.out
+affilio-api/distributoor-mcp
+affilio-api/affilio-server
+.codegraph/
+.cursor/
+__pycache__/

@@ -31,6 +31,19 @@ func APIKeyAuth(db *database.DB, audit *services.AuditLogger) gin.HandlerFunc {
 		keyPrefix := services.KeyPrefix(apiKey)
 		site, err := db.GetSiteByAnyKeyHash(c.Request.Context(), keyHash, keyPrefix)
 		if err != nil {
+			agentSiteID, agentErr := db.AgentSite(c.Request.Context(), keyHash)
+			if agentErr == nil {
+				if !agentRouteAllowed(c) {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "agent key is not authorized for this action"})
+					return
+				}
+				c.Set("site_id", agentSiteID)
+				c.Set("agent_access", true)
+				c.Next()
+				return
+			}
+		}
+		if err != nil {
 			if audit != nil {
 				audit.Log(database.AuditEvent{
 					EventType: "auth_failure_api_key",
@@ -97,4 +110,14 @@ func safePrefix(key string) string {
 		return "***"
 	}
 	return key[:8] + "..."
+}
+
+func agentRouteAllowed(c *gin.Context) bool {
+	switch c.FullPath() {
+	case "/v1/revenue/opportunities", "/v1/placements", "/v1/placements/:id", "/v1/placements/:id/commit", "/v1/placements/:id/receipt":
+		return c.Request.Method == http.MethodGet || c.Request.Method == http.MethodPost
+	case "/v1/payouts/balance", "/v1/payouts/history":
+		return c.Request.Method == http.MethodGet
+	}
+	return false
 }

@@ -8,6 +8,8 @@ import (
 
 type Config struct {
 	Port                   string
+	Host                   string
+	POCReportPath          string
 	DatabaseURL            string
 	ClaudeAPIKey           string
 	ClaudeModel            string
@@ -18,6 +20,7 @@ type Config struct {
 	AdminAPIKey            string
 	KeyRotationGracePeriod time.Duration
 
+	ConnectionEncryptionKey   string
 	StripeWebhookSecret       string
 	LemonSqueezyWebhookSecret string
 	PolarWebhookSecret        string
@@ -30,6 +33,8 @@ func Load() Config {
 	}
 	return Config{
 		Port:                   getEnvValue("PORT", "8080"),
+		Host:                   os.Getenv("HOST"),
+		POCReportPath:          os.Getenv("POC_REPORT_PATH"),
 		DatabaseURL:            getEnvValue("DATABASE_URL", "postgresql://affilio:password@localhost:5432/affilio"),
 		ClaudeAPIKey:           os.Getenv("CLAUDE_API_KEY"),
 		ClaudeModel:            getEnvValue("CLAUDE_MODEL", "claude-sonnet-4-5-20250929"),
@@ -40,6 +45,7 @@ func Load() Config {
 		AdminAPIKey:            getEnvValue("ADMIN_API_KEY", ""),
 		KeyRotationGracePeriod: time.Duration(graceHours) * time.Hour,
 
+		ConnectionEncryptionKey:   os.Getenv("CONNECTION_ENCRYPTION_KEY"),
 		StripeWebhookSecret:       os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		LemonSqueezyWebhookSecret: os.Getenv("LEMONSQUEEZY_WEBHOOK_SECRET"),
 		PolarWebhookSecret:        os.Getenv("POLAR_WEBHOOK_SECRET"),

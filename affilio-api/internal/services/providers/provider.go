@@ -1,7 +1,4 @@
-// Package providers turns payment-provider webhooks into a single normalized
-// conversion signal. None of the supported providers offers affiliate rails of
-// its own, so Distributoor owns the attribution ledger and each provider is
-// only a signal source: adding one means implementing Adapter in one file.
+// Package providers normalizes payment-provider events for attribution.
 package providers
 
 import (
@@ -11,13 +8,18 @@ import (
 
 // ConversionEvent is the normalized signal an adapter extracts from a webhook.
 type ConversionEvent struct {
-	EventID  string  // provider-unique event id (idempotency key)
-	ObjectID string  // order / checkout-session id, joins refunds to sales
-	Kind     string  // sale | renewal | refund | ignore
-	Amount   float64 // gross amount in currency units (not cents)
-	Currency string
-	Ref      string // the dtr click id carried through checkout metadata
-	OccurredAt time.Time
+	EventID       string  // provider-unique event id (idempotency key)
+	ObjectID      string  // order / checkout-session id, joins refunds to sales
+	Kind          string  // sale | renewal | refund | ignore
+	Amount        float64 // gross amount in currency units (not cents)
+	Currency      string
+	Ref           string // the dtr click id carried through checkout metadata
+	OccurredAt    time.Time
+	AmountMinor   int64
+	GrossMinor    int64
+	RefundedMinor int64
+	LiveMode      bool
+	ProductID     string
 }
 
 type Adapter interface {

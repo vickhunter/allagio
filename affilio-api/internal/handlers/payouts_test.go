@@ -23,6 +23,7 @@ func newPayoutsRouter(db *database.DB) *gin.Engine {
 	{
 		site.GET("/balance", payouts.Balance)
 		site.GET("/history", payouts.History)
+		site.POST("/:id/confirm-received", payouts.ConfirmReceived)
 	}
 	makerGroup := r.Group("/v1/maker/earnings")
 	makerGroup.Use(middleware.MakerKeyAuth(db))
@@ -38,6 +39,11 @@ func newPayoutsRouter(db *database.DB) *gin.Engine {
 
 func adminJSON(t *testing.T, r *gin.Engine, method, path string, payload interface{}) (*httptest.ResponseRecorder, map[string]interface{}) {
 	t.Helper()
+	if path == "/v1/payout-batches/run" {
+		if values, ok := payload.(map[string]interface{}); ok {
+			values["include_test_mode"] = true
+		}
+	}
 	rec, body := doJSONWithHeader(t, r, method, path, "X-Admin-Key", "admin-secret", payload)
 	return rec, body
 }
@@ -81,7 +87,7 @@ func TestPayoutLifecycle(t *testing.T) {
 	r.ServeHTTP(rrec, req)
 	location := rrec.Header().Get("Location")
 	clickID := location[strings.Index(location, "via=")+4:]
-	wrec, wbody := sendStripeEvent(t, r, stripeSalePayload("evt_payout_sale", "pi_payout", clickID, 20000))
+	wrec, wbody := sendStripeEvent(t, db, r, stripeSalePayload("evt_payout_sale", "pi_payout", clickID, 20000))
 	if wrec.Code != http.StatusOK || wbody["status"] != "recorded" {
 		t.Fatalf("sale: expected recorded, got %d %v", wrec.Code, wbody)
 	}
@@ -133,6 +139,15 @@ func TestPayoutLifecycle(t *testing.T) {
 		t.Fatalf("mark-paid: expected 200, got %d", rec.Code)
 	}
 	rec, body = doSiteJSON(t, r, http.MethodGet, "/v1/payouts/balance", siteKey, nil)
+	usdReported := body["balances"].([]interface{})[0].(map[string]interface{})
+	if usdReported["paid"] != float64(0) || usdReported["payment_reported"] != float64(40) {
+		t.Fatalf("unconfirmed payout shown as paid: %v", usdReported)
+	}
+	rec, _ = doSiteJSON(t, r, http.MethodPost, "/v1/payouts/"+payoutID+"/confirm-received", siteKey, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("confirm receipt: %d", rec.Code)
+	}
+	_, body = doSiteJSON(t, r, http.MethodGet, "/v1/payouts/balance", siteKey, nil)
 	usd = body["balances"].([]interface{})[0].(map[string]interface{})
 	if usd["paid"].(float64) != 40 || usd["cleared_unpaid"].(float64) != 0 {
 		t.Fatalf("expected 40 paid after payout, got %v", usd)

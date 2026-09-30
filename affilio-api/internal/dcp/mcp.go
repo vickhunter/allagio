@@ -50,8 +50,8 @@ func HandleMessage(client *Client, raw []byte) []byte {
 		resp.Result = map[string]interface{}{
 			"protocolVersion": mcpProtocolVersion,
 			"capabilities":    map[string]interface{}{"tools": map[string]interface{}{}},
-			"serverInfo":      map[string]interface{}{"name": "distributoor", "version": "0.1.0"},
-			"instructions":    "Distributoor: the agent-native distribution network. Register a maker, register the product, run the readiness assessment and fix failing checks via their remediation fields, create and submit an offer, then track earnings.",
+			"serverInfo":      map[string]interface{}{"name": "distributoor", "version": "0.2.0"},
+			"instructions":    "Use the owner's existing agent. Makers prepare products and offers for review. Publishers find_opportunities, prepare_placement, wait for separate owner approval, commit_placement, publish approved copy with disclosure through their own tool, then record_placement_receipt. Poll list_agent_tasks to resume. Approval and payout confirmation are not agent tools. A scoped publisher key cannot join through legacy endpoints. Do not claim a sale, publication or payout is independently verified without evidence.",
 		}
 	case "ping":
 		resp.Result = map[string]interface{}{}

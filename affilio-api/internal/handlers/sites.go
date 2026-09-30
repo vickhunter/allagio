@@ -113,13 +113,13 @@ func (h *SitesHandler) Register(c *gin.Context) {
 	}
 	keyHash := services.HashAPIKey(apiKey)
 	keyPrefix := services.KeyPrefix(apiKey)
-	_, err = h.DB.CreateSite(c.Request.Context(), keyHash, keyPrefix, req.Domain, req.Name)
+	siteID, err := h.DB.CreateSite(c.Request.Context(), keyHash, keyPrefix, req.Domain, req.Name)
 	if err != nil {
 		log.Printf("sites.register db create failed domain=%s name=%s err=%v", req.Domain, req.Name, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register site"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"api_key": apiKey})
+	c.JSON(http.StatusOK, gin.H{"api_key": apiKey, "site_id": siteID})
 }
 
 func (h *SitesHandler) Delete(c *gin.Context) {

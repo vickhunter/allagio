@@ -26,9 +26,10 @@ func newAttributionRouter(db *database.DB) *gin.Engine {
 	r := newMakerRouter(db)
 	marketplace := &MarketplaceHandler{DB: db}
 	redirects := &RedirectsHandler{DB: db}
-	webhooks := &WebhooksHandler{DB: db, Secrets: map[string]string{"stripe": testStripeSecret}}
+	webhooks := &WebhooksHandler{DB: db, Cipher: testConnectionCipher()}
 	r.GET("/v1/go/:code", redirects.Go)
 	r.POST("/v1/webhooks/:provider", webhooks.Receive)
+	r.POST("/v1/webhooks/:provider/:product_id", webhooks.Receive)
 	site := r.Group("/v1")
 	site.Use(middleware.APIKeyAuth(db, services.NewAuditLogger(db)))
 	{
@@ -50,6 +51,13 @@ func listedOffer(t *testing.T, db *database.DB, r *gin.Engine, makerKey string) 
 	})
 	productID := product["id"].(string)
 	markProductReady(t, db, productID)
+	ciphertext, err := testConnectionCipher().Encrypt(productID, testStripeSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.CreateProductConnection(context.Background(), database.ProductConnection{ProductID: productID, SecretCiphertext: ciphertext, Currency: "USD"}); err != nil {
+		t.Fatal(err)
+	}
 	_, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
 		"product_id":         productID,
 		"commission_type":    "percentage",
@@ -87,17 +95,30 @@ func doSiteJSON(t *testing.T, r *gin.Engine, method, path, siteKey string, paylo
 	return rec, body
 }
 
-func sendStripeEvent(t *testing.T, r *gin.Engine, payload map[string]interface{}) (*httptest.ResponseRecorder, map[string]interface{}) {
+func sendStripeEvent(t *testing.T, db *database.DB, r *gin.Engine, payload map[string]interface{}) (*httptest.ResponseRecorder, map[string]interface{}) {
+	t.Helper()
+	var productID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT product_id FROM product_connections LIMIT 1`).Scan(&productID); err != nil {
+		t.Fatal(err)
+	}
+	object := payload["data"].(map[string]interface{})["object"].(map[string]interface{})
+	if _, ok := object["metadata"]; !ok {
+		object["metadata"] = map[string]interface{}{"dtr_product_id": productID}
+	}
+	return sendScopedStripeEvent(t, r, productID, payload, testStripeSecret)
+}
+
+func sendScopedStripeEvent(t *testing.T, r *gin.Engine, productID string, payload map[string]interface{}, secret string) (*httptest.ResponseRecorder, map[string]interface{}) {
 	t.Helper()
 	body, err := json.Marshal(payload)
 	if err != nil {
 		t.Fatalf("marshal event: %v", err)
 	}
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())
-	mac := hmac.New(sha256.New, []byte(testStripeSecret))
+	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(timestamp + "."))
 	mac.Write(body)
-	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/stripe", strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/stripe/"+productID, strings.NewReader(string(body)))
 	req.Header.Set("Stripe-Signature", "t="+timestamp+",v1="+hex.EncodeToString(mac.Sum(nil)))
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -117,6 +138,7 @@ func stripeSalePayload(eventID, paymentIntent, ref string, amountCents int) map[
 			"object": map[string]interface{}{
 				"id":                  "cs_" + eventID,
 				"amount_total":        amountCents,
+				"payment_status":      "paid",
 				"currency":            "usd",
 				"client_reference_id": ref,
 				"payment_intent":      paymentIntent,
@@ -179,7 +201,7 @@ func TestAttributionEndToEnd(t *testing.T) {
 	}
 
 	// A signed sale webhook books the conversion and a pending ledger entry.
-	wrec, wbody := sendStripeEvent(t, r, stripeSalePayload("evt_sale_1", "pi_100", clickID, 10000))
+	wrec, wbody := sendStripeEvent(t, db, r, stripeSalePayload("evt_sale_1", "pi_100", clickID, 10000))
 	if wrec.Code != http.StatusOK || wbody["status"] != "recorded" {
 		t.Fatalf("webhook sale: expected recorded, got %d %v", wrec.Code, wbody)
 	}
@@ -198,17 +220,17 @@ WHERE cv.provider_event_id='evt_sale_1'`).Scan(&commission, &ledgerStatus)
 	}
 
 	// Redelivery of the same event is a duplicate, not a double booking.
-	wrec, wbody = sendStripeEvent(t, r, stripeSalePayload("evt_sale_1", "pi_100", clickID, 10000))
+	wrec, wbody = sendStripeEvent(t, db, r, stripeSalePayload("evt_sale_1", "pi_100", clickID, 10000))
 	if wrec.Code != http.StatusOK || wbody["status"] != "duplicate" {
 		t.Fatalf("expected duplicate, got %d %v", wrec.Code, wbody)
 	}
 
 	// Refund inside the window reverses the pending commission.
-	wrec, wbody = sendStripeEvent(t, r, map[string]interface{}{
+	wrec, wbody = sendStripeEvent(t, db, r, map[string]interface{}{
 		"id":      "evt_refund_1",
 		"type":    "charge.refunded",
 		"created": time.Now().Unix(),
-		"data":    map[string]interface{}{"object": map[string]interface{}{"id": "ch_1", "payment_intent": "pi_100"}},
+		"data":    map[string]interface{}{"object": map[string]interface{}{"id": "ch_1", "payment_intent": "pi_100", "amount_refunded": 10000, "currency": "usd"}},
 	})
 	if wrec.Code != http.StatusOK || wbody["status"] != "refunded" {
 		t.Fatalf("expected refunded, got %d %v", wrec.Code, wbody)
@@ -227,10 +249,16 @@ func TestWebhookRejectsBadSignatureAndUnattributed(t *testing.T) {
 	defer cleanup()
 
 	r := newAttributionRouter(db)
+	_, makerKey := createTestMaker(t, db)
+	listedOffer(t, db, r, makerKey)
+	var productID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT product_id FROM product_connections LIMIT 1`).Scan(&productID); err != nil {
+		t.Fatal(err)
+	}
 
 	// Wrong signature never touches storage.
 	body := []byte(`{"id":"evt_x","type":"checkout.session.completed","data":{"object":{}}}`)
-	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/stripe", strings.NewReader(string(body)))
+	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/stripe/"+productID, strings.NewReader(string(body)))
 	req.Header.Set("Stripe-Signature", "t=1,v1=bad")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
@@ -244,7 +272,7 @@ func TestWebhookRejectsBadSignatureAndUnattributed(t *testing.T) {
 	}
 
 	// A sale without a matching click is stored but unattributed.
-	wrec, wbody := sendStripeEvent(t, r, stripeSalePayload("evt_lost", "pi_lost", "99999999-9999-9999-9999-999999999999", 5000))
+	wrec, wbody := sendStripeEvent(t, db, r, stripeSalePayload("evt_lost", "pi_lost", "99999999-9999-9999-9999-999999999999", 5000))
 	if wrec.Code != http.StatusOK || wbody["status"] != "unattributed" {
 		t.Fatalf("expected unattributed, got %d %v", wrec.Code, wbody)
 	}
@@ -305,4 +333,12 @@ func TestRedirectStopsAttributingWhenPaused(t *testing.T) {
 	if rrec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for unknown code, got %d", rrec.Code)
 	}
+}
+
+func testConnectionCipher() *services.ConnectionCipher {
+	cipher, err := services.NewConnectionCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	if err != nil {
+		panic(err)
+	}
+	return cipher
 }

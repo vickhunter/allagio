@@ -153,7 +153,7 @@ func TestFraudFlagsHoldCommissionsUntilCleared(t *testing.T) {
 	// Purchase seconds after the click: booked, but flagged.
 	payload := stripeSalePayload("evt_fraud_1", "pi_fraud", clickID, 10000)
 	payload["created"] = time.Now().Unix()
-	wrec, wbody := sendStripeEvent(t, r, payload)
+	wrec, wbody := sendStripeEvent(t, db, r, payload)
 	if wrec.Code != http.StatusOK || wbody["status"] != "recorded" {
 		t.Fatalf("expected recorded, got %d %v", wrec.Code, wbody)
 	}
@@ -227,7 +227,7 @@ func TestVelocityCapPausesCampaign(t *testing.T) {
 
 	// 21 sales inside an hour: the 21st trips the velocity cap.
 	for i := 1; i <= 21; i++ {
-		wrec, wbody := sendStripeEvent(t, r, stripeSalePayload(fmt.Sprintf("evt_vel_%d", i), fmt.Sprintf("pi_vel_%d", i), clickID, 1000))
+		wrec, wbody := sendStripeEvent(t, db, r, stripeSalePayload(fmt.Sprintf("evt_vel_%d", i), fmt.Sprintf("pi_vel_%d", i), clickID, 1000))
 		if wrec.Code != http.StatusOK || wbody["status"] != "recorded" {
 			t.Fatalf("sale %d: expected recorded, got %d %v", i, wrec.Code, wbody)
 		}

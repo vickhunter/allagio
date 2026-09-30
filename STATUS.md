@@ -1,5 +1,21 @@
 # Affilio — Project Status
 
+## Agent revenue POC · 2026-09-30
+
+Implemented an agent-native workflow on the existing Go 1.23 service. Run `./scripts/run-agent-poc.sh` and open <http://127.0.0.1:8086/pilot>. Details and endpoint contracts: [AGENT-REVENUE-POC.md](docs/AGENT-REVENUE-POC.md).
+
+- Signup-free public preview; up to five relevant native offers or `no_match`.
+- Exact placement proposals, frozen terms, separate operator-recorded owner approval, expiry/revocation and stable commit receipts.
+- Scoped, hashed publisher-agent keys; agents cannot approve themselves or confirm bank receipt.
+- Portable revenue skill plus seven new MCP tools. Two actual local MCP processes exercise the flow.
+- Product-scoped encrypted Stripe connections; paid-state, mode, currency, product and attribution-window checks; async success and payment-level dedupe.
+- Durable event retries and recovery; cumulative partial/full refunds; pending batch cancellation; explicit late clawbacks.
+- Separate test/live/legacy balances and maker-specific payout batches. Reserved, payment-reported and owner-confirmed receipt are distinct.
+- WordPress Earnings shows mode labels and all five balance states; payment reports and cancelled batches no longer appear as received payments.
+- Migration `012_agent_revenue_poc.sql`, regression coverage and a runnable local proof report in the compiled admin assets directory.
+
+Scope: synthetic signed Stripe events, simulated owner approval and local publication artifact. Real checkout/publishing/client integrations, SSO, external-program reconciliation, funding/disputes and service-fee invoicing remain pilot launch work. The global Stripe webhook route now requires migration to a product-specific connection; renewals are outside this POC.
+
 ## Goal
 Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that scans posts, detects existing affiliate links, recommends curated + user‑specific programs, and supports one‑click insertion with a clear monetization score + potential indicator. The MVP proves revenue‑lift with minimal risk and a tight scope.
 
@@ -162,7 +178,7 @@ See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
 - **Offer rails**: admin review queue; approve promotes the offer into `affiliate_programs` (`source='distributoor'`, `offer_id` linked) so the existing matcher/recommendation/insertion pipeline serves it unchanged.
 - **Attribution** (`008_attribution_payouts.sql`): publisher marketplace (`GET /v1/marketplace/offers`, `POST /v1/marketplace/offers/:id/join`), tracked redirect `GET /v1/go/:code` (click + ref param carrying click id), `POST /v1/webhooks/:provider` for Stripe/Lemon Squeezy/Polar behind a `ProviderAdapter` interface with per‑provider HMAC verification, idempotent raw event storage, conversions joined to clicks, commissions booked as pending ledger entries clearing after the offer's refund window, refunds reversing/clawing back.
 - **Payouts**: publisher `GET /v1/payouts/balance|history`, admin `POST /v1/payout-batches/run` (manual payouts per site+currency over a minimum) + `:id/mark-paid`, maker `GET /v1/maker/earnings`.
-- New env vars (all optional, degrade off): `STRIPE_WEBHOOK_SECRET`, `LEMONSQUEEZY_WEBHOOK_SECRET`, `POLAR_WEBHOOK_SECRET`.
+- Payment configuration: `CONNECTION_ENCRYPTION_KEY` for product-scoped Stripe credentials; `LEMONSQUEEZY_WEBHOOK_SECRET` and `POLAR_WEBHOOK_SECRET` for the legacy adapters. The old global Stripe secret no longer enables ingestion.
 - **Agentic layer (P4)**: `distributoor` maker CLI (`cmd/distributoor`: init/assess/offer/snippet/status), stdio MCP server (`cmd/distributoor-mcp`) exposing 13 DCP maker verbs, Agent Plugins 1.0.0 package (`distributoor-plugin/` with plugin.json + mcp.json + 3 skills), DCP v0.1 spec extracted to `docs/dcp/`, and `GET /.well-known/dcp.json` discovery manifest.
 - **Hosted MCP + publisher tools (P5, part 2)**: `POST /v1/mcp` streamable‑HTTP MCP transport (maker auth via `X-Maker-Key`/Bearer, publisher via `X-API-Key`, per‑request loopback client, rate‑limited), plus 4 publisher‑side MCP tools (`list_marketplace_offers`, `join_offer`, `get_balance`, `get_payout_history`) behind `DISTRIBUTOOR_SITE_KEY` on the stdio server; discovery manifest and `docs/dcp/` updated.
 - **WP plugin Distributoor screens**: new Marketplace submenu (offers ranked by fit with join/copy‑link flows, `admin/build/marketplace.js`) and Earnings submenu (pending/cleared/paid balance cards, commission ledger, payout history, `admin/build/earnings.js`), both bilingual EN/IT and matching existing plugin CSS patterns.

@@ -36,7 +36,7 @@ Read the value back at checkout time and attach it:
 
 | Provider | Where the click id goes |
 |---|---|
-| Stripe | Checkout Session `client_reference_id` (or `metadata.dtr`) |
+| Stripe | Checkout Session `client_reference_id` (or `metadata.dtr`), plus `metadata.dtr_product_id` matching the connected product |
 | Lemon Squeezy | `checkout[custom][dtr]` custom data |
 | Polar | checkout `metadata.dtr` |
 
@@ -45,12 +45,12 @@ Read the value back at checkout time and attach it:
 Point the provider's webhook at the network (each is verified with the
 provider's signature scheme; the network operator configures the secrets):
 
-- Stripe: `POST <api>/v1/webhooks/stripe` — events `checkout.session.completed`, `invoice.paid`, `charge.refunded`
+- Stripe: `POST <api>/v1/webhooks/stripe/<product_id>` — events `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded`. The pilot operator creates an encrypted per-product signing-secret connection with fixed test/live mode and USD/EUR/GBP currency. The old global Stripe route is disabled. Only positive paid first checkouts are eligible; renewals are outside this POC.
 - Lemon Squeezy: `POST <api>/v1/webhooks/lemonsqueezy` — events `order_created`, `order_refunded`
 - Polar: `POST <api>/v1/webhooks/polar` — events `order.created`, `order.refunded`
 
 ## 4. Verify
 
 Run `run_assessment` and confirm `ref_param_survives` passes. After a test
-purchase, `get_earnings` should show the sale within a minute; an
+purchase, verify paid status, product metadata, mode, currency and the click's attribution window. `get_earnings` should show an eligible sale within a minute; an
 "unattributed" webhook usually means step 2 isn't reaching the provider.
