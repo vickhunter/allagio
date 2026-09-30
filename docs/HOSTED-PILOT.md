@@ -20,6 +20,7 @@ The owner workspace lists proposals, agent connections and payments. Disconnecti
 - `/oauth/authorize` requires owner consent. Codes are hashed, expire after five minutes and can be exchanged once. Resource parameters must match the canonical `/mcp` URL.
 - Opaque access tokens expire after one hour. Refresh tokens rotate, last at most seven days and revoke the grant on reuse. Tokens and browser session secrets are stored as SHA-256 hashes; issuer tokens are never forwarded to tools.
 - Verified OIDC issuer + subject establishes identity. Email must be verified, but does not establish ownership of an existing maker or publisher account.
+- New OAuth maker accounts have no legacy API key. Legacy makers keep their existing key authentication, and an operator can explicitly issue a key if a separate integration needs it.
 - Owner sessions last eight hours. Production cookies use Secure, HttpOnly and the `__Host-` prefix; owner mutations require the session's CSRF token and exact Origin.
 - Publisher OAuth tokens cannot approve, revoke placements, confirm funds, alter WordPress settings or use legacy marketplace joins. Maker OAuth tokens cannot configure payment connections or perform operator actions.
 - Legacy stdio and `/v1/mcp` key-based clients remain available. DCP discovery distinguishes the legacy HTTP JSON-RPC endpoint from the new hosted transport.

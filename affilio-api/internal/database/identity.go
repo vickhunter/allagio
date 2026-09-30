@@ -117,7 +117,7 @@ func (d *DB) CreateOwnerAccount(ctx context.Context, o *Owner, role, domain, key
 		if makerID != "" {
 			return errors.New("maker account already linked")
 		}
-		err = tx.QueryRow(ctx, `INSERT INTO makers(api_key,email,name) VALUES($1,$2,$3) RETURNING id`, keyHash, strings.ToLower(o.Email), o.Name).Scan(&id)
+		err = tx.QueryRow(ctx, `INSERT INTO makers(email,name) VALUES($1,$2) RETURNING id`, strings.ToLower(o.Email), o.Name).Scan(&id)
 		if err == nil {
 			_, err = tx.Exec(ctx, `UPDATE owners SET maker_id=$2 WHERE id=$1`, o.ID, id)
 		}

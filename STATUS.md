@@ -2,7 +2,7 @@
 
 ## Hosted pilot · 2026-09-30
 
-Implemented hosted Streamable HTTP MCP with OIDC owner sign-in, OAuth discovery/DCR/S256 PKCE, hashed single-use codes, scoped access tokens, rotating refresh tokens and owner revocation. Browser approval now records verified issuer/subject authority for the exact placement; agent tokens cannot approve or confirm receipt of money. New accounts need no API key; legacy ownership requires an owner key once, never an email match.
+Implemented hosted Streamable HTTP MCP with OIDC owner sign-in, OAuth discovery/DCR/S256 PKCE, hashed single-use codes, scoped access tokens, rotating refresh tokens and owner revocation. Browser approval now records verified issuer/subject authority for the exact placement; agent tokens cannot approve or confirm receipt of money. New accounts need no API key, and OAuth maker accounts have no legacy key stored. Legacy ownership requires an owner key once, never an email match.
 
 The owner workspace supports account setup, placement review, connected-agent revocation, live payment receipt confirmation and Stripe configuration checks. A restricted merchant key is used once for read-only account/one-time-price/webhook verification, then discarded; signing secrets remain product-bound and encrypted. Hosted matching requires verified configuration. Rotation preserves account, price, currency and mode.
 

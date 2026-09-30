@@ -1,3 +1,5 @@
+ALTER TABLE makers ALTER COLUMN api_key DROP NOT NULL;
+
 CREATE TABLE owners (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     issuer TEXT NOT NULL,
