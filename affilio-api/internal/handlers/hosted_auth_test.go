@@ -313,6 +313,9 @@ func TestHostedPublisherApprovalAndRealHTTPMCPClient(t *testing.T) {
 	if review.Code != 200 || !strings.Contains(review.Body.String(), p["copy"].(string)) || !strings.Contains(review.Body.String(), "excluding tax and shipping") {
 		t.Fatal("owner review omitted the approved copy or readable financial terms")
 	}
+	if !strings.Contains(review.Body.String(), "Destination: "+p["terms"].(map[string]any)["landing_url"].(string)) {
+		t.Fatal("owner review omitted the approved destination")
+	}
 	committed := call("commit_placement", map[string]any{"placement_id": id}, false)
 	if committed["placement"].(map[string]any)["status"] != "committed" {
 		t.Fatal("approved placement not committed")

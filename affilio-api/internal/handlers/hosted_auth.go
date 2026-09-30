@@ -562,6 +562,7 @@ func (h *HostedHandler) ReviewPlacement(c *gin.Context) {
 		CommissionType       string `json:"commission_type"`
 		CommissionValueMinor int64  `json:"commission_value_minor"`
 		Currency             string `json:"currency"`
+		LandingURL           string `json:"landing_url"`
 		CookieDays           int    `json:"cookie_duration_days"`
 		RefundDays           int    `json:"refund_window_days"`
 		Mode                 string `json:"payment_mode"`
@@ -576,7 +577,7 @@ func (h *HostedHandler) ReviewPlacement(c *gin.Context) {
 	if terms.CommissionType == "percentage" {
 		commission = fmt.Sprintf("%.2f%% of the first paid checkout, excluding tax and shipping", float64(terms.CommissionValueMinor)/100)
 	}
-	summary := fmt.Sprintf("%s\nRefund hold: %d days. Attribution window: %d days.\nMerchant pays directly. Service fee: %d%% of commission.\nCurrency: %s. Payment mode: %s.\n%s", commission, terms.RefundDays, terms.CookieDays, terms.FeePercent, terms.Currency, terms.Mode, terms.Text)
+	summary := fmt.Sprintf("Destination: %s\n%s\nRefund hold: %d days. Attribution window: %d days.\nMerchant pays directly. Service fee: %d%% of commission.\nCurrency: %s. Payment mode: %s.\n%s", terms.LandingURL, commission, terms.RefundDays, terms.CookieDays, terms.FeePercent, terms.Currency, terms.Mode, terms.Text)
 	h.render(c, "Review this placement", "", template.HTML(fmt.Sprintf(`<p>Status: %s · Expires: %s</p><p><a href="%s">%s</a></p><h2>Recommendation</h2><pre>%s</pre><h2>Disclosure</h2><pre>%s</pre><h2>Terms</h2><pre>%s</pre><form method="post" action="/owner/placements/%s/approve"><input type="hidden" name="csrf" value="%s"><button>Approve this exact placement</button></form><p>Approval lets your agent create the tracked link. Publication uses your existing publishing tool.</p><form method="post" action="/owner/placements/%s/revoke"><input type="hidden" name="csrf" value="%s"><button>Revoke placement</button></form>`, template.HTMLEscapeString(p.Status), p.ExpiresAt.Format(time.RFC3339), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy), template.HTMLEscapeString(p.Disclosure), template.HTMLEscapeString(summary), p.ID, template.HTMLEscapeString(o.CSRF), p.ID, template.HTMLEscapeString(o.CSRF))))
 }
 
