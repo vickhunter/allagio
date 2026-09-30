@@ -108,3 +108,5 @@ Do not delete duplicate financial rows to make migration pass. Reconcile them an
 Run tests against a disposable database only: handler tests reset its public schema. Verification results are recorded in `docs/AGENT-REVENUE-VERIFICATION.md`.
 
 The next pilot gate is one real paid product, one independently owned relevant article, a tested checkout reference, and a received commission. Three makers and three actual audiences are the subsequent cohort; the 50 meetup contacts remain a recruitment pool.
+
+The optional [Jev / CLM evaluation plan](./DECISION-MODELS.md) covers semantic relevance decisions. No model integration or measured improvement is claimed; the current matcher remains the baseline.
