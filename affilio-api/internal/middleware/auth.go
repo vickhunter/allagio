@@ -10,8 +10,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func APIKeyAuth(db *database.DB, audit *services.AuditLogger) gin.HandlerFunc {
+func APIKeyAuth(db *database.DB, audit *services.AuditLogger, resources ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if len(resources) > 0 && c.GetHeader("Authorization") != "" {
+			g, ok := agentBearer(c, db, resources[0])
+			if !ok {
+				return
+			}
+			if g.SiteID == "" || !agentRouteAllowed(c) {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "publisher scope is not authorized for this action"})
+				return
+			}
+			c.Set("site_id", g.SiteID)
+			c.Set("agent_access", true)
+			c.Next()
+			return
+		}
 		apiKey := c.GetHeader("X-API-Key")
 		if apiKey == "" {
 			if audit != nil {

@@ -1,5 +1,13 @@
 # Affilio — Project Status
 
+## Hosted pilot · 2026-09-30
+
+Implemented hosted Streamable HTTP MCP with OIDC owner sign-in, OAuth discovery/DCR/S256 PKCE, hashed single-use codes, scoped access tokens, rotating refresh tokens and owner revocation. Browser approval now records verified issuer/subject authority for the exact placement; agent tokens cannot approve or confirm receipt of money. New accounts need no API key; legacy ownership requires an owner key once, never an email match.
+
+The owner workspace supports account setup, placement review, connected-agent revocation, live payment receipt confirmation and Stripe configuration checks. A restricted merchant key is used once for read-only account/one-time-price/webhook verification, then discarded; signing secrets remain product-bound and encrypted. Hosted matching requires verified configuration. Rotation preserves account, price, currency and mode.
+
+Migrations `013_hosted_identity.sql` and `014_verified_stripe_connections.sql` are required. Go remains 1.23. The official SDK HTTP client and installed Codex CLI tested the local hosted flow with fixture owner sessions. Real identity-provider login, public HTTPS, Cursor, Stripe-delivered checkout/refund, live commissions and recruitment still require activation and participant details. Nothing has been deployed to Railway production. See [HOSTED-PILOT.md](docs/HOSTED-PILOT.md) and `affilio-api/hosted-pilot.env.example`.
+
 ## Agent revenue POC · 2026-09-30
 
 Implemented an agent-native workflow on the existing Go 1.23 service. Run `./scripts/run-agent-poc.sh` and open <http://127.0.0.1:8086/pilot>. Details and endpoint contracts: [AGENT-REVENUE-POC.md](docs/AGENT-REVENUE-POC.md).

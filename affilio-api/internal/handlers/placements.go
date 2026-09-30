@@ -19,7 +19,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type PlacementsHandler struct{ DB *database.DB }
+type PlacementsHandler struct {
+	DB                        *database.DB
+	RequireVerifiedConnection bool
+}
 
 type opportunity struct {
 	OfferID          string  `json:"offer_id"`
@@ -42,7 +45,7 @@ func (h *PlacementsHandler) opportunities(c *gin.Context, contextText string) ([
 	if err != nil {
 		return nil, err
 	}
-	eligible, err := h.DB.EligibleRevenueOfferIDs(c.Request.Context())
+	eligible, err := h.DB.EligibleRevenueOfferIDs(c.Request.Context(), h.RequireVerifiedConnection)
 	if err != nil {
 		return nil, err
 	}

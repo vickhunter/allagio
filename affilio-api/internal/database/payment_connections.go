@@ -33,6 +33,20 @@ func (d *DB) ProductConnection(ctx context.Context, productID string) (*ProductC
 	return &out, err
 }
 
+func (d *DB) CreateVerifiedProductConnection(ctx context.Context, makerID string, connection ProductConnection, accountID, priceID, endpointID string) (bool, error) {
+	res, err := d.Pool.Exec(ctx, `INSERT INTO product_connections(product_id,secret_ciphertext,live_mode,currency,stripe_account_id,stripe_price_id,stripe_endpoint_id,configuration_verified_at)
+SELECT id,$3,$4,$5,$6,$7,$8,NOW() FROM products WHERE id=$1 AND maker_id=$2 AND payment_provider='stripe'
+ON CONFLICT(product_id) DO UPDATE SET secret_ciphertext=EXCLUDED.secret_ciphertext,stripe_account_id=EXCLUDED.stripe_account_id,
+stripe_price_id=EXCLUDED.stripe_price_id,stripe_endpoint_id=EXCLUDED.stripe_endpoint_id,configuration_verified_at=NOW()
+WHERE product_connections.enabled AND product_connections.live_mode=EXCLUDED.live_mode AND product_connections.currency=EXCLUDED.currency
+AND (product_connections.stripe_account_id IS NULL OR product_connections.stripe_account_id=EXCLUDED.stripe_account_id)
+AND (product_connections.stripe_price_id IS NULL OR product_connections.stripe_price_id=EXCLUDED.stripe_price_id)`, connection.ProductID, makerID, connection.SecretCiphertext, connection.LiveMode, connection.Currency, accountID, priceID, endpointID)
+	if err != nil {
+		return false, err
+	}
+	return res.RowsAffected() == 1, nil
+}
+
 type PendingWebhook struct {
 	Provider  string
 	EventID   string
@@ -101,9 +115,10 @@ WHERE cv.provider='stripe' AND cv.provider_object_id=$2 AND cv.kind='sale'`, pro
 	return valid, err
 }
 
-func (d *DB) EligibleRevenueOfferIDs(ctx context.Context) (map[string]bool, error) {
+func (d *DB) EligibleRevenueOfferIDs(ctx context.Context, requireVerified ...bool) (map[string]bool, error) {
+	verified := len(requireVerified) > 0 && requireVerified[0]
 	rows, err := d.Pool.Query(ctx, `SELECT o.id FROM offers o JOIN product_connections pc ON pc.product_id=o.product_id
- WHERE o.status='listed' AND pc.enabled AND pc.currency=o.commission_currency AND o.commission_type IN ('percentage','flat')`)
+ WHERE o.status='listed' AND pc.enabled AND pc.currency=o.commission_currency AND o.commission_type IN ('percentage','flat') AND (NOT $1 OR pc.configuration_verified_at IS NOT NULL)`, verified)
 	if err != nil {
 		return nil, err
 	}

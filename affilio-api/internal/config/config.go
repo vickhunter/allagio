@@ -10,6 +10,10 @@ type Config struct {
 	Port                   string
 	Host                   string
 	POCReportPath          string
+	PublicBaseURL          string
+	OIDCIssuer             string
+	OIDCClientID           string
+	OIDCClientSecret       string
 	DatabaseURL            string
 	ClaudeAPIKey           string
 	ClaudeModel            string
@@ -35,6 +39,10 @@ func Load() Config {
 		Port:                   getEnvValue("PORT", "8080"),
 		Host:                   os.Getenv("HOST"),
 		POCReportPath:          os.Getenv("POC_REPORT_PATH"),
+		PublicBaseURL:          os.Getenv("PUBLIC_BASE_URL"),
+		OIDCIssuer:             os.Getenv("OIDC_ISSUER"),
+		OIDCClientID:           os.Getenv("OIDC_CLIENT_ID"),
+		OIDCClientSecret:       os.Getenv("OIDC_CLIENT_SECRET"),
 		DatabaseURL:            getEnvValue("DATABASE_URL", "postgresql://affilio:password@localhost:5432/affilio"),
 		ClaudeAPIKey:           os.Getenv("CLAUDE_API_KEY"),
 		ClaudeModel:            getEnvValue("CLAUDE_MODEL", "claude-sonnet-4-5-20250929"),

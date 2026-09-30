@@ -59,6 +59,8 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"010_audit_events.sql",
 		"011_hash_api_keys.sql",
 		"012_agent_revenue_poc.sql",
+		"013_hosted_identity.sql",
+		"014_verified_stripe_connections.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)

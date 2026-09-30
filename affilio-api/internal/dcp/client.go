@@ -6,6 +6,7 @@ package dcp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,6 +20,8 @@ type Client struct {
 	MakerKey string
 	SiteKey  string // publisher-side verbs authenticate as a site
 	HTTP     *http.Client
+	Bearer   string
+	Context  context.Context
 }
 
 func NewClient(baseURL, makerKey string) *Client {
@@ -39,7 +42,7 @@ func (c *Client) Do(method, path string, payload interface{}) (map[string]interf
 
 // DoSite performs one publisher-authenticated API call (site key).
 func (c *Client) DoSite(method, path string, payload interface{}) (map[string]interface{}, error) {
-	if c.SiteKey == "" {
+	if c.SiteKey == "" && c.Bearer == "" {
 		return nil, fmt.Errorf("publisher verbs need a site key: set DISTRIBUTOOR_SITE_KEY (the Affilio site api key)")
 	}
 	return c.request(method, path, payload, "X-API-Key", c.SiteKey)
@@ -54,7 +57,11 @@ func (c *Client) request(method, path string, payload interface{}, authHeader, a
 		}
 		body = bytes.NewReader(encoded)
 	}
-	req, err := http.NewRequest(method, c.BaseURL+path, body)
+	ctx := c.Context
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, body)
 	if err != nil {
 		return nil, err
 	}
@@ -63,6 +70,9 @@ func (c *Client) request(method, path string, payload interface{}, authHeader, a
 	}
 	if authKey != "" {
 		req.Header.Set(authHeader, authKey)
+	}
+	if c.Bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Bearer)
 	}
 	client := c.HTTP
 	if client == nil {

@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"affilio-api/internal/config"
@@ -29,7 +32,10 @@ func main() {
 	audit := services.NewAuditLogger(db)
 	defer audit.Close()
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.LoggerWithFormatter(func(p gin.LogFormatterParams) string {
+		return fmt.Sprintf("%s %d %s %s %s\n", p.TimeStamp.Format(time.RFC3339), p.StatusCode, p.Method, p.Request.URL.Path, p.Latency)
+	}), gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ any) { log.Print("request panic recovered"); c.AbortWithStatus(500) }))
 	if err := r.SetTrustedProxies(nil); err != nil {
 		log.Fatalf("failed to set trusted proxies: %v", err)
 	}
@@ -43,6 +49,10 @@ func main() {
 	}
 	r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
 	r.GET("/.well-known/dcp.json", func(c *gin.Context) {
+		mcpURL, mcpTransport := "/v1/mcp", "legacy-http-jsonrpc"
+		if cfg.PublicBaseURL != "" {
+			mcpURL, mcpTransport = "/mcp", "streamable-http"
+		}
 		makerVerbs := make([]string, 0, len(dcp.Tools))
 		for _, tool := range dcp.Tools {
 			makerVerbs = append(makerVerbs, tool.Name)
@@ -57,8 +67,8 @@ func main() {
 			"description": "Agent-native distribution network: makers publish offers, publishers earn commissions, agents do the operational work.",
 			"http_base":   "/v1",
 			"mcp": gin.H{
-				"transport": "streamable-http",
-				"url":       "/v1/mcp",
+				"transport": mcpTransport,
+				"url":       mcpURL,
 				"stdio": gin.H{
 					"command": "distributoor-mcp",
 					"env":     []string{"DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY", "DISTRIBUTOOR_SITE_KEY"},
@@ -122,7 +132,7 @@ func main() {
 	}
 
 	marketplace := &handlers.MarketplaceHandler{DB: db}
-	placements := &handlers.PlacementsHandler{DB: db}
+	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != ""}
 	payouts := &handlers.PayoutsHandler{DB: db}
 	redirects := &handlers.RedirectsHandler{
 		DB:          db,
@@ -136,6 +146,20 @@ func main() {
 		}
 	}
 	connections := &handlers.PaymentConnectionsHandler{DB: db, Cipher: connectionCipher}
+	var oauthResources []string
+	if cfg.PublicBaseURL != "" {
+		if err = handlers.ValidatePublicURL(cfg.PublicBaseURL); err != nil {
+			log.Fatal(err)
+		}
+		cfg.PublicBaseURL = strings.TrimRight(cfg.PublicBaseURL, "/")
+		login, loginErr := services.NewOIDCLogin(ctx, cfg.OIDCIssuer, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.PublicBaseURL+"/auth/callback")
+		if loginErr != nil {
+			log.Fatalf("owner sign-in configuration failed: %v", loginErr)
+		}
+		hosted := &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}}
+		hosted.Mount(r)
+		oauthResources = append(oauthResources, cfg.PublicBaseURL+"/mcp")
+	}
 	webhooks := &handlers.WebhooksHandler{
 		Cipher: connectionCipher,
 		DB:     db,
@@ -170,7 +194,7 @@ func main() {
 	v1.POST("/mcp", mcp.Receive)
 
 	secured := v1.Group("/")
-	secured.Use(middleware.APIKeyAuth(db, audit))
+	secured.Use(middleware.APIKeyAuth(db, audit, oauthResources...))
 	{
 		secured.POST("/scan/full", scan.ScanFull)
 		secured.POST("/scan/single", scan.ScanSingle)
@@ -224,7 +248,7 @@ func main() {
 	}
 
 	maker := v1.Group("/maker")
-	maker.Use(middleware.MakerKeyAuth(db))
+	maker.Use(middleware.MakerKeyAuth(db, oauthResources...))
 	{
 		maker.POST("/products", products.Create)
 		maker.GET("/products", products.List)
