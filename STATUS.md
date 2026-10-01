@@ -1,5 +1,9 @@
 # Affilio — Project Status
 
+## October 2 launch preparation · 2026-10-01
+
+Prepared [OCTOBER-2-LAUNCH.md](docs/OCTOBER-2-LAUNCH.md): proposed release order, verified versus pending work, WordPress/native identity bridge, direct installer distribution, UI brief and presentation rehearsal. This is planning only; deployment, public distribution and real checkout verification remain pending.
+
 ## One-entry setup · 2026-09-30
 
 - Added `packages/distributoor-setup`: portable Node CLI, manifest detection, hosted OAuth preflight, Codex agent handoff and Cursor/Claude MCP + skill installation. Configuration and custom skills are preserved on conflicts. The npm package is prepared, not published.
