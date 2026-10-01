@@ -5,9 +5,33 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 )
+
+func TestReadinessPublicTransportRejectsPrivateDestinations(t *testing.T) {
+	e := &ReadinessEngine{}
+	client := e.httpClient()
+	for _, raw := range []string{"http://127.0.0.1/secret", "http://[::1]/secret", "http://169.254.169.254/latest", "http://10.0.0.1/secret", "http://224.0.0.1/secret", "file:///etc/passwd", "https://user:password@example.com"} {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if client.CheckRedirect(&http.Request{URL: u}, nil) == nil {
+			t.Fatalf("redirect accepted: %s", raw)
+		}
+	}
+	for _, address := range []string{"127.0.0.1:80", "[::1]:80", "169.254.169.254:80", "10.0.0.1:80"} {
+		if conn, err := dialPublicProbe(context.Background(), "tcp", address); err == nil {
+			conn.Close()
+			t.Fatalf("private dial accepted: %s", address)
+		}
+	}
+	if client.Transport.(*http.Transport).Proxy != nil {
+		t.Fatal("public probes must not bypass destination checks through an environment proxy")
+	}
+}
 
 func testEngine() *ReadinessEngine {
 	return &ReadinessEngine{

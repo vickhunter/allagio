@@ -17,6 +17,7 @@ class Affilio_API {
         $args = array(
             'method'  => $method,
             'timeout' => 30,
+            'redirection' => 0,
             'headers' => array(
                 'Content-Type' => 'application/json',
                 'X-API-Key'    => $this->current_api_key(),

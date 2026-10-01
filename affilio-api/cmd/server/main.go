@@ -14,6 +14,7 @@ import (
 	"affilio-api/internal/dcp"
 	"affilio-api/internal/handlers"
 	"affilio-api/internal/middleware"
+	"affilio-api/internal/migrations"
 	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,11 @@ func main() {
 		log.Fatalf("database connection failed: %v", err)
 	}
 	defer db.Close()
+	if cfg.AutoMigrate {
+		if err := migrations.Apply(ctx, db.Pool); err != nil {
+			log.Fatalf("database migration failed: %v", err)
+		}
+	}
 
 	audit := services.NewAuditLogger(db)
 	defer audit.Close()
@@ -47,7 +53,9 @@ func main() {
 		}
 		r.GET("/pilot", func(c *gin.Context) { c.File(cfg.POCReportPath) })
 	}
-	health := func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok", "site_installation_registration": true}) }
+	health := func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok", "site_installation_registration": true, "native_distribution": cfg.PublicBaseURL != ""})
+	}
 	r.GET("/health", health)
 	r.GET("/.well-known/dcp.json", func(c *gin.Context) {
 		mcpURL, mcpTransport := "/v1/mcp", "legacy-http-jsonrpc"
@@ -148,6 +156,7 @@ func main() {
 	}
 	connections := &handlers.PaymentConnectionsHandler{DB: db, Cipher: connectionCipher}
 	var oauthResources []string
+	var hosted *handlers.HostedHandler
 	if cfg.PublicBaseURL != "" {
 		if err = handlers.ValidatePublicURL(cfg.PublicBaseURL); err != nil {
 			log.Fatal(err)
@@ -157,7 +166,10 @@ func main() {
 		if loginErr != nil {
 			log.Fatalf("owner sign-in configuration failed: %v", loginErr)
 		}
-		hosted := &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}}
+		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments}
+		if err = hosted.LoadWorkspace(); err != nil {
+			log.Fatalf("workspace assets failed: %v", err)
+		}
 		hosted.Mount(r)
 		oauthResources = append(oauthResources, cfg.PublicBaseURL+"/mcp")
 	}
@@ -197,6 +209,10 @@ func main() {
 
 	secured := v1.Group("/")
 	secured.Use(middleware.APIKeyAuth(db, audit, oauthResources...))
+	if hosted != nil {
+		secured.GET("/sites/owner-connection", hosted.SiteConnectionStatus)
+		secured.POST("/sites/owner-connection", hosted.StartSiteConnection)
+	}
 	{
 		secured.POST("/scan/full", scan.ScanFull)
 		secured.POST("/scan/single", scan.ScanSingle)

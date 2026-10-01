@@ -1,8 +1,16 @@
 # Affilio — Project Status
 
-## October 2 launch preparation · 2026-10-01
+## Distributoor MVP implementation · 2026-10-01
 
-Prepared [OCTOBER-2-LAUNCH.md](docs/OCTOBER-2-LAUNCH.md): proposed release order, verified versus pending work, WordPress/native identity bridge, direct installer distribution, UI brief and presentation rehearsal. This is planning only; deployment, public distribution and real checkout verification remain pending.
+Added the working owner workspace: product creation/editing, readiness checks, offer creation/submission, placement review, earnings, agent revocation, publisher payment instructions, merchant payment reports and separately confirmed receipt. The configured operator gets offer review and live commission batching. UI sources live in `affilio-wp/admin/build/`.
+
+WordPress Distribution links an installed site to its authenticated owner through a ten-minute, single-use token, then finds native offers, prepares placements and inserts only approved recommendations. Existing content is preserved, disclosure appears once, and publication recording can retry without duplicate insertion. Agent credentials cannot claim site ownership.
+
+`Dockerfile.mvp` bundles the API, UI, portable installer and origin-configured plugin download. Opt-in automatic migrations apply 001–015 to a fresh/history-tracked database with locking and checksum checks. Public readiness probes validate redirects and dial validated public addresses.
+
+Provisioned isolated Railway project `distributoor-mvp`, PostgreSQL 15 with persistent storage, and application domain `distributoor-production.up.railway.app`. The image built, but startup is blocked by missing Google OAuth client credentials. **The hosted MVP is not usable yet.** Existing Affilio production is untouched. Exact activation and shipping instructions: [MVP-DELIVERY.md](docs/MVP-DELIVERY.md). The previous October 2 presentation plan is superseded; product/article recruitment is not a software release prerequisite.
+
+Verification: full Go suite, handler/database/migration race checks, vet, seven installer tests, PHP setup/distribution suites and Docker/archive checks pass. Chromium exercises real owner backend forms, product/offer management, placement approval/commit and separate merchant/publisher payment confirmations. WordPress 6.6/PHP 8.2 browser checks also pass installed-site handoff, matching, owner approval, real post insertion and backend publication recording on an isolated local fixture. Real Google login, a real merchant checkout and real commission receipt remain unverified.
 
 ## One-entry setup · 2026-09-30
 

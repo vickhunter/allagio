@@ -24,3 +24,7 @@ jobs:
         run: find affilio-wp -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Test WordPress setup
         run: php affilio-wp/tests/onboarding.php
+      - name: Test WordPress distribution
+        run: php affilio-wp/tests/distribution.php
+      - name: Check workspace scripts
+        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/distribution.js

@@ -21,12 +21,17 @@ import (
 )
 
 type HostedHandler struct {
-	DB          *database.DB
-	BaseURL     string
-	LoopbackURL string
-	Login       services.OwnerLogin
-	Limiter     *IPRateLimiter
-	Payments    *MerchantConnectionsHandler
+	DB            *database.DB
+	BaseURL       string
+	LoopbackURL   string
+	Login         services.OwnerLogin
+	Limiter       *IPRateLimiter
+	Payments      *MerchantConnectionsHandler
+	Page          *template.Template
+	AssetsPath    string
+	DownloadsPath string
+	OperatorID    string
+	Assessments   *AssessmentsHandler
 }
 
 func ValidatePublicURL(raw string) error {
@@ -78,6 +83,9 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 	owner.POST("/accounts", h.OwnerAccount)
 	owner.POST("/logout", h.Logout)
 	owner.POST("/authorize", h.Consent)
+	owner.GET("/connect-site", h.ReviewSiteConnection)
+	owner.POST("/connect-site", h.CompleteSiteConnection)
+	h.mountWorkspace(public, owner)
 	owner.POST("/grants/:id/revoke", h.RevokeGrant)
 	owner.GET("/placements/:id", h.ReviewPlacement)
 	owner.POST("/placements/:id/approve", h.ApprovePlacement)
@@ -94,8 +102,8 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 func (h *HostedHandler) headers(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
-	c.Header("Referrer-Policy", "no-referrer")
-	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+	c.Header("Referrer-Policy", "strict-origin")
+	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 	c.Next()
 }
 
@@ -128,7 +136,15 @@ func (h *HostedHandler) ownerSession(c *gin.Context) {
 	}
 	if c.Request.Method != http.MethodGet {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 32768)
-		if c.GetHeader("Origin") != h.BaseURL || c.Request.ParseForm() != nil || subtle.ConstantTimeCompare([]byte(c.PostForm("csrf")), []byte(o.CSRF)) != 1 {
+		csrf := c.GetHeader("X-CSRF-Token")
+		if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
+			if c.Request.ParseForm() != nil {
+				c.AbortWithStatus(http.StatusBadRequest)
+				return
+			}
+			csrf = c.PostForm("csrf")
+		}
+		if c.GetHeader("Origin") != h.BaseURL || subtle.ConstantTimeCompare([]byte(csrf), []byte(o.CSRF)) != 1 {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "invalid owner confirmation"})
 			return
 		}
@@ -159,7 +175,7 @@ func (h *HostedHandler) LoginStart(c *gin.Context) {
 	}
 	returnTo := c.DefaultQuery("return_to", "/owner")
 	u, err := url.Parse(returnTo)
-	validPath := u != nil && (u.Path == "/owner" || u.Path == "/oauth/authorize" || strings.HasPrefix(u.Path, "/owner/placements/") && uuidPattern.MatchString(strings.TrimPrefix(u.Path, "/owner/placements/")))
+	validPath := u != nil && (u.Path == "/owner" || u.Path == "/owner/products" || u.Path == "/owner/placements" || u.Path == "/owner/earnings" || u.Path == "/owner/settings" || u.Path == "/owner/review" || u.Path == "/owner/connect-site" || u.Path == "/oauth/authorize" || strings.HasPrefix(u.Path, "/owner/placements/") && uuidPattern.MatchString(strings.TrimPrefix(u.Path, "/owner/placements/")))
 	if err != nil || !validPath || u.IsAbs() || u.Host != "" || u.Fragment != "" || len(returnTo) > 8192 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return
@@ -585,7 +601,20 @@ func (h *HostedHandler) ReviewPlacement(c *gin.Context) {
 		commission = fmt.Sprintf("%.2f%% of the first paid checkout, excluding tax and shipping", float64(terms.CommissionValueMinor)/100)
 	}
 	summary := fmt.Sprintf("Destination: %s\n%s\nRefund hold: %d days. Attribution window: %d days.\nMerchant pays directly. Service fee: %d%% of commission.\nCurrency: %s. Payment mode: %s.\n%s", terms.LandingURL, commission, terms.RefundDays, terms.CookieDays, terms.FeePercent, terms.Currency, terms.Mode, terms.Text)
-	h.render(c, "Review this placement", "", template.HTML(fmt.Sprintf(`<p>Status: %s · Expires: %s</p><p><a href="%s">%s</a></p><h2>Recommendation</h2><pre>%s</pre><h2>Disclosure</h2><pre>%s</pre><h2>Terms</h2><pre>%s</pre><form method="post" action="/owner/placements/%s/approve"><input type="hidden" name="csrf" value="%s"><button>Approve this exact placement</button></form><p>Approval lets your agent create the tracked link. Publication uses your existing publishing tool.</p><form method="post" action="/owner/placements/%s/revoke"><input type="hidden" name="csrf" value="%s"><button>Revoke placement</button></form>`, template.HTMLEscapeString(p.Status), p.ExpiresAt.Format(time.RFC3339), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy), template.HTMLEscapeString(p.Disclosure), template.HTMLEscapeString(summary), p.ID, template.HTMLEscapeString(o.CSRF), p.ID, template.HTMLEscapeString(o.CSRF))))
+	body := fmt.Sprintf(`<p>Status: %s · Expires: %s</p><p><a href="%s">%s</a></p><h2>Recommendation</h2><pre>%s</pre><h2>Disclosure</h2><pre>%s</pre><h2>Terms</h2><pre>%s</pre>`, template.HTMLEscapeString(p.Status), p.ExpiresAt.Format(time.RFC3339), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy), template.HTMLEscapeString(p.Disclosure), template.HTMLEscapeString(summary))
+	if p.Status == "pending" && p.ExpiresAt.After(time.Now()) {
+		body += fmt.Sprintf(`<form method="post" action="/owner/placements/%s/approve"><input type="hidden" name="csrf" value="%s"><button>Approve this exact placement</button></form>`, p.ID, template.HTMLEscapeString(o.CSRF))
+	}
+	body += `<p>Approval lets your agent create the tracked link. Publish from WordPress or your existing publishing tool.</p>`
+	if p.Status != "revoked" {
+		body += fmt.Sprintf(`<form method="post" action="/owner/placements/%s/revoke"><input type="hidden" name="csrf" value="%s"><button>Revoke placement</button></form>`, p.ID, template.HTMLEscapeString(o.CSRF))
+	}
+	body += string(h.placementReceiptHTML(p))
+	if p.Status == "approved" {
+		body += fmt.Sprintf(`<p><button data-commit-placement="%s">Create tracked link</button></p>`, p.ID)
+	}
+	body += `<div id="workspace-feedback" role="status" aria-live="polite"></div>`
+	h.render(c, "Review this placement", "", template.HTML(body))
 }
 
 func (h *HostedHandler) ApprovePlacement(c *gin.Context) {
@@ -610,7 +639,17 @@ var ownerPage = template.Must(template.New("owner").Parse(`<!doctype html><html 
 
 func (h *HostedHandler) render(c *gin.Context, title, message string, body any) {
 	c.Header("Content-Type", "text/html; charset=utf-8")
-	if err := ownerPage.Execute(c.Writer, map[string]any{"Title": title, "Message": message, "Body": body}); err != nil {
+	page := ownerPage
+	if h.Page != nil {
+		page = h.Page
+	}
+	data := map[string]any{"Title": title, "Message": message, "Body": body, "BaseURL": h.BaseURL}
+	if value, ok := c.Get("owner"); ok {
+		o := value.(*database.Owner)
+		data["CSRF"], data["Name"], data["OwnerID"] = o.CSRF, o.Name, o.ID
+		data["Maker"], data["Publisher"], data["Operator"] = o.MakerID != "", o.SiteID != "", h.OperatorID != "" && o.ID == h.OperatorID
+	}
+	if err := page.Execute(c.Writer, data); err != nil {
 		c.Abort()
 	}
 }
@@ -639,6 +678,12 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 			c.Status(500)
 			return
 		}
+		c.Set("owner", o)
+		c.Set("maker_id", o.MakerID)
+	}
+	if h.Page != nil {
+		h.render(c, "Your distribution workspace", "", template.HTML(`<div id="workspace-app" aria-live="polite"></div>`))
+		return
 	}
 	csrf := template.HTMLEscapeString(o.CSRF)
 	var body strings.Builder

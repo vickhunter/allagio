@@ -11,6 +11,10 @@ type Config struct {
 	Host                   string
 	POCReportPath          string
 	PublicBaseURL          string
+	UIAssetsPath           string
+	DownloadsPath          string
+	OperatorOwnerID        string
+	AutoMigrate            bool
 	OIDCIssuer             string
 	OIDCClientID           string
 	OIDCClientSecret       string
@@ -40,6 +44,10 @@ func Load() Config {
 		Host:                   os.Getenv("HOST"),
 		POCReportPath:          os.Getenv("POC_REPORT_PATH"),
 		PublicBaseURL:          os.Getenv("PUBLIC_BASE_URL"),
+		UIAssetsPath:           os.Getenv("UI_ASSETS_PATH"),
+		DownloadsPath:          os.Getenv("DOWNLOADS_PATH"),
+		OperatorOwnerID:        os.Getenv("OPERATOR_OWNER_ID"),
+		AutoMigrate:            os.Getenv("AUTO_MIGRATE") == "true",
 		OIDCIssuer:             os.Getenv("OIDC_ISSUER"),
 		OIDCClientID:           os.Getenv("OIDC_CLIENT_ID"),
 		OIDCClientSecret:       os.Getenv("OIDC_CLIENT_SECRET"),

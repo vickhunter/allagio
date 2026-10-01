@@ -23,6 +23,7 @@ class Affilio_Admin {
             'dashicons-analytics'
         );
         add_submenu_page('affilio', $this->t('Marketplace', 'Marketplace'), $this->t('Marketplace', 'Marketplace'), 'manage_options', 'affilio-marketplace', array($this, 'render_marketplace'));
+        add_submenu_page('affilio', 'Distribution', 'Distribution', 'manage_options', 'affilio-distribution', array($this, 'render_distribution'));
         add_submenu_page('affilio', $this->t('Earnings', 'Guadagni'), $this->t('Earnings', 'Guadagni'), 'manage_options', 'affilio-earnings', array($this, 'render_earnings'));
         add_submenu_page('affilio', $this->t('Analytics', 'Analitiche'), $this->t('Analytics', 'Analitiche'), 'manage_options', 'affilio-analytics', array($this, 'render_analytics'));
         add_submenu_page('affilio', $this->t('Settings', 'Impostazioni'), $this->t('Settings', 'Impostazioni'), 'manage_options', 'affilio-settings', array($this, 'render_settings'));
@@ -46,6 +47,12 @@ class Affilio_Admin {
     }
 
     public function enqueue_dashboard_assets($hook) {
+        if ($hook === 'affilio_page_affilio-distribution') {
+            wp_enqueue_script('affilio-distribution', AFFILIO_PLUGIN_URL . 'admin/build/distribution.js', array(), AFFILIO_VERSION, true);
+            wp_enqueue_style('affilio-distribution', AFFILIO_PLUGIN_URL . 'admin/build/distribution.css', array(), AFFILIO_VERSION);
+            wp_localize_script('affilio-distribution', 'AffilioDistribution', array('restBase' => rest_url('affilio/v1'), 'nonce' => wp_create_nonce('wp_rest')));
+            return;
+        }
         if ($hook === 'affilio_page_affilio-settings') {
             wp_enqueue_script('affilio-onboarding', AFFILIO_PLUGIN_URL . 'admin/build/onboarding.js', array(), AFFILIO_VERSION, true);
             wp_localize_script('affilio-onboarding', 'AffilioSetup', array('restBase' => rest_url('affilio/v1'), 'nonce' => wp_create_nonce('wp_rest'), 'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(), 'serviceUrl' => Affilio_API::resolve_base_url()));
@@ -125,6 +132,10 @@ class Affilio_Admin {
         echo '</form>';
         echo '</div>';
         echo '</div>';
+    }
+
+    public function render_distribution() {
+        echo '<div class="wrap affilio-distribution"><h1>Distributoor</h1><p>Relevant recommendations. Approved by you. Tracked from purchase to commission.</p><div id="affilio-distribution-root"></div></div>';
     }
 
     public function render_discovery() {

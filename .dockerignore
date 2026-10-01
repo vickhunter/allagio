@@ -1,0 +1,11 @@
+.git
+.local
+.env
+.env.*
+**/node_modules
+.codegraph
+.cursor
+**/test-results
+**/playwright-report
+**/coverage.out
+**/*.tgz

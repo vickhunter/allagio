@@ -1,0 +1,91 @@
+import { chromium, expect } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+
+let input = '';
+for await (const chunk of process.stdin) input += chunk;
+const fixture = JSON.parse(input);
+const browser = await chromium.launch({ headless: true });
+const errors = [];
+const contexts = [];
+async function owner(cookie) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+    contexts.push(context);
+    await context.addCookies([{ name: cookie.Name, value: cookie.Value, url: fixture.base, httpOnly: true, sameSite: 'Lax' }]);
+    const page = await context.newPage();
+    page.on('pageerror', error => errors.push(error.message));
+    return page;
+}
+async function screenshot(page, name) {
+    if (!fixture.screenshots) return;
+    await mkdir(fixture.screenshots, { recursive: true });
+    await page.screenshot({ path: join(fixture.screenshots, name + '.png'), fullPage: true });
+}
+try {
+    const builder = await owner(fixture.builder);
+    await builder.goto(fixture.base + '/');
+    await expect(builder.getByRole('heading', { name: 'You built it. Give it a distribution channel.' })).toBeVisible();
+    await screenshot(builder, 'home');
+    await builder.goto(fixture.base + '/owner/products');
+    await builder.getByLabel('Product name', { exact: true }).fill('Browser Tool <script>');
+    await builder.getByLabel('Website', { exact: true }).fill('https://browser-tool.example');
+    await builder.getByLabel('What does it help people do?').fill('Help developers understand their databases.');
+    await builder.getByLabel('Topics, separated by commas').fill('postgres, databases');
+    await builder.getByRole('button', { name: 'Register product', exact: true }).click();
+    await expect(builder.getByRole('heading', { name: 'Browser Tool <script>', exact: true })).toBeVisible();
+    await builder.getByRole('button', { name: 'Edit', exact: true }).click();
+    await builder.getByLabel('Product name', { exact: true }).fill('Browser Tool');
+    await builder.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await expect(builder.getByRole('heading', { name: 'Browser Tool', exact: true })).toBeVisible();
+    await builder.getByLabel('Commission value', { exact: true }).fill('20');
+    await builder.getByLabel('Referral destination', { exact: true }).fill('https://browser-tool.example');
+    await builder.getByRole('button', { name: 'Create offer', exact: true }).click();
+    await expect(builder.getByRole('button', { name: 'Submit for review', exact: true })).toBeVisible();
+    await builder.getByRole('button', { name: 'Submit for review', exact: true }).click();
+    await expect(builder.locator('#workspace-feedback')).toContainText('product has not passed readiness assessment');
+    await screenshot(builder, 'products');
+    await builder.goto(fixture.base + '/owner/review');
+    await expect(builder.getByRole('heading', { name: 'Prepare commission payouts' })).toBeVisible();
+    await builder.goto(fixture.base + '/owner/earnings');
+    await builder.getByLabel('Payment reference').fill('browser-check-reference');
+    await builder.getByLabel('I have sent this payment outside Distributoor.').check();
+    await builder.getByRole('button', { name: 'Report payment sent' }).click();
+    await expect(builder.locator('#workspace-feedback')).toContainText('publisher must confirm receipt separately');
+    const publisher = await owner(fixture.publisher);
+    await publisher.goto(fixture.base + '/owner/settings');
+    await publisher.getByLabel('Payment contact instructions').fill('Contact https://publisher.example.com/contact');
+    await publisher.getByRole('button', { name: 'Save instructions' }).click();
+    await expect(publisher.locator('#workspace-feedback')).toContainText('Payment instructions saved');
+    await publisher.goto(fixture.base + '/owner/placements');
+    await publisher.getByLabel('Published article URL').fill('https://publisher.example.com/tutorial');
+    await publisher.getByLabel('What is this article about?').fill('InboxPilot email inbox productivity tutorial for developers.');
+    await publisher.getByRole('button', { name: 'Find opportunities' }).click();
+    await expect(publisher.getByRole('heading', { name: 'InboxPilot' })).toBeVisible();
+    await publisher.getByLabel('Recommendation copy').fill('Consider InboxPilot for organizing an email inbox.');
+    await publisher.getByRole('button', { name: 'Prepare for owner review' }).click();
+    await expect(publisher.getByRole('heading', { name: 'Review this placement' })).toBeVisible();
+    await expect(publisher.getByText('excluding tax and shipping', { exact: false })).toBeVisible();
+    const approvalResponse = publisher.waitForResponse(response => response.url().endsWith('/approve'));
+    await publisher.getByRole('button', { name: 'Approve this exact placement' }).click();
+    const approved = await approvalResponse;
+    expect(approved.status(), approved.status() === 303 ? '' : await approved.text()).toBe(303);
+    await publisher.getByRole('button', { name: 'Create tracked link' }).click();
+    await expect(publisher.getByRole('heading', { name: 'Your tracked link' })).toBeVisible();
+    await screenshot(publisher, 'placement');
+    await publisher.goto(fixture.base + '/owner/earnings');
+    await publisher.getByRole('button', { name: 'Confirm funds arrived' }).click();
+    await publisher.waitForURL(fixture.base + '/owner');
+    await publisher.goto(fixture.base + '/owner/earnings');
+    await expect(publisher.getByText('You confirmed receipt.', { exact: true })).toBeVisible();
+    await screenshot(publisher, 'earnings');
+    await publisher.setViewportSize({ width: 390, height: 844 });
+    await publisher.goto(fixture.base + '/owner/placements');
+    await expect(publisher.getByRole('button', { name: 'Find opportunities' })).toBeVisible();
+    expect(await publisher.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await screenshot(publisher, 'mobile');
+    expect(errors).toEqual([]);
+    console.log('Workspace browser integration passed: products, offers, placement approval, tracked link, payment reporting and receipt.');
+} finally {
+    await Promise.all(contexts.map(context => context.close()));
+    await browser.close();
+}

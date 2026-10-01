@@ -10,7 +10,7 @@ The next pilot supports hosted MCP, signed-in owner review and a Stripe configur
 4. Review the requesting client's name, callback and role permissions, then allow access for seven days.
 5. A publisher agent prepares a placement and returns `/owner/placements/{id}`. The owner reviews exact copy, disclosure, commission, refund hold, service fee, currency and payment mode. After approval the agent commits the tracked link and publishes using the owner's existing tool.
 
-The owner workspace lists proposals, agent connections and payments. Disconnecting an agent invalidates its access and refresh tokens. Human receipt confirmation remains a separate action after a merchant-reported live payment.
+The owner workspace creates and edits products and offers, runs readiness checks, lists proposals, agent connections, commissions and payment reports. WordPress administrators link their installed site through an expiring, single-use owner confirmation link and publish approved placements from the Distribution screen. Disconnecting an agent invalidates its access and refresh tokens. Human receipt confirmation remains a separate action after a merchant-reported live payment.
 
 ## Authentication contract
 
@@ -29,11 +29,11 @@ The consent screen identifies the callback because a dynamically registered clie
 
 ## Configure the isolated service
 
-Use a **new pilot service and a separate database**, with GitHub repository `vickhunter/affilio`, branch `feat/agent-revenue-poc`, root directory `/affilio-api` and its existing Go 1.23 Dockerfile. Do not change the existing production service's branch or database. Do not enable automatic deployments before checking the branch and environment.
+The MVP service and its separate PostgreSQL database are provisioned in Railway project `distributoor-mvp`. Use repository root `/` and `Dockerfile.mvp`, which bundles the Go API, owner UI, builder installer and WordPress ZIP. See [MVP-DELIVERY.md](MVP-DELIVERY.md) for the exact service, environment, authentication settings and current deployment state. Existing Affilio production is separate.
 
-See `affilio-api/hosted-pilot.env.example`. Set a real public HTTPS origin. Register an OIDC web application with the exact callback `<PUBLIC_BASE_URL>/auth/callback`; configure its issuer, client ID and client secret through the platform's secret settings. Generate a base64-encoded 32-byte connection encryption key and a random operator admin key. Never put either key in the agent client or this repository.
+Set a real public HTTPS origin. Register an OIDC web application with the exact callback `<PUBLIC_BASE_URL>/auth/callback`; configure its issuer, client ID and secret through Railway variables. Signing secrets and operator credentials belong in secret settings, never in an agent client or the repository.
 
-Apply migrations 001–014 in order to the **empty pilot database**, with `psql -v ON_ERROR_STOP=1`, before starting the service. Existing databases must apply only missing migrations once; this repository does not have a migration-history runner. The server fails startup when hosted sign-in is configured incompletely. With no `PUBLIC_BASE_URL`, hosted routes remain disabled and the local synthetic POC still runs.
+On the isolated MVP database, `AUTO_MIGRATE=true` applies migrations 001–015 with a checksummed history, transaction per migration and a startup advisory lock. Repeated or concurrent startup is safe. It refuses an existing untracked schema and changed previously applied migrations. Keep this opt-in setting disabled for existing Affilio production. The server refuses startup when hosted sign-in is configured incompletely. With no `PUBLIC_BASE_URL`, hosted routes stay disabled and the local proof still runs.
 
 Check `/health`, protected-resource metadata and the unauthenticated `/mcp` 401 challenge. Then complete sign-in, create an account and connect two separate clients. Do not reuse production API keys for this check.
 

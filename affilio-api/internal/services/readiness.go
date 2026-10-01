@@ -123,10 +123,62 @@ type fetchedPage struct {
 }
 
 func (e *ReadinessEngine) httpClient() *http.Client {
+	client := &http.Client{Timeout: 10 * time.Second}
 	if e.Client != nil {
-		return e.Client
+		copy := *e.Client
+		client = &copy
 	}
-	return &http.Client{Timeout: 10 * time.Second}
+	if e.AllowPrivateHosts {
+		return client
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if existing, ok := client.Transport.(*http.Transport); ok {
+		transport = existing.Clone()
+	}
+	transport.Proxy = nil
+	transport.DialContext = dialPublicProbe
+	client.Transport = transport
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("too many redirects")
+		}
+		return e.hostAllowed(req.Context(), req.URL.String())
+	}
+	return client
+}
+
+func dialPublicProbe(ctx context.Context, network, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	addresses, err := publicProbeAddresses(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+	dialer := net.Dialer{Timeout: 10 * time.Second}
+	for _, address := range addresses {
+		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(address.IP.String(), port))
+		if dialErr == nil {
+			return conn, nil
+		}
+		err = dialErr
+	}
+	return nil, err
+}
+
+func publicProbeAddresses(ctx context.Context, host string) ([]net.IPAddr, error) {
+	addresses, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil || len(addresses) == 0 {
+		return nil, errors.New("host did not resolve")
+	}
+	for _, address := range addresses {
+		ip := address.IP
+		if !ip.IsGlobalUnicast() || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return nil, errors.New("host resolves to a private address")
+		}
+	}
+	return addresses, nil
 }
 
 func (e *ReadinessEngine) fetchPage(ctx context.Context, rawURL string) fetchedPage {
@@ -142,7 +194,9 @@ func (e *ReadinessEngine) fetchPage(ctx context.Context, rawURL string) fetchedP
 		return fetchedPage{Err: "invalid url"}
 	}
 	req.Header.Set("User-Agent", "Distributoor-Readiness/1.0")
-	resp, err := e.httpClient().Do(req)
+	client := e.httpClient()
+	defer client.CloseIdleConnections()
+	resp, err := client.Do(req)
 	if err != nil {
 		return fetchedPage{Err: "request failed: " + err.Error()}
 	}
@@ -163,20 +217,11 @@ func (e *ReadinessEngine) hostAllowed(ctx context.Context, rawURL string) error 
 		return nil
 	}
 	parsed, err := url.Parse(rawURL)
-	if err != nil || parsed.Hostname() == "" {
+	if err != nil || parsed.Hostname() == "" || parsed.User != nil || parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return errors.New("invalid url")
 	}
-	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, parsed.Hostname())
-	if err != nil {
-		return errors.New("host did not resolve")
-	}
-	for _, addr := range addrs {
-		ip := addr.IP
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-			return errors.New("host resolves to a private address")
-		}
-	}
-	return nil
+	_, err = publicProbeAddresses(ctx, parsed.Hostname())
+	return err
 }
 
 func (e *ReadinessEngine) checkSiteReachable(site fetchedPage) ReadinessCheck {

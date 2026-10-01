@@ -1,6 +1,8 @@
 # October 2 launch plan
 
-Prepared October 1, 2026. This is a proposed release plan, not a deployment record.
+Superseded by [MVP-DELIVERY.md](MVP-DELIVERY.md). The release objective is a usable MVP; a presentation or rehearsal is not a release requirement.
+
+This file preserves the earlier proposed plan, not a deployment record.
 
 ## Outcome
 
