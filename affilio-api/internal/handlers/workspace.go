@@ -83,7 +83,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	review.POST("/payouts/batch", payouts.RunBatch)
 	if h.AssetsPath != "" {
 		public.GET("/", h.Home)
-		for _, name := range []string{"workspace.css", "workspace.js"} {
+		for _, name := range []string{"workspace.css", "workspace.js", "setup-controls.js", "landing.css", "landing.js", "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt", "THIRD_PARTY_NOTICES.md"} {
 			file := name
 			public.GET("/assets/"+file, func(c *gin.Context) { c.File(filepath.Join(h.AssetsPath, file)) })
 		}

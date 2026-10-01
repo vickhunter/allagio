@@ -6,6 +6,9 @@ on:
       - "affilio-api/**"
       - "affilio-wp/admin/build/workspace*"
       - "affilio-wp/admin/build/home.html"
+      - "affilio-wp/admin/build/landing*"
+      - "affilio-wp/admin/build/setup-controls.js"
+      - "affilio-wp/admin/build/package*.json"
       - "affilio-wp/e2e/workspace.mjs"
       - "Dockerfile.mvp"
       - ".github/workflows/affilio-api-tests.yml"
@@ -14,6 +17,9 @@ on:
       - "affilio-api/**"
       - "affilio-wp/admin/build/workspace*"
       - "affilio-wp/admin/build/home.html"
+      - "affilio-wp/admin/build/landing*"
+      - "affilio-wp/admin/build/setup-controls.js"
+      - "affilio-wp/admin/build/package*.json"
       - "affilio-wp/e2e/workspace.mjs"
       - "Dockerfile.mvp"
       - ".github/workflows/affilio-api-tests.yml"
@@ -65,6 +71,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      - name: Build landing illustration
+        working-directory: affilio-wp/admin/build
+        run: npm ci --ignore-scripts && npm run build
 
       - name: Install workspace browser
         working-directory: affilio-wp/e2e

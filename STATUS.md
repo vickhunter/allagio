@@ -1,3 +1,10 @@
+## October 1 — landing page and setup UX
+
+- Added an original Three.js distribution illustration, editorial ivory/moss styling and clearer builder/WordPress entry points. The scene loads only on desktop when visible; mobile, reduced-motion, data-saving, no-JavaScript and unavailable-WebGL paths retain an original SVG illustration.
+- Added accessible pause/play controls and copy-command actions in the landing page and owner workspace, with a manual selection fallback when clipboard access is unavailable.
+- Self-hosted, pinned Three.js and esbuild; Docker builds the optional scene and includes its MIT notice. The WordPress ZIP excludes hosted-page assets and the UI toolchain.
+- Verified Chromium workspace flow, new enhancement/fallback states and command copying; built the release Docker image. Production activation still requires the Google OAuth credentials documented in `docs/MVP-DELIVERY.md`.
+
 # Affilio — Project Status
 
 ## Distributoor MVP implementation · 2026-10-01

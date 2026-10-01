@@ -120,3 +120,17 @@ After release, the first iteration is onboarding the first builders and
 publishers, fixing their setup failures, and observing an unrelated attributed
 buyer plus an actual commission receipt. Subscription billing, additional
 publishing channels and ranking changes should follow evidence from that loop.
+
+## Landing illustration and UI builds
+
+The landing page uses original illustration work inspired by Blume's visual clarity and ThreeUI's interactive presentation. It bundles Three.js locally, retains the SVG on mobile/reduced-motion/data-saving browsers and preserves the primary actions without JavaScript or WebGL. The owner workspace shares copyable installer commands with clipboard fallback. No ThreeUI assets or app framework are shipped.
+
+The Docker build and CI compile the optional scene automatically. For local development:
+
+```sh
+cd affilio-wp/admin/build
+npm ci --ignore-scripts
+npm run build
+```
+
+`landing-scene.bundle.js` and its generated legal notice are build outputs. The full Three.js MIT notice lives in `THIRD_PARTY_NOTICES.md` and ships in the hosted image. The WordPress ZIP does not include hosted landing assets.

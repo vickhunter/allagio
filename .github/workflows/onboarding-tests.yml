@@ -26,5 +26,8 @@ jobs:
         run: php affilio-wp/tests/onboarding.php
       - name: Test WordPress distribution
         run: php affilio-wp/tests/distribution.php
+      - name: Build landing illustration
+        working-directory: affilio-wp/admin/build
+        run: npm ci --ignore-scripts && npm run build
       - name: Check workspace scripts
-        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/distribution.js
+        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/setup-controls.js && node --check affilio-wp/admin/build/landing.js && node --check affilio-wp/admin/build/distribution.js

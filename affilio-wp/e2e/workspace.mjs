@@ -5,7 +5,7 @@ import { join } from 'node:path';
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
 const fixture = JSON.parse(input);
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader'] });
 const errors = [];
 const contexts = [];
 async function owner(cookie) {
@@ -19,13 +19,77 @@ async function owner(cookie) {
 async function screenshot(page, name) {
     if (!fixture.screenshots) return;
     await mkdir(fixture.screenshots, { recursive: true });
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: join(fixture.screenshots, name + '.png'), fullPage: true });
 }
 try {
     const builder = await owner(fixture.builder);
+    await builder.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await builder.goto(fixture.base + '/');
     await expect(builder.getByRole('heading', { name: 'You built it. Give it a distribution channel.' })).toBeVisible();
+    if (await builder.locator('#install').count()) {
+        await builder.getByRole('button', { name: 'Copy command', exact: true }).click();
+        await expect(builder.locator('.copy-status')).toContainText('Copied.');
+        expect(await builder.evaluate(() => navigator.clipboard.readText())).toBe(await builder.locator('#install').inputValue());
+        await builder.evaluate(() => window.scrollTo(0, 0));
+    }
+    await expect(builder.locator('.world-stage')).toHaveClass(/scene-ready/);
+    await builder.getByRole('button', { name: 'Pause illustration', exact: true }).click();
+    await expect(builder.getByRole('button', { name: 'Play illustration', exact: true })).toBeVisible();
+    if (fixture.screenshots) {
+        await mkdir(fixture.screenshots, { recursive: true });
+        await builder.screenshot({ path: join(fixture.screenshots, 'hero.png') });
+    }
     await screenshot(builder, 'home');
+    await expect(builder.locator('.world-stage')).toHaveClass(/scene-ready/);
+    await builder.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(builder.locator('.world-stage canvas')).toHaveCount(0);
+    await expect(builder.getByRole('button', { name: /illustration$/ })).toBeHidden();
+    await expect(builder.getByRole('link', { name: 'Get customers ↗', exact: true })).toBeVisible();
+    await builder.setViewportSize({ width: 390, height: 844 });
+    expect(await builder.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await screenshot(builder, 'home-mobile');
+    await builder.setViewportSize({ width: 1440, height: 1000 });
+    await builder.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect(builder.getByRole('button', { name: 'Play illustration', exact: true })).toBeVisible();
+    const fallbackContext = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
+    contexts.push(fallbackContext);
+    const fallbackPage = await fallbackContext.newPage();
+    await fallbackPage.goto(fixture.base + '/');
+    await expect(fallbackPage.getByRole('link', { name: 'Get customers ↗', exact: true })).toBeVisible();
+    await expect(fallbackPage.locator('.world-fallback')).toBeVisible();
+    expect(await fallbackPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const noGPUContext = await browser.newContext();
+    contexts.push(noGPUContext);
+    await noGPUContext.addInitScript(() => {
+        const original = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+            return type === 'webgl2' ? null : original.call(this, type, ...args);
+        };
+    });
+    const noGPUPage = await noGPUContext.newPage();
+    noGPUPage.on('pageerror', error => errors.push(error.message));
+    await Promise.all([
+        noGPUPage.waitForResponse(response => response.url().endsWith('/landing-scene.bundle.js')),
+        noGPUPage.goto(fixture.base + '/'),
+    ]);
+    await expect(noGPUPage.locator('.world-stage canvas')).toHaveCount(0);
+    await expect(noGPUPage.locator('.world-fallback')).toBeVisible();
+    await expect(noGPUPage.getByRole('link', { name: 'Get customers ↗', exact: true })).toBeVisible();
+    await builder.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await builder.goto(fixture.base + '/owner/settings');
+    const command = await builder.locator('.setup-command pre').textContent();
+    await builder.getByRole('button', { name: 'Copy command', exact: true }).click();
+    await expect(builder.locator('.copy-status')).toContainText('Copied.');
+    expect(await builder.evaluate(() => navigator.clipboard.readText())).toBe(command);
+    await builder.context().clearPermissions();
+    await builder.addInitScript(() => {
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('Clipboard unavailable'); } } });
+    });
+    await builder.reload();
+    await builder.getByRole('button', { name: 'Copy command', exact: true }).click();
+    await expect(builder.locator('.copy-status')).toContainText('Select and copy');
+    expect(await builder.evaluate(() => window.getSelection().toString())).toBe(command);
     await builder.goto(fixture.base + '/owner/products');
     await builder.getByLabel('Product name', { exact: true }).fill('Browser Tool <script>');
     await builder.getByLabel('Website', { exact: true }).fill('https://browser-tool.example');

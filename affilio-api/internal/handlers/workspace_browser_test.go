@@ -23,7 +23,11 @@ func TestWorkspaceBrowser(t *testing.T) {
 	r := gin.New()
 	server := httptest.NewUnstartedServer(r)
 	base := "http://" + server.Listener.Addr().String()
-	h := &HostedHandler{DB: db, BaseURL: base, LoopbackURL: base, AssetsPath: "../../../affilio-wp/admin/build", Login: &fakeOwnerLogin{}}
+	assets := os.Getenv("AFFILIO_WORKSPACE_ASSETS")
+	if assets == "" {
+		assets = "../../../affilio-wp/admin/build"
+	}
+	h := &HostedHandler{DB: db, BaseURL: base, LoopbackURL: base, AssetsPath: assets, DownloadsPath: os.Getenv("AFFILIO_WORKSPACE_DOWNLOADS"), Login: &fakeOwnerLogin{}}
 	if err := h.LoadWorkspace(); err != nil {
 		t.Fatal(err)
 	}
