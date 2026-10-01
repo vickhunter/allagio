@@ -1,0 +1,33 @@
+name: MVP Release Package
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ["affilio-api/**", "affilio-wp/**", "packages/distributoor-setup/**", "distributoor-plugin/skills/**", "Dockerfile.mvp", ".dockerignore", "scripts/mvp_release.py", "scripts/test_mvp_release.py", ".github/workflows/mvp-release.yml"]
+  pull_request:
+    paths: ["affilio-api/**", "affilio-wp/**", "packages/distributoor-setup/**", "distributoor-plugin/skills/**", "Dockerfile.mvp", ".dockerignore", "scripts/mvp_release.py", "scripts/test_mvp_release.py", ".github/workflows/mvp-release.yml"]
+
+jobs:
+  release:
+    name: mvp-release-package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test release gates
+        run: python3 -m unittest discover -s scripts -p 'test_mvp_release.py'
+      - name: Build actual delivery image
+        run: docker build -f Dockerfile.mvp -t distributoor-mvp:release .
+      - name: Verify bundled release
+        run: |
+          mkdir -p /tmp/distributoor-release
+          container=$(docker create distributoor-mvp:release)
+          trap 'docker rm "$container"' EXIT
+          docker cp "$container:/app/assets" /tmp/distributoor-release/assets
+          docker cp "$container:/app/downloads" /tmp/distributoor-release/downloads
+          python3 scripts/mvp_release.py bundle /tmp/distributoor-release
+          mkdir -p /tmp/distributoor-product
+          npm exec --yes --package=/tmp/distributoor-release/downloads/distributoor-setup-0.1.0.tgz -- distributoor-setup --api-url https://distributoor-production.up.railway.app --client skill --project /tmp/distributoor-product --offline --install-only
+          test -s /tmp/distributoor-product/.agents/skills/distributoor-onboard/SKILL.md

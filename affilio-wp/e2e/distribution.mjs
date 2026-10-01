@@ -1,6 +1,6 @@
 import { chromium, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 let input = '';
@@ -8,7 +8,16 @@ for await (const chunk of process.stdin) input += chunk;
 const fixture = JSON.parse(input);
 const credentials = JSON.parse(await readFile(join(fixture.qa, 'credentials.json'), 'utf8'));
 const wp = (...args) => execFileSync('docker', ['compose', '-p', 'distributoor-mvp-wp-qa', '-f', join(fixture.qa, 'compose.json'), 'run', '--rm', 'cli', 'wp', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-wp('option', 'update', 'affilio_api_url_override', fixture.base + '/v1');
+if (fixture.download) {
+    const response = await fetch(fixture.base + '/downloads/affilio.zip');
+    expect(response.status).toBe(200);
+    await writeFile(join(fixture.qa, 'affilio.zip'), Buffer.from(await response.arrayBuffer()));
+    wp('plugin', 'install', '/release/affilio.zip', '--force', '--activate');
+    wp('eval', "delete_option('affilio_api_url_override');");
+    expect(wp('eval', 'echo AFFILIO_API_URL;')).toBe(fixture.base + '/v1');
+} else {
+    wp('option', 'update', 'affilio_api_url_override', fixture.base + '/v1');
+}
 wp('eval', "foreach (array('affilio_api_key','affilio_site_id','affilio_installation_key','affilio_setup_state','affilio_setup_lock') as $option) delete_option($option); delete_transient('affilio_connection_status');");
 const existing = '<p>InboxPilot email inbox productivity tutorial for developers. Keep C:\\tools and the "quoted" R&amp;D example.</p>';
 const postID = wp('post', 'create', '--post_title=Email inbox developer tutorial', '--post_status=publish', '--post_content=' + existing, '--porcelain');
@@ -21,10 +30,14 @@ try {
     page.on('pageerror', error => errors.push(error.message));
     const wordpress = 'https://publisher.example.com:8443';
     await page.goto(wordpress + '/wp-login.php');
+    await expect(page.locator('#user_login')).toBeFocused();
     await page.locator('#user_login').fill(credentials.user);
     await page.locator('#user_pass').fill(credentials.password);
-    await page.locator('#wp-submit').click();
-    await page.waitForURL(/wp-admin/, { waitUntil: 'domcontentloaded' });
+    expect(await page.locator('#loginform').evaluate(form => form.checkValidity())).toBe(true);
+    await Promise.all([
+        page.waitForURL(/wp-admin/, { waitUntil: 'domcontentloaded' }),
+        page.locator('#user_pass').press('Enter')
+    ]);
     await page.goto(wordpress + '/wp-admin/admin.php?page=affilio-settings');
     await page.getByRole('button', { name: 'Connect and find opportunities', exact: true }).click();
     await expect(page.locator('[data-progress]')).toContainText('Scanning in the background');
@@ -64,6 +77,21 @@ try {
     expect(content).toContain('R&amp;D.');
     await page.getByRole('button', { name: 'Refresh approvals', exact: true }).click();
     expect(wp('post', 'get', postID, '--field=post_content')).toBe(content);
+    const reader = await browser.newContext({ ignoreHTTPSErrors: true });
+    const published = await reader.newPage();
+    await published.goto(wordpress + '/?p=' + postID);
+    const recommendation = published.locator('a[rel="sponsored nofollow"]');
+    await expect(recommendation).toHaveCount(1);
+    await expect(published.getByText('Affiliate disclosure:', { exact: false })).toBeVisible();
+    const tracked = await recommendation.getAttribute('href');
+    expect(new URL(tracked).origin).toBe(fixture.base);
+    expect(new URL(tracked).searchParams.get('placement')).toMatch(/^[0-9a-f-]{36}$/);
+    const redirect = await reader.request.get(tracked, { maxRedirects: 0 });
+    expect(redirect.status()).toBe(302);
+    const destination = new URL(redirect.headers().location);
+    expect(destination.origin).toBe('https://inboxpilot.example.com');
+    expect(destination.searchParams.get('via')).toMatch(/^[0-9a-f-]{36}$/);
+    await reader.close();
     if (fixture.screenshots) {
         await mkdir(fixture.screenshots, { recursive: true });
         await page.screenshot({ path: join(fixture.screenshots, 'wordpress.png'), fullPage: true });
@@ -71,7 +99,7 @@ try {
     expect(errors).toEqual([]);
     await ownerContext.close();
     await context.close();
-    console.log('WordPress browser integration passed: installation connection, owner handoff, matching, approval, real post insertion and publication receipt.');
+    console.log(`WordPress browser integration passed: ${fixture.download ? 'downloaded ZIP installation and embedded API origin, ' : ''}installation connection, owner handoff, matching, approval, real post insertion, publication receipt and attributed reader click.`);
 } catch (error) {
     console.error('WordPress page:', page?.url(), (await page?.locator('body').innerText())?.slice(0, 1200));
     throw error;

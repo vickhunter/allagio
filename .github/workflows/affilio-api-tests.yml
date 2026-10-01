@@ -1,6 +1,7 @@
 name: Affilio API Tests
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "affilio-api/**"

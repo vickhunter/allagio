@@ -34,12 +34,14 @@ func TestWordPressDistributionBrowser(t *testing.T) {
 	server.Listener = listener
 	base := fmt.Sprintf("http://127.0.0.1:%d", listener.Addr().(*net.TCPAddr).Port)
 	h := &HostedHandler{DB: db, BaseURL: base, LoopbackURL: base, AssetsPath: "../../../affilio-wp/admin/build", Login: &fakeOwnerLogin{}}
+	h.DownloadsPath = os.Getenv("AFFILIO_WORKSPACE_DOWNLOADS")
 	if err = h.LoadWorkspace(); err != nil {
 		t.Fatal(err)
 	}
 	h.Mount(r)
 	r.GET("/v1/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok", "site_installation_registration": true}) })
 	r.POST("/v1/sites/register", (&SitesHandler{DB: db}).Register)
+	r.GET("/v1/go/:code", (&RedirectsHandler{DB: db}).Go)
 	p := &PlacementsHandler{DB: db, RequireVerifiedConnection: true}
 	site := r.Group("/v1", middleware.APIKeyAuth(db, nil, h.resource()))
 	site.GET("/articles", (&ArticlesHandler{DB: db}).List)
@@ -59,7 +61,7 @@ func TestWordPressDistributionBrowser(t *testing.T) {
 	if _, err = db.Pool.Exec(context.Background(), `UPDATE product_connections SET configuration_verified_at=NOW()`); err != nil {
 		t.Fatal(err)
 	}
-	fixture, err := json.Marshal(map[string]any{"base": base, "owner": cookie, "qa": qa, "screenshots": os.Getenv("AFFILIO_WORKSPACE_SCREENSHOTS")})
+	fixture, err := json.Marshal(map[string]any{"base": base, "owner": cookie, "qa": qa, "download": h.DownloadsPath != "", "screenshots": os.Getenv("AFFILIO_WORKSPACE_SCREENSHOTS")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,6 +76,9 @@ func TestWordPressDistributionBrowser(t *testing.T) {
 	var recorded int
 	if err = db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM placement_proposals WHERE status='committed' AND receipt->>'publication_status'='publisher_reported'`).Scan(&recorded); err != nil || recorded != 1 {
 		t.Fatalf("publication receipt missing: %d %v", recorded, err)
+	}
+	if err = db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks c JOIN placement_proposals p ON p.id=c.placement_id WHERE p.status='committed' AND c.campaign_id=p.campaign_id`).Scan(&recorded); err != nil || recorded != 1 {
+		t.Fatalf("published recommendation click missing: %d %v", recorded, err)
 	}
 	t.Log(string(output))
 }

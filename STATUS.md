@@ -1,3 +1,10 @@
+## October 1 — release gates
+
+- Added a deployment preflight pinned to the isolated `distributoor-mvp` service: configuration, clean/pushed revision and required CI checks must pass before uploading. Variable values and CLI failure output are withheld.
+- Added Docker release CI covering runtime assets, license notices, the installer command/skills and WordPress ZIP. A public smoke command checks downloads, embedded API origin, OAuth discovery and protected owner/MCP routes after Railway reports success.
+- Extended the WordPress browser fixture to install the HTTP-served release ZIP and use its embedded API origin without an override, then verify the public article's referral redirect and persisted placement-attributed click. Real Google login and operator activation remain pending credentials.
+- Verified the Docker bundle and packaged builder command, release-gate tests and Go vet. The packaged WordPress flow passed twice after fixing its sign-in autofocus race. No production deployment was requested while OAuth credentials are missing.
+
 ## October 1 — landing page and setup UX
 
 - Added an original Three.js distribution illustration, editorial ivory/moss styling and clearer builder/WordPress entry points. The scene loads only on desktop when visible; mobile, reduced-motion, data-saving, no-JavaScript and unavailable-WebGL paths retain an original SVG illustration.

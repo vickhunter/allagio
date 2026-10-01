@@ -1,6 +1,7 @@
 name: Onboarding Tests
 
 on:
+  workflow_dispatch:
   push:
     paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", ".github/workflows/onboarding-tests.yml"]
   pull_request:

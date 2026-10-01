@@ -80,12 +80,34 @@ activate it in WordPress, open **Affilio → Settings** to connect, then open
 The private GitHub repository need not become public. The npm registry and
 WordPress directory can be added later.
 
-Subsequent reviewed versions can deploy to the same service without changing
-existing Affilio production:
+Release tooling targets only this isolated service. From the repository root:
 
 ```sh
-railway up --project cf3a1d9d-d8f8-44bf-94e1-fcb590055ae0 --environment 2534a1db-d231-45ae-868e-680c48b11dfb --service c3a5be47-e442-4ff4-8dda-ee808944c233 --detach
+python3 scripts/mvp_release.py check
+python3 scripts/mvp_release.py deploy
 ```
+
+The preflight reads Railway variables privately, reports missing names without
+printing values, and refuses to upload an uncommitted, unpushed or failing
+revision. Required checks are `affilio-api-tests`, `onboarding` and
+`mvp-release-package`. The package check builds `Dockerfile.mvp`, verifies its
+runtime assets, notices and archives, and runs the packaged installer in a fresh
+product directory. It does not publish the internal WordPress ZIP: the public
+download handler embeds the correct service origin before serving it.
+All three workflows also allow manual runs against a release branch when a
+commit falls outside their automatic path filters.
+
+`deploy` requests an upload; it does not claim the deployment is healthy. Wait
+for the exact deployment to report **SUCCESS** in Railway, then run:
+
+```sh
+python3 scripts/mvp_release.py verify
+```
+
+This checks public health, hosted assets, both installation downloads, plugin API
+origin, OAuth discovery, anonymous owner/MCP rejection and Google's login
+redirect/cookie configuration. Complete a real Google login separately; a correct
+redirect does not prove that Google accepts the client credentials or audience.
 
 The service currently receives CLI source deployments. GitHub automatic deploys
 are not configured. Upload and Docker ignore files exclude local secrets, env
@@ -107,8 +129,13 @@ customer purchases or merchant funds received.
 
 A real WordPress 6.6/PHP 8.2 instance also passed browser-driven installation
 connection, owner handoff, offer matching, exact approval, insertion into a
-published article and persisted backend publication receipt. The fixture uses
+published article, persisted backend publication receipt and a reader referral
+redirect with a placement-attributed click. The fixture uses
 local HTTPS and isolated owner sessions; no customer article was published.
+Set `AFFILIO_WORKSPACE_DOWNLOADS` to the extracted image's downloads directory
+when running `TestWordPressDistributionBrowser` to install the actual HTTP-served
+ZIP and verify its embedded API origin. Its isolated WP-CLI container must mount
+the QA ZIP at `/release/affilio.zip`, with no source plugin bind mount.
 
 Use the real Stripe integration to validate each merchant's checkout: preserve
 the `via` click UUID, set Checkout Session `client_reference_id` and
