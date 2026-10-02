@@ -1,0 +1,34 @@
+name: Onboarding Tests
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", ".github/workflows/onboarding-tests.yml"]
+  pull_request:
+    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", ".github/workflows/onboarding-tests.yml"]
+
+jobs:
+  onboarding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test builder setup
+        working-directory: packages/distributoor-setup
+        run: npm test
+      - name: Verify distributable package
+        working-directory: packages/distributoor-setup
+        run: npm pack --dry-run
+      - name: Check WordPress PHP
+        run: find affilio-wp -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Test WordPress setup
+        run: php affilio-wp/tests/onboarding.php
+      - name: Test WordPress distribution
+        run: php affilio-wp/tests/distribution.php
+      - name: Build landing illustration
+        working-directory: affilio-wp/admin/build
+        run: npm ci --ignore-scripts && npm run build
+      - name: Check workspace scripts
+        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/setup-controls.js && node --check affilio-wp/admin/build/landing.js && node --check affilio-wp/admin/build/distribution.js

@@ -3,7 +3,9 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
+	"math/big"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -76,36 +78,63 @@ RETURNING id, tracking_code`, offerID, siteID, trackingCode).Scan(&campaignID, &
 }
 
 type CampaignLink struct {
-	CampaignID     string
-	SiteID         string
-	OfferID        string
-	CampaignStatus string
-	OfferStatus    string
-	LandingURL     string
-	RefParam       string
-	ProgramID      *string
+	CampaignID        string
+	SiteID            string
+	OfferID           string
+	CampaignStatus    string
+	OfferStatus       string
+	LandingURL        string
+	RefParam          string
+	ProgramID         *string
+	RequiresPlacement bool
 }
 
 func (d *DB) GetCampaignByTrackingCode(ctx context.Context, code string) (*CampaignLink, error) {
 	row := d.Pool.QueryRow(ctx, `
-SELECT c.id, c.site_id, c.offer_id, c.status, o.status, o.landing_url, o.ref_param, o.program_id
+SELECT c.id, c.site_id, c.offer_id, c.status, o.status, o.landing_url, o.ref_param, o.program_id,c.requires_placement
 FROM campaigns c
 JOIN offers o ON o.id = c.offer_id
 WHERE c.tracking_code=$1`, code)
 	var link CampaignLink
-	if err := row.Scan(&link.CampaignID, &link.SiteID, &link.OfferID, &link.CampaignStatus, &link.OfferStatus, &link.LandingURL, &link.RefParam, &link.ProgramID); err != nil {
+	if err := row.Scan(&link.CampaignID, &link.SiteID, &link.OfferID, &link.CampaignStatus, &link.OfferStatus, &link.LandingURL, &link.RefParam, &link.ProgramID, &link.RequiresPlacement); err != nil {
 		return nil, err
 	}
 	return &link, nil
 }
 
 func (d *DB) InsertCampaignClick(ctx context.Context, campaignID, siteID string, programID *string, ipHash, userAgent, referrer string) (string, error) {
+	return d.InsertPlacementClick(ctx, campaignID, siteID, programID, ipHash, userAgent, referrer, "")
+}
+
+func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string, programID *string, ipHash, userAgent, referrer, placementID string) (string, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var snapshot []byte
+	if placementID != "" {
+		var status string
+		var expires time.Time
+		err = tx.QueryRow(ctx, `SELECT status,expires_at,terms_snapshot FROM placement_proposals WHERE id=$1 AND campaign_id=$2 FOR SHARE`, placementID, campaignID).Scan(&status, &expires, &snapshot)
+		if err != nil {
+			return "", err
+		}
+		if status != "committed" || !time.Now().Before(expires) {
+			return "", ErrPlacementAuthority
+		}
+	}
 	var id string
-	err := d.Pool.QueryRow(ctx, `
-INSERT INTO clicks (site_id, campaign_id, program_id, ip_hash, user_agent, referrer)
-VALUES ($1,$2,$3,$4,$5,$6)
-RETURNING id`, siteID, campaignID, programID, ipHash, userAgent, referrer).Scan(&id)
-	return id, err
+	err = tx.QueryRow(ctx, `INSERT INTO clicks(site_id,campaign_id,program_id,ip_hash,user_agent,referrer,terms_snapshot,placement_id)
+ SELECT $1,$2,$3,$4,$5,$6,COALESCE($7::jsonb,jsonb_build_object(
+ 'product_id',o.product_id,'commission_type',o.commission_type,'commission_value_minor',(o.commission_value*100)::bigint,
+ 'currency',o.commission_currency,'cookie_duration_days',o.cookie_duration_days,'refund_window_days',o.refund_window_days)),NULLIF($8,'')::uuid
+ FROM campaigns cam JOIN offers o ON o.id=cam.offer_id WHERE cam.id=$2 RETURNING id`,
+		siteID, campaignID, programID, ipHash, userAgent, referrer, snapshot, placementID).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	return id, tx.Commit(ctx)
 }
 
 // InsertWebhookEvent stores the raw event for replay and acts as the
@@ -151,30 +180,72 @@ const (
 // the conversion — flagged commissions never clear until an admin clears the
 // flag — and a velocity spike pauses the campaign.
 func (d *DB) RecordSaleConversion(ctx context.Context, clickID, provider, eventID, objectID, kind string, amount float64, currency string, occurredAt time.Time) (*SaleConversion, error) {
+	return d.recordSale(ctx, "", clickID, provider, eventID, objectID, kind, amount, 0, 0, currency, "legacy", occurredAt)
+}
+
+func (d *DB) RecordStripeSale(ctx context.Context, productID, clickID, eventID, objectID string, amountMinor, grossMinor int64, currency string, liveMode bool, occurredAt time.Time) (*SaleConversion, error) {
+	mode := "test"
+	if liveMode {
+		mode = "live"
+	}
+	return d.recordSale(ctx, productID, clickID, "stripe", eventID, objectID, "sale", float64(amountMinor)/100, amountMinor, grossMinor, currency, mode, occurredAt)
+}
+
+func lockMoney(ctx context.Context, tx pgx.Tx) error {
+	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(4150110)`)
+	return err
+}
+
+func (d *DB) recordSale(ctx context.Context, productID, clickID, provider, eventID, objectID, kind string, amount float64, amountMinor, grossMinor int64, currency, paymentMode string, occurredAt time.Time) (*SaleConversion, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	if err := lockMoney(ctx, tx); err != nil {
+		return nil, err
+	}
+	if provider == "stripe" {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM conversions WHERE provider='stripe' AND provider_object_id=$1 AND kind='sale')`, objectID).Scan(&exists); err != nil {
+			return nil, err
+		}
+		if exists {
+			return nil, nil
+		}
+	}
 	var out SaleConversion
 	var commissionType string
-	var commissionValue float64
+	var commissionValueMinor int64
 	var refundWindowDays int
 	var clickedAt time.Time
 	err = tx.QueryRow(ctx, `
-SELECT cam.id, cam.site_id, cam.offer_id, o.commission_type, o.commission_value, o.refund_window_days, cl.clicked_at
+SELECT cam.id, cam.site_id, cam.offer_id,
+ COALESCE(cl.terms_snapshot->>'commission_type',o.commission_type),
+ COALESCE((cl.terms_snapshot->>'commission_value_minor')::bigint,(o.commission_value*100)::bigint),
+ COALESCE((cl.terms_snapshot->>'refund_window_days')::int,o.refund_window_days), cl.clicked_at
 FROM clicks cl
 JOIN campaigns cam ON cam.id = cl.campaign_id
 JOIN offers o ON o.id = cam.offer_id
-WHERE cl.id=$1`, clickID).Scan(&out.CampaignID, &out.SiteID, &out.OfferID, &commissionType, &commissionValue, &refundWindowDays, &clickedAt)
+WHERE cl.id=$1 AND ($2='' OR o.product_id::text=$2)`, clickID, productID).Scan(&out.CampaignID, &out.SiteID, &out.OfferID, &commissionType, &commissionValueMinor, &refundWindowDays, &clickedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrClickNotFound
 		}
 		return nil, err
 	}
-	out.Commission = commissionFor(commissionType, commissionValue, amount)
+	out.Commission = commissionFor(commissionType, float64(commissionValueMinor)/100, amount)
+	if productID != "" {
+		commissionMinor := commissionValueMinor
+		if commissionType != "flat" {
+			commissionMinor = (amountMinor*commissionValueMinor + 5000) / 10000
+		}
+		if commissionMinor < 0 || commissionMinor > amountMinor {
+			return nil, fmt.Errorf("commission exceeds eligible revenue")
+		}
+		out.Commission = float64(commissionMinor) / 100
+	}
 
 	// A purchase before the click is as suspicious as one seconds after it
 	// (and provider timestamps truncate to seconds, so tiny negatives happen).
@@ -197,10 +268,10 @@ WHERE campaign_id=$1 AND kind IN ('sale','renewal') AND created_at >= NOW() - IN
 	}
 
 	err = tx.QueryRow(ctx, `
-INSERT INTO conversions (offer_id, campaign_id, click_id, provider, provider_event_id, provider_object_id, kind, amount, currency, commission_amount, occurred_at, flagged, flag_reason)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,''))
+INSERT INTO conversions (offer_id, campaign_id, click_id, provider, provider_event_id, provider_object_id, kind, amount, currency, commission_amount, occurred_at, flagged, flag_reason, gross_minor,payment_mode)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,''),NULLIF($14,0),$15)
 ON CONFLICT (provider, provider_event_id) DO NOTHING
-RETURNING id`, out.OfferID, out.CampaignID, clickID, provider, eventID, objectID, kind, amount, currency, out.Commission, occurredAt, out.Flagged, out.FlagReason).Scan(&out.ConversionID)
+RETURNING id`, out.OfferID, out.CampaignID, clickID, provider, eventID, objectID, kind, amount, currency, out.Commission, occurredAt, out.Flagged, out.FlagReason, grossMinor, paymentMode).Scan(&out.ConversionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Duplicate delivery raced past the webhook_events barrier; nothing to book.
@@ -218,69 +289,89 @@ VALUES ($1,$2,'commission',$3,$4,'pending',$5)`, out.SiteID, out.ConversionID, o
 	return &out, tx.Commit(ctx)
 }
 
-// RecordRefund finds the sale a refund belongs to via the provider object id,
-// records the refund conversion, and unwinds the commission: a still-pending
-// ledger entry is reversed in place, a cleared one gets a clawback entry.
 func (d *DB) RecordRefund(ctx context.Context, provider, eventID, objectID string, occurredAt time.Time) (string, error) {
+	return d.RecordPartialRefund(ctx, provider, eventID, objectID, -1, occurredAt)
+}
+
+func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectID string, cumulativeMinor int64, occurredAt time.Time) (string, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return "", err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-
-	var saleID, campaignID, siteID, offerID, currency string
+	if err := lockMoney(ctx, tx); err != nil {
+		return "", err
+	}
+	var saleID, campaignID, siteID, offerID, currency, paymentMode string
 	var clickID *string
-	var amount, commission float64
-	err = tx.QueryRow(ctx, `
-SELECT cv.id, cv.campaign_id, cam.site_id, cv.offer_id, cv.click_id, cv.amount, COALESCE(cv.commission_amount,0), cv.currency
-FROM conversions cv
-JOIN campaigns cam ON cam.id = cv.campaign_id
-WHERE cv.provider=$1 AND cv.provider_object_id=$2 AND cv.kind IN ('sale','renewal')
-ORDER BY cv.created_at DESC
-LIMIT 1`, provider, objectID).Scan(&saleID, &campaignID, &siteID, &offerID, &clickID, &amount, &commission, &currency)
+	var netMinor, commissionMinor, grossMinor int64
+	err = tx.QueryRow(ctx, `SELECT cv.id,cv.campaign_id,cam.site_id,cv.offer_id,cv.click_id,
+ (cv.amount*100)::bigint,(COALESCE(cv.commission_amount,0)*100)::bigint,cv.currency,COALESCE(cv.gross_minor,(cv.amount*100)::bigint),cv.payment_mode
+ FROM conversions cv JOIN campaigns cam ON cam.id=cv.campaign_id
+ WHERE cv.provider=$1 AND cv.provider_object_id=$2 AND cv.kind IN ('sale','renewal') ORDER BY cv.created_at DESC LIMIT 1`, provider, objectID).
+		Scan(&saleID, &campaignID, &siteID, &offerID, &clickID, &netMinor, &commissionMinor, &currency, &grossMinor, &paymentMode)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrConversionNotFound
+	}
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrConversionNotFound
-		}
 		return "", err
 	}
-
+	if cumulativeMinor == -1 {
+		cumulativeMinor = grossMinor
+	}
+	if cumulativeMinor <= 0 || cumulativeMinor > grossMinor {
+		return "", errors.New("refund exceeds payment")
+	}
+	var priorGross, priorNet, priorCommission int64
+	err = tx.QueryRow(ctx, `SELECT COALESCE(SUM(COALESCE(gross_minor,(amount*100)::bigint)),0)::bigint,
+ COALESCE(SUM(amount*100),0)::bigint,COALESCE(SUM(commission_amount*100),0)::bigint
+ FROM conversions WHERE provider=$1 AND provider_object_id=$2 AND kind='refund'`, provider, objectID).Scan(&priorGross, &priorNet, &priorCommission)
+	if err != nil {
+		return "", err
+	}
+	if cumulativeMinor <= priorGross {
+		return "", nil
+	}
+	netDelta := proratedMinor(netMinor, cumulativeMinor, grossMinor) - priorNet
+	commissionDelta := proratedMinor(commissionMinor, cumulativeMinor, grossMinor) - priorCommission
 	var refundID string
-	err = tx.QueryRow(ctx, `
-INSERT INTO conversions (offer_id, campaign_id, click_id, provider, provider_event_id, provider_object_id, kind, amount, currency, commission_amount, occurred_at)
-VALUES ($1,$2,$3,$4,$5,$6,'refund',$7,$8,$9,$10)
-ON CONFLICT (provider, provider_event_id) DO NOTHING
-RETURNING id`, offerID, campaignID, clickID, provider, eventID, objectID, amount, currency, commission, occurredAt).Scan(&refundID)
+	err = tx.QueryRow(ctx, `INSERT INTO conversions(offer_id,campaign_id,click_id,provider,provider_event_id,provider_object_id,kind,amount,currency,commission_amount,occurred_at,gross_minor,payment_mode)
+ VALUES($1,$2,$3,$4,$5,$6,'refund',$7,$8,$9,$10,$11,$12) ON CONFLICT(provider,provider_event_id) DO NOTHING RETURNING id`,
+		offerID, campaignID, clickID, provider, eventID, objectID, float64(netDelta)/100, currency, float64(commissionDelta)/100, occurredAt, cumulativeMinor-priorGross, paymentMode).Scan(&refundID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", nil
-		}
 		return "", err
 	}
-
-	var entryStatus string
-	err = tx.QueryRow(ctx, `
-SELECT status FROM ledger_entries
-WHERE conversion_id=$1 AND kind='commission'
-ORDER BY created_at DESC LIMIT 1`, saleID).Scan(&entryStatus)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	var status string
+	var clearsAt *time.Time
+	err = tx.QueryRow(ctx, `SELECT status,clears_at FROM ledger_entries WHERE conversion_id=$1 AND kind='commission' LIMIT 1`, saleID).Scan(&status, &clearsAt)
+	if err != nil {
 		return "", err
 	}
-	switch entryStatus {
-	case "pending":
-		if _, err := tx.Exec(ctx, `
-UPDATE ledger_entries SET status='reversed'
-WHERE conversion_id=$1 AND kind='commission' AND status='pending'`, saleID); err != nil {
-			return "", err
-		}
-	case "cleared":
-		if _, err := tx.Exec(ctx, `
-INSERT INTO ledger_entries (site_id, conversion_id, kind, amount, currency, status, clears_at)
-VALUES ($1,$2,'clawback',$3,$4,'cleared',NOW())`, siteID, refundID, -commission, currency); err != nil {
-			return "", err
-		}
+	if _, err = tx.Exec(ctx, `WITH cancelled AS (UPDATE payouts SET status='cancelled' WHERE status='pending' AND id IN
+ (SELECT payout_id FROM ledger_entries WHERE conversion_id=$1 AND payout_id IS NOT NULL) RETURNING id)
+ UPDATE ledger_entries SET payout_id=NULL WHERE payout_id IN (SELECT id FROM cancelled)`, saleID); err != nil {
+		return "", err
+	}
+	if status == "pending" && cumulativeMinor == grossMinor {
+		_, err = tx.Exec(ctx, `UPDATE ledger_entries SET status='reversed' WHERE status='pending' AND conversion_id IN
+  (SELECT id FROM conversions WHERE provider=$1 AND provider_object_id=$2)`, provider, objectID)
+	} else if commissionDelta > 0 {
+		_, err = tx.Exec(ctx, `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency,status,clears_at)
+  VALUES($1,$2,'clawback',$3,$4,$5,$6)`, siteID, refundID, -float64(commissionDelta)/100, currency, status, clearsAt)
+	}
+	if err != nil {
+		return "", err
 	}
 	return refundID, tx.Commit(ctx)
+}
+
+func proratedMinor(amount, refunded, total int64) int64 {
+	numerator := new(big.Int).Mul(big.NewInt(amount), big.NewInt(refunded))
+	numerator.Add(numerator, big.NewInt(total/2))
+	return numerator.Quo(numerator, big.NewInt(total)).Int64()
 }
 
 type FlaggedConversion struct {

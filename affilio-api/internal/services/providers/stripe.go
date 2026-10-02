@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -39,7 +40,8 @@ func (s *Stripe) VerifySignature(headers http.Header, body []byte, secret string
 			signatures = append(signatures, kv[1])
 		}
 	}
-	if timestamp == "" || len(signatures) == 0 {
+	seconds, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil || time.Since(time.Unix(seconds, 0)).Abs() > 5*time.Minute || len(signatures) == 0 {
 		return false
 	}
 	mac := hmac.New(sha256.New, []byte(secret))
@@ -55,13 +57,20 @@ func (s *Stripe) VerifySignature(headers http.Header, body []byte, secret string
 }
 
 type stripeEvent struct {
-	ID      string `json:"id"`
-	Type    string `json:"type"`
-	Created int64  `json:"created"`
-	Data    struct {
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Created  int64  `json:"created"`
+	LiveMode bool   `json:"livemode"`
+	Data     struct {
 		Object struct {
-			ID                string            `json:"id"`
-			AmountTotal       int64             `json:"amount_total"`
+			ID             string `json:"id"`
+			AmountTotal    int64  `json:"amount_total"`
+			AmountRefunded int64  `json:"amount_refunded"`
+			PaymentStatus  string `json:"payment_status"`
+			TotalDetails   struct {
+				Tax      int64 `json:"amount_tax"`
+				Shipping int64 `json:"amount_shipping"`
+			} `json:"total_details"`
 			Currency          string            `json:"currency"`
 			ClientReferenceID string            `json:"client_reference_id"`
 			PaymentIntent     string            `json:"payment_intent"`
@@ -92,23 +101,39 @@ func (s *Stripe) ParseEvent(body []byte) (*ConversionEvent, error) {
 		ObjectID:   objectID,
 		Currency:   strings.ToUpper(object.Currency),
 		OccurredAt: occurred,
+		LiveMode:   event.LiveMode,
+		ProductID:  object.Metadata["dtr_product_id"],
+		Kind:       "ignore",
 	}
 	switch event.Type {
-	case "checkout.session.completed":
+	case "checkout.session.completed", "checkout.session.async_payment_succeeded":
+		if object.PaymentStatus != "paid" || object.AmountTotal <= 0 {
+			return out, nil
+		}
+		if object.PaymentIntent == "" || !stripeCurrency(out.Currency) || object.AmountTotal > 9999999999 || object.TotalDetails.Tax < 0 || object.TotalDetails.Shipping < 0 {
+			return nil, errors.New("unsupported paid checkout")
+		}
+		out.GrossMinor = object.AmountTotal
+		out.AmountMinor = object.AmountTotal - object.TotalDetails.Tax - object.TotalDetails.Shipping
+		if out.AmountMinor <= 0 {
+			return out, nil
+		}
 		out.Kind = "sale"
-		out.Amount = float64(object.AmountTotal) / 100
+		out.Amount = float64(out.AmountMinor) / 100
 		out.Ref = object.ClientReferenceID
 		if out.Ref == "" {
 			out.Ref = object.Metadata["dtr"]
 		}
-	case "invoice.paid":
-		out.Kind = "renewal"
-		out.Amount = float64(object.AmountTotal) / 100
-		out.Ref = object.Metadata["dtr"]
 	case "charge.refunded":
+		if object.PaymentIntent == "" || object.AmountRefunded <= 0 || !stripeCurrency(out.Currency) {
+			return nil, errors.New("unsupported refund")
+		}
 		out.Kind = "refund"
-	default:
-		out.Kind = "ignore"
+		out.RefundedMinor = object.AmountRefunded
 	}
 	return out, nil
+}
+
+func stripeCurrency(currency string) bool {
+	return currency == "USD" || currency == "EUR" || currency == "GBP"
 }

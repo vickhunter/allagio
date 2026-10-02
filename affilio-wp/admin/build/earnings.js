@@ -52,24 +52,37 @@
         return `<span class="affilio-rec-status affilio-rec-status-pending">${t('Pending', 'In attesa')}${clears}</span>`;
     };
 
+    const modeLabel = (mode) => mode === 'test'
+        ? t('Test · simulated earnings', 'Test · guadagni simulati')
+        : (mode === 'live' ? t('Live', 'Reale') : t('Legacy · mode unverified', 'Storico · modalità non verificata'));
+
     const balanceCards = (balances) => {
         if (!balances.length) {
             balances = [{ currency: 'USD', pending: 0, cleared_unpaid: 0, paid: 0 }];
         }
         return balances.map((balance) => `
+            <h3>${esc(balance.currency)} · ${esc(modeLabel(balance.mode))}</h3>
             <div class="affilio-metric-grid">
                 <div class="affilio-metric-card">
                     <div class="affilio-metric-label">${t('Pending — inside refund windows', 'In attesa — entro le finestre di rimborso')}</div>
                     <div class="affilio-metric-value">${money(balance.pending, balance.currency)}</div>
-                    <div class="affilio-balance-note">${t('clears automatically when each hold ends', 'matura automaticamente al termine di ogni attesa')}</div>
+                    <div class="affilio-balance-note">${t('held while the refund window or review remains open', 'trattenuto durante la finestra di rimborso o la revisione')}</div>
                 </div>
                 <div class="affilio-metric-card">
                     <div class="affilio-metric-label">${t('Cleared — awaiting next payout', 'Maturato — in attesa del prossimo pagamento')}</div>
                     <div class="affilio-metric-value" style="color: #1e6f31;">${money(balance.cleared_unpaid, balance.currency)}</div>
-                    <div class="affilio-balance-note">${t('payouts run once you pass the minimum', 'i pagamenti partono superato il minimo')}</div>
+                    <div class="affilio-balance-note">${t('available for a manual payout batch', 'disponibile per un pagamento manuale')}</div>
                 </div>
                 <div class="affilio-metric-card">
-                    <div class="affilio-metric-label">${t('Paid out to date', 'Pagato ad oggi')}</div>
+                    <div class="affilio-metric-label">${t('Reserved for payout', 'Riservato al pagamento')}</div>
+                    <div class="affilio-metric-value">${money(balance.reserved, balance.currency)}</div>
+                </div>
+                <div class="affilio-metric-card">
+                    <div class="affilio-metric-label">${t('Payment reported · receipt unconfirmed', 'Pagamento dichiarato · ricezione non confermata')}</div>
+                    <div class="affilio-metric-value">${money(balance.payment_reported, balance.currency)}</div>
+                </div>
+                <div class="affilio-metric-card">
+                    <div class="affilio-metric-label">${t('Receipt confirmed by owner', 'Ricezione confermata dal titolare')}</div>
                     <div class="affilio-metric-value">${money(balance.paid, balance.currency)}</div>
                 </div>
             </div>
@@ -86,7 +99,7 @@
                 <tr>
                     <td>${esc(shortDate(entry.created_at))}</td>
                     <td><strong>${esc(entry.product_name || t('Offer', 'Offerta'))}</strong></td>
-                    <td>${esc(entry.kind)}</td>
+                    <td>${esc(entry.kind)} · ${esc(modeLabel(entry.mode))}</td>
                     <td style="text-align: right;" class="${negative ? 'affilio-amount-negative' : ''}"><strong>${money(entry.amount, entry.currency)}</strong></td>
                     <td>${statusPill(entry)}</td>
                 </tr>
@@ -100,15 +113,17 @@
         }
         return payouts.map((payout) => {
             const reference = payout.provider_reference ? ` · ${esc(payout.provider_reference)}` : '';
-            const paid = String(payout.status) === 'paid';
+            const paid = String(payout.status) === 'paid' && Boolean(payout.received_at);
             const pill = paid
-                ? `<span class="affilio-rec-status affilio-rec-status-approved">${t('Paid', 'Pagato')}</span>`
-                : `<span class="affilio-rec-status affilio-rec-status-pending">${t('Processing', 'In lavorazione')}</span>`;
+                ? `<span class="affilio-rec-status affilio-rec-status-approved">${t('Receipt confirmed', 'Ricezione confermata')}</span>`
+                : (String(payout.status) === 'cancelled'
+                    ? `<span class="affilio-rec-status affilio-rec-status-dismissed">${t('Cancelled', 'Annullato')}</span>`
+                    : `<span class="affilio-rec-status affilio-rec-status-pending">${String(payout.status) === 'paid' ? t('Payment reported', 'Pagamento dichiarato') : t('Reserved', 'Riservato')}</span>`);
             return `
                 <div class="affilio-payout-row">
                     <div>
-                        <strong>${money(payout.amount, payout.currency)} · ${esc(shortDate(payout.paid_at || payout.created_at))}</strong>
-                        <div class="affilio-muted">${esc(payout.method || 'manual')}${reference}</div>
+                        <strong>${money(payout.amount, payout.currency)} · ${esc(shortDate(payout.received_at || payout.paid_at || payout.created_at))}</strong>
+                        <div class="affilio-muted">${esc(modeLabel(payout.mode))} · ${esc(payout.method || 'manual')}${reference}</div>
                     </div>
                     ${pill}
                 </div>

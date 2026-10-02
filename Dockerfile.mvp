@@ -1,0 +1,34 @@
+FROM node:20-alpine AS releases
+RUN apk add --no-cache zip
+WORKDIR /source
+COPY packages/distributoor-setup ./packages/distributoor-setup
+COPY distributoor-plugin/skills ./distributoor-plugin/skills
+RUN mkdir /release && cd packages/distributoor-setup && npm pack --pack-destination /release
+COPY affilio-wp/affilio.php ./wordpress/affilio/affilio.php
+COPY affilio-wp/includes ./wordpress/affilio/includes
+COPY affilio-wp/admin ./wordpress/affilio/admin
+RUN cd wordpress && zip -qr /release/affilio.zip affilio -x 'affilio/admin/build/agent-poc.html' 'affilio/admin/build/workspace*' 'affilio/admin/build/home.html' 'affilio/admin/build/landing*' 'affilio/admin/build/setup-controls.js' 'affilio/admin/build/package*.json' 'affilio/admin/build/THIRD_PARTY_NOTICES.md'
+
+FROM node:20-alpine AS site
+WORKDIR /site
+COPY affilio-wp/admin/build/package.json affilio-wp/admin/build/package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY affilio-wp/admin/build/landing-scene.js ./
+RUN npm run build
+
+FROM golang:1.23 AS build
+WORKDIR /app
+COPY affilio-api/go.mod affilio-api/go.sum ./
+RUN go mod download
+COPY affilio-api ./
+RUN go build -o /bin/affilio ./cmd/server
+
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=build /bin/affilio /bin/affilio
+COPY --from=releases /release /app/downloads
+COPY affilio-wp/admin/build/workspace.html affilio-wp/admin/build/home.html affilio-wp/admin/build/workspace.css affilio-wp/admin/build/workspace.js affilio-wp/admin/build/setup-controls.js affilio-wp/admin/build/landing.css affilio-wp/admin/build/landing.js affilio-wp/admin/build/THIRD_PARTY_NOTICES.md /app/assets/
+COPY --from=site /site/landing-scene.bundle.js /site/landing-scene.bundle.js.LEGAL.txt /app/assets/
+ENV UI_ASSETS_PATH=/app/assets DOWNLOADS_PATH=/app/downloads
+EXPOSE 8080
+CMD ["/bin/affilio"]

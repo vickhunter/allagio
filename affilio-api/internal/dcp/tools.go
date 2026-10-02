@@ -165,7 +165,7 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "create_offer",
-		Description: "Create a draft offer (commission terms) for a product.",
+		Description: "Create a draft offer for a product. The revenue POC uses percentage or flat commission on the first paid checkout.",
 		InputSchema: schema([]string{"product_id", "commission_type", "commission_value"}, map[string]interface{}{
 			"product_id":           str("Product id"),
 			"commission_type":      str("One of: percentage, flat, recurring"),
@@ -242,7 +242,7 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "get_earnings",
-		Description: "Per-offer clicks, sales, refunds, gross revenue, and commission owed to publishers.",
+		Description: "Per-offer clicks, sales, refunds, commissionable revenue and publisher commission, separated by currency and payment mode. Native Stripe revenue excludes Checkout tax and shipping.",
 		InputSchema: schema(nil, map[string]interface{}{}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			return c.Do(http.MethodGet, "/v1/maker/earnings", nil)
@@ -278,7 +278,7 @@ var PublisherTools = []Tool{
 	},
 	{
 		Name:        "get_balance",
-		Description: "The publisher site's commission balance per currency: pending (inside refund windows), cleared awaiting payout, and paid to date.",
+		Description: "Publisher balances by currency and test/live/legacy mode: pending, cleared_unpaid, reserved, payment_reported and paid. Paid means owner-confirmed receipt; this is not independent bank verification.",
 		InputSchema: schema(nil, map[string]interface{}{}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			return c.DoSite(http.MethodGet, "/v1/payouts/balance", nil)
@@ -297,7 +297,9 @@ var PublisherTools = []Tool{
 func AllTools() []Tool {
 	out := make([]Tool, 0, len(Tools)+len(PublisherTools))
 	out = append(out, Tools...)
-	return append(out, PublisherTools...)
+	out = append(out, PublisherTools...)
+	out = append(out, RevenueTools...)
+	return append(out, PreviewTools...)
 }
 
 func CallTool(c *Client, name string, args map[string]interface{}) (map[string]interface{}, error) {

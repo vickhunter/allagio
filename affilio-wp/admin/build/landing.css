@@ -1,0 +1,79 @@
+.landing { background: #f8f5eb; --paper: #f8f5eb; --panel: #fffcf3; --line: #dedbcc; --muted: #676d5d; }
+.landing main, .landing .site-header, .landing .site-footer { max-width: 1440px; }
+.landing .site-header { padding-top: 30px; padding-bottom: 30px; border-bottom: 1px solid var(--line); }
+.landing .site-header nav a:last-child { border: 1px solid var(--line); border-radius: 6px; padding: 10px 15px; background: var(--panel); }
+.landing .site-header nav { align-items: center; }
+.landing .hero { gap: 48px; grid-template-columns: 1.12fr 1fr; padding: 68px 0 64px; }
+.hero-copy { min-width: 0; }
+.hero-copy .eyebrow { font-size: 10px; letter-spacing: 1.2px; }
+.hero-divider { margin: 0 8px; color: #b5b7a6; }
+.landing .hero h1 { font-size: clamp(46px, 5.1vw, 76px); letter-spacing: -2.6px; margin: 26px 0 24px; }
+.landing .hero p { font-size: 16px; max-width: 500px; }
+.landing .hero .caption { font-size: 12px; margin-top: 18px; margin-bottom: 0; }
+.landing .actions { gap: 10px; }
+.distribution-world { margin: 0; background: #273f34; color: #f3edda; border: 1px solid #1e352a; border-radius: 16px; box-shadow: 0 3px 0 #1c3026, 0 22px 40px -28px #1a2c22; overflow: hidden; transform: rotate(1.2deg); }
+.world-heading { padding: 23px 24px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.world-heading .eyebrow { font-size: 10px; letter-spacing: 1.3px; color: #c1cfb8; }
+.world-edition { font: 9px monospace; color: #aabb9f; white-space: nowrap; }
+.world-stage { position: relative; aspect-ratio: 560 / 410; isolation: isolate; }
+.world-fallback, .world-stage canvas { display: block; width: 100%; height: 100%; position: absolute; inset: 0; }
+.world-stage canvas { opacity: 0; }
+.world-stage.scene-ready canvas { opacity: 1; }
+.world-stage.scene-ready .world-fallback { visibility: hidden; }
+.distribution-world figcaption { border-top: 1px solid #506047; padding: 19px 24px 16px; }
+.world-legend { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; font-size: 12px; }
+.world-legend li { display: flex; gap: 12px; align-items: baseline; }
+.world-legend li span { font: 10px monospace; color: #dcad78; }
+.world-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; font-size: 10px; color: #b8c5ab; min-height: 25px; }
+.motion-toggle { padding: 5px 8px; font-size: 10px; font-weight: 400; border: 1px solid #849478; color: #f3edda; background: transparent; border-radius: 4px; }
+.motion-toggle[hidden] { display: none; }
+.principles { border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 20px; padding: 22px 0; font-size: 12px; color: var(--muted); }
+.principles span::before { content: "↗"; color: var(--accent); margin-right: 10px; }
+.landing .entry-points article { padding-top: 55px; padding-bottom: 50px; }
+.landing .entry-points h2 { font-size: 34px; line-height: 1.18; letter-spacing: -.9px; }
+.landing .entry-points p { max-width: 520px; }
+.install-box { padding: 16px; margin: 24px 0 20px; background: #edf0e2; border: 1px solid #d2d8c4; border-radius: 7px; }
+.install-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 27px; }
+.install-heading .command-label { font: 9px monospace; letter-spacing: 1px; }
+.install-box .command { border: 0; padding: 10px 0 0; background: transparent; border-radius: 0; margin: 0; font-size: 12px; line-height: 1.8; resize: none; min-height: 106px; }
+.text-link { font-size: 13px; font-weight: 600; text-decoration: none; border-bottom: 1px solid #b7bca6; padding-bottom: 4px; }
+.plugin-download { margin: 14px 0 0; gap: 12px; border-color: #b9bea9; background: var(--panel); }
+.plugin-icon { border: 1px solid #b1b8a0; border-radius: 50%; width: 22px; height: 22px; display: inline-flex; justify-content: center; align-items: center; font: 15px Georgia, serif; }
+.publisher-steps { list-style: none; padding: 0; margin: 22px 0 20px; display: grid; gap: 12px; color: var(--muted); font-size: 12px; }
+.publisher-steps li { display: flex; align-items: center; gap: 12px; }
+.publisher-steps li span { font: 10px monospace; width: 22px; height: 22px; border: 1px solid var(--line); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+.landing .scope-note { display: grid; grid-template-columns: 1fr 1fr; gap: 70px; max-width: none; padding: 65px 0 70px; align-items: center; }
+.landing .scope-note h2 { font: 36px/1.18 Georgia, serif; letter-spacing: -1px; margin: 20px 0 24px; }
+.landing .scope-note .caption { font-size: 12px; }
+.landing .site-footer { padding-top: 25px; padding-bottom: 25px; }
+@media (max-width: 1050px) {
+  .landing .hero { gap: 30px; }
+  .landing .hero h1 { font-size: 54px; }
+  .landing .hero-copy .eyebrow { font-size: 9px; letter-spacing: .6px; }
+  .world-heading, .distribution-world figcaption { padding-left: 18px; padding-right: 18px; }
+}
+@media (max-width: 850px) {
+  .landing .hero { grid-template-columns: 1fr; gap: 40px; padding: 40px 0; }
+  .landing .hero h1 { font-size: clamp(46px, 8vw, 70px); }
+  .distribution-world { max-width: 550px; width: 100%; justify-self: center; transform: none; }
+  .principles { flex-wrap: wrap; justify-content: flex-start; gap: 12px 24px; }
+  .landing .entry-points article, .landing .entry-points article + article { padding: 36px 24px; }
+  .landing .scope-note { gap: 35px; }
+}
+@media (max-width: 600px) {
+  .landing main { padding: 0 22px; }
+  .landing .site-header, .landing .site-footer { padding: 22px; }
+  .landing .site-header nav a:last-child { font-size: 11px; padding: 9px 10px; }
+  .landing .hero h1 { font-size: 47px; letter-spacing: -1.8px; }
+  .landing .hero-copy .eyebrow { font-size: 9px; letter-spacing: .5px; }
+  .landing .hero .actions { flex-direction: column; align-items: stretch; }
+  .landing .hero p { font-size: 15px; }
+  .world-heading { padding-top: 20px; }
+  .world-heading .eyebrow { font-size: 9px; letter-spacing: 1px; }
+  .principles { display: grid; padding: 25px 0; }
+  .landing .entry-points article, .landing .entry-points article + article { padding: 35px 0; }
+  .landing .entry-points h2 { font-size: 31px; }
+  .landing .scope-note { grid-template-columns: 1fr; gap: 25px; padding: 40px 0; }
+  .landing .scope-note h2 { font-size: 32px; }
+  .install-heading .command-label { font-size: 8px; letter-spacing: .6px; }
+}

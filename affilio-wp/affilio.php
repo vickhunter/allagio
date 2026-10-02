@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Affilio
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.6
+ * Version: 0.1.8
  * Author: Affilio
  */
 
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('AFFILIO_VERSION', '0.1.6');
+define('AFFILIO_VERSION', '0.1.8');
 define('AFFILIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AFFILIO_PLUGIN_URL', plugin_dir_url(__FILE__));
 if (!defined('AFFILIO_API_URL')) {
@@ -24,6 +24,8 @@ require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-inserter.php';
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-tracker.php';
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-admin.php';
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-editor-proxy.php';
+require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-onboarding.php';
+require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-distribution.php';
 
 function affilio_init() {
     $api = new Affilio_API();
@@ -32,6 +34,8 @@ function affilio_init() {
     $tracker = new Affilio_Tracker($api);
     $admin = new Affilio_Admin($api, $scanner, $inserter);
     $editor_proxy = new Affilio_Editor_Proxy($api, $inserter);
+    $onboarding = new Affilio_Onboarding($api);
+    $distribution = new Affilio_Distribution($api);
 
     add_action('admin_menu', array($admin, 'register_menu'));
     add_action('enqueue_block_editor_assets', array($admin, 'enqueue_sidebar_assets'));
@@ -39,6 +43,22 @@ function affilio_init() {
     add_action('rest_api_init', array($tracker, 'register_routes'));
     add_action('rest_api_init', array($inserter, 'register_routes'));
     add_action('rest_api_init', array($editor_proxy, 'register_routes'));
+    add_action('rest_api_init', array($onboarding, 'register_routes'));
+    add_action('rest_api_init', array($distribution, 'register_routes'));
 }
 
 add_action('plugins_loaded', 'affilio_init');
+
+register_activation_hook(__FILE__, function () {
+    if (get_option('affilio_api_key', '') === '') {
+        update_option('affilio_setup_redirect', true, false);
+    }
+});
+
+add_action('admin_init', function () {
+    if (get_option('affilio_setup_redirect', false) && current_user_can('manage_options') && !wp_doing_ajax() && !is_network_admin() && !isset($_GET['activate-multi'])) {
+        delete_option('affilio_setup_redirect');
+        wp_safe_redirect(admin_url('admin.php?page=affilio-settings'));
+        exit;
+    }
+});

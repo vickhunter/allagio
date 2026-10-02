@@ -1,4 +1,64 @@
+## October 1 — release gates
+
+- Added a deployment preflight pinned to the isolated `distributoor-mvp` service: configuration, clean/pushed revision and required CI checks must pass before uploading. Variable values and CLI failure output are withheld.
+- Added Docker release CI covering runtime assets, license notices, the installer command/skills and WordPress ZIP. A public smoke command checks downloads, embedded API origin, OAuth discovery and protected owner/MCP routes after Railway reports success.
+- Extended the WordPress browser fixture to install the HTTP-served release ZIP and use its embedded API origin without an override, then verify the public article's referral redirect and persisted placement-attributed click. Real Google login and operator activation remain pending credentials.
+- Verified the Docker bundle and packaged builder command, release-gate tests and Go vet. The packaged WordPress flow passed twice after fixing its sign-in autofocus race. No production deployment was requested while OAuth credentials are missing.
+
+## October 1 — landing page and setup UX
+
+- Added an original Three.js distribution illustration, editorial ivory/moss styling and clearer builder/WordPress entry points. The scene loads only on desktop when visible; mobile, reduced-motion, data-saving, no-JavaScript and unavailable-WebGL paths retain an original SVG illustration.
+- Added accessible pause/play controls and copy-command actions in the landing page and owner workspace, with a manual selection fallback when clipboard access is unavailable.
+- Self-hosted, pinned Three.js and esbuild; Docker builds the optional scene and includes its MIT notice. The WordPress ZIP excludes hosted-page assets and the UI toolchain.
+- Verified Chromium workspace flow, new enhancement/fallback states and command copying; built the release Docker image. Production activation still requires the Google OAuth credentials documented in `docs/MVP-DELIVERY.md`.
+
 # Affilio — Project Status
+
+## Distributoor MVP implementation · 2026-10-01
+
+Added the working owner workspace: product creation/editing, readiness checks, offer creation/submission, placement review, earnings, agent revocation, publisher payment instructions, merchant payment reports and separately confirmed receipt. The configured operator gets offer review and live commission batching. UI sources live in `affilio-wp/admin/build/`.
+
+WordPress Distribution links an installed site to its authenticated owner through a ten-minute, single-use token, then finds native offers, prepares placements and inserts only approved recommendations. Existing content is preserved, disclosure appears once, and publication recording can retry without duplicate insertion. Agent credentials cannot claim site ownership.
+
+`Dockerfile.mvp` bundles the API, UI, portable installer and origin-configured plugin download. Opt-in automatic migrations apply 001–015 to a fresh/history-tracked database with locking and checksum checks. Public readiness probes validate redirects and dial validated public addresses.
+
+Provisioned isolated Railway project `distributoor-mvp`, PostgreSQL 15 with persistent storage, and application domain `distributoor-production.up.railway.app`. The image built, but startup is blocked by missing Google OAuth client credentials. **The hosted MVP is not usable yet.** Existing Affilio production is untouched. Exact activation and shipping instructions: [MVP-DELIVERY.md](docs/MVP-DELIVERY.md). The previous October 2 presentation plan is superseded; product/article recruitment is not a software release prerequisite.
+
+Verification: full Go suite, handler/database/migration race checks, vet, seven installer tests, PHP setup/distribution suites and Docker/archive checks pass. Chromium exercises real owner backend forms, product/offer management, placement approval/commit and separate merchant/publisher payment confirmations. WordPress 6.6/PHP 8.2 browser checks also pass installed-site handoff, matching, owner approval, real post insertion and backend publication recording on an isolated local fixture. Real Google login, a real merchant checkout and real commission receipt remain unverified.
+
+## One-entry setup · 2026-09-30
+
+- Added `packages/distributoor-setup`: portable Node CLI, manifest detection, hosted OAuth preflight, Codex agent handoff and Cursor/Claude MCP + skill installation. Configuration and custom skills are preserved on conflicts. The npm package is prepared, not published.
+- Hosted explicit maker OAuth and `/owner?setup=maker` create a new owned maker without an API key; existing email/account conflicts still require proof of ownership.
+- Fresh WordPress activation opens setup. One Connect action provisions a site credential and scans published posts in resumable batches; settings show progress and retry. The backend accepts hashed, idempotent installation registration. New plugin needs the updated backend; no deployment occurred.
+- Fixed missing editor proxy that prevented activation, with post access and recommendation ownership checks.
+- WordPress cron drives scans. Native WordPress connection remains separate from hosted publisher-agent identity. Builder code wiring, Stripe connection and real purchase verification remain distinct from installing files.
+- See `docs/ONE-STEP-SETUP.md` for release gates and `packages/distributoor-setup/README.md` for runnable local commands.
+- Verification: full Go suite, handler/database race tests and vet passed; seven installer tests and the portable npm archive ran successfully. WordPress 6.6/PHP 8.2 activated and completed keyless Connect → scan → dashboard in Playwright (3 passed, 1 optional legacy-key test skipped). PHP setup tests cover lost responses, permissions, unsupported backends, batch failure and resume. The local browser fixture used an explicit cron run.
+
+## Hosted pilot · 2026-09-30
+
+Implemented hosted Streamable HTTP MCP with OIDC owner sign-in, OAuth discovery/DCR/S256 PKCE, hashed single-use codes, scoped access tokens, rotating refresh tokens and owner revocation. Browser approval now records verified issuer/subject authority for the exact placement; agent tokens cannot approve or confirm receipt of money. New accounts need no API key, and OAuth maker accounts have no legacy key stored. Legacy ownership requires an owner key once, never an email match.
+
+The owner workspace supports account setup, placement review, connected-agent revocation, live payment receipt confirmation and Stripe configuration checks. A restricted merchant key is used once for read-only account/one-time-price/webhook verification, then discarded; signing secrets remain product-bound and encrypted. Hosted matching requires verified configuration. Rotation preserves account, price, currency and mode.
+
+Migrations `013_hosted_identity.sql` and `014_verified_stripe_connections.sql` are required. Go remains 1.23. The official SDK HTTP client and installed Codex CLI tested the local hosted flow with fixture owner sessions. Real identity-provider login, public HTTPS, Cursor, Stripe-delivered checkout/refund, live commissions and recruitment still require activation and participant details. Nothing has been deployed to Railway production. See [HOSTED-PILOT.md](docs/HOSTED-PILOT.md) and `affilio-api/hosted-pilot.env.example`.
+
+## Agent revenue POC · 2026-09-30
+
+Implemented an agent-native workflow on the existing Go 1.23 service. Run `./scripts/run-agent-poc.sh` and open <http://127.0.0.1:8086/pilot>. Details and endpoint contracts: [AGENT-REVENUE-POC.md](docs/AGENT-REVENUE-POC.md).
+
+- Signup-free public preview; up to five relevant native offers or `no_match`.
+- Exact placement proposals, frozen terms, separate operator-recorded owner approval, expiry/revocation and stable commit receipts.
+- Scoped, hashed publisher-agent keys; agents cannot approve themselves or confirm bank receipt.
+- Portable revenue skill plus seven new MCP tools. Two actual local MCP processes exercise the flow.
+- Product-scoped encrypted Stripe connections; paid-state, mode, currency, product and attribution-window checks; async success and payment-level dedupe.
+- Durable event retries and recovery; cumulative partial/full refunds; pending batch cancellation; explicit late clawbacks.
+- Separate test/live/legacy balances and maker-specific payout batches. Reserved, payment-reported and owner-confirmed receipt are distinct.
+- WordPress Earnings shows mode labels and all five balance states; payment reports and cancelled batches no longer appear as received payments.
+- Migration `012_agent_revenue_poc.sql`, regression coverage and a runnable local proof report in the compiled admin assets directory.
+
+Scope: synthetic signed Stripe events, simulated owner approval and local publication artifact. Real checkout/publishing/client integrations, SSO, external-program reconciliation, funding/disputes and service-fee invoicing remain pilot launch work. The global Stripe webhook route now requires migration to a product-specific connection; renewals are outside this POC.
 
 ## Goal
 Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that scans posts, detects existing affiliate links, recommends curated + user‑specific programs, and supports one‑click insertion with a clear monetization score + potential indicator. The MVP proves revenue‑lift with minimal risk and a tight scope.
@@ -162,7 +222,7 @@ See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
 - **Offer rails**: admin review queue; approve promotes the offer into `affiliate_programs` (`source='distributoor'`, `offer_id` linked) so the existing matcher/recommendation/insertion pipeline serves it unchanged.
 - **Attribution** (`008_attribution_payouts.sql`): publisher marketplace (`GET /v1/marketplace/offers`, `POST /v1/marketplace/offers/:id/join`), tracked redirect `GET /v1/go/:code` (click + ref param carrying click id), `POST /v1/webhooks/:provider` for Stripe/Lemon Squeezy/Polar behind a `ProviderAdapter` interface with per‑provider HMAC verification, idempotent raw event storage, conversions joined to clicks, commissions booked as pending ledger entries clearing after the offer's refund window, refunds reversing/clawing back.
 - **Payouts**: publisher `GET /v1/payouts/balance|history`, admin `POST /v1/payout-batches/run` (manual payouts per site+currency over a minimum) + `:id/mark-paid`, maker `GET /v1/maker/earnings`.
-- New env vars (all optional, degrade off): `STRIPE_WEBHOOK_SECRET`, `LEMONSQUEEZY_WEBHOOK_SECRET`, `POLAR_WEBHOOK_SECRET`.
+- Payment configuration: `CONNECTION_ENCRYPTION_KEY` for product-scoped Stripe credentials; `LEMONSQUEEZY_WEBHOOK_SECRET` and `POLAR_WEBHOOK_SECRET` for the legacy adapters. The old global Stripe secret no longer enables ingestion.
 - **Agentic layer (P4)**: `distributoor` maker CLI (`cmd/distributoor`: init/assess/offer/snippet/status), stdio MCP server (`cmd/distributoor-mcp`) exposing 13 DCP maker verbs, Agent Plugins 1.0.0 package (`distributoor-plugin/` with plugin.json + mcp.json + 3 skills), DCP v0.1 spec extracted to `docs/dcp/`, and `GET /.well-known/dcp.json` discovery manifest.
 - **Hosted MCP + publisher tools (P5, part 2)**: `POST /v1/mcp` streamable‑HTTP MCP transport (maker auth via `X-Maker-Key`/Bearer, publisher via `X-API-Key`, per‑request loopback client, rate‑limited), plus 4 publisher‑side MCP tools (`list_marketplace_offers`, `join_offer`, `get_balance`, `get_payout_history`) behind `DISTRIBUTOOR_SITE_KEY` on the stdio server; discovery manifest and `docs/dcp/` updated.
 - **WP plugin Distributoor screens**: new Marketplace submenu (offers ranked by fit with join/copy‑link flows, `admin/build/marketplace.js`) and Earnings submenu (pending/cleared/paid balance cards, commission ledger, payout history, `admin/build/earnings.js`), both bilingual EN/IT and matching existing plugin CSS patterns.
@@ -188,9 +248,9 @@ See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
 2. **Install Plugin**
    - Copy `affilio-wp/` into `wp-content/plugins/affilio/`
    - Activate “Affilio” plugin in WP admin
-   - Open **Affilio → Settings**, create an account if needed, and set **API Key**
+   - Open **Affilio → Settings** and click **Connect and find opportunities**. This requires the updated backend; manual keys remain available under the settings accordion.
 3. **Test Flow**
-   - Click **Scan All Posts** in **Affilio** dashboard
+   - Review the automatic first scan; **Scan All Posts** in the dashboard refreshes it later.
    - Open a post → sidebar → **Analyze**
    - Approve & insert a recommendation
 

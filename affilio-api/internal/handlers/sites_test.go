@@ -2,13 +2,54 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"affilio-api/internal/services"
+
 	"github.com/gin-gonic/gin"
 )
+
+func TestSitesInstallationRegistrationRetries(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	r := gin.New()
+	r.POST("/sites/register", (&SitesHandler{DB: db}).Register)
+	key := strings.Repeat("ab", 32)
+	register := func(domain, installationKey string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest("POST", "/sites/register", newJSONRequest(t, "POST", "/sites/register", map[string]any{"domain": domain, "installation_key": installationKey})))
+		return rec
+	}
+	first, retry := register("blog.example", key), register("blog.example", key)
+	if first.Code != 200 || retry.Code != 200 {
+		t.Fatalf("registration failed: %d %d", first.Code, retry.Code)
+	}
+	var one, two map[string]string
+	if err := json.Unmarshal(first.Body.Bytes(), &one); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(retry.Body.Bytes(), &two); err != nil {
+		t.Fatal(err)
+	}
+	if one["site_id"] != two["site_id"] || two["api_key"] != key {
+		t.Fatal("retry created another site or changed its credential")
+	}
+	site, err := db.GetSiteByID(context.Background(), one["site_id"])
+	if err != nil || site.APIKeyHash != services.HashAPIKey(key) {
+		t.Fatal("installation key was not hashed")
+	}
+	if rec := register("other.example", key); rec.Code != 409 {
+		t.Fatalf("domain change accepted: %d", rec.Code)
+	}
+	if rec := register("blog.example", "weak-key"); rec.Code != 400 {
+		t.Fatalf("invalid installation key accepted: %d", rec.Code)
+	}
+}
 
 func TestSitesRegisterRateLimit(t *testing.T) {
 	db, cleanup := setupTestDB(t)

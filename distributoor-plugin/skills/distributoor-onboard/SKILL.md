@@ -1,43 +1,82 @@
 ---
 name: distributoor-onboard
-description: Take a product from zero to listed on the Distributoor network - register the maker and product, run the readiness assessment, fix failing checks in the product's own codebase, and resubmit until it passes. Use when the maker wants to distribute, list, or monetize their product through Distributoor, or asks to get their app "distribution-ready".
+description: Set up product distribution end to end in the builder's existing coding agent. Detect the stack and checkout, connect hosted MCP, reuse or register the product, wire attribution, test it, and report verified readiness. Use when a builder asks to monetize, distribute, or make a product distribution-ready.
 ---
 
-# Distributoor onboarding
+# Distributoor setup
 
-You are onboarding the maker's product onto Distributoor, the agent-native
-affiliate network. The `distributoor` MCP tools drive the network; the failing
-checks you fix live in the maker's own codebase, which you edit directly.
+Carry the integration through in this repository. Use the user's current agent,
+tools and model account. The user should not have to assemble SDK snippets,
+copy API keys or provide another model API key.
 
-## Flow
+## 1. Detect and connect
 
-1. **Account.** If `DISTRIBUTOOR_API_KEY` is not set, call `register_maker`
-   with the maker's email, hand them the returned `api_key` to store as
-   `DISTRIBUTOOR_API_KEY`, and continue with it.
-2. **Product.** Call `register_product` with the live `website_url` plus
-   `docs_url` / `pricing_url` when they exist. Pick honest `product_type` and
-   `payment_provider` values — the assessment verifies them.
-3. **Assess.** Call `run_assessment`. The result is a check list; each failing
-   or warning check carries a `remediation` string written for you.
-4. **Fix, in their code.** For every check with status `fail` (and `warn`
-   where cheap), apply the remediation in the product's codebase or hosting
-   config. Typical fixes:
-   - `ref_param_survives` — preserve the `?via=` query parameter through
-     redirects, or capture it before redirecting (see distributoor-instrument).
-   - `checkout_present` — expose the Stripe / Lemon Squeezy / Polar checkout
-     from the landing or pricing page.
-   - `privacy_policy`, `onboarding_flow`, `pricing_page`, `docs_present` —
-     content fixes on the site itself.
-   Deploy the fixes, then call `run_assessment` again. Repeat until
-   `readiness_status` is `ready`. Gate checks block listing; AI rubric checks
-   (onboarding_clarity, docs_quality, value_prop_clarity) don't gate but do
-   shape how publishers convert — improve them when the maker agrees.
-5. **Offer.** Once ready, continue with the distributoor-launch skill (or
-   `create_offer` + `submit_offer` directly). Submission requires `ready`.
+Inspect dependency manifests, routes and existing checkout code. Infer the
+framework, payment provider, product name and deployed URL from reliable project
+configuration and documentation. Installer detection is a hint, not proof.
+Ask only for information the repository cannot establish. Never read or upload
+`.env` files, private keys or payment secrets to discover the stack.
 
-## Rules
+Use the configured `distributoor` hosted MCP server. Authenticate with **maker**
+access using the client's browser OAuth flow. Verified sign-in creates a new
+maker automatically when no existing account conflicts. An existing maker
+requires its owner's account connection; matching an email never proves access.
+For clients that initially request publisher access, open
+`<hosted-api>/owner?setup=maker` to set up maker access, then reconnect the client.
+If no server is configured, use the installation's API URL and the client's
+native MCP configuration. Never invent a production endpoint. A connection that
+cannot authenticate is pending, even if configuration files were installed.
 
-- Never fake a check: fixes belong in the product, not in probing artifacts.
-- Ask before changing pricing, legal pages, or anything user-visible beyond
-  what a remediation asks for.
-- The api_key is a secret: put it in env/secret storage, never in committed code.
+The local stdio server is a legacy alternative. `register_maker` and API-key
+setup are for explicit legacy development use, not the hosted onboarding flow.
+
+## 2. Reuse the product
+
+Call `list_products` first. Reuse the product whose deployed website matches;
+do not create a duplicate on reruns. Record its ID in a non-secret local setup
+report. Otherwise call `register_product` with verified name, `website_url`,
+`product_type`, `payment_provider`, and actual pricing/docs URLs when present.
+
+## 3. Instrument the actual checkout
+
+Use distributoor-instrument. Preserve the `via` click parameter across redirects,
+capture it on the landing page and propagate it to the server's existing Stripe
+Checkout creation. Merge metadata and preserve existing checkout behavior.
+The server must set `dtr_product_id` to the registered product ID.
+Use the project's existing libraries and test conventions; never generate a
+second checkout implementation merely to pass a probe.
+
+In this pilot, paid attribution supports Stripe first paid Checkout purchases
+with a verified per-product connection. If the product uses another provider,
+report that limitation instead of claiming paid attribution is configured.
+Open `<hosted-api>/owner/products/<product_id>/connection` for the owner to
+connect Stripe. Credentials belong in that owner form, never in chat or skills.
+The agent can prepare the integration while this owner action is pending.
+
+## 4. Verify and fix
+
+Run the relevant project checks and `run_assessment`. Apply concrete remediations
+in the product repository, then reassess after the deployed changes are actually
+reachable. Preserve pricing, legal policies and payment behavior. Follow the
+user's existing deployment authorization; otherwise leave a reviewable diff.
+Do not retry assessments endlessly against an undeployed change.
+
+Verify a referral through the real checkout creation in tests, including metadata
+preservation and a purchase without a referral. A passing readiness probe does
+not prove a paid conversion. A Stripe-delivered test purchase and refund provide
+the separate end-to-end proof; confirm their results through `get_earnings`.
+Use existing test-mode fixtures where available. Ask for authorization before
+creating a real live charge or changing financial terms.
+
+## 5. Finish with evidence
+
+Write `distributoor-setup-report.md` with the product ID and these separate
+states: agent connected, attribution code tested, deployed assessment passed,
+Stripe connection verified, paid test purchase/refund verified, offer listed.
+For each state give observed evidence or a concrete pending action. File
+installation alone never means the product is earning or live.
+
+Continue with distributoor-launch when the maker has supplied commission terms.
+If terms are missing, prepare everything independent of them and ask for the
+commission and refund window. Never invent a financial commitment or claim an
+offer is listed before the network confirms it.

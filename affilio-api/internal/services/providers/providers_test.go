@@ -40,6 +40,7 @@ func TestStripeSignatureAndParse(t *testing.T) {
 		"data": {"object": {
 			"id": "cs_1",
 			"amount_total": 4900,
+			"payment_status": "paid",
 			"currency": "usd",
 			"client_reference_id": "11111111-2222-3333-4444-555555555555",
 			"payment_intent": "pi_1"
@@ -65,7 +66,7 @@ func TestStripeSignatureAndParse(t *testing.T) {
 		t.Fatalf("unexpected stripe event: %+v", event)
 	}
 
-	refund, err := adapter.ParseEvent([]byte(`{"id":"evt_2","type":"charge.refunded","created":1750000100,"data":{"object":{"id":"ch_1","payment_intent":"pi_1"}}}`))
+	refund, err := adapter.ParseEvent([]byte(`{"id":"evt_2","type":"charge.refunded","created":1750000100,"data":{"object":{"id":"ch_1","payment_intent":"pi_1","amount_refunded":4900,"currency":"usd"}}}`))
 	if err != nil || refund.Kind != "refund" || refund.ObjectID != "pi_1" {
 		t.Fatalf("unexpected stripe refund: %+v err=%v", refund, err)
 	}
@@ -73,6 +74,34 @@ func TestStripeSignatureAndParse(t *testing.T) {
 	other, err := adapter.ParseEvent([]byte(`{"id":"evt_3","type":"customer.created","data":{"object":{"id":"cus_1"}}}`))
 	if err != nil || other.Kind != "ignore" {
 		t.Fatalf("expected ignore for unrelated event, got %+v err=%v", other, err)
+	}
+}
+
+func TestStripeRejectsStaleSignatures(t *testing.T) {
+	for _, offset := range []time.Duration{-6 * time.Minute, 6 * time.Minute} {
+		body := []byte(`{"id":"evt_old"}`)
+		headers := http.Header{}
+		headers.Set("Stripe-Signature", stripeSign("secret", body, fmt.Sprint(time.Now().Add(offset).Unix())))
+		if (&Stripe{}).VerifySignature(headers, body, "secret") {
+			t.Fatalf("accepted signature outside tolerance: %s", offset)
+		}
+	}
+}
+
+func TestStripeOnlyBooksPositivePaidCheckout(t *testing.T) {
+	for _, body := range []string{
+		`{"id":"e","type":"checkout.session.completed","data":{"object":{"amount_total":4900,"payment_status":"unpaid","currency":"usd","payment_intent":"pi"}}}`,
+		`{"id":"e","type":"checkout.session.completed","data":{"object":{"amount_total":0,"payment_status":"no_payment_required","currency":"usd","payment_intent":"pi"}}}`,
+		`{"id":"e","type":"invoice.paid","data":{"object":{"amount_paid":4900,"currency":"usd","payment_intent":"pi"}}}`,
+	} {
+		event, err := (&Stripe{}).ParseEvent([]byte(body))
+		if err != nil || event.Kind != "ignore" {
+			t.Fatalf("booked ineligible event: %+v, %v", event, err)
+		}
+	}
+	async, err := (&Stripe{}).ParseEvent([]byte(`{"id":"e","livemode":true,"type":"checkout.session.async_payment_succeeded","data":{"object":{"amount_total":4900,"payment_status":"paid","currency":"usd","payment_intent":"pi","metadata":{"dtr_product_id":"product"},"total_details":{"amount_tax":900}}}}`))
+	if err != nil || async.Kind != "sale" || async.Amount != 40 || async.AmountMinor != 4000 || async.GrossMinor != 4900 || !async.LiveMode || async.ProductID != "product" {
+		t.Fatalf("async paid checkout normalization: %+v, %v", async, err)
 	}
 }
 

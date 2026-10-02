@@ -1,0 +1,16 @@
+.local/
+.env
+.env.*
+!.env.example
+affilio-api/coverage.out
+affilio-api/distributoor-mcp
+affilio-api/affilio-server
+.codegraph/
+.cursor/
+packages/distributoor-setup/skills/
+packages/distributoor-setup/*.tgz
+**/node_modules/
+affilio-wp/e2e/test-results/
+affilio-wp/e2e/playwright-report/
+__pycache__/
+affilio-wp/admin/build/landing-scene.bundle.js*

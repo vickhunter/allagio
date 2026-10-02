@@ -1,13 +1,28 @@
 name: Affilio API Tests
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "affilio-api/**"
+      - "affilio-wp/admin/build/workspace*"
+      - "affilio-wp/admin/build/home.html"
+      - "affilio-wp/admin/build/landing*"
+      - "affilio-wp/admin/build/setup-controls.js"
+      - "affilio-wp/admin/build/package*.json"
+      - "affilio-wp/e2e/workspace.mjs"
+      - "Dockerfile.mvp"
       - ".github/workflows/affilio-api-tests.yml"
   pull_request:
     paths:
       - "affilio-api/**"
+      - "affilio-wp/admin/build/workspace*"
+      - "affilio-wp/admin/build/home.html"
+      - "affilio-wp/admin/build/landing*"
+      - "affilio-wp/admin/build/setup-controls.js"
+      - "affilio-wp/admin/build/package*.json"
+      - "affilio-wp/e2e/workspace.mjs"
+      - "Dockerfile.mvp"
       - ".github/workflows/affilio-api-tests.yml"
 
 jobs:
@@ -30,6 +45,7 @@ jobs:
           --health-retries 10
     env:
       AFFILIO_TEST_DATABASE_URL: postgresql://affilio:password@localhost:5432/affilio_test
+      AFFILIO_MIGRATION_TEST_DATABASE_URL: postgresql://affilio:password@localhost:5432/affilio_migration_test
       COVERAGE_MIN: "25"
     defaults:
       run:
@@ -47,8 +63,31 @@ jobs:
             affilio-api/go.mod
             affilio-api/go.sum
 
+      - name: Create isolated migration database
+        run: PGPASSWORD=password psql -h localhost -U affilio -d postgres -c 'CREATE DATABASE affilio_migration_test'
+
       - name: Run CI tests
         run: make ci-test
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build landing illustration
+        working-directory: affilio-wp/admin/build
+        run: npm ci --ignore-scripts && npm run build
+
+      - name: Install workspace browser
+        working-directory: affilio-wp/e2e
+        run: npm install && npx playwright install --with-deps chromium
+
+      - name: Verify workspace in Chromium
+        env:
+          AFFILIO_WORKSPACE_BROWSER: '1'
+        run: go test ./internal/handlers -run TestWorkspaceBrowser -count=1
+
+      - name: Vet Go source
+        run: go vet ./...
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4

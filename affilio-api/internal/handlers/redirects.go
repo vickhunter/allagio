@@ -46,7 +46,22 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 		c.Redirect(http.StatusFound, link.LandingURL)
 		return
 	}
-	clickID, err := h.DB.InsertCampaignClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, hashIP(c.ClientIP()), c.Request.UserAgent(), c.Request.Referer())
+	if link.RequiresPlacement && c.Query("placement") == "" {
+		c.Redirect(http.StatusFound, link.LandingURL)
+		return
+	}
+	if placementID := c.Query("placement"); placementID != "" {
+		if !uuidPattern.MatchString(placementID) {
+			c.Redirect(http.StatusFound, link.LandingURL)
+			return
+		}
+		valid, err := h.DB.PlacementAllowsClick(c.Request.Context(), placementID, link.CampaignID)
+		if err != nil || !valid {
+			c.Redirect(http.StatusFound, link.LandingURL)
+			return
+		}
+	}
+	clickID, err := h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, hashIP(c.ClientIP()), c.Request.UserAgent(), c.Request.Referer(), c.Query("placement"))
 	if err != nil {
 		log.Printf("redirects.go click insert failed campaign=%s err=%v", link.CampaignID, err)
 		c.Redirect(http.StatusFound, link.LandingURL)

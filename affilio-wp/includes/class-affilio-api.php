@@ -16,6 +16,8 @@ class Affilio_API {
         $url = trailingslashit($this->base_url) . ltrim($path, '/');
         $args = array(
             'method'  => $method,
+            'timeout' => 30,
+            'redirection' => 0,
             'headers' => array(
                 'Content-Type' => 'application/json',
                 'X-API-Key'    => $this->current_api_key(),
@@ -54,8 +56,8 @@ class Affilio_API {
 
         $status = array(
             'state' => 'missing_key',
-            'label' => $this->t('Missing API Key', 'Chiave API mancante'),
-            'message' => $this->t('Enter your Affilio API key to connect this site.', 'Inserisci la chiave API di Affilio per collegare questo sito.'),
+            'label' => $this->t('Ready to connect', 'Pronto per il collegamento'),
+            'message' => $this->t('Open Affilio settings to connect and find opportunities.', 'Apri le impostazioni Affilio per collegarti e trovare opportunità.'),
             'connected' => false,
             'checked_at' => gmdate('c'),
             'http_code' => 0,

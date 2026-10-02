@@ -58,6 +58,10 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"009_scale_fraud_trust.sql",
 		"010_audit_events.sql",
 		"011_hash_api_keys.sql",
+		"012_agent_revenue_poc.sql",
+		"013_hosted_identity.sql",
+		"014_verified_stripe_connections.sql",
+		"015_site_owner_connection.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)
