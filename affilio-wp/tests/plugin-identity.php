@@ -11,6 +11,7 @@ check_identity(basename($root . '/affilio.php') === 'affilio.php', 'main file na
 $dockerfile = file_get_contents(dirname($root) . '/Dockerfile.mvp');
 check_identity(strpos($dockerfile, 'wordpress/affilio-wp/affilio.php') !== false, 'release image does not package folder affilio-wp');
 check_identity(strpos($dockerfile, 'zip -qr /release/affilio.zip affilio-wp') !== false, 'release ZIP is not rooted at affilio-wp/');
+check_identity(strpos($dockerfile, 'COPY affilio-wp/readme.txt') !== false, 'release image does not package readme.txt');
 
 $double = run_php('
 require ' . var_export($root . '/tests/bootstrap.php', true) . ';
