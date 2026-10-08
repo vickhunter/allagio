@@ -1,3 +1,13 @@
+function affilioEmptyOfferMessage(result, copy) {
+    const text = copy || {};
+    const below = text.belowRelevance || 'Nessuna offerta adatta: la più vicina ha rilevanza %1$d/100, serve almeno %2$d.';
+    const none = text.noEligibleOffers || 'Nessuna offerta idonea al momento.';
+    if (result && result.reason === 'below_relevance') {
+        return below.replace('%1$d', String(result.best_score)).replace('%2$d', String(result.threshold));
+    }
+    return none;
+}
+
 (() => {
     'use strict';
     const root = document.getElementById('affilio-distribution-root');
@@ -89,9 +99,10 @@
         root.querySelector('[data-find]')?.addEventListener('submit',event => {
             event.preventDefault(); const form = event.currentTarget; const postID = Number(new FormData(form).get('post_id'));
             run(form.querySelector('button'),async () => {
-                const {opportunities} = await call('/opportunities','POST',{post_id:postID});
+                const data = await call('/opportunities','POST',{post_id:postID});
+                const opportunities = data.opportunities || [];
                 const results = document.getElementById('distribution-results');
-                results.innerHTML = opportunities.length ? opportunities.map(offer => `<section><h3>${escape(offer.product_name)}</h3><p>${escape(offer.reason)}</p><p>${escape(offer.commission_value)}${offer.commission_type === 'percentage' ? '%' : ' ' + escape(offer.currency)} per first paid checkout · ${offer.refund_window_days}-day refund hold</p><form data-offer="${offer.offer_id}"><label>Recommendation copy<textarea name="copy" minlength="10" maxlength="4000" required>${escape('Consider ' + offer.product_name + ' if it fits the problem described in this article.')}</textarea></label><button class="button">Prepare for review</button></form></section>`).join('') : '<p>No relevant offers yet. Only listed offers with verified payment configuration appear here.</p>';
+                results.innerHTML = opportunities.length ? opportunities.map(offer => `<section><h3>${escape(offer.product_name)}</h3><p>${escape(offer.reason)}</p><p>${escape(offer.commission_value)}${offer.commission_type === 'percentage' ? '%' : ' ' + escape(offer.currency)} per first paid checkout · ${offer.refund_window_days}-day refund hold</p><form data-offer="${offer.offer_id}"><label>Recommendation copy<textarea name="copy" minlength="10" maxlength="4000" required>${escape('Valuta ' + offer.product_name + ' se risolve il problema descritto in questo articolo.')}</textarea></label><button class="button">Prepare for review</button></form></section>`).join('') : `<p>${escape(affilioEmptyOfferMessage(data, AffilioDistribution))}</p>`;
                 results.querySelectorAll('[data-offer]').forEach(proposal => proposal.addEventListener('submit',event => {
                     event.preventDefault();
                     run(proposal.querySelector('button'),async () => { await call('/prepare','POST',{post_id:postID,offer_id:proposal.dataset.offer,copy:new FormData(proposal).get('copy')}); await refreshPlacements(); message('Placement prepared. Open Review copy & terms to approve it, then refresh approvals here.'); });

@@ -105,7 +105,12 @@ class Affilio_Admin {
         if ($hook === 'affilio_page_affilio-distribution') {
             wp_enqueue_script('affilio-distribution', AFFILIO_PLUGIN_URL . 'admin/build/distribution.js', array(), AFFILIO_VERSION, true);
             wp_enqueue_style('affilio-distribution', AFFILIO_PLUGIN_URL . 'admin/build/distribution.css', array(), AFFILIO_VERSION);
-            wp_localize_script('affilio-distribution', 'AffilioDistribution', array('restBase' => rest_url('affilio/v1'), 'nonce' => wp_create_nonce('wp_rest')));
+            wp_localize_script('affilio-distribution', 'AffilioDistribution', array(
+                'restBase' => rest_url('affilio/v1'),
+                'nonce' => wp_create_nonce('wp_rest'),
+                'noEligibleOffers' => $this->t('Nessuna offerta idonea al momento.', 'Nessuna offerta idonea al momento.'),
+                'belowRelevance' => $this->t('Nessuna offerta adatta: la più vicina ha rilevanza %1$d/100, serve almeno %2$d.', 'Nessuna offerta adatta: la più vicina ha rilevanza %1$d/100, serve almeno %2$d.'),
+            ));
             return;
         }
         if ($hook === 'affilio_page_affilio-settings') {

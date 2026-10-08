@@ -29,4 +29,4 @@ jobs:
         working-directory: affilio-wp/admin/build
         run: npm ci --ignore-scripts && npm run build
       - name: Check workspace scripts
-        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/setup-controls.js && node --check affilio-wp/admin/build/landing.js && node --check affilio-wp/admin/build/distribution.js
+        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/setup-controls.js && node --check affilio-wp/admin/build/landing.js && node --check affilio-wp/admin/build/distribution.js && node affilio-wp/tests/distribution-empty.js
