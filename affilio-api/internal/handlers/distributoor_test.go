@@ -16,13 +16,17 @@ import (
 )
 
 func newMakerRouter(db *database.DB) *gin.Engine {
+	return newMakerRouterWithReadinessClient(db, &http.Client{Timeout: 5 * time.Second})
+}
+
+func newMakerRouterWithReadinessClient(db *database.DB, client *http.Client) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	products := &ProductsHandler{DB: db}
 	offers := &OffersHandler{DB: db}
 	assessments := &AssessmentsHandler{
 		DB:     db,
-		Engine: &services.ReadinessEngine{AllowPrivateHosts: true, Client: &http.Client{Timeout: 5 * time.Second}},
+		Engine: &services.ReadinessEngine{AllowPrivateHosts: true, Client: client},
 	}
 	maker := r.Group("/v1/maker")
 	maker.Use(middleware.MakerKeyAuth(db))
@@ -278,8 +282,8 @@ func TestOfferRejectReturnsToDraft(t *testing.T) {
 	r := newMakerRouter(db)
 
 	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
-		"name":        "PixelQuest",
-		"website_url": "https://pixelquest.example.com",
+		"name":         "PixelQuest",
+		"website_url":  "https://pixelquest.example.com",
 		"product_type": "game",
 	})
 	_, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
@@ -312,14 +316,15 @@ func TestAssessGatesOfferSubmitEndToEnd(t *testing.T) {
 	defer cleanup()
 
 	_, makerKey := createTestMaker(t, db)
-	r := newMakerRouter(db)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(`<html><body>Sign up <a href="/privacy">Privacy</a> for $9/month <script src="https://js.stripe.com/v3/"></script></body></html>`))
 	})
-	site := httptest.NewServer(mux)
+	site := httptest.NewTLSServer(mux)
 	defer site.Close()
+	probe := site.Client()
+	probe.Timeout = 5 * time.Second
+	r := newMakerRouterWithReadinessClient(db, probe)
 
 	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
 		"name":             "ShipFast",
@@ -370,13 +375,14 @@ func TestAssessFailingProductBlocksSubmit(t *testing.T) {
 	defer cleanup()
 
 	_, makerKey := createTestMaker(t, db)
-	r := newMakerRouter(db)
-
 	// No checkout marker anywhere: the checkout_present gate must fail.
-	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	site := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(`<html><body>Just a landing page</body></html>`))
 	}))
 	defer site.Close()
+	probe := site.Client()
+	probe.Timeout = 5 * time.Second
+	r := newMakerRouterWithReadinessClient(db, probe)
 
 	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
 		"name":        "NoCheckout",
