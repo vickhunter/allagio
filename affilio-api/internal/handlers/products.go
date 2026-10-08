@@ -182,13 +182,20 @@ func applyProductPayload(p *database.Product, req *productPayload) error {
 		p.PaymentProvider = provider
 	}
 	if req.PrimaryCategory != nil {
-		p.PrimaryCategory = strings.TrimSpace(strings.ToLower(*req.PrimaryCategory))
+		category := strings.TrimSpace(strings.ToLower(*req.PrimaryCategory))
+		// The edit form always posts this field. A blank capture must not wipe a category already stored.
+		if category != "" || strings.TrimSpace(p.PrimaryCategory) == "" {
+			p.PrimaryCategory = category
+		}
 	}
 	if req.Tags != nil {
 		p.Tags = trimStrings(req.Tags)
 	}
 	if req.Keywords != nil {
-		p.Keywords = trimStrings(req.Keywords)
+		keywords := trimStrings(req.Keywords)
+		if len(keywords) > 0 || len(p.Keywords) == 0 {
+			p.Keywords = keywords
+		}
 	}
 	return nil
 }

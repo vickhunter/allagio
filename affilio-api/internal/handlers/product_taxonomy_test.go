@@ -77,6 +77,22 @@ func TestFirstProductEditKeepsCategoryAndKeywords(t *testing.T) {
 		t.Fatalf("reload after blank: %d %s", reloaded.Code, reloaded.Body.String())
 	}
 	assertTaxonomy(t, "reload after blank", productByID(t, reloaded.Body.Bytes(), id), keywords)
+
+	replaced := []string{"queues", "workers", "retries"}
+	changed := ownerJSON(t, h, r, cookie, owner.CSRF, http.MethodPatch, "/owner/api/products/"+id, map[string]any{
+		"primary_category": "background jobs",
+		"keywords":         replaced,
+	})
+	if changed.Code != http.StatusOK {
+		t.Fatalf("replace topics: %d %s", changed.Code, changed.Body.String())
+	}
+	got := decodeProduct(t, changed.Body.Bytes())
+	if got["primary_category"] != "background jobs" {
+		t.Fatalf("replace category = %v", got["primary_category"])
+	}
+	if listed := stringList(got["keywords"]); !sameStrings(listed, replaced) {
+		t.Fatalf("replace keywords = %v", listed)
+	}
 }
 
 func decodeProduct(t *testing.T, body []byte) map[string]any {

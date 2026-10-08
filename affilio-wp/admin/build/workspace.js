@@ -335,7 +335,7 @@
         }
         root.innerHTML = `${rail}<div class="grid"><section><span class="eyebrow">BUILDERS</span><h2>Give your product an offer.</h2><p>Connect your existing agent, prepare your checkout and choose the commission you want to offer.</p><a class="button" data-primary-action href="${makerHref}">${makerLabel} ↗</a></section><section><span class="eyebrow">PUBLISHERS</span><h2>Find a useful recommendation.</h2><p>Match an article to relevant products, approve the exact placement and publish a tracked link.</p><a class="button secondary" href="${session.publisher ? '/owner/placements' : '/owner/settings'}">${session.publisher ? 'Open placements' : 'Connect your content'} ↗</a></section></div><section><h2>One setup. Your own agent.</h2><p>Run this command in your product repository. Setup installs the integration skills and connects your agent. Checkout wiring, Stripe connection and verification are separate steps.</p>${copyCommand(session.install_command)}<p class="caption">Node 20+ · Codex CLI handoff · Cursor and Claude configuration</p></section>`;
     };
-    const productForm = (product, primaryRegister, registered) => `<section><h2>${product ? 'Edit product' : 'Register a product'}</h2><form data-product="${escape(product?.id || '')}"><div class="form-grid">${field('name','Product name',product?.name,'required maxlength="255"')}${field('website_url','Website',product?.website_url,'type="url" required maxlength="512"')}${field('tagline','What does it help people do?',product?.tagline,'required maxlength="512"',true)}${field('docs_url','Documentation URL',product?.docs_url,'type="url"')}${field('pricing_url','Pricing URL',product?.pricing_url,'type="url"')}${field('primary_category','Category',product?.primary_category,'placeholder="developer tools"')}${field('keywords','Topics, separated by commas',(product?.keywords || []).join(', '),'placeholder="postgres, monitoring, debugging"')}</div><p class="caption">Your product remains private until its offer is reviewed and listed.</p><button ${!product && primaryRegister ? 'data-primary-action' : 'class="secondary"'}>${product ? 'Save changes' : 'Register product'}</button>${product ? '<button type="button" class="secondary" data-cancel-edit>Cancel</button>' : ''}${registered ? '<p id="product-registered" class="success" role="status" tabindex="-1">Product registered. It is in your list.</p>' : ''}</form></section>`;
+    const productForm = (product, primaryRegister, registered) => `<section><h2>${product ? 'Edit product' : 'Register a product'}</h2><form data-product="${escape(product?.id || '')}"><div class="form-grid">${field('name','Product name',product?.name,'required maxlength="255"')}${field('website_url','Website',product?.website_url,'type="url" required maxlength="512"')}${field('tagline','What does it help people do?',product?.tagline,'required maxlength="512"',true)}${field('docs_url','Documentation URL',product?.docs_url,'type="url"')}${field('pricing_url','Pricing URL',product?.pricing_url,'type="url"')}${field('primary_category','Category',product?.primary_category,'placeholder="developer tools" autocomplete="off"')}${field('keywords','Topics, separated by commas',(product?.keywords || []).join(', '),'placeholder="postgres, monitoring, debugging" autocomplete="off"')}</div><p class="caption">Your product remains private until its offer is reviewed and listed.</p><button ${!product && primaryRegister ? 'data-primary-action' : 'class="secondary"'}>${product ? 'Save changes' : 'Register product'}</button>${product ? '<button type="button" class="secondary" data-cancel-edit>Cancel</button>' : ''}${registered ? '<p id="product-registered" class="success" role="status" tabindex="-1">Product registered. It is in your list.</p>' : ''}</form></section>`;
     const productsPage = async (options = {}) => {
         if (!session.maker) { root.innerHTML = '<section><h2>Start your builder account</h2><p>Your account can hold products and referral offers.</p><a class="button" data-primary-action href="/owner/products?setup=maker">Create builder account</a></section>'; return; }
         let products, offers;
@@ -478,9 +478,26 @@
         const returned = justReturned[0] && document.getElementById('offer-returned-' + justReturned[0]);
         if (returned) scrollFocus(returned);
     };
+    const topicValue = (form, name) => {
+        const fields = [...form.querySelectorAll(`[name="${name}"]`)];
+        for (const input of fields) {
+            const live = String(input.value || '').trim();
+            if (live) return live;
+        }
+        for (const input of fields) {
+            const rendered = String(input.defaultValue || '').trim();
+            if (rendered) return rendered;
+        }
+        return '';
+    };
     const saveProduct = event => {
         event.preventDefault(); const form = event.currentTarget; const values = Object.fromEntries(new FormData(form));
-        values.keywords = values.keywords.split(',').map(value => value.trim()).filter(Boolean);
+        const category = topicValue(form, 'primary_category');
+        const keywords = topicValue(form, 'keywords').split(',').map(value => value.trim()).filter(Boolean);
+        if (category) values.primary_category = category;
+        else delete values.primary_category;
+        if (keywords.length) values.keywords = keywords;
+        else delete values.keywords;
         run(form.querySelector('button'), async () => {
             const creating = !form.dataset.product;
             try { await api('/products' + (creating ? '' : '/' + form.dataset.product), creating ? 'POST' : 'PATCH', values); }

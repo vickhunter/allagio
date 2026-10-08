@@ -937,6 +937,47 @@ test('a second product keeps the success message in view', async ({ browser }) =
   }
 });
 
+test('the first product edit keeps category and keywords', async ({ browser }) => {
+  const keywords = ['postgres', 'monitoring', 'debugging', 'alerts', 'metrics', 'logs', 'tracing', 'slo'];
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const patches = [];
+  page.on('request', request => {
+    if (request.method() === 'PATCH' && /\/owner\/api\/products\/[^/]+$/.test(new URL(request.url()).pathname)) {
+      patches.push(request.postDataJSON());
+    }
+  });
+  await page.goto(base + '/owner/products');
+  await registerProduct(page, 'Offer Rails Demo');
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Category', { exact: true }).fill('developer tools');
+  await page.getByLabel('Topics, separated by commas').fill(keywords.join(', '));
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByText('Product saved.', { exact: true })).toBeVisible();
+  expect(patches).toHaveLength(1);
+  expect(patches[0].primary_category).toBe('developer tools');
+  expect(patches[0].keywords).toEqual(keywords);
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel('Category', { exact: true })).toHaveValue('developer tools');
+  await expect(page.getByLabel('Topics, separated by commas')).toHaveValue(keywords.join(', '));
+
+  await page.getByLabel('Product name', { exact: true }).fill('Offer Rails Demo renamed');
+  await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Offer Rails Demo renamed', exact: true })).toBeVisible();
+  expect(patches).toHaveLength(2);
+  if (patches[1].primary_category !== undefined) expect(patches[1].primary_category).toBe('developer tools');
+  if (patches[1].keywords !== undefined) expect(patches[1].keywords).toEqual(keywords);
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel('Product name', { exact: true })).toHaveValue('Offer Rails Demo renamed');
+  await expect(page.getByLabel('Category', { exact: true })).toHaveValue('developer tools');
+  await expect(page.getByLabel('Topics, separated by commas')).toHaveValue(keywords.join(', '));
+  await context.close();
+});
+
 test('empty create offer fields explain the problem in plain words', async ({ browser }) => {
   for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
     reset();
