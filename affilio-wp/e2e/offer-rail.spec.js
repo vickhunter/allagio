@@ -7,7 +7,7 @@ const { randomUUID } = require('node:crypto');
 
 const build = path.resolve(__dirname, '../admin/build');
 const adminCss = path.resolve(__dirname, '../admin/css/affilio-admin.css');
-const artifacts = '/opt/cursor/artifacts/d011';
+const artifacts = process.env.OFFER_RAIL_ARTIFACTS || '/opt/cursor/artifacts/d011';
 const template = fs.readFileSync(path.join(build, 'workspace.html'), 'utf8');
 
 function shell(title, body, operator) {
@@ -251,7 +251,21 @@ async function fits(page) {
 }
 
 async function shot(page, name) {
+  // Full-page captures paint position:fixed at the current scroll offset. Reset first so the sidebar is not shown mid-page.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const sidebar = page.locator('aside.sidebar');
+  if (await sidebar.count()) {
+    const box = await sidebar.boundingBox();
+    expect(box.y).toBeLessThanOrEqual(1);
+  }
   await page.screenshot({ path: path.join(artifacts, name + '.png'), fullPage: true });
+}
+
+async function viewportShot(page, name) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const box = await page.locator('aside.sidebar').boundingBox();
+  expect(box.y).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: path.join(artifacts, name + '.png'), fullPage: false });
 }
 
 async function registerProduct(page, name = 'Rail Tool') {
@@ -292,6 +306,7 @@ async function journey(page, width) {
   await expect(page.locator('[data-station="product"]')).toHaveAttribute('aria-current', 'step');
   await fits(page);
   await shot(page, `after-owner-rail-product-empty-${width}`);
+  if (width === 1440) await viewportShot(page, 'after-owner-viewport-1440');
 
   await registerProduct(page);
   await onePrimary(page, 'Check readiness');
@@ -351,6 +366,7 @@ async function journey(page, width) {
   await expect(page.getByRole('button', { name: 'Pause offer', exact: true })).toBeVisible();
   await fits(page);
   await shot(page, `after-owner-rail-listed-${width}`);
+  if (width === 1440) await viewportShot(page, 'after-owner-viewport-listed-1440');
 }
 
 test('offer rail happy path at 1440', async ({ browser }) => {
