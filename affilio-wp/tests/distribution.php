@@ -17,6 +17,7 @@ function esc_html($value) { return htmlspecialchars($value, ENT_QUOTES, 'UTF-8')
 function esc_url($value) { return $value; }
 function wp_slash($value) { return addslashes($value); }
 function wp_update_post($values, $error = false) { $GLOBALS['post']->post_content = stripslashes($values['post_content']); $GLOBALS['updates']++; return $values['ID']; }
+function get_option($key, $default = false) { return $default; }
 class Affilio_API { public static function resolve_base_url() { return 'https://distribution.example/v1'; } }
 class Request {
     private $values;

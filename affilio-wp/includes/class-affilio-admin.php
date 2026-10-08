@@ -248,6 +248,8 @@ class Affilio_Admin {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             check_admin_referer('affilio_settings');
             $this->keep_or_replace_secret('affilio_api_key', 'affilio_api_key');
+            $existing_disclosure = isset($_POST['affilio_existing_disclosure']) ? sanitize_text_field(wp_unslash($_POST['affilio_existing_disclosure'])) : '';
+            update_option('affilio_existing_disclosure', $existing_disclosure === '1' ? '1' : '');
             if ($this->is_advanced_mode()) {
                 update_option('affilio_api_url_override', esc_url_raw(isset($_POST['affilio_api_url_override']) ? $_POST['affilio_api_url_override'] : ''));
                 $this->keep_or_replace_secret('affilio_admin_api_key', 'affilio_admin_api_key');
@@ -280,6 +282,8 @@ class Affilio_Admin {
         echo '<tr><th>' . esc_html($this->t('API Key', 'Chiave API')) . '</th><td>';
         $this->secret_input('affilio_api_key', 'affilio_api_key');
         echo '<p class="description">' . esc_html($this->t('Optional manual setup. The Connect button manages this for new installs.', 'Setup manuale opzionale. Il pulsante Collega lo gestisce per le nuove installazioni.')) . '</p></td></tr>';
+        $existing_disclosure = get_option('affilio_existing_disclosure', '') === '1';
+        echo '<tr><th>' . esc_html($this->t('Disclosure', 'Disclosure')) . '</th><td><label><input type="checkbox" name="affilio_existing_disclosure" value="1"' . ($existing_disclosure ? ' checked' : '') . ' /> ' . esc_html($this->t('My articles already contain a disclosure', 'I miei articoli contengono già una disclosure')) . '</label></td></tr>';
         echo '</table>';
 
         if ($this->is_advanced_mode()) {

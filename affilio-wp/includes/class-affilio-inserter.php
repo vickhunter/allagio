@@ -50,9 +50,8 @@ class Affilio_Inserter {
         }
         $content = $post->post_content;
         $content = $this->inject_by_position($content, $html, $suggested_position);
-        $disclosure = $this->disclosure_block();
-        if (!get_post_meta($post_id, '_affilio_disclosure_inserted', true)) {
-            $content .= "\n\n" . $disclosure;
+        if (!get_post_meta($post_id, '_affilio_disclosure_inserted', true) && !Affilio_Distribution::disclosure_suppressed($content)) {
+            $content .= "\n\n" . $this->disclosure_block();
             update_post_meta($post_id, '_affilio_disclosure_inserted', 1);
         }
         wp_update_post(array(

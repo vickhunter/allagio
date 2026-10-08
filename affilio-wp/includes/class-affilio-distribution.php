@@ -11,6 +11,21 @@ class Affilio_Distribution {
         $this->api = $api;
     }
 
+    public static function disclosure_suppressed($content) {
+        $setting = get_option('affilio_existing_disclosure', '');
+        if ($setting === '1' || $setting === 1) {
+            return true;
+        }
+        $text = strtolower(wp_strip_all_tags((string) $content));
+        $patterns = array('link affiliat', 'link di affiliazione', 'affiliate link', 'commissione', 'disclosure', 'sponsorizzat', 'contiene link');
+        foreach ($patterns as $pattern) {
+            if (strpos($text, $pattern) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public function allowed() {
         return current_user_can('manage_options');
     }
@@ -146,7 +161,7 @@ class Affilio_Distribution {
         $content = $post->post_content;
         if (strpos($content, $marker) === false) {
             $content .= "\n" . $marker . '<p>' . esc_html($placement['copy']) . ' <a href="' . esc_url($this->origin() . $link) . '" rel="sponsored nofollow">View product</a></p>';
-            if (strpos($content, esc_html($placement['disclosure'])) === false) {
+            if (!self::disclosure_suppressed($content) && strpos($content, esc_html($placement['disclosure'])) === false) {
                 $content .= '<p class="affiliate-disclosure">' . esc_html($placement['disclosure']) . '</p>';
             }
             $updated = wp_update_post(array('ID' => $post->ID, 'post_content' => wp_slash($content)), true);
