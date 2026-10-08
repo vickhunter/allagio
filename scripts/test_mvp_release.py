@@ -26,6 +26,9 @@ def configuration():
         "HOST": "0.0.0.0", "PORT": "8080", "AUTO_MIGRATE": "true",
         "ALLOWED_ORIGINS": release.ORIGIN,
         "RAILWAY_DOCKERFILE_PATH": "Dockerfile.mvp",
+        "API_KEY_SECRET": "c" * 32,
+        "GIN_MODE": "release",
+        "TRUSTED_PROXIES": "173.245.48.0/20",
     }
 
 

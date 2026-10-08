@@ -61,26 +61,58 @@ def run_json(args):
         raise ReleaseError(f"{args[0]} returned an unexpected response; raw output was withheld.") from None
 
 
-def validate_config(values):
+OPEN_PROXIES = {"*", "0.0.0.0/0", "::/0"}
+
+
+def load_env_file(path):
+    values = {}
+    for raw in Path(path).read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def https_origin(value):
+    parsed = parse.urlsplit(value)
+    return parsed.scheme == "https" and bool(parsed.hostname) and value == f"https://{parsed.netloc}"
+
+
+def validate_config(values, origin=None):
+    generic = origin is not None
+    expected_origin = origin if generic else ORIGIN
+    label = "service" if generic else "Railway"
     names = {
         "DATABASE_URL", "ADMIN_API_KEY", "CONNECTION_ENCRYPTION_KEY",
         "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET",
         "PUBLIC_BASE_URL", "HOST", "PORT", "AUTO_MIGRATE", "ALLOWED_ORIGINS",
-        "RAILWAY_DOCKERFILE_PATH",
+        "API_KEY_SECRET", "GIN_MODE", "TRUSTED_PROXIES",
     }
-    require(isinstance(values, dict) and all(isinstance(v, str) for v in values.values()), "Unexpected Railway variable format.")
+    if not generic:
+        names.add("RAILWAY_DOCKERFILE_PATH")
+    require(isinstance(values, dict) and all(isinstance(v, str) for v in values.values()), f"Unexpected {label} variable format.")
     missing = sorted(name for name in names if not values.get(name, "").strip())
-    require(not missing, "Missing Railway variables: " + ", ".join(missing))
+    require(not missing, f"Missing {label} variables: " + ", ".join(missing))
+    require(https_origin(expected_origin), "PUBLIC_BASE_URL must be an https origin.")
     expected = {
-        "PUBLIC_BASE_URL": ORIGIN, "OIDC_ISSUER": "https://accounts.google.com",
-        "HOST": "0.0.0.0", "PORT": "8080", "AUTO_MIGRATE": "true",
-        "RAILWAY_DOCKERFILE_PATH": "Dockerfile.mvp",
+        "PUBLIC_BASE_URL": expected_origin, "OIDC_ISSUER": "https://accounts.google.com",
+        "HOST": "0.0.0.0", "AUTO_MIGRATE": "true", "GIN_MODE": "release",
     }
+    if generic:
+        require(values["PORT"].isdigit() and 1 <= int(values["PORT"]) <= 65535, "Incorrect service configuration: PORT.")
+    else:
+        expected["PORT"] = "8080"
+        expected["RAILWAY_DOCKERFILE_PATH"] = "Dockerfile.mvp"
     for name, value in expected.items():
-        require(values[name] == value, f"Incorrect Railway configuration: {name}.")
+        require(values[name] == value, f"Incorrect {label} configuration: {name}.")
     require(values["OIDC_CLIENT_ID"].endswith(".apps.googleusercontent.com"), "OIDC_CLIENT_ID must be the Google Web application client ID.")
-    require(set(values["ALLOWED_ORIGINS"].split(",")) == {ORIGIN}, "ALLOWED_ORIGINS must contain only the MVP origin.")
+    require(set(part.strip() for part in values["ALLOWED_ORIGINS"].split(",")) == {expected_origin}, "ALLOWED_ORIGINS must contain only the MVP origin.")
     require(len(values["ADMIN_API_KEY"]) >= 32, "ADMIN_API_KEY must contain at least 32 characters.")
+    require(values["API_KEY_SECRET"] != "dev-secret" and len(values["API_KEY_SECRET"]) >= 32, "API_KEY_SECRET must contain at least 32 characters and must not be the development default.")
+    proxies = [part.strip() for part in values["TRUSTED_PROXIES"].split(",") if part.strip()]
+    require(proxies and OPEN_PROXIES.isdisjoint(proxies), "TRUSTED_PROXIES must list platform proxy ranges and must not trust every address.")
     try:
         valid_key = len(base64.b64decode(values["CONNECTION_ENCRYPTION_KEY"], validate=True)) == 32
     except ValueError:
@@ -100,9 +132,7 @@ def validate_checks(checks):
     require(not failed, "Required GitHub checks are missing, pending or failed: " + ", ".join(failed))
 
 
-def preflight():
-    values = run_json(["railway", "variables", "--project", PROJECT, "--environment", ENVIRONMENT, "--service", SERVICE, "--json"])
-    validate_config(values)
+def git_preflight():
     require(not run(["git", "status", "--porcelain"]), "Commit the working tree before deploying.")
     branch = run(["git", "branch", "--show-current"])
     require(bool(branch), "Deploy from a pushed branch, not a detached checkout.")
@@ -111,6 +141,22 @@ def preflight():
     require(remote.split()[:1] == [sha], "Push the exact commit before deploying.")
     data = run_json(["gh", "api", f"repos/vickhunter/affilio/commits/{sha}/check-runs?per_page=100"])
     validate_checks(data.get("check_runs", []))
+    return sha
+
+
+def preflight(host="railway", env_file=None):
+    if host == "generic":
+        require(env_file is not None, "Generic host checks require --env-file. Names are checked; values are never printed.")
+        values = load_env_file(env_file)
+        origin = values.get("PUBLIC_BASE_URL", "").strip()
+        validate_config(values, origin=origin)
+        sha = git_preflight()
+        print(f"Preflight passed for {sha[:12]} on {origin}.")
+        return sha
+    require(host == "railway", "Deploy and the Railway variable check stay on --host railway.")
+    values = run_json(["railway", "variables", "--project", PROJECT, "--environment", ENVIRONMENT, "--service", SERVICE, "--json"])
+    validate_config(values)
+    sha = git_preflight()
     print(f"Preflight passed for {sha[:12]} on distributoor-mvp.")
     if not values.get("OPERATOR_OWNER_ID"):
         print("Operator access remains pending: set OPERATOR_OWNER_ID after the first real owner login.")
@@ -168,8 +214,8 @@ class NoRedirect(request.HTTPRedirectHandler):
         return None
 
 
-def fetch(path, method="GET", data=None):
-    req = request.Request(ORIGIN + path, method=method, data=data, headers={"Content-Type": "application/json", "User-Agent": "Distributoor-Release-Check"})
+def fetch(path, method="GET", data=None, origin=ORIGIN):
+    req = request.Request(origin + path, method=method, data=data, headers={"Content-Type": "application/json", "User-Agent": "Distributoor-Release-Check"})
     try:
         response = request.build_opener(NoRedirect).open(req, timeout=20)
     except error.HTTPError as exc:
@@ -182,9 +228,11 @@ def fetch(path, method="GET", data=None):
         return response.code, response.headers, body
 
 
-def verify():
+def verify(origin=ORIGIN):
+    require(https_origin(origin), "--base-url must be an https origin with no path, query, or fragment.")
+
     def get(path):
-        status, headers, body = fetch(path)
+        status, headers, body = fetch(path, "GET", None, origin)
         require(status == 200, f"Public check failed at {path}: HTTP {status}.")
         return headers, body
 
@@ -196,22 +244,22 @@ def verify():
     for name in ASSETS:
         if name not in {"home.html", "workspace.html"}:
             require(bool(get("/assets/" + name)[1]), f"Empty public asset: {name}.")
-    validate_plugin(get("/downloads/affilio.zip")[1], ORIGIN)
+    validate_plugin(get("/downloads/affilio.zip")[1], origin)
     validate_installer(get("/downloads/" + INSTALLER)[1])
     resource = json.loads(get("/.well-known/oauth-protected-resource/mcp")[1])
     authorization = json.loads(get("/.well-known/oauth-authorization-server")[1])
-    require(resource.get("resource") == ORIGIN + "/mcp" and resource.get("authorization_servers") == [ORIGIN] and set(resource.get("scopes_supported", [])) == {"maker", "publisher"}, "MCP discovery is configured for the wrong resource or scopes.")
+    require(resource.get("resource") == origin + "/mcp" and resource.get("authorization_servers") == [origin] and set(resource.get("scopes_supported", [])) == {"maker", "publisher"}, "MCP discovery is configured for the wrong resource or scopes.")
     for field, path in {"issuer": "", "authorization_endpoint": "/oauth/authorize", "token_endpoint": "/oauth/token", "registration_endpoint": "/oauth/register"}.items():
-        require(authorization.get(field) == ORIGIN + path, "OAuth discovery is configured for the wrong origin.")
+        require(authorization.get(field) == origin + path, "OAuth discovery is configured for the wrong origin.")
     require("S256" in authorization.get("code_challenge_methods_supported", []), "OAuth discovery does not advertise S256 PKCE.")
-    status, headers, _ = fetch("/owner")
+    status, headers, _ = fetch("/owner", "GET", None, origin)
     require(status == 302 and headers.get("Location", "").startswith("/auth/login?"), "Anonymous owner access did not require sign-in.")
-    status, headers, _ = fetch("/mcp", "POST", b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"release-check","version":"1"}}}')
-    require(status == 401 and ORIGIN + "/.well-known/oauth-protected-resource/mcp" in headers.get("WWW-Authenticate", ""), "Anonymous MCP access did not require OAuth.")
-    status, headers, _ = fetch("/auth/login?return_to=/owner")
+    status, headers, _ = fetch("/mcp", "POST", b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"release-check","version":"1"}}}', origin)
+    require(status == 401 and origin + "/.well-known/oauth-protected-resource/mcp" in headers.get("WWW-Authenticate", ""), "Anonymous MCP access did not require OAuth.")
+    status, headers, _ = fetch("/auth/login?return_to=/owner", "GET", None, origin)
     target = parse.urlsplit(headers.get("Location", ""))
     params = parse.parse_qs(target.query)
-    require(status == 302 and target.scheme == "https" and target.hostname == "accounts.google.com" and params.get("redirect_uri") == [ORIGIN + "/auth/callback"] and params.get("code_challenge_method") == ["S256"], "Google login start has the wrong callback or PKCE configuration.")
+    require(status == 302 and target.scheme == "https" and target.hostname == "accounts.google.com" and params.get("redirect_uri") == [origin + "/auth/callback"] and params.get("code_challenge_method") == ["S256"], "Google login start has the wrong callback or PKCE configuration.")
     cookie = headers.get("Set-Cookie", "")
     require(cookie.startswith("__Host-dtr_login=") and all(flag in cookie for flag in ("Path=/", "Secure", "HttpOnly", "SameSite=Lax")), "Google login attempt cookie is missing security attributes.")
     print("Public delivery checks passed: health, assets, both downloads, OAuth discovery, protected owner/MCP routes and Google login redirect.")
@@ -222,15 +270,19 @@ def main():
     parser = argparse.ArgumentParser(description="Release only the isolated Distributoor MVP. Configuration values are never printed.")
     parser.add_argument("command", choices=("check", "deploy", "verify", "bundle"), nargs="?", default="check")
     parser.add_argument("path", type=Path, nargs="?", help="Extracted Docker release directory for bundle validation")
+    parser.add_argument("--host", choices=("railway", "generic"), default="railway", help="railway reads Railway variables; generic reads --env-file and does not call the Railway CLI")
+    parser.add_argument("--env-file", type=Path, help="KEY=VALUE file for --host generic. Values are never printed.")
+    parser.add_argument("--base-url", help="https origin for verify, for example https://service.onrender.com")
     args = parser.parse_args()
     try:
         if args.command == "bundle":
             require(args.path is not None, "Provide the extracted release directory.")
             validate_bundle(args.path)
         elif args.command == "verify":
-            verify()
+            verify((args.base_url or ORIGIN).rstrip("/"))
         else:
-            sha = preflight()
+            require(args.command != "deploy" or args.host == "railway", "Deploy stays on the Railway host. Use check --host generic to validate another host.")
+            sha = preflight(args.host, args.env_file)
             if args.command == "deploy":
                 run(["railway", "up", "--project", PROJECT, "--environment", ENVIRONMENT, "--service", SERVICE, "--detach", "--json", "--message", f"Distributoor MVP {sha}"])
                 print(f"Deployment requested for {sha[:12]}. Wait for Railway SUCCESS, then run: python3 scripts/mvp_release.py verify")
