@@ -40,12 +40,19 @@ class Affilio_Admin {
         register_rest_route('affilio/v1', '/proxy', array(
             'methods' => 'POST',
             'callback' => array($this, 'proxy'),
-            'permission_callback' => array($this, 'proxy_allowed'),
+            'permission_callback' => array($this, 'rest_permission'),
         ));
     }
 
     public function proxy_allowed() {
         return current_user_can('manage_options');
+    }
+
+    public function rest_permission() {
+        if ($this->proxy_allowed()) {
+            return true;
+        }
+        return new WP_Error('affilio_forbidden', 'Administrator access required.', array('status' => 403));
     }
 
     public function proxy($request) {
@@ -154,6 +161,11 @@ class Affilio_Admin {
         echo '<div class="affilio-panel affilio-panel-actions">';
         echo '<h2>' . esc_html($this->t('Scan', 'Scansione')) . '</h2>';
         echo '<p>' . esc_html($this->t('Run a full scan to refresh article scores and recommendations.', 'Esegui una scansione completa per aggiornare punteggi e raccomandazioni.')) . '</p>';
+        $notice = get_transient('affilio_scan_all_notice');
+        if (is_string($notice) && $notice !== '') {
+            delete_transient('affilio_scan_all_notice');
+            echo '<div class="notice notice-info"><p>' . nl2br(esc_html($notice)) . '</p></div>';
+        }
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         wp_nonce_field('affilio_scan_all');
         echo '<input type="hidden" name="action" value="affilio_scan_all">';
@@ -309,7 +321,7 @@ class Affilio_Admin {
 
     public function handle_scan_all() {
         if (!current_user_can('manage_options')) {
-            wp_die(esc_html($this->t('Unauthorized', 'Non autorizzato')));
+            wp_die(esc_html($this->t('Unauthorized', 'Non autorizzato')), '', array('response' => 403));
         }
         check_admin_referer('affilio_scan_all');
         $status = $this->api->get_connection_status();
@@ -317,9 +329,31 @@ class Affilio_Admin {
             wp_safe_redirect(admin_url('admin.php?page=affilio-settings'));
             exit;
         }
-        $this->scanner->scan_all_posts();
+        $result = $this->scanner->scan_all_posts();
+        $notice = $this->format_scan_result($result);
+        if ($notice !== '') {
+            set_transient('affilio_scan_all_notice', $notice, 120);
+        }
         wp_safe_redirect(admin_url('admin.php?page=affilio'));
         exit;
+    }
+
+    public function format_scan_result($result) {
+        if (!is_array($result)) {
+            return '';
+        }
+        $scanned = isset($result['scanned']) ? (int) $result['scanned'] : 0;
+        $skipped = isset($result['skipped']) && is_array($result['skipped']) ? $result['skipped'] : array();
+        $lines = array(affilio_scan_summary($scanned, count($skipped)));
+        foreach ($skipped as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $id = isset($row['wp_post_id']) ? (int) $row['wp_post_id'] : 0;
+            $reason = isset($row['reason']) ? (string) $row['reason'] : '';
+            $lines[] = $id . ': ' . $reason;
+        }
+        return implode("\n", $lines);
     }
 
     private function public_script_data() {

@@ -15,6 +15,13 @@ class Affilio_Distribution {
         return current_user_can('manage_options');
     }
 
+    public function rest_permission() {
+        if ($this->allowed()) {
+            return true;
+        }
+        return new WP_Error('affilio_forbidden', 'Administrator access required.', array('status' => 403));
+    }
+
     public function register_routes() {
         $routes = array(
             '/distribution' => array('GET', 'status'),
@@ -26,7 +33,7 @@ class Affilio_Distribution {
             '/distribution/publish' => array('POST', 'publish'),
         );
         foreach ($routes as $path => $route) {
-            register_rest_route('affilio/v1', $path, array('methods' => $route[0], 'callback' => array($this, $route[1]), 'permission_callback' => array($this, 'allowed')));
+            register_rest_route('affilio/v1', $path, array('methods' => $route[0], 'callback' => array($this, $route[1]), 'permission_callback' => array($this, 'rest_permission')));
         }
     }
 
@@ -37,7 +44,7 @@ class Affilio_Distribution {
     private function request($method, $path, $body = null) {
         $response = $this->api->request($method, $path, $body);
         if (is_wp_error($response)) {
-            return $response;
+            return new WP_Error('affilio_distribution', 'Il servizio non è raggiungibile. Riprova tra qualche istante.', array('status' => 503));
         }
         if ($response['code'] < 200 || $response['code'] >= 300) {
             $message = isset($response['data']['error']) ? $response['data']['error'] : 'The distribution service could not complete this request.';

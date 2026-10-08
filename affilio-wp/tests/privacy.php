@@ -52,7 +52,7 @@ foreach ($GLOBALS['http'] as $call) {
 check(is_array($registration), 'site registration made no outbound request');
 check(array_keys($registration) === array('site_url', 'plugin_version'), 'registration payload is not limited to site_url and plugin_version');
 check($registration['site_url'] === 'https://blog.example', 'registration did not send the site URL');
-check($registration['plugin_version'] === '0.1.10', 'registration did not send the plugin version');
+check($registration['plugin_version'] === '0.1.11', 'registration did not send the plugin version');
 $contract = json_decode(file_get_contents(__DIR__ . '/fixtures/sites-register.json'), true);
 check($registration === $contract, 'registration payload drifted from the Go contract fixture');
 check($contract['plugin_version'] === AFFILIO_VERSION, 'contract fixture plugin_version is not AFFILIO_VERSION');
@@ -82,7 +82,12 @@ foreach ($GLOBALS['http'] as $call) {
     $captured[] = $call['url'];
     if (!empty($call['args']['body'])) {
         $decoded = json_decode($call['args']['body'], true);
-        $captured[] = is_array($decoded) ? json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : $call['args']['body'];
+        if (is_array($decoded)) {
+            $decoded = affilio_privacy_expand($decoded);
+            $captured[] = json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        } else {
+            $captured[] = $call['args']['body'];
+        }
     }
     if (!empty($call['args']['headers'])) {
         $captured[] = json_encode($call['args']['headers']);
@@ -102,3 +107,35 @@ check(strpos($blob, 'Published lighthouse body') !== false, 'published content w
 check(strpos($blob, 'https://blog.example/published-lighthouse') !== false, 'published permalink was not sent');
 
 echo "Registration is allowlisted and scans send only published post data.\n";
+
+function affilio_privacy_expand($value) {
+    if (!is_array($value)) {
+        return $value;
+    }
+    if (isset($value['articles']) && is_array($value['articles'])) {
+        foreach ($value['articles'] as $index => $article) {
+            $value['articles'][$index] = affilio_privacy_expand_article($article);
+        }
+    }
+    return affilio_privacy_expand_article($value);
+}
+
+function affilio_privacy_expand_article($article) {
+    if (!is_array($article)) {
+        return $article;
+    }
+    $encoding = isset($article['content_encoding']) ? (string) $article['content_encoding'] : 'base64';
+    foreach (array('title' => 'title_b64', 'content' => 'content_b64') as $plain => $field) {
+        if (!isset($article[$field]) || !is_string($article[$field])) {
+            continue;
+        }
+        $bytes = base64_decode($article[$field], true);
+        if ($bytes !== false && $encoding === 'gzip+base64') {
+            $bytes = gzdecode($bytes);
+        }
+        if (is_string($bytes)) {
+            $article[$plain] = $bytes;
+        }
+    }
+    return $article;
+}

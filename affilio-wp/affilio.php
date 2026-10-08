@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Affilio
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.10
+ * Version: 0.1.11
  * Author: Affilio
  */
 
@@ -15,7 +15,30 @@ if (defined('AFFILIO_LOADED')) {
 }
 define('AFFILIO_LOADED', true);
 
-define('AFFILIO_VERSION', '0.1.10');
+define('AFFILIO_VERSION', '0.1.11');
+
+if (!function_exists('affilio_scan_summary')) {
+function affilio_scan_summary($scanned, $skipped) {
+    $scanned = (int) $scanned;
+    $skipped = (int) $skipped;
+    $locale = 'en_US';
+    if (isset($GLOBALS['user_locale']) && $GLOBALS['user_locale'] !== '') {
+        $locale = $GLOBALS['user_locale'];
+    } elseif (function_exists('get_user_locale')) {
+        $locale = get_user_locale();
+    } elseif (function_exists('get_locale')) {
+        $locale = get_locale();
+    }
+    if (strpos(strtolower((string) $locale), 'it') === 0) {
+        $analyzed = $scanned === 1 ? '1 articolo analizzato' : $scanned . ' articoli analizzati';
+        $skipped_label = $skipped === 1 ? '1 saltato' : $skipped . ' saltati';
+        return 'Analisi completata: ' . $analyzed . ', ' . $skipped_label;
+    }
+    $analyzed = $scanned === 1 ? '1 post analyzed' : $scanned . ' posts analyzed';
+    $skipped_label = $skipped === 1 ? '1 skipped' : $skipped . ' skipped';
+    return 'Analysis complete: ' . $analyzed . ', ' . $skipped_label;
+}
+}
 define('AFFILIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AFFILIO_PLUGIN_URL', plugin_dir_url(__FILE__));
 

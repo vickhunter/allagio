@@ -70,7 +70,7 @@ class SetupTestAPI {
             }
             return array('code' => 200, 'data' => array('site_id' => 'same-site', 'api_key' => 'server-issued-api-key'));
         }
-        if ($path === '/scan/full') {
+        if ($path === '/scan/full' || $path === '/scan/single') {
             $this->scans[] = $body;
             return array('code' => $this->fail_scan ? 503 : 202, 'data' => array('status' => 'queued'));
         }
@@ -108,12 +108,12 @@ check(get_option('affilio_setup_state')['scanned'] === 10 && count($api->scans[0
 $api->fail_scan = true;
 unset($cron['affilio_setup_scan']);
 $setup->scan_batch();
-check(get_option('affilio_setup_state')['phase'] === 'scan_error' && get_option('affilio_setup_state')['offset'] === 10, 'Failed scan falsely advanced progress');
+$failed = get_option('affilio_setup_state');
+check($failed['phase'] === 'complete' && $failed['offset'] === 14 && $failed['scanned'] === 10 && count($failed['skipped']) === 4, 'A rejected batch stopped onboarding or counted skipped posts as analyzed');
 $api->fail_scan = false;
 $setup->connect();
-check(get_option('affilio_setup_state')['offset'] === 10, 'Retry lost scan progress');
-$setup->scan_batch();
+check(get_option('affilio_setup_state')['offset'] === 14, 'Retry lost scan progress');
 $state = $setup->status();
-check($state['phase'] === 'complete' && $state['scanned'] === 14 && count($api->registrations) === 2, 'Resumed scan did not finish or registered another account');
+check($state['phase'] === 'complete' && $state['scanned'] === 10 && count($api->registrations) === 2, 'Skipped scan did not finish or registered another account');
 check(get_option('affilio_setup_lock', false) === false, 'Setup did not release its lock');
 echo "WordPress setup: activation, permission, credential recovery, batching and scan retries passed.\n";

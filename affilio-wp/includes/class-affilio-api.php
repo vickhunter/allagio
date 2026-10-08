@@ -42,7 +42,19 @@ class Affilio_API {
                 'plugin_version' => defined('AFFILIO_VERSION') ? AFFILIO_VERSION : '',
             );
         }
+        if (strtoupper($method) === 'GET' && rtrim($path_only, '/') === '/health') {
+            $health = $this->service_health();
+            if (is_wp_error($health)) {
+                return $health;
+            }
+            $decoded = json_decode(wp_remote_retrieve_body($health), true);
+            return array(
+                'code' => (int) wp_remote_retrieve_response_code($health),
+                'data' => is_array($decoded) ? $decoded : array(),
+            );
+        }
         if ($body !== null) {
+            $body = $this->encode_scan_body($path_only, $body);
             $args['body'] = wp_json_encode($body);
         }
         $response = wp_remote_request($url, $args);
@@ -107,12 +119,57 @@ class Affilio_API {
     }
 
     public function invalidate_status_cache() {
+        $index = get_option('affilio_status_cache_keys', array());
+        if (is_array($index)) {
+            foreach ($index as $key) {
+                delete_transient($key);
+            }
+        }
+        delete_option('affilio_status_cache_keys');
         delete_transient($this->connection_cache_key());
         delete_transient($this->status_cache_key);
     }
 
+    private function forget_other_status_caches($current) {
+        $index = get_option('affilio_status_cache_keys', array());
+        if (!is_array($index)) {
+            $index = array();
+        }
+        $keep = array();
+        foreach ($index as $key) {
+            if ($key === $current) {
+                $keep[] = $key;
+                continue;
+            }
+            delete_transient($key);
+        }
+        delete_transient($this->status_cache_key);
+        if ($keep !== $index) {
+            update_option('affilio_status_cache_keys', $keep, false);
+        }
+    }
+
+    private function remember_status_cache($key) {
+        $index = get_option('affilio_status_cache_keys', array());
+        if (!is_array($index)) {
+            $index = array();
+        }
+        if (!in_array($key, $index, true)) {
+            $index[] = $key;
+            update_option('affilio_status_cache_keys', $index, false);
+        }
+    }
+
+    private function store_status($cache_key, $status, $ttl) {
+        set_transient($cache_key, $status, $ttl);
+        $this->remember_status_cache($cache_key);
+        return $status;
+    }
+
     public function get_connection_status($force_refresh = false) {
+        $this->base_url = self::resolve_base_url();
         $cache_key = $this->connection_cache_key();
+        $this->forget_other_status_caches($cache_key);
         $cached = get_transient($cache_key);
         if (!$force_refresh && is_array($cached)) {
             return $cached;
@@ -131,22 +188,19 @@ class Affilio_API {
             $status['state'] = 'missing_url';
             $status['label'] = $this->t('Not connected', 'Non connesso');
             $status['message'] = 'Not connected — set the API URL in Settings';
-            set_transient($cache_key, $status, 60);
-            return $status;
+            return $this->store_status($cache_key, $status, 60);
         }
 
         if ($this->current_api_key() === '') {
-            set_transient($cache_key, $status, 60);
-            return $status;
+            return $this->store_status($cache_key, $status, 60);
         }
 
-        $health = wp_remote_get(trailingslashit($this->base_url) . 'health', array('timeout' => 8));
+        $health = $this->service_health();
         if (is_wp_error($health)) {
-            $status['state'] = 'network_error';
-            $status['label'] = $this->t('Connection Error', 'Errore di connessione');
-            $status['message'] = $this->t('Cannot reach Affilio API. Check network or API URL.', 'Impossibile raggiungere l\'API di Affilio. Controlla rete o URL API.');
-            set_transient($cache_key, $status, 60);
-            return $status;
+            $status['state'] = 'starting';
+            $status['label'] = $this->t('Starting', 'In avvio');
+            $status['message'] = $health->get_error_message();
+            return $this->store_status($cache_key, $status, 15);
         }
 
         $probe = $this->request('GET', '/articles');
@@ -154,8 +208,7 @@ class Affilio_API {
             $status['state'] = 'network_error';
             $status['label'] = $this->t('Connection Error', 'Errore di connessione');
             $status['message'] = $this->t('Cannot reach Affilio API. Check network or API URL.', 'Impossibile raggiungere l\'API di Affilio. Controlla rete o URL API.');
-            set_transient($cache_key, $status, 60);
-            return $status;
+            return $this->store_status($cache_key, $status, 60);
         }
 
         $code = isset($probe['code']) ? (int) $probe['code'] : 0;
@@ -182,8 +235,84 @@ class Affilio_API {
             $status['label'] = $this->t('Connection Failed', 'Connessione non riuscita');
             $status['message'] = $this->t('Unexpected API response while validating credentials.', 'Risposta API inattesa durante la validazione delle credenziali.');
         }
-        set_transient($cache_key, $status, 60);
-        return $status;
+        return $this->store_status($cache_key, $status, 60);
+    }
+
+    private function service_health() {
+        $this->base_url = self::resolve_base_url();
+        $url = trailingslashit($this->base_url) . 'health';
+        $timeouts = array(8, 20);
+        $health = null;
+        foreach ($timeouts as $index => $timeout) {
+            $health = wp_remote_get($url, array('timeout' => $timeout));
+            if (!$this->health_needs_retry($health) || $index > 0) {
+                break;
+            }
+        }
+        if ($this->health_needs_retry($health)) {
+            return new WP_Error(
+                'affilio_starting',
+                $this->t('The service is starting. Try again in a few seconds.', 'Il servizio si sta avviando, riprova tra qualche secondo'),
+                array('status' => 503)
+            );
+        }
+        return $health;
+    }
+
+    private function health_needs_retry($health) {
+        if (is_wp_error($health)) {
+            return true;
+        }
+        $code = (int) wp_remote_retrieve_response_code($health);
+        return $code === 0 || $code === 502 || $code === 503 || $code === 504;
+    }
+
+    private function encode_scan_body($path, $body) {
+        $bare = rtrim((string) $path, '/');
+        if ($bare !== '/scan/full' && $bare !== '/scan/single') {
+            return $body;
+        }
+        if (!is_array($body)) {
+            return $body;
+        }
+        if (isset($body['articles']) && is_array($body['articles'])) {
+            foreach ($body['articles'] as $index => $article) {
+                $body['articles'][$index] = $this->encode_scan_article($article);
+            }
+            return $body;
+        }
+        return $this->encode_scan_article($body);
+    }
+
+    private function encode_scan_article($article) {
+        if (!is_array($article) || isset($article['content_b64']) || isset($article['title_b64'])) {
+            return $article;
+        }
+        $encoding = function_exists('gzencode') ? 'gzip+base64' : 'base64';
+        $encoded = false;
+        foreach (array('title' => 'title_b64', 'content' => 'content_b64') as $plain => $field) {
+            if (!array_key_exists($plain, $article)) {
+                continue;
+            }
+            $article[$field] = $this->encode_scan_field((string) $article[$plain], $encoding);
+            unset($article[$plain]);
+            $encoded = true;
+        }
+        if ($encoded) {
+            $article['content_encoding'] = $encoding;
+        }
+        return $article;
+    }
+
+    private function encode_scan_field($value, $encoding) {
+        $bytes = $value;
+        if ($encoding === 'gzip+base64') {
+            $gzipped = gzencode($bytes);
+            if ($gzipped !== false) {
+                $bytes = $gzipped;
+            }
+        }
+        return base64_encode($bytes);
     }
 
     private function t($en, $it) {

@@ -2,10 +2,10 @@
 
 $root = dirname(__DIR__);
 $main = file_get_contents($root . '/affilio.php');
-check_identity(strpos($main, 'Version: 0.1.10') !== false, 'plugin header is not 0.1.10');
-check_identity(strpos($main, "define('AFFILIO_VERSION', '0.1.10');") !== false, 'AFFILIO_VERSION is not 0.1.10');
+check_identity(strpos($main, 'Version: 0.1.11') !== false, 'plugin header is not 0.1.11');
+check_identity(strpos($main, "define('AFFILIO_VERSION', '0.1.11');") !== false, 'AFFILIO_VERSION is not 0.1.11');
 $readme = file_get_contents($root . '/readme.txt');
-check_identity(strpos($readme, 'Stable tag: 0.1.10') !== false, 'readme stable tag is not 0.1.10');
+check_identity(strpos($readme, 'Stable tag: 0.1.11') !== false, 'readme stable tag is not 0.1.11');
 check_identity(basename($root . '/affilio.php') === 'affilio.php', 'main file name drifted from v0.1.6 affilio.php');
 
 $dockerfile = file_get_contents(dirname($root) . '/Dockerfile.mvp');
@@ -37,7 +37,7 @@ echo "loaded\n";
 ');
 check_identity($old[0] === 0 && strpos($old[1], 'loaded') !== false, "load beside v0.1.6 fataled:\n" . $old[1]);
 
-echo "Plugin 0.1.10 packages as affilio-wp/affilio.php and survives a double load.\n";
+echo "Plugin 0.1.11 packages as affilio-wp/affilio.php and survives a double load.\n";
 
 function check_identity($condition, $message) {
     if (!$condition) {

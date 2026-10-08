@@ -107,7 +107,7 @@ foreach ($dangerous as $needle) {
 }
 expect(strpos($restored, $dangerous[0]) !== false, 'encoded body dropped the published post text');
 expect(strpos($raw, 'Hidden ') === false && strpos($restored, 'Hidden ') === false, 'draft post was sent');
-expect(strpos($raw, 'https://blog.example/safe-slug') !== false, 'published permalink was not sent');
+expect(strpos($visible, 'https://blog.example/safe-slug') !== false, 'published permalink was not sent');
 
 if ($failures) {
     fwrite(STDERR, implode("\n", $failures) . "\n");
