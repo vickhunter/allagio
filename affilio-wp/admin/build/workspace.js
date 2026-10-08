@@ -4,6 +4,7 @@
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     const pill = value => `<span class="pill ${value === 'test' ? 'test' : value === 'live' ? 'live' : ''}">${escape(value)}</span>`;
+    const placementStatusLabel = placement => placement.removed_at ? `Rimosso ${String(placement.removed_at).slice(0, 10)}` : placement.status;
     const money = (value, currency) => {
         try { return new Intl.NumberFormat(undefined, {style:'currency',currency}).format(value || 0); }
         catch { return `${Number(value || 0).toFixed(2)} ${currency}`; }
@@ -387,7 +388,13 @@
         const ordered = focus.product ? [focus.product, ...products.filter(product => product.id !== focus.product.id)] : products;
         const showForm = !products.length || options.keepForm;
         const formBlock = showForm ? productForm(null, !products.length && kind === 'product', !!options.registered) : `<p><button type="button" class="secondary" data-add-product>Add product</button></p>`;
-        root.innerHTML = `${railMarkup(focus, true)}<div id="product-form">${formBlock}</div>${products.length ? '' : empty('Your first product starts here.','Register its website and topics so relevant publishers can find it.')}${products.length ? '<h2>Your products</h2>' + ordered.map(productSection).join('') : ''}<h2>Your referral offers</h2>${offers.length ? offers.map(offerSection).join('') : empty('Choose what a referral is worth.','Create an offer after registering your product.')}${offerCreator()}`;
+        root.innerHTML = `${railMarkup(focus, true)}<div id="product-form">${formBlock}</div>${products.length ? '' : empty('Your first product starts here.','Register its website and topics so relevant publishers can find it.')}${products.length ? '<h2>Your products</h2>' + ordered.map(productSection).join('') : ''}<h2>Your referral offers</h2>${offers.length ? offers.map(offerSection).join('') : empty('Choose what a referral is worth.','Create an offer after registering your product.')}${offerCreator()}<div id="maker-placements"></div>`;
+        api('/maker-placements').then(data => {
+            const slot = document.getElementById('maker-placements');
+            if (!slot) return;
+            const items = data.placements || [];
+            slot.innerHTML = `<h2>Publisher placements</h2>${items.length ? items.map(placement => `<section><div class="row">${escape(placement.surface_url)} ${pill(placementStatusLabel(placement))}</div><p>${escape(placement.copy)}</p></section>`).join('') : empty('No publisher placements yet.','Placements of your offers show up here, including ones a publisher has removed.')}`;
+        }).catch(() => {});
         root.querySelector('[data-product]')?.addEventListener('submit', saveProduct);
         root.querySelector('[data-add-product]')?.addEventListener('click', () => {
             document.getElementById('product-form').innerHTML = productForm(null, false, false);
@@ -509,7 +516,7 @@
     const placementsPage = async () => {
         if (!session.publisher) { root.innerHTML = '<section><h2>Connect your content first.</h2><p>Install the WordPress plugin, connect your site, then use its publisher connection action. You can also create a publisher account for another publishing tool.</p><a class="button secondary" href="/downloads/affilio.zip">Download WordPress plugin</a></section>' + accountForm('publisher'); return; }
         const {placements} = await api('/placements');
-        root.innerHTML = `<section><h2>Find a relevant offer</h2><form data-find><div class="form-grid">${field('surface_url','Published article URL','','type="url" required',true)}<label class="full">What is this article about?<textarea name="context" minlength="10" maxlength="12000" required placeholder="Paste the article or describe its topic and audience."></textarea></label></div><button>Find opportunities</button></form><div id="opportunity-results"></div></section><h2>Placement inbox</h2>${placements.length ? placements.map(placement => `<section><div class="row"><a href="/owner/placements/${placement.id}">${escape(placement.surface_url)}</a>${pill(placement.status)}</div><p>${escape(placement.copy)}</p><a href="/owner/placements/${placement.id}">Review placement ↗</a></section>`).join('') : empty('Your recommendations will appear here.','Start with an article where a product can help its readers.')}`;
+        root.innerHTML = `<section><h2>Find a relevant offer</h2><form data-find><div class="form-grid">${field('surface_url','Published article URL','','type="url" required',true)}<label class="full">What is this article about?<textarea name="context" minlength="10" maxlength="12000" required placeholder="Paste the article or describe its topic and audience."></textarea></label></div><button>Find opportunities</button></form><div id="opportunity-results"></div></section><h2>Placement inbox</h2>${placements.length ? placements.map(placement => `<section><div class="row"><a href="/owner/placements/${placement.id}">${escape(placement.surface_url)}</a>${pill(placementStatusLabel(placement))}</div><p>${escape(placement.copy)}</p><a href="/owner/placements/${placement.id}">Review placement ↗</a></section>`).join('') : empty('Your recommendations will appear here.','Start with an article where a product can help its readers.')}`;
         root.querySelector('[data-find]').addEventListener('submit',event => {
             event.preventDefault(); const form = event.currentTarget; const values = Object.fromEntries(new FormData(form));
             run(form.querySelector('button'),async () => {

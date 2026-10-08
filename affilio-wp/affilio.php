@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Affilio
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.13
+ * Version: 0.1.14
  * Author: Affilio
  */
 
@@ -15,7 +15,7 @@ if (defined('AFFILIO_LOADED')) {
 }
 define('AFFILIO_LOADED', true);
 
-define('AFFILIO_VERSION', '0.1.13');
+define('AFFILIO_VERSION', '0.1.14');
 
 if (!function_exists('affilio_scan_summary')) {
 function affilio_scan_summary($scanned, $skipped) {
@@ -70,6 +70,14 @@ function affilio_init() {
     add_action('rest_api_init', array($editor_proxy, 'register_routes'));
     add_action('rest_api_init', array($onboarding, 'register_routes'));
     add_action('rest_api_init', array($distribution, 'register_routes'));
+    add_action('admin_menu', array($distribution, 'register_revert_page'));
+    add_action('admin_post_affilio_revert', array($distribution, 'handle_revert_post'));
+    add_action('admin_notices', array($distribution, 'render_revert_notice'));
+    add_action('affilio_retry_removals', array($distribution, 'retry_removals'));
+    if (defined('WP_CLI') && WP_CLI) {
+        require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-cli.php';
+        WP_CLI::add_command('affilio revert', new Affilio_Revert_Command($distribution));
+    }
 }
 }
 

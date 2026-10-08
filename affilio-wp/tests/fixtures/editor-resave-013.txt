@@ -1,0 +1,3 @@
+<!-- wp:paragraph -->
+<p><!-- distributoor-placement:aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa --><p>Uno strumento utile per il team. <a href="https://distribution.example/v1/go/test?placement=aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" rel="sponsored nofollow">Vedi il prodotto</a></p></p>
+<!-- /wp:paragraph -->

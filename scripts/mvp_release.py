@@ -35,6 +35,7 @@ WP_FILES = {
     "affilio-wp/includes/class-affilio-editor-proxy.php",
     "affilio-wp/includes/class-affilio-onboarding.php",
     "affilio-wp/includes/class-affilio-distribution.php",
+    "affilio-wp/includes/class-affilio-cli.php",
     "affilio-wp/admin/build/onboarding.js",
     "affilio-wp/admin/build/distribution.js",
     "affilio-wp/admin/build/distribution.css",
@@ -48,7 +49,7 @@ WP_FILES = {
     "affilio-wp/readme.txt",
 }
 PLUGIN_ROOT = "affilio-wp/"
-PLUGIN_VERSION = "0.1.13"
+PLUGIN_VERSION = "0.1.14"
 ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
 DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
 QUOTED_BUILD = re.compile(r"""(['"])([A-Za-z0-9_.-]+\.(?:js|css))\1""")
@@ -223,6 +224,10 @@ def validate_plugin(data, origin=None):
         archive_names(names)
         require(sum(file.file_size for file in archive.infolist()) <= MAX_DOWNLOAD, "WordPress ZIP expands beyond the release size limit.")
         require(archive.testzip() is None, "WordPress ZIP failed its checksum check.")
+        for info in archive.infolist():
+            if info.is_dir():
+                continue
+            require(info.compress_type == zipfile.ZIP_DEFLATED, "WordPress ZIP stores " + info.filename + " uncompressed")
         files = {name: archive.read(name) for name in names if not name.endswith("/")}
         require(PLUGIN_ROOT + "admin/build/analytics.js" in files, "WordPress ZIP is missing admin/build/analytics.js")
         missing = sorted(WP_FILES - set(files))

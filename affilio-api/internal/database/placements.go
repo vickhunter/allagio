@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 var ErrPlacementAuthority = errors.New("placement is not authorized, has expired, or terms changed")
@@ -22,9 +24,10 @@ type Placement struct {
 	Status     string          `json:"status"`
 	ExpiresAt  time.Time       `json:"expires_at"`
 	Receipt    json.RawMessage `json:"receipt,omitempty"`
+	RemovedAt  *time.Time      `json:"removed_at,omitempty"`
 }
 
-const placementColumns = `id,site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,status,expires_at,receipt`
+const placementColumns = `id,site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,status,expires_at,receipt,removed_at`
 const placementTermsSQL = `jsonb_build_object('product_id',o.product_id,'commission_type',o.commission_type,
  'commission_value_minor',(o.commission_value*100)::bigint,'currency',o.commission_currency,
  'cookie_duration_days',o.cookie_duration_days,'refund_window_days',o.refund_window_days,
@@ -40,8 +43,66 @@ const placementEligibleSQL = `FROM offers o JOIN products p ON p.id=o.product_id
 
 func scanPlacement(row interface{ Scan(...interface{}) error }) (*Placement, error) {
 	var p Placement
-	err := row.Scan(&p.ID, &p.SiteID, &p.OfferID, &p.SurfaceURL, &p.Context, &p.Copy, &p.Disclosure, &p.Reason, &p.Terms, &p.Status, &p.ExpiresAt, &p.Receipt)
+	err := row.Scan(&p.ID, &p.SiteID, &p.OfferID, &p.SurfaceURL, &p.Context, &p.Copy, &p.Disclosure, &p.Reason, &p.Terms, &p.Status, &p.ExpiresAt, &p.Receipt, &p.RemovedAt)
 	return &p, err
+}
+
+type MakerPlacement struct {
+	ID         string     `json:"id"`
+	SurfaceURL string     `json:"surface_url"`
+	Copy       string     `json:"copy"`
+	Status     string     `json:"status"`
+	RemovedAt  *time.Time `json:"removed_at,omitempty"`
+}
+
+func (d *DB) ListMakerPlacements(ctx context.Context, makerID string) ([]MakerPlacement, error) {
+	rows, err := d.Pool.Query(ctx, `SELECT pp.id, pp.surface_url, pp.copy, pp.status, pp.removed_at
+FROM placement_proposals pp
+JOIN offers o ON o.id=pp.offer_id
+JOIN products p ON p.id=o.product_id
+WHERE p.maker_id=$1
+ORDER BY pp.created_at DESC LIMIT 50`, makerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []MakerPlacement{}
+	for rows.Next() {
+		var item MakerPlacement
+		if err = rows.Scan(&item.ID, &item.SurfaceURL, &item.Copy, &item.Status, &item.RemovedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) MarkPlacementRemoved(ctx context.Context, siteID, id string) (already bool, at time.Time, found bool, err error) {
+	err = d.Pool.QueryRow(ctx, `UPDATE placement_proposals SET removed_at=NOW()
+WHERE id=$1 AND site_id=$2 AND removed_at IS NULL RETURNING removed_at`, id, siteID).Scan(&at)
+	if err == nil {
+		return false, at, true, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return false, time.Time{}, false, err
+	}
+	err = d.Pool.QueryRow(ctx, `SELECT removed_at FROM placement_proposals WHERE id=$1 AND site_id=$2 AND removed_at IS NOT NULL`, id, siteID).Scan(&at)
+	if err == nil {
+		return true, at, true, nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, time.Time{}, false, nil
+	}
+	return false, time.Time{}, false, err
+}
+
+func (d *DB) PlacementRemoved(ctx context.Context, placementID, campaignID string) (bool, error) {
+	var removed bool
+	err := d.Pool.QueryRow(ctx, `SELECT removed_at IS NOT NULL FROM placement_proposals WHERE id=$1 AND campaign_id=$2`, placementID, campaignID).Scan(&removed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return removed, err
 }
 
 func (d *DB) CreatePlacement(ctx context.Context, p Placement) (*Placement, error) {

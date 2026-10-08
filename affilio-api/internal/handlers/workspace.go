@@ -62,6 +62,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	maker.PATCH("/offers/:id", offers.Patch)
 	maker.POST("/offers/:id/submit", offers.Submit)
 	maker.GET("/earnings/maker", payouts.MakerEarnings)
+	maker.GET("/maker-placements", placements.ListForMaker)
 	maker.GET("/payments", h.MerchantPayments)
 	maker.POST("/payments/:id/report", h.ReportMerchantPayment)
 	if h.Assessments != nil {
@@ -168,7 +169,8 @@ func (h *HostedHandler) DownloadWordPress(c *gin.Context) {
 			return
 		}
 		data = rewriteDownloadedPlugin(file.Name, data, h.BaseURL)
-		entry, err := writer.CreateHeader(&file.FileHeader)
+		header := &zip.FileHeader{Name: file.Name, Method: zip.Deflate, Modified: file.Modified}
+		entry, err := writer.CreateHeader(header)
 		if err != nil {
 			c.Status(500)
 			return

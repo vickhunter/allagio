@@ -59,6 +59,15 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 			c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "removed"})
 			return
 		}
+		removed, err := h.DB.PlacementRemoved(c.Request.Context(), placementID, link.CampaignID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
+			return
+		}
+		if removed {
+			c.Redirect(http.StatusFound, link.LandingURL)
+			return
+		}
 		valid, err := h.DB.PlacementAllowsClick(c.Request.Context(), placementID, link.CampaignID)
 		if err != nil || !valid {
 			c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "removed"})

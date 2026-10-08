@@ -602,7 +602,7 @@ func (h *HostedHandler) ReviewPlacement(c *gin.Context) {
 		commission = fmt.Sprintf("%.2f%% of the first paid checkout, excluding tax and shipping", float64(terms.CommissionValueMinor)/100)
 	}
 	summary := fmt.Sprintf("Destination: %s\n%s\nRefund hold: %d days. Attribution window: %d days.\nMerchant pays directly. Service fee: %d%% of commission.\nCurrency: %s. Payment mode: %s.\n%s", terms.LandingURL, commission, terms.RefundDays, terms.CookieDays, terms.FeePercent, terms.Currency, terms.Mode, terms.Text)
-	body := fmt.Sprintf(`<p>Status: %s · Expires: %s</p><p><a href="%s">%s</a></p><h2>Recommendation</h2><pre>%s</pre><h2>Disclosure</h2><pre>%s</pre><h2>Terms</h2><pre>%s</pre>`, template.HTMLEscapeString(p.Status), p.ExpiresAt.Format(time.RFC3339), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy), template.HTMLEscapeString(p.Disclosure), template.HTMLEscapeString(summary))
+	body := fmt.Sprintf(`<p>Status: %s · Expires: %s</p><p><a href="%s">%s</a></p><h2>Recommendation</h2><pre>%s</pre><h2>Disclosure</h2><pre>%s</pre><h2>Terms</h2><pre>%s</pre>`, template.HTMLEscapeString(PlacementDashboardLabel(p.Status, p.RemovedAt)), p.ExpiresAt.Format(time.RFC3339), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy), template.HTMLEscapeString(p.Disclosure), template.HTMLEscapeString(summary))
 	if p.Status == "pending" && p.ExpiresAt.After(time.Now()) {
 		body += fmt.Sprintf(`<form method="post" action="/owner/placements/%s/approve"><input type="hidden" name="csrf" value="%s"><button>Approve this exact placement</button></form>`, p.ID, template.HTMLEscapeString(o.CSRF))
 	}
@@ -712,7 +712,7 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 		}
 		body.WriteString(`<h2>Placement inbox</h2>`)
 		for _, p := range placements {
-			fmt.Fprintf(&body, `<section><a href="/owner/placements/%s">Review placement</a><p>%s · %s</p><p>%s</p></section>`, p.ID, template.HTMLEscapeString(p.Status), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy))
+			fmt.Fprintf(&body, `<section><a href="/owner/placements/%s">Review placement</a><p>%s · %s</p><p>%s</p></section>`, p.ID, template.HTMLEscapeString(PlacementDashboardLabel(p.Status, p.RemovedAt)), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy))
 		}
 		payouts, err := h.DB.ListPayouts(c.Request.Context(), o.SiteID)
 		if err != nil {
@@ -740,6 +740,15 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 		body.WriteString(`<h2>Products</h2>`)
 		for _, p := range products {
 			fmt.Fprintf(&body, `<p>%s · <a href="/owner/products/%s/connection">Connect Stripe</a></p>`, template.HTMLEscapeString(p.Name), p.ID)
+		}
+		makerPlacements, err := h.DB.ListMakerPlacements(c.Request.Context(), o.MakerID)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+		body.WriteString(`<h2>Publisher placements</h2>`)
+		for _, p := range makerPlacements {
+			fmt.Fprintf(&body, `<section><p>%s · %s</p><p>%s</p></section>`, template.HTMLEscapeString(PlacementDashboardLabel(p.Status, p.RemovedAt)), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy))
 		}
 	}
 	grants, err := h.DB.OwnerGrants(c.Request.Context(), o.ID)

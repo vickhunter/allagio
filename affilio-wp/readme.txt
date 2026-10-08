@@ -1,11 +1,30 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.13
+Stable tag: 0.1.14
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.14 =
+* A post counts as already disclosed only when it matches the receipt rule: the approved disclosure, "commissione", or "link" within 60 characters of "affiliat".
+* If publication is refused, the insert is removed and the admin sees the reason in Italian. That automatic revert does not tell the service the placement was removed.
+* An insert is a paragraph block marked with the class `affilio-placement-<placement id>`. A disclosure the plugin adds uses `affilio-disclosure-<placement id>`.
+* Placement list: "Rimuovi inserimento" asks you to confirm the post and the exact link, then removes that block. The notice says whether the service was told.
+* WP-CLI: `wp affilio revert <post_id> [--placement=<id>] [--dry-run]`. The post is edited first. The command prints the post change and the API result separately, and exits 0 when the local revert succeeded.
+
+== Removing an insertion ==
+
+From the placement list, "Rimuovi inserimento" shows the post title and the link (anchor text and go URL). Annulla leaves the post alone. Rimuovi edits the post, then reports the removal. If the service is unreachable, the post stays reverted and the report is retried.
+
+From WP-CLI, when it is loaded:
+
+`wp affilio revert 42`
+`wp affilio revert 42 --placement=<placement id>`
+`wp affilio revert 42 --dry-run`
+
+`--dry-run` prints the post change and does not call the API. A local revert exits 0 even when the API result is "API: non raggiungibile, riprovo più tardi". Nothing matched locally exits non-zero.
 
 = 0.1.13 =
 * A placement receipt accepts a disclosure already written in the post. The setting does not skip Affilio's disclosure unless that post text actually discloses.

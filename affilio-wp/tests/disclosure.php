@@ -77,7 +77,7 @@ $inserter = new Affilio_Inserter($api);
 $GLOBALS['post'] = (object) array('ID' => 7, 'post_type' => 'post', 'post_status' => 'publish', 'post_title' => 'Strumenti', 'post_content' => $italian);
 $before = $GLOBALS['post']->post_content;
 $distribution->publish($request);
-check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 0, 'Italian disclosure still received a second disclosure from distribution');
+check(added($before, $GLOBALS['post']->post_content, 'affilio-disclosure-') === 0, 'Italian disclosure still received a second disclosure from distribution');
 check(strpos($GLOBALS['post']->post_content, 'contiene link di affiliazione') !== false, 'Existing Italian disclosure was removed');
 
 $GLOBALS['post']->post_content = $italian;
@@ -95,7 +95,7 @@ $GLOBALS['options']['affilio_existing_disclosure'] = '';
 $GLOBALS['post']->post_content = $verbatim;
 $before = $GLOBALS['post']->post_content;
 $distribution->publish($request);
-check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 0, 'The blog disclosure fixture still received a second disclosure from distribution');
+check(added($before, $GLOBALS['post']->post_content, 'affilio-disclosure-') === 0, 'The blog disclosure fixture still received a second disclosure from distribution');
 check(strpos($GLOBALS['post']->post_content, $fixture) !== false, 'The blog disclosure fixture was removed');
 
 $GLOBALS['post']->post_content = $verbatim;
@@ -108,19 +108,19 @@ $GLOBALS['post']->post_content = $reworded;
 $GLOBALS['meta'] = array();
 $before = $GLOBALS['post']->post_content;
 $distribution->publish($request);
-check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 0, 'A reworded affiliate-link sentence still received a second disclosure');
+check(added($before, $GLOBALS['post']->post_content, 'affilio-disclosure-') === 0, 'A reworded affiliate-link sentence still received a second disclosure');
 
 $GLOBALS['post']->post_content = $separated;
 $GLOBALS['meta'] = array();
 $before = $GLOBALS['post']->post_content;
 $distribution->publish($request);
-check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 0, 'link and affiliat within 60 characters, inside tags, still received a second disclosure');
+check(added($before, $GLOBALS['post']->post_content, 'affilio-disclosure-') === 0, 'link and affiliat within 60 characters, inside tags, still received a second disclosure');
 
 $GLOBALS['post']->post_content = $plain;
 $GLOBALS['options']['affilio_existing_disclosure'] = '';
 $before = $GLOBALS['post']->post_content;
 $distribution->publish($request);
-check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 1, 'A post without a disclosure did not get exactly one');
+check(added($before, $GLOBALS['post']->post_content, '<!-- wp:paragraph {"className":"affilio-disclosure-') === 1, 'A post without a disclosure did not get exactly one');
 
 $GLOBALS['post']->post_content = $plain;
 $GLOBALS['meta'] = array();
@@ -132,7 +132,7 @@ $GLOBALS['post']->post_content = $plain;
 $GLOBALS['options']['affilio_existing_disclosure'] = '1';
 $before = $GLOBALS['post']->post_content;
 $distribution->publish($request);
-check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 1, 'The existing-disclosure setting skipped a post that does not disclose');
+check(added($before, $GLOBALS['post']->post_content, '<!-- wp:paragraph {"className":"affilio-disclosure-') === 1, 'The existing-disclosure setting skipped a post that does not disclose');
 
 $GLOBALS['post']->post_content = $plain;
 $GLOBALS['meta'] = array();

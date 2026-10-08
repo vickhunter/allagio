@@ -5,6 +5,7 @@ class WP_Error {
     public $message;
     public $data;
     public function __construct($code, $message, $data = array()) { $this->code = $code; $this->message = $message; $this->data = $data; }
+    public function get_error_message() { return $this->message; }
 }
 function is_wp_error($value) { return $value instanceof WP_Error; }
 function rest_ensure_response($value) { return $value; }
@@ -69,11 +70,11 @@ $api->surface = 'https://blog.example/another-post';
 check(is_wp_error($distribution->publish($request)) && $GLOBALS['updates'] === 0, 'Placement inserted in wrong article.');
 $api->surface = 'https://blog.example/post';
 $api->receipt_failed = true;
-check(is_wp_error($distribution->publish($request)) && $GLOBALS['updates'] === 1, 'Receipt failure lost insertion state.');
+check(is_wp_error($distribution->publish($request)) && $GLOBALS['updates'] === 2 && $GLOBALS['post']->post_content === $existing, 'A refused receipt left the insert in the post.');
 $api->receipt_failed = false;
 $result = $distribution->publish($request);
-check(!is_wp_error($result) && $result['published'] && $GLOBALS['updates'] === 1, 'Retry inserted twice.');
-check(substr_count($GLOBALS['post']->post_content, '<!-- distributoor-placement:') === 1, 'Duplicate placement marker.');
+check(!is_wp_error($result) && $result['published'] && $GLOBALS['updates'] === 3, 'Retry inserted twice.');
+check(substr_count($GLOBALS['post']->post_content, '<!-- wp:paragraph {"className":"affilio-placement-') === 1, 'Duplicate placement marker.');
 check(substr_count($GLOBALS['post']->post_content, 'Affiliate disclosure:') === 1, 'Duplicate disclosure.');
 check(strpos($GLOBALS['post']->post_content, $existing) === 0, 'Existing article content was modified.');
 check(strlen($api->receipt['published_text']) < 16000 && strpos($api->receipt['published_text'], 'R&D') !== false && strpos($api->receipt['published_text'], '/v1/go/test?placement=') !== false, 'Published evidence did not preserve exact approved text/link.');

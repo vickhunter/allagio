@@ -39,7 +39,7 @@ $tracked = '/v1/go/test?placement=' . $placement_id;
 function affilio_receipt_code($published, $copy, $disclosure, $tracked) {
     $plain = strtolower(strip_tags((string) $published));
     $has_disclosure = strpos((string) $published, (string) $disclosure) !== false
-        || preg_match('/\blink\b.{0,60}affiliat/iu', $plain)
+        || preg_match('/link.{0,60}affiliat|affiliat.{0,60}link/iu', $plain)
         || strpos($plain, 'commissione') !== false;
     if (strpos((string) $published, (string) $copy) !== false && $has_disclosure && strpos((string) $published, (string) $tracked) !== false) {
         return 200;
@@ -103,7 +103,7 @@ $result = $distribution->publish($request);
 check(!is_wp_error($result) && !empty($result['published']), 'a post that already discloses was not published: ' . (is_wp_error($result) ? $result->get_error_message() . ' (' . $result->data['status'] . ')' : 'not published'));
 check(!empty($GLOBALS['receipt_recorded']), 'the receipt was not recorded for a post that already discloses');
 check(strpos($GLOBALS['last_published'], $fixture) !== false, 'the receipt omitted the post disclosure');
-check(strpos($GLOBALS['post']->post_content, 'affiliate-disclosure') === false, 'the plugin added a second disclosure');
+check(strpos($GLOBALS['post']->post_content, 'affilio-disclosure-') === false, 'the plugin added a second disclosure');
 
 $GLOBALS['receipt_recorded'] = false;
 $GLOBALS['options']['affilio_existing_disclosure'] = '1';
@@ -119,7 +119,7 @@ if ($decision === 409) {
 }
 check(!is_wp_error($result) && !empty($result['published']), 'publish did not record a post that needed its own disclosure');
 check(!empty($GLOBALS['receipt_recorded']), 'receipt was not recorded after the plugin added the missing disclosure');
-check(strpos($GLOBALS['post']->post_content, 'affiliate-disclosure') !== false, 'the setting skipped the disclosure');
+check(strpos($GLOBALS['post']->post_content, 'affilio-disclosure-') !== false, 'the setting skipped the disclosure');
 
 $GLOBALS['force_receipt'] = 409;
 $GLOBALS['receipt_recorded'] = false;
@@ -150,7 +150,7 @@ $policy = '<p>Leggi la nostra disclosure policy.</p>';
 $GLOBALS['post']->post_content = $policy;
 $result = $distribution->publish($request);
 check(!is_wp_error($result) && !empty($result['published']), 'a disclosure-policy sentence blocked publication: ' . (is_wp_error($result) ? $result->get_error_message() : ''));
-check(strpos($GLOBALS['post']->post_content, 'affiliate-disclosure') !== false, 'a disclosure-policy sentence was treated as the disclosure');
+check(strpos($GLOBALS['post']->post_content, 'affilio-disclosure-') !== false, 'a disclosure-policy sentence was treated as the disclosure');
 check(strpos($GLOBALS['post']->post_content, '/v1/go/') !== false, 'the tracked link was not inserted once a real disclosure was added');
 
 $GLOBALS['receipt_recorded'] = false;

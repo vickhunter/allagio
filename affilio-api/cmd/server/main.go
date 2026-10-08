@@ -261,6 +261,7 @@ func main() {
 		secured.GET("/placements/:id", placements.Get)
 		secured.POST("/placements/:id/commit", placements.Commit)
 		secured.POST("/placements/:id/receipt", placements.RecordReceipt)
+		secured.POST("/placements/:id/removed", placements.MarkRemoved)
 		secured.POST("/placements/:id/revoke", placements.Revoke)
 		secured.GET("/marketplace/offers", marketplace.ListOffers)
 		secured.POST("/marketplace/offers/:id/join", marketplace.JoinOffer)

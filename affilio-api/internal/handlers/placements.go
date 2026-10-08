@@ -279,7 +279,7 @@ func (h *PlacementsHandler) Revoke(c *gin.Context) {
 
 var (
 	htmlTags        = regexp.MustCompile(`(?s)<[^>]*>`)
-	looseDisclosure = regexp.MustCompile(`(?i)\blink\b.{0,60}affiliat`)
+	looseDisclosure = regexp.MustCompile(`(?i)link.{0,60}affiliat|affiliat.{0,60}link`)
 )
 
 func publishedDisclosureOK(published, approved string) bool {
@@ -323,6 +323,42 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "publisher_reported", "content_sha256": hex.EncodeToString(hash[:])})
+}
+
+func (h *PlacementsHandler) MarkRemoved(c *gin.Context) {
+	if !uuidPattern.MatchString(c.Param("id")) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
+		return
+	}
+	already, at, found, err := h.DB.MarkPlacementRemoved(c.Request.Context(), siteIDFrom(c), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "removal recording failed"})
+		return
+	}
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "removed", "already_removed": already, "removed_at": at.UTC().Format(time.RFC3339)})
+}
+
+func (h *PlacementsHandler) ListForMaker(c *gin.Context) {
+	items, err := h.DB.ListMakerPlacements(c.Request.Context(), makerID(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load placements"})
+		return
+	}
+	if items == nil {
+		items = []database.MakerPlacement{}
+	}
+	c.JSON(http.StatusOK, gin.H{"placements": items})
+}
+
+func PlacementDashboardLabel(status string, removed *time.Time) string {
+	if removed != nil {
+		return "Rimosso " + removed.UTC().Format("2006-01-02")
+	}
+	return status
 }
 
 func (h *PlacementsHandler) CreateAgentAccess(c *gin.Context) {

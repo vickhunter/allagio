@@ -128,7 +128,7 @@ func safePrefix(key string) string {
 
 func agentRouteAllowed(c *gin.Context) bool {
 	switch c.FullPath() {
-	case "/v1/revenue/opportunities", "/v1/placements", "/v1/placements/:id", "/v1/placements/:id/commit", "/v1/placements/:id/receipt":
+	case "/v1/revenue/opportunities", "/v1/placements", "/v1/placements/:id", "/v1/placements/:id/commit", "/v1/placements/:id/receipt", "/v1/placements/:id/removed":
 		return c.Request.Method == http.MethodGet || c.Request.Method == http.MethodPost
 	case "/v1/payouts/balance", "/v1/payouts/history":
 		return c.Request.Method == http.MethodGet
