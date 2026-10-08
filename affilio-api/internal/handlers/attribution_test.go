@@ -336,6 +336,70 @@ func TestRedirectStopsAttributingWhenPaused(t *testing.T) {
 	}
 }
 
+func TestRedirectRefusesPausedUnlistedAndDeleted(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, makerKey := createTestMaker(t, db)
+	r := newAttributionRouter(db)
+	offerID := listedOffer(t, db, r, makerKey)
+	siteKey := "site-key-unavailable"
+	createTestSite(t, db, siteKey, "gone.example.com", "Gone Blog")
+	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
+	code := join["tracking_code"].(string)
+
+	rec, _ := doJSON(t, r, http.MethodPatch, "/v1/maker/offers/"+offerID, makerKey, map[string]interface{}{"status": "paused"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("pause: expected 200, got %d", rec.Code)
+	}
+	t.Run("paused", func(t *testing.T) {
+		assertUnavailable(t, r, db, "/v1/go/"+code, http.StatusGone, "paused")
+		bot := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
+		bot.Header.Set("User-Agent", "Slackbot-LinkExpanding 1.0")
+		botRec := httptest.NewRecorder()
+		r.ServeHTTP(botRec, bot)
+		if botRec.Code != http.StatusGone || botRec.Header().Get("Location") != "" {
+			t.Fatalf("preview bot must not be redirected to a paused offer, got %d %q", botRec.Code, botRec.Header().Get("Location"))
+		}
+	})
+
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='draft' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("unlisted", func(t *testing.T) {
+		assertUnavailable(t, r, db, "/v1/go/"+code, http.StatusGone, "unlisted")
+	})
+
+	if _, err := db.Pool.Exec(context.Background(), `DELETE FROM campaigns WHERE tracking_code=$1`, code); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("deleted", func(t *testing.T) {
+		assertUnavailable(t, r, db, "/v1/go/"+code, http.StatusNotFound, "")
+	})
+}
+
+func assertUnavailable(t *testing.T, r *gin.Engine, db *database.DB, path string, want int, reason string) {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	if rec.Code != want {
+		t.Fatalf("%s: expected %d, got %d %s", path, want, rec.Code, rec.Body.String())
+	}
+	if loc := rec.Header().Get("Location"); loc != "" {
+		t.Fatalf("%s: must not redirect, got %q", path, loc)
+	}
+	if reason != "" && !strings.Contains(rec.Body.String(), reason) {
+		t.Fatalf("%s: body %s missing reason %q", path, rec.Body.String(), reason)
+	}
+	var clicks int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks`).Scan(&clicks); err != nil {
+		t.Fatal(err)
+	}
+	if clicks != 0 {
+		t.Fatalf("%s: expected no clicks, got %d", path, clicks)
+	}
+}
+
 func testConnectionCipher() *services.ConnectionCipher {
 	cipher, err := services.NewConnectionCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
 	if err != nil {
