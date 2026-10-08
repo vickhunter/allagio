@@ -19,6 +19,9 @@ class Affilio_Distribution {
             return true;
         }
         $text = strtolower(wp_strip_all_tags((string) $content));
+        if (preg_match('/\blink\b.{0,60}affiliat/iu', $text)) {
+            return true;
+        }
         $patterns = array('link affiliat', 'link di affiliazione', 'affiliate link', 'commissione', 'disclosure', 'sponsorizzat', 'contiene link');
         foreach ($patterns as $pattern) {
             if (strpos($text, $pattern) !== false) {
