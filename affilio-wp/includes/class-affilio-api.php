@@ -1,5 +1,9 @@
 <?php
 
+if (class_exists('Affilio_API')) {
+    return;
+}
+
 class Affilio_API {
     private $base_url;
     private $status_cache_key = 'affilio_connection_status';
@@ -13,6 +17,10 @@ class Affilio_API {
     }
 
     public function request($method, $path, $body = null) {
+        $this->base_url = self::resolve_base_url();
+        if ($this->base_url === '') {
+            return new WP_Error('affilio_not_configured', 'Not connected — set the API URL in Settings');
+        }
         $url = trailingslashit($this->base_url) . ltrim($path, '/');
         $args = array(
             'method'  => $method,
@@ -23,6 +31,17 @@ class Affilio_API {
                 'X-API-Key'    => $this->current_api_key(),
             ),
         );
+        $path_only = $path;
+        $query_at = strpos($path, '?');
+        if ($query_at !== false) {
+            $path_only = substr($path, 0, $query_at);
+        }
+        if (rtrim($path_only, '/') === '/sites/register') {
+            $body = array(
+                'site_url' => home_url(),
+                'plugin_version' => defined('AFFILIO_VERSION') ? AFFILIO_VERSION : '',
+            );
+        }
         if ($body !== null) {
             $args['body'] = wp_json_encode($body);
         }
@@ -35,21 +54,66 @@ class Affilio_API {
         return array('code' => $code, 'data' => $data);
     }
 
+    public function admin_request($method, $path, $body = null) {
+        $this->base_url = self::resolve_base_url();
+        if ($this->base_url === '') {
+            return new WP_Error('affilio_not_configured', 'Not connected — set the API URL in Settings');
+        }
+        $args = array(
+            'method'  => $method,
+            'timeout' => 30,
+            'redirection' => 0,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-Admin-Key'  => trim((string) get_option('affilio_admin_api_key', '')),
+            ),
+        );
+        if ($body !== null) {
+            $args['body'] = wp_json_encode($body);
+        }
+        $response = wp_remote_request(trailingslashit($this->base_url) . ltrim($path, '/'), $args);
+        if (is_wp_error($response)) {
+            return $response;
+        }
+        return array(
+            'code' => wp_remote_retrieve_response_code($response),
+            'data' => json_decode(wp_remote_retrieve_body($response), true),
+        );
+    }
+
+    public static function mask_key($key) {
+        $key = trim((string) $key);
+        if ($key === '') {
+            return '';
+        }
+        if (strlen($key) < 8) {
+            return '••••••••';
+        }
+        return substr($key, 0, 4) . '…';
+    }
+
     public static function resolve_base_url() {
-        $default = defined('AFFILIO_API_URL') ? AFFILIO_API_URL : 'https://api.affilio.io/v1';
-        $url = trim((string) get_option('affilio_api_url_override', ''));
-        if ($url === '') {
-            $url = $default;
+        $url = defined('AFFILIO_API_URL') ? trim((string) AFFILIO_API_URL) : '';
+        $override = trim((string) get_option('affilio_api_url_override', ''));
+        if ($override !== '') {
+            $url = $override;
         }
         return rtrim((string) apply_filters('affilio_api_base_url', $url), '/');
     }
 
+    private function connection_cache_key() {
+        $this->base_url = self::resolve_base_url();
+        return 'affilio_cs_' . md5($this->base_url . "\n" . $this->current_api_key());
+    }
+
     public function invalidate_status_cache() {
+        delete_transient($this->connection_cache_key());
         delete_transient($this->status_cache_key);
     }
 
     public function get_connection_status($force_refresh = false) {
-        $cached = get_transient($this->status_cache_key);
+        $cache_key = $this->connection_cache_key();
+        $cached = get_transient($cache_key);
         if (!$force_refresh && is_array($cached)) {
             return $cached;
         }
@@ -63,8 +127,16 @@ class Affilio_API {
             'http_code' => 0,
         );
 
+        if ($this->base_url === '') {
+            $status['state'] = 'missing_url';
+            $status['label'] = $this->t('Not connected', 'Non connesso');
+            $status['message'] = 'Not connected — set the API URL in Settings';
+            set_transient($cache_key, $status, 60);
+            return $status;
+        }
+
         if ($this->current_api_key() === '') {
-            set_transient($this->status_cache_key, $status, 60);
+            set_transient($cache_key, $status, 60);
             return $status;
         }
 
@@ -73,7 +145,7 @@ class Affilio_API {
             $status['state'] = 'network_error';
             $status['label'] = $this->t('Connection Error', 'Errore di connessione');
             $status['message'] = $this->t('Cannot reach Affilio API. Check network or API URL.', 'Impossibile raggiungere l\'API di Affilio. Controlla rete o URL API.');
-            set_transient($this->status_cache_key, $status, 60);
+            set_transient($cache_key, $status, 60);
             return $status;
         }
 
@@ -82,7 +154,7 @@ class Affilio_API {
             $status['state'] = 'network_error';
             $status['label'] = $this->t('Connection Error', 'Errore di connessione');
             $status['message'] = $this->t('Cannot reach Affilio API. Check network or API URL.', 'Impossibile raggiungere l\'API di Affilio. Controlla rete o URL API.');
-            set_transient($this->status_cache_key, $status, 60);
+            set_transient($cache_key, $status, 60);
             return $status;
         }
 
@@ -110,7 +182,7 @@ class Affilio_API {
             $status['label'] = $this->t('Connection Failed', 'Connessione non riuscita');
             $status['message'] = $this->t('Unexpected API response while validating credentials.', 'Risposta API inattesa durante la validazione delle credenziali.');
         }
-        set_transient($this->status_cache_key, $status, 60);
+        set_transient($cache_key, $status, 60);
         return $status;
     }
 

@@ -1,6 +1,16 @@
 ( function() {
     const root = document.getElementById('affilio-discovery-root');
     if (!root) return;
+    const affilioProxy = (method, path, body) => {
+        const base = String((AffilioData && AffilioData.restBase) || '').replace(/\/$/, '');
+        const payload = { method: method, path: path };
+        if (body !== undefined) payload.body = body;
+        return fetch(base + '/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': AffilioData.nonce },
+            body: JSON.stringify(payload),
+        });
+    };
     if (!AffilioData.adminKey) {
         const settings = AffilioData.settingsUrl || '/wp-admin/admin.php?page=affilio-settings';
         root.innerHTML = `<h2>Program Discovery Queue</h2><p>Admin API key is missing. Configure it in advanced settings: <a href="${settings}">Open settings</a></p>`;
@@ -80,11 +90,7 @@
             btn.addEventListener('click', async () => {
                 const id = btn.getAttribute('data-id');
                 const status = btn.getAttribute('data-status');
-                await fetch(`${AffilioData.apiUrl}/program-discovery/queue/${id}/review`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Admin-Key': AffilioData.adminKey },
-                    body: JSON.stringify({ status, actor: AffilioData.actor || 'admin' }),
-                });
+                await affilioProxy('POST', '/program-discovery/queue/' + id + '/review', { status: status });
                 location.reload();
             });
         });
@@ -106,17 +112,12 @@
                 if (website === null) return;
                 const signup = window.prompt('Signup URL (optional)', '');
                 if (signup === null) return;
-                await fetch(`${AffilioData.apiUrl}/program-discovery/queue/${id}/promote`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Admin-Key': AffilioData.adminKey },
-                    body: JSON.stringify({
-                        name,
-                        company,
-                        primary_category: category,
-                        website_url: website,
-                        signup_url: signup,
-                        actor: AffilioData.actor || 'admin'
-                    }),
+                await affilioProxy('POST', '/program-discovery/queue/' + id + '/promote', {
+                    name: name,
+                    company: company,
+                    primary_category: category,
+                    website_url: website,
+                    signup_url: signup
                 });
                 location.reload();
             });
@@ -137,9 +138,7 @@
     };
 
     const loadQueue = (offset = 0) => {
-        fetch(AffilioData.apiUrl + '/program-discovery/queue?offset=' + offset + '&limit=50', {
-            headers: { 'X-Admin-Key': AffilioData.adminKey }
-        })
+        affilioProxy('GET', '/program-discovery/queue?offset=' + offset + '&limit=50')
             .then(r => r.json())
             .then(data => render(data.queue || [], data.pagination))
             .catch(() => { root.innerHTML = '<h2>Program Discovery Queue</h2><p>Failed to load queue.</p>'; });

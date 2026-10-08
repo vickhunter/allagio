@@ -1,0 +1,11 @@
+title = "Affilio"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Plugin tests use fixed fake keys to prove masking. They are not credentials."
+regexes = [
+  '''abcdSECRETKEY1234wxyz''',
+  '''admnSECRETADMIN9999qrst''',
+]

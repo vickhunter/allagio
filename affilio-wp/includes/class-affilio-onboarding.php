@@ -1,5 +1,9 @@
 <?php
 
+if (class_exists('Affilio_Onboarding')) {
+    return;
+}
+
 class Affilio_Onboarding {
     private $api;
 
@@ -41,6 +45,9 @@ class Affilio_Onboarding {
         if (!$this->allowed()) {
             return new WP_Error('affilio_forbidden', 'Administrator access required.', array('status' => 403));
         }
+        if (Affilio_API::resolve_base_url() === '') {
+            return new WP_Error('affilio_missing_url', 'Set the API URL in Settings before connecting.', array('status' => 400));
+        }
         if (!$this->lock()) {
             return new WP_Error('affilio_busy', 'Setup is already running. Try again shortly.', array('status' => 409));
         }
@@ -50,19 +57,14 @@ class Affilio_Onboarding {
                 if (is_wp_error($health) || $health['code'] !== 200 || empty($health['data']['site_installation_registration'])) {
                     return new WP_Error('affilio_version', 'This service is not ready for one-click setup. Update the backend before connecting.', array('status' => 503));
                 }
-                $domain = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
-                if (!$domain || strpos($domain, '.') === false) {
-                    return new WP_Error('affilio_domain', 'Use a public site domain before connecting.', array('status' => 400));
-                }
-                add_option('affilio_installation_key', bin2hex(random_bytes(32)), '', false);
-                $key = get_option('affilio_installation_key');
                 $response = $this->api->request('POST', '/sites/register', array(
-                    'domain' => $domain, 'name' => get_bloginfo('name'), 'installation_key' => $key,
+                    'site_url' => home_url(),
+                    'plugin_version' => AFFILIO_VERSION,
                 ));
-                if (is_wp_error($response) || $response['code'] !== 200 || empty($response['data']['site_id']) || !isset($response['data']['api_key']) || !hash_equals($key, (string) $response['data']['api_key'])) {
+                if (is_wp_error($response) || $response['code'] !== 200 || empty($response['data']['site_id']) || empty($response['data']['api_key'])) {
                     return new WP_Error('affilio_connect', 'Could not connect. Your setup can be retried safely.', array('status' => 502));
                 }
-                update_option('affilio_api_key', $key, false);
+                update_option('affilio_api_key', (string) $response['data']['api_key'], false);
                 update_option('affilio_site_id', $response['data']['site_id'], false);
             }
             $this->api->invalidate_status_cache();
@@ -110,6 +112,9 @@ class Affilio_Onboarding {
             }
             $articles = array();
             foreach ($posts as $post) {
+                if (isset($post->post_status) && $post->post_status !== 'publish') {
+                    continue;
+                }
                 $articles[] = array('wp_post_id' => $post->ID, 'title' => $post->post_title, 'content' => $post->post_content, 'url' => get_permalink($post));
             }
             $response = $this->api->request('POST', '/scan/full', array('articles' => $articles));

@@ -1,5 +1,9 @@
 <?php
 
+if (class_exists('Affilio_Editor_Proxy')) {
+    return;
+}
+
 class Affilio_Editor_Proxy {
     private $api;
     private $inserter;
@@ -22,6 +26,9 @@ class Affilio_Editor_Proxy {
         $post = get_post((int) $request->get_param('wp_post_id'));
         if (!$post || !current_user_can('edit_post', $post->ID)) {
             return new WP_Error('affilio_post', 'Post not found or not editable.', array('status' => 403));
+        }
+        if (!isset($post->post_status) || $post->post_status !== 'publish') {
+            return new WP_Error('affilio_unpublished', 'Only published posts can be scanned.', array('status' => 409));
         }
         return $this->response($this->api->request('POST', '/scan/single', array('wp_post_id' => $post->ID, 'title' => $post->post_title, 'content' => $post->post_content, 'url' => get_permalink($post))));
     }
@@ -56,7 +63,11 @@ class Affilio_Editor_Proxy {
         if (!$found) {
             return new WP_Error('affilio_recommendation', 'Recommendation does not belong to this post.', array('status' => 404));
         }
-        $generated = $this->api->request('POST', '/generate/content', array('recommendation_id' => $id, 'article_context' => get_post($post_id)->post_content));
+        $source = get_post($post_id);
+        if (!$source || !isset($source->post_status) || $source->post_status !== 'publish') {
+            return new WP_Error('affilio_unpublished', 'Only published posts can be scanned.', array('status' => 409));
+        }
+        $generated = $this->api->request('POST', '/generate/content', array('recommendation_id' => $id, 'article_context' => $source->post_content));
         if (is_wp_error($generated) || $generated['code'] !== 200 || empty($generated['data']['html'])) {
             return $this->response($generated);
         }

@@ -68,7 +68,7 @@ class SetupTestAPI {
                 $this->lose_response = false;
                 return new WP_Error('network', 'Response lost after registration');
             }
-            return array('code' => 200, 'data' => array('site_id' => 'same-site', 'api_key' => $body['installation_key']));
+            return array('code' => 200, 'data' => array('site_id' => 'same-site', 'api_key' => 'server-issued-api-key'));
         }
         if ($path === '/scan/full') {
             $this->scans[] = $body;
@@ -80,6 +80,7 @@ class SetupTestAPI {
 
 $api = new SetupTestAPI();
 $setup = new Affilio_Onboarding($api);
+update_option('affilio_api_url_override', 'https://api.example.test/v1');
 check($setup->status()['phase'] === 'not_started' && count($api->registrations) === 0, 'Setup phoned home before Connect');
 $administrator = false;
 check(!$setup->allowed() && is_wp_error($setup->connect()), 'Non-admin could connect');
@@ -87,13 +88,14 @@ $administrator = true;
 $api->supports_setup = false;
 check(is_wp_error($setup->connect()) && count($api->registrations) === 0, 'Unsupported backend created an orphan registration');
 $api->supports_setup = true;
-check(is_wp_error($setup->connect()), 'Lost response was marked connected');
-$key = get_option('affilio_installation_key');
-check(strlen($key) === 64 && get_option('affilio_api_key', '') === '', 'Registration did not persist its retry identity safely');
+check(is_wp_error($setup->connect()) && count($api->registrations) === 1, 'Lost response was marked connected');
+check(get_option('affilio_api_key', '') === '', 'Lost response stored a key');
+check($api->registrations[0] === array('site_url' => 'https://blog.example', 'plugin_version' => AFFILIO_VERSION), 'Registration sent more than the site URL and plugin version');
 $state = $setup->connect();
 check($state['phase'] === 'scanning' && $state['connection']['connected'], 'Retry did not connect');
-check($api->registrations[0]['installation_key'] === $api->registrations[1]['installation_key'], 'Retry created a new installation identity');
-check(strpos(json_encode($state), $key) === false, 'Setup leaked a credential to the browser');
+check($api->registrations[0] === $api->registrations[1], 'Retry changed the registration payload');
+check(get_option('affilio_api_key') === 'server-issued-api-key', 'Server API key was not stored');
+check(strpos(json_encode($state), 'server-issued-api-key') === false, 'Setup leaked a credential to the browser');
 $setup->connect();
 check(count($api->registrations) === 2, 'Connected setup registered again');
 

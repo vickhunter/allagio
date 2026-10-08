@@ -23,10 +23,8 @@ jobs:
         run: npm pack --dry-run
       - name: Check WordPress PHP
         run: find affilio-wp -name '*.php' -print0 | xargs -0 -n1 php -l
-      - name: Test WordPress setup
-        run: php affilio-wp/tests/onboarding.php
-      - name: Test WordPress distribution
-        run: php affilio-wp/tests/distribution.php
+      - name: Test WordPress plugin
+        run: find affilio-wp/tests -name '*.php' ! -name 'bootstrap.php' -print0 | xargs -0 -n1 php
       - name: Build landing illustration
         working-directory: affilio-wp/admin/build
         run: npm ci --ignore-scripts && npm run build

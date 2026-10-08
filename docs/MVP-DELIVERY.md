@@ -76,7 +76,9 @@ npm exec --yes --package=https://distributoor-production.up.railway.app/download
 
 Publishers download `/downloads/affilio.zip` from that same origin, upload and
 activate it in WordPress, open **Affilio → Settings** to connect, then open
-**Affilio → Distribution**. The download embeds the service's actual API origin.
+**Affilio → Distribution**. The ZIP is the 0.1.10 package rooted at
+`affilio-wp/affilio.php`. It does not contain a `railway.app` host. Set the API
+URL in Settings; the plugin does not bake one in.
 The private GitHub repository need not become public. The npm registry and
 WordPress directory can be added later.
 
@@ -93,7 +95,10 @@ revision. Required checks are `affilio-api-tests`, `onboarding` and
 `mvp-release-package`. The package check builds `Dockerfile.mvp`, verifies its
 runtime assets, notices and archives, and runs the packaged installer in a fresh
 product directory. It does not publish the internal WordPress ZIP: the public
-download handler embeds the correct service origin before serving it.
+download handler serves `affilio-wp/affilio.php` and removes any `railway.app`
+host before responding. A leftover `https://affilio-production.up.railway.app/v1`
+placeholder in that main file is replaced with the service origin when the
+origin itself is not a `railway.app` host.
 All three workflows also allow manual runs against a release branch when a
 commit falls outside their automatic path filters.
 
@@ -134,7 +139,8 @@ redirect with a placement-attributed click. The fixture uses
 local HTTPS and isolated owner sessions; no customer article was published.
 Set `AFFILIO_WORKSPACE_DOWNLOADS` to the extracted image's downloads directory
 when running `TestWordPressDistributionBrowser` to install the actual HTTP-served
-ZIP and verify its embedded API origin. Its isolated WP-CLI container must mount
+ZIP and verify it is folder `affilio-wp/` at 0.1.10 with no `railway.app` host.
+Its isolated WP-CLI container must mount
 the QA ZIP at `/release/affilio.zip`, with no source plugin bind mount.
 
 Use the real Stripe integration to validate each merchant's checkout: preserve

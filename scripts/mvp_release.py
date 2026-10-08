@@ -4,6 +4,7 @@ import base64
 import io
 import json
 from pathlib import Path, PurePosixPath
+import re
 import subprocess
 import sys
 import tarfile
@@ -25,13 +26,32 @@ ASSETS = (
     "THIRD_PARTY_NOTICES.md",
 )
 WP_FILES = {
-    "affilio/affilio.php", "affilio/includes/class-affilio-api.php",
-    "affilio/includes/class-affilio-editor-proxy.php",
-    "affilio/includes/class-affilio-onboarding.php",
-    "affilio/includes/class-affilio-distribution.php",
-    "affilio/admin/build/onboarding.js", "affilio/admin/build/distribution.js",
-    "affilio/admin/build/distribution.css",
+    "affilio-wp/affilio.php",
+    "affilio-wp/includes/class-affilio-api.php",
+    "affilio-wp/includes/class-affilio-scanner.php",
+    "affilio-wp/includes/class-affilio-inserter.php",
+    "affilio-wp/includes/class-affilio-tracker.php",
+    "affilio-wp/includes/class-affilio-admin.php",
+    "affilio-wp/includes/class-affilio-editor-proxy.php",
+    "affilio-wp/includes/class-affilio-onboarding.php",
+    "affilio-wp/includes/class-affilio-distribution.php",
+    "affilio-wp/admin/build/onboarding.js",
+    "affilio-wp/admin/build/distribution.js",
+    "affilio-wp/admin/build/distribution.css",
+    "affilio-wp/admin/build/sidebar.js",
+    "affilio-wp/admin/build/discovery.js",
+    "affilio-wp/admin/build/analytics.js",
+    "affilio-wp/admin/build/dashboard.js",
+    "affilio-wp/admin/build/marketplace.js",
+    "affilio-wp/admin/build/earnings.js",
+    "affilio-wp/admin/css/affilio-admin.css",
+    "affilio-wp/readme.txt",
 }
+PLUGIN_ROOT = "affilio-wp/"
+PLUGIN_VERSION = "0.1.10"
+ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
+DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
+QUOTED_BUILD = re.compile(r"""(['"])([A-Za-z0-9_.-]+\.(?:js|css))\1""")
 SKILLS = {f"package/skills/distributoor-{name}/SKILL.md" for name in ("onboard", "instrument", "launch")}
 MAX_DOWNLOAD = 20 * 1024 * 1024
 
@@ -171,22 +191,58 @@ def archive_names(names):
         require(not any(part in {".git", ".local", "node_modules", ".env"} or part.startswith(".env.") for part in parts), "Archive contains private or development files.")
 
 
+def referenced_plugin_files(text):
+    needed = set()
+    for match in ASSET_CONCAT.finditer(text):
+        relative = match.group(2).lstrip("/")
+        if "." in PurePosixPath(relative).name:
+            needed.add(relative)
+    if DYNAMIC_BUILD.search(text):
+        for match in QUOTED_BUILD.finditer(text):
+            needed.add("admin/build/" + match.group(2))
+    return needed
+
+
+def unguarded_init(text):
+    marker = "function affilio_init"
+    start = 0
+    while True:
+        index = text.find(marker, start)
+        if index < 0:
+            return False
+        window = text[max(0, index - 400):index]
+        if "function_exists('affilio_init')" not in window and 'function_exists("affilio_init")' not in window:
+            return True
+        start = index + len(marker)
+
+
 def validate_plugin(data, origin=None):
+    del origin  # The plugin no longer bakes a deployment origin into its source.
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         names = archive.namelist()
         archive_names(names)
-        require(WP_FILES <= set(names), "WordPress ZIP is missing runtime files.")
         require(sum(file.file_size for file in archive.infolist()) <= MAX_DOWNLOAD, "WordPress ZIP expands beyond the release size limit.")
         require(archive.testzip() is None, "WordPress ZIP failed its checksum check.")
-        for name in names:
-            require(name.startswith("affilio/"), "WordPress ZIP has an unexpected top-level path.")
-            if name.startswith("affilio/admin/build/"):
+        files = {name: archive.read(name) for name in names if not name.endswith("/")}
+        require(PLUGIN_ROOT + "admin/build/analytics.js" in files, "WordPress ZIP is missing admin/build/analytics.js")
+        missing = sorted(WP_FILES - set(files))
+        require(not missing, "WordPress ZIP is missing " + ", ".join(missing))
+        for name, payload in files.items():
+            require(name.startswith(PLUGIN_ROOT), "WordPress ZIP top folder must be affilio-wp/")
+            require(b"railway.app" not in payload, "WordPress ZIP must not contain railway.app")
+            if name.startswith(PLUGIN_ROOT + "admin/build/"):
                 file = PurePosixPath(name).name
                 require(not file.startswith(("workspace", "landing", "package")) and file not in {"home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}, "WordPress ZIP includes hosted UI or build tools.")
-        plugin = archive.read("affilio/affilio.php").decode("utf8")
+        plugin = files[PLUGIN_ROOT + "affilio.php"].decode("utf8")
         require("Plugin Name:" in plugin, "WordPress plugin header is missing.")
-        if origin:
-            require(f"'{origin}/v1'" in plugin and "https://affilio-production.up.railway.app/v1" not in plugin, "WordPress download points at the wrong API origin.")
+        php = {name: payload.decode("utf8", "replace") for name, payload in files.items() if name.endswith(".php")}
+        require(not any(unguarded_init(text) for text in php.values()), "WordPress ZIP has an unguarded function affilio_init")
+        require(f"Version: {PLUGIN_VERSION}" in plugin, f"WordPress plugin header is not {PLUGIN_VERSION}")
+        require(f"define('AFFILIO_VERSION', '{PLUGIN_VERSION}')" in plugin, f"AFFILIO_VERSION is not {PLUGIN_VERSION}")
+        require(f"Stable tag: {PLUGIN_VERSION}".encode() in files.get(PLUGIN_ROOT + "readme.txt", b""), f"readme stable tag is not {PLUGIN_VERSION}")
+        for text in php.values():
+            for relative in referenced_plugin_files(text):
+                require(PLUGIN_ROOT + relative in files, "WordPress ZIP is missing " + relative)
 
 
 def validate_installer(data):

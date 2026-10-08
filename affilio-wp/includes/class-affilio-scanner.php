@@ -1,5 +1,9 @@
 <?php
 
+if (class_exists('Affilio_Scanner')) {
+    return;
+}
+
 class Affilio_Scanner {
     private $api;
 
@@ -11,6 +15,9 @@ class Affilio_Scanner {
         $posts = get_posts(array('post_type' => 'post', 'posts_per_page' => -1, 'post_status' => 'publish'));
         $articles = array();
         foreach ($posts as $post) {
+            if (isset($post->post_status) && $post->post_status !== 'publish') {
+                continue;
+            }
             $articles[] = array(
                 'wp_post_id' => $post->ID,
                 'title'      => $post->post_title,
@@ -23,8 +30,8 @@ class Affilio_Scanner {
 
     public function scan_single_post($post_id) {
         $post = get_post($post_id);
-        if (!$post) {
-            return new WP_Error('affilio_not_found', 'Post not found');
+        if (!$post || !isset($post->post_status) || $post->post_status !== 'publish') {
+            return new WP_Error('affilio_unpublished', 'Only published posts can be scanned.');
         }
         $payload = array(
             'wp_post_id' => $post->ID,

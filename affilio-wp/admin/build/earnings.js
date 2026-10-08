@@ -4,6 +4,16 @@
     const locale = String((AffilioData && AffilioData.locale) || document.documentElement.lang || 'en').toLowerCase();
     const isItalian = locale.startsWith('it');
     const t = (en, it) => (isItalian ? it : en);
+    const affilioProxy = (method, path, body) => {
+        const base = String((AffilioData && AffilioData.restBase) || '').replace(/\/$/, '');
+        const payload = { method: method, path: path };
+        if (body !== undefined) payload.body = body;
+        return fetch(base + '/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': AffilioData.nonce },
+            body: JSON.stringify(payload),
+        });
+    };
     root.classList.add('affilio-dashboard-app');
 
     if (AffilioData.connectionStatus && !AffilioData.connectionStatus.connected) {
@@ -133,10 +143,9 @@
 
     const load = async () => {
         try {
-            const headers = { 'X-API-Key': AffilioData.apiKey };
             const [balanceRes, historyRes] = await Promise.all([
-                fetch(AffilioData.apiUrl + '/payouts/balance', { headers }),
-                fetch(AffilioData.apiUrl + '/payouts/history', { headers }),
+                affilioProxy('GET', '/payouts/balance'),
+                affilioProxy('GET', '/payouts/history'),
             ]);
             if (!balanceRes.ok || !historyRes.ok) throw new Error('load failed');
             const balance = await balanceRes.json();

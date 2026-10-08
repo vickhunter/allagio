@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Affilio
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.8
+ * Version: 0.1.10
  * Author: Affilio
  */
 
@@ -10,13 +10,14 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('AFFILIO_VERSION', '0.1.8');
+if (defined('AFFILIO_LOADED')) {
+    return;
+}
+define('AFFILIO_LOADED', true);
+
+define('AFFILIO_VERSION', '0.1.10');
 define('AFFILIO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('AFFILIO_PLUGIN_URL', plugin_dir_url(__FILE__));
-if (!defined('AFFILIO_API_URL')) {
-    // Production API default for customer installs. Can still be overridden in advanced mode.
-    define('AFFILIO_API_URL', 'https://affilio-production.up.railway.app/v1');
-}
 
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-api.php';
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-scanner.php';
@@ -27,6 +28,7 @@ require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-editor-proxy.php';
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-onboarding.php';
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-distribution.php';
 
+if (!function_exists('affilio_init')) {
 function affilio_init() {
     $api = new Affilio_API();
     $scanner = new Affilio_Scanner($api);
@@ -40,11 +42,12 @@ function affilio_init() {
     add_action('admin_menu', array($admin, 'register_menu'));
     add_action('enqueue_block_editor_assets', array($admin, 'enqueue_sidebar_assets'));
     add_action('admin_enqueue_scripts', array($admin, 'enqueue_dashboard_assets'));
-    add_action('rest_api_init', array($tracker, 'register_routes'));
+    add_action('rest_api_init', array($admin, 'register_routes'));
     add_action('rest_api_init', array($inserter, 'register_routes'));
     add_action('rest_api_init', array($editor_proxy, 'register_routes'));
     add_action('rest_api_init', array($onboarding, 'register_routes'));
     add_action('rest_api_init', array($distribution, 'register_routes'));
+}
 }
 
 add_action('plugins_loaded', 'affilio_init');

@@ -260,6 +260,25 @@ func (d *DB) DeleteSiteByID(ctx context.Context, siteID string) (bool, error) {
 	return res.RowsAffected() > 0, nil
 }
 
+func (d *DB) SaveSitePluginVersion(ctx context.Context, siteID, version string) error {
+	version = strings.TrimSpace(version)
+	if siteID == "" || version == "" {
+		return nil
+	}
+	var exists bool
+	err := d.Pool.QueryRow(ctx, `SELECT EXISTS (
+		SELECT 1 FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'sites'
+		  AND column_name = 'plugin_version'
+	)`).Scan(&exists)
+	if err != nil || !exists {
+		return err
+	}
+	_, err = d.Pool.Exec(ctx, `UPDATE sites SET plugin_version = $2 WHERE id = $1`, siteID, version)
+	return err
+}
+
 func (d *DB) CreateSite(ctx context.Context, keyHash, keyPrefix, domain, name string) (string, error) {
 	var id string
 	err := d.Pool.QueryRow(ctx, `INSERT INTO sites (api_key_hash, api_key_prefix, domain, name) VALUES ($1,$2,$3,$4) RETURNING id`, keyHash, keyPrefix, domain, name).Scan(&id)

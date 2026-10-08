@@ -4,6 +4,16 @@
     const locale = String((AffilioData && AffilioData.locale) || document.documentElement.lang || 'en').toLowerCase();
     const isItalian = locale.startsWith('it');
     const t = (en, it) => (isItalian ? it : en);
+    const affilioProxy = (method, path, body) => {
+        const base = String((AffilioData && AffilioData.restBase) || '').replace(/\/$/, '');
+        const payload = { method: method, path: path };
+        if (body !== undefined) payload.body = body;
+        return fetch(base + '/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': AffilioData.nonce },
+            body: JSON.stringify(payload),
+        });
+    };
     root.classList.add('affilio-dashboard-app');
     if (AffilioData.connectionStatus && !AffilioData.connectionStatus.connected) {
         const settings = AffilioData.settingsUrl || '/wp-admin/admin.php?page=affilio-settings';
@@ -270,9 +280,7 @@
                 row.addEventListener('click', async () => {
                     const id = row.getAttribute('data-article-id');
                     detail.innerHTML = `<p>${t('Loading details...', 'Caricamento dettagli...')}</p>`;
-                    const res = await fetch(AffilioData.apiUrl + '/articles/' + id, {
-                        headers: { 'X-API-Key': AffilioData.apiKey }
-                    });
+                    const res = await affilioProxy('GET', '/articles/' + id);
                     const data = await res.json();
                     const recommendations = data.recommendations || [];
                     const recMap = {};
@@ -364,11 +372,7 @@
                         const previewEl = detail.querySelector(`#affilio-rec-preview-${recId}`);
 
                         if (action === 'dismiss') {
-                            await fetch(`${AffilioData.apiUrl}/recommendations/${recId}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json', 'X-API-Key': AffilioData.apiKey },
-                                body: JSON.stringify({ status: 'dismissed' }),
-                            });
+                            await affilioProxy('PATCH', '/recommendations/' + recId, { status: 'dismissed' });
                             btn.innerText = 'Dismissed';
                             btn.disabled = true;
                             const statusEl = detail.querySelector(`[data-rec-item="${recId}"] .affilio-rec-status`);
@@ -384,10 +388,7 @@
                             btn.disabled = true;
                             btn.innerText = action === 'preview' ? t('Generating...', 'Generazione in corso...') : t('Regenerating...', 'Rigenerazione in corso...');
                             const articleContext = await loadArticleContext();
-                            const gen = await fetch(AffilioData.apiUrl + '/generate/content', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'X-API-Key': AffilioData.apiKey },
-                                body: JSON.stringify({
+                            const gen = await affilioProxy('POST', '/generate/content', {
                                     recommendation_id: recId,
                                     insertion_type: rec.insertion_type || 'inline_mention',
                                     article_context: articleContext,
@@ -398,7 +399,6 @@
                                     article_category: data.article.category || '',
                                     preferred_tone: 'match article author voice',
                                     site_language: document.documentElement.lang || 'auto',
-                                }),
                             });
                             btn.disabled = false;
                             btn.innerText = action === 'preview' ? t('Preview Insert', 'Anteprima inserimento') : t('Regenerate', 'Rigenera');
@@ -540,11 +540,7 @@
                                     confirmBtn.disabled = true;
                                     confirmBtn.innerText = t('Inserting...', 'Inserimento in corso...');
 
-                                    const approve = await fetch(`${AffilioData.apiUrl}/recommendations/${recId}`, {
-                                        method: 'PATCH',
-                                        headers: { 'Content-Type': 'application/json', 'X-API-Key': AffilioData.apiKey },
-                                        body: JSON.stringify({ status: 'approved' }),
-                                    });
+                                    const approve = await affilioProxy('PATCH', '/recommendations/' + recId, { status: 'approved' });
                                     if (!approve.ok && approve.status !== 409) {
                                         renderToast(t('Failed to approve recommendation', 'Impossibile approvare la raccomandazione'));
                                         confirmOverlay.remove();
@@ -592,24 +588,17 @@
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const formData = new FormData(form);
-                await fetch(AffilioData.apiUrl + '/user-programs', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': AffilioData.apiKey,
-                    },
-                    body: JSON.stringify({
-                        name: formData.get('name'),
-                        domain: formData.get('domain'),
-                        affiliate_link: formData.get('link'),
-                    }),
+                await affilioProxy('POST', '/user-programs', {
+                    name: formData.get('name'),
+                    domain: formData.get('domain'),
+                    affiliate_link: formData.get('link'),
                 });
                 location.reload();
             });
         }
     };
 
-    const fetchJSON = (path) => fetch(AffilioData.apiUrl + path, { headers: { 'X-API-Key': AffilioData.apiKey } }).then(r => {
+    const fetchJSON = (path) => affilioProxy('GET', path).then(r => {
         if (!r.ok) throw new Error(path + ' failed');
         return r.json();
     });

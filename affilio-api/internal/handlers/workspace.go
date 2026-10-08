@@ -166,9 +166,7 @@ func (h *HostedHandler) DownloadWordPress(c *gin.Context) {
 			c.Status(500)
 			return
 		}
-		if file.Name == "affilio/affilio.php" {
-			data = bytes.ReplaceAll(data, []byte("https://affilio-production.up.railway.app/v1"), []byte(h.BaseURL+"/v1"))
-		}
+		data = rewriteDownloadedPlugin(file.Name, data, h.BaseURL)
 		entry, err := writer.CreateHeader(&file.FileHeader)
 		if err != nil {
 			c.Status(500)
@@ -185,6 +183,18 @@ func (h *HostedHandler) DownloadWordPress(c *gin.Context) {
 	}
 	c.Header("Content-Disposition", `attachment; filename="affilio.zip"`)
 	c.Data(200, "application/zip", output.Bytes())
+}
+
+func rewriteDownloadedPlugin(name string, data []byte, baseURL string) []byte {
+	if name == "affilio-wp/affilio.php" {
+		replacement := ""
+		base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+		if base != "" && !strings.Contains(strings.ToLower(base), "railway.app") {
+			replacement = base + "/v1"
+		}
+		data = bytes.ReplaceAll(data, []byte("https://affilio-production.up.railway.app/v1"), []byte(replacement))
+	}
+	return bytes.ReplaceAll(data, []byte("railway.app"), nil)
 }
 
 func (h *HostedHandler) placementReceiptHTML(p *database.Placement) template.HTML {
