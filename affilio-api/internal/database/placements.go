@@ -29,7 +29,14 @@ const placementTermsSQL = `jsonb_build_object('product_id',o.product_id,'commiss
  'commission_value_minor',(o.commission_value*100)::bigint,'currency',o.commission_currency,
  'cookie_duration_days',o.cookie_duration_days,'refund_window_days',o.refund_window_days,
  'landing_url',o.landing_url,'ref_param',o.ref_param,'terms',COALESCE(o.terms,''),
- 'payment_mode',CASE WHEN pc.live_mode THEN 'live' ELSE 'test' END,'payout_method','direct_merchant','service_fee_percent_of_commission',10,'scope','first_paid_checkout')`
+ 'payment_mode',CASE WHEN pc.product_id IS NULL THEN 'none' WHEN pc.live_mode THEN 'live' ELSE 'test' END,'payout_method','direct_merchant','service_fee_percent_of_commission',10,'scope','first_paid_checkout')`
+
+// A listed percentage or flat offer is placeable when its product has no payment
+// provider, or when a Stripe product has an enabled connection in the offer currency.
+const placementEligibleSQL = `FROM offers o JOIN products p ON p.id=o.product_id
+ LEFT JOIN product_connections pc ON pc.product_id=o.product_id AND pc.enabled AND pc.currency=o.commission_currency
+ WHERE o.status='listed' AND o.commission_type IN ('percentage','flat')
+ AND (COALESCE(NULLIF(p.payment_provider, ''), 'none') = 'none' OR (p.payment_provider='stripe' AND pc.product_id IS NOT NULL))`
 
 func scanPlacement(row interface{ Scan(...interface{}) error }) (*Placement, error) {
 	var p Placement
@@ -39,8 +46,7 @@ func scanPlacement(row interface{ Scan(...interface{}) error }) (*Placement, err
 
 func (d *DB) CreatePlacement(ctx context.Context, p Placement) (*Placement, error) {
 	return scanPlacement(d.Pool.QueryRow(ctx, `INSERT INTO placement_proposals(site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,expires_at)
- SELECT $1,o.id,$3,$4,$5,$6,$7,`+placementTermsSQL+`,$8 FROM offers o JOIN product_connections pc ON pc.product_id=o.product_id
- WHERE o.id=$2 AND o.status='listed' AND pc.enabled AND pc.currency=o.commission_currency
+ SELECT $1,o.id,$3,$4,$5,$6,$7,`+placementTermsSQL+`,$8 `+placementEligibleSQL+` AND o.id=$2
  RETURNING `+placementColumns, p.SiteID, p.OfferID, p.SurfaceURL, p.Context, p.Copy, p.Disclosure, p.Reason, p.ExpiresAt))
 }
 
@@ -104,8 +110,7 @@ func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Pla
 		return nil, ErrPlacementAuthority
 	}
 	var eligible bool
-	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM offers o JOIN product_connections pc ON pc.product_id=o.product_id
- WHERE o.id=$1 AND o.status='listed' AND pc.enabled AND pc.currency=o.commission_currency AND `+placementTermsSQL+`=$2::jsonb)`, p.OfferID, p.Terms).Scan(&eligible)
+	err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 `+placementEligibleSQL+` AND o.id=$1 AND `+placementTermsSQL+`=$2::jsonb)`, p.OfferID, p.Terms).Scan(&eligible)
 	if err != nil {
 		return nil, err
 	}

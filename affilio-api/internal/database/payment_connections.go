@@ -131,8 +131,18 @@ WHERE cv.provider='stripe' AND cv.provider_object_id=$2 AND cv.kind='sale'`, pro
 
 func (d *DB) EligibleRevenueOfferIDs(ctx context.Context, requireVerified ...bool) (map[string]bool, error) {
 	verified := len(requireVerified) > 0 && requireVerified[0]
-	rows, err := d.Pool.Query(ctx, `SELECT o.id FROM offers o JOIN product_connections pc ON pc.product_id=o.product_id
- WHERE o.status='listed' AND pc.enabled AND pc.currency=o.commission_currency AND o.commission_type IN ('percentage','flat') AND (NOT $1 OR pc.configuration_verified_at IS NOT NULL)`, verified)
+	rows, err := d.Pool.Query(ctx, `SELECT o.id FROM offers o
+ JOIN products p ON p.id=o.product_id
+ LEFT JOIN product_connections pc ON pc.product_id=o.product_id
+ WHERE o.status='listed' AND o.commission_type IN ('percentage','flat')
+ AND (
+   COALESCE(NULLIF(p.payment_provider, ''), 'none') = 'none'
+   OR (
+     p.payment_provider = 'stripe'
+     AND pc.enabled AND pc.currency = o.commission_currency
+     AND (NOT $1 OR pc.configuration_verified_at IS NOT NULL)
+   )
+ )`, verified)
 	if err != nil {
 		return nil, err
 	}
