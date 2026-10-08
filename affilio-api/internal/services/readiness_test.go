@@ -251,11 +251,15 @@ func agnosticSite(t *testing.T) *httptest.Server {
 	t.Helper()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html><body>
-<a href="/start">Get started</a>
+		start := "/start"
+		if r.URL.RawQuery != "" {
+			start += "?" + r.URL.RawQuery
+		}
+		fmt.Fprintf(w, `<html><body>
+<a href="%s">Get started</a>
 <a href="/privacy">Privacy Policy</a>
 <a href="/terms">Terms</a>
-</body></html>`))
+</body></html>`, start)
 	})
 	mux.HandleFunc("/pricing", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html><body>Pro plan: $19/month</body></html>`))
