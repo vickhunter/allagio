@@ -17,6 +17,9 @@ class Affilio_API {
     }
 
     public function request($method, $path, $body = null) {
+        if ($this->base_url === '') {
+            return new WP_Error('affilio_not_configured', 'Not connected — set the API URL in Settings');
+        }
         $url = trailingslashit($this->base_url) . ltrim($path, '/');
         $args = array(
             'method'  => $method,
@@ -40,10 +43,10 @@ class Affilio_API {
     }
 
     public static function resolve_base_url() {
-        $default = defined('AFFILIO_API_URL') ? AFFILIO_API_URL : 'https://api.affilio.io/v1';
-        $url = trim((string) get_option('affilio_api_url_override', ''));
-        if ($url === '') {
-            $url = $default;
+        $url = defined('AFFILIO_API_URL') ? trim((string) AFFILIO_API_URL) : '';
+        $override = trim((string) get_option('affilio_api_url_override', ''));
+        if ($override !== '') {
+            $url = $override;
         }
         return rtrim((string) apply_filters('affilio_api_base_url', $url), '/');
     }
@@ -66,6 +69,14 @@ class Affilio_API {
             'checked_at' => gmdate('c'),
             'http_code' => 0,
         );
+
+        if ($this->base_url === '') {
+            $status['state'] = 'missing_url';
+            $status['label'] = $this->t('Not connected', 'Non connesso');
+            $status['message'] = 'Not connected — set the API URL in Settings';
+            set_transient($this->status_cache_key, $status, 60);
+            return $status;
+        }
 
         if ($this->current_api_key() === '') {
             set_transient($this->status_cache_key, $status, 60);

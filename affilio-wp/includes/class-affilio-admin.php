@@ -217,7 +217,7 @@ class Affilio_Admin {
 
         $api_key = esc_attr(get_option('affilio_api_key', ''));
         $status = $this->api->get_connection_status();
-        $default_api_url = defined('AFFILIO_API_URL') ? AFFILIO_API_URL : 'https://api.affilio.io/v1';
+        $default_api_url = Affilio_API::resolve_base_url();
         $override_api_url = esc_attr(get_option('affilio_api_url_override', ''));
         $admin_key = esc_attr(get_option('affilio_admin_api_key', ''));
 

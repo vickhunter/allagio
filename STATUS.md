@@ -1,3 +1,7 @@
+## October 8 — plugin 0.1.9 (D-012b)
+
+The WordPress package is folder `affilio-wp/` at version 0.1.9. Global functions and classes are guarded so a second copy cannot redeclare them. The public `/track` route and front-end tracker script are gone. The API base URL comes only from the `AFFILIO_API_URL` constant, the `affilio_api_url_override` option, or the `affilio_api_base_url` filter. With none of those set, admin shows “Not connected — set the API URL in Settings” and the plugin makes no outbound HTTP calls.
+
 ## October 8 — pre-deploy hardening follow-up
 
 Tracked links that are paused, unlisted, or removed return `410` and record no click, including for preview bots and `HEAD`. A deleted tracking code stays `404`. Product `website_url` and offer `landing_url` must be `https` at create and update; `/v1/go` refuses a stored non-https destination with `400` and records no click. An active listed `https` browser `GET` still redirects with `via=`.
