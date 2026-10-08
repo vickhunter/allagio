@@ -400,6 +400,75 @@ func assertUnavailable(t *testing.T, r *gin.Engine, db *database.DB, path string
 	}
 }
 
+func TestDestinationURLsRejectHTTP(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, makerKey := createTestMaker(t, db)
+	r := newAttributionRouter(db)
+	t.Run("create website", func(t *testing.T) {
+		rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+			"name":             "Insecure",
+			"website_url":      "http://insecure.example.com",
+			"product_type":     "saas",
+			"payment_provider": "stripe",
+		})
+		if rec.Code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(body["error"]), "https") {
+			t.Fatalf("http website_url must be rejected with an https error, got %d %v", rec.Code, body)
+		}
+	})
+
+	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":             "InboxPilot",
+		"website_url":      "https://inboxpilot.example.com",
+		"docs_url":         "http://docs.inboxpilot.example.com",
+		"product_type":     "saas",
+		"payment_provider": "stripe",
+	})
+	if product["id"] == nil {
+		t.Fatal("https product with an http docs_url should still be accepted")
+	}
+	productID := product["id"].(string)
+	t.Run("update website", func(t *testing.T) {
+		rec, body := doJSON(t, r, http.MethodPatch, "/v1/maker/products/"+productID, makerKey, map[string]interface{}{
+			"website_url": "http://insecure.example.com/path",
+		})
+		if rec.Code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(body["error"]), "https") {
+			t.Fatalf("http website_url update must be rejected, got %d %v", rec.Code, body)
+		}
+	})
+	t.Run("create landing", func(t *testing.T) {
+		rec, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+			"product_id":       productID,
+			"commission_type":  "percentage",
+			"commission_value": 20,
+			"landing_url":      "http://insecure.example.com/offer",
+		})
+		if rec.Code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(offer["error"]), "https") {
+			t.Fatalf("http landing_url must be rejected with an https error, got %d %v", rec.Code, offer)
+		}
+	})
+
+	offerID := listedOffer(t, db, r, makerKey)
+	siteKey := "site-key-http-dest"
+	createTestSite(t, db, siteKey, "httpdest.example.com", "HTTP Dest")
+	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
+	code := join["tracking_code"].(string)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET landing_url='http://insecure.example.com/stored' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("stored destination", func(t *testing.T) {
+		assertUnavailable(t, r, db, "/v1/go/"+code, http.StatusBadRequest, "https")
+		bot := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
+		bot.Header.Set("User-Agent", "Twitterbot/1.0")
+		botRec := httptest.NewRecorder()
+		r.ServeHTTP(botRec, bot)
+		if botRec.Code == http.StatusFound || botRec.Header().Get("Location") != "" {
+			t.Fatalf("preview bot must not be sent to a non-https destination, got %d %q", botRec.Code, botRec.Header().Get("Location"))
+		}
+	})
+}
+
 func testConnectionCipher() *services.ConnectionCipher {
 	cipher, err := services.NewConnectionCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
 	if err != nil {
