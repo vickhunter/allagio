@@ -1,3 +1,9 @@
+## October 8 — offer rail polish (D-019)
+
+- Once a referral offer exists, Products & offers hides "Create a referral offer" behind a secondary "New offer" button. The form stays open when there are no offers, or when creating an offer is the rail's next step. Expanding it focuses the first field, and a rejected create still shows the inline error.
+- The landing page and the owner workspace share one palette and one type scale from the custom properties on `:root` in `workspace.css`. The blue action color is only the single next step. The name on the page is still "distributoor".
+- Setup & agents gives an agent one line to copy (`Read <origin>/SKILL.md and connect this site to Offer Rails`), says the skill file is coming soon while that URL 404s, states the current rail step in a sentence, and lists the steps that still need a person (Stripe connect, operator approval). No Go route was added.
+
 ## October 8 — offer rail in the owner workspace
 
 - The owner products page shows an offer rail: product, readiness, Stripe test mode, offer, submitted, listed. Exactly one control is the next action. Done stations stay marked done. Readiness and submit errors sit on the check or button, take focus, and scroll into view at 390 and 1440.

@@ -8,6 +8,7 @@ const { randomUUID } = require('node:crypto');
 const build = path.resolve(__dirname, '../admin/build');
 const adminCss = path.resolve(__dirname, '../admin/css/affilio-admin.css');
 const artifacts = process.env.OFFER_RAIL_ARTIFACTS || '/opt/cursor/artifacts/d011';
+const d019 = process.env.CI ? path.join(artifacts, 'd019') : '/opt/cursor/artifacts/d019';
 const template = fs.readFileSync(path.join(build, 'workspace.html'), 'utf8');
 
 function shell(title, body, operator) {
@@ -32,6 +33,7 @@ const state = {
   failDistribution: false,
   failFind: false,
   failEarnings: false,
+  failOffer: false,
 };
 
 function reset() {
@@ -46,6 +48,7 @@ function reset() {
   state.failDistribution = false;
   state.failFind = false;
   state.failEarnings = false;
+  state.failOffer = false;
 }
 
 function readBody(req) {
@@ -106,6 +109,7 @@ async function handle(req, res) {
     return send(res, 200, { ok: true });
   }
   if (pathname === '/owner/api/session') return send(res, 200, session);
+  if (pathname === '/owner/api/agents' && req.method === 'GET') return send(res, 200, { grants: [] });
   if (pathname === '/owner/api/products' && req.method === 'GET') {
     if (state.failProducts) return send(res, 503, { error: 'The product list could not be loaded.' });
     return send(res, 200, { products: state.products.map(productJSON) });
@@ -143,6 +147,7 @@ async function handle(req, res) {
   if (pathname === '/owner/api/offers' && req.method === 'GET') return send(res, 200, { offers: state.offers });
   if (pathname === '/owner/api/offers' && req.method === 'POST') {
     const body = await readBody(req);
+    if (state.failOffer) return send(res, 422, { error: 'commission value is below the minimum' });
     const offer = { id: randomUUID(), product_id: body.product_id, status: 'draft', commission_type: body.commission_type, commission_value: body.commission_value, commission_currency: body.commission_currency, currency: body.commission_currency, cookie_duration_days: body.cookie_duration_days, refund_window_days: body.refund_window_days, terms: body.terms || '' };
     state.offers.push(offer);
     return send(res, 201, { offer });
@@ -174,8 +179,8 @@ async function handle(req, res) {
   if (connection && req.method === 'GET') {
     return send(res, 200, shell('Stripe configuration verified', '<p>Account: acct_test · Price: price_test · Currency: usd · Live mode: false</p><p>Stripe configuration verified</p><p>The verification key was not stored.</p><p><a href="/owner/products">Return to your products</a></p>', true), 'text/html; charset=utf-8');
   }
-  if (pathname === '/owner/products' || pathname === '/owner' || pathname === '/owner/review') {
-    const titles = { '/owner/products': 'Products & offers', '/owner': 'Your distribution workspace', '/owner/review': 'Offer review' };
+  if (pathname === '/owner/products' || pathname === '/owner' || pathname === '/owner/review' || pathname === '/owner/settings') {
+    const titles = { '/owner/products': 'Products & offers', '/owner': 'Your distribution workspace', '/owner/review': 'Offer review', '/owner/settings': 'Setup & agents' };
     return send(res, 200, shell(titles[pathname], '<div id="workspace-app"></div>', true), 'text/html; charset=utf-8');
   }
   if (pathname.startsWith('/assets/')) {
@@ -259,6 +264,17 @@ async function shot(page, name) {
     expect(box.y).toBeLessThanOrEqual(1);
   }
   await page.screenshot({ path: path.join(artifacts, name + '.png'), fullPage: true });
+}
+
+async function frame(page, name, fullPage = false, keepScroll = false) {
+  if (!keepScroll) await page.evaluate(() => window.scrollTo(0, 0));
+  const sidebar = page.locator('aside.sidebar');
+  if (await sidebar.count()) {
+    const box = await sidebar.boundingBox();
+    expect(box.y).toBeLessThanOrEqual(1);
+  }
+  fs.mkdirSync(d019, { recursive: true });
+  await page.screenshot({ path: path.join(d019, name + '.png'), fullPage });
 }
 
 async function viewportShot(page, name) {
@@ -511,6 +527,104 @@ test('wordpress distribution, marketplace, and earnings states', async ({ browse
     state.failEarnings = false;
     await context.close();
   }
+});
+
+test('new offer collapses once an offer exists', async ({ browser }) => {
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    reset();
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    await page.goto(base + '/owner/products');
+    await registerProduct(page, 'Collapsed Tool');
+    const productId = await page.evaluate(async () => (await (await fetch('/owner/api/products')).json()).products[0].id);
+    await page.evaluate(async id => {
+      await fetch('/owner/api/products/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ readiness_status: 'ready' }) });
+    }, productId);
+    await page.reload();
+    await createOffer(page);
+    await expect(page.getByRole('button', { name: 'New offer', exact: true })).toBeVisible();
+    await expect(page.locator('[data-new-offer]')).toHaveCount(0);
+    await onePrimary(page, 'Connect Stripe');
+    await fits(page);
+    await frame(page, `after-products-collapsed-${viewport.width}`);
+    await page.getByRole('button', { name: 'New offer', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    const firstField = page.locator('#new-offer select, #new-offer input, #new-offer textarea').first();
+    await expect(firstField).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Create a referral offer' })).toBeVisible();
+    await page.locator('#new-offer').evaluate(section => section.scrollIntoView({ block: 'start' }));
+    await fits(page);
+    await frame(page, `after-products-expanded-${viewport.width}`, false, true);
+    await page.evaluate(async endpoint => {
+      await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ failOffer: true }) });
+    }, base + '/__test/mode');
+    await page.getByLabel('Commission value', { exact: true }).fill('1');
+    await page.getByLabel('Referral destination', { exact: true }).fill('https://rail-tool.example');
+    await page.getByRole('button', { name: 'Create offer', exact: true }).click();
+    const error = page.locator('#new-offer .field-error');
+    await expect(error).toBeFocused();
+    await expect(error).toContainText('commission value is below the minimum');
+    const box = await error.boundingBox();
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+    await onePrimary(page, 'Connect Stripe');
+    await context.close();
+  }
+});
+
+test('setup and agents, landing, and overview', async ({ browser }) => {
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    reset();
+    const productId = randomUUID();
+    state.products = [{ id: productId, name: 'Rail Tool', website_url: 'https://rail-tool.example', tagline: 'Help developers ship a referral offer.', docs_url: '', pricing_url: '', primary_category: '', keywords: [], readiness_status: 'ready', readiness_score: 90 }];
+    state.offers = [{ id: randomUUID(), product_id: productId, status: 'draft', commission_type: 'percentage', commission_value: 20, commission_currency: 'USD', currency: 'USD', cookie_duration_days: 30, refund_window_days: 30, terms: 'First purchase.' }];
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.goto(base + '/landing');
+    await expect(page.getByRole('heading', { name: /You built it/ })).toBeVisible();
+    await expect(page.locator('[data-primary-action]')).toHaveCount(1);
+    await fits(page);
+    await frame(page, `after-landing-${viewport.width}`);
+    await page.goto(base + '/owner');
+    await expect(page.locator('[data-station="stripe"]')).toHaveAttribute('aria-current', 'step');
+    await onePrimary(page, 'Open products ↗');
+    await fits(page);
+    await frame(page, `after-overview-${viewport.width}`);
+    await page.goto(base + '/owner/settings');
+    await expect(page.getByRole('heading', { name: 'Setup & agents', level: 1 })).toBeVisible();
+    await expect(page.locator('.agent-line pre')).toHaveText(`Read ${base}/SKILL.md and connect this site to Offer Rails`);
+    await expect(page.locator('[data-skill-status]')).toContainText('Coming soon');
+    await expect(page.locator('[data-rail-plain]')).toHaveText('Your product is registered. Next: connect Stripe test mode.');
+    const humans = page.locator('.task-list');
+    await expect(humans).toContainText('Connect Stripe in test mode');
+    await expect(humans).toContainText('An operator approves the offer before it is listed.');
+    await expect(page.getByRole('heading', { name: 'Connect your existing agent' })).toBeVisible();
+    await expect(page.locator('.setup-command pre')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Copy line', exact: true }).click();
+    await expect(page.locator('.agent-line .copy-status')).toContainText('Copied');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`Read ${base}/SKILL.md and connect this site to Offer Rails`);
+    await fits(page);
+    await frame(page, `after-setup-${viewport.width}`);
+    if (viewport.width === 1440) await frame(page, 'after-setup-1440-page', true);
+    await context.close();
+  }
+  reset();
+  const productId = randomUUID();
+  state.products = [{ id: productId, name: 'Rail Tool', website_url: 'https://rail-tool.example', tagline: 'Help developers ship a referral offer.', docs_url: '', pricing_url: '', primary_category: '', keywords: [], readiness_status: 'ready', readiness_score: 90 }];
+  state.offers = [{ id: randomUUID(), product_id: productId, status: 'draft', commission_type: 'percentage', commission_value: 20, commission_currency: 'USD', currency: 'USD', cookie_duration_days: 30, refund_window_days: 30, terms: 'First purchase.' }];
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, recordVideo: { dir: '/tmp/d019-video', size: { width: 1440, height: 900 } } });
+  const page = await context.newPage();
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto(base + '/owner/settings');
+  await expect(page.locator('[data-rail-plain]')).toHaveText('Your product is registered. Next: connect Stripe test mode.');
+  await page.getByRole('button', { name: 'Copy line', exact: true }).click();
+  await expect(page.locator('.agent-line .copy-status')).toContainText('Copied');
+  await page.waitForTimeout(4000);
+  const video = page.video();
+  await context.close();
+  const source = await video.path();
+  execFileSync('ffmpeg', ['-y', '-i', source, '-filter:v', 'setpts=0.25*PTS', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '30', path.join(d019, 'after-setup-agents.mp4')], { stdio: 'inherit' });
 });
 
 test('landing still renders at both widths', async ({ browser }) => {

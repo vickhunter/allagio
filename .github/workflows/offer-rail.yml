@@ -5,6 +5,8 @@ on:
   push:
     paths:
       - "affilio-wp/admin/build/workspace.*"
+      - "affilio-wp/admin/build/landing.css"
+      - "affilio-wp/admin/build/home.html"
       - "affilio-wp/admin/build/distribution.*"
       - "affilio-wp/admin/build/marketplace.js"
       - "affilio-wp/admin/build/earnings.js"
@@ -16,6 +18,8 @@ on:
   pull_request:
     paths:
       - "affilio-wp/admin/build/workspace.*"
+      - "affilio-wp/admin/build/landing.css"
+      - "affilio-wp/admin/build/home.html"
       - "affilio-wp/admin/build/distribution.*"
       - "affilio-wp/admin/build/marketplace.js"
       - "affilio-wp/admin/build/earnings.js"

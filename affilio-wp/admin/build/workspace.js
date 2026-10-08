@@ -158,6 +158,26 @@
         if (state.next === 'listed' && offer?.status === 'submitted') return 'waiting-line';
         return state.next;
     };
+    const plainProgress = focus => {
+        const next = focus.state.next;
+        if (!focus.product) return 'No product yet. Next: register a product.';
+        if (next === 'ready') return 'Your product is registered. Next: run the readiness check.';
+        if (next === 'stripe') return focus.stripe?.known && focus.stripe.live_mode
+            ? 'Your product is registered. Next: connect Stripe test mode. Live mode is connected, and this step needs test mode.'
+            : 'Your product is registered. Next: connect Stripe test mode.';
+        if (next === 'offer') return 'Stripe test mode is connected. Next: create a referral offer.';
+        if (next === 'submitted') return 'Your referral offer is saved. Next: submit it for review.';
+        if (next === 'listed') return 'Your offer is submitted. Next: an operator lists it.';
+        if (!next && focus.offer?.status === 'paused') return 'This offer is paused. Resume it when you want publishers to place it.';
+        if (!next && focus.offer?.status === 'listed') return 'This offer is listed. Publishers can place it.';
+        return 'Your offer is in progress.';
+    };
+    const humanSteps = focus => {
+        const steps = [];
+        if (!focus.state.done.stripe) steps.push('Connect Stripe in test mode. A person confirms the restricted key.');
+        if (!focus.state.done.listed) steps.push('An operator approves the offer before it is listed.');
+        return steps;
+    };
     const stationDetail = (id, focus, returned) => {
         const {product, stripe} = focus;
         if (id === 'product') return 'Register the product this offer belongs to.';
@@ -263,8 +283,14 @@
                     : '<p class="caption">Awaiting operator review. Listing does not promise traffic or purchases.</p>';
             return `<section><div class="row"><h3>${escape(names[offer.product_id] || 'Product')}</h3>${pill(offer.status)}</div><p>${escape(commission(offer))} · ${offer.commission_currency} · ${offer.cookie_duration_days}-day attribution · ${offer.refund_window_days}-day refund hold</p><p>${escape(offer.terms)}</p>${returnedNote}${action}</section>`;
         };
+        const offerFormMarkup = () => `<form data-new-offer><div class="form-grid"><label class="full">Product<select name="product_id">${products.map(product => `<option value="${product.id}" ${product.id === focus.product?.id ? 'selected' : ''}>${escape(product.name)}</option>`).join('')}</select></label><label>Commission type<select name="commission_type"><option value="percentage">Percentage of first purchase</option><option value="flat">Fixed amount per first purchase</option></select></label>${field('commission_value','Commission value','','type="number" step="0.01" min="0.01" required')}<label>Currency<select name="commission_currency"><option>USD</option><option>EUR</option><option>GBP</option></select></label>${field('cookie_duration_days','Attribution window (days)','30','type="number" min="1" max="365" required')}${field('refund_window_days','Refund hold (days)','30','type="number" min="0" max="180" required')}${field('landing_url','Referral destination','','type="url" required',true)}<label class="full">Additional terms<textarea name="terms" maxlength="4000" placeholder="Explain any eligibility restrictions and how you will pay commissions."></textarea></label></div><p class="caption">The merchant pays commissions directly. Placement terms include a 10% service fee on commission; fee collection is not automated.</p><button class="${kind === 'offer' ? '' : 'secondary'}" ${kind === 'offer' ? 'data-primary-action' : ''}>Create offer</button></form>`;
+        const offerCreator = () => {
+            if (!products.length) return '';
+            if (!offers.length || kind === 'offer') return `<section id="new-offer"><h2>Create a referral offer</h2>${offerFormMarkup()}</section>`;
+            return `<section id="new-offer"><button type="button" class="secondary" data-expand-offer>New offer</button></section>`;
+        };
         const ordered = focus.product ? [focus.product, ...products.filter(product => product.id !== focus.product.id)] : products;
-        root.innerHTML = `${railMarkup(focus, true)}<div id="product-form">${products.length ? '' : productForm(null, kind === 'product')}</div>${products.length ? '' : empty('Your first product starts here.','Register its website and topics so relevant publishers can find it.')}${products.length ? '<h2>Your products</h2>' + ordered.map(productSection).join('') : ''}<h2>Your referral offers</h2>${offers.length ? offers.map(offerSection).join('') : empty('Choose what a referral is worth.','Create an offer after registering your product.')}${products.length ? `<section><h2>Create a referral offer</h2><form data-new-offer><div class="form-grid"><label class="full">Product<select name="product_id">${products.map(product => `<option value="${product.id}" ${product.id === focus.product?.id ? 'selected' : ''}>${escape(product.name)}</option>`).join('')}</select></label><label>Commission type<select name="commission_type"><option value="percentage">Percentage of first purchase</option><option value="flat">Fixed amount per first purchase</option></select></label>${field('commission_value','Commission value','','type="number" step="0.01" min="0.01" required')}<label>Currency<select name="commission_currency"><option>USD</option><option>EUR</option><option>GBP</option></select></label>${field('cookie_duration_days','Attribution window (days)','30','type="number" min="1" max="365" required')}${field('refund_window_days','Refund hold (days)','30','type="number" min="0" max="180" required')}${field('landing_url','Referral destination','','type="url" required',true)}<label class="full">Additional terms<textarea name="terms" maxlength="4000" placeholder="Explain any eligibility restrictions and how you will pay commissions."></textarea></label></div><p class="caption">The merchant pays commissions directly. Placement terms include a 10% service fee on commission; fee collection is not automated.</p><button class="${kind === 'offer' ? '' : 'secondary'}" ${kind === 'offer' ? 'data-primary-action' : ''}>Create offer</button></form></section>` : ''}`;
+        root.innerHTML = `${railMarkup(focus, true)}<div id="product-form">${products.length ? '' : productForm(null, kind === 'product')}</div>${products.length ? '' : empty('Your first product starts here.','Register its website and topics so relevant publishers can find it.')}${products.length ? '<h2>Your products</h2>' + ordered.map(productSection).join('') : ''}<h2>Your referral offers</h2>${offers.length ? offers.map(offerSection).join('') : empty('Choose what a referral is worth.','Create an offer after registering your product.')}${offerCreator()}`;
         root.querySelector('[data-product]')?.addEventListener('submit', saveProduct);
         root.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => {
             const product = products.find(item => item.id === button.dataset.edit);
@@ -312,16 +338,27 @@
             report('Offer submitted. Its current status is shown below.');
         })));
         root.querySelectorAll('[data-offer]').forEach(button => button.addEventListener('click', () => run(button, async () => { await api(`/offers/${button.dataset.offer}`, 'PATCH', {status:button.dataset.status}); await productsPage(); })));
-        root.querySelector('[data-new-offer]')?.addEventListener('submit', event => {
-            event.preventDefault(); const form = event.currentTarget; const values = Object.fromEntries(new FormData(form));
-            for (const key of ['commission_value','cookie_duration_days','refund_window_days']) values[key] = Number(values[key]);
-            values.commission_unit = values.commission_type === 'percentage' ? 'percent' : 'currency'; values.ref_param = 'via';
-            run(form.querySelector('button'), async () => {
-                try { await api('/offers', 'POST', values); }
-                catch (error) { showFormIssue(form, error); throw error; }
-                await productsPage();
-                report('Offer created. Check readiness, connect Stripe and submit it for review.');
+        const bindNewOffer = form => {
+            form.addEventListener('submit', event => {
+                event.preventDefault(); const values = Object.fromEntries(new FormData(form));
+                for (const key of ['commission_value','cookie_duration_days','refund_window_days']) values[key] = Number(values[key]);
+                values.commission_unit = values.commission_type === 'percentage' ? 'percent' : 'currency'; values.ref_param = 'via';
+                run(form.querySelector('button'), async () => {
+                    try { await api('/offers', 'POST', values); }
+                    catch (error) { showFormIssue(form, error); throw error; }
+                    await productsPage();
+                    report('Offer created. Check readiness, connect Stripe and submit it for review.');
+                });
             });
+        };
+        const openOffer = root.querySelector('[data-new-offer]');
+        if (openOffer) bindNewOffer(openOffer);
+        root.querySelector('[data-expand-offer]')?.addEventListener('click', () => {
+            const section = document.getElementById('new-offer');
+            section.innerHTML = `<h2>Create a referral offer</h2>${offerFormMarkup()}`;
+            const form = section.querySelector('[data-new-offer]');
+            bindNewOffer(form);
+            form.querySelector('select, input, textarea')?.focus();
         });
         const firstFail = root.querySelector('.check.fail .field-error');
         if (firstFail && (options.focusCheck || focus.state.next === 'ready')) {
@@ -375,7 +412,29 @@
     };
     const settingsPage = async () => {
         const {grants} = await api('/agents');
-        root.innerHTML = `<section><h2>Connect your existing agent</h2><p>Builders: run this in your product repository.</p>${copyCommand(session.install_command)}<p>Hosted MCP URL</p><pre>${escape(session.mcp_url)}</pre><p class="caption">Choose maker or publisher permissions in the browser consent screen. Connections last up to seven days and can be revoked here.</p></section>${!session.publisher ? '<section><h2>WordPress publishers</h2><p>Upload and activate the plugin, connect the site, then connect its publisher account from the Distribution screen.</p><a class="button secondary" href="/downloads/affilio.zip">Download plugin ↓</a></section>' + accountForm('publisher') : ''}${!session.maker ? '<p><a href="/owner?setup=maker">Create a builder account ↗</a></p>' : ''}<section><h2>Connected agents</h2>${grants.length ? grants.map(grant => `<div class="card"><h3>${escape(grant.client_name)}</h3><p>${escape(grant.scope)} · expires ${escape(new Date(grant.expires_at).toLocaleString())}</p><form method="post" action="/owner/grants/${grant.id}/revoke"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Disconnect agent</button></form></div>`).join('') : '<p>No agents connected yet.</p>'}</section><section><h2>Account</h2><p>${escape(session.email)}</p><p class="caption">Owner ID: ${escape(session.owner_id)}</p><form method="post" action="/owner/logout"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Sign out</button></form></section>`;
+        const skillURL = location.origin + '/SKILL.md';
+        let skillNote = 'Coming soon. This skill file is not published yet.';
+        try {
+            const skill = await fetch(skillURL);
+            if (skill.ok) skillNote = '';
+        } catch { /* unpublished skill stays coming soon */ }
+        const agentLine = `Read ${skillURL} and connect this site to Offer Rails`;
+        let progress = 'Start a builder account to see offer progress.';
+        let humans = ['Create a builder account before an agent can register a product.', 'An operator approves the offer before it is listed.'];
+        if (session.maker) {
+            try {
+                const [{products},{offers}] = await Promise.all([api('/products'), api('/offers')]);
+                OfferSeen.remember(offers);
+                const focus = pickFocus(products, offers);
+                progress = plainProgress(focus);
+                humans = humanSteps(focus);
+            } catch (error) {
+                progress = error.message;
+            }
+        }
+        const humanList = humans.length ? `<ul class="task-list">${humans.map(step => `<li>${escape(step)}</li>`).join('')}</ul>` : '<p>Nothing here needs a person right now.</p>';
+        const skillStatus = `<p class="caption" data-skill-status>${skillNote ? escape(skillNote) : 'The skill file is available.'}</p>`;
+        root.innerHTML = `<section><h2>Start an agent</h2><p>Give this line to an agent. It reads the skill file, then connects this site.</p><div class="copy-field agent-line"><div class="row"><span class="eyebrow">AGENT START</span><button type="button" class="copy-action" data-copy>Copy line</button></div><pre>${escape(agentLine)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div>${skillStatus}</section><section><h2>Where this offer stands</h2><p data-rail-plain>${escape(progress)}</p></section><section><h2>Still needs a person</h2>${humanList}</section><section><h2>Connect your existing agent</h2><p>Builders: run this in your product repository.</p>${copyCommand(session.install_command)}<p>Hosted MCP URL</p><pre>${escape(session.mcp_url)}</pre><p class="caption">Choose maker or publisher permissions in the browser consent screen. Connections last up to seven days and can be revoked here.</p></section>${!session.publisher ? '<section><h2>WordPress publishers</h2><p>Upload and activate the plugin, connect the site, then connect its publisher account from the Distribution screen.</p><a class="button secondary" href="/downloads/affilio.zip">Download plugin ↓</a></section>' + accountForm('publisher') : ''}${!session.maker ? '<p><a href="/owner?setup=maker">Create a builder account ↗</a></p>' : ''}<section><h2>Connected agents</h2>${grants.length ? grants.map(grant => `<div class="card"><h3>${escape(grant.client_name)}</h3><p>${escape(grant.scope)} · expires ${escape(new Date(grant.expires_at).toLocaleString())}</p><form method="post" action="/owner/grants/${grant.id}/revoke"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Disconnect agent</button></form></div>`).join('') : '<p>No agents connected yet.</p>'}</section><section><h2>Account</h2><p>${escape(session.email)}</p><p class="caption">Owner ID: ${escape(session.owner_id)}</p><form method="post" action="/owner/logout"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Sign out</button></form></section>`;
         if (session.publisher) {
             const profile = await api('/payout-profile');
             root.insertAdjacentHTML('beforeend',`<section><h2>How merchants can arrange payment</h2><p>These instructions are shared only with merchants that have a payout due to you. Use a payment contact or contact-page URL.</p><form data-payout-profile><label>Payment contact instructions<textarea name="instructions" maxlength="2000">${escape(profile.instructions)}</textarea></label><button>Save instructions</button></form></section>`);
