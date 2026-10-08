@@ -42,6 +42,43 @@ class Affilio_API {
         return array('code' => $code, 'data' => $data);
     }
 
+    public function admin_request($method, $path, $body = null) {
+        if ($this->base_url === '') {
+            return new WP_Error('affilio_not_configured', 'Not connected — set the API URL in Settings');
+        }
+        $args = array(
+            'method'  => $method,
+            'timeout' => 30,
+            'redirection' => 0,
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                'X-Admin-Key'  => trim((string) get_option('affilio_admin_api_key', '')),
+            ),
+        );
+        if ($body !== null) {
+            $args['body'] = wp_json_encode($body);
+        }
+        $response = wp_remote_request(trailingslashit($this->base_url) . ltrim($path, '/'), $args);
+        if (is_wp_error($response)) {
+            return $response;
+        }
+        return array(
+            'code' => wp_remote_retrieve_response_code($response),
+            'data' => json_decode(wp_remote_retrieve_body($response), true),
+        );
+    }
+
+    public static function mask_key($key) {
+        $key = trim((string) $key);
+        if ($key === '') {
+            return '';
+        }
+        if (strlen($key) < 8) {
+            return '••••••••';
+        }
+        return substr($key, 0, 4) . '…' . substr($key, -4);
+    }
+
     public static function resolve_base_url() {
         $url = defined('AFFILIO_API_URL') ? trim((string) AFFILIO_API_URL) : '';
         $override = trim((string) get_option('affilio_api_url_override', ''));

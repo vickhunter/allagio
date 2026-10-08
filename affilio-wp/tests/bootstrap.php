@@ -39,15 +39,17 @@ if (!function_exists('add_action')) {
         $args = func_get_args();
         if ($name === 'pre_http_request') {
             $GLOBALS['http'][] = array(
-                'url' => isset($args[2]) ? $args[2] : '',
-                'args' => isset($args[1]) ? $args[1] : array(),
+                'url' => isset($args[3]) ? $args[3] : '',
+                'args' => isset($args[2]) ? $args[2] : array(),
                 'hook' => 'pre_http_request',
             );
         }
         if (isset($GLOBALS['filters'][$name])) {
+            $passed = array_slice($args, 1);
             foreach ($GLOBALS['filters'][$name] as $callback) {
-                $value = call_user_func($callback, $value);
+                $passed[0] = call_user_func_array($callback, $passed);
             }
+            return $passed[0];
         }
         return $value;
     }

@@ -36,6 +36,50 @@ class Affilio_Admin {
         }
     }
 
+    public function register_routes() {
+        register_rest_route('affilio/v1', '/proxy', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'proxy'),
+            'permission_callback' => array($this, 'proxy_allowed'),
+        ));
+    }
+
+    public function proxy_allowed() {
+        return current_user_can('manage_options');
+    }
+
+    public function proxy($request) {
+        if (!$this->proxy_allowed()) {
+            return new WP_Error('affilio_forbidden', 'Administrator access required.', array('status' => 403));
+        }
+        $payload = $request->get_json_params();
+        if (!is_array($payload)) {
+            $payload = array();
+        }
+        $method = strtoupper((string) (isset($payload['method']) ? $payload['method'] : ''));
+        $path = $this->proxy_target(isset($payload['path']) ? $payload['path'] : '');
+        if (!in_array($method, array('GET', 'POST', 'PATCH', 'DELETE'), true) || $path === '') {
+            return new WP_Error('affilio_proxy', 'Path not allowed.', array('status' => 404));
+        }
+        $body = isset($payload['body']) && is_array($payload['body']) ? $payload['body'] : null;
+        $bare = strstr($path, '?', true);
+        if ($bare === false) {
+            $bare = $path;
+        }
+        if (strpos($bare, '/program-discovery/') === 0) {
+            if (is_array($body)) {
+                unset($body['actor'], $body['email'], $body['username'], $body['user_login'], $body['display_name']);
+            }
+            $response = $this->api->admin_request($method, $path, $body);
+        } else {
+            $response = $this->api->request($method, $path, $body);
+        }
+        if (is_wp_error($response)) {
+            return new WP_Error('affilio_api', 'Affilio is unavailable. Try again shortly.', array('status' => 502));
+        }
+        return new WP_REST_Response(isset($response['data']) ? $response['data'] : array(), isset($response['code']) ? (int) $response['code'] : 502);
+    }
+
     public function enqueue_sidebar_assets() {
         if (!current_user_can('edit_posts')) {
             return;
@@ -73,8 +117,9 @@ class Affilio_Admin {
             wp_enqueue_script('affilio-discovery', AFFILIO_PLUGIN_URL . 'admin/build/discovery.js', array(), AFFILIO_VERSION, true);
             wp_localize_script('affilio-discovery', 'AffilioData', array(
                 'apiUrl' => Affilio_API::resolve_base_url(),
-                'adminKey' => get_option('affilio_admin_api_key', ''),
-                'actor' => wp_get_current_user()->user_login,
+                'adminKey' => Affilio_API::mask_key(get_option('affilio_admin_api_key', '')),
+                'restBase' => rest_url('affilio/v1'),
+                'nonce' => wp_create_nonce('wp_rest'),
                 'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
                 'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
             ));
@@ -82,34 +127,13 @@ class Affilio_Admin {
             $handle = $hook === 'affilio_page_affilio-marketplace' ? 'affilio-marketplace' : 'affilio-earnings';
             $script = $hook === 'affilio_page_affilio-marketplace' ? 'marketplace.js' : 'earnings.js';
             wp_enqueue_script($handle, AFFILIO_PLUGIN_URL . 'admin/build/' . $script, array(), AFFILIO_VERSION, true);
-            wp_localize_script($handle, 'AffilioData', array(
-                'apiUrl' => Affilio_API::resolve_base_url(),
-                'apiKey' => get_option('affilio_api_key', ''),
-                'nonce'  => wp_create_nonce('wp_rest'),
-                'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
-                'connectionStatus' => $this->api->get_connection_status(),
-                'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
-            ));
+            wp_localize_script($handle, 'AffilioData', $this->public_script_data());
         } elseif ($hook === 'affilio_page_affilio-analytics') {
             wp_enqueue_script('affilio-analytics', AFFILIO_PLUGIN_URL . 'admin/build/analytics.js', array(), AFFILIO_VERSION, true);
-            wp_localize_script('affilio-analytics', 'AffilioData', array(
-                'apiUrl' => Affilio_API::resolve_base_url(),
-                'apiKey' => get_option('affilio_api_key', ''),
-                'nonce'  => wp_create_nonce('wp_rest'),
-                'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
-                'connectionStatus' => $this->api->get_connection_status(),
-                'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
-            ));
+            wp_localize_script('affilio-analytics', 'AffilioData', $this->public_script_data());
         } else {
             wp_enqueue_script('affilio-dashboard', AFFILIO_PLUGIN_URL . 'admin/build/dashboard.js', array(), AFFILIO_VERSION, true);
-            wp_localize_script('affilio-dashboard', 'AffilioData', array(
-                'apiUrl' => Affilio_API::resolve_base_url(),
-                'apiKey' => get_option('affilio_api_key', ''),
-                'nonce'  => wp_create_nonce('wp_rest'),
-                'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
-                'connectionStatus' => $this->api->get_connection_status(),
-                'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
-            ));
+            wp_localize_script('affilio-dashboard', 'AffilioData', $this->public_script_data());
         }
         wp_enqueue_style('affilio-admin', AFFILIO_PLUGIN_URL . 'admin/css/affilio-admin.css', array(), AFFILIO_VERSION);
     }
@@ -287,6 +311,52 @@ class Affilio_Admin {
         $this->scanner->scan_all_posts();
         wp_safe_redirect(admin_url('admin.php?page=affilio'));
         exit;
+    }
+
+    private function public_script_data() {
+        return array(
+            'apiUrl' => Affilio_API::resolve_base_url(),
+            'apiKey' => Affilio_API::mask_key(get_option('affilio_api_key', '')),
+            'restBase' => rest_url('affilio/v1'),
+            'nonce' => wp_create_nonce('wp_rest'),
+            'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
+            'connectionStatus' => $this->api->get_connection_status(),
+            'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
+        );
+    }
+
+    private function proxy_target($path) {
+        $path = trim((string) $path);
+        if ($path === '' || strpos($path, '..') !== false || strpos($path, '://') !== false || strpos($path, '\\') !== false) {
+            return '';
+        }
+        if ($path[0] !== '/') {
+            $path = '/' . $path;
+        }
+        $query = '';
+        $bare = $path;
+        $split = strpos($path, '?');
+        if ($split !== false) {
+            $query = substr($path, $split);
+            $bare = substr($path, 0, $split);
+        }
+        $prefixes = array(
+            '/articles', '/recommendations', '/generate/content', '/user-programs',
+            '/marketplace/offers', '/payouts/', '/track/summary', '/track/trends',
+            '/track/funnel', '/track/attribution', '/track/export', '/track/cohorts',
+            '/track/recommendation-quality', '/track/retention', '/track/recommendation-tuning',
+            '/program-discovery/', '/insert/confirm', '/scan/full', '/scan/single', '/scan/status',
+        );
+        foreach ($prefixes as $prefix) {
+            $boundary = substr($prefix, -1) === '/';
+            if ($boundary && strpos($bare, $prefix) === 0) {
+                return $bare . $query;
+            }
+            if (!$boundary && ($bare === $prefix || strpos($bare, $prefix . '/') === 0)) {
+                return $bare . $query;
+            }
+        }
+        return '';
     }
 
     private function is_advanced_mode() {

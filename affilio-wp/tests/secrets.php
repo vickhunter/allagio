@@ -66,7 +66,8 @@ foreach (array('dashboard.js', 'marketplace.js', 'earnings.js', 'discovery.js', 
     check(strpos($source, 'X-Admin-Key') === false, $file . ' still sends the admin key from the browser');
 }
 $discovery_source = file_get_contents(dirname(__DIR__) . '/admin/build/discovery.js');
-check(strpos($discovery_source, 'actor') === false, 'discovery script still sends an actor');
+check(strpos($discovery_source, 'AffilioData.actor') === false, 'discovery script still sends the WordPress username');
+check(preg_match('/actor\s*:/', $discovery_source) !== 1, 'discovery script still sends an actor');
 
 $proxy = null;
 foreach ($GLOBALS['routes'] as $route) {

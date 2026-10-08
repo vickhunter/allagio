@@ -199,18 +199,24 @@ async function handle(req, res) {
     if (state.failFind) return send(res, 500, { message: 'Relevant offers could not be loaded. Check the connection and retry.' });
     return send(res, 200, { opportunities: [] });
   }
-  if (pathname === '/v1/marketplace/offers' && req.method === 'GET') {
-    if (state.failMarketplace) return send(res, 503, { error: 'down' });
-    return send(res, 200, { offers: [{ offer_id: 'offer-1', product_name: 'InboxPilot', joined: false, commission_type: 'percentage', commission_value: 20, commission_currency: 'USD', cookie_duration_days: 30, refund_window_days: 14, terms: 'First purchase only.', relevance: 82, product_tagline: 'Inbox cleanup for developers.' }] });
-  }
-  if (pathname.startsWith('/v1/marketplace/offers/') && pathname.endsWith('/join')) {
-    if (state.failJoin) return send(res, 500, { error: 'join failed' });
-    return send(res, 200, { joined: true });
-  }
-  if (pathname === '/v1/payouts/balance' || pathname === '/v1/payouts/history') {
-    if (state.failEarnings) return send(res, 503, { error: 'down' });
-    if (pathname.endsWith('balance')) return send(res, 200, { balances: [] });
-    return send(res, 200, { ledger: [], payouts: [] });
+  if (pathname === '/wp-json/affilio/v1/proxy' && req.method === 'POST') {
+    const payload = await readBody(req);
+    const target = String(payload.path || '');
+    const targetPath = target.split('?')[0];
+    if (targetPath === '/marketplace/offers' && String(payload.method).toUpperCase() === 'GET') {
+      if (state.failMarketplace) return send(res, 503, { error: 'down' });
+      return send(res, 200, { offers: [{ offer_id: 'offer-1', product_name: 'InboxPilot', joined: false, commission_type: 'percentage', commission_value: 20, commission_currency: 'USD', cookie_duration_days: 30, refund_window_days: 14, terms: 'First purchase only.', relevance: 82, product_tagline: 'Inbox cleanup for developers.' }] });
+    }
+    if (targetPath.startsWith('/marketplace/offers/') && targetPath.endsWith('/join')) {
+      if (state.failJoin) return send(res, 500, { error: 'join failed' });
+      return send(res, 200, { joined: true });
+    }
+    if (targetPath === '/payouts/balance' || targetPath === '/payouts/history') {
+      if (state.failEarnings) return send(res, 503, { error: 'down' });
+      if (targetPath.endsWith('balance')) return send(res, 200, { balances: [] });
+      return send(res, 200, { ledger: [], payouts: [] });
+    }
+    return send(res, 404, { error: 'not found', path: targetPath });
   }
   send(res, 404, { error: 'not found', path: pathname });
 }
@@ -224,11 +230,11 @@ function wpDistribution() {
 }
 
 function wpMarketplace() {
-  return wpChrome('Marketplace', 'affilio-marketplace-root', '', '<script>window.AffilioData={locale:"en",apiUrl:"/v1",apiKey:"k",settingsUrl:"/wp-admin/admin.php?page=affilio-settings",connectionStatus:{connected:true}};</script><script src="/assets/marketplace.js"></script>');
+  return wpChrome('Marketplace', 'affilio-marketplace-root', '', '<script>window.AffilioData={locale:"en",apiUrl:"/v1",restBase:"/wp-json/affilio/v1",nonce:"n",settingsUrl:"/wp-admin/admin.php?page=affilio-settings",connectionStatus:{connected:true}};</script><script src="/assets/marketplace.js"></script>');
 }
 
 function wpEarnings() {
-  return wpChrome('Earnings', 'affilio-earnings-root', '', '<script>window.AffilioData={locale:"en",apiUrl:"/v1",apiKey:"k",settingsUrl:"/wp-admin/admin.php?page=affilio-settings",connectionStatus:{connected:true}};</script><script src="/assets/earnings.js"></script>');
+  return wpChrome('Earnings', 'affilio-earnings-root', '', '<script>window.AffilioData={locale:"en",apiUrl:"/v1",restBase:"/wp-json/affilio/v1",nonce:"n",settingsUrl:"/wp-admin/admin.php?page=affilio-settings",connectionStatus:{connected:true}};</script><script src="/assets/earnings.js"></script>');
 }
 
 function landing() {
