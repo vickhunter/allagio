@@ -196,6 +196,7 @@ func main() {
 	v1.DELETE("/sites", sites.Delete)
 	v1.POST("/makers/register", makers.Register)
 	v1.GET("/go/:code", redirects.Go)
+	v1.HEAD("/go/:code", redirects.Go)
 	v1.POST("/webhooks/:provider", webhooks.Receive)
 	v1.POST("/webhooks/:provider/:product_id", webhooks.Receive)
 	workerCtx, cancelWorker := context.WithCancel(ctx)

@@ -40,6 +40,12 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
 		return
 	}
+	// Link-preview fetches and HEAD probes still need the destination, but
+	// they are not visitors and must not create a click or an attribution ref.
+	if c.Request.Method == http.MethodHead || isPreviewBot(c.Request.UserAgent()) {
+		c.Redirect(http.StatusFound, link.LandingURL)
+		return
+	}
 	// A paused campaign or unlisted offer still forwards the visitor, but
 	// without attribution: the destination stays useful, the earning stops.
 	if link.CampaignStatus != "active" || link.OfferStatus != "listed" {
@@ -68,6 +74,45 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 		return
 	}
 	c.Redirect(http.StatusFound, appendRefParam(link.LandingURL, link.RefParam, clickID))
+}
+
+// previewBotMarkers are link-unfurl clients. Matching is a case-insensitive
+// substring of the User-Agent, modeled on offerrails isPreviewBot.
+var previewBotMarkers = []string{
+	"facebookexternalhit",
+	"facebot",
+	"twitterbot",
+	"linkedinbot",
+	"slackbot",
+	"slack-imgproxy",
+	"discordbot",
+	"telegrambot",
+	"whatsapp",
+	"pinterest",
+	"redditbot",
+	"embedly",
+	"quora link preview",
+	"showyoubot",
+	"outbrain",
+	"vkshare",
+	"w3c_validator",
+	"bingpreview",
+	"skypeuripreview",
+	"applebot",
+	"iframely",
+}
+
+func isPreviewBot(userAgent string) bool {
+	ua := strings.ToLower(strings.TrimSpace(userAgent))
+	if ua == "" {
+		return false
+	}
+	for _, marker := range previewBotMarkers {
+		if strings.Contains(ua, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func appendRefParam(landingURL, refParam, clickID string) string {

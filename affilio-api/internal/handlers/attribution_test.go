@@ -28,6 +28,7 @@ func newAttributionRouter(db *database.DB) *gin.Engine {
 	redirects := &RedirectsHandler{DB: db}
 	webhooks := &WebhooksHandler{DB: db, Cipher: testConnectionCipher()}
 	r.GET("/v1/go/:code", redirects.Go)
+	r.HEAD("/v1/go/:code", redirects.Go)
 	r.POST("/v1/webhooks/:provider", webhooks.Receive)
 	r.POST("/v1/webhooks/:provider/:product_id", webhooks.Receive)
 	site := r.Group("/v1")
