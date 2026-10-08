@@ -27,8 +27,8 @@ if (!empty($GLOBALS['actions']['admin_enqueue_scripts'])) {
     }
 }
 
-$masked = substr($secret, 0, 4) . '…' . substr($secret, -4);
-$admin_masked = substr($admin_secret, 0, 4) . '…' . substr($admin_secret, -4);
+$masked = substr($secret, 0, 4) . '…';
+$admin_masked = substr($admin_secret, 0, 4) . '…';
 $handles = array(
     'affilio-dashboard' => $masked,
     'affilio-marketplace' => $masked,
@@ -40,12 +40,14 @@ foreach ($handles as $handle => $expected) {
     $encoded = json_encode($data);
     check(strpos($encoded, $secret) === false, $handle . ' localized the full API key');
     check(isset($data['apiKey']) && $data['apiKey'] === $expected, $handle . ' did not receive a masked API key');
+    check(strpos((string) $data['apiKey'], substr($secret, -4)) === false, $handle . ' masked key includes the last 4 characters');
     check(isset($data['restBase']) && $data['restBase'] !== '', $handle . ' is missing the WordPress proxy base');
 }
 $discovery = $GLOBALS['localized']['affilio-discovery']['AffilioData'];
 $discovery_json = json_encode($discovery);
 check(strpos($discovery_json, $admin_secret) === false, 'discovery localized the full admin key');
 check($discovery['adminKey'] === $admin_masked, 'discovery admin key is not masked');
+check(strpos((string) $discovery['adminKey'], substr($admin_secret, -4)) === false, 'discovery masked admin key includes the last 4 characters');
 check(!isset($discovery['actor']) || ($discovery['actor'] !== 'siteadmin' && strpos($discovery_json, 'siteadmin') === false), 'discovery still receives the WordPress username');
 check(strpos($discovery_json, 'admin@example.com') === false, 'discovery localized an email address');
 check(strpos($discovery_json, 'Ada Admin') === false, 'discovery localized a display name');

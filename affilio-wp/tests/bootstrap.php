@@ -125,9 +125,20 @@ if (!function_exists('add_action')) {
     function sanitize_text_field($value) { return trim((string) $value); }
     function sanitize_key($value) { return strtolower((string) $value); }
     function wp_die($message) { throw new RuntimeException(strip_tags((string) $message)); }
-    function wp_nonce_field($action) { echo '<input type="hidden" name="_wpnonce" value="test" />'; }
+    function wp_nonce_field($action, $name = '_wpnonce') {
+        echo '<input type="hidden" name="' . esc_attr($name) . '" value="' . esc_attr(wp_create_nonce($action)) . '" />';
+    }
+    function wp_verify_nonce($nonce, $action) {
+        return hash_equals((string) wp_create_nonce($action), (string) $nonce);
+    }
     function submit_button($text) { echo '<button>' . esc_html($text) . '</button>'; }
-    function check_admin_referer($action) { return true; }
+    function check_admin_referer($action) {
+        $nonce = isset($_REQUEST['_wpnonce']) ? (string) $_REQUEST['_wpnonce'] : '';
+        if (!wp_verify_nonce($nonce, $action)) {
+            throw new RuntimeException('The link you followed has expired.');
+        }
+        return true;
+    }
     function get_transient($key) { return isset($GLOBALS['transients'][$key]) ? $GLOBALS['transients'][$key] : false; }
     function set_transient($key, $value, $expiration) { $GLOBALS['transients'][$key] = $value; return true; }
     function delete_transient($key) { unset($GLOBALS['transients'][$key]); }
@@ -137,7 +148,7 @@ if (!function_exists('add_action')) {
     function wp_unslash($value) { return stripslashes((string) $value); }
     function wp_kses_post($value) { return (string) $value; }
     function wp_update_post($values, $error = false) { return $values['ID']; }
-    function get_current_screen() { return null; }
+    function get_current_screen() { return isset($GLOBALS['screen']) ? $GLOBALS['screen'] : null; }
     function add_menu_page() { return 'affilio'; }
     function add_submenu_page() { return 'affilio'; }
 }
