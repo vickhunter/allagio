@@ -2,7 +2,9 @@ import base64
 from email.message import Message
 import io
 import json
+from pathlib import Path
 import subprocess
+import tempfile
 import sys
 import unittest
 from unittest.mock import patch
@@ -132,6 +134,60 @@ class ReleaseTests(unittest.TestCase):
             release.validate_plugin(archive("https://affilio-production.up.railway.app"), release.ORIGIN)
         with self.assertRaisesRegex(release.ReleaseError, "hosted UI"):
             release.validate_plugin(archive(release.ORIGIN, "affilio/admin/build/landing-scene.bundle.js"))
+
+    def test_generic_host_does_not_require_railway(self):
+        values = configuration()
+        del values["RAILWAY_DOCKERFILE_PATH"]
+        values.update({
+            "PUBLIC_BASE_URL": "https://affilio-mvp.onrender.com",
+            "ALLOWED_ORIGINS": "https://affilio-mvp.onrender.com",
+            "PORT": "10000",
+            "API_KEY_SECRET": "c" * 32,
+            "GIN_MODE": "release",
+            "TRUSTED_PROXIES": "173.245.48.0/20",
+        })
+        env = tempfile.NamedTemporaryFile("w", delete=False)
+        env.write("".join(f"{key}={value}\n" for key, value in values.items()))
+        env.close()
+        self.addCleanup(lambda: Path(env.name).unlink(missing_ok=True))
+        sha = "a" * 40
+        calls = []
+
+        def git(args):
+            calls.append(args[0])
+            outputs = {
+                ("git", "status", "--porcelain"): "",
+                ("git", "branch", "--show-current"): "release",
+                ("git", "rev-parse", "HEAD"): sha,
+                ("git", "ls-remote", "origin", "refs/heads/release"): sha + " refs/heads/release",
+            }
+            return outputs[tuple(args)]
+
+        checks = [{"id": i, "name": name, "status": "completed", "conclusion": "success"} for i, name in enumerate(sorted(release.CHECKS))]
+        with patch.object(sys, "argv", ["mvp_release.py", "check", "--host", "generic", "--env-file", env.name]), patch.object(release, "run", side_effect=git), patch.object(release, "run_json", return_value={"check_runs": checks}), patch("sys.stdout", io.StringIO()):
+            self.assertEqual(release.main(), 0)
+        self.assertNotIn("railway", calls)
+
+        for name, bad in {
+            "API_KEY_SECRET": "dev-secret",
+            "GIN_MODE": "debug",
+            "TRUSTED_PROXIES": "",
+        }.items():
+            with self.subTest(name=name), self.assertRaisesRegex(release.ReleaseError, name):
+                release.validate_config(values | {name: bad}, origin=values["PUBLIC_BASE_URL"])
+        with self.assertRaisesRegex(release.ReleaseError, "API_KEY_SECRET"):
+            release.validate_config(values | {"API_KEY_SECRET": "short"}, origin=values["PUBLIC_BASE_URL"])
+
+    def test_verify_accepts_any_https_base_url(self):
+        origin = "https://affilio-mvp.onrender.com"
+        responses = public_responses()
+        responses["/.well-known/oauth-protected-resource/mcp"] = response(body=json.dumps({"resource": origin + "/mcp", "authorization_servers": [origin], "scopes_supported": ["maker", "publisher"]}).encode())
+        responses["/.well-known/oauth-authorization-server"] = response(body=json.dumps({"issuer": origin, "authorization_endpoint": origin + "/oauth/authorize", "token_endpoint": origin + "/oauth/token", "registration_endpoint": origin + "/oauth/register", "code_challenge_methods_supported": ["S256"]}).encode())
+        responses["/mcp"] = response(401, WWW_Authenticate='Bearer resource_metadata="' + origin + '/.well-known/oauth-protected-resource/mcp"')
+        responses["/auth/login?return_to=/owner"] = response(302, Location="https://accounts.google.com/o/oauth2/v2/auth?" + urlencode({"redirect_uri": origin + "/auth/callback", "code_challenge_method": "S256"}), Set_Cookie="__Host-dtr_login=fixture; Path=/; Secure; HttpOnly; SameSite=Lax")
+        with patch.object(sys, "argv", ["mvp_release.py", "verify", "--base-url", origin]), patch.object(release, "fetch", side_effect=lambda path, *args: responses[path]), patch.object(release, "validate_plugin") as plugin, patch.object(release, "validate_installer"), patch("sys.stdout", io.StringIO()):
+            self.assertEqual(release.main(), 0)
+        plugin.assert_called_once_with(b"ok", origin)
 
     def test_public_check_rejects_broken_delivery_and_unprotected_auth(self):
         mutations = {
