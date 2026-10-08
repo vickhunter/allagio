@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -103,6 +104,32 @@ func TestReadinessAssessPassesGatesForHealthySite(t *testing.T) {
 	}
 	if result.Score < 90 {
 		t.Fatalf("expected high score, got %d", result.Score)
+	}
+}
+
+func TestRefParamCheckCatchesCTAThatDropsTheParameter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body><a href="/start">Get started</a> <a href="/pricing">Pricing</a> <a href="/signup">Sign up</a></body></html>`))
+	}))
+	defer server.Close()
+	result := testEngine().Assess(context.Background(), ReadinessProduct{Name: "App", WebsiteURL: server.URL})
+	check := findCheck(t, result.Checks, "ref_param_survives")
+	if check.Status != "fail" || check.Remediation == "" {
+		t.Fatalf("a get-started link that drops the referral parameter must fail, got %+v", check)
+	}
+}
+
+func TestRefParamCheckAllowsCTAThatKeepsTheParameter(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = fmt.Fprintf(w, `<html><body><a href="/start?via=dtr-probe">Get started</a> <a href="/pricing?via=dtr-probe">Pricing</a> <a href="/signup">Sign up</a></body></html>`)
+	}))
+	defer server.Close()
+	result := testEngine().Assess(context.Background(), ReadinessProduct{Name: "App", WebsiteURL: server.URL})
+	check := findCheck(t, result.Checks, "ref_param_survives")
+	if check.Status != "pass" {
+		t.Fatalf("a get-started link that keeps the referral parameter must pass, got %+v", check)
 	}
 }
 

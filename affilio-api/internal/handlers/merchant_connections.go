@@ -12,11 +12,12 @@ import (
 )
 
 type MerchantConnectionsHandler struct {
-	DB       *database.DB
-	Cipher   *services.ConnectionCipher
-	Verifier services.StripeConnectionVerifier
-	BaseURL  string
-	Page     *template.Template
+	DB         *database.DB
+	Cipher     *services.ConnectionCipher
+	Verifier   services.StripeConnectionVerifier
+	BaseURL    string
+	Page       *template.Template
+	OperatorID string
 }
 
 func (h *MerchantConnectionsHandler) Form(c *gin.Context) {

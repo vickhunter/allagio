@@ -2,7 +2,8 @@ const { test, expect } = require('@playwright/test');
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
+const os = require('node:os');
 const { randomUUID } = require('node:crypto');
 
 const build = path.resolve(__dirname, '../admin/build');
@@ -39,6 +40,7 @@ const state = {
   healthHits: 0,
   healthFails: 0,
   failProductCreate: false,
+  stripeForm: false,
 };
 
 function reset() {
@@ -58,6 +60,7 @@ function reset() {
   state.healthHits = 0;
   state.healthFails = 0;
   state.failProductCreate = false;
+  state.stripeForm = false;
 }
 
 function readBody(req) {
@@ -196,6 +199,11 @@ async function handle(req, res) {
   }
   const connection = pathname.match(/^\/owner\/products\/([^/]+)\/connection$/);
   if (connection && req.method === 'GET') {
+    if (state.stripeForm) {
+      const webhook = 'https://api.example.test/v1/webhooks/stripe/' + connection[1] + '/checkout.session.completed.checkout.session.async_payment_succeeded.charge.refunded';
+      const body = `<p>This page is for Stripe test mode only. Live keys (sk_live_ and rk_live_) are rejected.</p><p>Create an endpoint in Stripe for <code class="webhook-url">${webhook}</code> with checkout.session.completed events.</p><form method="post" action="/owner/products/${connection[1]}/connection"><label>Restricted API key <input type="password" name="stripe_key" autocomplete="off" required></label><label>One-time price ID <input name="price_id" required></label><label>Webhook endpoint ID <input name="endpoint_id" required></label><label>Webhook signing secret <input type="password" name="signing_secret" autocomplete="off" required></label><button>Verify and connect Stripe</button></form>`;
+      return send(res, 200, shell('Connect your checkout', body, true), 'text/html; charset=utf-8');
+    }
     return send(res, 200, shell('Stripe configuration verified', '<p>Account: acct_test · Price: price_test · Currency: usd · Live mode: false</p><p>Stripe configuration verified</p><p>The verification key was not stored.</p><p><a href="/owner/products">Return to your products</a></p>', true), 'text/html; charset=utf-8');
   }
   if (pathname === '/owner/products' || pathname === '/owner' || pathname === '/owner/review' || pathname === '/owner/settings') {
@@ -831,6 +839,189 @@ test('a server that stays down offers try again', async ({ browser }) => {
       await expect(page.getByRole('heading', { name: 'Waking the server, about 30 seconds' })).toBeVisible();
     }
     await context.close();
+  }
+});
+
+function startDemoServer() {
+  const addrFile = path.join(os.tmpdir(), `affilio-demo-${process.pid}-${Date.now()}`);
+  const child = spawn('go', ['test', './internal/handlers', '-run', '^TestServeDemoForE2E$', '-count=1', '-timeout', '20m', '-v'], {
+    cwd: path.resolve(__dirname, '../../affilio-api'),
+    env: { ...process.env, DEMO_E2E: '1', DEMO_E2E_ADDR_FILE: addrFile },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  child.stdout.on('data', chunk => { output += chunk.toString(); });
+  child.stderr.on('data', chunk => { output += chunk.toString(); });
+  const ready = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('demo server did not start\n' + output)), 180000);
+    const poll = setInterval(() => {
+      if (!fs.existsSync(addrFile)) return;
+      const addr = fs.readFileSync(addrFile, 'utf8').trim();
+      if (!addr) return;
+      clearInterval(poll);
+      clearTimeout(timer);
+      resolve('http://' + addr);
+    }, 200);
+    child.on('exit', code => {
+      clearInterval(poll);
+      clearTimeout(timer);
+      reject(new Error('demo server exited ' + code + '\n' + output));
+    });
+  });
+  return { ready, stop() { child.kill('SIGTERM'); fs.rmSync(addrFile, { force: true }); } };
+}
+
+test('stripe page rejects a live key before submit and fits', async ({ browser }) => {
+  state.stripeForm = true;
+  const productId = randomUUID();
+  for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    let posted = 0;
+    page.on('request', request => {
+      if (request.method() === 'POST' && request.url().includes('/connection')) posted += 1;
+    });
+    await page.goto(base + '/owner/products/' + productId + '/connection');
+    await expect(page.getByRole('link', { name: 'Offer review', exact: true })).toBeVisible();
+    await fits(page);
+    for (const key of ['sk_live_browser_secret', 'rk_live_browser_secret', 'pk_live_browser_secret']) {
+      posted = 0;
+      await page.getByLabel('Restricted API key').fill(key);
+      await page.getByLabel('One-time price ID').fill('price_x');
+      await page.getByLabel('Webhook endpoint ID').fill('we_x');
+      await page.getByLabel('Webhook signing secret').fill('whsec_not_sent');
+      await page.getByRole('button', { name: 'Verify and connect Stripe' }).click();
+      const error = page.locator('#stripe-live-key');
+      await expect(error).toContainText('Live keys are not accepted');
+      await expect(error).toBeFocused();
+      expect(posted).toBe(0);
+      await expect(page.getByLabel('Restricted API key')).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Verify and connect Stripe' })).toBeEnabled();
+    }
+    await context.close();
+  }
+});
+
+test('a second product keeps the success message in view', async ({ browser }) => {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    reset();
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    let saved;
+    page.on('request', request => {
+      if (request.method() === 'POST' && request.url().endsWith('/owner/api/products')) saved = request.postDataJSON();
+    });
+    await page.goto(base + '/owner/products');
+    const stripe = page.locator('[data-station="stripe"]');
+    await expect(stripe.locator('.station-name')).toHaveText('Checkout (optional)');
+    await expect(stripe.locator('.station-flag')).toHaveText('Optional');
+    await expect(stripe).toHaveAttribute('aria-label', /optional/i);
+    await expect(stripe).toContainText('no provider yet');
+    await expect(page.locator('body')).not.toContainText('This version supports Stripe one-time checkout.');
+    await registerProduct(page, 'First Product');
+    expect(saved.payment_provider === undefined || saved.payment_provider === '' || saved.payment_provider === 'none').toBe(true);
+    await page.reload();
+    await page.getByRole('button', { name: 'Add product', exact: true }).click();
+    await registerProduct(page, 'Second Product');
+    const message = page.locator('#product-registered');
+    await expect(message).toHaveText('Product registered. It is in your list.');
+    await expect(message).toBeFocused();
+    await expect.poll(async () => {
+      const box = await message.boundingBox();
+      return !!box && box.y >= 0 && box.y + box.height <= viewport.height + 1;
+    }).toBe(true);
+    await expect(page.getByRole('heading', { name: 'First Product', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Second Product', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your first product starts here.' })).toHaveCount(0);
+    await context.close();
+  }
+});
+
+test('empty create offer fields explain the problem in plain words', async ({ browser }) => {
+  for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    reset();
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    await page.goto(base + '/owner/products');
+    await registerProduct(page, 'Needs Words');
+    await page.getByRole('button', { name: 'Create offer', exact: true }).click();
+    const error = page.locator('#new-offer .field-error');
+    await expect(error).toContainText('Enter a commission value.');
+    await expect(error).toBeFocused();
+    await expect(page.locator('#new-offer [name="commission_value"]')).toBeEnabled();
+    await expect(page.locator('#new-offer [name="landing_url"]')).toBeEnabled();
+    const box = await error.boundingBox();
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+    await fits(page);
+    await context.close();
+  }
+});
+
+test('setup calls checkout optional', async ({ browser }) => {
+  const productId = randomUUID();
+  state.products = [{ id: productId, name: 'Rail Tool', website_url: 'https://rail-tool.example', tagline: 'Help developers ship a referral offer.', docs_url: '', pricing_url: '', primary_category: '', keywords: [], readiness_status: 'ready', readiness_score: 90 }];
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await page.goto(base + '/owner/settings');
+  await expect(page.locator('.task-list')).toContainText('Checkout is optional');
+  await expect(page.locator('.task-list')).not.toContainText('Connect Stripe in test mode');
+  await expect(page.locator('body')).not.toContainText('connect Stripe and submit it');
+  await context.close();
+});
+
+test('demo pages fit a phone and keep referral parameters', async ({ browser }) => {
+  test.setTimeout(300000);
+  const demo = startDemoServer();
+  let demoBase;
+  try {
+    demoBase = await demo.ready;
+  } catch (error) {
+    demo.stop();
+    throw error;
+  }
+  try {
+    const head = await fetch(demoBase + '/demo', { method: 'HEAD' });
+    expect(head.status).toBe(200);
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    const titles = [];
+    for (const pathName of ['/demo', '/demo/pricing', '/demo/docs', '/demo/privacy', '/demo/terms', '/demo/start']) {
+      await page.goto(demoBase + pathName);
+      await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+      await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', 'width=device-width, initial-scale=1');
+      const title = await page.title();
+      expect(title.length).toBeGreaterThan(0);
+      expect(titles).not.toContain(title);
+      titles.push(title);
+      await fits(page);
+      const fontSize = await page.locator('body').evaluate(body => parseFloat(getComputedStyle(body).fontSize));
+      expect(fontSize).toBeGreaterThanOrEqual(16);
+      if (pathName !== '/demo') await expect(page.getByRole('link', { name: /demo/i }).first()).toBeVisible();
+    }
+    const ctaPage = await context.newPage();
+    for (const start of ['/demo', '/demo/pricing']) {
+      await ctaPage.goto(demoBase + start);
+      const cta = ctaPage.getByRole('link', { name: 'Get started', exact: true });
+      const box = await cta.boundingBox();
+      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+    await ctaPage.goto(demoBase + '/demo?ref=test');
+    await ctaPage.getByRole('link', { name: 'Get started', exact: true }).click();
+    await expect(ctaPage).toHaveURL(/[?&]ref=test(?:&|$)/);
+    await ctaPage.goto(demoBase + '/demo?via=test');
+    await ctaPage.getByRole('link', { name: 'Get started', exact: true }).click();
+    await expect(ctaPage).toHaveURL(/[?&]via=test(?:&|$)/);
+    await ctaPage.goto(demoBase + '/demo/pricing?ref=test');
+    await ctaPage.getByRole('link', { name: 'Get started', exact: true }).click();
+    await expect(ctaPage).toHaveURL(/[?&]ref=test(?:&|$)/);
+    await ctaPage.goto(demoBase + '/demo/start');
+    await expect(ctaPage.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
+    await expect(ctaPage.getByRole('link', { name: 'Register', exact: true })).toBeVisible();
+    await context.close();
+  } finally {
+    demo.stop();
   }
 });
 
