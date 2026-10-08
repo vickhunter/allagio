@@ -95,8 +95,7 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 		owner.GET("/products/:id/connection", h.Payments.Form)
 		owner.POST("/products/:id/connection", h.Payments.Connect)
 	}
-	transport := h.MCPTransport()
-	public.Any("/mcp", func(c *gin.Context) { transport.ServeHTTP(c.Writer, c.Request) })
+	public.Any("/mcp", h.MCP)
 }
 
 func (h *HostedHandler) headers(c *gin.Context) {
