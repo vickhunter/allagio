@@ -1,3 +1,9 @@
+## October 8 — waking host and narrow nav (D-020)
+
+- At 390 and 360 the workspace navigation wraps into two columns, so Setup & agents stays on screen without a sideways scroll. The desktop list is unchanged.
+- While `/SKILL.md` is not served, the agent start line's copy control is a secondary button. The copied hint is "Copied. Paste it to your agent."
+- If the hosted workspace is asleep (network error, 502, 503, 504, or a timeout), the page says it is waking the server and retries `GET /health` every 4 seconds for up to 60 seconds. A recovered check reloads the page data and keeps what the owner already typed. If it is still down, the page says so and offers Try again. No server code changed.
+
 ## October 8 — offer rail polish (D-019)
 
 - Once a referral offer exists, Products & offers hides "Create a referral offer" behind a secondary "New offer" button. The form stays open when there are no offers, or when creating an offer is the rail's next step. Expanding it focuses the first field, and a rejected create still shows the inline error.

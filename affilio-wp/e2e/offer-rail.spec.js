@@ -9,6 +9,7 @@ const build = path.resolve(__dirname, '../admin/build');
 const adminCss = path.resolve(__dirname, '../admin/css/affilio-admin.css');
 const artifacts = process.env.OFFER_RAIL_ARTIFACTS || '/opt/cursor/artifacts/d011';
 const d019 = process.env.CI ? path.join(artifacts, 'd019') : '/opt/cursor/artifacts/d019';
+const d020 = process.env.CI ? path.join(artifacts, 'd020') : '/opt/cursor/artifacts/d020';
 const template = fs.readFileSync(path.join(build, 'workspace.html'), 'utf8');
 
 function shell(title, body, operator) {
@@ -34,6 +35,10 @@ const state = {
   failFind: false,
   failEarnings: false,
   failOffer: false,
+  healthMode: '',
+  healthHits: 0,
+  healthFails: 0,
+  failProductCreate: false,
 };
 
 function reset() {
@@ -49,6 +54,10 @@ function reset() {
   state.failFind = false;
   state.failEarnings = false;
   state.failOffer = false;
+  state.healthMode = '';
+  state.healthHits = 0;
+  state.healthFails = 0;
+  state.failProductCreate = false;
 }
 
 function readBody(req) {
@@ -109,6 +118,12 @@ async function handle(req, res) {
     return send(res, 200, { ok: true });
   }
   if (pathname === '/owner/api/session') return send(res, 200, session);
+  if (pathname === '/health') {
+    state.healthHits += 1;
+    if (state.healthMode === 'never') return send(res, 503, { error: 'asleep' });
+    if (state.healthMode === 'slow' && state.healthHits <= state.healthFails) return send(res, 503, { error: 'asleep' });
+    return send(res, 200, { ok: true });
+  }
   if (pathname === '/owner/api/agents' && req.method === 'GET') return send(res, 200, { grants: [] });
   if (pathname === '/owner/api/products' && req.method === 'GET') {
     if (state.failProducts) return send(res, 503, { error: 'The product list could not be loaded.' });
@@ -116,6 +131,10 @@ async function handle(req, res) {
   }
   if (pathname === '/owner/api/products' && req.method === 'POST') {
     const body = await readBody(req);
+    if (state.failProductCreate) {
+      state.failProductCreate = false;
+      return send(res, 503, { error: 'asleep' });
+    }
     const product = { id: randomUUID(), name: body.name, website_url: body.website_url, tagline: body.tagline, docs_url: body.docs_url || '', pricing_url: body.pricing_url || '', primary_category: body.primary_category || '', keywords: body.keywords || [], readiness_status: 'unassessed', readiness_score: 0 };
     state.products.push(product);
     return send(res, 201, { product });
@@ -264,6 +283,39 @@ async function shot(page, name) {
     expect(box.y).toBeLessThanOrEqual(1);
   }
   await page.screenshot({ path: path.join(artifacts, name + '.png'), fullPage: true });
+}
+
+async function shotD020(page, name) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const sidebar = page.locator('aside.sidebar');
+  if (await sidebar.count()) {
+    const box = await sidebar.boundingBox();
+    expect(box.y).toBeLessThanOrEqual(1);
+  }
+  fs.mkdirSync(d020, { recursive: true });
+  await page.screenshot({ path: path.join(d020, name + '.png'), fullPage: false });
+}
+
+const workspaceNav = ['Overview', 'Products & offers', 'Placements', 'Earnings', 'Setup & agents', 'Offer review'];
+
+async function navFits(page) {
+  const viewport = page.viewportSize();
+  for (const name of workspaceNav) {
+    const link = page.getByRole('link', { name, exact: true });
+    await expect(link).toBeVisible();
+    const box = await link.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(-1);
+    expect(box.y).toBeGreaterThanOrEqual(-1);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+  }
+  const clipped = await page.locator('nav[aria-label="Workspace"]').evaluate(nav => {
+    const navClipped = nav.scrollWidth > nav.clientWidth + 1 || nav.scrollHeight > nav.clientHeight + 1;
+    const itemClipped = [...nav.querySelectorAll('a')].some(link => link.scrollWidth > link.clientWidth + 1 || link.scrollHeight > link.clientHeight + 1);
+    return navClipped || itemClipped;
+  });
+  expect(clipped).toBe(false);
+  await fits(page);
 }
 
 async function frame(page, name, fullPage = false, keepScroll = false) {
@@ -601,11 +653,16 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     await expect(humans).toContainText('An operator approves the offer before it is listed.');
     await expect(page.getByRole('heading', { name: 'Connect your existing agent' })).toBeVisible();
     await expect(page.locator('.setup-command pre')).toHaveCount(1);
-    await page.getByRole('button', { name: 'Copy line', exact: true }).click();
-    await expect(page.locator('.agent-line .copy-status')).toContainText('Copied');
+    const copy = page.getByRole('button', { name: 'Copy line', exact: true });
+    await expect(copy).toBeEnabled();
+    await expect(copy).toHaveClass(/secondary/);
+    await expect(copy).not.toHaveAttribute('data-primary-action');
+    await copy.click();
+    await expect(page.locator('.agent-line .copy-status')).toHaveText('Copied. Paste it to your agent.');
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`Read ${base}/SKILL.md and connect this site to Offer Rails`);
     await fits(page);
     await frame(page, `after-setup-${viewport.width}`);
+    await shotD020(page, `after-setup-${viewport.width}`);
     if (viewport.width === 1440) await frame(page, 'after-setup-1440-page', true);
     await context.close();
   }
@@ -625,6 +682,96 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
   await context.close();
   const source = await video.path();
   execFileSync('ffmpeg', ['-y', '-i', source, '-filter:v', 'setpts=0.25*PTS', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '30', path.join(d019, 'after-setup-agents.mp4')], { stdio: 'inherit' });
+});
+
+test('workspace nav is reachable at 390 and 360', async ({ browser }) => {
+  for (const viewport of [
+    { width: 390, height: 844, shot: 'after-nav-390' },
+    { width: 360, height: 740, shot: 'after-nav-360' },
+    { width: 1440, height: 900, shot: '' },
+  ]) {
+    reset();
+    const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+    const page = await context.newPage();
+    await page.goto(base + '/owner');
+    await expect(page.getByRole('link', { name: 'Open products ↗', exact: true })).toBeVisible();
+    await navFits(page);
+    if (viewport.shot) await shotD020(page, viewport.shot);
+    await context.close();
+  }
+});
+
+test('a slow health check wakes the workspace and keeps typed input', async ({ browser }) => {
+  test.setTimeout(90000);
+  fs.mkdirSync('/tmp/d020-video', { recursive: true });
+  reset();
+  state.healthMode = 'slow';
+  state.healthFails = 3;
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, recordVideo: { dir: '/tmp/d020-video', size: { width: 1440, height: 900 } } });
+  const page = await context.newPage();
+  await page.goto(base + '/owner');
+  await expect(page.getByRole('heading', { name: 'Waking the server, about 30 seconds' })).toBeVisible();
+  await expect(page.locator('#workspace-feedback')).toHaveText('');
+  await shotD020(page, 'after-waking-1440');
+  await expect(page.getByRole('link', { name: 'Open products ↗', exact: true })).toBeVisible({ timeout: 25000 });
+  await shotD020(page, 'after-recovered-1440');
+  const video = page.video();
+  await context.close();
+  const source = await video.path();
+  fs.mkdirSync(d020, { recursive: true });
+  execFileSync('ffmpeg', ['-y', '-i', source, '-filter:v', 'setpts=0.25*PTS', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '30', path.join(d020, 'after-waking-recovered.mp4')], { stdio: 'inherit' });
+
+  reset();
+  state.healthMode = 'slow';
+  state.healthFails = 3;
+  const narrow = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  const phone = await narrow.newPage();
+  await phone.goto(base + '/owner');
+  await expect(phone.getByRole('heading', { name: 'Waking the server, about 30 seconds' })).toBeVisible();
+  await expect(phone.locator('.wake-bar')).toHaveCSS('transition-duration', '0s');
+  await shotD020(phone, 'after-waking-390');
+  await expect(phone.getByRole('link', { name: 'Open products ↗', exact: true })).toBeVisible({ timeout: 25000 });
+  await shotD020(phone, 'after-recovered-390');
+  await narrow.close();
+
+  reset();
+  const kept = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const formPage = await kept.newPage();
+  await formPage.goto(base + '/owner/products');
+  await formPage.getByLabel('Product name', { exact: true }).fill('Kept Name');
+  await formPage.getByLabel('Website', { exact: true }).fill('https://rail-tool.example');
+  await formPage.getByLabel('What does it help people do?').fill('Help developers ship a referral offer.');
+  state.healthMode = 'slow';
+  state.healthHits = 0;
+  state.healthFails = 2;
+  state.failProductCreate = true;
+  await formPage.getByRole('button', { name: 'Register product', exact: true }).click();
+  await expect(formPage.getByRole('heading', { name: 'Waking the server, about 30 seconds' })).toBeVisible();
+  await expect(formPage.getByLabel('Product name', { exact: true })).toHaveValue('Kept Name');
+  await expect(formPage.getByRole('heading', { name: 'Kept Name', exact: true })).toBeVisible({ timeout: 25000 });
+  await kept.close();
+});
+
+test('a server that stays down offers try again', async ({ browser }) => {
+  test.setTimeout(180000);
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    reset();
+    state.healthMode = 'never';
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    await page.goto(base + '/owner');
+    await expect(page.getByRole('heading', { name: 'The server did not wake.' })).toBeVisible({ timeout: 90000 });
+    await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
+    await expect(page.locator('#workspace-app')).not.toContainText('503');
+    await expect(page.locator('#workspace-feedback')).toHaveText('');
+    await onePrimary(page, 'Try again');
+    await shotD020(page, `after-giveup-${viewport.width}`);
+    if (viewport.width === 1440) {
+      await page.getByRole('button', { name: 'Try again', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Waking the server, about 30 seconds' })).toBeVisible();
+    }
+    await context.close();
+  }
 });
 
 test('landing still renders at both widths', async ({ browser }) => {
