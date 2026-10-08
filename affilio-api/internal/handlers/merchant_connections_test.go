@@ -220,6 +220,12 @@ func TestLiveKeyRefusalStaysOnTheFormAndOutOfLogs(t *testing.T) {
 			t.Fatalf("%s: expected the inline form refusal, got %d %s", key, again.Code, again.Body.String())
 		}
 	}
+	logged.POST("/panic-secret", func(c *gin.Context) { panic(secret) })
+	panicRec := httptest.NewRecorder()
+	logged.ServeHTTP(panicRec, httptest.NewRequest(http.MethodPost, "/panic-secret", nil))
+	if panicRec.Code != http.StatusInternalServerError || !strings.Contains(logs.String(), "request panic recovered") || strings.Contains(logs.String(), secret) {
+		t.Fatalf("a panic must not record the live key: %d %s", panicRec.Code, logs.String())
+	}
 }
 
 func TestStripeConnectionNavIncludesOfferReview(t *testing.T) {
