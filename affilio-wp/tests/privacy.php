@@ -74,7 +74,18 @@ if (isset($state['phase']) && $state['phase'] === 'scanning') {
     $onboarding->scan_batch();
 }
 
-$blob = json_encode($GLOBALS['http']);
+$captured = array();
+foreach ($GLOBALS['http'] as $call) {
+    $captured[] = $call['url'];
+    if (!empty($call['args']['body'])) {
+        $decoded = json_decode($call['args']['body'], true);
+        $captured[] = is_array($decoded) ? json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : $call['args']['body'];
+    }
+    if (!empty($call['args']['headers'])) {
+        $captured[] = json_encode($call['args']['headers']);
+    }
+}
+$blob = implode("\n", $captured);
 $forbidden = array(
     'admin@example.com', 'commenter@example.com', '203.0.113.50', 'siteadmin', 'cara-login',
     'Ada Admin', 'Cara Comment', 'Ada Admin Blog', 'Secret comment about the draft',

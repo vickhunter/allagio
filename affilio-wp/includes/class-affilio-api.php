@@ -30,6 +30,17 @@ class Affilio_API {
                 'X-API-Key'    => $this->current_api_key(),
             ),
         );
+        $path_only = $path;
+        $query_at = strpos($path, '?');
+        if ($query_at !== false) {
+            $path_only = substr($path, 0, $query_at);
+        }
+        if (rtrim($path_only, '/') === '/sites/register') {
+            $body = array(
+                'site_url' => home_url(),
+                'plugin_version' => defined('AFFILIO_VERSION') ? AFFILIO_VERSION : '',
+            );
+        }
         if ($body !== null) {
             $args['body'] = wp_json_encode($body);
         }
