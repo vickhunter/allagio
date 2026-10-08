@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -216,5 +217,129 @@ func TestReadinessAIRubricContributesChecksAndTaxonomy(t *testing.T) {
 	// AI checks never gate: probes all pass, so the product is still ready.
 	if result.Status != "ready" {
 		t.Fatalf("expected ready despite low ai score, got %s", result.Status)
+	}
+}
+
+func agnosticSite(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body>
+<a href="/start">Get started</a>
+<a href="/privacy">Privacy Policy</a>
+<a href="/terms">Terms</a>
+</body></html>`))
+	})
+	mux.HandleFunc("/pricing", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body>Pro plan: $19/month</body></html>`))
+	})
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("<html><body>" + longDocs() + "</body></html>"))
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestReadinessCheckoutDoesNotRequireAKnownProvider(t *testing.T) {
+	site := agnosticSite(t)
+	result := testEngine().Assess(context.Background(), ReadinessProduct{
+		Name:       "Northstar",
+		WebsiteURL: site.URL,
+		PricingURL: site.URL + "/pricing",
+		DocsURL:    site.URL + "/docs",
+	})
+	checkout := findCheck(t, result.Checks, "checkout_present")
+	if !checkout.Gate || checkout.Status != "pass" {
+		t.Fatalf("a get-started link must pass checkout_present, got %+v", checkout)
+	}
+	if strings.Contains(strings.ToLower(checkout.Evidence+checkout.Remediation), "stripe") {
+		t.Fatalf("passing without a known provider must not mention Stripe, got %+v", checkout)
+	}
+	warning := findCheck(t, result.Checks, "payment_provider")
+	if warning.Gate || warning.Status != "warn" || !strings.Contains(strings.ToLower(warning.Evidence), "no known payment provider") {
+		t.Fatalf("missing provider must be a non-gating warning, got %+v", warning)
+	}
+	for _, key := range []string{"site_reachable", "pricing_page", "docs_present", "privacy_policy", "terms"} {
+		check := findCheck(t, result.Checks, key)
+		if !check.Gate || check.Status != "pass" {
+			t.Fatalf("%s must stay a passing gate, got %+v", key, check)
+		}
+	}
+	if result.Status != "ready" {
+		t.Fatalf("expected ready without a known provider, got %s %+v", result.Status, result.Checks)
+	}
+}
+
+func TestReadinessReportsKnownProviderWithoutLockIn(t *testing.T) {
+	site := agnosticSite(t)
+	result := testEngine().Assess(context.Background(), ReadinessProduct{
+		Name:        "Northstar",
+		WebsiteURL:  site.URL,
+		PricingURL:  site.URL + "/pricing",
+		DocsURL:     site.URL + "/docs",
+		CheckoutURL: site.URL + "/checkout",
+	})
+	checkout := findCheck(t, result.Checks, "checkout_present")
+	if checkout.Status != "pass" || !strings.Contains(strings.ToLower(checkout.Evidence), "checkout") {
+		t.Fatalf("declared checkout URL must pass, got %+v", checkout)
+	}
+	marked := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body><a href="https://buy.stripe.com/test">Buy</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></body></html>`))
+	}))
+	t.Cleanup(marked.Close)
+	detected := testEngine().Assess(context.Background(), ReadinessProduct{Name: "Paid", WebsiteURL: marked.URL, PricingURL: marked.URL, DocsURL: marked.URL})
+	found := findCheck(t, detected.Checks, "checkout_present")
+	if found.Status != "pass" || !strings.Contains(strings.ToLower(found.Evidence), "stripe") {
+		t.Fatalf("known marker must be reported, got %+v", found)
+	}
+	for _, check := range detected.Checks {
+		if check.Key == "payment_provider" && check.Status == "warn" {
+			t.Fatalf("a detected provider must not warn, got %+v", check)
+		}
+	}
+}
+
+func TestReadinessPageGatesFailClosed(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body><a href="/start">Get started</a></body></html>`))
+	}))
+	defer server.Close()
+	result := testEngine().Assess(context.Background(), ReadinessProduct{Name: "Thin", WebsiteURL: server.URL})
+	if result.Status != "failing" {
+		t.Fatalf("expected failing, got %s", result.Status)
+	}
+	for _, key := range []string{"pricing_page", "docs_present", "privacy_policy", "terms"} {
+		check := findCheck(t, result.Checks, key)
+		if !check.Gate || check.Status != "fail" || check.Remediation == "" {
+			t.Fatalf("%s must stay a failing gate, got %+v", key, check)
+		}
+	}
+	checkout := findCheck(t, result.Checks, "checkout_present")
+	if strings.Contains(checkout.Remediation, "Lemon Squeezy") || strings.Contains(checkout.Remediation, "Polar") {
+		t.Fatalf("remediation must not lock the product to one provider, got %s", checkout.Remediation)
+	}
+}
+
+func TestReadinessAllowsOnlyTheConfiguredPublicOrigin(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body><a href="/start">Get started</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></body></html>`))
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	engine := &ReadinessEngine{Client: &http.Client{Timeout: 5 * time.Second}, PublicBaseURL: server.URL}
+	result := engine.Assess(context.Background(), ReadinessProduct{Name: "Self", WebsiteURL: server.URL})
+	check := findCheck(t, result.Checks, "site_reachable")
+	if check.Status != "pass" {
+		t.Fatalf("PUBLIC_BASE_URL must be probeable, got %+v", check)
+	}
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("secret"))
+	}))
+	defer other.Close()
+	blocked := engine.Assess(context.Background(), ReadinessProduct{Name: "Other", WebsiteURL: other.URL})
+	if findCheck(t, blocked.Checks, "site_reachable").Status != "fail" {
+		t.Fatal("a different loopback origin must stay blocked")
 	}
 }

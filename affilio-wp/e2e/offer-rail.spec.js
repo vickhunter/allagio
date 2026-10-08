@@ -463,6 +463,28 @@ test('offer rail happy path at 390', async ({ browser }) => {
   await context.close();
 });
 
+test('registering a product shows success and lists it without reload', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await page.goto(base + '/owner/products');
+  await registerProduct(page, 'Listed Immediately');
+  await expect(page.locator('#workspace-feedback')).toContainText('Product registered');
+  await expect(page.locator('#workspace-feedback')).toHaveClass(/success/);
+  await expect(page.getByRole('heading', { name: 'Listed Immediately', exact: true })).toBeVisible();
+  await context.close();
+});
+
+test('the offer station stays undone while readiness is pending', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await page.goto(base + '/owner/products');
+  await registerProduct(page, 'Early Offer');
+  await createOffer(page);
+  await expect(page.locator('[data-station="ready"]')).toHaveClass(/is-current/);
+  await expect(page.locator('[data-station="offer"]')).not.toHaveClass(/is-done/);
+  await context.close();
+});
+
 test('submit before readiness keeps the error in view', async ({ browser }) => {
   for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     reset();
@@ -478,6 +500,8 @@ test('submit before readiness keeps the error in view', async ({ browser }) => {
     const error = page.locator('.field-error').first();
     await expect(error).toBeFocused();
     await expect(error).toContainText('product has not passed readiness assessment');
+    await expect(error).not.toContainText('/v1/');
+    await expect(error).not.toContainText('POST /');
     const box = await error.boundingBox();
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);

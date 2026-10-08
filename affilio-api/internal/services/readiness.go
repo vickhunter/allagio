@@ -27,6 +27,9 @@ type ReadinessEngine struct {
 	APIVersion string
 	// AllowPrivateHosts permits probing loopback/private addresses (tests only).
 	AllowPrivateHosts bool
+	// PublicBaseURL is the only extra origin readiness may probe when it is not a public host.
+	// Behavior is covered by TestReadinessAllowsOnlyTheConfiguredPublicOrigin.
+	PublicBaseURL string
 }
 
 type ReadinessProduct struct {
@@ -37,6 +40,7 @@ type ReadinessProduct struct {
 	PricingURL      string
 	PaymentProvider string
 	RefParam        string
+	CheckoutURL     string
 }
 
 type ReadinessCheck struct {

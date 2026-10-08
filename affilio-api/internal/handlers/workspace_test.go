@@ -97,6 +97,35 @@ func TestWorkspaceOwnerProductsAndCSRF(t *testing.T) {
 	}
 }
 
+func TestOperatorReviewLinkFollowsOperatorOwner(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, r, _ := hostedTestServer(t, db)
+	o, cookie := linkedMaker(t, h, "operator-owner")
+	h.AssetsPath = "../../../affilio-wp/admin/build"
+	if err := h.LoadWorkspace(); err != nil {
+		t.Fatal(err)
+	}
+	get := func() string {
+		req := httptest.NewRequest("GET", "/owner/products", nil)
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != 200 {
+			t.Fatalf("workspace: %d", rec.Code)
+		}
+		return rec.Body.String()
+	}
+	if strings.Contains(get(), `href="/owner/review"`) {
+		t.Fatal("review link shown without OPERATOR_OWNER_ID")
+	}
+	h.OperatorID = o.ID
+	body := get()
+	if !strings.Contains(body, `href="/owner/review"`) || !strings.Contains(body, "Offer review") {
+		t.Fatal("operator nav is missing Offer review")
+	}
+}
+
 func TestWordPressOwnerConnection(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

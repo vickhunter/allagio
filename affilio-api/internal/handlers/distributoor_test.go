@@ -3,8 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -367,6 +369,83 @@ func TestAssessGatesOfferSubmitEndToEnd(t *testing.T) {
 	assessments, _ := listBody["assessments"].([]interface{})
 	if len(assessments) != 1 {
 		t.Fatalf("expected 1 stored assessment, got %d", len(assessments))
+	}
+}
+
+func TestSubmitDoesNotRequireAPaymentConnection(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	makerID, makerKey := createTestMaker(t, db)
+	r := newMakerRouter(db)
+	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":             "Agnostic",
+		"website_url":      "https://agnostic.example",
+		"payment_provider": "none",
+	})
+	productID := product["id"].(string)
+	var connections int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM product_connections WHERE product_id=$1`, productID).Scan(&connections); err != nil {
+		t.Fatal(err)
+	}
+	if connections != 0 {
+		t.Fatalf("expected no payment connection, got %d", connections)
+	}
+	markProductReady(t, db, productID)
+	_, blocked := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       productID,
+		"commission_type":  "flat",
+		"commission_value": 8,
+	})
+	// A second offer is created after the first submit so the trusted path can list.
+	firstID := blocked["id"].(string)
+	early, earlyBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+firstID+"/submit", makerKey, nil)
+	if early.Code != http.StatusOK || earlyBody["status"] != "submitted" {
+		t.Fatalf("ready product with no provider connection must submit, got %d %v", early.Code, earlyBody)
+	}
+	if hint, _ := earlyBody["hint"].(string); strings.Contains(hint, "/v1/") || strings.Contains(fmt.Sprint(earlyBody["error"]), "/v1/") {
+		t.Fatalf("submit response must not name an API path: %v", earlyBody)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/offer-review/makers/"+makerID+"/trust", newJSONRequest(t, http.MethodPost, "", map[string]interface{}{"trusted": true}))
+	req.Header.Set("X-Admin-Key", "admin-secret")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("trust: %d %s", rec.Code, rec.Body.String())
+	}
+	_, listedOffer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       productID,
+		"commission_type":  "flat",
+		"commission_value": 9,
+	})
+	listed, listedBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+listedOffer["id"].(string)+"/submit", makerKey, nil)
+	if listed.Code != http.StatusOK || listedBody["status"] != "listed" || listedBody["program_id"] == nil || listedBody["program_id"] == "" {
+		t.Fatalf("trusted maker with no provider connection must list, got %d %v", listed.Code, listedBody)
+	}
+}
+
+func TestUnreadySubmitErrorHasNoAPIPath(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	_, makerKey := createTestMaker(t, db)
+	r := newMakerRouter(db)
+	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":        "NotReady",
+		"website_url": "https://notready.example",
+	})
+	_, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       product["id"],
+		"commission_type":  "flat",
+		"commission_value": 4,
+	})
+	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offer["id"].(string)+"/submit", makerKey, nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", rec.Code)
+	}
+	encoded := fmt.Sprint(body)
+	if strings.Contains(encoded, "/v1/") || strings.Contains(encoded, "POST ") {
+		t.Fatalf("readiness refusal must be plain language, got %s", encoded)
 	}
 }
 

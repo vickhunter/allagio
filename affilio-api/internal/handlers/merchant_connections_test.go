@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -78,5 +79,41 @@ func TestOwnerStripeConnectionAndRotation(t *testing.T) {
 	verify.check.AccountID = "acct_foreign"
 	if rec := ownerForm(t, h, r, cookie, "/owner/products/"+productID+"/connection", values); rec.Code != 409 {
 		t.Fatal("rotation changed merchant account")
+	}
+}
+
+func TestStripeConnectionPageIsTestModeOnly(t *testing.T) {
+	db, _, _, offerID, _ := testPaidCampaign(t)
+	h, r, _ := hostedTestServer(t, db)
+	o, cookie := testOwnerSession(t, h, "test-mode-owner", "test-mode@example.com")
+	var productID, makerID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT p.id,p.maker_id FROM products p JOIN offers o ON o.product_id=p.id WHERE o.id=$1`, offerID).Scan(&productID, &makerID); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := db.BindOwnerAccount(context.Background(), o.ID, "maker", makerID); err != nil || !ok {
+		t.Fatal(err)
+	}
+	verify := &fixtureStripeVerifier{expectedURL: h.BaseURL + "/v1/webhooks/stripe/" + productID}
+	merchant := &MerchantConnectionsHandler{DB: db, Cipher: testConnectionCipher(), Verifier: verify, BaseURL: h.BaseURL, Page: h.Page}
+	group := r.Group("/owner", h.ownerSession)
+	group.GET("/products/:id/connection", merchant.Form)
+	group.POST("/products/:id/connection", merchant.Connect)
+	get := httptest.NewRequest("GET", "/owner/products/"+productID+"/connection", nil)
+	get.AddCookie(cookie)
+	page := httptest.NewRecorder()
+	r.ServeHTTP(page, get)
+	if page.Code != 200 || !strings.Contains(strings.ToLower(page.Body.String()), "test mode only") {
+		t.Fatalf("connection page must say test mode only: %d %s", page.Code, page.Body.String())
+	}
+	before := verify.calls
+	for _, key := range []string{"sk_live_rejected", "rk_live_rejected"} {
+		values := url.Values{"csrf": {o.CSRF}, "stripe_key": {key}, "price_id": {"price_pilot"}, "endpoint_id": {"we_pilot"}, "signing_secret": {"whsec_verified_pilot_secret"}}
+		rec := ownerForm(t, h, r, cookie, "/owner/products/"+productID+"/connection", values)
+		if rec.Code != 400 || !strings.Contains(strings.ToLower(rec.Body.String()), "test mode") {
+			t.Fatalf("%s: expected a test-mode refusal, got %d %s", key, rec.Code, rec.Body.String())
+		}
+	}
+	if verify.calls != before {
+		t.Fatal("live keys were sent to Stripe")
 	}
 }

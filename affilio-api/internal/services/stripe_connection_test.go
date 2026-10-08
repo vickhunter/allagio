@@ -80,3 +80,20 @@ func TestStripeConnectionVerification(t *testing.T) {
 		})
 	}
 }
+
+func TestStripeRejectsLiveKeysBeforeAnyRequest(t *testing.T) {
+	requests := 0
+	api := &StripeAPI{HTTP: &http.Client{Transport: stripeRoundTripper(func(r *http.Request) (*http.Response, error) {
+		requests++
+		return nil, context.Canceled
+	})}}
+	for _, key := range []string{"sk_live_rejected", "rk_live_rejected"} {
+		_, err := api.Verify(context.Background(), key, "price_pilot", "we_pilot", "https://pilot.example/hook")
+		if err == nil || !strings.Contains(strings.ToLower(err.Error()), "test mode") {
+			t.Fatalf("%s: expected a test-mode refusal, got %v", key, err)
+		}
+	}
+	if requests != 0 {
+		t.Fatalf("live keys must not reach Stripe, requests=%d", requests)
+	}
+}
