@@ -1,0 +1,11 @@
+{
+  "positives": [
+    "Nota: alcuni link in questa pagina sono affiliati. Se acquisti tramite questi link, posso ricevere una commissione, senza costi extra per te.",
+    "This post contains affiliate links"
+  ],
+  "negatives": [
+    "Leggi la nostra disclosure policy",
+    "contenuto sponsorizzato",
+    "contiene link"
+  ]
+}

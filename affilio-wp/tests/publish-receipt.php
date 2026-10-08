@@ -127,8 +127,39 @@ $GLOBALS['options']['affilio_existing_disclosure'] = '';
 $GLOBALS['post']->post_content = '<p>Un altro articolo senza avvisi.</p>';
 $result = $distribution->publish($request);
 $status = is_wp_error($result) && isset($result->data['status']) ? (int) $result->data['status'] : 0;
+$plain_before_refusal = '<p>Un altro articolo senza avvisi.</p>';
 check(is_wp_error($result) && $status === 409, 'a rejected receipt did not fail publish with 409 (status ' . $status . ')');
 check(empty($GLOBALS['receipt_recorded']), 'a rejected receipt marked the placement published');
 check(!(is_array($result) && !empty($result['published'])), 'publish reported the placement published after a 409');
+check($GLOBALS['post']->post_content === $plain_before_refusal, 'a refused receipt left the tracked link in the post');
+check(strpos($result->get_error_message(), 'Il testo pubblicato deve includere') !== false, 'the admin did not see the API refusal in Italian: ' . $result->get_error_message());
+
+$GLOBALS['force_receipt'] = 500;
+$GLOBALS['receipt_recorded'] = false;
+$server_original = '<p>Articolo prima del rifiuto del server.</p>';
+$GLOBALS['post']->post_content = $server_original;
+$result = $distribution->publish($request);
+check(is_wp_error($result), 'a 500 receipt was treated as published');
+check($GLOBALS['post']->post_content === $server_original, 'a non-2xx receipt left the insert in the post');
+check(strpos($GLOBALS['post']->post_content, '/v1/go/') === false, 'a non-2xx receipt left the tracked link in the post');
+check(strpos($result->get_error_message(), 'annullato') !== false, 'a non-2xx receipt did not tell the admin in Italian: ' . $result->get_error_message());
+
+$GLOBALS['force_receipt'] = 0;
+$GLOBALS['receipt_recorded'] = false;
+$policy = '<p>Leggi la nostra disclosure policy.</p>';
+$GLOBALS['post']->post_content = $policy;
+$result = $distribution->publish($request);
+check(!is_wp_error($result) && !empty($result['published']), 'a disclosure-policy sentence blocked publication: ' . (is_wp_error($result) ? $result->get_error_message() : ''));
+check(strpos($GLOBALS['post']->post_content, 'affiliate-disclosure') !== false, 'a disclosure-policy sentence was treated as the disclosure');
+check(strpos($GLOBALS['post']->post_content, '/v1/go/') !== false, 'the tracked link was not inserted once a real disclosure was added');
+
+$GLOBALS['receipt_recorded'] = false;
+$boundary = '<p>' . str_repeat('a', 80) . 'è' . str_repeat('b', 79) . 'link affiliati nel testo.</p>';
+$GLOBALS['post']->post_content = $boundary;
+$result = $distribution->publish($request);
+check(!is_wp_error($result) && !empty($result['published']), 'an accented disclosure was not published: ' . (is_wp_error($result) ? $result->get_error_message() : ''));
+check(mb_check_encoding($GLOBALS['last_published'], 'UTF-8'), 'the receipt excerpt split a multibyte character');
+check(mb_strpos($GLOBALS['last_published'], 'è', 0, 'UTF-8') !== false, 'the accented character on the excerpt boundary was dropped');
+check(strpos($GLOBALS['last_published'], 'link affiliati') !== false, 'the receipt excerpt missed the disclosure');
 
 echo "A post disclosure satisfies the receipt, and a setting cannot publish a post that has none.\n";

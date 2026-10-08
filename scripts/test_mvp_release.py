@@ -160,6 +160,16 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(release.ReleaseError, "marketplace.js"):
             release.validate_plugin(archive(plugin=guarded + "wp_enqueue_script($handle, AFFILIO_PLUGIN_URL . 'admin/build/' . $script);\n$script = 'marketplace.js';\n", drop="affilio-wp/admin/build/marketplace.js"))
 
+    def test_plugin_zip_rejects_stored_entries(self):
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
+            for name in release.WP_FILES:
+                version = release.PLUGIN_VERSION
+                body = f"<?php\n/* Plugin Name: Affilio\n * Version: {version}\n */\ndefine('AFFILIO_VERSION', '{version}');\nif (!function_exists('affilio_init')) {{\nfunction affilio_init() {{}}\n}}\n" if name.endswith("/affilio.php") else (f"=== Affilio ===\nStable tag: {version}\n" if name.endswith("/readme.txt") else "runtime")
+                archive.writestr(name, body)
+        with self.assertRaisesRegex(release.ReleaseError, "uncompressed"):
+            release.validate_plugin(output.getvalue())
+
     def test_plugin_zip_requires_analytics_script(self):
         legacy = {
             "affilio/affilio.php", "affilio/includes/class-affilio-api.php",
