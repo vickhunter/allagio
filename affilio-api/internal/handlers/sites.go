@@ -31,6 +31,8 @@ type siteRegisterRequest struct {
 	Domain          string `json:"domain"`
 	Name            string `json:"name"`
 	InstallationKey string `json:"installation_key"`
+	SiteURL         string `json:"site_url"`
+	PluginVersion   string `json:"plugin_version"`
 }
 
 type siteDeleteRequest struct {
@@ -98,13 +100,29 @@ func (h *SitesHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}
-	req.Domain = normalizeDomain(req.Domain)
 	req.Name = strings.TrimSpace(req.Name)
+	req.PluginVersion = strings.TrimSpace(req.PluginVersion)
+	storedName := req.Name
+	if siteURL := strings.TrimSpace(req.SiteURL); siteURL != "" {
+		derived, ok := domainFromSiteURL(siteURL)
+		if !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "valid domain is required"})
+			return
+		}
+		if strings.TrimSpace(req.Domain) != "" && normalizeDomain(req.Domain) != derived {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "valid domain is required"})
+			return
+		}
+		req.Domain = derived
+		storedName = ""
+	} else {
+		req.Domain = normalizeDomain(req.Domain)
+	}
 	if req.Domain == "" || !validDomain(req.Domain) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "valid domain is required"})
 		return
 	}
-	if len(req.Name) > 255 {
+	if len(storedName) > 255 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name too long"})
 		return
 	}
@@ -128,16 +146,21 @@ func (h *SitesHandler) Register(c *gin.Context) {
 	keyPrefix := services.KeyPrefix(apiKey)
 	var siteID string
 	if req.InstallationKey != "" {
-		siteID, err = h.DB.RegisterInstallation(c.Request.Context(), keyHash, keyPrefix, req.Domain, req.Name)
+		siteID, err = h.DB.RegisterInstallation(c.Request.Context(), keyHash, keyPrefix, req.Domain, storedName)
 	} else {
-		siteID, err = h.DB.CreateSite(c.Request.Context(), keyHash, keyPrefix, req.Domain, req.Name)
+		siteID, err = h.DB.CreateSite(c.Request.Context(), keyHash, keyPrefix, req.Domain, storedName)
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusConflict, gin.H{"error": "installation is already connected to a different domain"})
 		return
 	}
 	if err != nil {
-		log.Printf("sites.register db create failed domain=%s name=%s err=%v", req.Domain, req.Name, err)
+		log.Printf("sites.register db create failed domain=%s name=%s err=%v", req.Domain, storedName, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register site"})
+		return
+	}
+	if err := h.DB.SaveSitePluginVersion(c.Request.Context(), siteID, req.PluginVersion); err != nil {
+		log.Printf("sites.register plugin version save failed domain=%s err=%v", req.Domain, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register site"})
 		return
 	}
@@ -216,6 +239,22 @@ func (h *SitesHandler) Delete(c *gin.Context) {
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "deleted", "site_id": siteID})
+}
+
+func domainFromSiteURL(raw string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return "", false
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if (scheme != "http" && scheme != "https") || parsed.Hostname() == "" {
+		return "", false
+	}
+	domain := normalizeDomain(parsed.Hostname())
+	if domain == "" || !validDomain(domain) {
+		return "", false
+	}
+	return domain, true
 }
 
 func normalizeDomain(domain string) string {
