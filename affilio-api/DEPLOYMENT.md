@@ -13,7 +13,8 @@ This guide covers production deployment for `affilio-api` and required integrati
 - `PORT` (default: `8080`)
 - `DATABASE_URL` (required)
 - `ADMIN_API_KEY` (required for discovery/admin routes)
-- `API_KEY_SECRET` (required for site registration workflows)
+- `API_KEY_SECRET` (required for site registration workflows; `GIN_MODE=release` refuses an empty value or `dev-secret`)
+- `GIN_MODE` (`release` also refuses `ALLOWED_ORIGINS=*`)
 
 ## Optional Environment Variables
 - `CLAUDE_API_KEY` (enable AI classification/generation)

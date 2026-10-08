@@ -1,8 +1,10 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,6 +27,7 @@ type Config struct {
 	ClaudeAPIVersion       string
 	AllowedOrigins         string
 	TrustedProxies         string
+	GinMode                string
 	APIKeySecret           string
 	AdminAPIKey            string
 	KeyRotationGracePeriod time.Duration
@@ -59,6 +62,7 @@ func Load() Config {
 		ClaudeAPIVersion:       getEnvValue("CLAUDE_API_VERSION", ""),
 		AllowedOrigins:         getEnvValue("ALLOWED_ORIGINS", "*"),
 		TrustedProxies:         os.Getenv("TRUSTED_PROXIES"),
+		GinMode:                os.Getenv("GIN_MODE"),
 		APIKeySecret:           getEnvValue("API_KEY_SECRET", "dev-secret"),
 		AdminAPIKey:            getEnvValue("ADMIN_API_KEY", ""),
 		KeyRotationGracePeriod: time.Duration(graceHours) * time.Hour,
@@ -68,6 +72,23 @@ func Load() Config {
 		LemonSqueezyWebhookSecret: os.Getenv("LEMONSQUEEZY_WEBHOOK_SECRET"),
 		PolarWebhookSecret:        os.Getenv("POLAR_WEBHOOK_SECRET"),
 	}
+}
+
+// ValidateRuntime refuses to boot a release process that still has the
+// development API key secret or a wildcard CORS allowlist.
+func (c Config) ValidateRuntime() error {
+	if !strings.EqualFold(strings.TrimSpace(c.GinMode), "release") {
+		return nil
+	}
+	secret := strings.TrimSpace(c.APIKeySecret)
+	if secret == "" || secret == "dev-secret" {
+		return errors.New("API_KEY_SECRET must be set to a non-default value when GIN_MODE=release")
+	}
+	origins := strings.TrimSpace(c.AllowedOrigins)
+	if origins == "" || origins == "*" {
+		return errors.New("ALLOWED_ORIGINS must list explicit origins when GIN_MODE=release")
+	}
+	return nil
 }
 
 func getEnvValue(key, defaultValue string) string {

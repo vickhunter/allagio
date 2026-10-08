@@ -22,6 +22,9 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err := cfg.ValidateRuntime(); err != nil {
+		log.Fatalf("refusing to start: %v", err)
+	}
 	ctx := context.Background()
 
 	db, err := database.Connect(ctx, cfg.DatabaseURL)
