@@ -55,6 +55,10 @@ def public_responses():
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_runtime_image_defaults_to_release_mode(self):
+        dockerfile = (release.ROOT / "Dockerfile.mvp").read_text()
+        runtime = dockerfile.split("FROM ubuntu:24.04", 1)[1]
+        self.assertIn("ENV GIN_MODE=release", runtime)
     def test_missing_oidc_stops_deployment_without_exposing_values(self):
         values = configuration()
         del values["OIDC_CLIENT_ID"]
