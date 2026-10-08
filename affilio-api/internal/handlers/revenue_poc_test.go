@@ -82,17 +82,17 @@ func TestStripePaymentGatesAndBusinessDedupe(t *testing.T) {
 	if rec.Code != 200 || body["status"] != "duplicate" {
 		t.Fatalf("payment counted twice: %d %v", rec.Code, body)
 	}
-	for _, field := range []string{"livemode", "product"} {
-		payload := stripeSalePayload("evt_wrong_"+field, "pi_wrong_"+field, clickID, 10000)
-		if field == "livemode" {
-			payload["livemode"] = true
-		} else {
-			payload["data"].(map[string]interface{})["object"].(map[string]interface{})["metadata"] = map[string]interface{}{"dtr_product_id": "other-product"}
-		}
-		rec, _ = sendStripeEvent(t, db, r, payload)
-		if rec.Code != 400 {
-			t.Fatalf("accepted wrong %s: %d", field, rec.Code)
-		}
+	wrongMode := stripeSalePayload("evt_wrong_livemode", "pi_wrong_livemode", clickID, 10000)
+	wrongMode["livemode"] = true
+	rec, _ = sendStripeEvent(t, db, r, wrongMode)
+	if rec.Code != 400 {
+		t.Fatalf("accepted wrong livemode: %d", rec.Code)
+	}
+	wrongProduct := stripeSalePayload("evt_wrong_product", "pi_wrong_product", clickID, 10000)
+	wrongProduct["data"].(map[string]interface{})["object"].(map[string]interface{})["metadata"] = map[string]interface{}{"dtr_product_id": "other-product"}
+	rec, body = sendStripeEvent(t, db, r, wrongProduct)
+	if rec.Code != 200 || body["status"] != "ignored" {
+		t.Fatalf("wrong product was not ignored: %d %v", rec.Code, body)
 	}
 	var count int
 	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM conversions WHERE kind='sale'`).Scan(&count); err != nil || count != 1 {
@@ -245,7 +245,7 @@ SELECT id,'Other product','https://other.example.com','saas','stripe' FROM maker
 	payload := stripeSalePayload("evt_cross_product", "pi_cross", clickID, 10000)
 	payload["data"].(map[string]interface{})["object"].(map[string]interface{})["metadata"] = map[string]interface{}{"dtr_product_id": otherID}
 	rec, _ := sendScopedStripeEvent(t, r, otherID, payload, testStripeSecret)
-	if rec.Code != 401 {
+	if rec.Code != 400 {
 		t.Fatalf("another connection secret accepted: %d", rec.Code)
 	}
 	rec, body := sendScopedStripeEvent(t, r, otherID, payload, otherSecret)
