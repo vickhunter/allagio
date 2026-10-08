@@ -165,3 +165,19 @@ Palette, defined once on `:root` in `workspace.css` and used by the landing page
 | `--text-eyebrow` through `--text-h1` | 11, 12, 13, 14, 16, 19, 25, `clamp(32px, 4vw, 48px)` | one scale |
 
 Archivo and IBM Plex Mono stay SIL OFL and stay inside `.offer-rail`.
+
+## D-020
+
+Checked again at 390×844, 360×740, and 1440×900. WordPress was not restyled. Counts are unchanged.
+
+| Surface | pass | gap | n-a |
+| --- | --- | --- | --- |
+| Landing | 13 | 6 | 9 |
+| Owner workspace | 17 | 3 | 8 |
+| WordPress | 12 | 8 | 8 |
+
+Owner gaps that remain: 8, 19, 28. Rule 19 stays a gap. Stripe connection fields, `review_note`, and `SKILL.md` are still absent from the API. No Go route was added. Rule 22 stays n-a on the owner workspace: the narrow nav is a width step, not a new scene.
+
+Narrow navigation: below 600px the six workspace links wrap on a two-column grid. A sideways scroller hid Setup & agents, and a menu would hide five destinations. Every label stays in view at 390 and 360. The desktop sidebar stays a vertical list.
+
+Waking host: when `GET /health` answers 502, 503, 504, or the request fails as a network error or timeout, the page shows "Waking the server, about 30 seconds" and a bar. It probes `/health` on its own, first immediately, then every 4 seconds, and stops after 60 seconds. Each probe aborts after 8 seconds. A 2xx, or any other status, clears the panel and the failed owner call is tried once. Form fields already on the page stay. After 60 seconds the page says "The server did not wake." with one "Try again" button, which starts the same 60 second poll again. The bar moves only when the reader has not asked for reduced motion.

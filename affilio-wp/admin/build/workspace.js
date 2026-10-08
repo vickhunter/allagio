@@ -8,7 +8,7 @@
         try { return new Intl.NumberFormat(undefined, {style:'currency',currency}).format(value || 0); }
         catch { return `${Number(value || 0).toFixed(2)} ${currency}`; }
     };
-    const api = async (path, method = 'GET', body) => {
+    const apiOnce = async (path, method = 'GET', body) => {
         const response = await fetch('/owner/api' + path, {method, credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, ...(body === undefined ? {} : {body:JSON.stringify(body)})});
         if (response.status === 401) { location.assign('/auth/login?return_to=' + encodeURIComponent(location.pathname)); throw new Error('Sign in to continue.'); }
         const data = await response.json().catch(() => ({}));
@@ -20,6 +20,15 @@
         }
         return data;
     };
+    const isAsleep = error => error?.status === 502 || error?.status === 503 || error?.status === 504 || error?.name === 'AbortError' || (error instanceof TypeError);
+    const api = async (path, method, body) => {
+        try { return await apiOnce(path, method, body); }
+        catch (error) {
+            if (!isAsleep(error)) throw error;
+            await ensureAwake();
+            return apiOnce(path, method, body);
+        }
+    };
     const report = (message, bad = false, duplicate = false) => {
         const element = document.getElementById('workspace-feedback');
         if (!element) return;
@@ -27,6 +36,79 @@
         element.className = 'feedback ' + (bad ? 'error' : message ? 'success' : '');
         if (duplicate) element.setAttribute('aria-hidden', 'true');
         else element.removeAttribute('aria-hidden');
+    };
+    const WAKE_LIMIT = 60000;
+    const WAKE_EVERY = 4000;
+    const healthState = async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        try {
+            const response = await fetch('/health', {cache:'no-store', signal:controller.signal});
+            if (response.ok) return 'up';
+            if (response.status === 502 || response.status === 503 || response.status === 504) return 'asleep';
+            return 'other';
+        } catch (error) {
+            if (error?.name === 'AbortError' || error instanceof TypeError) return 'asleep';
+            return 'other';
+        } finally { clearTimeout(timer); }
+    };
+    const wakeMarkup = failed => failed
+        ? '<section class="wake" role="alert"><h2>The server did not wake.</h2><p>It is still not answering.</p><button type="button" data-primary-action data-wake-retry>Try again</button></section>'
+        : '<section class="wake" role="status"><h2>Waking the server, about 30 seconds</h2><p>This page will continue on its own.</p><div class="wake-track" aria-hidden="true"><span class="wake-bar" data-wake-bar></span></div></section>';
+    const paintWake = failed => {
+        if (!root) return;
+        const html = wakeMarkup(failed);
+        if (root.querySelector('form')) {
+            let slot = document.getElementById('server-wake');
+            if (!slot) {
+                slot = document.createElement('div');
+                slot.id = 'server-wake';
+                root.prepend(slot);
+            }
+            slot.innerHTML = html;
+        } else root.innerHTML = `<div id="server-wake">${html}</div>`;
+        report('');
+    };
+    const setWakeBar = started => {
+        const bar = document.querySelector('[data-wake-bar]');
+        if (bar) bar.style.width = `${Math.min(100, Math.round(((Date.now() - started) / WAKE_LIMIT) * 100))}%`;
+    };
+    const pause = (ms, started) => new Promise(resolve => {
+        const end = Date.now() + ms;
+        const tick = () => {
+            setWakeBar(started);
+            const left = end - Date.now();
+            if (left <= 0) resolve();
+            else setTimeout(tick, Math.min(1000, left));
+        };
+        tick();
+    });
+    let wakePromise = null;
+    const ensureAwake = () => {
+        if (wakePromise) return wakePromise;
+        wakePromise = (async () => {
+            try {
+                for (;;) {
+                    const started = Date.now();
+                    let shown = false;
+                    while (Date.now() - started < WAKE_LIMIT) {
+                        const state = await healthState();
+                        if (state !== 'asleep') {
+                            document.getElementById('server-wake')?.remove();
+                            return;
+                        }
+                        if (!shown) { paintWake(false); shown = true; }
+                        setWakeBar(started);
+                        const left = WAKE_LIMIT - (Date.now() - started);
+                        if (left <= 0) break;
+                        await pause(Math.min(WAKE_EVERY, left), started);
+                    }
+                    paintWake(true);
+                    await new Promise(resolve => document.querySelector('[data-wake-retry]')?.addEventListener('click', () => resolve(), {once:true}));
+                }
+            } finally { wakePromise = null; }
+        })();
+        return wakePromise;
     };
     const motion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
     const scrollFocus = element => {
@@ -434,7 +516,7 @@
         }
         const humanList = humans.length ? `<ul class="task-list">${humans.map(step => `<li>${escape(step)}</li>`).join('')}</ul>` : '<p>Nothing here needs a person right now.</p>';
         const skillStatus = `<p class="caption" data-skill-status>${skillNote ? escape(skillNote) : 'The skill file is available.'}</p>`;
-        root.innerHTML = `<section><h2>Start an agent</h2><p>Give this line to an agent. It reads the skill file, then connects this site.</p><div class="copy-field agent-line"><div class="row"><span class="eyebrow">AGENT START</span><button type="button" class="copy-action" data-copy>Copy line</button></div><pre>${escape(agentLine)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div>${skillStatus}</section><section><h2>Where this offer stands</h2><p data-rail-plain>${escape(progress)}</p></section><section><h2>Still needs a person</h2>${humanList}</section><section><h2>Connect your existing agent</h2><p>Builders: run this in your product repository.</p>${copyCommand(session.install_command)}<p>Hosted MCP URL</p><pre>${escape(session.mcp_url)}</pre><p class="caption">Choose maker or publisher permissions in the browser consent screen. Connections last up to seven days and can be revoked here.</p></section>${!session.publisher ? '<section><h2>WordPress publishers</h2><p>Upload and activate the plugin, connect the site, then connect its publisher account from the Distribution screen.</p><a class="button secondary" href="/downloads/affilio.zip">Download plugin ↓</a></section>' + accountForm('publisher') : ''}${!session.maker ? '<p><a href="/owner?setup=maker">Create a builder account ↗</a></p>' : ''}<section><h2>Connected agents</h2>${grants.length ? grants.map(grant => `<div class="card"><h3>${escape(grant.client_name)}</h3><p>${escape(grant.scope)} · expires ${escape(new Date(grant.expires_at).toLocaleString())}</p><form method="post" action="/owner/grants/${grant.id}/revoke"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Disconnect agent</button></form></div>`).join('') : '<p>No agents connected yet.</p>'}</section><section><h2>Account</h2><p>${escape(session.email)}</p><p class="caption">Owner ID: ${escape(session.owner_id)}</p><form method="post" action="/owner/logout"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Sign out</button></form></section>`;
+        root.innerHTML = `<section><h2>Start an agent</h2><p>Give this line to an agent. It reads the skill file, then connects this site.</p><div class="copy-field agent-line"><div class="row"><span class="eyebrow">AGENT START</span><button type="button" class="copy-action${skillNote ? ' secondary' : ''}" data-copy data-copied="Copied. Paste it to your agent.">Copy line</button></div><pre>${escape(agentLine)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div>${skillStatus}</section><section><h2>Where this offer stands</h2><p data-rail-plain>${escape(progress)}</p></section><section><h2>Still needs a person</h2>${humanList}</section><section><h2>Connect your existing agent</h2><p>Builders: run this in your product repository.</p>${copyCommand(session.install_command)}<p>Hosted MCP URL</p><pre>${escape(session.mcp_url)}</pre><p class="caption">Choose maker or publisher permissions in the browser consent screen. Connections last up to seven days and can be revoked here.</p></section>${!session.publisher ? '<section><h2>WordPress publishers</h2><p>Upload and activate the plugin, connect the site, then connect its publisher account from the Distribution screen.</p><a class="button secondary" href="/downloads/affilio.zip">Download plugin ↓</a></section>' + accountForm('publisher') : ''}${!session.maker ? '<p><a href="/owner?setup=maker">Create a builder account ↗</a></p>' : ''}<section><h2>Connected agents</h2>${grants.length ? grants.map(grant => `<div class="card"><h3>${escape(grant.client_name)}</h3><p>${escape(grant.scope)} · expires ${escape(new Date(grant.expires_at).toLocaleString())}</p><form method="post" action="/owner/grants/${grant.id}/revoke"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Disconnect agent</button></form></div>`).join('') : '<p>No agents connected yet.</p>'}</section><section><h2>Account</h2><p>${escape(session.email)}</p><p class="caption">Owner ID: ${escape(session.owner_id)}</p><form method="post" action="/owner/logout"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Sign out</button></form></section>`;
         if (session.publisher) {
             const profile = await api('/payout-profile');
             root.insertAdjacentHTML('beforeend',`<section><h2>How merchants can arrange payment</h2><p>These instructions are shared only with merchants that have a payout due to you. Use a payment contact or contact-page URL.</p><form data-payout-profile><label>Payment contact instructions<textarea name="instructions" maxlength="2000">${escape(profile.instructions)}</textarea></label><button>Save instructions</button></form></section>`);
@@ -458,5 +540,20 @@
     const pages = {'/owner/products':['Products & offers',productsPage],'/owner/placements':['Placements',placementsPage],'/owner/earnings':['Earnings',earningsPage],'/owner/settings':['Setup & agents',settingsPage],'/owner/review':['Offer review',reviewPage]};
     const [title,render] = pages[location.pathname] || ['Your distribution workspace',overview];
     document.querySelector('h1').textContent = title;
-    api('/session').then(value => { session = value; return render(); }).catch(error => { root.textContent = ''; report(error.message,true); });
+    const boot = async () => {
+        root.textContent = 'Loading your workspace…';
+        try {
+            if (await healthState() === 'asleep') await ensureAwake();
+            session = await api('/session');
+            await render();
+        } catch (error) {
+            if (isAsleep(error) && await healthState() === 'asleep') {
+                await ensureAwake();
+                return boot();
+            }
+            root.textContent = '';
+            report(error.message, true);
+        }
+    };
+    boot();
 })();

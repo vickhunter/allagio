@@ -4,6 +4,12 @@ Tracked links that are paused, unlisted, or removed return `410` and record no c
 
 `scripts/mvp_release.py check --host generic --env-file` validates a non-Railway host without the Railway CLI. `verify --base-url` accepts any https origin. Both modes require `API_KEY_SECRET` (32+ characters, not `dev-secret`), `GIN_MODE=release`, and a `TRUSTED_PROXIES` list that is not open to every address. `Dockerfile.mvp` sets `GIN_MODE=release`. Hosted MCP rate limits use the trusted client IP. Render plus Neon (Aiven Free fallback) is documented in [HOSTING.md](docs/HOSTING.md), including the cold-start `GET /health` retry. The onboarding workflow also runs for API, script, Dockerfile, and docs changes. The hosted page `Content-Security-Policy` allows `font-src 'self' data:` so embedded OFL fonts load. The other directives are unchanged.
 
+## October 8 — waking host and narrow nav (D-020)
+
+- At 390 and 360 the workspace navigation wraps into two columns, so Setup & agents stays on screen without a sideways scroll. The desktop list is unchanged.
+- While `/SKILL.md` is not served, the agent start line's copy control is a secondary button. The copied hint is "Copied. Paste it to your agent."
+- If the hosted workspace is asleep (network error, 502, 503, 504, or a timeout), the page says it is waking the server and retries `GET /health` every 4 seconds for up to 60 seconds. A recovered check reloads the page data and keeps what the owner already typed. If it is still down, the page says so and offers Try again. No server code changed.
+
 ## October 8 — offer rail polish (D-019)
 
 - Once a referral offer exists, Products & offers hides "Create a referral offer" behind a secondary "New offer" button. The form stays open when there are no offers, or when creating an offer is the rail's next step. Expanding it focuses the first field, and a rejected create still shows the inline error.
