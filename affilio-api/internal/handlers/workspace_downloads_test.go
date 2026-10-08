@@ -13,6 +13,31 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func TestPrototypeRouteIsStatic(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &HostedHandler{BaseURL: "https://distribution.example", AssetsPath: "../../../affilio-wp/admin/build"}
+	r := gin.New()
+	public := r.Group("")
+	h.mountWorkspace(public, public.Group("/owner"))
+	for _, path := range []string{"/prototype", "/prototype/", "/prototype/share", "/prototype/audience", "/prototype/payments"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Example data") || !strings.Contains(rec.Body.String(), "/assets/prototype.js") {
+			t.Fatalf("%s -> %d", path, rec.Code)
+		}
+	}
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest("GET", "/prototype/secret", nil))
+	if rec.Code != 404 {
+		t.Fatalf("unknown screen %d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest("GET", "/assets/prototype.js", nil))
+	if rec.Code != 200 || strings.Contains(rec.Body.String(), "fetch(") {
+		t.Fatalf("script %d", rec.Code)
+	}
+}
+
 func TestWorkspaceDownloadsUseActualOrigin(t *testing.T) {
 	path := t.TempDir()
 	var source bytes.Buffer

@@ -10,6 +10,7 @@ const adminCss = path.resolve(__dirname, '../admin/css/affilio-admin.css');
 const artifacts = process.env.OFFER_RAIL_ARTIFACTS || '/opt/cursor/artifacts/d011';
 const d019 = process.env.CI ? path.join(artifacts, 'd019') : '/opt/cursor/artifacts/d019';
 const d020 = process.env.CI ? path.join(artifacts, 'd020') : '/opt/cursor/artifacts/d020';
+const d023 = process.env.CI ? path.join(artifacts, 'd023') : '/opt/cursor/artifacts/d023';
 const template = fs.readFileSync(path.join(build, 'workspace.html'), 'utf8');
 
 function shell(title, body, operator) {
@@ -213,6 +214,9 @@ async function handle(req, res) {
   if (pathname === '/wp/marketplace') return send(res, 200, wpMarketplace(), 'text/html; charset=utf-8');
   if (pathname === '/wp/earnings-down') return send(res, 200, wpEarnings(), 'text/html; charset=utf-8');
   if (pathname === '/landing') return send(res, 200, landing(), 'text/html; charset=utf-8');
+  if (pathname === '/prototype' || pathname === '/prototype/' || pathname === '/prototype/share' || pathname === '/prototype/audience' || pathname === '/prototype/payments') {
+    return send(res, 200, fs.readFileSync(path.join(build, 'prototype.html')), 'text/html; charset=utf-8');
+  }
   if (pathname === '/wp-json/affilio/v1/distribution' && req.method === 'GET') {
     if (state.failDistribution) return send(res, 503, { message: 'Distribution could not be loaded.' });
     return send(res, 200, { site_connected: true, native_available: true, publisher_connected: true, owner_url: 'http://127.0.0.1/owner', settings_url: '/wp-admin/admin.php?page=affilio-settings' });
@@ -772,6 +776,104 @@ test('a server that stays down offers try again', async ({ browser }) => {
     }
     await context.close();
   }
+});
+
+async function shotD023(page, name) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const sidebar = page.locator('aside.sidebar');
+  if (await sidebar.count()) {
+    const box = await sidebar.boundingBox();
+    expect(box.y).toBeLessThanOrEqual(1);
+  }
+  fs.mkdirSync(d023, { recursive: true });
+  await page.screenshot({ path: path.join(d023, name + '.png'), fullPage: false });
+}
+
+function watchApi(page, bag) {
+  page.on('request', request => bag.push(request.url()));
+}
+
+function assertNoApi(bag) {
+  const banned = bag.filter(url => {
+    const parsed = new URL(url);
+    if (parsed.origin !== new URL(base).origin) return true;
+    return ['/owner', '/v1', '/health', '/wp-json', '/mcp', '/auth'].some(prefix => parsed.pathname === prefix || parsed.pathname.startsWith(prefix + '/'));
+  });
+  expect(banned).toEqual([]);
+}
+
+test('owner prototype screens at 390 and 1440', async ({ browser }) => {
+  fs.mkdirSync(d023, { recursive: true });
+  fs.copyFileSync(path.resolve(__dirname, '../../docs/prototype/d023-fields.md'), path.join(d023, 'd023-fields.md'));
+  const screens = [
+    { path: '/prototype/share', heading: 'What my agent shares', shot: 'after-share' },
+    { path: '/prototype/audience', heading: 'Where my audience lives', shot: 'after-audience' },
+    { path: '/prototype/payments', heading: 'Who pays whom', shot: 'after-payments' },
+  ];
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    const context = await browser.newContext({ viewport });
+    const page = await context.newPage();
+    const calls = [];
+    watchApi(page, calls);
+    for (const screen of screens) {
+      await page.goto(base + screen.path);
+      await expect(page.getByRole('heading', { level: 1, name: screen.heading })).toBeVisible();
+      await expect(page.getByText('Example data', { exact: true })).toBeVisible();
+      await expect(page.locator('[data-primary-action]')).toHaveCount(1);
+      const action = await page.locator('[data-primary-action]').boundingBox();
+      expect(action.y).toBeGreaterThanOrEqual(0);
+      expect(action.y + action.height).toBeLessThanOrEqual(viewport.height + 1);
+      await fits(page);
+      await shotD023(page, `${screen.shot}-${viewport.width}`);
+    }
+    await page.goto(base + '/prototype/share');
+    const shareSwitch = page.getByRole('switch', { name: 'Sharing on/off' });
+    await expect(shareSwitch).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByText('Being sent', { exact: true })).toHaveCount(2);
+    await shareSwitch.click();
+    await expect(shareSwitch).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByText('Not being sent', { exact: true })).toHaveCount(2);
+    await expect(page.locator('[data-primary-action]')).toHaveCount(1);
+    if (viewport.width === 390) await shotD023(page, 'after-sharing-off-390');
+    await page.goto(base + '/prototype/audience');
+    const card = page.getByRole('region', { name: 'Audience card' });
+    await page.getByRole('button', { name: 'Pinterest', exact: true }).click();
+    await page.getByLabel('Topic for Pinterest').fill('home offices');
+    await page.getByLabel('Size for Pinterest').selectOption('100k+');
+    await expect(card).toContainText('Pinterest');
+    await expect(card).toContainText('home offices');
+    await expect(card).toContainText('100k+');
+    await fits(page);
+    await expect(card).toContainText('Not being sent');
+    await page.getByRole('button', { name: 'Show empty example', exact: true }).click();
+    await page.goto(base + '/prototype/share');
+    await expect(page.getByRole('region', { name: 'Offer card' })).toContainText('No offer yet');
+    await page.goto(base + '/prototype/payments');
+    await expect(page.getByText('No sales in this example.')).toBeVisible();
+    await expect(page.getByText('We never hold money. Payouts go from seller to publisher.')).toBeVisible();
+    assertNoApi(calls);
+    await context.close();
+  }
+
+  fs.mkdirSync('/tmp/d023-video', { recursive: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, recordVideo: { dir: '/tmp/d023-video', size: { width: 1440, height: 900 } } });
+  const page = await context.newPage();
+  const calls = [];
+  watchApi(page, calls);
+  await page.goto(base + '/prototype/share');
+  await expect(page.getByRole('heading', { name: 'What my agent shares' })).toBeVisible();
+  await page.waitForTimeout(900);
+  await page.getByRole('link', { name: 'See where the audience lives', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Where my audience lives' })).toBeVisible();
+  await page.waitForTimeout(900);
+  await page.getByRole('link', { name: 'See who pays whom', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Who pays whom' })).toBeVisible();
+  await page.waitForTimeout(900);
+  assertNoApi(calls);
+  const video = page.video();
+  await context.close();
+  const source = await video.path();
+  execFileSync('ffmpeg', ['-y', '-i', source, '-filter:v', 'setpts=0.5*PTS', '-an', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '30', path.join(d023, 'after-prototype-walk.mp4')], { stdio: 'inherit' });
 });
 
 test('landing still renders at both widths', async ({ browser }) => {

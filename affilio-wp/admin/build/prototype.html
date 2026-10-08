@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prototype · Distributoor</title>
+<link rel="stylesheet" href="/assets/workspace.css">
+<style>
+  body.workspace{font-family:"Archivo Rail",var(--font-sans)}
+  .eyebrow,.proto-kicker,.example-flag{font-family:"IBM Plex Mono Rail",var(--font-mono)}
+  .example-flag{display:inline-block;margin:0 0 16px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;background:var(--tint);color:var(--ink);font-size:var(--text-eyebrow);letter-spacing:.06em;text-transform:uppercase}
+  .proto-lead{max-width:62ch;margin:0 0 20px;color:var(--muted)}
+  .proto-split{display:grid;gap:16px}
+  @media(min-width:900px){.proto-split{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);align-items:start}}
+  .proto-card{border:1px solid var(--line);background:var(--panel);border-radius:var(--radius);padding:16px 18px;margin:0 0 16px;min-width:0}
+  .proto-card h2{font-size:var(--text-h3);margin:0 0 8px}
+  .proto-kicker{margin:0 0 8px;font-size:var(--text-eyebrow);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .send-state{margin:0 0 12px;font-size:var(--text-ui);font-weight:600}
+  .proto-card[data-leaving="off"]{background:var(--tint)}
+  .proto-card[data-leaving="off"] .send-state{color:var(--muted)}
+  .proto-facts{display:grid;grid-template-columns:minmax(0,8.5rem) minmax(0,1fr);gap:8px 12px;margin:0}
+  .proto-facts dt{margin:0;color:var(--muted);font-size:var(--text-small)}
+  .proto-facts dd{margin:0;overflow-wrap:anywhere}
+  .never-list,.sale-list{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+  .never-list li,.sale{border-top:1px solid var(--line);padding-top:8px}
+  .sale{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 12px;align-items:center}
+  .tag{font-size:var(--text-caption);border:1px solid var(--line);border-radius:999px;padding:3px 8px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  button.chip,button.proto-quiet,button.switch{background:transparent;color:var(--ink);border:1px solid var(--line);box-shadow:none}
+  button.chip{border-radius:999px;padding:8px 12px;font-size:var(--text-ui);font-weight:500}
+  button.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  button.proto-quiet{padding:8px 12px;font-size:var(--text-caption);font-weight:500}
+  .proto-mode{margin-top:18px;display:grid;gap:8px}
+  button.switch{width:52px;height:32px;border-radius:999px;padding:3px;justify-content:flex-start}
+  button.switch span{width:24px;height:24px;border-radius:50%;background:var(--ink);display:block}
+  button.switch[aria-checked="true"]{background:var(--ink);border-color:var(--ink)}
+  button.switch[aria-checked="true"] span{margin-left:auto;background:var(--paper)}
+  .switch-row{display:flex;align-items:center;gap:12px;margin:0 0 20px}
+  .switch-row p{margin:0}
+  .surface-edit{border-top:1px solid var(--line);padding-top:12px;margin-top:12px;display:grid;gap:8px}
+  .surface-edit h3{margin:0;font-size:var(--text-ui)}
+  .surface-edit label{display:grid;gap:4px;font-size:var(--text-small);color:var(--muted)}
+  .surface-edit input,.surface-edit select{width:100%;max-width:100%}
+  .money-line{font-weight:600}
+  .proto-note{color:var(--muted);font-size:var(--text-small);margin:12px 0 0}
+  body.workspace main{padding-bottom:108px}
+  .page-heading{margin-bottom:20px}
+  .proto-next{position:fixed;z-index:2;left:232px;right:0;bottom:0;margin:0;background:var(--paper);border-top:1px solid var(--line);padding:12px 48px}
+  @media(max-width:850px){.proto-next{left:190px;padding:12px 28px}}
+  @media(max-width:600px){.proto-next{left:0;padding:12px 18px}}
+</style>
+</head>
+<body class="workspace">
+<a class="skip" href="#main">Skip to content</a>
+<aside class="sidebar">
+  <a class="brand" href="/prototype/share">distributoor<span class="brand-dot">↗</span></a>
+  <span class="eyebrow">PROTOTYPE</span>
+  <nav aria-label="Prototype">
+    <a href="/prototype/share" data-screen="share">What my agent shares</a>
+    <a href="/prototype/audience" data-screen="audience">Where my audience lives</a>
+    <a href="/prototype/payments" data-screen="payments">Who pays whom</a>
+  </nav>
+  <div class="proto-mode">
+    <span class="eyebrow">EXAMPLE</span>
+    <button type="button" class="proto-quiet" id="example-toggle" aria-pressed="true">Show empty example</button>
+  </div>
+</aside>
+<div class="work-area">
+  <header class="topbar"><span>Example only</span><span>No live data</span></header>
+  <main id="main">
+    <p class="example-flag" data-example-label>Example data</p>
+    <div class="page-heading"><span class="eyebrow">DISTRIBUTOOR</span><h1 id="proto-title">What my agent shares</h1><p id="proto-lead" class="proto-lead"></p></div>
+    <div id="prototype-app"></div>
+  </main>
+</div>
+<script src="/assets/prototype.js"></script>
+</body>
+</html>

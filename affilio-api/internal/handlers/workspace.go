@@ -83,10 +83,13 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	review.POST("/payouts/batch", payouts.RunBatch)
 	if h.AssetsPath != "" {
 		public.GET("/", h.Home)
-		for _, name := range []string{"workspace.css", "workspace.js", "setup-controls.js", "landing.css", "landing.js", "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt", "THIRD_PARTY_NOTICES.md"} {
+		for _, name := range []string{"workspace.css", "workspace.js", "setup-controls.js", "prototype.js", "landing.css", "landing.js", "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt", "THIRD_PARTY_NOTICES.md"} {
 			file := name
 			public.GET("/assets/"+file, func(c *gin.Context) { c.File(filepath.Join(h.AssetsPath, file)) })
 		}
+		public.GET("/prototype", h.Prototype)
+		public.GET("/prototype/", h.Prototype)
+		public.GET("/prototype/:screen", h.Prototype)
 		public.GET("/downloads/distributoor-setup-0.1.0.tgz", func(c *gin.Context) {
 			file := filepath.Join(h.DownloadsPath, "distributoor-setup-0.1.0.tgz")
 			if h.DownloadsPath == "" {
@@ -121,6 +124,20 @@ func (h *HostedHandler) requireOperator(c *gin.Context) {
 
 func (h *HostedHandler) installCommand() string {
 	return "npm exec --yes --package=" + h.BaseURL + "/downloads/distributoor-setup-0.1.0.tgz -- distributoor-setup --api-url " + h.BaseURL
+}
+
+func (h *HostedHandler) Prototype(c *gin.Context) {
+	if h.AssetsPath == "" {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	switch c.Param("screen") {
+	case "", "share", "audience", "payments":
+	default:
+		c.Status(http.StatusNotFound)
+		return
+	}
+	c.File(filepath.Join(h.AssetsPath, "prototype.html"))
 }
 
 func (h *HostedHandler) Home(c *gin.Context) {

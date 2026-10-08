@@ -27,7 +27,7 @@ FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /bin/affilio /bin/affilio
 COPY --from=releases /release /app/downloads
-COPY affilio-wp/admin/build/workspace.html affilio-wp/admin/build/home.html affilio-wp/admin/build/workspace.css affilio-wp/admin/build/workspace.js affilio-wp/admin/build/setup-controls.js affilio-wp/admin/build/landing.css affilio-wp/admin/build/landing.js affilio-wp/admin/build/THIRD_PARTY_NOTICES.md /app/assets/
+COPY affilio-wp/admin/build/workspace.html affilio-wp/admin/build/home.html affilio-wp/admin/build/workspace.css affilio-wp/admin/build/workspace.js affilio-wp/admin/build/setup-controls.js affilio-wp/admin/build/prototype.html affilio-wp/admin/build/prototype.js affilio-wp/admin/build/landing.css affilio-wp/admin/build/landing.js affilio-wp/admin/build/THIRD_PARTY_NOTICES.md /app/assets/
 COPY --from=site /site/landing-scene.bundle.js /site/landing-scene.bundle.js.LEGAL.txt /app/assets/
 ENV UI_ASSETS_PATH=/app/assets DOWNLOADS_PATH=/app/downloads
 EXPOSE 8080

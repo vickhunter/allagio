@@ -1,3 +1,11 @@
+## October 8 — owner prototype (D-023)
+
+- `/prototype/share`, `/prototype/audience`, and `/prototype/payments` are a static clickable prototype. The pages do not call the API. Every screen is labeled Example data.
+- What my agent shares previews the offer card and the audience card, lists what is never shared, and has one Sharing on/off switch.
+- Where my audience lives asks only for a surface, a size bucket, and a topic. The audience card updates as those change.
+- Who pays whom shows the seller's provider and whether a sale was confirmed by the provider or reported by the seller, and says we never hold money.
+- Field notes for the protocol spec are in `docs/prototype/d023-fields.md`.
+
 ## October 8 — waking host and narrow nav (D-020)
 
 - At 390 and 360 the workspace navigation wraps into two columns, so Setup & agents stays on screen without a sideways scroll. The desktop list is unchanged.
