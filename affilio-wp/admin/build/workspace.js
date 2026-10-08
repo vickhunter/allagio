@@ -227,7 +227,7 @@
             submitted: !!offer && offer.status !== 'draft',
             listed: !!offer && (offer.status === 'listed' || offer.status === 'paused')
         };
-        const next = STATIONS.map(station => station.id).find(id => !done[id]) || null;
+        const next = STATIONS.map(station => station.id).find(id => id !== 'stripe' && !done[id]) || null;
         return {done, next};
     };
     const describeProduct = (product, offers) => {
@@ -251,10 +251,9 @@
         const next = focus.state.next;
         if (!focus.product) return 'No product yet. Next: register a product.';
         if (next === 'ready') return 'Your product is registered. Next: run the readiness check.';
-        if (next === 'stripe') return focus.stripe?.known && focus.stripe.live_mode
-            ? 'Your product is registered. Next: connect Stripe test mode. Live mode is connected, and this step needs test mode.'
-            : 'Your product is registered. Next: connect Stripe test mode.';
-        if (next === 'offer') return 'Stripe test mode is connected. Next: create a referral offer.';
+        if (next === 'offer') return focus.state.done.stripe
+            ? 'Stripe test mode is connected. Next: create a referral offer.'
+            : 'Your product is ready. Next: create a referral offer.';
         if (next === 'submitted') return 'Your referral offer is saved. Next: submit it for review.';
         if (next === 'listed') return 'Your offer is submitted. Next: an operator lists it.';
         if (!next && focus.offer?.status === 'paused') return 'This offer is paused. Resume it when you want publishers to place it.';
@@ -283,8 +282,12 @@
         const items = STATIONS.map(station => {
             const done = focus.state.done[station.id];
             const current = focus.state.next === station.id;
-            const detail = current ? stationDetail(station.id, focus, returned) : '';
-            return `<li class="${done ? 'is-done' : current ? 'is-current' : 'is-todo'}" data-station="${station.id}" ${current ? 'aria-current="step"' : ''}><span class="station-flag">${done ? 'Done' : current ? 'Now' : 'Later'}</span><span class="station-name">${station.label}</span>${detail ? `<span class="station-detail">${escape(detail)}</span>` : ''}</li>`;
+            const optional = station.id === 'stripe' && !done;
+            const detail = optional
+                ? (focus.stripe?.known && focus.stripe.live_mode ? 'no provider yet. Live mode is connected. This step needs Stripe test mode.' : 'no provider yet')
+                : (current ? stationDetail(station.id, focus, returned) : '');
+            const klass = done ? 'is-done' : optional ? 'is-optional' : current ? 'is-current' : 'is-todo';
+            return `<li class="${klass}" data-station="${station.id}" ${current ? 'aria-current="step"' : ''}><span class="station-flag">${done ? 'Done' : current ? 'Now' : 'Later'}</span><span class="station-name">${station.label}</span>${detail ? `<span class="station-detail">${escape(detail)}</span>` : ''}</li>`;
         }).join('');
         const line = statusLine && kind === 'waiting-line'
             ? '<p class="offer-rail-status" data-primary-action tabindex="-1">Waiting for the operator to list this offer</p>'

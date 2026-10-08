@@ -404,7 +404,8 @@ async function journey(page, width) {
   await page.getByRole('button', { name: 'Check readiness', exact: true }).click();
   await expect(page.locator('.check.fail')).toHaveCount(0);
   await expect(page.locator('[data-station="ready"]')).toHaveClass(/is-done/);
-  await onePrimary(page, 'Connect Stripe');
+  await expect(page.locator('[data-station="stripe"]')).toContainText('no provider yet');
+  await onePrimary(page, 'Create offer');
   await fits(page);
   await shot(page, `after-owner-rail-stripe-${width}`);
 
@@ -653,7 +654,7 @@ test('new offer collapses once an offer exists', async ({ browser }) => {
     await createOffer(page);
     await expect(page.getByRole('button', { name: 'New offer', exact: true })).toBeVisible();
     await expect(page.locator('[data-new-offer]')).toHaveCount(0);
-    await onePrimary(page, 'Connect Stripe');
+    await onePrimary(page, 'Submit for review');
     await fits(page);
     await frame(page, `after-products-collapsed-${viewport.width}`);
     await page.getByRole('button', { name: 'New offer', exact: true }).focus();
@@ -676,7 +677,7 @@ test('new offer collapses once an offer exists', async ({ browser }) => {
     const box = await error.boundingBox();
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
-    await onePrimary(page, 'Connect Stripe');
+    await onePrimary(page, 'Submit for review');
     await context.close();
   }
 });
@@ -696,7 +697,9 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     await fits(page);
     await frame(page, `after-landing-${viewport.width}`);
     await page.goto(base + '/owner');
-    await expect(page.locator('[data-station="stripe"]')).toHaveAttribute('aria-current', 'step');
+    await expect(page.locator('[data-station="stripe"]')).toContainText('no provider yet');
+    await expect(page.locator('[data-station="stripe"]')).not.toHaveAttribute('aria-current', 'step');
+    await expect(page.locator('[data-station="submitted"]')).toHaveAttribute('aria-current', 'step');
     await onePrimary(page, 'Open products ↗');
     await fits(page);
     await frame(page, `after-overview-${viewport.width}`);
@@ -704,7 +707,7 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     await expect(page.getByRole('heading', { name: 'Setup & agents', level: 1 })).toBeVisible();
     await expect(page.locator('.agent-line pre')).toHaveText(`Read ${base}/SKILL.md and connect this site to Offer Rails`);
     await expect(page.locator('[data-skill-status]')).toContainText('Coming soon');
-    await expect(page.locator('[data-rail-plain]')).toHaveText('Your product is registered. Next: connect Stripe test mode.');
+    await expect(page.locator('[data-rail-plain]')).toHaveText('Your referral offer is saved. Next: submit it for review.');
     const humans = page.locator('.task-list');
     await expect(humans).toContainText('Connect Stripe in test mode');
     await expect(humans).toContainText('An operator approves the offer before it is listed.');
@@ -731,7 +734,7 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
   const page = await context.newPage();
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto(base + '/owner/settings');
-  await expect(page.locator('[data-rail-plain]')).toHaveText('Your product is registered. Next: connect Stripe test mode.');
+  await expect(page.locator('[data-rail-plain]')).toHaveText('Your referral offer is saved. Next: submit it for review.');
   await page.getByRole('button', { name: 'Copy line', exact: true }).click();
   await expect(page.locator('.agent-line .copy-status')).toContainText('Copied');
   await page.waitForTimeout(4000);

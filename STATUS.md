@@ -4,7 +4,7 @@ Readiness `checkout_present` passes on a declared checkout URL or a buy, subscri
 
 `/demo` serves a static product site (pricing, docs, privacy, terms, get-started). It does not show a checkout link. Readiness may probe only the configured `PUBLIC_BASE_URL` origin in addition to public hosts. `?via=` stays on `/demo`.
 
-Registering a product shows "Product registered" and the product appears in the list without a reload. Offer submit errors next to the button are plain language. The offer station stays undone while readiness is pending. The Stripe connection page says test mode only and rejects live keys before calling Stripe. `/owner/review` stays in the owner nav for `OPERATOR_OWNER_ID`.
+Registering a product shows "Product registered" and the product appears in the list without a reload. Offer submit errors next to the button are plain language. The offer station stays undone while readiness is pending. The Stripe test station is optional: with no provider connected it stays grey and reads "no provider yet", and Ready, Offer, and Submit proceed without it. Connecting Stripe test mode still marks that station done. The Stripe connection page says test mode only and rejects live keys before calling Stripe. `/owner/review` stays in the owner nav for `OPERATOR_OWNER_ID`.
 
 ## October 8 — plugin 0.1.10 (D-012b)
 

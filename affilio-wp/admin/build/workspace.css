@@ -12,6 +12,8 @@
 .offer-rail li{min-width:0;border-top:2px solid var(--line);padding-top:8px}
 .offer-rail li.is-done{border-top-color:var(--green)}
 .offer-rail li.is-current{border-top-color:var(--action)}
+.offer-rail li.is-optional{border-top-color:var(--muted)}
+.offer-rail li.is-optional .station-name,.offer-rail li.is-optional .station-detail{color:var(--muted)}
 .station-name{display:block;font-weight:600;font-size:var(--text-ui);margin-top:4px}
 .station-detail{display:block;margin-top:6px;font-size:var(--text-small);line-height:1.45;color:var(--ink)}
 .offer-rail-status{margin:16px 0 0;padding:12px 14px;border:1px solid var(--action);background:var(--paper);color:var(--ink);font-weight:650}
@@ -32,6 +34,7 @@ button[data-primary-action]:hover,a.button[data-primary-action]:hover{border-col
 .offer-rail li{border-top:0;border-left:2px solid var(--line);padding:8px 0 8px 12px}
 .offer-rail li.is-done{border-left-color:var(--green)}
 .offer-rail li.is-current{border-left-color:var(--action)}
+.offer-rail li.is-optional{border-left-color:var(--muted)}
 }
 .wake{border:1px solid var(--line);background:var(--panel);border-radius:var(--radius);padding:16px 18px;margin:0 0 20px}
 .wake h2{font-size:var(--text-h3);margin:0 0 8px}
