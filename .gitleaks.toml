@@ -4,8 +4,9 @@ title = "Affilio"
 useDefault = true
 
 [allowlist]
-description = "Plugin tests use fixed fake keys to prove masking. They are not credentials."
+description = "Tests use fixed fake keys to prove masking and live-key refusal. They are not credentials."
 regexes = [
   '''abcdSECRETKEY1234wxyz''',
   '''admnSECRETADMIN9999qrst''',
+  '''sk_live_TESTSECRET[0-9a-fA-F]*''',
 ]
