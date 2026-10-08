@@ -1,5 +1,9 @@
 <?php
 
+if (class_exists('Affilio_Onboarding')) {
+    return;
+}
+
 class Affilio_Onboarding {
     private $api;
 

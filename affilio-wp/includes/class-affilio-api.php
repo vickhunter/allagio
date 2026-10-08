@@ -1,5 +1,9 @@
 <?php
 
+if (class_exists('Affilio_API')) {
+    return;
+}
+
 class Affilio_API {
     private $base_url;
     private $status_cache_key = 'affilio_connection_status';

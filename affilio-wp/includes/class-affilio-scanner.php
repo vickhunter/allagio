@@ -1,5 +1,9 @@
 <?php
 
+if (class_exists('Affilio_Scanner')) {
+    return;
+}
+
 class Affilio_Scanner {
     private $api;
 

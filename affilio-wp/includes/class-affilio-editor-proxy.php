@@ -1,5 +1,9 @@
 <?php
 
+if (class_exists('Affilio_Editor_Proxy')) {
+    return;
+}
+
 class Affilio_Editor_Proxy {
     private $api;
     private $inserter;
