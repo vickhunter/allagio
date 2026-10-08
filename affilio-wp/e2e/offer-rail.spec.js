@@ -485,6 +485,33 @@ test('the offer station stays undone while readiness is pending', async ({ brows
   await context.close();
 });
 
+test('the rail reaches ready and offer with no provider connected', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await page.goto(base + '/owner/products');
+  await registerProduct(page, 'No Provider');
+  await page.getByRole('button', { name: 'Check readiness', exact: true }).click();
+  await expect(page.locator('.check.fail .field-error').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Check readiness', exact: true }).click();
+  await expect(page.locator('[data-station="ready"]')).toHaveClass(/is-done/);
+  const stripe = page.locator('[data-station="stripe"]');
+  await expect(stripe).toContainText('no provider yet');
+  await expect(stripe).toHaveClass(/is-optional/);
+  await expect(stripe).not.toHaveAttribute('aria-current', 'step');
+  await expect(stripe).not.toHaveClass(/is-done/);
+  expect(await stripe.evaluate(el => getComputedStyle(el).borderTopColor)).toBe('rgb(105, 112, 99)');
+  await expect(page.locator('[data-station="offer"]')).toHaveAttribute('aria-current', 'step');
+  await onePrimary(page, 'Create offer');
+  await createOffer(page);
+  await expect(page.locator('[data-station="offer"]')).toHaveClass(/is-done/);
+  await expect(stripe).toContainText('no provider yet');
+  await expect(stripe).toHaveClass(/is-optional/);
+  await expect(stripe).not.toHaveClass(/is-done/);
+  await expect(page.locator('[data-station="submitted"]')).toHaveAttribute('aria-current', 'step');
+  await onePrimary(page, 'Submit for review');
+  await context.close();
+});
+
 test('submit before readiness keeps the error in view', async ({ browser }) => {
   for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     reset();
