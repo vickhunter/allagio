@@ -293,7 +293,6 @@ ON CONFLICT (api_key_hash) DO UPDATE SET domain=sites.domain WHERE sites.domain=
 }
 
 func (d *DB) RotateSiteAPIKey(ctx context.Context, siteID, newKeyHash, newKeyPrefix string, gracePeriod time.Duration) error {
-	graceInterval := fmt.Sprintf("%d hours", int(gracePeriod.Hours()))
 	_, err := d.Pool.Exec(ctx, `
 UPDATE sites
 SET api_key_prev_hash=api_key_hash,
@@ -301,8 +300,8 @@ SET api_key_prev_hash=api_key_hash,
     api_key_hash=$2,
     api_key_prefix=$3,
     api_key_rotated_at=NOW(),
-    api_key_previous_expires_at=NOW() + ($4 || ' hours')::interval
-WHERE id=$1`, siteID, newKeyHash, newKeyPrefix, graceInterval)
+    api_key_previous_expires_at=NOW() + make_interval(hours => $4::int)
+WHERE id=$1`, siteID, newKeyHash, newKeyPrefix, int(gracePeriod.Hours()))
 	return err
 }
 
