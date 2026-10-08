@@ -17,6 +17,7 @@ class Affilio_API {
     }
 
     public function request($method, $path, $body = null) {
+        $this->base_url = self::resolve_base_url();
         if ($this->base_url === '') {
             return new WP_Error('affilio_not_configured', 'Not connected — set the API URL in Settings');
         }
@@ -54,6 +55,7 @@ class Affilio_API {
     }
 
     public function admin_request($method, $path, $body = null) {
+        $this->base_url = self::resolve_base_url();
         if ($this->base_url === '') {
             return new WP_Error('affilio_not_configured', 'Not connected — set the API URL in Settings');
         }
@@ -87,7 +89,7 @@ class Affilio_API {
         if (strlen($key) < 8) {
             return '••••••••';
         }
-        return substr($key, 0, 4) . '…' . substr($key, -4);
+        return substr($key, 0, 4) . '…';
     }
 
     public static function resolve_base_url() {
@@ -99,12 +101,19 @@ class Affilio_API {
         return rtrim((string) apply_filters('affilio_api_base_url', $url), '/');
     }
 
+    private function connection_cache_key() {
+        $this->base_url = self::resolve_base_url();
+        return 'affilio_cs_' . md5($this->base_url . "\n" . $this->current_api_key());
+    }
+
     public function invalidate_status_cache() {
+        delete_transient($this->connection_cache_key());
         delete_transient($this->status_cache_key);
     }
 
     public function get_connection_status($force_refresh = false) {
-        $cached = get_transient($this->status_cache_key);
+        $cache_key = $this->connection_cache_key();
+        $cached = get_transient($cache_key);
         if (!$force_refresh && is_array($cached)) {
             return $cached;
         }
@@ -122,12 +131,12 @@ class Affilio_API {
             $status['state'] = 'missing_url';
             $status['label'] = $this->t('Not connected', 'Non connesso');
             $status['message'] = 'Not connected — set the API URL in Settings';
-            set_transient($this->status_cache_key, $status, 60);
+            set_transient($cache_key, $status, 60);
             return $status;
         }
 
         if ($this->current_api_key() === '') {
-            set_transient($this->status_cache_key, $status, 60);
+            set_transient($cache_key, $status, 60);
             return $status;
         }
 
@@ -136,7 +145,7 @@ class Affilio_API {
             $status['state'] = 'network_error';
             $status['label'] = $this->t('Connection Error', 'Errore di connessione');
             $status['message'] = $this->t('Cannot reach Affilio API. Check network or API URL.', 'Impossibile raggiungere l\'API di Affilio. Controlla rete o URL API.');
-            set_transient($this->status_cache_key, $status, 60);
+            set_transient($cache_key, $status, 60);
             return $status;
         }
 
@@ -145,7 +154,7 @@ class Affilio_API {
             $status['state'] = 'network_error';
             $status['label'] = $this->t('Connection Error', 'Errore di connessione');
             $status['message'] = $this->t('Cannot reach Affilio API. Check network or API URL.', 'Impossibile raggiungere l\'API di Affilio. Controlla rete o URL API.');
-            set_transient($this->status_cache_key, $status, 60);
+            set_transient($cache_key, $status, 60);
             return $status;
         }
 
@@ -173,7 +182,7 @@ class Affilio_API {
             $status['label'] = $this->t('Connection Failed', 'Connessione non riuscita');
             $status['message'] = $this->t('Unexpected API response while validating credentials.', 'Risposta API inattesa durante la validazione delle credenziali.');
         }
-        set_transient($this->status_cache_key, $status, 60);
+        set_transient($cache_key, $status, 60);
         return $status;
     }
 

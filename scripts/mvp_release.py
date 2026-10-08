@@ -45,8 +45,10 @@ WP_FILES = {
     "affilio-wp/admin/build/marketplace.js",
     "affilio-wp/admin/build/earnings.js",
     "affilio-wp/admin/css/affilio-admin.css",
+    "affilio-wp/readme.txt",
 }
 PLUGIN_ROOT = "affilio-wp/"
+PLUGIN_VERSION = "0.1.10"
 ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
 DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
 QUOTED_BUILD = re.compile(r"""(['"])([A-Za-z0-9_.-]+\.(?:js|css))\1""")
@@ -235,6 +237,9 @@ def validate_plugin(data, origin=None):
         require("Plugin Name:" in plugin, "WordPress plugin header is missing.")
         php = {name: payload.decode("utf8", "replace") for name, payload in files.items() if name.endswith(".php")}
         require(not any(unguarded_init(text) for text in php.values()), "WordPress ZIP has an unguarded function affilio_init")
+        require(f"Version: {PLUGIN_VERSION}" in plugin, f"WordPress plugin header is not {PLUGIN_VERSION}")
+        require(f"define('AFFILIO_VERSION', '{PLUGIN_VERSION}')" in plugin, f"AFFILIO_VERSION is not {PLUGIN_VERSION}")
+        require(f"Stable tag: {PLUGIN_VERSION}".encode() in files.get(PLUGIN_ROOT + "readme.txt", b""), f"readme stable tag is not {PLUGIN_VERSION}")
         for text in php.values():
             for relative in referenced_plugin_files(text):
                 require(PLUGIN_ROOT + relative in files, "WordPress ZIP is missing " + relative)

@@ -76,7 +76,7 @@ npm exec --yes --package=https://distributoor-production.up.railway.app/download
 
 Publishers download `/downloads/affilio.zip` from that same origin, upload and
 activate it in WordPress, open **Affilio → Settings** to connect, then open
-**Affilio → Distribution**. The ZIP is the 0.1.9 package rooted at
+**Affilio → Distribution**. The ZIP is the 0.1.10 package rooted at
 `affilio-wp/affilio.php`. It does not contain a `railway.app` host. Set the API
 URL in Settings; the plugin does not bake one in.
 The private GitHub repository need not become public. The npm registry and
@@ -139,7 +139,7 @@ redirect with a placement-attributed click. The fixture uses
 local HTTPS and isolated owner sessions; no customer article was published.
 Set `AFFILIO_WORKSPACE_DOWNLOADS` to the extracted image's downloads directory
 when running `TestWordPressDistributionBrowser` to install the actual HTTP-served
-ZIP and verify it is folder `affilio-wp/` at 0.1.9 with no `railway.app` host.
+ZIP and verify it is folder `affilio-wp/` at 0.1.10 with no `railway.app` host.
 Its isolated WP-CLI container must mount
 the QA ZIP at `/release/affilio.zip`, with no source plugin bind mount.
 

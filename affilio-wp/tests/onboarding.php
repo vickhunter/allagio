@@ -80,6 +80,7 @@ class SetupTestAPI {
 
 $api = new SetupTestAPI();
 $setup = new Affilio_Onboarding($api);
+update_option('affilio_api_url_override', 'https://api.example.test/v1');
 check($setup->status()['phase'] === 'not_started' && count($api->registrations) === 0, 'Setup phoned home before Connect');
 $administrator = false;
 check(!$setup->allowed() && is_wp_error($setup->connect()), 'Non-admin could connect');

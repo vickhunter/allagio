@@ -45,6 +45,9 @@ class Affilio_Onboarding {
         if (!$this->allowed()) {
             return new WP_Error('affilio_forbidden', 'Administrator access required.', array('status' => 403));
         }
+        if (Affilio_API::resolve_base_url() === '') {
+            return new WP_Error('affilio_missing_url', 'Set the API URL in Settings before connecting.', array('status' => 400));
+        }
         if (!$this->lock()) {
             return new WP_Error('affilio_busy', 'Setup is already running. Try again shortly.', array('status' => 409));
         }

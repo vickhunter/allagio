@@ -155,6 +155,7 @@ class Affilio_Admin {
         echo '<h2>' . esc_html($this->t('Scan', 'Scansione')) . '</h2>';
         echo '<p>' . esc_html($this->t('Run a full scan to refresh article scores and recommendations.', 'Esegui una scansione completa per aggiornare punteggi e raccomandazioni.')) . '</p>';
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+        wp_nonce_field('affilio_scan_all');
         echo '<input type="hidden" name="action" value="affilio_scan_all">';
         submit_button($this->t('Scan All Posts', 'Scansiona tutti gli articoli'));
         echo '</form>';
@@ -229,26 +230,29 @@ class Affilio_Admin {
         }
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             check_admin_referer('affilio_settings');
-            update_option('affilio_api_key', sanitize_text_field(isset($_POST['affilio_api_key']) ? $_POST['affilio_api_key'] : ''));
+            $this->keep_or_replace_secret('affilio_api_key', 'affilio_api_key');
             if ($this->is_advanced_mode()) {
                 update_option('affilio_api_url_override', esc_url_raw(isset($_POST['affilio_api_url_override']) ? $_POST['affilio_api_url_override'] : ''));
-                update_option('affilio_admin_api_key', sanitize_text_field(isset($_POST['affilio_admin_api_key']) ? $_POST['affilio_admin_api_key'] : ''));
+                $this->keep_or_replace_secret('affilio_admin_api_key', 'affilio_admin_api_key');
             }
             $this->api->invalidate_status_cache();
             $this->api->get_connection_status(true);
             echo '<div class="updated"><p>' . esc_html($this->t('Settings saved.', 'Impostazioni salvate.')) . '</p></div>';
         }
 
-        $api_key = esc_attr(get_option('affilio_api_key', ''));
         $status = $this->api->get_connection_status();
         $default_api_url = Affilio_API::resolve_base_url();
         $override_api_url = esc_attr(get_option('affilio_api_url_override', ''));
-        $admin_key = esc_attr(get_option('affilio_admin_api_key', ''));
+        $saved_key = trim((string) get_option('affilio_api_key', ''));
+        $key_hint = $saved_key === '' ? '' : 'Key saved (' . Affilio_API::mask_key($saved_key) . ')';
 
         echo '<div class="wrap affilio-admin-page"><h1>' . esc_html($this->t('Affilio Settings', 'Impostazioni Affilio')) . '</h1>';
         echo '<div class="affilio-status-row">';
         echo '<span class="affilio-status-pill affilio-status-' . esc_attr($status['state']) . '">' . esc_html($status['label']) . '</span>';
         echo '<span class="affilio-status-message">' . esc_html($status['message']) . '</span>';
+        if ($key_hint !== '') {
+            echo '<span class="affilio-key-hint">' . esc_html($key_hint) . '</span>';
+        }
         echo '</div>';
         echo '<div id="affilio-onboarding-root"></div>';
         echo '<details><summary>' . esc_html($this->t('Existing connection or manual settings', 'Collegamento esistente o impostazioni manuali')) . '</summary>';
@@ -256,7 +260,8 @@ class Affilio_Admin {
         echo '<form class="affilio-settings-form" method="post">';
         wp_nonce_field('affilio_settings');
         echo '<table class="form-table">';
-        echo '<tr><th>' . esc_html($this->t('API Key', 'Chiave API')) . '</th><td><input type="password" name="affilio_api_key" value="' . $api_key . '" class="regular-text" autocomplete="off" spellcheck="false" />';
+        echo '<tr><th>' . esc_html($this->t('API Key', 'Chiave API')) . '</th><td>';
+        $this->secret_input('affilio_api_key', 'affilio_api_key');
         echo '<p class="description">' . esc_html($this->t('Optional manual setup. The Connect button manages this for new installs.', 'Setup manuale opzionale. Il pulsante Collega lo gestisce per le nuove installazioni.')) . '</p></td></tr>';
         echo '</table>';
 
@@ -266,7 +271,8 @@ class Affilio_Admin {
             echo '<tr><th>' . esc_html($this->t('Default API URL', 'URL API predefinito')) . '</th><td><code>' . esc_html($default_api_url) . '</code></td></tr>';
             echo '<tr><th>' . esc_html($this->t('API URL Override', 'Override URL API')) . '</th><td><input name="affilio_api_url_override" value="' . $override_api_url . '" class="regular-text" />';
             echo '<p class="description">' . esc_html($this->t('Optional. For development/self-hosted backends only.', 'Opzionale. Solo per sviluppo/backend self-hosted.')) . '</p></td></tr>';
-            echo '<tr><th>' . esc_html($this->t('Admin API Key', 'Chiave API Admin')) . '</th><td><input name="affilio_admin_api_key" value="' . $admin_key . '" class="regular-text" autocomplete="off" />';
+            echo '<tr><th>' . esc_html($this->t('Admin API Key', 'Chiave API Admin')) . '</th><td>';
+            $this->secret_input('affilio_admin_api_key', 'affilio_admin_api_key');
             echo '<p class="description">' . esc_html($this->t('Advanced only. For internal discovery/admin endpoints, not normal customer setup.', 'Solo avanzato. Per endpoint interni discovery/admin, non per setup clienti standard.')) . '</p></td></tr>';
             echo '</table>';
         }
@@ -295,7 +301,9 @@ class Affilio_Admin {
         if ($status['connected']) {
             return;
         }
-        echo '<div class="notice notice-warning"><p><strong>Affilio:</strong> ' . esc_html($status['message']) . ' ';
+        $saved_key = trim((string) get_option('affilio_api_key', ''));
+        $key_hint = $saved_key === '' ? '' : ' Key saved (' . Affilio_API::mask_key($saved_key) . ').';
+        echo '<div class="notice notice-warning"><p><strong>Affilio:</strong> ' . esc_html($status['message'] . $key_hint) . ' ';
         echo '<a href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a>.</p></div>';
     }
 
@@ -303,6 +311,7 @@ class Affilio_Admin {
         if (!current_user_can('manage_options')) {
             wp_die(esc_html($this->t('Unauthorized', 'Non autorizzato')));
         }
+        check_admin_referer('affilio_scan_all');
         $status = $this->api->get_connection_status();
         if (!$status['connected']) {
             wp_safe_redirect(admin_url('admin.php?page=affilio-settings'));
@@ -357,6 +366,19 @@ class Affilio_Admin {
             }
         }
         return '';
+    }
+
+    private function keep_or_replace_secret($option, $field) {
+        $submitted = sanitize_text_field(isset($_POST[$field]) ? wp_unslash($_POST[$field]) : '');
+        if ($submitted !== '') {
+            update_option($option, $submitted);
+        }
+    }
+
+    private function secret_input($name, $option) {
+        $stored = trim((string) get_option($option, ''));
+        $placeholder = $stored === '' ? '' : 'Key saved (' . Affilio_API::mask_key($stored) . ')';
+        echo '<input type="password" name="' . esc_attr($name) . '" value="" placeholder="' . esc_attr($placeholder) . '" class="regular-text" autocomplete="off" spellcheck="false" />';
     }
 
     private function is_advanced_mode() {
