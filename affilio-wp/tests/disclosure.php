@@ -86,6 +86,36 @@ $before = $GLOBALS['post']->post_content;
 $inserter->insert_inline_mention(7, '<p>Una menzione.</p>');
 check(added($before, $GLOBALS['post']->post_content, 'affilio-disclosure') === 0, 'Italian disclosure still received a second disclosure from the inserter');
 
+$fixture = 'Nota: alcuni link in questa pagina sono affiliati. Se acquisti tramite questi link, posso ricevere una commissione, senza costi extra per te.';
+$verbatim = '<p><em>' . $fixture . '</em></p>';
+$reworded = '<p>Alcuni dei link qui sotto sono link affiliati.</p>';
+$separated = '<p><em>Nota: alcuni link in questa pagina sono affiliati.</em></p>';
+
+$GLOBALS['options']['affilio_existing_disclosure'] = '';
+$GLOBALS['post']->post_content = $verbatim;
+$before = $GLOBALS['post']->post_content;
+$distribution->publish($request);
+check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 0, 'The blog disclosure fixture still received a second disclosure from distribution');
+check(strpos($GLOBALS['post']->post_content, $fixture) !== false, 'The blog disclosure fixture was removed');
+
+$GLOBALS['post']->post_content = $verbatim;
+$GLOBALS['meta'] = array();
+$before = $GLOBALS['post']->post_content;
+$inserter->insert_inline_mention(7, '<p>Una menzione.</p>');
+check(added($before, $GLOBALS['post']->post_content, 'affilio-disclosure') === 0, 'The blog disclosure fixture still received a second disclosure from the inserter');
+
+$GLOBALS['post']->post_content = $reworded;
+$GLOBALS['meta'] = array();
+$before = $GLOBALS['post']->post_content;
+$distribution->publish($request);
+check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 0, 'A reworded affiliate-link sentence still received a second disclosure');
+
+$GLOBALS['post']->post_content = $separated;
+$GLOBALS['meta'] = array();
+$before = $GLOBALS['post']->post_content;
+$distribution->publish($request);
+check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 0, 'link and affiliat within 60 characters, inside tags, still received a second disclosure');
+
 $GLOBALS['post']->post_content = $plain;
 $GLOBALS['options']['affilio_existing_disclosure'] = '';
 $before = $GLOBALS['post']->post_content;
