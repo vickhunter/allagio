@@ -83,8 +83,8 @@ if (!function_exists('add_action')) {
     function wp_enqueue_style($handle, $src = '', $deps = array(), $ver = false) { $GLOBALS['styles'][$handle] = $src; }
     function wp_localize_script($handle, $object, $data) { $GLOBALS['localized'][$handle][$object] = $data; }
     function wp_create_nonce($action) { return 'test-nonce'; }
-    function get_locale() { return 'en_US'; }
-    function get_user_locale() { return 'en_US'; }
+    function get_locale() { return isset($GLOBALS['user_locale']) ? $GLOBALS['user_locale'] : 'en_US'; }
+    function get_user_locale() { return isset($GLOBALS['user_locale']) ? $GLOBALS['user_locale'] : 'en_US'; }
     function wp_get_current_user() { return $GLOBALS['current_user']; }
     function get_permalink($post) { return 'https://blog.example/' . (is_object($post) ? $post->post_name : $post); }
     function get_post($id) {
@@ -124,7 +124,17 @@ if (!function_exists('add_action')) {
     function esc_url_raw($value) { return (string) $value; }
     function sanitize_text_field($value) { return trim((string) $value); }
     function sanitize_key($value) { return strtolower((string) $value); }
-    function wp_die($message) { throw new RuntimeException(strip_tags((string) $message)); }
+    function wp_die($message, $title = '', $args = array()) {
+        if (is_int($args)) {
+            $args = array('response' => $args);
+        }
+        if (!is_array($args)) {
+            $args = array();
+        }
+        $status = isset($args['response']) ? (int) $args['response'] : 500;
+        $GLOBALS['wp_die'] = array('message' => strip_tags((string) $message), 'status' => $status);
+        throw new RuntimeException(strip_tags((string) $message));
+    }
     function wp_nonce_field($action, $name = '_wpnonce') {
         echo '<input type="hidden" name="' . esc_attr($name) . '" value="' . esc_attr(wp_create_nonce($action)) . '" />';
     }

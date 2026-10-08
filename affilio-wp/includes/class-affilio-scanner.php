@@ -13,19 +13,63 @@ class Affilio_Scanner {
 
     public function scan_all_posts() {
         $posts = get_posts(array('post_type' => 'post', 'posts_per_page' => -1, 'post_status' => 'publish'));
-        $articles = array();
+        return $this->scan_posts($posts);
+    }
+
+    public function scan_posts($posts) {
+        $ready = array();
         foreach ($posts as $post) {
             if (isset($post->post_status) && $post->post_status !== 'publish') {
                 continue;
             }
-            $articles[] = array(
-                'wp_post_id' => $post->ID,
-                'title'      => $post->post_title,
-                'content'    => $post->post_content,
-                'url'        => get_permalink($post),
-            );
+            $ready[] = $post;
         }
-        return $this->api->request('POST', '/scan/full', array('articles' => $articles));
+        $scanned = 0;
+        $skipped = array();
+        foreach (array_chunk($ready, 10) as $chunk) {
+            $articles = array();
+            foreach ($chunk as $post) {
+                $articles[] = $this->article_payload($post);
+            }
+            $response = $this->api->request('POST', '/scan/full', array('articles' => $articles));
+            if ($this->scan_accepted($response)) {
+                $scanned += count($chunk);
+                continue;
+            }
+            foreach ($chunk as $post) {
+                $single = $this->api->request('POST', '/scan/single', $this->article_payload($post));
+                if ($this->scan_accepted($single)) {
+                    $scanned++;
+                    continue;
+                }
+                $skipped[] = array(
+                    'wp_post_id' => (int) $post->ID,
+                    'reason' => $this->skip_reason($single),
+                );
+            }
+        }
+        return array('scanned' => $scanned, 'skipped' => $skipped);
+    }
+
+    private function article_payload($post) {
+        return array(
+            'wp_post_id' => $post->ID,
+            'title' => $post->post_title,
+            'content' => $post->post_content,
+            'url' => get_permalink($post),
+        );
+    }
+
+    private function scan_accepted($response) {
+        return !is_wp_error($response) && isset($response['code']) && (int) $response['code'] >= 200 && (int) $response['code'] < 300;
+    }
+
+    private function skip_reason($response) {
+        if (is_wp_error($response)) {
+            return 'request failed';
+        }
+        $code = isset($response['code']) ? (int) $response['code'] : 0;
+        return 'HTTP ' . $code;
     }
 
     public function scan_single_post($post_id) {
