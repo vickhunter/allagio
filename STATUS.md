@@ -5,6 +5,7 @@
 - Where my audience lives asks only for a surface, a size bucket, and a topic. The audience card updates as those change.
 - Who pays whom shows the seller's provider and whether a sale was confirmed by the provider or reported by the seller, and says we never hold money.
 - Field notes for the protocol spec are in `docs/prototype/d023-fields.md`.
+- Audience segment counts are ranges such as 1k-10k. Groups smaller than 50 are never shared, and a smaller example segment stays on the card as "Too small to share". An offer can be found before the owner claims it. Both cards stay drafts until Claim and sign, then they read Claimed and signed.
 
 ## October 8 — waking host and narrow nav (D-020)
 

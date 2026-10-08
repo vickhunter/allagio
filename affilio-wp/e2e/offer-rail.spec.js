@@ -815,6 +815,25 @@ test('owner prototype screens at 390 and 1440', async ({ browser }) => {
     const page = await context.newPage();
     const calls = [];
     watchApi(page, calls);
+    if (viewport.width === 390) {
+      await page.goto(base + '/prototype/share');
+      await expect(page.getByText('Example data', { exact: true })).toBeVisible();
+      await expect(page.getByText('Not claimed yet').first()).toBeVisible();
+      await expect(page.getByRole('region', { name: 'Audience card' })).toContainText('Too small to share');
+      await expect(page.locator('.proto-note')).toHaveText('Groups smaller than 50 are never shared.');
+      await expect(page.getByRole('button', { name: 'Claim and sign', exact: true })).toBeVisible();
+      await expect(page.locator('[data-primary-action]')).toHaveCount(1);
+      await expect(page.getByText('Not being sent', { exact: true })).toHaveCount(2);
+      const draftAction = await page.locator('[data-primary-action]').boundingBox();
+      expect(draftAction.y).toBeGreaterThanOrEqual(0);
+      expect(draftAction.y + draftAction.height).toBeLessThanOrEqual(viewport.height + 1);
+      await fits(page);
+      await shotD023(page, 'after-unclaimed-390');
+    }
+    await page.goto(base + '/prototype/share');
+    await page.getByRole('button', { name: 'Claim and sign', exact: true }).click();
+    await expect(page.getByText('Claimed and signed').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'See where the audience lives', exact: true })).toBeVisible();
     for (const screen of screens) {
       await page.goto(base + screen.path);
       await expect(page.getByRole('heading', { level: 1, name: screen.heading })).toBeVisible();
@@ -824,6 +843,14 @@ test('owner prototype screens at 390 and 1440', async ({ browser }) => {
       expect(action.y).toBeGreaterThanOrEqual(0);
       expect(action.y + action.height).toBeLessThanOrEqual(viewport.height + 1);
       await fits(page);
+      if (screen.path === '/prototype/share') {
+        const audience = page.getByRole('region', { name: 'Audience card' });
+        await expect(audience).toContainText('1k-10k');
+        await expect(audience).toContainText('Too small to share');
+        await expect(audience).toContainText('Groups smaller than 50 are never shared.');
+        await expect(page.getByText('Claimed and signed').first()).toBeVisible();
+        await expect(page.getByText('Being sent', { exact: true })).toHaveCount(2);
+      }
       await shotD023(page, `${screen.shot}-${viewport.width}`);
     }
     await page.goto(base + '/prototype/share');
@@ -862,7 +889,10 @@ test('owner prototype screens at 390 and 1440', async ({ browser }) => {
   watchApi(page, calls);
   await page.goto(base + '/prototype/share');
   await expect(page.getByRole('heading', { name: 'What my agent shares' })).toBeVisible();
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(700);
+  await page.getByRole('button', { name: 'Claim and sign', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'See where the audience lives', exact: true })).toBeVisible();
+  await page.waitForTimeout(500);
   await page.getByRole('link', { name: 'See where the audience lives', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Where my audience lives' })).toBeVisible();
   await page.waitForTimeout(900);

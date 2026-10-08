@@ -4,22 +4,26 @@
     const title = document.getElementById('proto-title');
     const lead = document.getElementById('proto-lead');
     const toggle = document.getElementById('example-toggle');
-    const storeKey = 'distributoor.prototype.v1';
+    const storeKey = 'distributoor.prototype.v2';
     const surfaces = ['Blog', 'X', 'YouTube', 'TikTok', 'Pinterest', 'LinkedIn', 'Newsletter', 'App'];
     const buckets = ['<1k', '1-10k', '10-100k', '100k+'];
     const filledSurfaces = [
-        { surface: 'Blog', bucket: '10-100k', topic: 'Databases', segment: '40–100 readers' },
-        { surface: 'Newsletter', bucket: '1-10k', topic: 'Postgres', segment: '20–40 readers' },
-        { surface: 'X', bucket: '10-100k', topic: 'Developer tools', segment: '100–400 readers' },
+        { surface: 'TikTok', bucket: '<1k', topic: 'Short lessons', segment: '', tooSmall: true },
+        { surface: 'Blog', bucket: '10-100k', topic: 'Databases', segment: '1k-10k', tooSmall: false },
+        { surface: 'Newsletter', bucket: '1-10k', topic: 'Postgres', segment: '1k-10k', tooSmall: false },
+        { surface: 'X', bucket: '10-100k', topic: 'Developer tools', segment: '10k-100k', tooSmall: false },
     ];
     const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     const clone = value => JSON.parse(JSON.stringify(value));
 
-    const fresh = filled => ({ filled, sharing: true, surfaces: filled ? clone(filledSurfaces) : [] });
+    const fresh = (filled, claimed = false) => ({ filled, sharing: true, claimed, surfaces: filled ? clone(filledSurfaces) : [] });
     const load = () => {
         try {
             const saved = JSON.parse(sessionStorage.getItem(storeKey) || 'null');
-            if (saved && typeof saved.filled === 'boolean' && Array.isArray(saved.surfaces)) return saved;
+            if (saved && typeof saved.filled === 'boolean' && Array.isArray(saved.surfaces)) {
+                if (typeof saved.claimed !== 'boolean') saved.claimed = false;
+                return saved;
+            }
         } catch { /* a fresh example is enough */ }
         return fresh(true);
     };
@@ -33,8 +37,10 @@
         return 'share';
     };
 
-    const leaving = () => state.sharing ? 'on' : 'off';
-    const sendLine = () => state.sharing ? 'Being sent' : 'Not being sent';
+    const live = () => state.claimed && state.sharing;
+    const leaving = () => live() ? 'on' : 'off';
+    const sendLine = () => live() ? 'Being sent' : 'Not being sent';
+    const signedLine = () => `<p class="signed">Signed by owner · ${state.claimed ? 'Claimed and signed' : 'Not claimed yet'}</p>`;
 
     const offerFacts = () => state.filled
         ? [['Project', 'Rail Tool'], ['Category', 'Developer tools'], ['Commission terms', '20% of the first purchase'], ['Revenue range', '$1k–10k a month']]
@@ -45,30 +51,35 @@
         const body = facts.length
             ? `<dl class="proto-facts">${facts.map(([name, value]) => `<dt>${escape(name)}</dt><dd>${escape(value)}</dd>`).join('')}</dl>`
             : '<p>No offer yet. Your agent fills this card after a product exists.</p>';
-        return `<section class="proto-card" aria-label="Offer card" data-leaving="${leaving()}"><p class="proto-kicker">Offer card</p><p class="send-state">${sendLine()}</p>${body}</section>`;
+        const draft = state.claimed ? '' : '<p>Discovery can find this offer. It goes live after you claim and sign it.</p>';
+        return `<section class="proto-card" aria-label="Offer card" data-leaving="${leaving()}" data-signed="${state.claimed ? 'live' : 'draft'}"><p class="proto-kicker">Offer card</p>${signedLine()}<p class="send-state">${sendLine()}</p>${draft}${body}</section>`;
     };
 
     const audienceRows = () => state.surfaces.map(row => {
-        const count = row.segment ? escape(row.segment) : 'Not counted yet';
-        return `<dt>${escape(row.surface)}</dt><dd>${escape(row.topic || 'Topic not set')} · ${escape(row.bucket)} · ${count}</dd>`;
+        if (row.tooSmall) return `<dt class="is-small">${escape(row.surface)}</dt><dd class="is-small">${escape(row.topic || 'Topic not set')} · ${escape(row.bucket)} · Too small to share</dd>`;
+        const count = row.segment || 'Not counted yet';
+        return `<dt>${escape(row.surface)}</dt><dd>${escape(row.topic || 'Topic not set')} · ${escape(row.bucket)} · ${escape(count)}</dd>`;
     }).join('');
 
     const audienceCard = () => {
         const body = state.surfaces.length
             ? `<dl class="proto-facts">${audienceRows()}</dl>`
             : '<p>No audience yet. Pick a surface, a size bucket, and a topic.</p>';
-        return `<section class="proto-card" aria-label="Audience card" data-leaving="${leaving()}"><p class="proto-kicker">Audience card</p><p class="send-state">${sendLine()}</p>${body}<p class="proto-note">Groups smaller than 20 people are not shared.</p></section>`;
+        return `<section class="proto-card" aria-label="Audience card" data-leaving="${leaving()}" data-signed="${state.claimed ? 'live' : 'draft'}"><p class="proto-kicker">Audience card</p>${signedLine()}<p class="send-state">${sendLine()}</p>${body}<p class="proto-note">Groups smaller than 50 are never shared.</p></section>`;
     };
 
     const neverShared = () => `<section class="proto-card" aria-label="Never shared"><h2>Never shared</h2><ul class="never-list"><li>Customer names</li><li>Emails</li><li>Handles</li><li>Customer lists</li><li>IPs</li></ul></section>`;
 
     const nextLink = (href, label) => `<p class="proto-next"><a class="button" data-primary-action href="${href}">${label}</a></p>`;
+    const shareAction = () => state.filled && !state.claimed
+        ? '<p class="proto-next"><button type="button" class="button" data-primary-action data-claim-sign>Claim and sign</button></p>'
+        : nextLink('/prototype/audience', 'See where the audience lives');
 
     const shareScreen = () => {
         title.textContent = 'What my agent shares';
         lead.textContent = 'Your agent prepares two cards. You see them here. Nothing that names a person leaves.';
         document.title = 'What my agent shares · Distributoor';
-        root.innerHTML = `<div class="switch-row"><button type="button" class="switch" role="switch" aria-checked="${state.sharing ? 'true' : 'false'}" aria-labelledby="sharing-label" data-sharing><span></span></button><p id="sharing-label"><strong>Sharing on/off</strong><br>${state.sharing ? 'Sharing is on.' : 'Sharing is off. These cards stay here.'}</p></div><div class="proto-split">${offerCard()}${audienceCard()}</div>${neverShared()}${nextLink('/prototype/audience', 'See where the audience lives')}`;
+        root.innerHTML = `<div class="switch-row"><button type="button" class="switch" role="switch" aria-checked="${state.sharing ? 'true' : 'false'}" aria-labelledby="sharing-label" data-sharing><span></span></button><p id="sharing-label"><strong>Sharing on/off</strong><br>${state.sharing ? 'Sharing is on.' : 'Sharing is off. These cards stay here.'}</p></div><div class="proto-split">${offerCard()}${audienceCard()}</div>${neverShared()}${shareAction()}`;
     };
 
     const audienceScreen = () => {
@@ -117,12 +128,18 @@
             paint();
             return;
         }
+        if (event.target.closest('[data-claim-sign]')) {
+            state.claimed = true;
+            save();
+            paint();
+            return;
+        }
         const chip = event.target.closest('[data-surface]');
         if (!chip) return;
         const name = chip.dataset.surface;
         const existing = rowFor(name);
         if (existing) state.surfaces = state.surfaces.filter(row => row.surface !== name);
-        else state.surfaces.push({ surface: name, bucket: '<1k', topic: '', segment: '' });
+        else state.surfaces.push({ surface: name, bucket: '<1k', topic: '', segment: '', tooSmall: false });
         save();
         paint();
     });
@@ -134,6 +151,7 @@
         if (!row) return;
         row.topic = topic.value;
         row.segment = '';
+        row.tooSmall = false;
         save();
         const preview = document.getElementById('audience-preview');
         if (preview) preview.innerHTML = audienceCard();
@@ -146,6 +164,7 @@
         if (!row) return;
         row.bucket = size.value;
         row.segment = '';
+        row.tooSmall = false;
         save();
         const preview = document.getElementById('audience-preview');
         if (preview) preview.innerHTML = audienceCard();
@@ -153,7 +172,8 @@
 
     toggle.addEventListener('click', () => {
         const sharing = state.sharing;
-        state = fresh(!state.filled);
+        const claimed = state.claimed;
+        state = fresh(!state.filled, claimed);
         state.sharing = sharing;
         save();
         paint();
