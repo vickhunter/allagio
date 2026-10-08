@@ -1,3 +1,9 @@
+## October 8 — pre-deploy hardening follow-up
+
+Tracked links that are paused, unlisted, or removed return `410` and record no click, including for preview bots and `HEAD`. A deleted tracking code stays `404`. Product `website_url` and offer `landing_url` must be `https` at create and update; `/v1/go` refuses a stored non-https destination with `400` and records no click. An active listed `https` browser `GET` still redirects with `via=`.
+
+`scripts/mvp_release.py check --host generic --env-file` validates a non-Railway host without the Railway CLI. `verify --base-url` accepts any https origin. Both modes require `API_KEY_SECRET` (32+ characters, not `dev-secret`), `GIN_MODE=release`, and a `TRUSTED_PROXIES` list that is not open to every address. `Dockerfile.mvp` sets `GIN_MODE=release`. Hosted MCP rate limits use the trusted client IP. Render plus Neon (Aiven Free fallback) is documented in [HOSTING.md](docs/HOSTING.md), including the cold-start `GET /health` retry. The onboarding workflow also runs for API, script, Dockerfile, and docs changes.
+
 ## October 1 — release gates
 
 - Added a deployment preflight pinned to the isolated `distributoor-mvp` service: configuration, clean/pushed revision and required CI checks must pass before uploading. Variable values and CLI failure output are withheld.

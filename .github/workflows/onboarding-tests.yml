@@ -3,9 +3,9 @@ name: Onboarding Tests
 on:
   workflow_dispatch:
   push:
-    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", ".github/workflows/onboarding-tests.yml"]
+    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", "affilio-api/**", "scripts/**", "Dockerfile.mvp", "docs/**", ".github/workflows/onboarding-tests.yml"]
   pull_request:
-    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", ".github/workflows/onboarding-tests.yml"]
+    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", "affilio-api/**", "scripts/**", "Dockerfile.mvp", "docs/**", ".github/workflows/onboarding-tests.yml"]
 
 jobs:
   onboarding:

@@ -22,7 +22,7 @@ This guide covers production deployment for `affilio-api` and required integrati
 - `CLAUDE_API_URL` (defaults to Anthropic endpoint)
 - `CLAUDE_API_VERSION` (defaults to `2023-06-01`)
 - `ALLOWED_ORIGINS` (if CORS restrictions are required)
-- `TRUSTED_PROXIES` (comma-separated proxy IPs or CIDRs; empty ignores forwarded client IP headers)
+- `TRUSTED_PROXIES` (comma-separated proxy IPs or CIDRs; empty ignores forwarded client IP headers). On Render, trust the Cloudflare ranges in front of the load balancer and add the observed Render proxy range if the client IP never changes. See [HOSTING.md](../docs/HOSTING.md). Do not set `0.0.0.0/0`.
 
 ## Database Migration Order
 Run migrations in this exact order:
