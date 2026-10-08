@@ -4,6 +4,14 @@ Tracked links that are paused, unlisted, or removed return `410` and record no c
 
 `scripts/mvp_release.py check --host generic --env-file` validates a non-Railway host without the Railway CLI. `verify --base-url` accepts any https origin. Both modes require `API_KEY_SECRET` (32+ characters, not `dev-secret`), `GIN_MODE=release`, and a `TRUSTED_PROXIES` list that is not open to every address. `Dockerfile.mvp` sets `GIN_MODE=release`. Hosted MCP rate limits use the trusted client IP. Render plus Neon (Aiven Free fallback) is documented in [HOSTING.md](docs/HOSTING.md), including the cold-start `GET /health` retry. The onboarding workflow also runs for API, script, Dockerfile, and docs changes.
 
+## October 8 — offer rail in the owner workspace
+
+- The owner products page shows an offer rail: product, readiness, Stripe test mode, offer, submitted, listed. Exactly one control is the next action. Done stations stay marked done. Readiness and submit errors sit on the check or button, take focus, and scroll into view at 390 and 1440.
+- Stripe confirmation and a returned draft are read in the browser from the existing confirmation page and status changes. The owner JSON still has no connection or review-note fields. See `docs/design/D-011-design-rules.md`.
+- WordPress Distribution, Marketplace, and Earnings keep one next action and show load or join errors inline. Marketplace no longer uses an alert dialog.
+- UI files only. The Go host that serves `affilio-wp/admin/build/workspace.html` is unchanged.
+- `affilio-wp/e2e/offer-rail.spec.js` runs in the GitHub Actions job `offer-rail` at 1440×900 and 390×844.
+
 ## October 1 — release gates
 
 - Added a deployment preflight pinned to the isolated `distributoor-mvp` service: configuration, clean/pushed revision and required CI checks must pass before uploading. Variable values and CLI failure output are withheld.
