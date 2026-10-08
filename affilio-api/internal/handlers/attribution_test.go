@@ -315,11 +315,8 @@ func TestRedirectStopsAttributingWhenPaused(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
 	rrec := httptest.NewRecorder()
 	r.ServeHTTP(rrec, req)
-	if rrec.Code != http.StatusFound {
-		t.Fatalf("expected 302 for paused offer, got %d", rrec.Code)
-	}
-	if strings.Contains(rrec.Header().Get("Location"), "via=") {
-		t.Fatalf("paused offer must not carry attribution, got %q", rrec.Header().Get("Location"))
+	if rrec.Code != http.StatusGone || rrec.Header().Get("Location") != "" || !strings.Contains(rrec.Body.String(), "paused") {
+		t.Fatalf("expected 410 for paused offer with no redirect, got %d %q %s", rrec.Code, rrec.Header().Get("Location"), rrec.Body.String())
 	}
 	var clicks int
 	_ = db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks`).Scan(&clicks)

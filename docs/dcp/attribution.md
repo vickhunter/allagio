@@ -26,8 +26,12 @@ ledger entry: commission, pending, clears_at = occurred_at + refund_window_days
    deliver that exact value into provider checkout metadata (Stripe
    `client_reference_id`/`metadata.dtr`, Lemon Squeezy
    `checkout[custom][dtr]`, Polar `metadata.dtr`).
-2. **Non-attributing forwarding.** A paused campaign or unlisted offer still
-   forwards visitors to the landing page, but logs no click and stamps no ref.
+2. **Unavailable links do not redirect.** A paused campaign or offer returns
+   `410` with `reason=paused`. An offer that is not listed (draft or submitted)
+   returns `410` with `reason=unlisted`. A retired offer, an inactive campaign,
+   or a missing, invalid, or revoked placement returns `410` with
+   `reason=removed`. A deleted tracking code returns `404`. None of these log
+   a click or stamp a ref, including for link-preview clients and `HEAD`.
 3. **Webhook authenticity.** Every provider event is verified with the
    provider's signature scheme before it touches storage. Unverifiable events
    are rejected, not stored.
