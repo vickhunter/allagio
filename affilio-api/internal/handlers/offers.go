@@ -317,9 +317,9 @@ func applyOfferPayload(o *database.Offer, req *offerPayload) error {
 		o.RefundWindowDays = *req.RefundWindowDays
 	}
 	if req.LandingURL != nil {
-		u, err := normalizeHTTPURL(*req.LandingURL)
+		u, err := normalizeHTTPSURL(*req.LandingURL)
 		if err != nil {
-			return errors.New("landing_url must be a valid http(s) url")
+			return errors.New("landing_url must be an https URL")
 		}
 		o.LandingURL = u
 	}

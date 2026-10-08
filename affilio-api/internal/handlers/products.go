@@ -147,9 +147,9 @@ func applyProductPayload(p *database.Product, req *productPayload) error {
 		}
 	}
 	if req.WebsiteURL != nil {
-		u, err := normalizeHTTPURL(*req.WebsiteURL)
+		u, err := normalizeHTTPSURL(*req.WebsiteURL)
 		if err != nil {
-			return errors.New("website_url must be a valid http(s) url")
+			return errors.New("website_url must be an https URL")
 		}
 		p.WebsiteURL = u
 	}
@@ -217,6 +217,18 @@ func normalizeHTTPURL(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	parsed, err := url.Parse(raw)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return "", errors.New("invalid url")
+	}
+	if len(raw) > 512 {
+		return "", errors.New("url too long")
+	}
+	return raw, nil
+}
+
+func normalizeHTTPSURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
 		return "", errors.New("invalid url")
 	}
 	if len(raw) > 512 {

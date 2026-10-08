@@ -32,6 +32,8 @@ ledger entry: commission, pending, clears_at = occurred_at + refund_window_days
    or a missing, invalid, or revoked placement returns `410` with
    `reason=removed`. A deleted tracking code returns `404`. None of these log
    a click or stamp a ref, including for link-preview clients and `HEAD`.
+   A stored destination that is not `https` returns `400` with
+   `destination must be https` and also records no click.
 3. **Webhook authenticity.** Every provider event is verified with the
    provider's signature scheme before it touches storage. Unverifiable events
    are rejected, not stored.

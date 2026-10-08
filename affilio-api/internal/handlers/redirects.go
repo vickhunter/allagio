@@ -46,6 +46,10 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 		c.JSON(status, gin.H{"error": "link unavailable", "reason": reason})
 		return
 	}
+	if !httpsDestination(link.LandingURL) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "destination must be https"})
+		return
+	}
 	if link.RequiresPlacement && c.Query("placement") == "" {
 		c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "removed"})
 		return
@@ -100,6 +104,11 @@ var previewBotMarkers = []string{
 	"skypeuripreview",
 	"applebot",
 	"iframely",
+}
+
+func httpsDestination(raw string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	return err == nil && parsed.Scheme == "https" && parsed.Host != ""
 }
 
 func trackingUnavailable(link *database.CampaignLink) (int, string, bool) {
