@@ -11,6 +11,7 @@ const adminCss = path.resolve(__dirname, '../admin/css/affilio-admin.css');
 const artifacts = process.env.OFFER_RAIL_ARTIFACTS || '/opt/cursor/artifacts/d011';
 const d019 = process.env.CI ? path.join(artifacts, 'd019') : '/opt/cursor/artifacts/d019';
 const d020 = process.env.CI ? path.join(artifacts, 'd020') : '/opt/cursor/artifacts/d020';
+const d025 = process.env.CI ? path.join(artifacts, 'd025') : '/opt/cursor/artifacts/d025';
 const template = fs.readFileSync(path.join(build, 'workspace.html'), 'utf8');
 
 function shell(title, body, operator) {
@@ -842,6 +843,17 @@ test('a server that stays down offers try again', async ({ browser }) => {
   }
 });
 
+async function tallLink(page, name) {
+  const box = await page.getByRole('link', { name, exact: true }).boundingBox();
+  expect(box.height).toBeGreaterThanOrEqual(44);
+}
+
+async function shotD025(page, name, full) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  fs.mkdirSync(d025, { recursive: true });
+  await page.screenshot({ path: path.join(d025, name), fullPage: full });
+}
+
 function startDemoServer() {
   const addrFile = path.join(os.tmpdir(), `affilio-demo-${process.pid}-${Date.now()}`);
   const child = spawn('go', ['test', './internal/handlers', '-run', '^TestServeDemoForE2E$', '-count=1', '-timeout', '20m', '-v'], {
@@ -986,6 +998,7 @@ test('demo pages fit a phone and keep referral parameters', async ({ browser }) 
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
     const titles = [];
+    const shotPage = { '/demo': 'demo', '/demo/pricing': 'pricing', '/demo/docs': 'docs' };
     for (const pathName of ['/demo', '/demo/pricing', '/demo/docs', '/demo/privacy', '/demo/terms', '/demo/start']) {
       await page.goto(demoBase + pathName);
       await expect(page.locator('html')).toHaveAttribute('lang', 'en');
@@ -994,10 +1007,30 @@ test('demo pages fit a phone and keep referral parameters', async ({ browser }) 
       expect(title.length).toBeGreaterThan(0);
       expect(titles).not.toContain(title);
       titles.push(title);
+      await expect(page.locator('body')).toContainText('Demo landing page builder');
+      const flag = page.getByText('DEMO', { exact: true });
+      await expect(flag).toBeVisible();
+      const flagBox = await flag.boundingBox();
+      expect(flagBox.y).toBeGreaterThanOrEqual(0);
+      expect(flagBox.y + flagBox.height).toBeLessThanOrEqual(844);
       await fits(page);
       const fontSize = await page.locator('body').evaluate(body => parseFloat(getComputedStyle(body).fontSize));
       expect(fontSize).toBeGreaterThanOrEqual(16);
       if (pathName !== '/demo') await expect(page.getByRole('link', { name: /demo/i }).first()).toBeVisible();
+      if (pathName === '/demo') {
+        await expect(page.getByRole('heading', { level: 1 })).toContainText('Demo landing page builder');
+        await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /Demo landing page builder/);
+        for (const name of ['Pricing', 'Docs', 'Privacy', 'Terms']) await tallLink(page, name);
+      }
+      if (pathName !== '/demo') await tallLink(page, 'Back to the demo');
+      if (pathName === '/demo/start') {
+        await tallLink(page, 'Sign in');
+        await tallLink(page, 'Register');
+      }
+      if (shotPage[pathName]) {
+        await shotD025(page, `d025-${shotPage[pathName]}-after-390-fold.png`, false);
+        await shotD025(page, `d025-${shotPage[pathName]}-after-390-full.png`, true);
+      }
     }
     const ctaPage = await context.newPage();
     for (const start of ['/demo', '/demo/pricing']) {
@@ -1019,6 +1052,21 @@ test('demo pages fit a phone and keep referral parameters', async ({ browser }) 
     await ctaPage.goto(demoBase + '/demo/start');
     await expect(ctaPage.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
     await expect(ctaPage.getByRole('link', { name: 'Register', exact: true })).toBeVisible();
+    const wide = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    const widePage = await wide.newPage();
+    for (const [pathName, shotName] of [['/demo', 'demo'], ['/demo/pricing', 'pricing'], ['/demo/docs', 'docs']]) {
+      await widePage.goto(demoBase + pathName);
+      await expect(widePage.locator('body')).toContainText('Demo landing page builder');
+      const flag = widePage.getByText('DEMO', { exact: true });
+      await expect(flag).toBeVisible();
+      const flagBox = await flag.boundingBox();
+      expect(flagBox.y).toBeGreaterThanOrEqual(0);
+      expect(flagBox.y + flagBox.height).toBeLessThanOrEqual(900);
+      await fits(widePage);
+      await shotD025(widePage, `d025-${shotName}-after-1440-fold.png`, false);
+      await shotD025(widePage, `d025-${shotName}-after-1440-full.png`, true);
+    }
+    await wide.close();
     await context.close();
   } finally {
     demo.stop();

@@ -118,7 +118,7 @@ func TestDemoPagesAreReadableAndKeepReferralParams(t *testing.T) {
 
 	titles := map[string]string{}
 	pages := []struct{ path, title string }{
-		{"/demo", "Offer Rails demo"},
+		{"/demo", "Demo landing page builder"},
 		{"/demo/start", "Get started"},
 		{"/demo/pricing", "Pricing"},
 		{"/demo/docs", "Documentation"},
@@ -157,6 +157,20 @@ func TestDemoPagesAreReadableAndKeepReferralParams(t *testing.T) {
 		titles[title] = page.path
 		if !strings.Contains(html, "overflow-wrap:anywhere") && !strings.Contains(html, "overflow-wrap: anywhere") {
 			t.Fatalf("%s must wrap long lines", page.path)
+		}
+		if !strings.Contains(html, "Demo landing page builder") {
+			t.Fatalf("%s hero missing demo landing page builder: %s", page.path, html)
+		}
+		if !strings.Contains(html, `>DEMO<`) {
+			t.Fatalf("%s missing DEMO label", page.path)
+		}
+		if !strings.Contains(html, `<meta name="description" content="`) || !strings.Contains(html, "Demo landing page builder") {
+			t.Fatalf("%s missing demo meta description", page.path)
+		}
+		for _, banned := range []string{"trusted by", "testimonial", "$19", "sk_live"} {
+			if strings.Contains(strings.ToLower(html), banned) {
+				t.Fatalf("%s contains %q", page.path, banned)
+			}
 		}
 		if page.path != "/demo" && !strings.Contains(html, `href="/demo"`) && !strings.Contains(html, `href="/demo?`) {
 			t.Fatalf("%s must link back to /demo", page.path)
