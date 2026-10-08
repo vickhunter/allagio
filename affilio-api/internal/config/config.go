@@ -24,6 +24,7 @@ type Config struct {
 	ClaudeAPIURL           string
 	ClaudeAPIVersion       string
 	AllowedOrigins         string
+	TrustedProxies         string
 	APIKeySecret           string
 	AdminAPIKey            string
 	KeyRotationGracePeriod time.Duration
@@ -57,6 +58,7 @@ func Load() Config {
 		ClaudeAPIURL:           getEnvValue("CLAUDE_API_URL", ""),
 		ClaudeAPIVersion:       getEnvValue("CLAUDE_API_VERSION", ""),
 		AllowedOrigins:         getEnvValue("ALLOWED_ORIGINS", "*"),
+		TrustedProxies:         os.Getenv("TRUSTED_PROXIES"),
 		APIKeySecret:           getEnvValue("API_KEY_SECRET", "dev-secret"),
 		AdminAPIKey:            getEnvValue("ADMIN_API_KEY", ""),
 		KeyRotationGracePeriod: time.Duration(graceHours) * time.Hour,

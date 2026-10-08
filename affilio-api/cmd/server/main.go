@@ -42,7 +42,7 @@ func main() {
 	r.Use(gin.LoggerWithFormatter(func(p gin.LogFormatterParams) string {
 		return fmt.Sprintf("%s %d %s %s %s\n", p.TimeStamp.Format(time.RFC3339), p.StatusCode, p.Method, p.Request.URL.Path, p.Latency)
 	}), gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ any) { log.Print("request panic recovered"); c.AbortWithStatus(500) }))
-	if err := r.SetTrustedProxies(nil); err != nil {
+	if err := middleware.ConfigureTrustedProxies(r, cfg.TrustedProxies); err != nil {
 		log.Fatalf("failed to set trusted proxies: %v", err)
 	}
 	r.Use(middleware.CORS(cfg.AllowedOrigins))

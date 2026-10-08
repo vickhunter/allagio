@@ -21,6 +21,7 @@ This guide covers production deployment for `affilio-api` and required integrati
 - `CLAUDE_API_URL` (defaults to Anthropic endpoint)
 - `CLAUDE_API_VERSION` (defaults to `2023-06-01`)
 - `ALLOWED_ORIGINS` (if CORS restrictions are required)
+- `TRUSTED_PROXIES` (comma-separated proxy IPs or CIDRs; empty ignores forwarded client IP headers)
 
 ## Database Migration Order
 Run migrations in this exact order:
