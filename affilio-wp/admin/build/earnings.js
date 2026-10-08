@@ -12,7 +12,7 @@
             <div class="affilio-panel affilio-panel-warning">
                 <h2>${t('Earnings', 'Guadagni')}</h2>
                 <p><strong>${t('Not connected.', 'Non connesso.')}</strong> ${AffilioData.connectionStatus.message || t('Configure your API key.', 'Configura la tua chiave API.')}</p>
-                <p><a class="button button-primary" href="${settings}">${t('Open settings', 'Apri impostazioni')}</a></p>
+                <p><a class="button button-primary" data-primary-action href="${settings}">${t('Open settings', 'Apri impostazioni')}</a></p>
             </div>
         `;
         return;
@@ -170,9 +170,13 @@
             root.innerHTML = `
                 <div class="affilio-panel affilio-panel-warning">
                     <h2>${t('Earnings', 'Guadagni')}</h2>
-                    <p>${t('Could not load your balance from the Affilio API.', 'Impossibile caricare il saldo dall\'API di Affilio.')}</p>
+                    <p class="affilio-field-error" role="alert" tabindex="-1">${t('Could not load your balance from the Affilio API.', 'Impossibile caricare il saldo dall\'API di Affilio.')}</p>
+                    <p><button class="button button-primary" data-primary-action data-retry>${t('Retry', 'Riprova')}</button></p>
                 </div>
             `;
+            const alert = root.querySelector('[role="alert"]');
+            if (alert) alert.focus();
+            root.querySelector('[data-retry]').addEventListener('click', load);
         }
     };
 

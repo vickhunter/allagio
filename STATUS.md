@@ -1,3 +1,10 @@
+## October 8 — offer rail in the owner workspace
+
+- The owner products page shows an offer rail: product, readiness, Stripe test mode, offer, submitted, listed. Exactly one control is the next action. Done stations stay marked done. Readiness and submit errors sit on the check or button, take focus, and scroll into view at 390 and 1440.
+- Stripe confirmation and a returned draft are read in the browser from the existing confirmation page and status changes. The owner JSON still has no connection or review-note fields. See `docs/design/D-011-design-rules.md`.
+- WordPress Distribution, Marketplace, and Earnings keep one next action and show load or join errors inline. Marketplace no longer uses an alert dialog.
+- UI files only. The Go host that serves `affilio-wp/admin/build/workspace.html` is unchanged.
+
 ## October 1 — release gates
 
 - Added a deployment preflight pinned to the isolated `distributoor-mvp` service: configuration, clean/pushed revision and required CI checks must pass before uploading. Variable values and CLI failure output are withheld.
