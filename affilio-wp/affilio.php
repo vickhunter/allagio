@@ -40,7 +40,6 @@ function affilio_init() {
     add_action('admin_menu', array($admin, 'register_menu'));
     add_action('enqueue_block_editor_assets', array($admin, 'enqueue_sidebar_assets'));
     add_action('admin_enqueue_scripts', array($admin, 'enqueue_dashboard_assets'));
-    add_action('rest_api_init', array($tracker, 'register_routes'));
     add_action('rest_api_init', array($inserter, 'register_routes'));
     add_action('rest_api_init', array($editor_proxy, 'register_routes'));
     add_action('rest_api_init', array($onboarding, 'register_routes'));
