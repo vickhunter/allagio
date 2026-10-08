@@ -118,6 +118,19 @@ func (h *PlacementsHandler) Find(c *gin.Context) {
 	c.JSON(http.StatusOK, body)
 }
 
+func (h *PlacementsHandler) requireLinkedPublisher(c *gin.Context) bool {
+	linked, err := h.DB.SiteHasOwner(c.Request.Context(), siteIDFrom(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "publisher lookup failed"})
+		return false
+	}
+	if !linked {
+		c.JSON(http.StatusForbidden, gin.H{"error": "publisher account is not connected"})
+		return false
+	}
+	return true
+}
+
 func (h *PlacementsHandler) Prepare(c *gin.Context) {
 	var req struct {
 		OfferID    string `json:"offer_id"`
@@ -127,6 +140,9 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 	}
 	if bindBoundedJSON(c, &req) != nil || !uuidPattern.MatchString(req.OfferID) || len(req.Context) < 10 || len(req.Context) > 12000 || len(strings.TrimSpace(req.Copy)) < 10 || len(req.Copy) > 4000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "offer_id, surface_url, context and copy required"})
+		return
+	}
+	if !h.requireLinkedPublisher(c) {
 		return
 	}
 	site, err := h.DB.GetSiteByID(c.Request.Context(), siteIDFrom(c))
@@ -189,6 +205,9 @@ func (h *PlacementsHandler) List(c *gin.Context) {
 func (h *PlacementsHandler) Commit(c *gin.Context) {
 	if !uuidPattern.MatchString(c.Param("id")) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
+		return
+	}
+	if !h.requireLinkedPublisher(c) {
 		return
 	}
 	code, err := generateTrackingCode()

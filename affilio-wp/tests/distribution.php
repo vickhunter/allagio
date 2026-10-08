@@ -34,6 +34,9 @@ class DistributionAPI {
     public function request($method, $path, $body = null) {
         $id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
         $placement = array('id' => $id, 'surface_url' => $this->surface, 'status' => $this->status, 'copy' => 'A useful tool for R&D teams.', 'disclosure' => 'Affiliate disclosure: I may earn a commission if you buy through this link.', 'receipt' => array('tracked_link' => '/v1/go/test?placement=' . $id, 'publication_status' => $this->recorded ? 'publisher_reported' : 'awaiting_evidence'));
+        if ($method === 'GET' && strpos($path, '/sites/owner-connection') !== false) {
+            return array('code' => 200, 'data' => array('connected' => true));
+        }
         if ($method === 'GET') { return array('code' => 200, 'data' => array('placement' => $placement)); }
         if (strpos($path, '/commit') !== false) {
             $this->commits++;

@@ -6,6 +6,8 @@ if (class_exists('Affilio_Distribution')) {
 
 class Affilio_Distribution {
     private $api;
+    private $publisher_checked = false;
+    private $publisher_error = null;
 
     public function __construct($api) {
         $this->api = $api;
@@ -116,6 +118,10 @@ class Affilio_Distribution {
     }
 
     public function opportunities($request) {
+        $publisher = $this->require_publisher_connection();
+        if (is_wp_error($publisher)) {
+            return $publisher;
+        }
         $post = $this->article($request);
         if (is_wp_error($post)) {
             return $post;
@@ -124,6 +130,10 @@ class Affilio_Distribution {
     }
 
     public function prepare($request) {
+        $publisher = $this->require_publisher_connection();
+        if (is_wp_error($publisher)) {
+            return $publisher;
+        }
         $post = $this->article($request);
         if (is_wp_error($post)) {
             return $post;
@@ -135,7 +145,27 @@ class Affilio_Distribution {
         return $this->request('GET', '/placements');
     }
 
+    private function require_publisher_connection() {
+        if (!$this->publisher_checked) {
+            $this->publisher_checked = true;
+            $data = $this->request('GET', '/sites/owner-connection');
+            if (is_wp_error($data)) {
+                $this->publisher_error = $data;
+            } elseif (empty($data['connected'])) {
+                $this->publisher_error = new WP_Error('affilio_publisher', 'Collega prima il tuo account publisher.', array('status' => 403));
+            }
+        }
+        if ($this->publisher_error !== null) {
+            return $this->publisher_error;
+        }
+        return true;
+    }
+
     public function publish($request) {
+        $publisher = $this->require_publisher_connection();
+        if (is_wp_error($publisher)) {
+            return $publisher;
+        }
         $post = $this->article($request);
         if (is_wp_error($post)) {
             return $post;

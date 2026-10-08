@@ -289,6 +289,7 @@ func TestPlacementAuthorityAndScopedAgent(t *testing.T) {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT id FROM sites WHERE domain='publisher.example.com'`).Scan(&siteID); err != nil {
 		t.Fatal(err)
 	}
+	linkPublisherOwner(t, db, siteID)
 	_, access := adminJSON(t, r, http.MethodPost, "/v1/offer-review/agent-access/sites/"+siteID, nil)
 	agentKey := access["api_key"].(string)
 	for _, path := range []string{"/v1/marketplace/offers/" + offerID + "/join", "/v1/payouts/11111111-1111-1111-1111-111111111111/confirm-received"} {
@@ -434,6 +435,7 @@ func TestTwoIndependentStdioAgentsRevenueLoop(t *testing.T) {
 	_, makerKey := createTestMaker(t, db)
 	siteKey := "site-key-independent-publisher"
 	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Developer tutorials")
+	linkPublisherOwner(t, db, siteID)
 	_, access := adminJSON(t, r, http.MethodPost, "/v1/offer-review/agent-access/sites/"+siteID, nil)
 	binary := filepath.Join(t.TempDir(), "distributoor-mcp")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/distributoor-mcp")
