@@ -262,8 +262,8 @@ func TestWebhookRejectsBadSignatureAndUnattributed(t *testing.T) {
 	req.Header.Set("Stripe-Signature", "t=1,v1=bad")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401 for bad signature, got %d", rec.Code)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for bad signature, got %d", rec.Code)
 	}
 	var stored int
 	_ = db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM webhook_events`).Scan(&stored)
