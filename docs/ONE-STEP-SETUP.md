@@ -61,7 +61,7 @@ Real owner sign-in and a real builder agent's checkout integration remain pendin
 ## Release and pilot
 
 1. Deploy to the isolated pilot with its own database and OIDC configuration.
-2. Serve the bundled installer archive and origin-configured WordPress ZIP from the MVP service. Registry publication and directory submission can follow; they are not required for the first release.
+2. Serve the bundled installer archive and the `affilio-wp/` 0.1.9 WordPress ZIP from the MVP service. The ZIP has no `railway.app` host. Registry publication and directory submission can follow; they are not required for the first release.
 3. Use a real builder repository and an independent WordPress site to verify
    client login, checkout integration, recommendations and test sale/refund.
 4. Measure setup time, owner steps, failed installs and time to first attributable

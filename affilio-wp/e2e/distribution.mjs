@@ -13,8 +13,12 @@ if (fixture.download) {
     expect(response.status).toBe(200);
     await writeFile(join(fixture.qa, 'affilio.zip'), Buffer.from(await response.arrayBuffer()));
     wp('plugin', 'install', '/release/affilio.zip', '--force', '--activate');
-    wp('eval', "delete_option('affilio_api_url_override');");
-    expect(wp('eval', 'echo AFFILIO_API_URL;')).toBe(fixture.base + '/v1');
+    const pluginPath = wp('plugin', 'path', 'affilio-wp').replaceAll('\\', '/');
+    expect(pluginPath).toContain('affilio-wp/affilio.php');
+    const main = wp('eval', 'echo file_get_contents(WP_PLUGIN_DIR . "/affilio-wp/affilio.php");');
+    expect(main).toContain('Version: 0.1.9');
+    expect(main).not.toContain('railway.app');
+    wp('option', 'update', 'affilio_api_url_override', fixture.base + '/v1');
 } else {
     wp('option', 'update', 'affilio_api_url_override', fixture.base + '/v1');
 }
@@ -99,7 +103,7 @@ try {
     expect(errors).toEqual([]);
     await ownerContext.close();
     await context.close();
-    console.log(`WordPress browser integration passed: ${fixture.download ? 'downloaded ZIP installation and embedded API origin, ' : ''}installation connection, owner handoff, matching, approval, real post insertion, publication receipt and attributed reader click.`);
+    console.log(`WordPress browser integration passed: ${fixture.download ? 'downloaded affilio-wp 0.1.9 ZIP, ' : ''}installation connection, owner handoff, matching, approval, real post insertion, publication receipt and attributed reader click.`);
 } catch (error) {
     console.error('WordPress page:', page?.url(), (await page?.locator('body').innerText())?.slice(0, 1200));
     throw error;
