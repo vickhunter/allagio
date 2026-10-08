@@ -4,7 +4,7 @@ Source: Katie Dill on Lenny's Podcast, 2026-10-07, [How to scale intent, quality
 
 Surfaces checked at 390×844 and 1440×900:
 
-- **Landing** — `affilio-wp/admin/build/home.html`, served as a Go template. Audited from a static render (`audit-landing-390.png`, `audit-landing-1440.png`). Not restyled.
+- **Landing** — `affilio-wp/admin/build/home.html`, served as a Go template. Audited from a static render (`audit-landing-390.png`, `audit-landing-1440.png`). D-019 points its type and color at the workspace tokens. The distribution illustration is unchanged.
 - **Owner workspace** — `affilio-wp/admin/build/workspace.html`, `workspace.js`, `workspace.css`. The Go host parses `workspace.html` and injects the page body. This PR does not change that host.
 - **WordPress** — Distribution, Marketplace, and Earnings in `affilio-wp/admin/build/`. They stay on WordPress admin chrome (`#dcdcde`, `#2271b1`, 13px), not the engineering sheet.
 
@@ -16,12 +16,12 @@ Verdicts: **pass** means the surface already met the rule or this PR made it tru
 | --- | --- | --- | --- | --- |
 | 1 | Write the point of view before designing | n-a | n-a | n-a |
 | 2 | Layout, imagery, and copy signal what the product is | pass | pass | gap |
-| 3 | One brand value in every detail | gap | gap | gap |
+| 3 | One brand value in every detail | pass | pass | gap |
 | 4 | Match the form to the signal (trust, security, play) | pass | pass | pass |
 
 1. Process rule. No new brand essay was written. The existing line — a distribution channel for what you build, a revenue channel for what you publish — is what the rail and the landing both use.
 2. Landing: the distribution scene plus "You built it. Give it a distribution channel." Owner: the six stations name the job (product, ready, Stripe test, offer, submitted, listed) instead of a generic dashboard. WordPress: Distribution copy is clear, but the screen is still a settings panel. A full opportunity-first redesign is deferred; it is a separate brief and would fight wp-admin.
-3. Landing is ivory and moss. The workspace body is still terracotta on warm paper. The rail is rail blue on `#F4F3EF`. Those are three palettes. Unifying them is deferred so this PR does not restyle screens outside the offer journey.
+3. Landing and the owner workspace share one palette and one type scale, defined once on `:root` in `workspace.css` (D-019). WordPress stays on wp-admin colors. The word "distributoor" is unchanged.
 4. The rail uses hairlines, one blue action, and a red remediation next to the failed check. Landing stays editorial and calm. WordPress errors use the admin red panel, which reads as a trusted admin warning.
 
 ## Quality bar and craft
@@ -48,13 +48,13 @@ Verdicts: **pass** means the surface already met the rule or this PR made it tru
 
 | # | Rule | Landing | Owner | WordPress |
 | --- | --- | --- | --- | --- |
-| 12 | Treat the system, not the screen, as the object | gap | gap | gap |
+| 12 | Treat the system, not the screen, as the object | pass | pass | gap |
 | 13 | Opinionated enough to feel handmade | pass | pass | gap |
 | 14 | Ship full templates and flows | pass | pass | pass |
 | 15 | Deliver design docs at the moment of use | n-a | n-a | n-a |
 | 16 | Following every rule is the baseline, not the goal | n-a | n-a | n-a |
 
-12. The rail styles are scoped to `.offer-rail`. There is no shared token file across landing, owner, and wp-admin. Deferred: a token pass would touch Go-served landing CSS and every admin screen.
+12. Landing and the owner workspace read the same custom properties for color and type. The rail still scopes Archivo and IBM Plex Mono to `.offer-rail`. WordPress stays on wp-admin, so it is not in that system.
 13. Landing keeps its editorial type and scene. The rail refuses a second primary action. WordPress still inherits wp-admin, on purpose, so it does not pretend to be the engineering sheet.
 14. The owner flow now runs product → readiness → Stripe test → offer → submit → listed, including the failure and empty states. WordPress Distribution, Marketplace, and Earnings have connected, empty, error, and retry states.
 15. This file is a review note. It is not injected into a generator at build time.
@@ -67,14 +67,14 @@ Verdicts: **pass** means the surface already met the rule or this PR made it tru
 | 17 | Assign an editor | n-a | n-a | n-a |
 | 18 | Review by using the full journey | pass | pass | pass |
 | 19 | Ask whether it is fully formed | pass | gap | pass |
-| 20 | Unexpected details and a continuous theme | gap | gap | gap |
-| 21 | Justify every choice to the pixel | gap | pass | pass |
+| 20 | Unexpected details and a continuous theme | pass | pass | gap |
+| 21 | Justify every choice to the pixel | pass | pass | pass |
 
 17. Process rule. No human editor was assigned in this change.
 18. Playwright walks the owner journey at both widths, and opens Distribution, Marketplace, and Earnings at both widths. Landing was screenshotted at both widths.
-19. The owner journey still depends on two facts the API does not return: Stripe connection (including test versus live) and the operator's review note. A new browser cannot see a Stripe confirmation or a returned draft until those fields exist. Landing and WordPress are complete for the states this PR owns.
-20. The landing scene and the rail do not share a theme. Deferred with rule 3.
-21. Rail colors are the mockup's paper `#F4F3EF`, ink `#201F1B`, hairline `#E3E1D8`, blue `#2352C9`, done `#1F7A46`, and fail `#B23A2F` / `#F9ECEA` / `#E5C4BF`. WordPress errors use the existing admin danger colors, not a new palette. Landing colors were not re-chosen.
+19. The owner journey still depends on facts the API does not return: Stripe connection (including test versus live), the operator's review note, and the agent skill file. Setup & agents says "Coming soon" when `/SKILL.md` 404s. It does not invent the file. Landing and WordPress are complete for the states this pass owns.
+20. Landing and the owner workspace now share paper, ink, the blue next action, and one type scale. WordPress remains a separate admin theme.
+21. Landing and the workspace use the workspace tokens: paper `#f7f7ef`, panel `#fdfdf7`, ink `#232720`, muted `#697063`, line `#dde0d3`, accent `#c64f38` for the brand mark and focus ring, action `#2352c9` only on `[data-primary-action]`, and the fail trio `#b23a2f` / `#f9ecea` / `#e5c4bf`. Type is eyebrow 11, caption 12, small 13, UI 14, body 16, h3 19, h2 25, h1 `clamp(32px, 4vw, 48px)`, in the system sans. WordPress errors stay on the admin danger colors. The rail's OFL faces stay inside `.offer-rail`.
 
 ## Motion
 
@@ -106,8 +106,8 @@ Verdicts: **pass** means the surface already met the rule or this PR made it tru
 
 | Surface | pass | gap | n-a |
 | --- | --- | --- | --- |
-| Landing | 9 | 10 | 9 |
-| Owner workspace | 14 | 6 | 8 |
+| Landing | 13 | 6 | 9 |
+| Owner workspace | 17 | 3 | 8 |
 | WordPress | 12 | 8 | 8 |
 
 ## Fixed in this PR
@@ -122,7 +122,62 @@ Verdicts: **pass** means the surface already met the rule or this PR made it tru
 
 1. Expose Stripe `connected`, `configuration_verified` (or `configuration_verified_at`), and `live_mode` on the owner product JSON, and allow `font-src 'self'` (or the embedded font) in the hosted content-security policy. Until then a new browser cannot know Stripe state, and the hosted page will not paint the rail fonts.
 2. Persist `review_note` on an offer the operator returns to draft. This browser can only notice the return after it has seen the offer submitted.
-3. One palette across landing, workspace, and the rail. Three palettes are still on screen.
+3. One palette across landing and the owner workspace is done in D-019. WordPress stays on wp-admin. The owner journey is still not fully formed: Stripe connection fields, `review_note`, and `SKILL.md` are not in the API (rule 19).
 4. Landing scene motion and a personality pass (mascot or equivalent). Out of the offer journey.
 5. WordPress opportunity-first redesign. Distribution, Marketplace, and Earnings keep wp-admin.
 6. A shared design system and in-tool design docs. Process rules 1, 15, 16, 17, 23, 25, and 27 have no screen to change.
+
+## D-019
+
+Landing and the owner workspace were checked again at 390×844 and 1440×900 after the palette, the collapsed offer form, and Setup & agents.
+
+| Surface | pass | gap | n-a |
+| --- | --- | --- | --- |
+| Landing | 13 | 6 | 9 |
+| Owner workspace | 17 | 3 | 8 |
+| WordPress | 12 | 8 | 8 |
+
+WordPress was not restyled. Its counts are unchanged.
+
+Rules that moved from gap to pass on landing and the owner workspace: 3 (one palette), 12 (one token set), 20 (one theme), and on landing also 21 (the sizes and colors are the shared tokens). Owner rule 21 was already a pass; the justification is now those same tokens, not a separate rail palette.
+
+Owner gaps that remain: 8 (no new personality), 19 (not fully formed), 28 (no experimental interaction). Rule 19 stays a gap because Stripe `connected` / `configuration_verified` / `live_mode`, offer `review_note`, and `/SKILL.md` are still absent from the API. Setup & agents labels the skill URL as coming soon when it 404s, and it does not add a Go route.
+
+Landing gaps that remain: 5, 6, 8, 22, 26, 28. The illustration was not redrawn. n-a is unchanged (rules 1, 9, 11, 15, 16, 17, 23, 25, 27).
+
+Palette, defined once on `:root` in `workspace.css` and used by the landing page:
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `--paper` | `#f7f7ef` | page background |
+| `--panel` | `#fdfdf7` | raised panels |
+| `--ink` | `#232720` | text and secondary buttons |
+| `--muted` | `#697063` | secondary text |
+| `--line` | `#dde0d3` | hairlines |
+| `--accent` | `#c64f38` | brand mark and focus, not a second action |
+| `--tint` | `#ecefe2` | sidebar and command wells |
+| `--green` | `#45623a` | done and copied |
+| `--action` | `#2352c9` | the single next action only |
+| `--action-ink` | `#f4f3ef` | text on that action |
+| `--fail` / `--fail-bg` / `--fail-line` | `#b23a2f` / `#f9ecea` / `#e5c4bf` | inline errors |
+| `--font-sans` | Avenir Next, Avenir, Segoe UI, sans-serif | UI text |
+| `--font-mono` | SFMono-Regular, Consolas, ui-monospace, monospace | labels and commands |
+| `--text-eyebrow` through `--text-h1` | 11, 12, 13, 14, 16, 19, 25, `clamp(32px, 4vw, 48px)` | one scale |
+
+Archivo and IBM Plex Mono stay SIL OFL and stay inside `.offer-rail`.
+
+## D-020
+
+Checked again at 390×844, 360×740, and 1440×900. WordPress was not restyled. Counts are unchanged.
+
+| Surface | pass | gap | n-a |
+| --- | --- | --- | --- |
+| Landing | 13 | 6 | 9 |
+| Owner workspace | 17 | 3 | 8 |
+| WordPress | 12 | 8 | 8 |
+
+Owner gaps that remain: 8, 19, 28. Rule 19 stays a gap. Stripe connection fields, `review_note`, and `SKILL.md` are still absent from the API. No Go route was added. Rule 22 stays n-a on the owner workspace: the narrow nav is a width step, not a new scene.
+
+Narrow navigation: below 600px the six workspace links wrap on a two-column grid. A sideways scroller hid Setup & agents, and a menu would hide five destinations. Every label stays in view at 390 and 360. The desktop sidebar stays a vertical list.
+
+Waking host: when `GET /health` answers 502, 503, 504, or the request fails as a network error or timeout, the page shows "Waking the server, about 30 seconds" and a bar. It probes `/health` on its own, first immediately, then every 4 seconds, and stops after 60 seconds. Each probe aborts after 8 seconds. A 2xx, or any other status, clears the panel and the failed owner call is tried once. Form fields already on the page stay. After 60 seconds the page says "The server did not wake." with one "Try again" button, which starts the same 60 second poll again. The bar moves only when the reader has not asked for reduced motion.
