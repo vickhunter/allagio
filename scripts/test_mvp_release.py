@@ -123,20 +123,34 @@ class ReleaseTests(unittest.TestCase):
             release.archive_names(["package/package.json", "package/package.json"])
 
     def test_plugin_origin_and_hosted_asset_exclusion(self):
-        def archive(origin, extra=None):
+        guarded = "<?php\n/* Plugin Name: Affilio */\nif (!function_exists('affilio_init')) {\nfunction affilio_init() {}\n}\n"
+
+        def archive(plugin=guarded, extra=None, drop=None):
             output = io.BytesIO()
             with zipfile.ZipFile(output, "w") as z:
                 for name in release.WP_FILES:
-                    z.writestr(name, f"<?php /* Plugin Name: Affilio */ define('AFFILIO_API_URL', '{origin}/v1');" if name.endswith("/affilio.php") else "runtime")
+                    if drop and name == drop:
+                        continue
+                    z.writestr(name, plugin if name.endswith("/affilio.php") else "runtime")
                 if extra:
-                    z.writestr(extra, "unexpected")
+                    z.writestr(extra[0], extra[1])
             return output.getvalue()
 
-        release.validate_plugin(archive(release.ORIGIN), release.ORIGIN)
-        with self.assertRaisesRegex(release.ReleaseError, "wrong API origin"):
-            release.validate_plugin(archive("https://affilio-production.up.railway.app"), release.ORIGIN)
+        release.validate_plugin(archive(), release.ORIGIN)
+        with self.assertRaisesRegex(release.ReleaseError, "railway.app"):
+            release.validate_plugin(archive(plugin=guarded + "/* https://distributoor-production.up.railway.app/v1 */\n"))
+        with self.assertRaisesRegex(release.ReleaseError, "affilio-wp/"):
+            release.validate_plugin(archive(extra=("affilio/affilio.php", guarded)))
+        with self.assertRaisesRegex(release.ReleaseError, "analytics.js"):
+            release.validate_plugin(archive(drop="affilio-wp/admin/build/analytics.js"))
+        with self.assertRaisesRegex(release.ReleaseError, "unguarded function affilio_init"):
+            release.validate_plugin(archive(plugin="<?php\n/* Plugin Name: Affilio */\nfunction affilio_init() {}\n"))
         with self.assertRaisesRegex(release.ReleaseError, "hosted UI"):
-            release.validate_plugin(archive(release.ORIGIN, "affilio/admin/build/landing-scene.bundle.js"))
+            release.validate_plugin(archive(extra=("affilio-wp/admin/build/landing-scene.bundle.js", "unexpected")))
+        with self.assertRaisesRegex(release.ReleaseError, "class-affilio-missing.php"):
+            release.validate_plugin(archive(plugin=guarded + "require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-missing.php';\n"))
+        with self.assertRaisesRegex(release.ReleaseError, "marketplace.js"):
+            release.validate_plugin(archive(plugin=guarded + "wp_enqueue_script($handle, AFFILIO_PLUGIN_URL . 'admin/build/' . $script);\n$script = 'marketplace.js';\n", drop="affilio-wp/admin/build/marketplace.js"))
 
     def test_plugin_zip_requires_analytics_script(self):
         legacy = {

@@ -1,6 +1,6 @@
 ## October 8 — plugin 0.1.9 (D-012b)
 
-The WordPress package is folder `affilio-wp/` at version 0.1.9. Global functions and classes are guarded so a second copy cannot redeclare them. The public `/track` route and front-end tracker script are gone. The API base URL comes only from the `AFFILIO_API_URL` constant, the `affilio_api_url_override` option, or the `affilio_api_base_url` filter. With none of those set, admin shows “Not connected — set the API URL in Settings” and the plugin makes no outbound HTTP calls.
+The WordPress package is folder `affilio-wp/` at version 0.1.9. Global functions and classes are guarded so a second copy cannot redeclare them. The public `/track` route and front-end tracker script are gone. The API base URL comes only from the `AFFILIO_API_URL` constant, the `affilio_api_url_override` option, or the `affilio_api_base_url` filter. With none of those set, admin shows “Not connected — set the API URL in Settings” and the plugin makes no outbound HTTP calls. The release ZIP must be `affilio-wp/`, include every enqueued or required file (including `admin/build/analytics.js`), guard `affilio_init`, and contain no `railway.app` host.
 
 ## October 8 — pre-deploy hardening follow-up
 
