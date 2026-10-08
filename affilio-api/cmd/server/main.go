@@ -165,6 +165,7 @@ func main() {
 			log.Fatal(err)
 		}
 		cfg.PublicBaseURL = strings.TrimRight(cfg.PublicBaseURL, "/")
+		assessments.Engine.PublicBaseURL = cfg.PublicBaseURL
 		login, loginErr := services.NewOIDCLogin(ctx, cfg.OIDCIssuer, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.PublicBaseURL+"/auth/callback")
 		if loginErr != nil {
 			log.Fatalf("owner sign-in configuration failed: %v", loginErr)

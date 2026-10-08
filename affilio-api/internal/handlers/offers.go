@@ -194,9 +194,8 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 	}
 	if product.ReadinessStatus != "ready" {
 		c.JSON(http.StatusConflict, gin.H{
-			"error":            "product has not passed readiness assessment",
+			"error":            "This product has not passed readiness assessment. Fix the failed checks, then submit again.",
 			"readiness_status": product.ReadinessStatus,
-			"hint":             "run POST /v1/maker/products/:id/assess and fix the failing checks",
 		})
 		return
 	}

@@ -21,17 +21,18 @@ import (
 )
 
 type HostedHandler struct {
-	DB            *database.DB
-	BaseURL       string
-	LoopbackURL   string
-	Login         services.OwnerLogin
-	Limiter       *IPRateLimiter
-	Payments      *MerchantConnectionsHandler
-	Page          *template.Template
-	AssetsPath    string
-	DownloadsPath string
-	OperatorID    string
-	Assessments   *AssessmentsHandler
+	DB              *database.DB
+	BaseURL         string
+	LoopbackURL     string
+	Login           services.OwnerLogin
+	Limiter         *IPRateLimiter
+	Payments        *MerchantConnectionsHandler
+	Page            *template.Template
+	AssetsPath      string
+	DownloadsPath   string
+	OperatorID      string
+	Assessments     *AssessmentsHandler
+	DemoCheckoutURL string
 }
 
 func ValidatePublicURL(raw string) error {
@@ -70,6 +71,7 @@ func (h *HostedHandler) cookie(c *gin.Context, name, value string, maxAge int) {
 
 func (h *HostedHandler) Mount(r *gin.Engine) {
 	public := r.Group("", h.headers)
+	h.mountDemo(public)
 	public.GET("/.well-known/oauth-protected-resource", h.resourceMetadata)
 	public.GET("/.well-known/oauth-protected-resource/mcp", h.resourceMetadata)
 	public.GET("/.well-known/oauth-authorization-server", h.authorizationMetadata)

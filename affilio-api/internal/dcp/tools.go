@@ -79,7 +79,7 @@ var Tools = []Tool{
 			"docs_url":         str("Documentation URL"),
 			"pricing_url":      str("Pricing page URL"),
 			"product_type":     str("One of: saas, game, shopify_app, dev_tool, other"),
-			"payment_provider": str("One of: stripe, lemonsqueezy, polar, none"),
+			"payment_provider": str("Optional. One of: stripe, lemonsqueezy, polar, none. Readiness does not require a known provider."),
 			"primary_category": str("Lowercase category used for matching"),
 			"tags":             strList("Tags used for matching"),
 			"keywords":         strList("Keywords used for matching"),
@@ -121,7 +121,7 @@ var Tools = []Tool{
 			"docs_url":         str("Documentation URL"),
 			"pricing_url":      str("Pricing page URL"),
 			"product_type":     str("One of: saas, game, shopify_app, dev_tool, other"),
-			"payment_provider": str("One of: stripe, lemonsqueezy, polar, none"),
+			"payment_provider": str("Optional. One of: stripe, lemonsqueezy, polar, none. Readiness does not require a known provider."),
 			"primary_category": str("Lowercase category used for matching"),
 			"tags":             strList("Tags used for matching"),
 			"keywords":         strList("Keywords used for matching"),
@@ -136,10 +136,11 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "run_assessment",
-		Description: "Run the distribution-readiness assessment against the product's live pages. Fix every failing gate check using each check's remediation field, then run again; offers can only be submitted while the product is 'ready'.",
+		Description: "Run the distribution-readiness assessment against the product's live pages. Checkout is provider-agnostic: a buy, subscribe, checkout, start, or sign-up link passes, and no known payment provider is only a warning. Reachable site, pricing, docs, privacy, and terms are gates. Fix every failing gate using each check's remediation, then run again. Offers can be submitted only while the product is ready, with or without a connected payment provider.",
 		InputSchema: schema([]string{"product_id"}, map[string]interface{}{
-			"product_id": str("Product id"),
-			"ref_param":  str("Query parameter the product preserves for attribution (default: via)"),
+			"product_id":   str("Product id"),
+			"ref_param":    str("Query parameter the product preserves for attribution (default: via)"),
+			"checkout_url": str("Optional declared checkout URL. A known provider is not required."),
 		}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			id, err := pathArg(args, "product_id")
@@ -228,7 +229,7 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "submit_offer",
-		Description: "Submit a draft offer for listing review. Requires the product's readiness to be 'ready'; after human approval the offer is listed in the publisher catalog.",
+		Description: "Submit a draft offer for listing review. Requires the product's readiness to be 'ready'. A connected payment provider is not required. After human approval the offer is listed in the publisher catalog. Trusted makers list directly.",
 		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
 			"offer_id": str("Offer id"),
 		}),

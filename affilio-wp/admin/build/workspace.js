@@ -13,12 +13,19 @@
         if (response.status === 401) { location.assign('/auth/login?return_to=' + encodeURIComponent(location.pathname)); throw new Error('Sign in to continue.'); }
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-            const error = new Error([data.error, data.hint].filter(Boolean).join(' ') || 'The request could not be completed. Please retry.');
+            const error = new Error(plainWords([data.error, data.hint].filter(Boolean).join(' ')) || 'The request could not be completed. Please retry.');
             error.status = response.status;
             error.data = data;
             throw error;
         }
         return data;
+    };
+    const plainWords = message => {
+        const text = String(message || '');
+        if (/readiness/i.test(text) && (/\/v1\//.test(text) || /\bPOST\s+\//.test(text))) {
+            return 'This product has not passed readiness assessment. Fix the failed checks, then submit again.';
+        }
+        return text;
     };
     const isAsleep = error => error?.status === 502 || error?.status === 503 || error?.status === 504 || error?.name === 'AbortError' || (error instanceof TypeError);
     const api = async (path, method, body) => {
@@ -208,7 +215,7 @@
         {id:'submitted', label:'Submitted'},
         {id:'listed', label:'Listed'}
     ];
-    const CHECK_LABELS = {site_reachable:'Site is reachable', checkout_present:'Checkout is present', ref_param_survives:'Referral parameter survives', pricing_page:'Pricing page', docs_present:'Documentation', privacy_policy:'Privacy policy', onboarding_flow:'Onboarding'};
+    const CHECK_LABELS = {site_reachable:'Site is reachable', checkout_present:'Checkout is present', ref_param_survives:'Referral parameter survives', pricing_page:'Pricing page', docs_present:'Documentation', privacy_policy:'Privacy policy', terms:'Terms', onboarding_flow:'Onboarding', payment_provider:'Payment provider'};
     const offerRank = status => ({listed:5, paused:4, submitted:3, draft:2})[status] || 0;
     const bestOffer = (offers, productId) => offers.filter(offer => offer.product_id === productId && offer.status !== 'retired').sort((a, b) => offerRank(b.status) - offerRank(a.status))[0] || null;
     const stationState = (product, offer, stripe) => {
@@ -216,7 +223,7 @@
             product: !!product,
             ready: product?.readiness_status === 'ready',
             stripe: !!(stripe?.known && stripe.connected && stripe.verified && stripe.live_mode === false),
-            offer: !!offer,
+            offer: !!offer && product?.readiness_status === 'ready',
             submitted: !!offer && offer.status !== 'draft',
             listed: !!offer && (offer.status === 'listed' || offer.status === 'paused')
         };
@@ -454,10 +461,11 @@
         event.preventDefault(); const form = event.currentTarget; const values = Object.fromEntries(new FormData(form));
         values.keywords = values.keywords.split(',').map(value => value.trim()).filter(Boolean); values.payment_provider = 'stripe';
         run(form.querySelector('button'), async () => {
-            try { await api('/products' + (form.dataset.product ? '/' + form.dataset.product : ''), form.dataset.product ? 'PATCH' : 'POST', values); }
+            const creating = !form.dataset.product;
+            try { await api('/products' + (creating ? '' : '/' + form.dataset.product), creating ? 'POST' : 'PATCH', values); }
             catch (error) { showFormIssue(form, error); throw error; }
             await productsPage();
-            report('Product saved.');
+            report(creating ? 'Product registered. It is in your list.' : 'Product saved.');
         });
     };
     const placementsPage = async () => {

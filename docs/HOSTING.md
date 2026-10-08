@@ -49,7 +49,7 @@ Set these in Render. Values stay in the dashboard.
 | `OIDC_ISSUER` | `https://accounts.google.com` |
 | `OIDC_CLIENT_ID` | Google web client id |
 | `OIDC_CLIENT_SECRET` | Google web client secret |
-| `PUBLIC_BASE_URL` | `https://<service>.onrender.com` with no path or trailing slash |
+| `PUBLIC_BASE_URL` | `https://<service>.onrender.com` with no path or trailing slash. Readiness refuses private and loopback hosts. This origin is the only exception, so the server can assess its own demo product. No other host is allowed. |
 | `ALLOWED_ORIGINS` | The same origin, and nothing else |
 | `HOST` | `0.0.0.0` |
 | `PORT` | Render's `PORT` (default `10000`) |
@@ -61,6 +61,10 @@ Set these in Render. Values stay in the dashboard.
 | `DOWNLOADS_PATH` | Image default `/app/downloads` |
 
 Optional and unused until you connect them: `CLAUDE_API_KEY`, `CLAUDE_MODEL`, `STRIPE_WEBHOOK_SECRET`, `LEMONSQUEEZY_WEBHOOK_SECRET`, `POLAR_WEBHOOK_SECRET`.
+
+The server serves a static demo product at `/demo`, `/demo/pricing`, `/demo/docs`, `/demo/privacy`, and `/demo/terms`. The landing page has a get-started link, and `?via=` is left on the URL. A checkout link is not rendered. The shipped server has no checkout URL for the demo and no environment variable that sets one. Assessing `https://<service>.onrender.com/demo` is allowed only because that origin is `PUBLIC_BASE_URL`.
+
+Stripe connection on the owner page is test mode only. Live secret and restricted keys are rejected before any request to Stripe.
 
 ## Check and verify
 

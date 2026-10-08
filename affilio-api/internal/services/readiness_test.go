@@ -47,7 +47,7 @@ func readyProductSite(t *testing.T) *httptest.Server {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html><body>
 <h1>PromptForge</h1>
-<a href="/signup">Sign up</a> <a href="/privacy">Privacy Policy</a>
+<a href="/signup">Sign up</a> <a href="/privacy">Privacy Policy</a> <a href="/terms">Terms</a>
 <script src="https://js.stripe.com/v3/"></script>
 </body></html>`))
 	})

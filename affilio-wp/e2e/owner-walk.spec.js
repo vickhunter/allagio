@@ -25,7 +25,7 @@ function shell(title) {
     .replace('{{.Body}}', '<div id="workspace-app"></div>');
 }
 
-const state = { products: [], offers: [] };
+const state = { products: [], offers: [], checks: {} };
 
 function send(res, status, body, type) {
   const payload = Buffer.isBuffer(body) ? body : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body));
@@ -83,10 +83,11 @@ async function handle(req, res) {
       { key: 'privacy_policy', kind: 'probe', gate: true, status: 'pass', score: 100, evidence: 'Privacy link found.' },
       { key: 'terms', kind: 'probe', gate: true, status: 'pass', score: 100, evidence: 'Terms link found.' },
     ];
+    state.checks[product.id] = checks;
     return send(res, 200, { readiness_status: 'ready', readiness_score: 90, checks });
   }
   const assessments = pathname.match(/^\/owner\/api\/products\/([^/]+)\/assessments$/);
-  if (assessments) return send(res, 200, { assessments: [] });
+  if (assessments) return send(res, 200, { assessments: state.checks[assessments[1]] ? [{ checks: state.checks[assessments[1]] }] : [] });
   if (pathname === '/owner/api/offers' && req.method === 'GET') return send(res, 200, { offers: state.offers });
   if (pathname === '/owner/api/offers' && req.method === 'POST') {
     const body = await readBody(req);

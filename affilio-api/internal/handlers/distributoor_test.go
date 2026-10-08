@@ -320,7 +320,11 @@ func TestAssessGatesOfferSubmitEndToEnd(t *testing.T) {
 	_, makerKey := createTestMaker(t, db)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		w.Write([]byte(`<html><body>Sign up <a href="/privacy">Privacy</a> for $9/month <script src="https://js.stripe.com/v3/"></script></body></html>`))
+		if req.URL.Path == "/docs" {
+			w.Write([]byte("<html><body>" + strings.Repeat("ShipFast documents the product for publishers. ", 20) + "</body></html>"))
+			return
+		}
+		w.Write([]byte(`<html><body><a href="/signup">Sign up</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a> for $9/month <script src="https://js.stripe.com/v3/"></script></body></html>`))
 	})
 	site := httptest.NewTLSServer(mux)
 	defer site.Close()
@@ -332,6 +336,7 @@ func TestAssessGatesOfferSubmitEndToEnd(t *testing.T) {
 		"name":             "ShipFast",
 		"website_url":      site.URL,
 		"pricing_url":      site.URL,
+		"docs_url":         site.URL + "/docs",
 		"product_type":     "saas",
 		"payment_provider": "stripe",
 	})
