@@ -129,6 +129,6 @@ $result = $distribution->publish($request);
 $status = is_wp_error($result) && isset($result->data['status']) ? (int) $result->data['status'] : 0;
 check(is_wp_error($result) && $status === 409, 'a rejected receipt did not fail publish with 409 (status ' . $status . ')');
 check(empty($GLOBALS['receipt_recorded']), 'a rejected receipt marked the placement published');
-check(empty($result['published']), 'publish reported the placement published after a 409');
+check(!(is_array($result) && !empty($result['published'])), 'publish reported the placement published after a 409');
 
 echo "A post disclosure satisfies the receipt, and a setting cannot publish a post that has none.\n";

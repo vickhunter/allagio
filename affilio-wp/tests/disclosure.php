@@ -132,12 +132,12 @@ $GLOBALS['post']->post_content = $plain;
 $GLOBALS['options']['affilio_existing_disclosure'] = '1';
 $before = $GLOBALS['post']->post_content;
 $distribution->publish($request);
-check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 0, 'The existing-disclosure setting did not stop distribution');
+check(added($before, $GLOBALS['post']->post_content, 'affiliate-disclosure') === 1, 'The existing-disclosure setting skipped a post that does not disclose');
 
 $GLOBALS['post']->post_content = $plain;
 $GLOBALS['meta'] = array();
 $before = $GLOBALS['post']->post_content;
 $inserter->insert_inline_mention(7, '<p>Una menzione.</p>');
-check(added($before, $GLOBALS['post']->post_content, 'affilio-disclosure') === 0, 'The existing-disclosure setting did not stop the inserter');
+check(added($before, $GLOBALS['post']->post_content, 'affilio-disclosure') === 1, 'The existing-disclosure setting skipped the inserter on a post that does not disclose');
 
-echo "Disclosure is added once, and skipped when the post or the setting already covers it.\n";
+echo "Disclosure is added once, skipped only when the post text discloses, and still added when the setting is on but the post does not.\n";

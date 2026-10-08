@@ -14,10 +14,6 @@ class Affilio_Distribution {
     }
 
     public static function disclosure_suppressed($content) {
-        $setting = get_option('affilio_existing_disclosure', '');
-        if ($setting === '1' || $setting === 1) {
-            return true;
-        }
         $text = strtolower(wp_strip_all_tags((string) $content));
         if (preg_match('/\blink\b.{0,60}affiliat/iu', $text)) {
             return true;
@@ -29,6 +25,32 @@ class Affilio_Distribution {
             }
         }
         return false;
+    }
+
+    private static function receipt_disclosure($content, $approved) {
+        if ($approved !== '' && strpos((string) $content, (string) $approved) !== false) {
+            return true;
+        }
+        $text = strtolower(wp_strip_all_tags((string) $content));
+        return preg_match('/\blink\b.{0,60}affiliat/iu', $text) || strpos($text, 'commissione') !== false;
+    }
+
+    private static function disclosure_excerpt($content) {
+        $text = wp_strip_all_tags((string) $content);
+        $lower = strtolower($text);
+        $at = false;
+        if (preg_match('/\blink\b.{0,60}affiliat/iu', $text, $match, PREG_OFFSET_CAPTURE)) {
+            $at = $match[0][1];
+        }
+        $commissione = strpos($lower, 'commissione');
+        if ($commissione !== false && ($at === false || $commissione < $at)) {
+            $at = $commissione;
+        }
+        if ($at === false) {
+            return '';
+        }
+        $start = max(0, $at - 80);
+        return trim(substr($text, $start, 240));
     }
 
     public function allowed() {
@@ -210,14 +232,27 @@ class Affilio_Distribution {
         $current = get_post($post->ID);
         $reported = isset($placement['receipt']['publication_status']) && $placement['receipt']['publication_status'] === 'publisher_reported';
         if (!$reported) {
-            $offset = strpos($current->post_content, $marker);
-            $published = $offset === false ? '' : html_entity_decode(substr($current->post_content, $offset), ENT_QUOTES, 'UTF-8');
+            $full = html_entity_decode($current->post_content, ENT_QUOTES, 'UTF-8');
+            $offset = strpos($full, $marker);
+            $published = $offset === false ? '' : substr($full, $offset);
             if (strpos($current->post_content, esc_html($placement['disclosure'])) !== false && strpos($published, $placement['disclosure']) === false) {
                 $published .= "\n" . $placement['disclosure'];
             }
+            if (!self::receipt_disclosure($published, $placement['disclosure']) && self::receipt_disclosure($full, $placement['disclosure'])) {
+                $excerpt = self::disclosure_excerpt($full);
+                if ($excerpt !== '') {
+                    $published = $excerpt . "\n" . $published;
+                }
+            }
             $receipt = $this->request('POST', '/placements/' . $id . '/receipt', array('surface_url' => get_permalink($post), 'published_text' => $published, 'evidence' => 'WordPress administrator inserted the approved placement in published post ' . $post->ID));
             if (is_wp_error($receipt)) {
-                return new WP_Error('affilio_receipt', 'The recommendation was inserted, but its publication record failed. Retry to record it without inserting twice.', array('status' => 502));
+                $status = 502;
+                $message = 'The recommendation was inserted, but its publication record failed. Retry to record it without inserting twice.';
+                if (is_array($receipt->data) && isset($receipt->data['status']) && (int) $receipt->data['status'] === 409) {
+                    $status = 409;
+                    $message = $receipt->get_error_message();
+                }
+                return new WP_Error('affilio_receipt', $message, array('status' => $status));
             }
         }
         return rest_ensure_response(array('published' => true, 'url' => get_permalink($post)));

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/mail"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -276,6 +277,19 @@ func (h *PlacementsHandler) Revoke(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "revoked"})
 }
 
+var (
+	htmlTags        = regexp.MustCompile(`(?s)<[^>]*>`)
+	looseDisclosure = regexp.MustCompile(`(?i)\blink\b.{0,60}affiliat`)
+)
+
+func publishedDisclosureOK(published, approved string) bool {
+	if approved != "" && strings.Contains(published, approved) {
+		return true
+	}
+	text := strings.ToLower(htmlTags.ReplaceAllString(published, ""))
+	return strings.Contains(text, "commissione") || looseDisclosure.MatchString(text)
+}
+
 func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 	var req struct {
 		SurfaceURL    string `json:"surface_url"`
@@ -294,7 +308,7 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 	var receipt struct {
 		TrackedLink string `json:"tracked_link"`
 	}
-	if json.Unmarshal(p.Receipt, &receipt) != nil || receipt.TrackedLink == "" || !strings.Contains(req.PublishedText, p.Copy) || !strings.Contains(req.PublishedText, p.Disclosure) || !strings.Contains(req.PublishedText, receipt.TrackedLink) {
+	if json.Unmarshal(p.Receipt, &receipt) != nil || receipt.TrackedLink == "" || !strings.Contains(req.PublishedText, p.Copy) || !publishedDisclosureOK(req.PublishedText, p.Disclosure) || !strings.Contains(req.PublishedText, receipt.TrackedLink) {
 		c.JSON(http.StatusConflict, gin.H{"error": "published text must include approved copy, disclosure and exact tracked link"})
 		return
 	}
