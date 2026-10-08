@@ -42,3 +42,5 @@ button[data-primary-action]:hover,a.button[data-primary-action]:hover{border-col
 .wake-track{height:4px;background:var(--tint);border-radius:999px;overflow:hidden}
 .wake-bar{display:block;height:100%;width:0;background:var(--ink)}
 @media(prefers-reduced-motion:no-preference){.wake-bar{transition:width .8s linear}}
+code,.webhook-url{overflow-wrap:anywhere;word-break:break-word}
+.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

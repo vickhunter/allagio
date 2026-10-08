@@ -377,6 +377,83 @@ func TestAssessGatesOfferSubmitEndToEnd(t *testing.T) {
 	}
 }
 
+func TestUnspecifiedProviderStaysEmptyAndLegacyStripeStillReads(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	demo := ginEngine()
+	hosted := &HostedHandler{BaseURL: "http://127.0.0.1"}
+	hosted.Mount(demo)
+	site := httptest.NewServer(demo)
+	defer site.Close()
+
+	makerID, makerKey := createTestMaker(t, db)
+	client := site.Client()
+	client.Timeout = 5 * time.Second
+	r := newMakerRouterWithReadinessClient(db, client)
+	rec, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":        "Neutral",
+		"website_url": "https://neutral.example",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: %d %v", rec.Code, product)
+	}
+	productID := product["id"].(string)
+	if product["payment_provider"] != "" {
+		t.Fatalf("omitted provider must be stored empty, got %v", product["payment_provider"])
+	}
+	var stored *string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT payment_provider FROM products WHERE id=$1`, productID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored == nil || *stored != "" {
+		t.Fatalf("empty provider must stay an empty string, got %v", stored)
+	}
+
+	var legacyID, legacyProvider string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO products(maker_id, name, website_url, product_type, payment_provider)
+VALUES ($1,'Legacy','https://legacy.example','saas','stripe') RETURNING id`, makerID).Scan(&legacyID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT payment_provider FROM products WHERE id=$1`, legacyID).Scan(&legacyProvider); err != nil {
+		t.Fatal(err)
+	}
+	if legacyProvider != "stripe" {
+		t.Fatalf("legacy stripe insert must still read stripe, got %q", legacyProvider)
+	}
+	var absentID string
+	var absent *string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO products(maker_id, name, website_url, product_type, payment_provider)
+VALUES ($1,'Absent','https://absent.example','saas',NULL) RETURNING id`, makerID).Scan(&absentID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT payment_provider FROM products WHERE id=$1`, absentID).Scan(&absent); err != nil {
+		t.Fatal(err)
+	}
+	if absent != nil {
+		t.Fatalf("NULL provider must stay NULL, got %q", *absent)
+	}
+
+	base := site.URL
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE products SET website_url=$2, pricing_url=$3, docs_url=$4 WHERE id=$1`,
+		productID, base+"/demo", base+"/demo/pricing", base+"/demo/docs"); err != nil {
+		t.Fatal(err)
+	}
+	rec, assessment := doJSON(t, r, http.MethodPost, "/v1/maker/products/"+productID+"/assess", makerKey, nil)
+	if rec.Code != http.StatusOK || assessment["readiness_status"] != "ready" {
+		t.Fatalf("empty provider must still pass readiness, got %d %v", rec.Code, assessment)
+	}
+	_, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       productID,
+		"commission_type":  "flat",
+		"commission_value": 8,
+	})
+	submitted, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offer["id"].(string)+"/submit", makerKey, nil)
+	if submitted.Code != http.StatusOK || body["status"] != "submitted" {
+		t.Fatalf("empty provider must submit, got %d %v", submitted.Code, body)
+	}
+}
+
 func TestSubmitDoesNotRequireAPaymentConnection(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

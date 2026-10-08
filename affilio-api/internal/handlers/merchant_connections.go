@@ -20,10 +20,36 @@ type MerchantConnectionsHandler struct {
 	OperatorID string
 }
 
+func (h *MerchantConnectionsHandler) viewer() *HostedHandler {
+	return &HostedHandler{Page: h.Page, BaseURL: h.BaseURL, OperatorID: h.OperatorID}
+}
+
+func liveKeyRejected(key string) bool {
+	key = strings.ToLower(strings.TrimSpace(key))
+	return strings.HasPrefix(key, "sk_live_") || strings.HasPrefix(key, "rk_live_") || strings.HasPrefix(key, "pk_live_")
+}
+
+func blocksStripeConnect(provider string) bool {
+	switch strings.TrimSpace(strings.ToLower(provider)) {
+	case "", "none", "stripe":
+		return false
+	default:
+		return true
+	}
+}
+
+func (h *MerchantConnectionsHandler) connectionBody(name, productID, csrf, refusal string) template.HTML {
+	refusalHTML := ""
+	if refusal != "" {
+		refusalHTML = `<p class="field-error" id="stripe-live-key" role="alert" tabindex="-1">` + template.HTMLEscapeString(refusal) + `</p>`
+	}
+	return template.HTML(fmt.Sprintf(`<p>This page is for Stripe test mode only. Live keys (sk_live_ and rk_live_) are rejected.</p><p>Connect Stripe for %s. Use a restricted key with account, price and webhook endpoint read permissions. The API key is used once for verification and is not stored.</p><p>Create an endpoint in Stripe for <code class="webhook-url">%s/v1/webhooks/stripe/%s</code> with checkout.session.completed, checkout.session.async_payment_succeeded and charge.refunded events.</p><form method="post"><input type="hidden" name="csrf" value="%s"><label>Restricted API key <input type="password" name="stripe_key" autocomplete="off" required></label><label>One-time price ID <input name="price_id" required></label><label>Webhook endpoint ID <input name="endpoint_id" required></label><label>Webhook signing secret <input type="password" name="signing_secret" autocomplete="off" required></label><button>Verify and connect Stripe</button>%s</form><p>Configuration verification is followed by an attributed test checkout and refund before a real pilot. Subscription billing is outside this first pilot.</p>`, template.HTMLEscapeString(name), template.HTMLEscapeString(h.BaseURL), template.HTMLEscapeString(productID), template.HTMLEscapeString(csrf), refusalHTML))
+}
+
 func (h *MerchantConnectionsHandler) Form(c *gin.Context) {
 	if h.Cipher == nil || h.Verifier == nil {
 		c.Status(http.StatusServiceUnavailable)
-		(&HostedHandler{Page: h.Page, BaseURL: h.BaseURL}).render(c, "Payment connections are not enabled", "The service operator must finish the payment configuration first.", nil)
+		h.viewer().render(c, "Payment connections are not enabled", "The service operator must finish the payment configuration first.", nil)
 		return
 	}
 	o := ownerFrom(c)
@@ -36,8 +62,7 @@ func (h *MerchantConnectionsHandler) Form(c *gin.Context) {
 		c.Status(404)
 		return
 	}
-	body := template.HTML(fmt.Sprintf(`<p>This page is for Stripe test mode only. Live keys (sk_live_ and rk_live_) are rejected.</p><p>Connect Stripe for %s. Use a restricted key with account, price and webhook endpoint read permissions. The API key is used once for verification and is not stored.</p><p>Create an endpoint in Stripe for <code>%s/v1/webhooks/stripe/%s</code> with checkout.session.completed, checkout.session.async_payment_succeeded and charge.refunded events.</p><form method="post"><input type="hidden" name="csrf" value="%s"><label>Restricted API key <input type="password" name="stripe_key" autocomplete="off" required></label><label>One-time price ID <input name="price_id" required></label><label>Webhook endpoint ID <input name="endpoint_id" required></label><label>Webhook signing secret <input type="password" name="signing_secret" autocomplete="off" required></label><button>Verify and connect Stripe</button></form><p>Configuration verification is followed by an attributed test checkout and refund before a real pilot. Subscription billing is outside this first pilot.</p>`, template.HTMLEscapeString(p.Name), template.HTMLEscapeString(h.BaseURL), p.ID, template.HTMLEscapeString(o.CSRF)))
-	(&HostedHandler{Page: h.Page, BaseURL: h.BaseURL}).render(c, "Connect your checkout", "", body)
+	h.viewer().render(c, "Connect your checkout", "", h.connectionBody(p.Name, p.ID, o.CSRF, ""))
 }
 
 func (h *MerchantConnectionsHandler) Connect(c *gin.Context) {
@@ -52,13 +77,14 @@ func (h *MerchantConnectionsHandler) Connect(c *gin.Context) {
 		return
 	}
 	p, err := h.DB.GetProduct(c.Request.Context(), o.MakerID, productID)
-	if err != nil || p.PaymentProvider != "stripe" {
+	if err != nil || blocksStripeConnect(p.PaymentProvider) {
 		c.Status(404)
 		return
 	}
 	key := c.PostForm("stripe_key")
-	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(key)), "sk_live_") || strings.HasPrefix(strings.ToLower(strings.TrimSpace(key)), "rk_live_") {
-		c.JSON(400, gin.H{"error": "Stripe test mode only. Live keys are not accepted."})
+	if liveKeyRejected(key) {
+		c.Status(http.StatusBadRequest)
+		h.viewer().render(c, "Connect your checkout", "", h.connectionBody(p.Name, productID, o.CSRF, "Stripe test mode only. Live keys are not accepted."))
 		return
 	}
 	secret := c.PostForm("signing_secret")
@@ -85,6 +111,6 @@ func (h *MerchantConnectionsHandler) Connect(c *gin.Context) {
 		c.JSON(409, gin.H{"error": "connection is disabled or its account, currency, mode or price differs"})
 		return
 	}
-	c.Status(201)
-	(&HostedHandler{Page: h.Page, BaseURL: h.BaseURL}).render(c, "Stripe configuration verified", "A delivered payment event must still prove the signing secret and checkout attribution.", template.HTML(fmt.Sprintf(`<p>Account: %s · Price: %s · Currency: %s · Live mode: %t</p><p>The verification key was not stored. The webhook signing secret was encrypted.</p><p><a href="/owner/products">Return to your products</a></p>`, template.HTMLEscapeString(check.AccountID), template.HTMLEscapeString(check.PriceID), template.HTMLEscapeString(check.Currency), check.LiveMode)))
+	c.Status(http.StatusCreated)
+	h.viewer().render(c, "Stripe configuration verified", "A delivered payment event must still prove the signing secret and checkout attribution.", template.HTML(fmt.Sprintf(`<p>Account: %s · Price: %s · Currency: %s · Live mode: %t</p><p>The verification key was not stored. The webhook signing secret was encrypted.</p><p><a href="/owner/products">Return to your products</a></p>`, template.HTMLEscapeString(check.AccountID), template.HTMLEscapeString(check.PriceID), template.HTMLEscapeString(check.Currency), check.LiveMode)))
 }

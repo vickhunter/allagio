@@ -34,8 +34,13 @@ func (d *DB) ProductConnection(ctx context.Context, productID string) (*ProductC
 }
 
 func (d *DB) CreateVerifiedProductConnection(ctx context.Context, makerID string, connection ProductConnection, accountID, priceID, endpointID string) (bool, error) {
-	res, err := d.Pool.Exec(ctx, `INSERT INTO product_connections(product_id,secret_ciphertext,live_mode,currency,stripe_account_id,stripe_price_id,stripe_endpoint_id,configuration_verified_at)
-SELECT id,$3,$4,$5,$6,$7,$8,NOW() FROM products WHERE id=$1 AND maker_id=$2 AND payment_provider='stripe'
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	res, err := tx.Exec(ctx, `INSERT INTO product_connections(product_id,secret_ciphertext,live_mode,currency,stripe_account_id,stripe_price_id,stripe_endpoint_id,configuration_verified_at)
+SELECT id,$3,$4,$5,$6,$7,$8,NOW() FROM products WHERE id=$1 AND maker_id=$2 AND COALESCE(NULLIF(payment_provider, ''), 'none') IN ('none', 'stripe')
 ON CONFLICT(product_id) DO UPDATE SET secret_ciphertext=EXCLUDED.secret_ciphertext,stripe_account_id=EXCLUDED.stripe_account_id,
 stripe_price_id=EXCLUDED.stripe_price_id,stripe_endpoint_id=EXCLUDED.stripe_endpoint_id,configuration_verified_at=NOW()
 WHERE product_connections.enabled AND product_connections.live_mode=EXCLUDED.live_mode AND product_connections.currency=EXCLUDED.currency
@@ -44,7 +49,16 @@ AND (product_connections.stripe_price_id IS NULL OR product_connections.stripe_p
 	if err != nil {
 		return false, err
 	}
-	return res.RowsAffected() == 1, nil
+	if res.RowsAffected() != 1 {
+		return false, nil
+	}
+	if _, err = tx.Exec(ctx, `UPDATE products SET payment_provider='stripe', updated_at=NOW() WHERE id=$1 AND maker_id=$2 AND COALESCE(NULLIF(payment_provider, ''), 'none') IN ('none', 'stripe')`, connection.ProductID, makerID); err != nil {
+		return false, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 type PendingWebhook struct {

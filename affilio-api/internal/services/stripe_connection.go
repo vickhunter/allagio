@@ -49,7 +49,7 @@ func (s *StripeAPI) get(ctx context.Context, key, path string, out any) error {
 
 func liveStripeKey(key string) bool {
 	key = strings.ToLower(strings.TrimSpace(key))
-	return strings.HasPrefix(key, "sk_live_") || strings.HasPrefix(key, "rk_live_")
+	return strings.HasPrefix(key, "sk_live_") || strings.HasPrefix(key, "rk_live_") || strings.HasPrefix(key, "pk_live_")
 }
 
 func (s *StripeAPI) Verify(ctx context.Context, key, priceID, endpointID, webhookURL string) (StripeConnectionCheck, error) {

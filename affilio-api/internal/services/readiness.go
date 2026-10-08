@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -92,7 +93,7 @@ func (e *ReadinessEngine) Assess(ctx context.Context, product ReadinessProduct) 
 	checks := []ReadinessCheck{
 		e.checkSiteReachable(site),
 		checkout,
-		e.checkRefParamSurvives(ctx, product.WebsiteURL, refParam),
+		e.checkRefParamSurvives(ctx, product.WebsiteURL, product.PricingURL, refParam),
 		e.checkPricingPage(ctx, product.PricingURL),
 		e.checkDocsPresent(ctx, product.DocsURL),
 		checkBodyMarker(site, "privacy_policy", privacyMarkerPattern, true,
@@ -357,7 +358,33 @@ func (e *ReadinessEngine) checkCheckoutPresent(ctx context.Context, product Read
 	}
 }
 
-func (e *ReadinessEngine) checkRefParamSurvives(ctx context.Context, websiteURL, refParam string) ReadinessCheck {
+var ctaLinkPattern = regexp.MustCompile(`(?is)<a\b[^>]*\bhref\s*=\s*["']([^"']*)["'][^>]*>(.*?)</a>`)
+
+func attributionLinkDrops(body, pageURL, refParam, probeValue string) bool {
+	base, err := url.Parse(pageURL)
+	if err != nil {
+		return false
+	}
+	for _, match := range ctaLinkPattern.FindAllStringSubmatch(body, -1) {
+		href := html.UnescapeString(strings.TrimSpace(match[1]))
+		text := strings.ToLower(strings.TrimSpace(stripHTML(match[2])))
+		ref, err := url.Parse(href)
+		if err != nil {
+			continue
+		}
+		abs := base.ResolveReference(ref)
+		path := strings.TrimRight(abs.EscapedPath(), "/")
+		if text != "get started" && !strings.HasSuffix(path, "/start") && !strings.HasSuffix(path, "/pricing") {
+			continue
+		}
+		if abs.Query().Get(refParam) != probeValue {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *ReadinessEngine) checkRefParamSurvives(ctx context.Context, websiteURL, pricingURL, refParam string) ReadinessCheck {
 	check := ReadinessCheck{Key: "ref_param_survives", Kind: "probe", Gate: true}
 	probeValue := "dtr-probe"
 	probeURL, err := url.Parse(websiteURL)
@@ -379,6 +406,12 @@ func (e *ReadinessEngine) checkRefParamSurvives(ctx context.Context, websiteURL,
 		return check
 	}
 	if page.FinalURL != nil && page.FinalURL.Query().Get(refParam) == probeValue {
+		if attributionLinkDrops(page.Body, page.FinalURL.String(), refParam, probeValue) || e.pricingLinkDrops(ctx, pricingURL, websiteURL, refParam, probeValue) {
+			check.Status = "fail"
+			check.Evidence = fmt.Sprintf("a get-started or pricing link dropped ?%s=", refParam)
+			check.Remediation = fmt.Sprintf("Keep ?%s= on get-started and pricing links as well as on the landing URL. It carries the click id.", refParam)
+			return check
+		}
 		check.Status = "pass"
 		check.Score = 100
 		check.Evidence = fmt.Sprintf("?%s= parameter survived to the final URL", refParam)
@@ -388,6 +421,25 @@ func (e *ReadinessEngine) checkRefParamSurvives(ctx context.Context, websiteURL,
 	check.Evidence = fmt.Sprintf("?%s= parameter was stripped by a redirect before the final URL", refParam)
 	check.Remediation = fmt.Sprintf("Preserve the ?%s= query parameter through redirects (or capture it before redirecting); it carries the click id that attribution depends on.", refParam)
 	return check
+}
+
+func (e *ReadinessEngine) pricingLinkDrops(ctx context.Context, pricingURL, websiteURL, refParam, probeValue string) bool {
+	pricingURL = strings.TrimSpace(pricingURL)
+	if pricingURL == "" || pricingURL == websiteURL {
+		return false
+	}
+	probe, err := url.Parse(pricingURL)
+	if err != nil {
+		return false
+	}
+	q := probe.Query()
+	q.Set(refParam, probeValue)
+	probe.RawQuery = q.Encode()
+	page := e.fetchPage(ctx, probe.String())
+	if !page.OK || page.FinalURL == nil {
+		return false
+	}
+	return attributionLinkDrops(page.Body, page.FinalURL.String(), refParam, probeValue)
 }
 
 func (e *ReadinessEngine) checkPricingPage(ctx context.Context, pricingURL string) ReadinessCheck {

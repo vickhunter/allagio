@@ -27,6 +27,7 @@ func (h *HostedHandler) LoadWorkspace() error {
 	h.Page = page
 	if h.Payments != nil {
 		h.Payments.Page = page
+		h.Payments.OperatorID = h.OperatorID
 	}
 	return nil
 }

@@ -717,7 +717,7 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     await expect(page.locator('[data-skill-status]')).toContainText('Coming soon');
     await expect(page.locator('[data-rail-plain]')).toHaveText('Your referral offer is saved. Next: submit it for review.');
     const humans = page.locator('.task-list');
-    await expect(humans).toContainText('Connect Stripe in test mode');
+    await expect(humans).toContainText('Checkout is optional');
     await expect(humans).toContainText('An operator approves the offer before it is listed.');
     await expect(page.getByRole('heading', { name: 'Connect your existing agent' })).toBeVisible();
     await expect(page.locator('.setup-command pre')).toHaveCount(1);

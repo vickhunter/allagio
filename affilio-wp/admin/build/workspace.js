@@ -121,7 +121,7 @@
     const scrollFocus = element => {
         if (!element) return;
         element.focus({preventScroll: true});
-        element.scrollIntoView({block: 'center', inline: 'nearest', behavior: motion()});
+        element.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'auto'});
     };
     // Inline error is the accessible one. #workspace-feedback keeps the same text for existing checks, hidden from assistive tech when it would only repeat.
     const showIssue = (anchor, id, message) => {
@@ -210,7 +210,7 @@
     const STATIONS = [
         {id:'product', label:'Product'},
         {id:'ready', label:'Ready'},
-        {id:'stripe', label:'Stripe test'},
+        {id:'stripe', label:'Checkout (optional)'},
         {id:'offer', label:'Offer'},
         {id:'submitted', label:'Submitted'},
         {id:'listed', label:'Listed'}
@@ -262,7 +262,7 @@
     };
     const humanSteps = focus => {
         const steps = [];
-        if (!focus.state.done.stripe) steps.push('Connect Stripe in test mode. A person confirms the restricted key.');
+        if (!focus.state.done.stripe) steps.push('Checkout is optional. Connect a provider when you want one.');
         if (!focus.state.done.listed) steps.push('An operator approves the offer before it is listed.');
         return steps;
     };
@@ -270,7 +270,7 @@
         const {product, stripe} = focus;
         if (id === 'product') return 'Register the product this offer belongs to.';
         if (id === 'ready') return product?.readiness_status === 'failing' ? 'Readiness failed. Fix the checks below, then run it again.' : 'Run the readiness check against the live site.';
-        if (id === 'stripe') return stripe?.known && stripe.live_mode ? 'Live mode is connected. This step needs Stripe test mode.' : 'Connect Stripe in test mode. This browser confirms it from the verification page.';
+        if (id === 'stripe') return stripe?.known && stripe.live_mode ? 'Live mode is connected. This step needs Stripe test mode.' : 'Checkout is optional until a provider is connected.';
         if (id === 'offer') return 'Create the referral offer.';
         if (id === 'submitted') return returned ? 'The operator returned this offer. Update it and submit again.' : 'Submit the offer for operator review.';
         if (id === 'listed') return 'Waiting for the operator to list this offer.';
@@ -287,7 +287,10 @@
                 ? (focus.stripe?.known && focus.stripe.live_mode ? 'no provider yet. Live mode is connected. This step needs Stripe test mode.' : 'no provider yet')
                 : (current ? stationDetail(station.id, focus, returned) : '');
             const klass = done ? 'is-done' : optional ? 'is-optional' : current ? 'is-current' : 'is-todo';
-            return `<li class="${klass}" data-station="${station.id}" ${current ? 'aria-current="step"' : ''}><span class="station-flag">${done ? 'Done' : current ? 'Now' : 'Later'}</span><span class="station-name">${station.label}</span>${detail ? `<span class="station-detail">${escape(detail)}</span>` : ''}</li>`;
+            const flag = done ? 'Done' : current ? 'Now' : optional ? 'Optional' : 'Later';
+            const optionalName = optional ? ` aria-label="${escape(station.label)}, optional step"` : '';
+            const hidden = optional ? '<span class="visually-hidden">optional</span>' : '';
+            return `<li class="${klass}" data-station="${station.id}"${optionalName} ${current ? 'aria-current="step"' : ''}>${hidden}<span class="station-flag">${flag}</span><span class="station-name">${station.label}</span>${detail ? `<span class="station-detail">${escape(detail)}</span>` : ''}</li>`;
         }).join('');
         const line = statusLine && kind === 'waiting-line'
             ? '<p class="offer-rail-status" data-primary-action tabindex="-1">Waiting for the operator to list this offer</p>'
@@ -332,7 +335,7 @@
         }
         root.innerHTML = `${rail}<div class="grid"><section><span class="eyebrow">BUILDERS</span><h2>Give your product an offer.</h2><p>Connect your existing agent, prepare your checkout and choose the commission you want to offer.</p><a class="button" data-primary-action href="${makerHref}">${makerLabel} ↗</a></section><section><span class="eyebrow">PUBLISHERS</span><h2>Find a useful recommendation.</h2><p>Match an article to relevant products, approve the exact placement and publish a tracked link.</p><a class="button secondary" href="${session.publisher ? '/owner/placements' : '/owner/settings'}">${session.publisher ? 'Open placements' : 'Connect your content'} ↗</a></section></div><section><h2>One setup. Your own agent.</h2><p>Run this command in your product repository. Setup installs the integration skills and connects your agent. Checkout wiring, Stripe connection and verification are separate steps.</p>${copyCommand(session.install_command)}<p class="caption">Node 20+ · Codex CLI handoff · Cursor and Claude configuration</p></section>`;
     };
-    const productForm = (product, primaryRegister) => `<section><h2>${product ? 'Edit product' : 'Register a product'}</h2><form data-product="${escape(product?.id || '')}"><div class="form-grid">${field('name','Product name',product?.name,'required maxlength="255"')}${field('website_url','Website',product?.website_url,'type="url" required maxlength="512"')}${field('tagline','What does it help people do?',product?.tagline,'required maxlength="512"',true)}${field('docs_url','Documentation URL',product?.docs_url,'type="url"')}${field('pricing_url','Pricing URL',product?.pricing_url,'type="url"')}${field('primary_category','Category',product?.primary_category,'placeholder="developer tools"')}${field('keywords','Topics, separated by commas',(product?.keywords || []).join(', '),'placeholder="postgres, monitoring, debugging"')}</div><p class="caption">This version supports Stripe one-time checkout. Your product remains private until its offer is reviewed and listed.</p><button ${!product && primaryRegister ? 'data-primary-action' : 'class="secondary"'}>${product ? 'Save changes' : 'Register product'}</button>${product ? '<button type="button" class="secondary" data-cancel-edit>Cancel</button>' : ''}</form></section>`;
+    const productForm = (product, primaryRegister, registered) => `<section><h2>${product ? 'Edit product' : 'Register a product'}</h2><form data-product="${escape(product?.id || '')}"><div class="form-grid">${field('name','Product name',product?.name,'required maxlength="255"')}${field('website_url','Website',product?.website_url,'type="url" required maxlength="512"')}${field('tagline','What does it help people do?',product?.tagline,'required maxlength="512"',true)}${field('docs_url','Documentation URL',product?.docs_url,'type="url"')}${field('pricing_url','Pricing URL',product?.pricing_url,'type="url"')}${field('primary_category','Category',product?.primary_category,'placeholder="developer tools"')}${field('keywords','Topics, separated by commas',(product?.keywords || []).join(', '),'placeholder="postgres, monitoring, debugging"')}</div><p class="caption">Your product remains private until its offer is reviewed and listed.</p><button ${!product && primaryRegister ? 'data-primary-action' : 'class="secondary"'}>${product ? 'Save changes' : 'Register product'}</button>${product ? '<button type="button" class="secondary" data-cancel-edit>Cancel</button>' : ''}${registered ? '<p id="product-registered" class="success" role="status" tabindex="-1">Product registered. It is in your list.</p>' : ''}</form></section>`;
     const productsPage = async (options = {}) => {
         if (!session.maker) { root.innerHTML = '<section><h2>Start your builder account</h2><p>Your account can hold products and referral offers.</p><a class="button" data-primary-action href="/owner/products?setup=maker">Create builder account</a></section>'; return; }
         let products, offers;
@@ -375,15 +378,23 @@
                     : '<p class="caption">Awaiting operator review. Listing does not promise traffic or purchases.</p>';
             return `<section><div class="row"><h3>${escape(names[offer.product_id] || 'Product')}</h3>${pill(offer.status)}</div><p>${escape(commission(offer))} · ${offer.commission_currency} · ${offer.cookie_duration_days}-day attribution · ${offer.refund_window_days}-day refund hold</p><p>${escape(offer.terms)}</p>${returnedNote}${action}</section>`;
         };
-        const offerFormMarkup = () => `<form data-new-offer><div class="form-grid"><label class="full">Product<select name="product_id">${products.map(product => `<option value="${product.id}" ${product.id === focus.product?.id ? 'selected' : ''}>${escape(product.name)}</option>`).join('')}</select></label><label>Commission type<select name="commission_type"><option value="percentage">Percentage of first purchase</option><option value="flat">Fixed amount per first purchase</option></select></label>${field('commission_value','Commission value','','type="number" step="0.01" min="0.01" required')}<label>Currency<select name="commission_currency"><option>USD</option><option>EUR</option><option>GBP</option></select></label>${field('cookie_duration_days','Attribution window (days)','30','type="number" min="1" max="365" required')}${field('refund_window_days','Refund hold (days)','30','type="number" min="0" max="180" required')}${field('landing_url','Referral destination','','type="url" required',true)}<label class="full">Additional terms<textarea name="terms" maxlength="4000" placeholder="Explain any eligibility restrictions and how you will pay commissions."></textarea></label></div><p class="caption">The merchant pays commissions directly. Placement terms include a 10% service fee on commission; fee collection is not automated.</p><button class="${kind === 'offer' ? '' : 'secondary'}" ${kind === 'offer' ? 'data-primary-action' : ''}>Create offer</button></form>`;
+        const offerFormMarkup = () => `<form data-new-offer novalidate><div class="form-grid"><label class="full">Product<select name="product_id">${products.map(product => `<option value="${product.id}" ${product.id === focus.product?.id ? 'selected' : ''}>${escape(product.name)}</option>`).join('')}</select></label><label>Commission type<select name="commission_type"><option value="percentage">Percentage of first purchase</option><option value="flat">Fixed amount per first purchase</option></select></label>${field('commission_value','Commission value','','type="number" step="0.01" min="0.01" required')}<label>Currency<select name="commission_currency"><option>USD</option><option>EUR</option><option>GBP</option></select></label>${field('cookie_duration_days','Attribution window (days)','30','type="number" min="1" max="365" required')}${field('refund_window_days','Refund hold (days)','30','type="number" min="0" max="180" required')}${field('landing_url','Referral destination','','type="url" required',true)}<label class="full">Additional terms<textarea name="terms" maxlength="4000" placeholder="Explain any eligibility restrictions and how you will pay commissions."></textarea></label></div><p class="caption">The merchant pays commissions directly. Placement terms include a 10% service fee on commission; fee collection is not automated.</p><button class="${kind === 'offer' ? '' : 'secondary'}" ${kind === 'offer' ? 'data-primary-action' : ''}>Create offer</button></form>`;
         const offerCreator = () => {
             if (!products.length) return '';
             if (!offers.length || kind === 'offer') return `<section id="new-offer"><h2>Create a referral offer</h2>${offerFormMarkup()}</section>`;
             return `<section id="new-offer"><button type="button" class="secondary" data-expand-offer>New offer</button></section>`;
         };
         const ordered = focus.product ? [focus.product, ...products.filter(product => product.id !== focus.product.id)] : products;
-        root.innerHTML = `${railMarkup(focus, true)}<div id="product-form">${products.length ? '' : productForm(null, kind === 'product')}</div>${products.length ? '' : empty('Your first product starts here.','Register its website and topics so relevant publishers can find it.')}${products.length ? '<h2>Your products</h2>' + ordered.map(productSection).join('') : ''}<h2>Your referral offers</h2>${offers.length ? offers.map(offerSection).join('') : empty('Choose what a referral is worth.','Create an offer after registering your product.')}${offerCreator()}`;
+        const showForm = !products.length || options.keepForm;
+        const formBlock = showForm ? productForm(null, !products.length && kind === 'product', !!options.registered) : `<p><button type="button" class="secondary" data-add-product>Add product</button></p>`;
+        root.innerHTML = `${railMarkup(focus, true)}<div id="product-form">${formBlock}</div>${products.length ? '' : empty('Your first product starts here.','Register its website and topics so relevant publishers can find it.')}${products.length ? '<h2>Your products</h2>' + ordered.map(productSection).join('') : ''}<h2>Your referral offers</h2>${offers.length ? offers.map(offerSection).join('') : empty('Choose what a referral is worth.','Create an offer after registering your product.')}${offerCreator()}`;
         root.querySelector('[data-product]')?.addEventListener('submit', saveProduct);
+        root.querySelector('[data-add-product]')?.addEventListener('click', () => {
+            document.getElementById('product-form').innerHTML = productForm(null, false, false);
+            root.querySelector('[data-product]').addEventListener('submit', saveProduct);
+            root.querySelector('[name="name"]').focus();
+        });
+        if (options.registered) scrollFocus(document.getElementById('product-registered'));
         root.querySelectorAll('[data-edit]').forEach(button => button.addEventListener('click', () => {
             const product = products.find(item => item.id === button.dataset.edit);
             document.getElementById('product-form').innerHTML = productForm(product, false);
@@ -432,14 +443,21 @@
         root.querySelectorAll('[data-offer]').forEach(button => button.addEventListener('click', () => run(button, async () => { await api(`/offers/${button.dataset.offer}`, 'PATCH', {status:button.dataset.status}); await productsPage(); })));
         const bindNewOffer = form => {
             form.addEventListener('submit', event => {
-                event.preventDefault(); const values = Object.fromEntries(new FormData(form));
+                event.preventDefault();
+                const missing = [...form.querySelectorAll('input[required], textarea[required], select[required]')].find(input => !String(input.value || '').trim());
+                if (missing) {
+                    const words = {commission_value:'Enter a commission value.', cookie_duration_days:'Enter the attribution window in days.', refund_window_days:'Enter the refund hold in days.', landing_url:'Enter the referral destination.'};
+                    showIssue(missing, 'form-error-offer', words[missing.name] || 'Fill in this field.');
+                    return;
+                }
+                const values = Object.fromEntries(new FormData(form));
                 for (const key of ['commission_value','cookie_duration_days','refund_window_days']) values[key] = Number(values[key]);
                 values.commission_unit = values.commission_type === 'percentage' ? 'percent' : 'currency'; values.ref_param = 'via';
                 run(form.querySelector('button'), async () => {
                     try { await api('/offers', 'POST', values); }
                     catch (error) { showFormIssue(form, error); throw error; }
                     await productsPage();
-                    report('Offer created. Check readiness, connect Stripe and submit it for review.');
+                    report('Offer created. Check readiness and submit it for review. Checkout is optional.');
                 });
             });
         };
@@ -462,12 +480,12 @@
     };
     const saveProduct = event => {
         event.preventDefault(); const form = event.currentTarget; const values = Object.fromEntries(new FormData(form));
-        values.keywords = values.keywords.split(',').map(value => value.trim()).filter(Boolean); values.payment_provider = 'stripe';
+        values.keywords = values.keywords.split(',').map(value => value.trim()).filter(Boolean);
         run(form.querySelector('button'), async () => {
             const creating = !form.dataset.product;
             try { await api('/products' + (creating ? '' : '/' + form.dataset.product), creating ? 'POST' : 'PATCH', values); }
             catch (error) { showFormIssue(form, error); throw error; }
-            await productsPage();
+            await productsPage(creating ? {registered: true, keepForm: true} : {});
             report(creating ? 'Product registered. It is in your list.' : 'Product saved.');
         });
     };
@@ -542,6 +560,16 @@
         root.querySelector('[data-batch]').addEventListener('submit',event => { event.preventDefault(); const form = event.currentTarget; run(form.querySelector('button'),async () => { const data = await api('/review/payouts/batch','POST',{min_payout:Number(new FormData(form).get('minimum')),include_test_mode:false}); report(`${data.payouts.length} payout batches prepared. No money was transferred.`); }); });
         root.querySelectorAll('[data-review]').forEach(button => button.addEventListener('click',() => run(button,async () => { await api(`/review/offers/${button.dataset.review}/${button.dataset.decision}`,'POST',{}); await reviewPage(); })));
     };
+    document.querySelectorAll('form').forEach(form => {
+        const key = form.querySelector('[name="stripe_key"]');
+        if (!key) return;
+        form.addEventListener('submit', event => {
+            const value = key.value.trim().toLowerCase();
+            if (!value.startsWith('sk_live_') && !value.startsWith('rk_live_') && !value.startsWith('pk_live_')) return;
+            event.preventDefault();
+            showIssue(form.querySelector('button') || key, 'stripe-live-key', 'Stripe test mode only. Live keys are not accepted.');
+        });
+    });
     document.querySelectorAll('nav a').forEach(link => { if (link.getAttribute('href') === location.pathname) link.setAttribute('aria-current','page'); });
     document.querySelectorAll('[data-commit-placement]').forEach(button => button.addEventListener('click',() => run(button,async () => { await api(`/placements/${button.dataset.commitPlacement}/commit`,'POST',{}); location.reload(); })));
     CheckoutStatus.remember();
