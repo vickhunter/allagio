@@ -138,6 +138,25 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(release.ReleaseError, "hosted UI"):
             release.validate_plugin(archive(release.ORIGIN, "affilio/admin/build/landing-scene.bundle.js"))
 
+    def test_plugin_zip_requires_analytics_script(self):
+        legacy = {
+            "affilio/affilio.php", "affilio/includes/class-affilio-api.php",
+            "affilio/includes/class-affilio-editor-proxy.php",
+            "affilio/includes/class-affilio-onboarding.php",
+            "affilio/includes/class-affilio-distribution.php",
+            "affilio/admin/build/onboarding.js", "affilio/admin/build/distribution.js",
+            "affilio/admin/build/distribution.css",
+        }
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w") as archive:
+            for name in legacy:
+                body = "runtime"
+                if name.endswith("/affilio.php"):
+                    body = "<?php\n/* Plugin Name: Affilio */\ndefine('AFFILIO_API_URL', '%s/v1');\n" % release.ORIGIN
+                archive.writestr(name, body)
+        with self.assertRaisesRegex(release.ReleaseError, "analytics.js"):
+            release.validate_plugin(output.getvalue(), release.ORIGIN)
+
     def test_generic_host_does_not_require_railway(self):
         values = configuration()
         del values["RAILWAY_DOCKERFILE_PATH"]
