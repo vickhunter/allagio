@@ -56,6 +56,10 @@ class Affilio_Distribution {
         return preg_replace('#/v1/?$#', '', Affilio_API::resolve_base_url());
     }
 
+    private function paragraph_block($html) {
+        return "<!-- wp:paragraph -->\n" . $html . "\n<!-- /wp:paragraph -->";
+    }
+
     private function request($method, $path, $body = null) {
         $response = $this->api->request($method, $path, $body);
         if (is_wp_error($response)) {
@@ -160,9 +164,10 @@ class Affilio_Distribution {
         $marker = '<!-- distributoor-placement:' . $id . ' -->';
         $content = $post->post_content;
         if (strpos($content, $marker) === false) {
-            $content .= "\n" . $marker . '<p>' . esc_html($placement['copy']) . ' <a href="' . esc_url($this->origin() . $link) . '" rel="sponsored nofollow">View product</a></p>';
+            $paragraph = '<p>' . esc_html($placement['copy']) . ' <a href="' . esc_url($this->origin() . $link) . '" rel="sponsored nofollow">' . esc_html('Vedi il prodotto') . '</a></p>';
+            $content .= "\n" . $this->paragraph_block($marker . $paragraph);
             if (!self::disclosure_suppressed($content) && strpos($content, esc_html($placement['disclosure'])) === false) {
-                $content .= '<p class="affiliate-disclosure">' . esc_html($placement['disclosure']) . '</p>';
+                $content .= "\n" . $this->paragraph_block('<p class="affiliate-disclosure">' . esc_html($placement['disclosure']) . '</p>');
             }
             $updated = wp_update_post(array('ID' => $post->ID, 'post_content' => wp_slash($content)), true);
             if (is_wp_error($updated)) {
