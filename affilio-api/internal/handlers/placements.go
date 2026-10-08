@@ -36,39 +36,59 @@ type opportunity struct {
 	PayoutMethod     string  `json:"payout_method"`
 }
 
-func (h *PlacementsHandler) opportunities(c *gin.Context, contextText string) ([]opportunity, error) {
+const relevanceThreshold = 25
+
+type opportunitySearch struct {
+	items     []opportunity
+	reason    string
+	bestScore int
+}
+
+func (h *PlacementsHandler) opportunities(c *gin.Context, contextText string) (opportunitySearch, error) {
 	siteID := siteIDFrom(c)
 	if siteID == "" {
 		siteID = "00000000-0000-0000-0000-000000000000"
 	}
 	offers, err := h.DB.ListMarketplaceOffers(c.Request.Context(), siteID)
 	if err != nil {
-		return nil, err
+		return opportunitySearch{}, err
 	}
 	eligible, err := h.DB.EligibleRevenueOfferIDs(c.Request.Context(), h.RequireVerifiedConnection)
 	if err != nil {
-		return nil, err
+		return opportunitySearch{}, err
 	}
 	profile := services.BuildSiteProfile([]string{contextText}, nil)
-	out := []opportunity{}
+	found := opportunitySearch{items: []opportunity{}, bestScore: -1}
+	sawEligible := false
 	for _, o := range offers {
 		if !eligible[o.OfferID] {
 			continue
 		}
+		sawEligible = true
 		score := services.ScoreOfferForProfile(profile, services.OfferTerms{Name: o.ProductName, Tagline: o.ProductTagline, Category: o.PrimaryCategory, Keywords: o.Keywords, Tags: o.Tags})
-		if score < 25 {
+		if score > found.bestScore {
+			found.bestScore = score
+		}
+		if score < relevanceThreshold {
 			continue
 		}
-		out = append(out, opportunity{OfferID: o.OfferID, ProductName: o.ProductName, Relevance: score,
+		found.items = append(found.items, opportunity{OfferID: o.OfferID, ProductName: o.ProductName, Relevance: score,
 			Reason:         fmt.Sprintf("Product topics overlap this content (%d/100 lexical fit); review the product before recommending it.", score),
 			CommissionType: o.CommissionType, CommissionValue: o.CommissionValue, Currency: o.CommissionCurrency,
 			RefundWindowDays: o.RefundWindowDays, PayoutMethod: "direct_merchant"})
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Relevance > out[j].Relevance })
-	if len(out) > 5 {
-		out = out[:5]
+	sort.SliceStable(found.items, func(i, j int) bool { return found.items[i].Relevance > found.items[j].Relevance })
+	if len(found.items) > 5 {
+		found.items = found.items[:5]
 	}
-	return out, nil
+	if len(found.items) == 0 {
+		if sawEligible {
+			found.reason = "below_relevance"
+		} else {
+			found.reason = "no_eligible_offers"
+		}
+	}
+	return found, nil
 }
 
 func (h *PlacementsHandler) Find(c *gin.Context) {
@@ -85,10 +105,17 @@ func (h *PlacementsHandler) Find(c *gin.Context) {
 		return
 	}
 	status := "matched"
-	if len(out) == 0 {
+	body := gin.H{"status": status, "opportunities": out.items, "preview_only": siteIDFrom(c) == "", "payment_scope": "first paid Stripe checkout; USD/EUR/GBP"}
+	if len(out.items) == 0 {
 		status = "no_match"
+		body["status"] = status
+		body["reason"] = out.reason
+		if out.reason == "below_relevance" {
+			body["best_score"] = out.bestScore
+			body["threshold"] = relevanceThreshold
+		}
 	}
-	c.JSON(http.StatusOK, gin.H{"status": status, "opportunities": out, "preview_only": siteIDFrom(c) == "", "payment_scope": "first paid Stripe checkout; USD/EUR/GBP"})
+	c.JSON(http.StatusOK, body)
 }
 
 func (h *PlacementsHandler) Prepare(c *gin.Context) {
@@ -118,7 +145,7 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		return
 	}
 	reason := ""
-	for _, o := range matched {
+	for _, o := range matched.items {
 		if o.OfferID == req.OfferID {
 			reason = o.Reason
 			break
