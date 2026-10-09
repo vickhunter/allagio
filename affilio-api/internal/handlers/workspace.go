@@ -81,6 +81,8 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	review.POST("/offers/:id/approve", (&OfferReviewHandler{DB: h.DB}).Approve)
 	review.POST("/offers/:id/reject", (&OfferReviewHandler{DB: h.DB}).Reject)
 	review.POST("/payouts/batch", payouts.RunBatch)
+	review.POST("/placements/:id/approve", h.approvePlacementAsOperator)
+	review.POST("/payouts/:id/mark-paid", h.markPayoutPaidAsOperator)
 	if h.AssetsPath != "" {
 		public.GET("/", h.Home)
 		for _, name := range []string{"workspace.css", "workspace.js", "setup-controls.js", "landing.css", "landing.js", "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt", "THIRD_PARTY_NOTICES.md"} {
@@ -117,6 +119,30 @@ func (h *HostedHandler) requireOperator(c *gin.Context) {
 		return
 	}
 	c.Next()
+}
+
+func (h *HostedHandler) bindReviewOperator(c *gin.Context) bool {
+	id, err := h.DB.OperatorIDByOwner(c.Request.Context(), ownerFrom(c).ID)
+	if err != nil || id == "" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "operator key required"})
+		return false
+	}
+	c.Set("operator_id", id)
+	return true
+}
+
+func (h *HostedHandler) approvePlacementAsOperator(c *gin.Context) {
+	if !h.bindReviewOperator(c) {
+		return
+	}
+	(&PlacementsHandler{DB: h.DB}).Approve(c)
+}
+
+func (h *HostedHandler) markPayoutPaidAsOperator(c *gin.Context) {
+	if !h.bindReviewOperator(c) {
+		return
+	}
+	(&PayoutsHandler{DB: h.DB}).MarkPaid(c)
 }
 
 func (h *HostedHandler) installCommand() string {

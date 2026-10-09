@@ -66,14 +66,14 @@ The inbox has stable IDs and receipts. Publishing is not guaranteed exactly once
 | `POST /v1/placements/:id/commit` | Site or scoped agent key | Approved, unexpired proposal → stable receipt |
 | `POST /v1/placements/:id/receipt` | Site or scoped agent key | Report publication evidence |
 | `POST /v1/placements/:id/revoke` | Owner site key | Revoke placement authority |
-| `POST /v1/offer-review/placements/:id/approve` | Admin key | Record owner email, site ID and approval evidence |
+| `POST /v1/offer-review/placements/:id/approve` | Operator key | Record owner email, site ID and approval evidence |
 | `POST /v1/offer-review/agent-access/sites/:site_id` | Admin key | Issue scoped publisher agent key |
 | `POST /v1/offer-review/agent-access/:id/revoke` | Admin key | Revoke agent access |
 | `POST /v1/offer-review/products/:id/connection` | Admin key | Product-scoped Stripe secret, currency and mode |
 | `POST /v1/webhooks/stripe/:product_id` | Stripe signature | Durable paid/refund event ingest |
 | `POST /v1/payouts/:id/confirm-received` | Owner site key | Owner records receipt of maker-reported payment |
 
-Site/agent credentials use `X-API-Key`; admin actions use `X-Admin-Key`; maker APIs keep `X-Maker-Key`. Do not put operator credentials or provider secrets in agent chat. The local demo strips admin, encryption and database credentials from its two MCP process environments.
+Site/agent credentials use `X-API-Key`; admin actions use `X-Admin-Key`; placement approval and payout `mark-paid` use `X-Operator-Key`; maker APIs keep `X-Maker-Key`. Do not put operator credentials or provider secrets in agent chat. The local demo strips admin, encryption and database credentials from its two MCP process environments.
 
 MCP adds `preview_revenue`, `find_opportunities`, `prepare_placement`, `list_agent_tasks`, `get_placement`, `commit_placement` and `record_placement_receipt`. Existing balance, history and maker tools continue to work. Verified transport: real local stdio processes. The hosted JSON-RPC endpoint remains an existing transport; new OAuth, client conformance and real Cursor/OpenClaw/Grok/Muse/dots integrations are not claimed.
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -26,7 +27,8 @@ func (p *Polar) VerifySignature(headers http.Header, body []byte, secret string)
 	msgID := headers.Get("webhook-id")
 	timestamp := headers.Get("webhook-timestamp")
 	sigHeader := headers.Get("webhook-signature")
-	if msgID == "" || timestamp == "" || sigHeader == "" || secret == "" {
+	seconds, err := strconv.ParseInt(timestamp, 10, 64)
+	if msgID == "" || timestamp == "" || sigHeader == "" || secret == "" || err != nil || time.Since(time.Unix(seconds, 0)).Abs() > 5*time.Minute {
 		return false
 	}
 	key := []byte(secret)

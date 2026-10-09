@@ -156,7 +156,7 @@ func (h *OffersHandler) Patch(c *gin.Context) {
 		}
 		if _, err := h.DB.Pool.Exec(c.Request.Context(), `
 UPDATE offers
-SET commission_type=$2, commission_value=$3, commission_unit=$4, commission_currency=$5,
+SET commission_type=$2, commission_value=$3, commission_value_minor=ROUND(($3::numeric)*100)::bigint, commission_unit=$4, commission_currency=$5,
     cookie_duration_days=$6, refund_window_days=$7, landing_url=$8, ref_param=$9, terms=$10,
     updated_at=NOW()
 WHERE id=$1`, offer.ID, offer.CommissionType, offer.CommissionValue, offer.CommissionUnit, offer.CommissionCurrency,

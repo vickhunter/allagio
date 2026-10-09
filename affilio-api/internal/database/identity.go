@@ -284,7 +284,12 @@ func (d *DB) ApproveOwnerPlacement(ctx context.Context, o *Owner, id string) (bo
 approval_evidence=jsonb_build_object('method','owner_session','owner_id',$3::text,'issuer',$4::text,'subject',$5::text)::text
 FROM offers f JOIN products p ON p.id=f.product_id JOIN makers m ON m.id=p.maker_id
 WHERE pp.id=$1 AND pp.site_id=$2 AND pp.offer_id=f.id AND pp.status='pending' AND pp.expires_at>NOW()
-AND lower(m.email)<>lower($6) AND NOT EXISTS(SELECT 1 FROM owners WHERE id=$3 AND maker_id=m.id)`, id, o.SiteID, o.ID, o.Issuer, o.Subject, o.Email)
+AND lower(m.email)<>lower($6) AND NOT EXISTS(SELECT 1 FROM owners WHERE id=$3 AND maker_id=m.id)
+AND NOT EXISTS(SELECT 1 FROM owners ow WHERE ow.site_id=$2 AND ow.maker_id=m.id)
+AND NOT EXISTS(SELECT 1 FROM sites s WHERE s.id=$2 AND (
+ (COALESCE(s.stripe_customer_id,'') <> '' AND s.stripe_customer_id = m.stripe_customer_id)
+ OR (COALESCE(s.payment_fingerprint,'') <> '' AND s.payment_fingerprint = m.payment_fingerprint)
+))`, id, o.SiteID, o.ID, o.Issuer, o.Subject, o.Email)
 	if err != nil {
 		return false, err
 	}

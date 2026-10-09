@@ -36,6 +36,8 @@ Use a Neon Free Postgres database. Neon offers a direct hostname and a pooled ho
 
 If Neon Free is unavailable, use an [Aiven Free PostgreSQL](https://aiven.io/docs/platform/concepts/free-plan) service and its direct service URI as `DATABASE_URL`. Aiven may power off a free service that stays idle. Power it back on from the Aiven console, then retry `GET /health`. Do not use a pooler URI for migrations.
 
+Before applying migration `016_d015_operator_money.sql` on a deployed database, take a Neon snapshot (or an equivalent logical backup) and confirm that snapshot can be restored. The migration only adds tables and columns. Do not deploy it until that snapshot exists.
+
 ## Environment names
 
 Set these in Render. Values stay in the dashboard.

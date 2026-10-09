@@ -111,6 +111,23 @@ func AdminKeyAuth(adminKey string, audit *services.AuditLogger) gin.HandlerFunc 
 	}
 }
 
+func OperatorKeyAuth(db *database.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		provided := strings.TrimSpace(c.GetHeader("X-Operator-Key"))
+		if provided == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "operator key required"})
+			return
+		}
+		operator, err := db.OperatorByKeyHash(c.Request.Context(), services.HashAPIKey(provided))
+		if err != nil || operator.ID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid operator key"})
+			return
+		}
+		c.Set("operator_id", operator.ID)
+		c.Next()
+	}
+}
+
 func clientIP(c *gin.Context) string {
 	ip := strings.TrimSpace(c.ClientIP())
 	if ip == "" {

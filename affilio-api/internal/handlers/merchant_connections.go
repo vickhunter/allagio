@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"strings"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/services"
@@ -56,7 +55,7 @@ func (h *MerchantConnectionsHandler) Connect(c *gin.Context) {
 		return
 	}
 	secret := c.PostForm("signing_secret")
-	if !strings.HasPrefix(secret, "whsec_") || len(secret) < 16 || len(secret) > 512 {
+	if !stripeSigningSecret.MatchString(secret) {
 		c.JSON(400, gin.H{"error": "valid webhook signing secret required"})
 		return
 	}

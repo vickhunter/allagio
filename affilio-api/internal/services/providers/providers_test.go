@@ -110,7 +110,7 @@ func TestLemonSqueezySignatureAndParse(t *testing.T) {
 	secret := "ls-secret"
 	body := []byte(`{
 		"meta": {"event_name": "order_created", "custom_data": {"dtr": "11111111-2222-3333-4444-555555555555"}},
-		"data": {"id": "42", "attributes": {"identifier": "order-abc", "total": 1900, "currency": "usd", "created_at": "2026-08-30T10:00:00Z"}}
+		"data": {"id": "42", "attributes": {"identifier": "order-abc", "total": 1900, "currency": "usd", "created_at": "` + time.Now().UTC().Format(time.RFC3339) + `"}}
 	}`)
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
@@ -136,6 +136,36 @@ func TestLemonSqueezySignatureAndParse(t *testing.T) {
 	refund, err := adapter.ParseEvent([]byte(`{"meta":{"event_name":"order_refunded"},"data":{"id":"42","attributes":{"identifier":"order-abc"}}}`))
 	if err != nil || refund.Kind != "refund" || refund.ObjectID != "order-abc" {
 		t.Fatalf("unexpected lemonsqueezy refund: %+v err=%v", refund, err)
+	}
+}
+
+func TestLemonSqueezyRejectsStaleTimestamp(t *testing.T) {
+	body := []byte(`{"meta":{"event_name":"order_created","custom_data":{"dtr":"11111111-2222-3333-4444-555555555555"}},"data":{"id":"9","attributes":{"identifier":"old","total":100,"currency":"usd","created_at":"2020-01-01T00:00:00Z"}}}`)
+	secret := "ls-secret"
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(body)
+	headers := http.Header{}
+	headers.Set("X-Signature", hex.EncodeToString(mac.Sum(nil)))
+	if (&LemonSqueezy{}).VerifySignature(headers, body, secret) {
+		t.Fatal("accepted a signed Lemon Squeezy body outside the replay window")
+	}
+}
+
+func TestPolarRejectsStaleTimestamp(t *testing.T) {
+	rawSecret := []byte("polar-secret-bytes")
+	secret := "whsec_" + base64.StdEncoding.EncodeToString(rawSecret)
+	body := []byte(`{"type":"order.created","data":{"id":"ord_old","amount":100,"currency":"usd"}}`)
+	msgID := "msg_old"
+	timestamp := fmt.Sprintf("%d", time.Now().Add(-10*time.Minute).Unix())
+	mac := hmac.New(sha256.New, rawSecret)
+	mac.Write([]byte(msgID + "." + timestamp + "."))
+	mac.Write(body)
+	headers := http.Header{}
+	headers.Set("webhook-id", msgID)
+	headers.Set("webhook-timestamp", timestamp)
+	headers.Set("webhook-signature", "v1,"+base64.StdEncoding.EncodeToString(mac.Sum(nil)))
+	if (&Polar{}).VerifySignature(headers, body, secret) {
+		t.Fatal("accepted a Polar signature outside the replay window")
 	}
 }
 

@@ -200,8 +200,13 @@ func (h *PlacementsHandler) Approve(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "valid owner_email required"})
 		return
 	}
+	operatorID := operatorIDFrom(c)
+	if operatorID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "operator key required"})
+		return
+	}
 	evidence, _ := json.Marshal(gin.H{"owner_email": address.Address, "evidence": req.Evidence})
-	updated, err := h.DB.ApprovePlacement(c.Request.Context(), c.Param("id"), req.SiteID, address.Address, string(evidence))
+	updated, err := h.DB.ApprovePlacement(c.Request.Context(), c.Param("id"), req.SiteID, address.Address, string(evidence), operatorID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "approval failed"})
 		return

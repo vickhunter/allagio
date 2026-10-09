@@ -304,7 +304,6 @@ func main() {
 	offerAdmin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
 	{
 		offerAdmin.GET("/queue", offerReview.Queue)
-		offerAdmin.POST("/placements/:id/approve", placements.Approve)
 		offerAdmin.POST("/agent-access/sites/:site_id", placements.CreateAgentAccess)
 		offerAdmin.POST("/agent-access/:id/revoke", placements.RevokeAgentAccess)
 		offerAdmin.POST("/products/:id/connection", connections.Create)
@@ -320,7 +319,13 @@ func main() {
 	payoutAdmin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
 	{
 		payoutAdmin.POST("/run", payouts.RunBatch)
-		payoutAdmin.POST("/:id/mark-paid", payouts.MarkPaid)
+	}
+
+	operator := v1.Group("")
+	operator.Use(middleware.OperatorKeyAuth(db))
+	{
+		operator.POST("/offer-review/placements/:id/approve", placements.Approve)
+		operator.POST("/payout-batches/:id/mark-paid", payouts.MarkPaid)
 	}
 
 	log.Printf("Affilio API listening on %s", net.JoinHostPort(cfg.Host, cfg.Port))

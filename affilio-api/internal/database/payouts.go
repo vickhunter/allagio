@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"time"
 )
@@ -158,24 +159,25 @@ func (d *DB) RunPayoutBatch(ctx context.Context, minPayout float64, includeTest 
 		return nil, err
 	}
 
+	minMinor := int64(math.Round(minPayout * 100))
 	rows, err := tx.Query(ctx, `
-SELECT le.site_id, le.currency, p.maker_id,cv.payment_mode, SUM(le.amount)
+SELECT le.site_id, le.currency, p.maker_id,cv.payment_mode, SUM(COALESCE(le.amount_minor, ROUND(le.amount*100)::bigint))
 FROM ledger_entries le JOIN conversions cv ON cv.id=le.conversion_id
 JOIN offers o ON o.id=cv.offer_id JOIN products p ON p.id=o.product_id
 WHERE le.status='cleared' AND le.payout_id IS NULL AND le.site_id IS NOT NULL AND ($2 OR cv.payment_mode<>'test')
 GROUP BY le.site_id, le.currency,p.maker_id,cv.payment_mode
-HAVING SUM(le.amount) >= $1`, minPayout, includeTest)
+HAVING SUM(COALESCE(le.amount_minor, ROUND(le.amount*100)::bigint)) >= $1`, minMinor, includeTest)
 	if err != nil {
 		return nil, err
 	}
 	type due struct {
 		siteID, currency, makerID, mode string
-		amount                          float64
+		amountMinor                     int64
 	}
 	dues := []due{}
 	for rows.Next() {
 		var item due
-		if err := rows.Scan(&item.siteID, &item.currency, &item.makerID, &item.mode, &item.amount); err != nil {
+		if err := rows.Scan(&item.siteID, &item.currency, &item.makerID, &item.mode, &item.amountMinor); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -190,10 +192,10 @@ HAVING SUM(le.amount) >= $1`, minPayout, includeTest)
 	for _, item := range dues {
 		var payout Payout
 		err := tx.QueryRow(ctx, `
-INSERT INTO payouts (site_id, amount, currency, method, status,maker_id,payment_mode)
-VALUES ($1,$2,$3,'manual','pending',$4,$5)
+INSERT INTO payouts (site_id, amount, amount_minor, currency, method, status,maker_id,payment_mode)
+VALUES ($1,$2::numeric/100,$2,$3,'manual','pending',$4,$5)
 RETURNING id, site_id, amount, currency, COALESCE(method,''), COALESCE(provider_reference,''), status, created_at, paid_at,maker_id,payment_mode,received_at`,
-			item.siteID, item.amount, item.currency, item.makerID, item.mode).Scan(&payout.ID, &payout.SiteID, &payout.Amount, &payout.Currency, &payout.Method, &payout.ProviderReference, &payout.Status, &payout.CreatedAt, &payout.PaidAt, &payout.MakerID, &payout.Mode, &payout.ReceivedAt)
+			item.siteID, item.amountMinor, item.currency, item.makerID, item.mode).Scan(&payout.ID, &payout.SiteID, &payout.Amount, &payout.Currency, &payout.Method, &payout.ProviderReference, &payout.Status, &payout.CreatedAt, &payout.PaidAt, &payout.MakerID, &payout.Mode, &payout.ReceivedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +210,7 @@ AND conversion_id IN (SELECT cv.id FROM conversions cv JOIN offers o ON o.id=cv.
 	return payouts, tx.Commit(ctx)
 }
 
-func (d *DB) MarkPayoutPaid(ctx context.Context, payoutID, providerReference string) (bool, error) {
+func (d *DB) MarkPayoutPaid(ctx context.Context, payoutID, providerReference, operatorID string) (bool, error) {
 	if strings.TrimSpace(providerReference) == "" {
 		return false, errors.New("payment reference required")
 	}
@@ -220,7 +222,7 @@ func (d *DB) MarkPayoutPaid(ctx context.Context, payoutID, providerReference str
 	if err := lockMoney(ctx, tx); err != nil {
 		return false, err
 	}
-	res, err := tx.Exec(ctx, `UPDATE payouts SET status='paid',paid_at=NOW(),provider_reference=$2 WHERE id=$1 AND status='pending'`, payoutID, providerReference)
+	res, err := tx.Exec(ctx, `UPDATE payouts SET status='paid',paid_at=NOW(),provider_reference=$2,marked_paid_by=NULLIF($3,'')::uuid WHERE id=$1 AND status='pending'`, payoutID, providerReference, operatorID)
 	if err != nil {
 		return false, err
 	}

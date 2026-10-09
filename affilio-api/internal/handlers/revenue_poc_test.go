@@ -37,11 +37,13 @@ func newRevenueRouter(db *database.DB) *gin.Engine {
 	site.POST("/placements/:id/revoke", h.Revoke)
 	admin := r.Group("/v1/offer-review")
 	admin.Use(middleware.AdminKeyAuth("admin-secret", nil))
-	admin.POST("/placements/:id/approve", h.Approve)
 	admin.POST("/agent-access/sites/:site_id", h.CreateAgentAccess)
 	admin.POST("/agent-access/:id/revoke", h.RevokeAgentAccess)
 	connections := &PaymentConnectionsHandler{DB: db, Cipher: testConnectionCipher()}
 	admin.POST("/products/:id/connection", connections.Create)
+	operator := r.Group("/v1/offer-review")
+	operator.Use(middleware.OperatorKeyAuth(db))
+	operator.POST("/placements/:id/approve", h.Approve)
 	return r
 }
 
@@ -212,7 +214,7 @@ func TestTestPayoutIsolationAndRefundAfterConfirmedReceipt(t *testing.T) {
 		t.Fatalf("test batch mode: %v %v", testBatch, err)
 	}
 	payout := testBatch[0]
-	if marked, err := db.MarkPayoutPaid(context.Background(), payout.ID, "SIMULATED-BANK-REFERENCE"); err != nil || !marked {
+	if marked, err := db.MarkPayoutPaid(context.Background(), payout.ID, "SIMULATED-BANK-REFERENCE", ""); err != nil || !marked {
 		t.Fatalf("mark fixture payment: %v %v", marked, err)
 	}
 	rec, _ := doSiteJSON(t, r, http.MethodPost, "/v1/payouts/"+payout.ID+"/confirm-received", siteKey, nil)

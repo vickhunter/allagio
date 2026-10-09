@@ -13,6 +13,12 @@ type PayoutsHandler struct {
 	DB *database.DB
 }
 
+func operatorIDFrom(c *gin.Context) string {
+	id, _ := c.Get("operator_id")
+	s, _ := id.(string)
+	return s
+}
+
 type payoutBatchRequest struct {
 	MinPayout   float64 `json:"min_payout"`
 	IncludeTest bool    `json:"include_test_mode"`
@@ -111,7 +117,12 @@ func (h *PayoutsHandler) MarkPaid(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "valid payout id and payment reference required"})
 		return
 	}
-	updated, err := h.DB.MarkPayoutPaid(c.Request.Context(), c.Param("id"), strings.TrimSpace(req.ProviderReference))
+	operatorID := operatorIDFrom(c)
+	if operatorID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "operator key required"})
+		return
+	}
+	updated, err := h.DB.MarkPayoutPaid(c.Request.Context(), c.Param("id"), strings.TrimSpace(req.ProviderReference), operatorID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to mark payout paid"})
 		return

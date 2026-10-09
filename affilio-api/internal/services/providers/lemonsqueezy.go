@@ -19,16 +19,42 @@ type LemonSqueezy struct{}
 func (l *LemonSqueezy) Name() string { return "lemonsqueezy" }
 
 // VerifySignature implements Lemon Squeezy's X-Signature scheme:
-// hex(hmac_sha256(secret, body)).
+// hex(hmac_sha256(secret, body)). The signed created_at must fall inside the
+// replay window; Lemon Squeezy does not send a separate timestamp header.
 func (l *LemonSqueezy) VerifySignature(headers http.Header, body []byte, secret string) bool {
 	signature := headers.Get("X-Signature")
-	if signature == "" || secret == "" {
+	if signature == "" || secret == "" || !freshSignedTimestamp(lemonCreatedAt(body)) {
 		return false
 	}
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)
 	expected := hex.EncodeToString(mac.Sum(nil))
 	return hmac.Equal([]byte(expected), []byte(signature))
+}
+
+func lemonCreatedAt(body []byte) time.Time {
+	var event struct {
+		Data struct {
+			Attributes struct {
+				CreatedAt string `json:"created_at"`
+			} `json:"attributes"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &event) != nil {
+		return time.Time{}
+	}
+	ts, err := time.Parse(time.RFC3339, event.Data.Attributes.CreatedAt)
+	if err != nil {
+		return time.Time{}
+	}
+	return ts
+}
+
+func freshSignedTimestamp(ts time.Time) bool {
+	if ts.IsZero() {
+		return false
+	}
+	return time.Since(ts).Abs() <= 5*time.Minute
 }
 
 type lemonSqueezyEvent struct {

@@ -26,7 +26,7 @@ type Placement struct {
 
 const placementColumns = `id,site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,status,expires_at,receipt`
 const placementTermsSQL = `jsonb_build_object('product_id',o.product_id,'commission_type',o.commission_type,
- 'commission_value_minor',(o.commission_value*100)::bigint,'currency',o.commission_currency,
+ 'commission_value_minor',COALESCE(o.commission_value_minor,(o.commission_value*100)::bigint),'currency',o.commission_currency,
  'cookie_duration_days',o.cookie_duration_days,'refund_window_days',o.refund_window_days,
  'landing_url',o.landing_url,'ref_param',o.ref_param,'terms',COALESCE(o.terms,''),
  'payment_mode',CASE WHEN pc.live_mode THEN 'live' ELSE 'test' END,'payout_method','direct_merchant','service_fee_percent_of_commission',10,'scope','first_paid_checkout')`
@@ -65,11 +65,15 @@ func (d *DB) ListPlacements(ctx context.Context, siteID string) ([]Placement, er
 	return out, rows.Err()
 }
 
-func (d *DB) ApprovePlacement(ctx context.Context, id, siteID, ownerEmail, evidence string) (bool, error) {
-	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals pp SET status='approved',approved_at=NOW(),approval_evidence=$4
+func (d *DB) ApprovePlacement(ctx context.Context, id, siteID, ownerEmail, evidence, operatorID string) (bool, error) {
+	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals pp SET status='approved',approved_at=NOW(),approval_evidence=$4,approved_by_operator=$5::uuid
  FROM offers o JOIN products p ON p.id=o.product_id JOIN makers m ON m.id=p.maker_id
- WHERE pp.id=$1 AND pp.site_id=$2 AND pp.offer_id=o.id AND pp.status='pending' AND pp.expires_at>NOW()
- AND lower(m.email)<>lower($3)`, id, siteID, ownerEmail, evidence)
+ JOIN sites s ON s.id=$2::uuid
+ WHERE pp.id=$1 AND pp.site_id=$2 AND pp.site_id=s.id AND pp.offer_id=o.id AND pp.status='pending' AND pp.expires_at>NOW()
+ AND lower(m.email)<>lower($3)
+ AND NOT EXISTS (SELECT 1 FROM owners ow WHERE ow.site_id=s.id AND ow.maker_id=m.id)
+ AND NOT (COALESCE(s.stripe_customer_id,'') <> '' AND s.stripe_customer_id = m.stripe_customer_id)
+ AND NOT (COALESCE(s.payment_fingerprint,'') <> '' AND s.payment_fingerprint = m.payment_fingerprint)`, id, siteID, ownerEmail, evidence, operatorID)
 	if err != nil {
 		return false, err
 	}

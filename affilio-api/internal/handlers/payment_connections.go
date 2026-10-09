@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
+	"regexp"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
+
+var stripeSigningSecret = regexp.MustCompile(`^whsec_[A-Za-z0-9_]{10,200}$`)
 
 type PaymentConnectionsHandler struct {
 	DB     *database.DB
@@ -25,7 +27,7 @@ func (h *PaymentConnectionsHandler) Create(c *gin.Context) {
 		Currency string `json:"currency"`
 	}
 	productID := c.Param("id")
-	if !uuidPattern.MatchString(productID) || bindBoundedJSON(c, &req) != nil || !strings.HasPrefix(req.Secret, "whsec_") || len(req.Secret) < 16 || len(req.Secret) > 512 {
+	if !uuidPattern.MatchString(productID) || bindBoundedJSON(c, &req) != nil || !stripeSigningSecret.MatchString(req.Secret) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "valid product and signing_secret required"})
 		return
 	}

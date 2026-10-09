@@ -15,7 +15,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const testOperatorKey = "operator-key-d015"
+
+func seedTestOperator(db *database.DB) {
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO operators(name, key_hash) VALUES('pilot operator', $1) ON CONFLICT (key_hash) DO NOTHING`, services.HashAPIKey(testOperatorKey)); err != nil {
+		panic(err)
+	}
+}
+
 func newPayoutsRouter(db *database.DB) *gin.Engine {
+	seedTestOperator(db)
 	r := newAttributionRouter(db)
 	payouts := &PayoutsHandler{DB: db}
 	site := r.Group("/v1/payouts")
@@ -32,8 +41,10 @@ func newPayoutsRouter(db *database.DB) *gin.Engine {
 	admin.Use(middleware.AdminKeyAuth("admin-secret", services.NewAuditLogger(db)))
 	{
 		admin.POST("/run", payouts.RunBatch)
-		admin.POST("/:id/mark-paid", payouts.MarkPaid)
 	}
+	operator := r.Group("/v1/payout-batches")
+	operator.Use(middleware.OperatorKeyAuth(db))
+	operator.POST("/:id/mark-paid", payouts.MarkPaid)
 	return r
 }
 
@@ -44,7 +55,11 @@ func adminJSON(t *testing.T, r *gin.Engine, method, path string, payload interfa
 			values["include_test_mode"] = true
 		}
 	}
-	rec, body := doJSONWithHeader(t, r, method, path, "X-Admin-Key", "admin-secret", payload)
+	header, value := "X-Admin-Key", "admin-secret"
+	if strings.HasSuffix(path, "/mark-paid") || (strings.Contains(path, "/placements/") && strings.HasSuffix(path, "/approve")) {
+		header, value = "X-Operator-Key", testOperatorKey
+	}
+	rec, body := doJSONWithHeader(t, r, method, path, header, value, payload)
 	return rec, body
 }
 

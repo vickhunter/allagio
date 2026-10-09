@@ -73,37 +73,47 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 	}
 	clickID, err := h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, hashIP(c.ClientIP()), c.Request.UserAgent(), c.Request.Referer(), c.Query("placement"))
 	if err != nil {
-		log.Printf("redirects.go click insert failed campaign=%s err=%v", link.CampaignID, err)
-		c.Redirect(http.StatusFound, link.LandingURL)
+		log.Printf("redirects.go click insert failed campaign=%s", link.CampaignID)
+		if errors.Is(err, database.ErrPlacementAuthority) {
+			c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "removed"})
+			return
+		}
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "attribution unavailable"})
 		return
 	}
 	c.Redirect(http.StatusFound, appendRefParam(link.LandingURL, link.RefParam, clickID))
 }
 
-// previewBotMarkers are link-unfurl clients. Matching is a case-insensitive
-// substring of the User-Agent, modeled on offerrails isPreviewBot.
-var previewBotMarkers = []string{
-	"facebookexternalhit",
-	"facebot",
-	"twitterbot",
-	"linkedinbot",
-	"slackbot",
-	"slack-imgproxy",
-	"discordbot",
-	"telegrambot",
-	"whatsapp",
-	"pinterest",
-	"redditbot",
-	"embedly",
-	"quora link preview",
-	"showyoubot",
-	"outbrain",
-	"vkshare",
-	"w3c_validator",
-	"bingpreview",
-	"skypeuripreview",
-	"applebot",
-	"iframely",
+// previewBotTokens are link-unfurl product tokens. Matching is an exact
+// lowercased product token (the text before "/"), modeled on offerrails
+// isPreviewBot. A longer token that merely contains one of these names is
+// a visitor.
+var previewBotTokens = map[string]struct{}{
+	"facebookexternalhit":    {},
+	"facebot":                {},
+	"twitterbot":             {},
+	"linkedinbot":            {},
+	"slackbot":               {},
+	"slackbot-linkexpanding": {},
+	"slack-imgproxy":         {},
+	"discordbot":             {},
+	"telegrambot":            {},
+	"whatsapp":               {},
+	"pinterest":              {},
+	"redditbot":              {},
+	"embedly":                {},
+	"showyoubot":             {},
+	"outbrain":               {},
+	"vkshare":                {},
+	"w3c_validator":          {},
+	"bingpreview":            {},
+	"skypeuripreview":        {},
+	"applebot":               {},
+	"iframely":               {},
+}
+
+var previewBotPhrases = [][]string{
+	{"quora", "link", "preview"},
 }
 
 func httpsDestination(raw string) bool {
@@ -125,16 +135,55 @@ func trackingUnavailable(link *database.CampaignLink) (int, string, bool) {
 }
 
 func isPreviewBot(userAgent string) bool {
-	ua := strings.ToLower(strings.TrimSpace(userAgent))
-	if ua == "" {
+	tokens := userAgentProductTokens(userAgent)
+	if len(tokens) == 0 {
 		return false
 	}
-	for _, marker := range previewBotMarkers {
-		if strings.Contains(ua, marker) {
+	for i, token := range tokens {
+		if _, ok := previewBotTokens[token]; ok {
 			return true
+		}
+		for _, phrase := range previewBotPhrases {
+			if i+len(phrase) > len(tokens) {
+				continue
+			}
+			matched := true
+			for j, part := range phrase {
+				if tokens[i+j] != part {
+					matched = false
+					break
+				}
+			}
+			if matched {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+func userAgentProductTokens(userAgent string) []string {
+	fields := strings.FieldsFunc(strings.ToLower(userAgent), func(r rune) bool {
+		switch r {
+		case ' ', '\t', '(', ')', ';', ',':
+			return true
+		default:
+			return false
+		}
+	})
+	tokens := make([]string, 0, len(fields))
+	for _, field := range fields {
+		field = strings.Trim(field, "+")
+		if field == "" {
+			continue
+		}
+		name, _, _ := strings.Cut(field, "/")
+		name = strings.Trim(name, "+")
+		if name != "" {
+			tokens = append(tokens, name)
+		}
+	}
+	return tokens
 }
 
 func appendRefParam(landingURL, refParam, clickID string) string {

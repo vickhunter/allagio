@@ -158,8 +158,8 @@ WHERE id=$1 AND maker_id=$2`, p.ID, p.MakerID, p.Name, p.Tagline, p.WebsiteURL, 
 func (d *DB) CreateOffer(ctx context.Context, o *Offer) (string, error) {
 	var id string
 	err := d.Pool.QueryRow(ctx, `
-INSERT INTO offers (product_id, commission_type, commission_value, commission_unit, commission_currency, cookie_duration_days, refund_window_days, landing_url, ref_param, terms)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+INSERT INTO offers (product_id, commission_type, commission_value, commission_value_minor, commission_unit, commission_currency, cookie_duration_days, refund_window_days, landing_url, ref_param, terms)
+VALUES ($1,$2,$3,ROUND(($3::numeric)*100)::bigint,$4,$5,$6,$7,$8,$9,$10)
 RETURNING id`, o.ProductID, o.CommissionType, o.CommissionValue, o.CommissionUnit, o.CommissionCurrency, o.CookieDurationDays, o.RefundWindowDays, o.LandingURL, o.RefParam, o.Terms).Scan(&id)
 	return id, err
 }

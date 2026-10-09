@@ -33,7 +33,7 @@ The MVP service and its separate PostgreSQL database are provisioned in Railway 
 
 Set a real public HTTPS origin. Register an OIDC web application with the exact callback `<PUBLIC_BASE_URL>/auth/callback`; configure its issuer, client ID and secret through Railway variables. Signing secrets and operator credentials belong in secret settings, never in an agent client or the repository.
 
-On the isolated MVP database, `AUTO_MIGRATE=true` applies migrations 001–015 with a checksummed history, transaction per migration and a startup advisory lock. Repeated or concurrent startup is safe. It refuses an existing untracked schema and changed previously applied migrations. Keep this opt-in setting disabled for existing Affilio production. The server refuses startup when hosted sign-in is configured incompletely. With no `PUBLIC_BASE_URL`, hosted routes stay disabled and the local proof still runs.
+On the isolated MVP database, `AUTO_MIGRATE=true` applies migrations 001–016 with a checksummed history, transaction per migration and a startup advisory lock. Take a Neon snapshot and confirm it restores before applying `016_d015_operator_money.sql` on any deployed database. Repeated or concurrent startup is safe. It refuses an existing untracked schema and changed previously applied migrations. Keep this opt-in setting disabled for existing Affilio production. The server refuses startup when hosted sign-in is configured incompletely. With no `PUBLIC_BASE_URL`, hosted routes stay disabled and the local proof still runs.
 
 Check `/health`, protected-resource metadata and the unauthenticated `/mcp` 401 challenge. Then complete sign-in, create an account and connect two separate clients. Do not reuse production API keys for this check.
 

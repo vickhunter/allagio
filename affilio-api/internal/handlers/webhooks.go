@@ -39,7 +39,7 @@ func (h *WebhooksHandler) Receive(c *gin.Context) {
 		return
 	}
 	secret := h.Secrets[providerName]
-	if secret == "" {
+	if secret == "" || !distinctLegacyWebhookSecrets(h.Secrets) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "provider webhook not configured"})
 		return
 	}
@@ -253,6 +253,12 @@ func (h *WebhooksHandler) processProductEvent(ctx context.Context, productID str
 		return "storage failure", "", err
 	}
 	return status, id, nil
+}
+
+func distinctLegacyWebhookSecrets(secrets map[string]string) bool {
+	lemon := secrets["lemonsqueezy"]
+	polar := secrets["polar"]
+	return lemon == "" || polar == "" || lemon != polar
 }
 
 func stripeEventIsOurs(event *providers.ConversionEvent, productID, currency string) bool {
