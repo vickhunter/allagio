@@ -103,7 +103,10 @@ foreach ($blocks as $block) {
 $joined = implode('', array_map(function ($block) { return $block['innerHTML']; }, $blocks));
 check(strpos($joined, '/v1/go/') !== false, 'The block is missing the tracked /v1/go/ link');
 check(strpos($joined, 'rel="sponsored nofollow"') !== false, 'The tracked link is missing rel="sponsored nofollow"');
-check(strpos($joined, 'Vedi il prodotto') !== false, 'The product link is not in Italian');
+$nbsp_anchor = "Vedi\xc2\xa0il\xc2\xa0prodotto";
+check(strpos($joined, 'Vedi&nbsp;il&nbsp;prodotto') !== false || strpos($joined, $nbsp_anchor) !== false, 'The product link is not in Italian');
+check(preg_match('#<a [^>]*>Vedi(?:&nbsp;|\xC2\xA0)il(?:&nbsp;|\xC2\xA0)prodotto</a> \(link sponsorizzato\)#', $joined) === 1, 'The sponsor label is not plain text outside the link');
+check(strpos($joined, '<span') === false && stripos($joined, 'badge') === false, 'The sponsor label has a badge of its own');
 check(strpos($content, 'View product') === false, 'The English product link is still inserted');
 check(strpos($joined, '<utile>') === false, 'Recommendation copy was not escaped');
 check(strpos($joined, 'Uno strumento &lt;utile&gt; &amp; pronto.') !== false, 'Escaped recommendation copy is missing');

@@ -158,7 +158,7 @@ $GLOBALS['post'] = (object) array('ID' => 7, 'post_type' => 'post', 'post_status
 $result = $distribution->publish(new Request(array('post_id' => 7, 'placement_id' => $placement_id)));
 check(!is_wp_error($result), 'insert failed');
 $inserted = substr($GLOBALS['post']->post_content, strlen($kept));
-$inner = esc_html($copy) . ' <a href="' . $origin . $tracked . '" rel="sponsored nofollow">Vedi il prodotto</a>';
+$inner = esc_html($copy) . ' <a href="' . $origin . $tracked . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)';
 $placement_block = '<!-- wp:paragraph {"className":"affilio-placement-' . $placement_id . '"} -->' . "\n" . '<p class="affilio-placement-' . $placement_id . '">' . $inner . '</p>' . "\n" . '<!-- /wp:paragraph -->';
 $disclosure_block = '<!-- wp:paragraph {"className":"affilio-disclosure-' . $placement_id . '"} -->' . "\n" . '<p class="affilio-disclosure-' . $placement_id . '">' . esc_html($disclosure) . '</p>' . "\n" . '<!-- /wp:paragraph -->';
 check($inserted === "\n" . $placement_block . "\n" . $disclosure_block, "inserted markup was:\n" . $inserted);
@@ -177,6 +177,7 @@ check(strpos($marked[0]['innerHTML'], '<!--') === false, 'the paragraph innerHTM
 
 $removed = $distribution->revert_inserted(7, $placement_id, false, false);
 check(!empty($removed['matched']) && $GLOBALS['post']->post_content === $kept, 'reverting the className layout did not restore the other blocks');
+check(strpos($GLOBALS['post']->post_content, 'link sponsorizzato') === false, 'revert left the sponsor label in the post');
 check(strpos(implode("\n", $api->paths), '/removed') === false, 'a local-only revert called the API');
 
 $legacy_inner = '<!-- distributoor-placement:' . $placement_id . ' --><p>' . $inner . '</p>';
@@ -203,7 +204,8 @@ check($bad_nonce['status'] === 403 && $GLOBALS['post']->post_content === $extra,
 $confirm = $distribution->confirmation_view(7, $placement_id, 'nonce-for-affilio_revert_7_' . $placement_id);
 check($confirm['status'] === 200, 'confirmation was refused for an editor');
 check(strpos($confirm['html'], 'Strumenti utili') !== false, 'confirmation omitted the post title');
-check(strpos($confirm['html'], 'Vedi il prodotto') !== false, 'confirmation omitted the anchor');
+$nbsp_anchor = "Vedi\xc2\xa0il\xc2\xa0prodotto";
+check(strpos($confirm['html'], 'Vedi&nbsp;il&nbsp;prodotto') !== false || strpos($confirm['html'], $nbsp_anchor) !== false, 'confirmation omitted the anchor');
 check(strpos($confirm['html'], $origin . $tracked) !== false, 'confirmation omitted the go URL');
 check(strpos($confirm['html'], 'Annulla') !== false && strpos($confirm['html'], '>Rimuovi<') !== false, 'confirmation omitted Annulla / Rimuovi');
 
@@ -253,5 +255,30 @@ foreach ($api->paths as $path) {
 $GLOBALS['post']->post_content = $extra;
 $extra_cli = (new Affilio_Revert_Command($distribution))->run(array('7'), array('placement' => $placement_id));
 check($extra_cli === 0 && $GLOBALS['post']->post_content === $kept, 'CLI left the extra-class placement in the post');
+
+$other_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+$stripped_inner = esc_html($copy) . ' <a href="' . $origin . $tracked . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)';
+$other_inner = 'Altro <a href="' . $origin . '/v1/go/other?placement=' . $other_id . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)';
+$mention = 'Il placement ' . $placement_id . ' compare solo nel testo.';
+$other_block = "<!-- wp:paragraph -->\n<p>" . $other_inner . "</p>\n<!-- /wp:paragraph -->";
+$mention_block = "<!-- wp:paragraph -->\n<p>" . $mention . "</p>\n<!-- /wp:paragraph -->";
+$stripped = $kept . "\n" . "<!-- wp:paragraph -->\n<p>" . $stripped_inner . "</p>\n<!-- /wp:paragraph -->\n" . $other_block . "\n" . $mention_block;
+$stripped_kept = $kept . "\n" . $other_block . "\n" . $mention_block;
+$stripped_result = Affilio_Distribution::revert_content($stripped, $placement_id);
+check(!empty($stripped_result['matched']) && $stripped_result['content'] === $stripped_kept, "class-stripped go link was not removed:\n" . $stripped_result['content']);
+check(strpos($stripped_result['content'], 'link sponsorizzato') !== false, 'revert removed the other placement label');
+check(strpos($stripped_result['content'], 'placement=' . $other_id) !== false, 'revert removed another placement');
+check(strpos($stripped_result['content'], 'solo nel testo') !== false, 'revert removed a paragraph that only mentions the id');
+$prefix = $kept . "\n" . '<!-- wp:paragraph -->' . "\n" . '<p><a href="' . $origin . '/v1/go/test?placement=' . $placement_id . 'ffff" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a></p>' . "\n" . '<!-- /wp:paragraph -->';
+$prefix_result = Affilio_Distribution::revert_content($prefix, $placement_id);
+check(empty($prefix_result['matched']) && $prefix_result['content'] === $prefix, 'a longer placement id was treated as this one');
+$foreign = $kept . "\n" . '<!-- wp:paragraph -->' . "\n" . '<p><a href="https://shop.example/item?placement=' . $placement_id . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)</p>' . "\n" . '<!-- /wp:paragraph -->';
+$foreign_all = Affilio_Distribution::revert_content($foreign, '');
+check(empty($foreign_all['matched']) && $foreign_all['content'] === $foreign, 'a non-go link was removed when no placement id was requested');
+$foreign_one = Affilio_Distribution::revert_content($foreign, $placement_id);
+check(!empty($foreign_one['matched']) && $foreign_one['content'] === $kept, "wp affilio revert --placement did not remove the class-stripped link:\n" . $foreign_one['content']);
+$GLOBALS['post']->post_content = $stripped;
+$stripped_cli = (new Affilio_Revert_Command($distribution))->run(array('7'), array('placement' => $placement_id));
+check($stripped_cli === 0 && $GLOBALS['post']->post_content === $stripped_kept, 'CLI left the class-stripped placement in the post');
 
 echo "Placement className insert, legacy revert, confirmation and CLI passed.\n";

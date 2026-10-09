@@ -71,10 +71,13 @@ check(is_wp_error($distribution->publish($request)) && $GLOBALS['updates'] === 0
 $api->surface = 'https://blog.example/post';
 $api->receipt_failed = true;
 check(is_wp_error($distribution->publish($request)) && $GLOBALS['updates'] === 2 && $GLOBALS['post']->post_content === $existing, 'A refused receipt left the insert in the post.');
+check(strpos($GLOBALS['post']->post_content, 'link sponsorizzato') === false, 'A refused receipt left the sponsor label.');
 $api->receipt_failed = false;
 $result = $distribution->publish($request);
 check(!is_wp_error($result) && $result['published'] && $GLOBALS['updates'] === 3, 'Retry inserted twice.');
 check(substr_count($GLOBALS['post']->post_content, '<!-- wp:paragraph {"className":"affilio-placement-') === 1, 'Duplicate placement marker.');
+check(strpos($GLOBALS['post']->post_content, '</a> (link sponsorizzato)') !== false, 'Inline sponsor label missing from the placement paragraph.');
+check(strpos($GLOBALS['post']->post_content, '<span') === false, 'Sponsor label wrapped in a span.');
 check(substr_count($GLOBALS['post']->post_content, 'Affiliate disclosure:') === 1, 'Duplicate disclosure.');
 check(strpos($GLOBALS['post']->post_content, $existing) === 0, 'Existing article content was modified.');
 check(strlen($api->receipt['published_text']) < 16000 && strpos($api->receipt['published_text'], 'R&D') !== false && strpos($api->receipt['published_text'], '/v1/go/test?placement=') !== false, 'Published evidence did not preserve exact approved text/link.');

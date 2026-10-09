@@ -27,4 +27,19 @@ foreach (array('inserted' => $payload['inserted'], 'extra' => $payload['extra'],
 }
 $again = Affilio_Distribution::revert_content($kept, $id);
 check(!$again['matched'], 're-revert of a clean post matched something');
+if (!empty($payload['stripped'])) {
+    $stripped = Affilio_Distribution::revert_content($payload['stripped'], $id);
+    $left = rtrim($stripped['content'], "\n");
+    check($stripped['matched'] && $left === $payload['strippedKept'], "class-stripped go link was not removed:\n" . $stripped['content']);
+    check(strpos($stripped['content'], 'placement=' . $id) === false, 'stripped revert left this placement id in an href');
+    check(strpos($stripped['content'], $payload['otherId']) !== false, 'another placement was removed');
+    check(strpos($stripped['content'], 'solo nel testo') !== false, 'a text mention of the id was removed');
+    check(strpos($stripped['content'], 'link sponsorizzato') !== false, 'the other placement label was removed');
+}
+if (!empty($payload['foreign'])) {
+    $all = Affilio_Distribution::revert_content($payload['foreign'], '');
+    check(!$all['matched'] && $all['content'] === $payload['foreign'], 'a non-go link was removed when no placement id was requested');
+    $one = Affilio_Distribution::revert_content($payload['foreign'], $id);
+    check($one['matched'] && rtrim($one['content'], "\n") === $kept, "a specific placement id did not remove the class-stripped link:\n" . $one['content']);
+}
 echo "round-tripped content reverted\n";
