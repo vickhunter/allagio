@@ -171,6 +171,18 @@ class Affilio_Admin {
             delete_transient('affilio_scan_all_notice');
             echo '<div class="notice notice-info"><p>' . nl2br(esc_html($notice)) . '</p></div>';
         }
+        $job = get_option('affilio_scan_all_job', array());
+        if (isset($_GET['affilio_scan_continue']) && is_array($job) && $job) {
+            $so_far = isset($job['scanned']) ? (int) $job['scanned'] : 0;
+            echo '<form id="affilio-scan-continue" method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+            wp_nonce_field('affilio_scan_all');
+            echo '<input type="hidden" name="action" value="affilio_scan_all">';
+            echo '<input type="hidden" name="affilio_scan_continue" value="1">';
+            echo '<p>' . esc_html($this->t('Scanning… ' . $so_far . ' posts analyzed so far.', 'Scansione in corso… ' . $so_far . ' articoli analizzati finora.')) . '</p>';
+            submit_button($this->t('Continue scan', 'Continua la scansione'));
+            echo '</form>';
+            echo '<script>document.getElementById("affilio-scan-continue").submit();</script>';
+        }
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         wp_nonce_field('affilio_scan_all');
         echo '<input type="hidden" name="action" value="affilio_scan_all">';
@@ -343,18 +355,56 @@ class Affilio_Admin {
             wp_die(esc_html($this->t('Unauthorized', 'Non autorizzato')), '', array('response' => 403));
         }
         check_admin_referer('affilio_scan_all');
+        delete_option('affilio_setup_redirect');
         $status = $this->api->get_connection_status();
         if (!$status['connected']) {
             wp_safe_redirect(admin_url('admin.php?page=affilio-settings'));
             exit;
         }
-        $result = $this->scanner->scan_all_posts();
-        $notice = $this->format_scan_result($result);
+        $result = $this->advance_scan_all();
+        wp_safe_redirect($result['redirect']);
+        exit;
+    }
+
+    public function advance_scan_all() {
+        $continue = isset($_REQUEST['affilio_scan_continue']) && (string) $_REQUEST['affilio_scan_continue'] === '1';
+        $job = array();
+        if ($continue) {
+            $stored = get_option('affilio_scan_all_job', array());
+            if (is_array($stored)) {
+                $job = $stored;
+            }
+        }
+        $offset = isset($job['offset']) ? (int) $job['offset'] : 0;
+        $batch = $this->scanner->scan_published_batch($offset);
+        if (!is_array($batch)) {
+            $batch = array();
+        }
+        $scanned = (isset($job['scanned']) ? (int) $job['scanned'] : 0) + (isset($batch['scanned']) ? (int) $batch['scanned'] : 0);
+        $skipped = isset($job['skipped']) && is_array($job['skipped']) ? $job['skipped'] : array();
+        if (isset($batch['skipped']) && is_array($batch['skipped'])) {
+            $skipped = array_merge($skipped, $batch['skipped']);
+        }
+        if (empty($batch['done'])) {
+            update_option('affilio_scan_all_job', array(
+                'offset' => isset($batch['next_offset']) ? (int) $batch['next_offset'] : $offset + 10,
+                'scanned' => $scanned,
+                'skipped' => $skipped,
+            ), false);
+            return array(
+                'redirect' => admin_url('admin.php?page=affilio&affilio_scan_continue=1'),
+                'done' => false,
+            );
+        }
+        delete_option('affilio_scan_all_job');
+        $notice = $this->format_scan_result(array('scanned' => $scanned, 'skipped' => $skipped));
         if ($notice !== '') {
             set_transient('affilio_scan_all_notice', $notice, 120);
         }
-        wp_safe_redirect(admin_url('admin.php?page=affilio'));
-        exit;
+        return array(
+            'redirect' => admin_url('admin.php?page=affilio'),
+            'done' => true,
+        );
     }
 
     public function format_scan_result($result) {

@@ -442,6 +442,7 @@ class Affilio_Distribution {
     }
 
     public function handle_revert_post() {
+        delete_option('affilio_setup_redirect');
         $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
         $placement = isset($_POST['placement']) ? sanitize_text_field(wp_unslash($_POST['placement'])) : '';
         $nonce = isset($_POST['_wpnonce']) ? sanitize_text_field(wp_unslash($_POST['_wpnonce'])) : '';
@@ -500,8 +501,7 @@ class Affilio_Distribution {
         }
         if ($state === 'client_error') {
             $code = isset($outcome['code']) ? (int) $outcome['code'] : 0;
-            $reason = isset($outcome['reason']) ? $outcome['reason'] : '';
-            $line = self::client_error_line($code, $reason);
+            $line = self::admin_client_error_line($code);
         } else {
             $states = array(
                 'reported' => 'API: segnalato',
@@ -519,6 +519,14 @@ class Affilio_Distribution {
             $reason = 'richiesta rifiutata';
         }
         return 'API: errore 4xx (' . (int) $code . '): ' . $reason . '. Non riprovo.';
+    }
+
+    public static function admin_client_error_line($code) {
+        $code = (int) $code;
+        if ($code === 401) {
+            return 'Chiave API non valida: controlla la chiave in Impostazioni › Affilio.';
+        }
+        return 'Errore dall\'API (' . $code . '), non riprovo.';
     }
 
     public function retry_removals() {

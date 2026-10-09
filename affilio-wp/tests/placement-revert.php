@@ -92,6 +92,9 @@ class RevertAPI {
             if ($this->removed_mode === 'forbidden') {
                 return array('code' => 403, 'data' => array('error' => 'publisher account is not connected'));
             }
+            if ($this->removed_mode === 'unauthorized') {
+                return array('code' => 401, 'data' => array('error' => 'invalid api key'));
+            }
             if ($this->removed_mode === 'already') {
                 return array('code' => 200, 'data' => array('status' => 'removed', 'already_removed' => true));
             }
@@ -308,13 +311,16 @@ check($cli_unpublished === 0, 'CLI exited ' . $cli_unpublished . ' for 409 not_p
 check(strpos(implode("\n", $cli_unpublished_command->lines), $unpublished_sentence) !== false, 'CLI omitted the unpublished sentence');
 check(empty($GLOBALS['options']['affilio_removal_queue']), 'CLI queued 409 not_published');
 
-$client_line = 'API: errore 4xx (403): publisher account is not connected. Non riprovo.';
+$admin_403 = 'Errore dall\'API (403), non riprovo.';
+$cli_403 = 'API: errore 4xx (403): publisher account is not connected. Non riprovo.';
 $GLOBALS['options'] = array();
 $GLOBALS['scheduled'] = array();
 $GLOBALS['post']->post_content = $extra;
 $api->removed_mode = 'forbidden';
 $forbidden = $distribution->perform_revert_action(7, $placement_id, 'nonce-for-affilio_revert_7_' . $placement_id);
-check(strpos($forbidden['notice'], $client_line) !== false, 'admin notice for 403 was: ' . $forbidden['notice']);
+check(strpos($forbidden['notice'], $admin_403) !== false, 'admin notice for 403 was: ' . $forbidden['notice']);
+check(strpos($forbidden['notice'], 'publisher account is not connected') === false, 'admin notice kept the English 403 reason');
+check(strpos($forbidden['notice'], '<div') === false, 'admin notice changed the removal markup');
 check($GLOBALS['post']->post_content === $kept, '403 left the block in the post');
 check(empty($GLOBALS['options']['affilio_removal_queue']), '403 was queued');
 check(empty($GLOBALS['scheduled']['affilio_retry_removals']), '403 scheduled a retry');
@@ -322,8 +328,27 @@ $GLOBALS['post']->post_content = $extra;
 $cli_forbidden_command = new Affilio_Revert_Command($distribution);
 $cli_forbidden = $cli_forbidden_command->run(array('7'), array('placement' => $placement_id));
 check($cli_forbidden === 1, 'CLI exited ' . $cli_forbidden . ' for 403');
-check(strpos(implode("\n", $cli_forbidden_command->lines), $client_line) !== false, 'CLI omitted the 4xx line');
+check(strpos(implode("\n", $cli_forbidden_command->lines), $cli_403) !== false, 'CLI omitted the 4xx line');
 check(empty($GLOBALS['options']['affilio_removal_queue']), 'CLI queued a 403');
+
+$admin_401 = 'Chiave API non valida: controlla la chiave in Impostazioni › Affilio.';
+$cli_401 = 'API: errore 4xx (401): invalid api key. Non riprovo.';
+$GLOBALS['options'] = array();
+$GLOBALS['scheduled'] = array();
+$GLOBALS['post']->post_content = $extra;
+$api->removed_mode = 'unauthorized';
+$unauthorized = $distribution->perform_revert_action(7, $placement_id, 'nonce-for-affilio_revert_7_' . $placement_id);
+check(strpos($unauthorized['notice'], $admin_401) !== false, 'admin notice for 401 was: ' . $unauthorized['notice']);
+check(strpos($unauthorized['notice'], 'invalid api key') === false, 'admin notice kept the English 401 reason');
+check($GLOBALS['post']->post_content === $kept, '401 left the block in the post');
+check(empty($GLOBALS['options']['affilio_removal_queue']), '401 was queued');
+check(empty($GLOBALS['scheduled']['affilio_retry_removals']), '401 scheduled a retry');
+$GLOBALS['post']->post_content = $extra;
+$cli_unauthorized_command = new Affilio_Revert_Command($distribution);
+$cli_unauthorized = $cli_unauthorized_command->run(array('7'), array('placement' => $placement_id));
+check($cli_unauthorized === 1, 'CLI exited ' . $cli_unauthorized . ' for 401');
+check(strpos(implode("\n", $cli_unauthorized_command->lines), $cli_401) !== false, 'CLI omitted the 401 code and reason');
+check(empty($GLOBALS['options']['affilio_removal_queue']), 'CLI queued a 401');
 
 $GLOBALS['options'] = array();
 $GLOBALS['scheduled'] = array();

@@ -1,11 +1,18 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.16
+Stable tag: 0.1.17
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.17 =
+* The first Scan All after activation stays on the scan screen. The setup redirect no longer runs on admin-post.php.
+* A sleeping host still says the service is starting. A wrong or refused API URL says to check the address in Impostazioni › Affilio.
+* Connect errors follow the admin language, in Italian when that language is Italian.
+* Scan All sends one batch per request. A post the host rejects is still skipped and reported.
+* A 401 removal notice tells the owner to check the API key. Other 4xx notices name the code and leave out the English API reason. The command line still prints the code and the reason.
 
 = 0.1.16 =
 * A removal the service answers with 409 not_published stays removed locally and is not retried. The notice is "Rimosso dal post. L'inserimento non era pubblicato, quindi non c'è niente da segnalare."
