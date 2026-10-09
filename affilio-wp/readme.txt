@@ -1,11 +1,15 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.14
+Stable tag: 0.1.15
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.15 =
+* An inserted placement ends with the plain text "(link sponsorizzato)" after the link. The link text is "Vedi il prodotto" with non-breaking spaces, in the same paragraph.
+* Removing an insertion still finds that paragraph when the class was deleted, as long as the link is the tracked go URL or the placement id was named.
 
 = 0.1.14 =
 * A post counts as already disclosed only when it matches the receipt rule: the approved disclosure, "commissione", or "link" within 60 characters of "affiliat".

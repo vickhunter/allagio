@@ -250,7 +250,7 @@ class Affilio_Distribution {
         $inserted = false;
         if (!self::placement_present($content, $id)) {
             $class = 'affilio-placement-' . $id;
-            $inner = esc_html($placement['copy']) . ' <a href="' . esc_url($this->origin() . $link) . '" rel="sponsored nofollow">' . esc_html('Vedi il prodotto') . '</a>';
+            $inner = esc_html($placement['copy']) . ' <a href="' . esc_url($this->origin() . $link) . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)';
             $content .= "\n" . $this->paragraph_block('<p class="' . $class . '">' . $inner . '</p>', $class);
             if (!self::disclosure_suppressed($content) && strpos($content, esc_html($placement['disclosure'])) === false) {
                 $disclosure_class = 'affilio-disclosure-' . $id;
@@ -650,6 +650,28 @@ class Affilio_Distribution {
         if (preg_match('/<!-- distributoor-placement:([a-f0-9-]{36}) -->/i', $block['innerHTML'], $match)) {
             $id = $match[1];
             if ($wanted === '' || strcasecmp($wanted, $id) === 0) {
+                return $id;
+            }
+        }
+        return self::id_from_placement_href($block, $wanted);
+    }
+
+    private static function id_from_placement_href($block, $wanted) {
+        if (!isset($block['blockName']) || $block['blockName'] !== 'core/paragraph') {
+            return '';
+        }
+        if (!preg_match_all('/<a\b[^>]*\bhref="([^"]*)"/i', $block['innerHTML'], $hrefs)) {
+            return '';
+        }
+        foreach ($hrefs[1] as $href) {
+            $decoded = html_entity_decode($href, ENT_QUOTES, 'UTF-8');
+            if (!preg_match('/placement=([a-f0-9-]{36})(?![a-f0-9-])/i', $decoded, $match)) {
+                continue;
+            }
+            $id = $match[1];
+            $specific = $wanted !== '' && strcasecmp($wanted, $id) === 0;
+            $go = strpos($decoded, '/v1/go/') !== false;
+            if ($specific || ($wanted === '' && $go)) {
                 return $id;
             }
         }
