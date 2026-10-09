@@ -2,6 +2,26 @@ package services
 
 import "testing"
 
+// stagingPost2615 is the Italian publisher post whose historical relevance was 32.
+// The cutoff stays 25. Extra Italian function words and &nbsp; must not pull it under that line.
+const stagingPost2615 = "InboxPilot email inbox productivity tool. Staging post 2615."
+
+func stagingPost2615Terms() OfferTerms {
+	return OfferTerms{
+		Name:     "InboxPilot",
+		Tagline:  "email inbox tool",
+		Category: "productivity",
+		Keywords: []string{"email", "inbox", "productivity", "il", "lo", "la", "gli", "le", "una", "per", "con", "che", "non", "come", "del", "della", "questo", "quello", "sono", "tuo", "tua", "nel", "nella", "anche", "Vedi&nbsp;il&nbsp;prodotto"},
+	}
+}
+
+func TestStagingPost2615KeepsRelevance(t *testing.T) {
+	score := ScoreOfferForProfile(BuildSiteProfile([]string{stagingPost2615}, nil), stagingPost2615Terms())
+	if score < 25 {
+		t.Fatalf("staging post 2615 relevance %d, want >= 25", score)
+	}
+}
+
 func TestApplyRecommendationTuning_AdjustsAndResorts(t *testing.T) {
 	t.Parallel()
 	matches := []ProgramMatch{

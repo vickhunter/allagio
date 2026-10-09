@@ -350,6 +350,37 @@ func TestReadinessPageGatesFailClosed(t *testing.T) {
 	if strings.Contains(checkout.Remediation, "Lemon Squeezy") || strings.Contains(checkout.Remediation, "Polar") {
 		t.Fatalf("remediation must not lock the product to one provider, got %s", checkout.Remediation)
 	}
+	for _, key := range []string{"pricing_page", "docs_present"} {
+		check := findCheck(t, result.Checks, key)
+		if strings.Contains(check.Evidence, "pricing_url") || strings.Contains(check.Evidence, "docs_url") || strings.Contains(check.Remediation, "pricing_url") || strings.Contains(check.Remediation, "docs_url") {
+			t.Fatalf("%s must use plain words, got %+v", key, check)
+		}
+	}
+}
+
+func TestReadinessFindsPricingAndDocsLinksOnTheLandingPage(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body><a href="/start">Get started</a><a href="/pricing">Pricing</a><a href="/docs">Documentation</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></body></html>`))
+	})
+	mux.HandleFunc("/pricing", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body>Pro plan: $19/month</body></html>`))
+	})
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("<html><body>" + longDocs() + "</body></html>"))
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	result := testEngine().Assess(context.Background(), ReadinessProduct{Name: "Linked", WebsiteURL: server.URL})
+	for _, key := range []string{"pricing_page", "docs_present"} {
+		check := findCheck(t, result.Checks, key)
+		if check.Status != "pass" {
+			t.Fatalf("%s should pass from the landing-page link, got %+v", key, check)
+		}
+		if strings.Contains(check.Evidence, "pricing_url") || strings.Contains(check.Evidence, "docs_url") || strings.Contains(check.Remediation, "pricing_url") || strings.Contains(check.Remediation, "docs_url") {
+			t.Fatalf("%s must use plain words, got %+v", key, check)
+		}
+	}
 }
 
 func TestReadinessAllowsOnlyTheConfiguredPublicOrigin(t *testing.T) {

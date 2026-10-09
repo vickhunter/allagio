@@ -335,3 +335,64 @@ AND c.data_type IN ('text','character varying','character','json','jsonb')`)
 		}
 	}
 }
+
+func TestConnectionRefusalsStayInlineAndLogAReason(t *testing.T) {
+	db, _, _, offerID, _ := testPaidCampaign(t)
+	h, _, _ := hostedTestServer(t, db)
+	o, cookie := testOwnerSession(t, h, "secret-owner", "secret@example.com")
+	var productID, makerID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT p.id,p.maker_id FROM products p JOIN offers o ON o.product_id=p.id WHERE o.id=$1`, offerID).Scan(&productID, &makerID); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := db.BindOwnerAccount(context.Background(), o.ID, "maker", makerID); err != nil || !ok {
+		t.Fatal(err)
+	}
+	verify := &fixtureStripeVerifier{expectedURL: h.BaseURL + "/v1/webhooks/stripe/" + productID}
+	merchant := &MerchantConnectionsHandler{DB: db, Cipher: testConnectionCipher(), Verifier: verify, BaseURL: h.BaseURL, Page: h.Page}
+	logs := &bytes.Buffer{}
+	prevLog := log.Writer()
+	log.SetOutput(logs)
+	t.Cleanup(func() { log.SetOutput(prevLog) })
+	logged := gin.New()
+	group := logged.Group("/owner", h.ownerSession)
+	group.POST("/products/:id/connection", merchant.Connect)
+	path := "/owner/products/" + productID + "/connection"
+
+	suffix := make([]byte, 8)
+	if _, err := rand.Read(suffix); err != nil {
+		t.Fatal(err)
+	}
+	key := "rk_test_" + hex.EncodeToString(suffix)
+	secret := "not-a-webhook-secret-" + hex.EncodeToString(suffix)
+	values := url.Values{"csrf": {o.CSRF}, "stripe_key": {key}, "price_id": {"price_pilot"}, "endpoint_id": {"we_pilot"}, "signing_secret": {secret}}
+	rec := ownerForm(t, h, logged, cookie, path, values)
+	body := rec.Body.String()
+	if rec.Code != http.StatusBadRequest || strings.HasPrefix(strings.TrimSpace(body), "{") || !strings.Contains(body, `id="stripe-live-key"`) {
+		t.Fatalf("bad webhook secret must render inline, got %d %s", rec.Code, body)
+	}
+	if strings.Contains(body, secret) || strings.Contains(body, key) || strings.Contains(logs.String(), secret) || strings.Contains(logs.String(), key) {
+		t.Fatal("connection refusal exposed the key or the signing secret")
+	}
+	if !strings.Contains(logs.String(), "reason=webhook_secret") || !strings.Contains(logs.String(), "key_prefix="+key[:8]+"...") {
+		t.Fatalf("missing webhook reason log: %s", logs.String())
+	}
+
+	logs.Reset()
+	values.Set("signing_secret", "whsec_verified_pilot")
+	values.Set("stripe_key", "rk_test_wrong_key")
+	again := ownerForm(t, h, logged, cookie, path, values)
+	againBody := again.Body.String()
+	if again.Code != http.StatusBadRequest || strings.HasPrefix(strings.TrimSpace(againBody), "{") || strings.Contains(againBody, "context canceled") || strings.Contains(logs.String(), "whsec_verified_pilot") {
+		t.Fatalf("verifier refusal must stay inline and secret-free: %d %s log=%s", again.Code, againBody, logs.String())
+	}
+	if !strings.Contains(logs.String(), "reason=stripe_verify_failed") || !strings.Contains(logs.String(), "key_prefix=rk_test_...") {
+		t.Fatalf("missing verifier reason log: %s", logs.String())
+	}
+
+	logs.Reset()
+	values.Set("stripe_key", "sk_live_"+hex.EncodeToString(suffix))
+	live := ownerForm(t, h, logged, cookie, path, values)
+	if live.Code != http.StatusBadRequest || strings.HasPrefix(strings.TrimSpace(live.Body.String()), "{") || !strings.Contains(logs.String(), "reason=live_key") || strings.Contains(logs.String(), values.Get("stripe_key")) {
+		t.Fatalf("live key log: %d %s", live.Code, logs.String())
+	}
+}

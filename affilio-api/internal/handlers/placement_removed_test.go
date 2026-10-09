@@ -119,6 +119,97 @@ func TestPlacementRemoval(t *testing.T) {
 	}
 }
 
+func TestRemovalRejectsUnpublishedPlacements(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	makerID := insertPublisherMaker(t, db)
+	_, offerID := insertPublisherOffer(t, db, makerID, "none", "percentage", "USD", "InboxPilot", []string{"email", "inbox", "productivity"})
+	siteKey := "site-key-unpublished"
+	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Tutorials")
+	linkPublisherOwner(t, db, siteID)
+	r := removalRouter(db)
+	prepare := func() string {
+		t.Helper()
+		rec, prepared := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+			"offer_id": offerID, "surface_url": "https://publisher.example.com/tutorial", "context": "InboxPilot email inbox productivity tutorial for developers",
+			"copy": "Consider InboxPilot for an email inbox productivity workflow.",
+		})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("prepare: %d %s", rec.Code, rec.Body.String())
+		}
+		return prepared["placement"].(map[string]interface{})["id"].(string)
+	}
+	assertNotRemoved := func(id string) {
+		t.Helper()
+		var stillNull bool
+		if err := db.Pool.QueryRow(context.Background(), `SELECT removed_at IS NULL FROM placement_proposals WHERE id=$1`, id).Scan(&stillNull); err != nil || !stillNull {
+			t.Fatalf("placement %s was removed before it was published: null=%v err=%v", id, stillNull, err)
+		}
+	}
+	reject := func(id string) {
+		t.Helper()
+		rec, body := doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/removed", siteKey, map[string]interface{}{})
+		if rec.Code != http.StatusConflict || body["reason"] != "not_published" || body["error"] == nil || body["error"] == "" {
+			t.Fatalf("unpublished removal: %d %v", rec.Code, body)
+		}
+		assertNotRemoved(id)
+	}
+
+	pending := prepare()
+	reject(pending)
+
+	approved := prepare()
+	rec, _ := adminJSON(t, r, http.MethodPost, "/v1/offer-review/placements/"+approved+"/approve", map[string]interface{}{
+		"site_id": siteID, "owner_email": "publisher@example.com", "evidence": "Publisher approved this exact placement.",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", rec.Code, rec.Body.String())
+	}
+	reject(approved)
+
+	revoked := prepare()
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='revoked' WHERE id=$1`, revoked); err != nil {
+		t.Fatal(err)
+	}
+	reject(revoked)
+
+	unknown := "11111111-1111-4111-8111-111111111111"
+	rec, missing := doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+unknown+"/removed", siteKey, map[string]interface{}{})
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown id: %d %v", rec.Code, missing)
+	}
+
+	published := prepare()
+	rec, _ = adminJSON(t, r, http.MethodPost, "/v1/offer-review/placements/"+published+"/approve", map[string]interface{}{
+		"site_id": siteID, "owner_email": "publisher@example.com", "evidence": "Publisher approved this exact placement.",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("approve published: %d %s", rec.Code, rec.Body.String())
+	}
+	rec, _ = doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+published+"/commit", siteKey, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("commit: %d %s", rec.Code, rec.Body.String())
+	}
+	rec, removed := doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+published+"/removed", siteKey, map[string]interface{}{})
+	if rec.Code != http.StatusOK || removed["already_removed"] != false || removed["status"] != "removed" {
+		t.Fatalf("published removal: %d %v", rec.Code, removed)
+	}
+	rec, again := doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+published+"/removed", siteKey, map[string]interface{}{})
+	if rec.Code != http.StatusOK || again["already_removed"] != true {
+		t.Fatalf("already removed: %d %v", rec.Code, again)
+	}
+
+	receipted := prepare()
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='revoked', receipt='{"publication_status":"publisher_reported"}'::jsonb WHERE id=$1`, receipted); err != nil {
+		t.Fatal(err)
+	}
+	rec, reported := doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+receipted+"/removed", siteKey, map[string]interface{}{})
+	if rec.Code != http.StatusOK || reported["already_removed"] != false {
+		t.Fatalf("receipted removal: %d %v", rec.Code, reported)
+	}
+}
+
 func TestRemovedAtMigrationKeepsExistingPlacements(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

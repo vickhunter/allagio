@@ -171,7 +171,8 @@ async function handle(req, res) {
   if (pathname === '/owner/api/offers' && req.method === 'POST') {
     const body = await readBody(req);
     if (state.failOffer) return send(res, 422, { error: 'commission value is below the minimum' });
-    const offer = { id: randomUUID(), product_id: body.product_id, status: 'draft', commission_type: body.commission_type, commission_value: body.commission_value, commission_currency: body.commission_currency, currency: body.commission_currency, cookie_duration_days: body.cookie_duration_days, refund_window_days: body.refund_window_days, terms: body.terms || '' };
+    const offerId = randomUUID();
+    const offer = { id: offerId, product_id: body.product_id, status: 'draft', commission_type: body.commission_type, commission_value: body.commission_value, commission_currency: body.commission_currency, currency: body.commission_currency, cookie_duration_days: body.cookie_duration_days, refund_window_days: body.refund_window_days, terms: body.terms || '', tracked_link: '/v1/go/' + offerId.replace(/-/g, '') };
     state.offers.push(offer);
     return send(res, 201, { offer });
   }
@@ -199,6 +200,9 @@ async function handle(req, res) {
     return send(res, 200, { offer });
   }
   const connection = pathname.match(/^\/owner\/products\/([^/]+)\/connection$/);
+  if (connection && req.method === 'POST') {
+    return send(res, 400, { error: 'valid webhook signing secret required' });
+  }
   if (connection && req.method === 'GET') {
     if (state.stripeForm) {
       const webhook = 'https://api.example.test/v1/webhooks/stripe/' + connection[1] + '/checkout.session.completed.checkout.session.async_payment_succeeded.charge.refunded';
@@ -845,6 +849,7 @@ test('a server that stays down offers try again', async ({ browser }) => {
 
 async function tallLink(page, name) {
   const box = await page.getByRole('link', { name, exact: true }).boundingBox();
+  expect(box.width).toBeGreaterThanOrEqual(44);
   expect(box.height).toBeGreaterThanOrEqual(44);
 }
 
@@ -852,6 +857,40 @@ async function shotD025(page, name, full) {
   await page.evaluate(() => window.scrollTo(0, 0));
   fs.mkdirSync(d025, { recursive: true });
   await page.screenshot({ path: path.join(d025, name), fullPage: full });
+}
+
+function startAuthServer() {
+  const addrFile = path.join(os.tmpdir(), `affilio-auth-${process.pid}-${Date.now()}`);
+  const child = spawn('go', ['test', './internal/handlers', '-run', '^TestServeDemoAuthForE2E$', '-count=1', '-timeout', '20m', '-v'], {
+    cwd: path.resolve(__dirname, '../../affilio-api'),
+    env: {
+      ...process.env,
+      AUTH_E2E: '1',
+      AUTH_E2E_ADDR_FILE: addrFile,
+      AFFILIO_TEST_DATABASE_URL: process.env.AFFILIO_TEST_DATABASE_URL || 'postgresql://affilio:password@localhost:5432/affilio_test',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  child.stdout.on('data', chunk => { output += chunk.toString(); });
+  child.stderr.on('data', chunk => { output += chunk.toString(); });
+  const ready = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('auth server did not start\n' + output)), 180000);
+    const poll = setInterval(() => {
+      if (!fs.existsSync(addrFile)) return;
+      const addr = fs.readFileSync(addrFile, 'utf8').trim();
+      if (!addr) return;
+      clearInterval(poll);
+      clearTimeout(timer);
+      resolve('http://' + addr);
+    }, 200);
+    child.on('exit', code => {
+      clearInterval(poll);
+      clearTimeout(timer);
+      reject(new Error('auth server exited ' + code + '\n' + output));
+    });
+  });
+  return { ready, stop() { child.kill('SIGTERM'); fs.rmSync(addrFile, { force: true }); } };
 }
 
 function startDemoServer() {
@@ -889,15 +928,15 @@ test('stripe page rejects a live key before submit and fits', async ({ browser }
   for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
     const context = await browser.newContext({ viewport });
     const page = await context.newPage();
-    let posted = 0;
-    page.on('request', request => {
-      if (request.method() === 'POST' && request.url().includes('/connection')) posted += 1;
-    });
+    let armed = false;
+    let outbound = 0;
+    page.on('request', () => { if (armed) outbound += 1; });
     await page.goto(base + '/owner/products/' + productId + '/connection');
     await expect(page.getByRole('link', { name: 'Offer review', exact: true })).toBeVisible();
     await fits(page);
     for (const key of ['sk_live_browser_secret', 'rk_live_browser_secret', 'pk_live_browser_secret']) {
-      posted = 0;
+      armed = true;
+      outbound = 0;
       await page.getByLabel('Restricted API key').fill(key);
       await page.getByLabel('One-time price ID').fill('price_x');
       await page.getByLabel('Webhook endpoint ID').fill('we_x');
@@ -906,7 +945,7 @@ test('stripe page rejects a live key before submit and fits', async ({ browser }
       const error = page.locator('#stripe-live-key');
       await expect(error).toContainText('Live keys are not accepted');
       await expect(error).toBeFocused();
-      expect(posted).toBe(0);
+      expect(outbound).toBe(0);
       await expect(page.getByLabel('Restricted API key')).toBeEnabled();
       await expect(page.getByRole('button', { name: 'Verify and connect Stripe' })).toBeEnabled();
     }
@@ -1062,6 +1101,10 @@ test('demo pages fit a phone and keep referral parameters', async ({ browser }) 
         await expect(page.getByRole('heading', { level: 1 })).toContainText('Demo landing page builder');
         await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /Demo landing page builder/);
         for (const name of ['Pricing', 'Docs', 'Privacy', 'Terms']) await tallLink(page, name);
+        const nav = page.getByRole('navigation', { name: 'Demo' });
+        const navBox = await nav.boundingBox();
+        expect(navBox.width).toBeGreaterThanOrEqual(176);
+        expect(navBox.width).toBeLessThanOrEqual(184);
       }
       if (pathName !== '/demo') await tallLink(page, 'Back to the demo');
       if (pathName === '/demo/start') {
@@ -1111,6 +1154,67 @@ test('demo pages fit a phone and keep referral parameters', async ({ browser }) 
     await context.close();
   } finally {
     demo.stop();
+  }
+});
+
+test('a bad webhook secret stays an inline message', async ({ page }) => {
+  state.stripeForm = true;
+  const productId = randomUUID();
+  await page.goto(base + '/owner/products/' + productId + '/connection');
+  await page.getByLabel('Restricted API key').fill('rk_test_browser_secret');
+  await page.getByLabel('One-time price ID').fill('price_x');
+  await page.getByLabel('Webhook endpoint ID').fill('we_x');
+  await page.getByLabel('Webhook signing secret').fill('not-a-webhook-secret');
+  await page.getByRole('button', { name: 'Verify and connect Stripe' }).click();
+  await expect(page.locator('body')).not.toContainText('{"error"');
+  await expect(page.locator('body')).not.toContainText('valid webhook signing secret required');
+  await expect(page.getByRole('button', { name: 'Verify and connect Stripe' })).toBeVisible();
+  await expect(page.locator('#stripe-live-key')).toBeVisible();
+});
+
+test('a new offer shows its id and go link', async ({ page }) => {
+  let created;
+  page.on('response', async response => {
+    if (response.url().endsWith('/owner/api/offers') && response.request().method() === 'POST') created = await response.json();
+  });
+  await page.goto(base + '/owner/products');
+  await registerProduct(page);
+  await createOffer(page);
+  const code = created.offer.tracked_link;
+  await expect(page.getByText(created.offer.id, { exact: true })).toBeVisible();
+  await expect(page.locator('pre', { hasText: code })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copy link', exact: true })).toBeVisible();
+});
+
+test('referral params survive demo sign-in', async ({ page }) => {
+  test.setTimeout(180000);
+  const auth = startAuthServer();
+  let authBase;
+  try {
+    authBase = await auth.ready;
+  } catch (error) {
+    auth.stop();
+    throw error;
+  }
+  try {
+    const seen = [];
+    page.on('request', request => seen.push(request.url()));
+    await page.goto(authBase + '/demo/start?ref=camp&via=post2615');
+    const signIn = page.getByRole('link', { name: 'Sign in', exact: true });
+    await expect(signIn).toHaveAttribute('href', /ref=camp/);
+    await expect(signIn).toHaveAttribute('href', /via=post2615/);
+    await signIn.click();
+    await expect(page).toHaveURL(/\/owner/);
+    await expect(page).toHaveURL(/[?&]ref=camp(?:&|$)/);
+    await expect(page).toHaveURL(/[?&]via=post2615(?:&|$)/);
+    expect(seen.some(url => url.includes('/auth/login') && url.includes('ref=camp') && url.includes('via=post2615'))).toBe(true);
+    expect(seen.some(url => url.includes('/auth/callback'))).toBe(true);
+    await page.goto(authBase + '/demo/start?ref=camp&via=post2615');
+    await page.getByRole('link', { name: 'Register', exact: true }).click();
+    await expect(page).toHaveURL(/[?&]ref=camp(?:&|$)/);
+    await expect(page).toHaveURL(/[?&]via=post2615(?:&|$)/);
+  } finally {
+    auth.stop();
   }
 });
 

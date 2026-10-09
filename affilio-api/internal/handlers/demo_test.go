@@ -100,6 +100,23 @@ func TestServeDemoForE2E(t *testing.T) {
 	_ = srv.Close()
 }
 
+func TestDemoNavCollapsesForAPhone(t *testing.T) {
+	r := ginEngine()
+	(&HostedHandler{BaseURL: "http://127.0.0.1"}).Mount(r)
+	server := httptest.NewServer(r)
+	defer server.Close()
+	resp, err := http.Get(server.URL + "/demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	html := string(body)
+	if !strings.Contains(html, `class="demo-nav"`) || !strings.Contains(html, `aria-label="Demo"`) || !strings.Contains(html, "width:180px") {
+		t.Fatalf("demo nav must collapse to 180px: %s", html)
+	}
+}
+
 func TestDemoPagesAreReadableAndKeepReferralParams(t *testing.T) {
 	r := ginEngine()
 	h := &HostedHandler{BaseURL: "http://127.0.0.1"}
