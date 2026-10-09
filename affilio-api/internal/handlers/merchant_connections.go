@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"strings"
 
@@ -22,6 +23,20 @@ type MerchantConnectionsHandler struct {
 
 func (h *MerchantConnectionsHandler) viewer() *HostedHandler {
 	return &HostedHandler{Page: h.Page, BaseURL: h.BaseURL, OperatorID: h.OperatorID}
+}
+
+func connectionKeyPrefix(key string) string {
+	key = strings.TrimSpace(key)
+	if len(key) <= 8 {
+		return "***"
+	}
+	return key[:8] + "..."
+}
+
+func (h *MerchantConnectionsHandler) refuseConnection(c *gin.Context, name, productID, csrf, key, reason, message string) {
+	log.Printf("connection refused reason=%s key_prefix=%s", reason, connectionKeyPrefix(key))
+	c.Status(http.StatusBadRequest)
+	h.viewer().render(c, "Connect your checkout", "", h.connectionBody(name, productID, csrf, message))
 }
 
 func liveKeyRejected(key string) bool {
@@ -83,18 +98,17 @@ func (h *MerchantConnectionsHandler) Connect(c *gin.Context) {
 	}
 	key := c.PostForm("stripe_key")
 	if liveKeyRejected(key) {
-		c.Status(http.StatusBadRequest)
-		h.viewer().render(c, "Connect your checkout", "", h.connectionBody(p.Name, productID, o.CSRF, "Stripe test mode only. Live keys are not accepted."))
+		h.refuseConnection(c, p.Name, productID, o.CSRF, key, "live_key", "Stripe test mode only. Live keys are not accepted.")
 		return
 	}
 	secret := c.PostForm("signing_secret")
 	if !strings.HasPrefix(secret, "whsec_") || len(secret) < 16 || len(secret) > 512 {
-		c.JSON(400, gin.H{"error": "valid webhook signing secret required"})
+		h.refuseConnection(c, p.Name, productID, o.CSRF, key, "webhook_secret", "Enter the webhook signing secret from Stripe. It starts with whsec_.")
 		return
 	}
 	check, err := h.Verifier.Verify(c.Request.Context(), key, c.PostForm("price_id"), c.PostForm("endpoint_id"), h.BaseURL+"/v1/webhooks/stripe/"+productID)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		h.refuseConnection(c, p.Name, productID, o.CSRF, key, "stripe_verify_failed", "Stripe could not verify this connection. Check the key, price, and endpoint, then try again.")
 		return
 	}
 	encrypted, err := h.Cipher.Encrypt(productID, secret)

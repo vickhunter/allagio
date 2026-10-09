@@ -266,6 +266,7 @@ func semanticOverlapScore(tokens []string, terms []string) (int, string) {
 
 func tokenize(input string) []string {
 	input = strings.ToLower(input)
+	input = strings.NewReplacer("\u00a0", " ", "&nbsp;", " ", "&#160;", " ", "&#xa0;", " ", "&#x00a0;", " ").Replace(input)
 	parts := strings.FieldsFunc(input, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
 	})
@@ -301,7 +302,9 @@ func normalizeToken(token string) string {
 
 func isStopword(token string) bool {
 	switch token {
-	case "the", "and", "for", "with", "from", "this", "that", "are", "was", "were", "has", "have", "your", "you", "our", "their", "its", "about", "into", "but", "not", "can", "use", "using", "used", "how":
+	case "the", "and", "for", "with", "from", "this", "that", "are", "was", "were", "has", "have", "your", "you", "our", "their", "its", "about", "into", "but", "not", "can", "use", "using", "used", "how",
+		"il", "lo", "la", "gli", "le", "un", "uno", "una", "di", "da", "in", "con", "su", "per", "tra", "fra", "che", "non", "come", "del", "della", "dei", "delle", "dello", "degli",
+		"al", "alla", "nel", "nella", "nello", "negli", "questo", "questa", "quello", "quella", "sono", "tuo", "tua", "mio", "mia", "anche", "piu", "nbsp":
 		return true
 	default:
 		return false

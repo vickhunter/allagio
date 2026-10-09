@@ -377,7 +377,8 @@
                 : offer.status === 'listed' || offer.status === 'paused'
                     ? `<button type="button" class="secondary" data-offer="${offer.id}" data-status="${offer.status === 'listed' ? 'paused' : 'listed'}">${offer.status === 'listed' ? 'Pause offer' : 'Resume offer'}</button>`
                     : '<p class="caption">Awaiting operator review. Listing does not promise traffic or purchases.</p>';
-            return `<section><div class="row"><h3>${escape(names[offer.product_id] || 'Product')}</h3>${pill(offer.status)}</div><p>${escape(commission(offer))} · ${offer.commission_currency} · ${offer.cookie_duration_days}-day attribution · ${offer.refund_window_days}-day refund hold</p><p>${escape(offer.terms)}</p>${returnedNote}${action}</section>`;
+            const tracked = offer.tracked_link ? `<p class="offer-id">${escape(offer.id)}</p><div class="copy-field"><div class="row"><span class="eyebrow">GO LINK</span><button type="button" class="copy-action secondary" data-copy data-copied="Copied.">Copy link</button></div><pre>${escape(offer.tracked_link)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div>` : '';
+            return `<section><div class="row"><h3>${escape(names[offer.product_id] || 'Product')}</h3>${pill(offer.status)}</div><p>${escape(commission(offer))} · ${offer.commission_currency} · ${offer.cookie_duration_days}-day attribution · ${offer.refund_window_days}-day refund hold</p><p>${escape(offer.terms)}</p>${tracked}${returnedNote}${action}</section>`;
         };
         const offerFormMarkup = () => `<form data-new-offer novalidate><div class="form-grid"><label class="full">Product<select name="product_id">${products.map(product => `<option value="${product.id}" ${product.id === focus.product?.id ? 'selected' : ''}>${escape(product.name)}</option>`).join('')}</select></label><label>Commission type<select name="commission_type"><option value="percentage">Percentage of first purchase</option><option value="flat">Fixed amount per first purchase</option></select></label>${field('commission_value','Commission value','','type="number" step="0.01" min="0.01" required')}<label>Currency<select name="commission_currency"><option>USD</option><option>EUR</option><option>GBP</option></select></label>${field('cookie_duration_days','Attribution window (days)','30','type="number" min="1" max="365" required')}${field('refund_window_days','Refund hold (days)','30','type="number" min="0" max="180" required')}${field('landing_url','Referral destination','','type="url" required',true)}<label class="full">Additional terms<textarea name="terms" maxlength="4000" placeholder="Explain any eligibility restrictions and how you will pay commissions."></textarea></label></div><p class="caption">The merchant pays commissions directly. Placement terms include a 10% service fee on commission; fee collection is not automated.</p><button class="${kind === 'offer' ? '' : 'secondary'}" ${kind === 'offer' ? 'data-primary-action' : ''}>Create offer</button></form>`;
         const offerCreator = () => {
@@ -587,11 +588,28 @@
     document.querySelectorAll('form').forEach(form => {
         const key = form.querySelector('[name="stripe_key"]');
         if (!key) return;
-        form.addEventListener('submit', event => {
+        form.addEventListener('submit', async event => {
             const value = key.value.trim().toLowerCase();
-            if (!value.startsWith('sk_live_') && !value.startsWith('rk_live_') && !value.startsWith('pk_live_')) return;
+            const button = form.querySelector('button') || key;
             event.preventDefault();
-            showIssue(form.querySelector('button') || key, 'stripe-live-key', 'Stripe test mode only. Live keys are not accepted.');
+            if (value.startsWith('sk_live_') || value.startsWith('rk_live_') || value.startsWith('pk_live_')) {
+                showIssue(button, 'stripe-live-key', 'Stripe test mode only. Live keys are not accepted.');
+                return;
+            }
+            try {
+                const response = await fetch(form.action || location.pathname, { method: 'POST', body: new FormData(form), headers: { Accept: 'text/html' } });
+                const text = await response.text();
+                const trimmed = text.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    showIssue(button, 'stripe-live-key', 'Stripe could not connect. Check the webhook signing secret and try again.');
+                    return;
+                }
+                document.open();
+                document.write(text);
+                document.close();
+            } catch {
+                showIssue(button, 'stripe-live-key', 'Stripe could not connect. Check the webhook signing secret and try again.');
+            }
         });
     });
     document.querySelectorAll('nav a').forEach(link => { if (link.getAttribute('href') === location.pathname) link.setAttribute('aria-current','page'); });

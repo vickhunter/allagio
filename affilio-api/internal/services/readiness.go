@@ -74,6 +74,8 @@ var (
 	pricingMarkerPattern    = regexp.MustCompile(`(?i)[$€£]\s*\d|/\s*(month|mo|year|yr)|price|pricing|free trial`)
 	onboardingMarkerPattern = regexp.MustCompile(`(?i)sign\s*up|get started|start (for )?free|create (an )?account|register|try (it )?free`)
 	privacyMarkerPattern    = regexp.MustCompile(`(?i)href="[^"]*privacy[^"]*"`)
+	pricingLinkPattern      = regexp.MustCompile(`(?i)href\s*=\s*["']([^"']*(?:pricing|price)[^"']*)["']`)
+	docsLinkPattern         = regexp.MustCompile(`(?i)href\s*=\s*["']([^"']*(?:docs|documentation)[^"']*)["']`)
 	termsMarkerPattern      = regexp.MustCompile(`(?i)href="[^"]*terms[^"]*"`)
 	checkoutActionText      = regexp.MustCompile(`(?i)\b(buy|subscribe|checkout|start|sign[\s-]*up|get\s+started)\b`)
 	checkoutHrefMarker      = regexp.MustCompile(`(?i)(?:^|[/?#=_-])(buy|subscribe|checkout|signup|sign-up|get-started|start)(?:[/?#=_./-]|$)`)
@@ -90,12 +92,20 @@ func (e *ReadinessEngine) Assess(ctx context.Context, product ReadinessProduct) 
 
 	site := e.fetchPage(ctx, product.WebsiteURL)
 	checkout, providerWarning := e.checkCheckoutPresent(ctx, product, site)
+	pricingURL := strings.TrimSpace(product.PricingURL)
+	if pricingURL == "" {
+		pricingURL = linkedPageURL(site, product.WebsiteURL, pricingLinkPattern)
+	}
+	docsURL := strings.TrimSpace(product.DocsURL)
+	if docsURL == "" {
+		docsURL = linkedPageURL(site, product.WebsiteURL, docsLinkPattern)
+	}
 	checks := []ReadinessCheck{
 		e.checkSiteReachable(site),
 		checkout,
 		e.checkRefParamSurvives(ctx, product.WebsiteURL, product.PricingURL, refParam),
-		e.checkPricingPage(ctx, product.PricingURL),
-		e.checkDocsPresent(ctx, product.DocsURL),
+		e.checkPricingPage(ctx, pricingURL),
+		e.checkDocsPresent(ctx, docsURL),
 		checkBodyMarker(site, "privacy_policy", privacyMarkerPattern, true,
 			"Privacy Policy link found on the landing page.",
 			"Add a discoverable Privacy Policy link to the landing page."),
@@ -442,12 +452,39 @@ func (e *ReadinessEngine) pricingLinkDrops(ctx context.Context, pricingURL, webs
 	return attributionLinkDrops(page.Body, page.FinalURL.String(), refParam, probeValue)
 }
 
+func linkedPageURL(site fetchedPage, websiteURL string, pattern *regexp.Regexp) string {
+	if !site.OK {
+		return ""
+	}
+	match := pattern.FindStringSubmatch(site.Body)
+	if len(match) < 2 {
+		return ""
+	}
+	ref, err := url.Parse(strings.TrimSpace(html.UnescapeString(match[1])))
+	if err != nil || ref.Scheme == "javascript" || ref.Scheme == "data" {
+		return ""
+	}
+	base := site.FinalURL
+	if base == nil {
+		parsed, parseErr := url.Parse(websiteURL)
+		if parseErr != nil {
+			return ""
+		}
+		base = parsed
+	}
+	resolved := base.ResolveReference(ref)
+	if resolved.Scheme != "http" && resolved.Scheme != "https" {
+		return ""
+	}
+	return resolved.String()
+}
+
 func (e *ReadinessEngine) checkPricingPage(ctx context.Context, pricingURL string) ReadinessCheck {
 	check := ReadinessCheck{Key: "pricing_page", Kind: "probe", Gate: true}
 	if strings.TrimSpace(pricingURL) == "" {
 		check.Status = "fail"
-		check.Evidence = "no pricing_url provided"
-		check.Remediation = "Publish a pricing page and set pricing_url; publishers convert better when the price is visible."
+		check.Evidence = "No pricing page found."
+		check.Remediation = "Add a pricing page that states the price, and link it from the landing page."
 		return check
 	}
 	page := e.fetchPage(ctx, pricingURL)
@@ -471,8 +508,8 @@ func (e *ReadinessEngine) checkDocsPresent(ctx context.Context, docsURL string) 
 	check := ReadinessCheck{Key: "docs_present", Kind: "probe", Gate: true}
 	if strings.TrimSpace(docsURL) == "" {
 		check.Status = "fail"
-		check.Evidence = "no docs_url provided"
-		check.Remediation = "Publish documentation and set docs_url; publishers link to docs to support their recommendation."
+		check.Evidence = "No documentation page found."
+		check.Remediation = "Add a documentation page, and link it from the landing page."
 		return check
 	}
 	page := e.fetchPage(ctx, docsURL)

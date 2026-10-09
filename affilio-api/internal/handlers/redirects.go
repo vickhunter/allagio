@@ -34,6 +34,15 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 	link, err := h.DB.GetCampaignByTrackingCode(c.Request.Context(), code)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			landing, ok, lookupErr := h.DB.OfferLandingByPreviewCode(c.Request.Context(), code)
+			if lookupErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
+				return
+			}
+			if ok && httpsDestination(landing) {
+				c.Redirect(http.StatusFound, landing)
+				return
+			}
 			c.JSON(http.StatusNotFound, gin.H{"error": "unknown link"})
 			return
 		}

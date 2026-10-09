@@ -102,6 +102,21 @@ WHERE c.tracking_code=$1`, code)
 	return &link, nil
 }
 
+func (d *DB) OfferLandingByPreviewCode(ctx context.Context, code string) (string, bool, error) {
+	if len(code) != 32 {
+		return "", false, nil
+	}
+	var landing string
+	err := d.Pool.QueryRow(ctx, `SELECT landing_url FROM offers WHERE replace(id::text, '-', '') = $1`, code).Scan(&landing)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return landing, landing != "", nil
+}
+
 func (d *DB) InsertCampaignClick(ctx context.Context, campaignID, siteID string, programID *string, ipHash, userAgent, referrer string) (string, error) {
 	return d.InsertPlacementClick(ctx, campaignID, siteID, programID, ipHash, userAgent, referrer, "")
 }

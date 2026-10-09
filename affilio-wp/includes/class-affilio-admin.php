@@ -250,13 +250,23 @@ class Affilio_Admin {
             $this->keep_or_replace_secret('affilio_api_key', 'affilio_api_key');
             $existing_disclosure = isset($_POST['affilio_existing_disclosure']) ? sanitize_text_field(wp_unslash($_POST['affilio_existing_disclosure'])) : '';
             update_option('affilio_existing_disclosure', $existing_disclosure === '1' ? '1' : '');
+            $url_error = '';
             if ($this->is_advanced_mode()) {
-                update_option('affilio_api_url_override', esc_url_raw(isset($_POST['affilio_api_url_override']) ? $_POST['affilio_api_url_override'] : ''));
+                $override = isset($_POST['affilio_api_url_override']) ? trim((string) wp_unslash($_POST['affilio_api_url_override'])) : '';
+                if (!$this->api_url_override_allowed($override)) {
+                    $url_error = "L'URL dell'API deve usare https, salvo localhost.";
+                } else {
+                    update_option('affilio_api_url_override', esc_url_raw($override));
+                }
                 $this->keep_or_replace_secret('affilio_admin_api_key', 'affilio_admin_api_key');
             }
             $this->api->invalidate_status_cache();
             $this->api->get_connection_status(true);
-            echo '<div class="updated"><p>' . esc_html($this->t('Settings saved.', 'Impostazioni salvate.')) . '</p></div>';
+            if ($url_error !== '') {
+                echo '<div class="error"><p>' . esc_html($url_error) . '</p></div>';
+            } else {
+                echo '<div class="updated"><p>' . esc_html($this->t('Settings saved.', 'Impostazioni salvate.')) . '</p></div>';
+            }
         }
 
         $status = $this->api->get_connection_status();
@@ -422,6 +432,23 @@ class Affilio_Admin {
         $stored = trim((string) get_option($option, ''));
         $placeholder = $stored === '' ? '' : 'Key saved (' . Affilio_API::mask_key($stored) . ')';
         echo '<input type="password" name="' . esc_attr($name) . '" value="" placeholder="' . esc_attr($placeholder) . '" class="regular-text" autocomplete="off" spellcheck="false" />';
+    }
+
+    private function api_url_override_allowed($raw) {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return true;
+        }
+        $parts = wp_parse_url($raw);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return false;
+        }
+        $scheme = strtolower((string) $parts['scheme']);
+        $host = strtolower((string) $parts['host']);
+        if ($scheme === 'https') {
+            return true;
+        }
+        return $scheme === 'http' && ($host === 'localhost' || $host === '127.0.0.1');
     }
 
     private function is_advanced_mode() {

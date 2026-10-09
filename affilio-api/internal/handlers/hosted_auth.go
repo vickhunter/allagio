@@ -181,6 +181,17 @@ func (h *HostedHandler) LoginStart(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return
 	}
+	if extra := demoAttribution(c); extra != "" {
+		if strings.Contains(returnTo, "?") {
+			returnTo += "&" + extra
+		} else {
+			returnTo += "?" + extra
+		}
+		if len(returnTo) > 8192 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
+			return
+		}
+	}
 	state, err := randomToken()
 	if err != nil {
 		c.Status(500)

@@ -325,9 +325,36 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "publisher_reported", "content_sha256": hex.EncodeToString(hash[:])})
 }
 
+func placementPublishedOrReceipted(p *database.Placement) bool {
+	if p.Status == "committed" {
+		return true
+	}
+	var receipt struct {
+		PublicationStatus string `json:"publication_status"`
+	}
+	return json.Unmarshal(p.Receipt, &receipt) == nil && receipt.PublicationStatus == "publisher_reported"
+}
+
 func (h *PlacementsHandler) MarkRemoved(c *gin.Context) {
 	if !uuidPattern.MatchString(c.Param("id")) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
+		return
+	}
+	p, err := h.DB.GetPlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "removal recording failed"})
+		return
+	}
+	if p.RemovedAt != nil {
+		c.JSON(http.StatusOK, gin.H{"status": "removed", "already_removed": true, "removed_at": p.RemovedAt.UTC().Format(time.RFC3339)})
+		return
+	}
+	if !placementPublishedOrReceipted(p) {
+		c.JSON(http.StatusConflict, gin.H{"error": "placement is not published", "reason": "not_published"})
 		return
 	}
 	already, at, found, err := h.DB.MarkPlacementRemoved(c.Request.Context(), siteIDFrom(c), c.Param("id"))

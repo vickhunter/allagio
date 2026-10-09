@@ -350,6 +350,7 @@ func offerJSON(o *database.Offer) gin.H {
 		"ref_param":            o.RefParam,
 		"terms":                o.Terms,
 		"program_id":           o.ProgramID,
+		"tracked_link":         "/v1/go/" + strings.ReplaceAll(o.ID, "-", ""),
 		"created_at":           o.CreatedAt,
 		"updated_at":           o.UpdatedAt,
 	}

@@ -11,7 +11,7 @@ import (
 
 var demoAttributionParam = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
-const demoStyle = `<style>:root{--paper:#f7f7ef;--panel:#fdfdf7;--ink:#232720;--muted:#697063;--line:#dde0d3;--accent:#c64f38;--action:#2352c9;--action-ink:#f4f3ef;--font-sans:"Avenir Next",Avenir,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-sans);font-size:16px;line-height:1.5;overflow-wrap:anywhere}main{max-width:40rem;margin:0 auto;padding:28px 18px 48px}h1{font-size:clamp(32px,4vw,48px);line-height:1.1;letter-spacing:-.02em;margin:0 0 12px}.demo-flag{display:inline-flex;align-items:center;margin:0 0 16px;padding:4px 10px;border:1px solid var(--accent);border-radius:999px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.08em}.sub{color:var(--muted);margin:0 0 16px}.note{margin:0 0 16px}p.links{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}a{color:var(--ink);display:inline-flex;align-items:center;min-height:44px;padding:8px 2px}a.cta{background:var(--action);color:var(--action-ink);text-decoration:none;border-radius:5px;padding:12px 18px;min-width:44px;font-weight:600}</style>`
+const demoStyle = `<style>:root{--paper:#f7f7ef;--panel:#fdfdf7;--ink:#232720;--muted:#697063;--line:#dde0d3;--accent:#c64f38;--action:#2352c9;--action-ink:#f4f3ef;--font-sans:"Avenir Next",Avenir,"Segoe UI",sans-serif}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-sans);font-size:16px;line-height:1.5;overflow-wrap:anywhere}main{max-width:40rem;margin:0 auto;padding:28px 18px 48px}h1{font-size:clamp(32px,4vw,48px);line-height:1.1;letter-spacing:-.02em;margin:0 0 12px}.demo-flag{display:inline-flex;align-items:center;margin:0 0 16px;padding:4px 10px;border:1px solid var(--accent);border-radius:999px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.08em}.sub{color:var(--muted);margin:0 0 16px}.note{margin:0 0 16px}p.links{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center}a{color:var(--ink);display:inline-flex;align-items:center;min-height:44px;padding:8px 2px}a.cta{background:var(--action);color:var(--action-ink);text-decoration:none;border-radius:5px;padding:12px 18px;min-width:44px;font-weight:600}nav.demo-nav{display:block;width:auto}nav.demo-nav a{min-width:44px;min-height:44px}@media (max-width:390px){nav.demo-nav{width:180px}}</style>`
 
 const demoTagline = "Demo landing page builder: launch a landing page without code."
 
@@ -60,7 +60,7 @@ func (h *HostedHandler) writeDemo(c *gin.Context, page string) {
 	query := demoAttribution(c)
 	back := `<p><a href="` + demoHref("/demo", query) + `">Back to the demo</a></p>`
 	start := `<p><a class="cta" href="` + demoHref("/demo/start", query) + `">Get started</a></p>`
-	links := `<p class="links"><a href="` + demoHref("/demo/pricing", query) + `">Pricing</a><a href="` + demoHref("/demo/docs", query) + `">Docs</a><a href="` + demoHref("/demo/privacy", query) + `">Privacy</a><a href="` + demoHref("/demo/terms", query) + `">Terms</a></p>`
+	links := `<nav class="demo-nav" aria-label="Demo"><p class="links"><a href="` + demoHref("/demo/pricing", query) + `">Pricing</a><a href="` + demoHref("/demo/docs", query) + `">Docs</a><a href="` + demoHref("/demo/privacy", query) + `">Privacy</a><a href="` + demoHref("/demo/terms", query) + `">Terms</a></p></nav>`
 	var title, description, body string
 	switch page {
 	case "":
@@ -70,7 +70,8 @@ func (h *HostedHandler) writeDemo(c *gin.Context, page string) {
 	case "start":
 		title = "Get started · Demo landing page builder"
 		description = "Demo landing page builder. Sign in for the demo."
-		body = demoFlag() + `<h1>Get started</h1><p class="sub">Demo landing page builder. This screen only points at sign-in for the demo. It does not create an account.</p>` + back + `<p><a href="/auth/login">Sign in</a></p><p><a href="/auth/login">Register</a></p>`
+		signIn := demoHref("/auth/login", query)
+		body = demoFlag() + `<h1>Get started</h1><p class="sub">Demo landing page builder. This screen only points at sign-in for the demo. It does not create an account.</p><nav class="demo-nav" aria-label="Demo">` + back + `<p><a href="` + signIn + `">Sign in</a></p><p><a href="` + signIn + `">Register</a></p></nav>`
 	case "pricing":
 		title = "Pricing · Demo landing page builder"
 		description = "Demo landing page builder. Demo only: there is no real price."

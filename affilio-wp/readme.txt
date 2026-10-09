@@ -10,6 +10,7 @@ AI affiliate copilot for WordPress. Connect from Settings, then review recommend
 = 0.1.15 =
 * An inserted placement ends with the plain text "(link sponsorizzato)" after the link. The link text is "Vedi il prodotto" with non-breaking spaces, in the same paragraph.
 * Removing an insertion still finds that paragraph when the class was deleted, as long as the link is the tracked go URL or the placement id was named.
+* Settings refuse an API URL override that is not https, unless the host is localhost or 127.0.0.1. The message is in Italian.
 
 = 0.1.14 =
 * A post counts as already disclosed only when it matches the receipt rule: the approved disclosure, "commissione", or "link" within 60 characters of "affiliat".
