@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// stagingPost2615FixtureSHA is the hosted post body used with the hosted Demo offer.
+// Fixture: the 3021-byte context affilio-wp 0.1.12 builds from staging post 2615's post_content (25154 bytes, sha256 fa682c36d6f318d3877a34c8b61815c708c65ed65f06eaf5a902efd0ccfad1e8) and sends to /v1/revenue/preview. It is not the post itself.
 const stagingPost2615FixtureSHA = "4a2fff3f8e223bd0f4493b4da115e3df8532f613118fbbbf0e598e7c37ecf1d5"
 
 // hostedDemoOfferTerms is the hosted Demo offer as /v1/revenue/preview scores it:

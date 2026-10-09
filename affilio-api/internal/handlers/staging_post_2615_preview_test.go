@@ -45,6 +45,7 @@ RETURNING id`,
 		t.Fatal(err)
 	}
 
+	// Context built by affilio-wp 0.1.12 from staging post 2615's post_content, sha256 fa682c36…, not the post.
 	raw, err := os.ReadFile(filepath.Join("..", "services", "testdata", "staging_post_2615.txt"))
 	if err != nil {
 		t.Fatal(err)
