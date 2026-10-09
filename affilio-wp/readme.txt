@@ -1,11 +1,15 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.15
+Stable tag: 0.1.16
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.16 =
+* A removal the service answers with 409 not_published stays removed locally and is not retried. The notice is "Rimosso dal post. L'inserimento non era pubblicato, quindi non c'è niente da segnalare."
+* Any other 4xx is not queued. The notice names the HTTP code and the command exits 1. Only a network error or a 5xx is retried.
 
 = 0.1.15 =
 * An inserted placement ends with the plain text "(link sponsorizzato)" after the link. The link text is "Vedi il prodotto" with non-breaking spaces, in the same paragraph.

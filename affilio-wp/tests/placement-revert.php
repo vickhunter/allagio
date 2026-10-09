@@ -6,6 +6,7 @@ class WP_Error {
     public $data;
     public function __construct($code, $message, $data = array()) { $this->code = $code; $this->message = $message; $this->data = $data; }
     public function get_error_message() { return $this->message; }
+    public function get_error_data($code = '') { return $this->data; }
 }
 function is_wp_error($value) { return $value instanceof WP_Error; }
 function rest_ensure_response($value) { return $value; }
@@ -81,6 +82,15 @@ class RevertAPI {
         if (strpos($path, '/removed') !== false) {
             if ($this->removed_mode === 'down') {
                 return array('code' => 503, 'data' => array('error' => 'down'));
+            }
+            if ($this->removed_mode === 'network') {
+                return new WP_Error('http_request_failed', 'connection refused');
+            }
+            if ($this->removed_mode === 'not_published') {
+                return array('code' => 409, 'data' => array('error' => 'placement is not published', 'reason' => 'not_published'));
+            }
+            if ($this->removed_mode === 'forbidden') {
+                return array('code' => 403, 'data' => array('error' => 'publisher account is not connected'));
             }
             if ($this->removed_mode === 'already') {
                 return array('code' => 200, 'data' => array('status' => 'removed', 'already_removed' => true));
@@ -280,5 +290,65 @@ check(!empty($foreign_one['matched']) && $foreign_one['content'] === $kept, "wp 
 $GLOBALS['post']->post_content = $stripped;
 $stripped_cli = (new Affilio_Revert_Command($distribution))->run(array('7'), array('placement' => $placement_id));
 check($stripped_cli === 0 && $GLOBALS['post']->post_content === $stripped_kept, 'CLI left the class-stripped placement in the post');
+
+$unpublished_sentence = "Rimosso dal post. L'inserimento non era pubblicato, quindi non c'è niente da segnalare.";
+$GLOBALS['options'] = array();
+$GLOBALS['scheduled'] = array();
+$GLOBALS['post']->post_content = $extra;
+$api->removed_mode = 'not_published';
+$unpublished = $distribution->perform_revert_action(7, $placement_id, 'nonce-for-affilio_revert_7_' . $placement_id);
+check($unpublished['notice'] === $unpublished_sentence, 'admin notice for an unpublished placement was: ' . $unpublished['notice']);
+check($GLOBALS['post']->post_content === $kept, '409 not_published left the block in the post');
+check(empty($GLOBALS['options']['affilio_removal_queue']), '409 not_published was queued');
+check(empty($GLOBALS['scheduled']['affilio_retry_removals']), '409 not_published scheduled a retry');
+$GLOBALS['post']->post_content = $extra;
+$cli_unpublished_command = new Affilio_Revert_Command($distribution);
+$cli_unpublished = $cli_unpublished_command->run(array('7'), array('placement' => $placement_id));
+check($cli_unpublished === 0, 'CLI exited ' . $cli_unpublished . ' for 409 not_published');
+check(strpos(implode("\n", $cli_unpublished_command->lines), $unpublished_sentence) !== false, 'CLI omitted the unpublished sentence');
+check(empty($GLOBALS['options']['affilio_removal_queue']), 'CLI queued 409 not_published');
+
+$client_line = 'API: errore 4xx (403): publisher account is not connected. Non riprovo.';
+$GLOBALS['options'] = array();
+$GLOBALS['scheduled'] = array();
+$GLOBALS['post']->post_content = $extra;
+$api->removed_mode = 'forbidden';
+$forbidden = $distribution->perform_revert_action(7, $placement_id, 'nonce-for-affilio_revert_7_' . $placement_id);
+check(strpos($forbidden['notice'], $client_line) !== false, 'admin notice for 403 was: ' . $forbidden['notice']);
+check($GLOBALS['post']->post_content === $kept, '403 left the block in the post');
+check(empty($GLOBALS['options']['affilio_removal_queue']), '403 was queued');
+check(empty($GLOBALS['scheduled']['affilio_retry_removals']), '403 scheduled a retry');
+$GLOBALS['post']->post_content = $extra;
+$cli_forbidden_command = new Affilio_Revert_Command($distribution);
+$cli_forbidden = $cli_forbidden_command->run(array('7'), array('placement' => $placement_id));
+check($cli_forbidden === 1, 'CLI exited ' . $cli_forbidden . ' for 403');
+check(strpos(implode("\n", $cli_forbidden_command->lines), $client_line) !== false, 'CLI omitted the 4xx line');
+check(empty($GLOBALS['options']['affilio_removal_queue']), 'CLI queued a 403');
+
+$GLOBALS['options'] = array();
+$GLOBALS['scheduled'] = array();
+$GLOBALS['post']->post_content = $extra;
+$api->removed_mode = 'network';
+$network = $distribution->perform_revert_action(7, $placement_id, 'nonce-for-affilio_revert_7_' . $placement_id);
+check(strpos($network['notice'], 'API: non raggiungibile, riprovo più tardi') !== false, 'network notice was: ' . $network['notice']);
+check($GLOBALS['post']->post_content === $kept, 'a network error left the block in the post');
+check(isset($GLOBALS['options']['affilio_removal_queue'][$placement_id]), 'a network error was not queued');
+check(!empty($GLOBALS['scheduled']['affilio_retry_removals']), 'a network error did not schedule a retry');
+$GLOBALS['post']->post_content = $extra;
+$cli_network_command = new Affilio_Revert_Command($distribution);
+$cli_network = $cli_network_command->run(array('7'), array('placement' => $placement_id));
+check($cli_network === 0, 'CLI exited ' . $cli_network . ' for a network error');
+check(strpos(implode("\n", $cli_network_command->lines), 'API: non raggiungibile, riprovo più tardi') !== false, 'CLI omitted the retry line for a network error');
+
+$GLOBALS['options']['affilio_removal_queue'] = array($placement_id => array('attempts' => 1, 'next_at' => 0));
+$GLOBALS['scheduled'] = array();
+$api->removed_mode = 'forbidden';
+$distribution->retry_removals();
+check(empty($GLOBALS['options']['affilio_removal_queue']), 'cron kept a 4xx removal');
+check(empty($GLOBALS['scheduled']['affilio_retry_removals']), 'cron scheduled another try after a 4xx');
+$GLOBALS['options']['affilio_removal_queue'] = array($placement_id => array('attempts' => 1, 'next_at' => 0));
+$api->removed_mode = 'not_published';
+$distribution->retry_removals();
+check(empty($GLOBALS['options']['affilio_removal_queue']), 'cron kept a 409 not_published removal');
 
 echo "Placement className insert, legacy revert, confirmation and CLI passed.\n";

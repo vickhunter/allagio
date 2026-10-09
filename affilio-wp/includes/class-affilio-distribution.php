@@ -104,7 +104,12 @@ class Affilio_Distribution {
         }
         if ($response['code'] < 200 || $response['code'] >= 300) {
             $message = isset($response['data']['error']) ? $response['data']['error'] : 'The distribution service could not complete this request.';
-            return new WP_Error('affilio_distribution', $message, array('status' => $response['code'] >= 400 && $response['code'] < 500 ? $response['code'] : 502));
+            $status = $response['code'] >= 400 && $response['code'] < 500 ? (int) $response['code'] : 502;
+            $error_data = array('status' => $status);
+            if (isset($response['data']['reason']) && is_string($response['data']['reason'])) {
+                $error_data['reason'] = $response['data']['reason'];
+            }
+            return new WP_Error('affilio_distribution', $message, $error_data);
         }
         return $response['data'];
     }
@@ -488,13 +493,32 @@ class Affilio_Distribution {
         if (!$matched) {
             return 'Nessun inserimento da rimuovere.';
         }
-        $states = array(
-            'reported' => 'API: segnalato',
-            'already' => 'API: già rimosso',
-            'unreachable' => 'API: non raggiungibile, riprovo più tardi',
-        );
-        $line = isset($states[$api_state]) ? $states[$api_state] : $states['unreachable'];
+        $outcome = is_array($api_state) ? $api_state : array('state' => (string) $api_state);
+        $state = isset($outcome['state']) ? $outcome['state'] : 'unreachable';
+        if ($state === 'not_published') {
+            return "Rimosso dal post. L'inserimento non era pubblicato, quindi non c'è niente da segnalare.";
+        }
+        if ($state === 'client_error') {
+            $code = isset($outcome['code']) ? (int) $outcome['code'] : 0;
+            $reason = isset($outcome['reason']) ? $outcome['reason'] : '';
+            $line = self::client_error_line($code, $reason);
+        } else {
+            $states = array(
+                'reported' => 'API: segnalato',
+                'already' => 'API: già rimosso',
+                'unreachable' => 'API: non raggiungibile, riprovo più tardi',
+            );
+            $line = isset($states[$state]) ? $states[$state] : $states['unreachable'];
+        }
         return 'Inserimento rimosso da «' . $title . '»: ' . $anchor . ' ' . $href . '. ' . $line;
+    }
+
+    public static function client_error_line($code, $reason) {
+        $reason = trim((string) $reason);
+        if ($reason === '') {
+            $reason = 'richiesta rifiutata';
+        }
+        return 'API: errore 4xx (' . (int) $code . '): ' . $reason . '. Non riprovo.';
     }
 
     public function retry_removals() {
@@ -512,8 +536,9 @@ class Affilio_Distribution {
             if ($next > $now) {
                 continue;
             }
-            $state = $this->post_removed($id);
-            if ($state === 'reported' || $state === 'already') {
+            $outcome = $this->post_removed($id);
+            $state = isset($outcome['state']) ? $outcome['state'] : '';
+            if ($state === 'reported' || $state === 'already' || $state === 'not_published' || $state === 'client_error') {
                 unset($queue[$id]);
                 continue;
             }
@@ -531,24 +556,37 @@ class Affilio_Distribution {
     }
 
     private function report_removed($id) {
-        $state = $this->post_removed($id);
+        $outcome = $this->post_removed($id);
+        $state = isset($outcome['state']) ? $outcome['state'] : 'unreachable';
         if ($state === 'unreachable') {
             $this->enqueue_removal($id);
         } else {
             $this->dequeue_removal($id);
         }
-        return $state;
+        return $outcome;
     }
 
     private function post_removed($id) {
         $data = $this->request('POST', '/placements/' . $id . '/removed', array());
-        if (is_wp_error($data)) {
-            return 'unreachable';
+        if (!is_wp_error($data)) {
+            if (is_array($data) && !empty($data['already_removed'])) {
+                return array('state' => 'already');
+            }
+            return array('state' => 'reported');
         }
-        if (is_array($data) && !empty($data['already_removed'])) {
-            return 'already';
+        $error_data = method_exists($data, 'get_error_data') ? $data->get_error_data() : array();
+        if (!is_array($error_data)) {
+            $error_data = array();
         }
-        return 'reported';
+        $status = isset($error_data['status']) ? (int) $error_data['status'] : 0;
+        $reason = isset($error_data['reason']) ? (string) $error_data['reason'] : '';
+        if ($status === 409 && $reason === 'not_published') {
+            return array('state' => 'not_published');
+        }
+        if ($status >= 400 && $status < 500) {
+            return array('state' => 'client_error', 'code' => $status, 'reason' => $data->get_error_message());
+        }
+        return array('state' => 'unreachable');
     }
 
     private function enqueue_removal($id) {
