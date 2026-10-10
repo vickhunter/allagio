@@ -64,6 +64,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"015_site_owner_connection.sql",
 		"016_placement_removed_at.sql",
 		"017_owner_attribution_source.sql",
+		"018_d032_agent_entry.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)

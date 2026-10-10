@@ -285,6 +285,8 @@ func (d *DB) RevokeOwnerGrant(ctx context.Context, ownerID, grantID string) (boo
 
 func (d *DB) ApproveOwnerPlacement(ctx context.Context, o *Owner, id string) (bool, error) {
 	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals pp SET status='approved',approved_at=NOW(),approved_by=$3,
+approved_by_kind='owner', matched_rule='owner',
+policy_version=COALESCE((SELECT version FROM approval_policies WHERE site_id=pp.site_id),0),
 approval_evidence=jsonb_build_object('method','owner_session','owner_id',$3::text,'issuer',$4::text,'subject',$5::text)::text
 FROM offers f JOIN products p ON p.id=f.product_id JOIN makers m ON m.id=p.maker_id
 WHERE pp.id=$1 AND pp.site_id=$2 AND pp.offer_id=f.id AND pp.status='pending' AND pp.expires_at>NOW()

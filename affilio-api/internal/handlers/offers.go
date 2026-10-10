@@ -103,7 +103,11 @@ func (h *OffersHandler) List(c *gin.Context) {
 	}
 	out := make([]gin.H, 0, len(offers))
 	for i := range offers {
-		out = append(out, offerJSON(&offers[i]))
+		item := offerJSON(&offers[i])
+		if scoped := c.GetString("offer_scope_id"); scoped != "" && item["id"] != scoped {
+			continue
+		}
+		out = append(out, item)
 	}
 	c.JSON(http.StatusOK, gin.H{"offers": out})
 }

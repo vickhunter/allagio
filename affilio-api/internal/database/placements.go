@@ -12,22 +12,26 @@ import (
 var ErrPlacementAuthority = errors.New("placement is not authorized, has expired, or terms changed")
 
 type Placement struct {
-	ID         string          `json:"id"`
-	SiteID     string          `json:"site_id"`
-	OfferID    string          `json:"offer_id"`
-	SurfaceURL string          `json:"surface_url"`
-	Context    string          `json:"context"`
-	Copy       string          `json:"copy"`
-	Disclosure string          `json:"disclosure"`
-	Reason     string          `json:"reason"`
-	Terms      json.RawMessage `json:"terms"`
-	Status     string          `json:"status"`
-	ExpiresAt  time.Time       `json:"expires_at"`
-	Receipt    json.RawMessage `json:"receipt,omitempty"`
-	RemovedAt  *time.Time      `json:"removed_at,omitempty"`
+	ID            string          `json:"id"`
+	SiteID        string          `json:"site_id"`
+	OfferID       string          `json:"offer_id"`
+	SurfaceURL    string          `json:"surface_url"`
+	Context       string          `json:"context"`
+	Copy          string          `json:"copy"`
+	Disclosure    string          `json:"disclosure"`
+	Reason        string          `json:"reason"`
+	Terms         json.RawMessage `json:"terms"`
+	Status        string          `json:"status"`
+	ExpiresAt     time.Time       `json:"expires_at"`
+	Receipt       json.RawMessage `json:"receipt,omitempty"`
+	RemovedAt     *time.Time      `json:"removed_at,omitempty"`
+	ApprovedBy    string          `json:"approved_by,omitempty"`
+	PolicyVersion int             `json:"policy_version,omitempty"`
+	MatchedRule   string          `json:"matched_rule,omitempty"`
+	AutoPaused    bool            `json:"auto_paused,omitempty"`
 }
 
-const placementColumns = `id,site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,status,expires_at,receipt,removed_at`
+const placementColumns = `id,site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,status,expires_at,receipt,removed_at,COALESCE(approved_by_kind,''),COALESCE(policy_version,0),COALESCE(matched_rule,''),auto_paused`
 const placementTermsSQL = `jsonb_build_object('product_id',o.product_id,'commission_type',o.commission_type,
  'commission_value_minor',(o.commission_value*100)::bigint,'currency',o.commission_currency,
  'cookie_duration_days',o.cookie_duration_days,'refund_window_days',o.refund_window_days,
@@ -43,7 +47,7 @@ const placementEligibleSQL = `FROM offers o JOIN products p ON p.id=o.product_id
 
 func scanPlacement(row interface{ Scan(...interface{}) error }) (*Placement, error) {
 	var p Placement
-	err := row.Scan(&p.ID, &p.SiteID, &p.OfferID, &p.SurfaceURL, &p.Context, &p.Copy, &p.Disclosure, &p.Reason, &p.Terms, &p.Status, &p.ExpiresAt, &p.Receipt, &p.RemovedAt)
+	err := row.Scan(&p.ID, &p.SiteID, &p.OfferID, &p.SurfaceURL, &p.Context, &p.Copy, &p.Disclosure, &p.Reason, &p.Terms, &p.Status, &p.ExpiresAt, &p.Receipt, &p.RemovedAt, &p.ApprovedBy, &p.PolicyVersion, &p.MatchedRule, &p.AutoPaused)
 	return &p, err
 }
 
@@ -133,7 +137,9 @@ func (d *DB) ListPlacements(ctx context.Context, siteID string) ([]Placement, er
 }
 
 func (d *DB) ApprovePlacement(ctx context.Context, id, siteID, ownerEmail, evidence string) (bool, error) {
-	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals pp SET status='approved',approved_at=NOW(),approval_evidence=$4
+	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals pp SET status='approved',approved_at=NOW(),approval_evidence=$4,
+approved_by_kind='owner', matched_rule='owner_evidence',
+policy_version=COALESCE((SELECT version FROM approval_policies WHERE site_id=pp.site_id),0)
  FROM offers o JOIN products p ON p.id=o.product_id JOIN makers m ON m.id=p.maker_id
  WHERE pp.id=$1 AND pp.site_id=$2 AND pp.offer_id=o.id AND pp.status='pending' AND pp.expires_at>NOW()
  AND lower(m.email)<>lower($3)`, id, siteID, ownerEmail, evidence)
@@ -167,7 +173,7 @@ func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Pla
 	if p.Status == "committed" {
 		return p, nil
 	}
-	if p.Status != "approved" {
+	if p.Status != "approved" || p.AutoPaused {
 		return nil, ErrPlacementAuthority
 	}
 	var eligible bool

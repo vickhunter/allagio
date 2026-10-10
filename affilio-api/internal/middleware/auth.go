@@ -56,6 +56,13 @@ func APIKeyAuth(db *database.DB, audit *services.AuditLogger, resources ...strin
 				c.Next()
 				return
 			}
+			projectSiteID, projectErr := db.ProjectSiteKey(c.Request.Context(), keyHash)
+			if projectErr == nil {
+				c.Set("api_key_hash", keyHash)
+				c.Set("site_id", projectSiteID)
+				c.Next()
+				return
+			}
 		}
 		if err != nil {
 			if audit != nil {

@@ -12,6 +12,7 @@ import (
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
 	"affilio-api/internal/dcp"
+	"affilio-api/internal/entry"
 	"affilio-api/internal/handlers"
 	"affilio-api/internal/middleware"
 	"affilio-api/internal/migrations"
@@ -212,6 +213,21 @@ func main() {
 	}
 	v1.POST("/mcp", mcp.Receive)
 
+	agentEntry := &handlers.AgentEntry{
+		DB:             db,
+		BaseURL:        strings.TrimRight(cfg.PublicBaseURL, "/"),
+		Claims:         entry.StubClaimChecker{},
+		AccountLimiter: handlers.NewIPRateLimiter(8, time.Minute),
+		DeviceLimiter:  handlers.NewIPRateLimiter(30, time.Minute),
+	}
+	if hosted != nil {
+		agentEntry.Owner = hosted.RequireOwnerSession
+	}
+	agentEntry.Mount(r)
+	signals := v1.Group("/agent-signals")
+	signals.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
+	signals.GET("", agentEntry.AgentSignals)
+
 	secured := v1.Group("/")
 	secured.Use(middleware.APIKeyAuth(db, audit, oauthResources...))
 	if hosted != nil {
@@ -273,6 +289,7 @@ func main() {
 
 	maker := v1.Group("/maker")
 	maker.Use(middleware.MakerKeyAuth(db, oauthResources...))
+	maker.Use(middleware.LimitOfferScope())
 	{
 		maker.POST("/products", products.Create)
 		maker.GET("/products", products.List)

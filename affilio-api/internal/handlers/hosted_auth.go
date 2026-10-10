@@ -160,6 +160,8 @@ func (h *HostedHandler) ownerSession(c *gin.Context) {
 	c.Next()
 }
 
+func (h *HostedHandler) RequireOwnerSession(c *gin.Context) { h.ownerSession(c) }
+
 func ownerFrom(c *gin.Context) *database.Owner { return c.MustGet("owner").(*database.Owner) }
 
 func (h *HostedHandler) requirePublisher(c *gin.Context) {
@@ -608,7 +610,15 @@ func (h *HostedHandler) ReviewPlacement(c *gin.Context) {
 		commission = fmt.Sprintf("%.2f%% of the first paid checkout, excluding tax and shipping", float64(terms.CommissionValueMinor)/100)
 	}
 	summary := fmt.Sprintf("Destination: %s\n%s\nRefund hold: %d days. Attribution window: %d days.\nMerchant pays directly. Service fee: %d%% of commission.\nCurrency: %s. Payment mode: %s.\n%s", terms.LandingURL, commission, terms.RefundDays, terms.CookieDays, terms.FeePercent, terms.Currency, terms.Mode, terms.Text)
-	body := fmt.Sprintf(`<p>Status: %s · Expires: %s</p><p><a href="%s">%s</a></p><h2>Recommendation</h2><pre>%s</pre><h2>Disclosure</h2><pre>%s</pre><h2>Terms</h2><pre>%s</pre>`, template.HTMLEscapeString(PlacementDashboardLabel(p.Status, p.RemovedAt)), p.ExpiresAt.Format(time.RFC3339), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy), template.HTMLEscapeString(p.Disclosure), template.HTMLEscapeString(summary))
+	approvedBy := ""
+	if p.ApprovedBy != "" {
+		approvedBy = `<p>Approved by: ` + template.HTMLEscapeString(p.ApprovedBy)
+		if p.MatchedRule != "" {
+			approvedBy += template.HTMLEscapeString(" · " + p.MatchedRule)
+		}
+		approvedBy += `</p>`
+	}
+	body := fmt.Sprintf(`<p>Status: %s · Expires: %s</p>%s<p><a href="%s">%s</a></p><h2>Recommendation</h2><pre>%s</pre><h2>Disclosure</h2><pre>%s</pre><h2>Terms</h2><pre>%s</pre>`, template.HTMLEscapeString(PlacementDashboardLabel(p.Status, p.RemovedAt)), p.ExpiresAt.Format(time.RFC3339), approvedBy, template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy), template.HTMLEscapeString(p.Disclosure), template.HTMLEscapeString(summary))
 	if p.Status == "pending" && p.ExpiresAt.After(time.Now()) {
 		body += fmt.Sprintf(`<form method="post" action="/owner/placements/%s/approve"><input type="hidden" name="csrf" value="%s"><button>Approve this exact placement</button></form>`, p.ID, template.HTMLEscapeString(o.CSRF))
 	}
