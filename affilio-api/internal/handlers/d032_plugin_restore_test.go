@@ -70,7 +70,7 @@ func TestRestorePauseAndLimits(t *testing.T) {
 		t.Fatalf("pause site: %d %s", paused.Code, paused.Body.String())
 	}
 	refused, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+pausedSite+"/restore", nil, siteKey)
-	if refused.Code != http.StatusConflict || body["reason"] != "paused" {
+	if refused.Code != http.StatusConflict || body["reason"] != "paused" || body["message"] == "" {
 		t.Fatalf("pause then restore: %d %s", refused.Code, refused.Body.String())
 	}
 	if statusOf(pausedSite) != "revoked" {
@@ -93,7 +93,7 @@ func TestRestorePauseAndLimits(t *testing.T) {
 		t.Fatalf("resume offer: %d %s", resumed.Code, resumed.Body.String())
 	}
 	refused, body = postJSON(t, r, http.MethodPost, "/v1/placements/"+pausedOffer+"/restore", nil, siteKey)
-	if refused.Code != http.StatusConflict || body["reason"] != "paused" || body["error"] != "restore refused" {
+	if refused.Code != http.StatusConflict || body["reason"] != "paused" || body["message"] == "" || body["error"] != nil {
 		t.Fatalf("pause history then restore: %d %s", refused.Code, refused.Body.String())
 	}
 	if statusOf(pausedOffer) != "revoked" {
@@ -627,7 +627,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 		}
 	}
 	early, earlyBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, siteKey)
-	if early.Code != http.StatusConflict || earlyBody["error"] != "not_failed" || earlyBody["reason"] != "not_failed" {
+	if early.Code != http.StatusConflict || earlyBody["reason"] != "not_failed" || earlyBody["message"] == "" || earlyBody["error"] != nil {
 		t.Fatalf("retry before failure: %d %s", early.Code, early.Body.String())
 	}
 	missing, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed"}, siteKey)
@@ -668,7 +668,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 		t.Fatalf("silent undo: %s", state)
 	}
 	offlineRetry, offlineBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, siteKey)
-	if offlineRetry.Code != http.StatusConflict || offlineBody["error"] != "not_failed" {
+	if offlineRetry.Code != http.StatusConflict || offlineBody["reason"] != "not_failed" || offlineBody["message"] == "" {
 		t.Fatalf("retry offline: %d %s", offlineRetry.Code, offlineRetry.Body.String())
 	}
 	acked, ackedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "still missing"}, siteKey)
@@ -796,6 +796,153 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	}
 }
 
+func TestFailedRestoreIsNotLive(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	r.GET("/v1/go/:code", (&RedirectsHandler{DB: db}).Go)
+	current := time.Date(2026, 10, 10, 8, 0, 0, 0, time.UTC)
+	api.Now = func() time.Time { return current }
+
+	owner, cookie := testOwnerSession(t, h, "dark-owner", "dark-owner@example.com")
+	siteID := createTestSite(t, db, "dark-site-key", "dark.example", "Dark")
+	makerID, offerID := seedListedOffer(t, db, "dark-maker-key", "dark-maker@example.com", "Dark Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	siteKey := map[string]string{"X-API-Key": "dark-site-key"}
+	id := insertPlacement(t, db, siteID, offerID, "https://dark.example/post", "Honest note about the product.")
+	var campaignID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code,requires_placement,status) VALUES($1,$2,'dark-go',true,'active') RETURNING id`, offerID, siteID).Scan(&campaignID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', approved_at=NOW(), campaign_id=$2 WHERE id=$1`, id, campaignID); err != nil {
+		t.Fatal(err)
+	}
+	var clickID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO clicks(site_id,campaign_id,placement_id,referrer) VALUES($1,$2,$3,'https://news.example/story') RETURNING id`, siteID, campaignID, id).Scan(&clickID); err != nil {
+		t.Fatal(err)
+	}
+	var attributed string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO conversions(offer_id,campaign_id,click_id,provider,provider_event_id,kind,amount,currency,commission_amount,occurred_at,payment_mode)
+VALUES($1,$2,$3,'stripe','dark-attributed','sale',10,'USD',1.50,NOW(),'test') RETURNING id`, offerID, campaignID, clickID).Scan(&attributed); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency) VALUES($1,$2,'commission',1.50,'USD')`, siteID, attributed); err != nil {
+		t.Fatal(err)
+	}
+	var other string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO conversions(offer_id,provider,provider_event_id,kind,amount,currency,commission_amount,occurred_at,payment_mode)
+VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`, offerID).Scan(&other); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency) VALUES($1,$2,'commission',2.00,'USD')`, siteID, other); err != nil {
+		t.Fatal(err)
+	}
+
+	goPath := "/v1/go/dark-go?placement=" + id
+	numbers := func() (wentLive, earnings float64) {
+		t.Helper()
+		rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("digest: %d %s", rec.Code, rec.Body.String())
+		}
+		totals := body["totals"].(map[string]any)
+		wentLive = totals["went_live"].(float64)
+		earnings = totals["earnings"].(float64)
+		var sawSite bool
+		for _, raw := range body["projects"].([]any) {
+			project := raw.(map[string]any)
+			if project["id"] != siteID {
+				continue
+			}
+			sawSite = true
+			if project["went_live"] != wentLive-1 {
+				t.Fatalf("site live count: %v totals %v", project["went_live"], wentLive)
+			}
+			if project["earnings"] != earnings/2 {
+				t.Fatalf("site earnings: %v totals %v", project["earnings"], earnings)
+			}
+		}
+		if !sawSite {
+			t.Fatalf("site missing from digest: %s", rec.Body.String())
+		}
+		return wentLive, earnings
+	}
+	clicks := placementClickCount(t, db, id)
+	live := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	if live.Code != http.StatusFound {
+		t.Fatalf("live redirect: %d %s", live.Code, live.Body.String())
+	}
+	clicks = placementClickCount(t, db, id)
+	if went, earned := numbers(); went != 2 || earned != 7 {
+		t.Fatalf("live counts: went %v earned %v", went, earned)
+	}
+
+	undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if undone.Code != http.StatusOK {
+		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
+	}
+	current = current.Add(time.Second)
+	restored, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/restore", nil, siteKey)
+	if restored.Code != http.StatusOK {
+		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
+	}
+	again := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	if again.Code != http.StatusFound {
+		t.Fatalf("restore redirect: %d %s", again.Code, again.Body.String())
+	}
+	clicks = placementClickCount(t, db, id)
+	if went, earned := numbers(); went != 2 || earned != 7 {
+		t.Fatalf("restored counts: went %v earned %v", went, earned)
+	}
+
+	failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, siteKey)
+	if failed.Code != http.StatusOK || failedBody["failed_action"] != "restored" || failedBody["plugin_state"] != "failed" {
+		t.Fatalf("failed restore: %d %s", failed.Code, failed.Body.String())
+	}
+	dark := func() {
+		t.Helper()
+		hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+		if hit.Code != http.StatusGone || hit.Header().Get("Location") != "" || bodyReason(t, hit) != "failed" {
+			t.Fatalf("failed restore still redirected: %d %s %s", hit.Code, hit.Header().Get("Location"), hit.Body.String())
+		}
+		if placementClickCount(t, db, id) != clicks {
+			t.Fatal("failed restore credited a click")
+		}
+		if went, earned := numbers(); went != 1 || earned != 4 {
+			t.Fatalf("dark counts: went %v earned %v", went, earned)
+		}
+		var status string
+		var held bool
+		if err := db.Pool.QueryRow(context.Background(), `SELECT status, restore_unconfirmed FROM placement_proposals WHERE id=$1`, id).Scan(&status, &held); err != nil || status != "committed" || !held {
+			t.Fatalf("held row: %s %v %v", status, held, err)
+		}
+	}
+	dark()
+
+	retried, retriedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/retry", nil, siteKey)
+	if retried.Code != http.StatusOK || retriedBody["plugin_state"] != "pending" {
+		t.Fatalf("retry: %d %s", retried.Code, retried.Body.String())
+	}
+	dark()
+
+	placed, placedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	if placed.Code != http.StatusOK || placedBody["plugin_state"] != "placed" {
+		t.Fatalf("ack restored: %d %s", placed.Code, placed.Body.String())
+	}
+	back := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	if back.Code != http.StatusFound {
+		t.Fatalf("confirmed redirect: %d %s", back.Code, back.Body.String())
+	}
+	if placementClickCount(t, db, id) != clicks+1 {
+		t.Fatal("confirmed restore did not record a click")
+	}
+	if went, earned := numbers(); went != 2 || earned != 7 {
+		t.Fatalf("confirmed counts: went %v earned %v", went, earned)
+	}
+}
+
 func pluginFailedReasonOf(t *testing.T, body map[string]any, id string) string {
 	t.Helper()
 	if items, ok := body["items"].([]any); ok {
@@ -863,6 +1010,36 @@ func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 	for _, doc := range []string{llms, modes} {
 		if !strings.Contains(doc, "POST /v1/placements/:id/retry") || !strings.Contains(doc, "not_failed") {
 			t.Fatal("docs drifted on plugin retry")
+		}
+		if !strings.Contains(doc, "A 409 returns `reason` and `message`") || !strings.Contains(doc, "A 422 returns `check_id` and `check_text`") {
+			t.Fatal("docs drifted on the 409 and 422 body shapes")
+		}
+	}
+}
+
+func TestEveryConflictHasAMessage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	seen := map[string]bool{}
+	for _, refusal := range entry.RestoreRefusals {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		writeNamedConflict(c, refusal.Reason)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("%s status: %d", refusal.Reason, rec.Code)
+		}
+		var body map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		message, _ := body["message"].(string)
+		if body["reason"] != refusal.Reason || message == "" || message != refusal.Text || body["error"] != nil || len(body) != 2 {
+			t.Fatalf("%s body: %s", refusal.Reason, rec.Body.String())
+		}
+		seen[refusal.Reason] = true
+	}
+	for _, reason := range []string{"window_expired", "paused", "not_failed"} {
+		if !seen[reason] {
+			t.Fatalf("409 %s was not exercised", reason)
 		}
 	}
 }

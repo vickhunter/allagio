@@ -118,6 +118,17 @@ func (d *DB) PlacementRevoked(ctx context.Context, placementID, campaignID strin
 	return revoked, err
 }
 
+// PlacementRestoreUnconfirmed is true after a failed restore until a verified
+// restored acknowledgement confirms the block is placed again.
+func (d *DB) PlacementRestoreUnconfirmed(ctx context.Context, placementID, campaignID string) (bool, error) {
+	var held bool
+	err := d.Pool.QueryRow(ctx, `SELECT restore_unconfirmed FROM placement_proposals WHERE id=$1 AND campaign_id=$2`, placementID, campaignID).Scan(&held)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return held, err
+}
+
 func (d *DB) CreatePlacement(ctx context.Context, p Placement) (*Placement, error) {
 	return scanPlacement(d.Pool.QueryRow(ctx, `INSERT INTO placement_proposals(site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,expires_at)
  SELECT $1,o.id,$3,$4,$5,$6,$7,`+placementTermsSQL+`,$8 `+placementEligibleSQL+` AND o.id=$2
@@ -188,6 +199,7 @@ plugin_wait=CASE WHEN $3='undo' THEN 'remove' ELSE plugin_wait END,
 plugin_wait_at=CASE WHEN $3='undo' THEN $4 ELSE plugin_wait_at END,
 plugin_failed_reason=CASE WHEN $3='undo' THEN '' ELSE plugin_failed_reason END,
 failed_action=CASE WHEN $3='undo' THEN '' ELSE failed_action END,
+restore_unconfirmed=CASE WHEN $3='undo' THEN false ELSE restore_unconfirmed END,
 status='revoked', revoked_by_side=$2
 WHERE id=$1 AND status<>'revoked'`, placementID, side, reason, now, userID, keyHash)
 	if err != nil {
@@ -236,7 +248,7 @@ func (d *DB) RestoreUndonePlacement(ctx context.Context, id, userID, keyHash, ac
 	}
 	defer tx.Rollback(ctx)
 	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL,
-plugin_wait='restore', plugin_wait_at=$4, plugin_failed_reason='', failed_action=''
+plugin_wait='restore', plugin_wait_at=$4, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
 WHERE id=$1 AND status='revoked' AND status_before_undo<>'' AND undone_at IS NOT NULL
 AND undone_by_user=$2::uuid AND COALESCE(undone_by_key_hash,'')=$3
 AND undone_at >= $4::timestamptz - INTERVAL '6 seconds'
@@ -330,18 +342,19 @@ func (d *DB) AckPluginPlacement(ctx context.Context, id, siteID, action, reason 
 	switch action {
 	case "restored":
 		tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
-SET plugin_wait='placed', plugin_wait_at=$3, plugin_contact_at=$3, plugin_failed_reason='', failed_action=''
+SET plugin_wait='placed', plugin_wait_at=$3, plugin_contact_at=$3, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
 WHERE id=$1 AND site_id=$2 AND plugin_wait IN ('', 'restore')`, id, siteID, at)
 		return err == nil && tag.RowsAffected() == 1, err
 	case "removed":
 		tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
-SET plugin_wait='removed', plugin_wait_at=$3, plugin_contact_at=$3, plugin_failed_reason='', failed_action=''
+SET plugin_wait='removed', plugin_wait_at=$3, plugin_contact_at=$3, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
 WHERE id=$1 AND site_id=$2 AND plugin_wait='remove'`, id, siteID, at)
 		return err == nil && tag.RowsAffected() == 1, err
 	case "failed":
 		tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
 SET plugin_failed_reason=$4, plugin_contact_at=$3,
-failed_action=CASE WHEN plugin_wait='remove' THEN 'removed' ELSE 'restored' END
+failed_action=CASE WHEN plugin_wait='remove' THEN 'removed' ELSE 'restored' END,
+restore_unconfirmed=CASE WHEN plugin_wait='remove' THEN false ELSE true END
 WHERE id=$1 AND site_id=$2 AND plugin_wait IN ('', 'restore', 'remove')`, id, siteID, at, reason)
 		return err == nil && tag.RowsAffected() == 1, err
 	default:
@@ -350,8 +363,9 @@ WHERE id=$1 AND site_id=$2 AND plugin_wait IN ('', 'restore', 'remove')`, id, si
 }
 
 // RetryPluginPlacement re-queues only the action stored when the failure
-// arrived. removed stays a removal. restored stays a re-insert. Status is
-// left alone, so a revoked go link stays revoked.
+// arrived. removed stays a removal. restored stays a re-insert. Status and
+// restore_unconfirmed are left alone, so a revoked or failed-restore go link
+// stays stopped.
 func (d *DB) RetryPluginPlacement(ctx context.Context, id, siteID, action string, at time.Time) (bool, error) {
 	wait := "restore"
 	if action == "removed" {

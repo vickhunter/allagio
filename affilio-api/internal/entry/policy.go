@@ -232,7 +232,7 @@ func FirstCheck(failures []string) (HardCheck, bool) {
 func HardCheckDoc() string {
 	var b strings.Builder
 	b.WriteString("## Hard checks\n\n")
-	b.WriteString("A 422 from restore, or from any hard-check failure, returns `check_id` and `check_text`:\n\n")
+	b.WriteString("A 422 returns `check_id` and `check_text`:\n\n")
 	for _, check := range HardCheckCatalog {
 		b.WriteString("- `")
 		b.WriteString(check.ID)
@@ -244,7 +244,8 @@ func HardCheckDoc() string {
 }
 
 // RestoreRefusal is one public 409 reason. RestoreRefusals is the only list.
-// "placement was not undone" is a different 409 and is not in this list.
+// A 409 from this list returns reason and message. "placement was not undone"
+// is a different 409 and is not in this list.
 type RestoreRefusal struct {
 	Reason string
 	Text   string
@@ -270,7 +271,7 @@ func RestoreRefusalByReason(reason string) (RestoreRefusal, bool) {
 func RestoreRefusalDoc() string {
 	var b strings.Builder
 	b.WriteString("## 409 reasons\n\n")
-	b.WriteString("A 409 that names a reason uses one of these values. Restore returns `error` `restore refused` with `window_expired` or `paused`. Retry returns `not_failed` when the placement is not failed:\n\n")
+	b.WriteString("A 409 returns `reason` and `message`. `reason` is one of these values. `message` is the plain-English text:\n\n")
 	for _, refusal := range RestoreRefusals {
 		b.WriteString("- `")
 		b.WriteString(refusal.Reason)

@@ -1265,11 +1265,7 @@ func writeNamedConflict(c *gin.Context, reason string) {
 		c.JSON(http.StatusConflict, gin.H{"error": "restore refused"})
 		return
 	}
-	if refusal.Reason == "not_failed" {
-		c.JSON(http.StatusConflict, gin.H{"error": refusal.Reason, "reason": refusal.Reason})
-		return
-	}
-	c.JSON(http.StatusConflict, gin.H{"error": "restore refused", "reason": refusal.Reason})
+	c.JSON(http.StatusConflict, gin.H{"reason": refusal.Reason, "message": refusal.Text})
 }
 
 func writeCheckDenied(c *gin.Context, failures []string) {

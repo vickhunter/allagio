@@ -68,6 +68,15 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 			c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "revoked"})
 			return
 		}
+		held, err := h.DB.PlacementRestoreUnconfirmed(c.Request.Context(), placementID, link.CampaignID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
+			return
+		}
+		if held {
+			c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "failed"})
+			return
+		}
 		removed, err := h.DB.PlacementRemoved(c.Request.Context(), placementID, link.CampaignID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})

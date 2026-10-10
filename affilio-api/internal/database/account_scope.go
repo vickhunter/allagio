@@ -263,18 +263,25 @@ func (d *DB) clickSources(ctx context.Context, query, id string) ([]SourceCount,
 	return sourcesFromMap(counts), nil
 }
 
+// unconfirmedRestoreEarnings drops test commission whose click belongs to a
+// placement whose restore failed and has not been confirmed placed again.
+const unconfirmedRestoreEarnings = ` AND NOT EXISTS (
+  SELECT 1 FROM clicks held_click
+  JOIN placement_proposals held_placement ON held_placement.id = held_click.placement_id
+  WHERE held_click.id = cv.click_id AND held_placement.restore_unconfirmed)`
+
 func (d *DB) testPublisherEarnings(ctx context.Context, siteID string) ([]MoneyAmount, error) {
 	return d.moneyQuery(ctx, `SELECT le.currency, COALESCE(SUM(le.amount),0)
 FROM ledger_entries le JOIN conversions cv ON cv.id=le.conversion_id
-WHERE le.site_id=$1 AND cv.payment_mode='test'
+WHERE le.site_id=$1 AND cv.payment_mode='test'`+unconfirmedRestoreEarnings+`
 GROUP BY le.currency ORDER BY le.currency`, siteID)
 }
 
 func (d *DB) testMakerEarnings(ctx context.Context, offerID string) ([]MoneyAmount, error) {
-	return d.moneyQuery(ctx, `SELECT currency, COALESCE(SUM(commission_amount),0)
-FROM conversions
-WHERE offer_id=$1 AND payment_mode='test' AND commission_amount IS NOT NULL
-GROUP BY currency ORDER BY currency`, offerID)
+	return d.moneyQuery(ctx, `SELECT cv.currency, COALESCE(SUM(cv.commission_amount),0)
+FROM conversions cv
+WHERE cv.offer_id=$1 AND cv.payment_mode='test' AND cv.commission_amount IS NOT NULL`+unconfirmedRestoreEarnings+`
+GROUP BY cv.currency ORDER BY cv.currency`, offerID)
 }
 
 func (d *DB) testAccountPublisherEarnings(ctx context.Context, ownerID string) ([]MoneyAmount, error) {
@@ -282,7 +289,7 @@ func (d *DB) testAccountPublisherEarnings(ctx context.Context, ownerID string) (
 FROM ledger_entries le
 JOIN conversions cv ON cv.id=le.conversion_id
 JOIN owners o ON o.site_id=le.site_id
-WHERE o.id=$1 AND cv.payment_mode='test'
+WHERE o.id=$1 AND cv.payment_mode='test'`+unconfirmedRestoreEarnings+`
 GROUP BY le.currency ORDER BY le.currency`, ownerID)
 }
 
@@ -292,7 +299,7 @@ FROM conversions cv
 JOIN offers ofr ON ofr.id=cv.offer_id
 JOIN products p ON p.id=ofr.product_id
 JOIN owners o ON o.maker_id=p.maker_id
-WHERE o.id=$1 AND cv.payment_mode='test' AND cv.commission_amount IS NOT NULL
+WHERE o.id=$1 AND cv.payment_mode='test' AND cv.commission_amount IS NOT NULL`+unconfirmedRestoreEarnings+`
 GROUP BY cv.currency ORDER BY cv.currency`, ownerID)
 }
 
