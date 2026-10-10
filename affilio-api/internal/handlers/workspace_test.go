@@ -220,7 +220,7 @@ func TestSiteConnectionConcurrentOwners(t *testing.T) {
 		wg.Add(1)
 		go func(o *database.Owner) {
 			defer wg.Done()
-			results <- db.CompleteSiteOwnerConnection(context.Background(), o.ID, hash)
+			results <- db.CompleteSiteOwnerConnection(context.Background(), o.ID, hash, "")
 		}(o)
 	}
 	wg.Wait()

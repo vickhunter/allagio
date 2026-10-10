@@ -177,7 +177,12 @@ func (h *HostedHandler) LoginStart(c *gin.Context) {
 	returnTo := c.DefaultQuery("return_to", "/owner")
 	u, err := url.Parse(returnTo)
 	validPath := u != nil && (u.Path == "/owner" || u.Path == "/owner/products" || u.Path == "/owner/placements" || u.Path == "/owner/earnings" || u.Path == "/owner/settings" || u.Path == "/owner/review" || u.Path == "/owner/connect-site" || u.Path == "/oauth/authorize" || strings.HasPrefix(u.Path, "/owner/placements/") && uuidPattern.MatchString(strings.TrimPrefix(u.Path, "/owner/placements/")))
-	if err != nil || !validPath || u.IsAbs() || u.Host != "" || u.Fragment != "" || len(returnTo) > 8192 {
+	if err != nil || !validPath || u.IsAbs() || u.Host != "" || u.Fragment != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
+		return
+	}
+	returnTo = mergeAttributionSource(returnTo, c.Query("source"))
+	if len(returnTo) > 8192 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return
 	}
@@ -235,6 +240,7 @@ func (h *HostedHandler) LoginCallback(c *gin.Context) {
 		c.Status(500)
 		return
 	}
+	o.Source = attributionSourceFromReturn(a.ReturnTo)
 	if err = h.DB.StartOwnerSession(c.Request.Context(), o, services.HashAPIKey(token), csrf); err != nil {
 		c.Status(500)
 		return

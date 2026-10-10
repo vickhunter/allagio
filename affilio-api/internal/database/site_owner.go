@@ -32,7 +32,7 @@ func (d *DB) SiteHasOwner(ctx context.Context, siteID string) (bool, error) {
 	return linked, err
 }
 
-func (d *DB) CompleteSiteOwnerConnection(ctx context.Context, ownerID, hash string) error {
+func (d *DB) CompleteSiteOwnerConnection(ctx context.Context, ownerID, hash, source string) error {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -49,7 +49,12 @@ func (d *DB) CompleteSiteOwnerConnection(ctx context.Context, ownerID, hash stri
 	if current != nil && *current != siteID {
 		return errors.New("publisher already connected to another site")
 	}
-	if _, err = tx.Exec(ctx, `UPDATE owners SET site_id=$2 WHERE id=$1`, ownerID, siteID); err != nil {
+	if source == "" {
+		_, err = tx.Exec(ctx, `UPDATE owners SET site_id=$2 WHERE id=$1`, ownerID, siteID)
+	} else {
+		_, err = tx.Exec(ctx, `UPDATE owners SET site_id=$2, source=$3 WHERE id=$1`, ownerID, siteID, NormalizeAttributionSource(source))
+	}
+	if err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

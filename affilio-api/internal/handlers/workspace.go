@@ -71,6 +71,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	}
 	publisher := api.Group("", h.requirePublisher)
 	publisher.POST("/opportunities", placements.Find)
+	publisher.POST("/article-text", placements.ArticleText)
 	publisher.POST("/placements", placements.Prepare)
 	publisher.GET("/placements", placements.List)
 	publisher.POST("/placements/:id/commit", placements.Commit)

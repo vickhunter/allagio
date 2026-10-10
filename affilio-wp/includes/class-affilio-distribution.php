@@ -1,5 +1,29 @@
 <?php
 
+if (!function_exists('add_filter')) {
+    function add_filter($name, $callback) {
+        if (!isset($GLOBALS['filters']) || !is_array($GLOBALS['filters'])) {
+            $GLOBALS['filters'] = array();
+        }
+        $GLOBALS['filters'][$name][] = $callback;
+    }
+}
+
+if (!function_exists('remove_filter')) {
+    function remove_filter($name, $callback) {
+        if (!isset($GLOBALS['filters'][$name]) || !is_array($GLOBALS['filters'][$name])) {
+            return;
+        }
+        $kept = array();
+        foreach ($GLOBALS['filters'][$name] as $existing) {
+            if ($existing !== $callback) {
+                $kept[] = $existing;
+            }
+        }
+        $GLOBALS['filters'][$name] = $kept;
+    }
+}
+
 if (class_exists('Affilio_Distribution')) {
     return;
 }
@@ -11,6 +35,24 @@ class Affilio_Distribution {
 
     public function __construct($api) {
         $this->api = $api;
+    }
+
+    public static function without_revisions($callback) {
+        $keep = function ($count = null, $post = null) {
+            return 0;
+        };
+        add_filter('wp_revisions_to_keep', $keep);
+        try {
+            return call_user_func($callback);
+        } finally {
+            remove_filter('wp_revisions_to_keep', $keep);
+        }
+    }
+
+    private function save_content($post_id, $content) {
+        return self::without_revisions(function () use ($post_id, $content) {
+            return wp_update_post(array('ID' => $post_id, 'post_content' => wp_slash($content)), true);
+        });
     }
 
     public static function disclosure_suppressed($content) {
@@ -256,7 +298,7 @@ class Affilio_Distribution {
                 $disclosure_class = 'affilio-disclosure-' . $id;
                 $content .= "\n" . $this->paragraph_block('<p class="' . $disclosure_class . '">' . esc_html($placement['disclosure']) . '</p>', $disclosure_class);
             }
-            $updated = wp_update_post(array('ID' => $post->ID, 'post_content' => wp_slash($content)), true);
+            $updated = $this->save_content($post->ID, $content);
             if (is_wp_error($updated)) {
                 return $updated;
             }
@@ -281,7 +323,7 @@ class Affilio_Distribution {
                 if ($inserted) {
                     $fresh = get_post($post->ID);
                     $reverted = self::revert_content($fresh->post_content, $id);
-                    wp_update_post(array('ID' => $post->ID, 'post_content' => wp_slash($reverted['content'])), true);
+                    $this->save_content($post->ID, $reverted['content']);
                 }
                 $status = 502;
                 if (is_array($receipt->data) && isset($receipt->data['status'])) {
@@ -375,7 +417,7 @@ class Affilio_Distribution {
         if (!$result['matched'] || $dry_run) {
             return $result;
         }
-        $updated = wp_update_post(array('ID' => $post->ID, 'post_content' => wp_slash($result['content'])), true);
+        $updated = $this->save_content($post->ID, $result['content']);
         if (is_wp_error($updated)) {
             $result['matched'] = false;
             $result['error'] = $updated;

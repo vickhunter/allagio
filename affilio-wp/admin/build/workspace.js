@@ -1,3 +1,36 @@
+var offerRailsShortTopicLimit = 400;
+
+function offerRailsFindInputError(context) {
+    const about = String(context || '').trim();
+    if (about.length >= 10 && about.length <= 12000) return '';
+    return 'Describe what this article is about (at least 10 characters). The article URL is optional.';
+}
+
+function offerRailsFindEmptyState(result, context, surfaceURL) {
+    const reason = result && result.reason;
+    const title = 'No relevant offers yet.';
+    if (reason === 'no_eligible_offers') {
+        return {
+            title,
+            detail: 'Only listed offers with verified payment configuration are eligible. Try another article or check back as builders join.',
+            offerFetch: false,
+        };
+    }
+    if (reason === 'below_relevance') {
+        const score = Number(result.best_score);
+        const threshold = Number(result.threshold);
+        let detail = `The closest match is relevance ${score}/100, needs ${threshold}.`;
+        const about = String(context || '').trim();
+        const short = about.length < offerRailsShortTopicLimit;
+        if (short) {
+            detail += ' Paste a longer excerpt from the article, or fetch the text from the article URL.';
+        }
+        const url = String(surfaceURL || '').trim();
+        return { title, detail, offerFetch: short && url !== '' };
+    }
+    return { title, detail: 'Try another article or check back as builders join.', offerFetch: false };
+}
+
 (() => {
     'use strict';
     const root = document.getElementById('workspace-app');
@@ -516,15 +549,30 @@
     const placementsPage = async () => {
         if (!session.publisher) { root.innerHTML = '<section><h2>Connect your content first.</h2><p>Install the WordPress plugin, connect your site, then use its publisher connection action. You can also create a publisher account for another publishing tool.</p><a class="button secondary" href="/downloads/affilio.zip">Download WordPress plugin</a></section>' + accountForm('publisher'); return; }
         const {placements} = await api('/placements');
-        root.innerHTML = `<section><h2>Find a relevant offer</h2><form data-find><div class="form-grid">${field('surface_url','Published article URL','','type="url" required',true)}<label class="full">What is this article about?<textarea name="context" minlength="10" maxlength="12000" required placeholder="Paste the article or describe its topic and audience."></textarea></label></div><button>Find opportunities</button></form><div id="opportunity-results"></div></section><h2>Placement inbox</h2>${placements.length ? placements.map(placement => `<section><div class="row"><a href="/owner/placements/${placement.id}">${escape(placement.surface_url)}</a>${pill(placementStatusLabel(placement))}</div><p>${escape(placement.copy)}</p><a href="/owner/placements/${placement.id}">Review placement ↗</a></section>`).join('') : empty('Your recommendations will appear here.','Start with an article where a product can help its readers.')}`;
+        root.innerHTML = `<section><h2>Find a relevant offer</h2><form data-find><div class="form-grid">${field('surface_url','Published article URL','','type="url"',true)}<label class="full">What is this article about?<textarea name="context" minlength="10" maxlength="12000" required placeholder="Paste the article or describe its topic and audience."></textarea></label></div><button>Find opportunities</button></form><div id="opportunity-results"></div></section><h2>Placement inbox</h2>${placements.length ? placements.map(placement => `<section><div class="row"><a href="/owner/placements/${placement.id}">${escape(placement.surface_url)}</a>${pill(placementStatusLabel(placement))}</div><p>${escape(placement.copy)}</p><a href="/owner/placements/${placement.id}">Review placement ↗</a></section>`).join('') : empty('Your recommendations will appear here.','Start with an article where a product can help its readers.')}`;
         root.querySelector('[data-find]').addEventListener('submit',event => {
             event.preventDefault(); const form = event.currentTarget; const values = Object.fromEntries(new FormData(form));
+            const inputError = offerRailsFindInputError(values.context);
+            if (inputError) { report(inputError, true); return; }
             run(form.querySelector('button'),async () => {
-                const {opportunities} = await api('/opportunities','POST',{context:values.context});
+                const found = await api('/opportunities','POST',{context:values.context});
+                const opportunities = found.opportunities || [];
                 const results = document.getElementById('opportunity-results');
-                results.innerHTML = opportunities.length ? opportunities.map(offer => `<div class="card"><h3>${escape(offer.product_name)}</h3><p>${escape(offer.reason)}</p><p>${escape(commission(offer))} · ${escape(offer.currency)}</p><form data-prepare="${offer.offer_id}"><label>Recommendation copy<textarea name="copy" minlength="10" maxlength="4000" required>${escape('Consider ' + offer.product_name + ' if it fits the problem described in this article.')}</textarea></label><button>Prepare for owner review</button></form></div>`).join('') : empty('No relevant offers yet.','Only listed offers with verified payment configuration are eligible. Try another article or check back as builders join.');
+                if (opportunities.length) {
+                    results.innerHTML = opportunities.map(offer => `<div class="card"><h3>${escape(offer.product_name)}</h3><p>${escape(offer.reason)}</p><p>${escape(commission(offer))} · ${escape(offer.currency)}</p><form data-prepare="${offer.offer_id}"><label>Recommendation copy<textarea name="copy" minlength="10" maxlength="4000" required>${escape('Consider ' + offer.product_name + ' if it fits the problem described in this article.')}</textarea></label><button>Prepare for owner review</button></form></div>`).join('');
+                } else {
+                    const state = offerRailsFindEmptyState(found, values.context, values.surface_url);
+                    results.innerHTML = empty(state.title, state.detail) + (state.offerFetch ? '<p><button type="button" data-fetch-article>Fetch the article text</button></p>' : '');
+                    const fetchButton = results.querySelector('[data-fetch-article]');
+                    if (fetchButton) fetchButton.addEventListener('click', () => run(fetchButton, async () => {
+                        const article = await api('/article-text','POST',{surface_url:values.surface_url});
+                        const area = form.querySelector('textarea[name="context"]');
+                        if (area && article.text) { area.value = article.text; form.requestSubmit(); }
+                    }));
+                }
                 results.querySelectorAll('[data-prepare]').forEach(proposal => proposal.addEventListener('submit',event => {
                     event.preventDefault();
+                    if (!String(values.surface_url || '').trim()) { report('Add the published article URL before preparing this placement.', true); return; }
                     run(proposal.querySelector('button'),async () => { const result = await api('/placements','POST',{offer_id:proposal.dataset.prepare,surface_url:values.surface_url,context:values.context,copy:new FormData(proposal).get('copy')}); location.assign('/owner/placements/' + result.placement.id); });
                 }));
             });

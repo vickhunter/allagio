@@ -1,11 +1,14 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.14
+Stable tag: 0.1.18
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.18 =
+* Inserting or removing an Affilio block does not create a WordPress post revision.
 
 = 0.1.14 =
 * A post counts as already disclosed only when it matches the receipt rule: the approved disclosure, "commissione", or "link" within 60 characters of "affiliat".

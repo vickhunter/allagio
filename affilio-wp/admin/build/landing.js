@@ -36,3 +36,32 @@ if (stage && toggle) {
     window.addEventListener('pagehide', () => { cleanup?.(); cleanup = undefined; });
     window.addEventListener('pageshow', updateScene);
 }
+
+function offerRailsWithAttributionSource(href, source) {
+    const allowed = ['chatgpt', 'claude', 'cursor', 'grok', 'x', 'community'];
+    const value = String(source || '').trim().toLowerCase();
+    if (!allowed.includes(value)) return href;
+    try {
+        const url = new URL(href, 'https://offer-rails.example');
+        if (url.origin !== 'https://offer-rails.example') return href;
+        url.searchParams.set('source', value);
+        return url.pathname + url.search + url.hash;
+    } catch {
+        return href;
+    }
+}
+
+function offerRailsCarryAttributionSource(doc, loc) {
+    const params = new URLSearchParams(String((loc && loc.search) || ''));
+    const source = params.get('source');
+    doc.querySelectorAll('a[href]').forEach(link => {
+        const href = link.getAttribute('href') || '';
+        if (href.startsWith('/owner') || href.startsWith('/auth/login')) {
+            link.setAttribute('href', offerRailsWithAttributionSource(href, source));
+        }
+    });
+}
+
+if (typeof document !== 'undefined' && typeof location !== 'undefined') {
+    offerRailsCarryAttributionSource(document, location);
+}

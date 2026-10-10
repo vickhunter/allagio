@@ -18,6 +18,7 @@ type Owner struct {
 	SiteID  string
 	MakerID string
 	CSRF    string
+	Source  string
 }
 
 type LoginAttempt struct{ Nonce, Verifier, ReturnTo string }
@@ -54,8 +55,11 @@ func (d *DB) StartOwnerSession(ctx context.Context, o Owner, tokenHash, csrf str
 		return err
 	}
 	defer tx.Rollback(ctx)
-	err = tx.QueryRow(ctx, `INSERT INTO owners(issuer,subject,email,name) VALUES($1,$2,$3,$4)
-ON CONFLICT(issuer,subject) DO UPDATE SET email=EXCLUDED.email,name=EXCLUDED.name RETURNING id`, o.Issuer, o.Subject, o.Email, o.Name).Scan(&o.ID)
+	source := NormalizeAttributionSource(o.Source)
+	err = tx.QueryRow(ctx, `INSERT INTO owners(issuer,subject,email,name,source) VALUES($1,$2,$3,$4,$5)
+ON CONFLICT(issuer,subject) DO UPDATE SET email=EXCLUDED.email,name=EXCLUDED.name,
+source=CASE WHEN EXCLUDED.source <> 'direct' THEN EXCLUDED.source ELSE owners.source END
+RETURNING id`, o.Issuer, o.Subject, o.Email, o.Name, source).Scan(&o.ID)
 	if err != nil {
 		return err
 	}

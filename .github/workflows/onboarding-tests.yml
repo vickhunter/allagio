@@ -32,4 +32,4 @@ jobs:
         working-directory: affilio-wp/tests/block-roundtrip
         run: npm ci --ignore-scripts && node roundtrip.mjs
       - name: Check workspace scripts
-        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/setup-controls.js && node --check affilio-wp/admin/build/landing.js && node --check affilio-wp/admin/build/distribution.js && node affilio-wp/tests/distribution-empty.js
+        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/setup-controls.js && node --check affilio-wp/admin/build/landing.js && node --check affilio-wp/admin/build/distribution.js && node affilio-wp/tests/distribution-empty.js && node affilio-wp/tests/find-empty.js && node affilio-wp/tests/attribution-source.js

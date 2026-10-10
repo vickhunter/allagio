@@ -136,8 +136,8 @@ func servedPlugin(t *testing.T, h *HostedHandler, payload []byte) []byte {
 			t.Fatal(err)
 		}
 	}
-	if !bytes.Contains(main, []byte("Version: 0.1.14")) {
-		t.Fatal("served zip is missing affilio-wp/affilio.php 0.1.14")
+	if !bytes.Contains(main, []byte("Version: 0.1.18")) {
+		t.Fatal("served zip is missing affilio-wp/affilio.php 0.1.18")
 	}
 	requireValidPluginZip(t, rec.Body.Bytes())
 	home := httptest.NewRecorder()
@@ -153,7 +153,7 @@ func TestWorkspaceDownloadsUseActualOrigin(t *testing.T) {
 	h := &HostedHandler{BaseURL: "https://distribution.example", AssetsPath: filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"), DownloadsPath: path}
 	clean := servedPlugin(t, h, releasePluginZip(t, nil))
 	if bytes.Contains(clean, []byte("railway.app")) {
-		t.Fatal("clean 0.1.14 package gained a railway host")
+		t.Fatal("clean 0.1.18 package gained a railway host")
 	}
 	baked := releasePluginZip(t, func(main []byte) []byte {
 		return append(main, []byte("\ndefine('AFFILIO_API_URL', 'https://affilio-production.up.railway.app/v1');\n")...)

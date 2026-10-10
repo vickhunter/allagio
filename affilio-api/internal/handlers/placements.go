@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
+	"io"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -94,7 +97,8 @@ func (h *PlacementsHandler) opportunities(c *gin.Context, contextText string) (o
 
 func (h *PlacementsHandler) Find(c *gin.Context) {
 	var req struct {
-		Context string `json:"context"`
+		Context    string `json:"context"`
+		SurfaceURL string `json:"surface_url"`
 	}
 	if bindBoundedJSON(c, &req) != nil || len(strings.TrimSpace(req.Context)) < 10 || len(req.Context) > 12000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context must contain 10–12000 characters"})
@@ -151,9 +155,8 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "publisher lookup failed"})
 		return
 	}
-	u, err := url.Parse(req.SurfaceURL)
-	if err != nil || u.Scheme != "https" || u.Hostname() != site.Domain || u.User != nil || len(req.SurfaceURL) > 2048 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "surface_url must be an HTTPS article on the registered publisher domain"})
+	if problem := surfaceURLProblem(req.SurfaceURL, site.Domain); problem != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": problem})
 		return
 	}
 	matched, err := h.opportunities(c, req.Context)
@@ -395,6 +398,124 @@ func (h *PlacementsHandler) RevokeAgentAccess(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "revoked"})
+}
+
+func localPublisherHost(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	switch host {
+	case "127.0.0.1", "::1", "localhost":
+		return true
+	}
+	return strings.HasSuffix(host, ".localhost")
+}
+
+func surfaceURLProblem(raw, siteDomain string) string {
+	const registered = "surface_url must be an HTTPS article on the registered publisher domain"
+	const httpsRule = "surface_url must use HTTPS. HTTP is allowed only when the registered site is 127.0.0.1, ::1, localhost, or a name ending in .localhost."
+	if len(raw) > 2048 {
+		return registered
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Hostname() == "" || u.User != nil || u.Hostname() != siteDomain {
+		return registered
+	}
+	if u.Scheme == "https" {
+		return ""
+	}
+	if u.Scheme == "http" && localPublisherHost(siteDomain) {
+		return ""
+	}
+	if u.Scheme == "http" {
+		return httpsRule
+	}
+	return registered
+}
+
+func (h *PlacementsHandler) ArticleText(c *gin.Context) {
+	var req struct {
+		SurfaceURL string `json:"surface_url"`
+	}
+	if bindBoundedJSON(c, &req) != nil || strings.TrimSpace(req.SurfaceURL) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "surface_url is required"})
+		return
+	}
+	if !h.requireLinkedPublisher(c) {
+		return
+	}
+	site, err := h.DB.GetSiteByID(c.Request.Context(), siteIDFrom(c))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "publisher lookup failed"})
+		return
+	}
+	if problem := surfaceURLProblem(req.SurfaceURL, site.Domain); problem != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": problem})
+		return
+	}
+	text, err := fetchArticleText(c.Request.Context(), req.SurfaceURL)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "The article text could not be fetched. Paste a longer excerpt instead."})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"text": text})
+}
+
+var articleScriptStyle = regexp.MustCompile(`(?is)<(script|style)\b[^>]*>.*?</(script|style)>`)
+var articleTags = regexp.MustCompile(`(?s)<[^>]+>`)
+
+func stripArticleHTML(raw string) string {
+	raw = articleScriptStyle.ReplaceAllString(raw, " ")
+	raw = articleTags.ReplaceAllString(raw, " ")
+	raw = html.UnescapeString(raw)
+	return strings.TrimSpace(strings.Join(strings.Fields(raw), " "))
+}
+
+func fetchArticleText(ctx context.Context, raw string) (string, error) {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	host := parsed.Hostname()
+	client := &http.Client{
+		Timeout: 8 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 3 {
+				return errors.New("too many redirects")
+			}
+			if req.URL.Hostname() != host || req.URL.User != nil {
+				return errors.New("redirect left the article host")
+			}
+			return nil
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "OfferRails/article-text")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("article fetch status %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20+1))
+	if err != nil {
+		return "", err
+	}
+	if len(body) > 1<<20 {
+		return "", errors.New("article is too large")
+	}
+	text := stripArticleHTML(string(body))
+	runes := []rune(text)
+	if len(runes) > 12000 {
+		text = string(runes[:12000])
+	}
+	if len(strings.TrimSpace(text)) < 10 {
+		return "", errors.New("article text is too short")
+	}
+	return text, nil
 }
 
 func bindBoundedJSON(c *gin.Context, out interface{}) error {
