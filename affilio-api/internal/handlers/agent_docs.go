@@ -250,7 +250,13 @@ POST /v1/placements/:id/revoke
 {"reason":"undo"}
 ` + "```" + `
 
-Undo is that revoke. The site owner is recorded as ` + "`revoked_by_side: publisher`" + `. The offer's maker uses the same endpoint and is recorded as ` + "`maker`" + `. Either records a ` + "`placement_undo`" + ` event. Redo stays in the UI. There is no re-place endpoint.
+Undo is that revoke. It takes effect in the same request in the API and in MCP. There is no delay. The site owner is recorded as ` + "`revoked_by_side: publisher`" + `. The offer's maker uses the same endpoint and is recorded as ` + "`maker`" + `. Either records a ` + "`placement_undo`" + ` event with the server time and the key or session that undid it.
+
+` + "```" + `
+POST /v1/placements/:id/restore
+` + "```" + `
+
+Restore applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. The server re-runs every hard check first. A failing check returns 422 with that check id and leaves the placement revoked. On success the placement returns to the status it had before the undo, ` + "`approved_by`" + ` stays the original value, ` + "`restored_by`" + ` records the user, and a ` + "`placement_restore`" + ` event stores the actor.
 `
 
 const accountDoc = `# Account keys and digest

@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // stubAPI records the last request and answers with a fixed body per route.
@@ -117,6 +118,49 @@ func TestPublisherToolsUseSiteKey(t *testing.T) {
 	}
 	if lastReq.URL.Path != "/v1/marketplace/offers/offer-7/join" || lastReq.Method != http.MethodPost {
 		t.Fatalf("unexpected join call %s %s", lastReq.Method, lastReq.URL.Path)
+	}
+}
+
+func TestUndoAndRestoreToolsCallImmediately(t *testing.T) {
+	server, lastReq, lastBody := stubAPI(t)
+	client := NewClient(server.URL, "maker-key-1")
+	client.SiteKey = "site-key-9"
+	id := "11111111-1111-4111-8111-111111111111"
+
+	started := time.Now()
+	if _, err := CallTool(client, "undo_placement", map[string]interface{}{"placement_id": id}); err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("undo_placement waited before calling the API")
+	}
+	if lastReq.Method != http.MethodPost || lastReq.URL.Path != "/v1/placements/"+id+"/revoke" || lastReq.Header.Get("X-API-Key") != "site-key-9" {
+		t.Fatalf("undo call: %s %s key %q", lastReq.Method, lastReq.URL.Path, lastReq.Header.Get("X-API-Key"))
+	}
+	if string(*lastBody) != `{"reason":"undo"}` {
+		t.Fatalf("undo body: %s", string(*lastBody))
+	}
+
+	started = time.Now()
+	if _, err := CallTool(client, "restore_placement", map[string]interface{}{"placement_id": id}); err != nil {
+		t.Fatal(err)
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("restore_placement waited before calling the API")
+	}
+	if lastReq.Method != http.MethodPost || lastReq.URL.Path != "/v1/placements/"+id+"/restore" {
+		t.Fatalf("restore call: %s %s", lastReq.Method, lastReq.URL.Path)
+	}
+	if lastReq.ContentLength != 0 {
+		t.Fatalf("restore body: %s", string(*lastBody))
+	}
+
+	maker := NewClient(server.URL, "maker-key-1")
+	if _, err := CallTool(maker, "undo_placement", map[string]interface{}{"placement_id": id}); err != nil {
+		t.Fatal(err)
+	}
+	if lastReq.Header.Get("X-Maker-Key") != "maker-key-1" || lastReq.Header.Get("X-API-Key") != "" || lastReq.URL.Path != "/v1/placements/"+id+"/revoke" {
+		t.Fatalf("maker undo: %s key %q site %q", lastReq.URL.Path, lastReq.Header.Get("X-Maker-Key"), lastReq.Header.Get("X-API-Key"))
 	}
 }
 

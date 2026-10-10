@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
@@ -30,6 +31,7 @@ type AgentEntry struct {
 	Owner          func(*gin.Context)
 	AccountLimiter *IPRateLimiter
 	DeviceLimiter  *IPRateLimiter
+	Now            func() time.Time
 }
 
 type entryActor struct {
@@ -57,6 +59,7 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.PUT("/v1/offers/:id/mode", h.PutOfferMode)
 	r.POST("/v1/placements/:id/decide", h.DecidePlacement)
 	r.POST("/v1/placements/:id/revoke", h.RevokePlacement)
+	r.POST("/v1/placements/:id/restore", h.RestorePlacement)
 	r.POST("/v1/offers/:id/accept", h.AcceptPublisher)
 	r.POST("/v1/listing-cards", h.CreateListing)
 	r.GET("/v1/listing-cards/:id", h.GetListing)
@@ -954,7 +957,8 @@ func (h *AgentEntry) RevokePlacement(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "undo requires an owner"})
 		return
 	}
-	updated, err := h.DB.RevokePlacementForSide(c.Request.Context(), placement.ID, side, userID, reason, time.Now().UTC())
+	now := h.now()
+	updated, err := h.DB.RevokePlacementForSide(c.Request.Context(), placement.ID, side, userID, actorKeyHash(c), actor.Kind, reason, now)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "revocation failed"})
 		return
@@ -963,7 +967,99 @@ func (h *AgentEntry) RevokePlacement(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "revoked", "revoked_by_side": side, "undo": reason == "undo"})
+	body := gin.H{"status": "revoked", "revoked_by_side": side, "undo": reason == "undo"}
+	if reason == "undo" {
+		body["undone_at"] = now.Format(time.RFC3339)
+	}
+	c.JSON(http.StatusOK, body)
+}
+
+const restoreWindow = 6 * time.Second
+
+func (h *AgentEntry) RestorePlacement(c *gin.Context) {
+	if !uuidPattern.MatchString(c.Param("id")) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
+		return
+	}
+	actor, ok := h.actorFrom(c)
+	if !ok {
+		return
+	}
+	row, err := h.DB.PlacementUndo(c.Request.Context(), c.Param("id"))
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+		return
+	}
+	if row.Status != "revoked" || row.UndoneAt == nil || row.StatusBefore == "" {
+		c.JSON(http.StatusConflict, gin.H{"error": "placement was not undone"})
+		return
+	}
+	userID := actor.UserID
+	if actor.Owner != nil {
+		userID = actor.Owner.ID
+	}
+	if subtle.ConstantTimeCompare([]byte(row.KeyHash), []byte(actorKeyHash(c))) != 1 || row.UserID == "" || row.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "only the identity that undid this placement can restore it"})
+		return
+	}
+	now := h.now()
+	if now.Sub(row.UndoneAt.UTC()) > restoreWindow {
+		c.JSON(http.StatusConflict, gin.H{"error": "restore window closed"})
+		return
+	}
+	failures, err := h.restoreHardFailures(c, row)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+		return
+	}
+	if len(failures) > 0 {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"decision": "denied", "failures": failures})
+		return
+	}
+	status, approvedBy, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+		return
+	}
+	if !restored {
+		c.JSON(http.StatusConflict, gin.H{"error": "restore window closed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": status, "approved_by": approvedBy, "restored_by": userID, "actor": actor.Kind})
+}
+
+func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementUndo) ([]string, error) {
+	live, _, _, err := h.DB.OfferFacts(c.Request.Context(), row.OfferID)
+	if err != nil {
+		return nil, err
+	}
+	boxes, err := h.DB.CountPlacementBoxes(c.Request.Context(), row.SiteID, row.SurfaceURL, c.Param("id"))
+	if err != nil {
+		return nil, err
+	}
+	decision := entry.EvaluatePlacement(entry.ModeYolo, entry.AutoRules{}, entry.PlacementFacts{
+		Disclosure: row.Disclosure, RelSponsored: true, Copy: row.Copy,
+		ExistingBoxes: boxes, Relevance: 100, OfferLive: live, RevokeWorks: true, Position: "end",
+	}, h.claims())
+	return decision.Failures, nil
+}
+
+func (h *AgentEntry) now() time.Time {
+	if h.Now != nil {
+		return h.Now().UTC()
+	}
+	return time.Now().UTC()
+}
+
+func actorKeyHash(c *gin.Context) string {
+	if !credentialPresented(c) {
+		return ""
+	}
+	return services.HashAPIKey(presentedKey(c))
 }
 
 func revokeReason(c *gin.Context) (string, bool) {

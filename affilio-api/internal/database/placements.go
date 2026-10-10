@@ -162,14 +162,21 @@ func (d *DB) GetPlacementByID(ctx context.Context, id string) (*Placement, error
 }
 
 // RevokePlacementForSide revokes a placement the caller is allowed to undo.
-// reason "undo" records a placement_undo event for that owner.
-func (d *DB) RevokePlacementForSide(ctx context.Context, placementID, side, userID, reason string, now time.Time) (bool, error) {
+// reason "undo" records the previous status, the server time, and the key or
+// session that undid it, and writes a placement_undo event in the same commit.
+func (d *DB) RevokePlacementForSide(ctx context.Context, placementID, side, userID, keyHash, actor, reason string, now time.Time) (bool, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return false, err
 	}
 	defer tx.Rollback(ctx)
-	tag, err := tx.Exec(ctx, `UPDATE placement_proposals SET status='revoked', revoked_by_side=$2 WHERE id=$1 AND status<>'revoked'`, placementID, side)
+	tag, err := tx.Exec(ctx, `UPDATE placement_proposals SET
+status_before_undo=CASE WHEN $3='undo' THEN status ELSE status_before_undo END,
+undone_at=CASE WHEN $3='undo' THEN $4 ELSE undone_at END,
+undone_by_user=CASE WHEN $3='undo' THEN NULLIF($5,'')::uuid ELSE undone_by_user END,
+undone_by_key_hash=CASE WHEN $3='undo' THEN NULLIF($6,'') ELSE undone_by_key_hash END,
+status='revoked', revoked_by_side=$2
+WHERE id=$1 AND status<>'revoked'`, placementID, side, reason, now, userID, keyHash)
 	if err != nil {
 		return false, err
 	}
@@ -177,11 +184,58 @@ func (d *DB) RevokePlacementForSide(ctx context.Context, placementID, side, user
 		return false, tx.Commit(ctx)
 	}
 	if reason == "undo" {
-		if _, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at) VALUES('placement_undo',$1,$2,$3)`, userID, placementID, now); err != nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at,actor) VALUES('placement_undo',$1,$2,$3,$4)`, userID, placementID, now, actor); err != nil {
 			return false, err
 		}
 	}
 	return true, tx.Commit(ctx)
+}
+
+// PlacementUndo is the server record of the latest undo for one placement.
+type PlacementUndo struct {
+	Status       string
+	StatusBefore string
+	UndoneAt     *time.Time
+	UserID       string
+	KeyHash      string
+	ApprovedBy   string
+	Disclosure   string
+	Copy         string
+	SiteID       string
+	SurfaceURL   string
+	OfferID      string
+}
+
+func (d *DB) PlacementUndo(ctx context.Context, id string) (PlacementUndo, error) {
+	var row PlacementUndo
+	err := d.Pool.QueryRow(ctx, `SELECT status, COALESCE(status_before_undo,''), undone_at, COALESCE(undone_by_user::text,''), COALESCE(undone_by_key_hash,''), COALESCE(approved_by_kind,''), disclosure, copy, site_id::text, surface_url, offer_id::text
+FROM placement_proposals WHERE id=$1`, id).Scan(&row.Status, &row.StatusBefore, &row.UndoneAt, &row.UserID, &row.KeyHash, &row.ApprovedBy, &row.Disclosure, &row.Copy, &row.SiteID, &row.SurfaceURL, &row.OfferID)
+	return row, err
+}
+
+// RestoreUndonePlacement puts the placement back only when the same identity
+// is still inside the undo window. approved_by_kind is left as it was.
+func (d *DB) RestoreUndonePlacement(ctx context.Context, id, userID, keyHash, actor string, now time.Time) (status, approvedBy string, ok bool, err error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return "", "", false, err
+	}
+	defer tx.Rollback(ctx)
+	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL
+WHERE id=$1 AND status='revoked' AND status_before_undo<>'' AND undone_at IS NOT NULL
+AND undone_by_user=$2::uuid AND COALESCE(undone_by_key_hash,'')=$3
+AND undone_at >= $4::timestamptz - INTERVAL '6 seconds'
+RETURNING status, COALESCE(approved_by_kind,''), COALESCE(restored_by,'')`, id, userID, keyHash, now).Scan(&status, &approvedBy, &userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at,actor) VALUES('placement_restore',$1,$2,$3,$4)`, userID, id, now, actor); err != nil {
+		return "", "", false, err
+	}
+	return status, approvedBy, true, tx.Commit(ctx)
 }
 
 func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Placement, error) {

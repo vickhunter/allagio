@@ -47,6 +47,7 @@ var ScreenActions = []ScreenAction{
 	{Screen: "digest", Action: "Account totals (went live, clicks, earnings, clicks by source)", Method: "GET", Path: "/v1/account/digest"},
 	{Screen: "digest", Action: "Per project went live, clicks, earnings, clicks by source, and an undo token per item", Method: "GET", Path: "/v1/account/digest"},
 	{Screen: "digest", Action: "Undo a placement as the publisher or the maker", Method: "POST", Path: "/v1/placements/:id/revoke"},
+	{Screen: "digest", Action: "Restore a placement within 6 seconds of its undo", Method: "POST", Path: "/v1/placements/:id/restore"},
 	{Screen: "setup", Action: "Session signed in and human login", Method: "GET", Path: "/v1/setup/settings"},
 	{Screen: "setup", Action: "Preselected mode from the install path", Method: "GET", Path: "/v1/setup/settings"},
 	{Screen: "digest", Action: "Session signed in", Method: "GET", Path: "/v1/account/digest"},

@@ -1163,3 +1163,140 @@ VALUES($1,'stripe','evt-zero','sale',0,'USD',0,NOW(),'test') RETURNING id`, offe
 		t.Fatalf("digest session: %d %s", opened.Code, opened.Body.String())
 	}
 }
+
+func TestPlacementRestore(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	current := time.Date(2026, 10, 10, 2, 0, 0, 0, time.UTC)
+	api.Now = func() time.Time { return current }
+
+	owner, cookie := testOwnerSession(t, h, "restore-owner", "restore-owner@example.com")
+	siteID := createTestSite(t, db, "restore-site-key", "restore.example", "Restore")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	makerID, offerID := seedListedOffer(t, db, "restore-maker-key", "restore-maker@example.com", "Restore Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET maker_id=$2 WHERE id=$1`, owner.ID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/sites/"+siteID+"/mode", map[string]any{"mode": "yolo"})
+	if saved.Code != http.StatusOK {
+		t.Fatalf("yolo: %d %s", saved.Code, saved.Body.String())
+	}
+	siteKey := map[string]string{"X-API-Key": "restore-site-key"}
+	makerKey := map[string]string{"X-Maker-Key": "restore-maker-key"}
+
+	approve := func(surface string) string {
+		t.Helper()
+		id := insertPlacement(t, db, siteID, offerID, surface, "Honest note about the product.")
+		decided, decision := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, siteKey)
+		if decided.Code != http.StatusOK || decision["approved_by"] != "policy:yolo" || decision["decision"] != "approved" {
+			t.Fatalf("approve %s: %d %s", surface, decided.Code, decided.Body.String())
+		}
+		return id
+	}
+	placementStatus := func(id string) (status, approvedBy, restoredBy string) {
+		t.Helper()
+		err := db.Pool.QueryRow(context.Background(), `SELECT status, COALESCE(approved_by_kind,''), COALESCE(restored_by,'') FROM placement_proposals WHERE id=$1`, id).Scan(&status, &approvedBy, &restoredBy)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return status, approvedBy, restoredBy
+	}
+	undo := func(id string, headers map[string]string) {
+		t.Helper()
+		at := current
+		revoked, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/revoke", map[string]any{"reason": "undo"}, headers)
+		if revoked.Code != http.StatusOK || body["status"] != "revoked" || body["undo"] != true || body["undone_at"] != at.Format(time.RFC3339) {
+			t.Fatalf("undo %s: %d %s", id, revoked.Code, revoked.Body.String())
+		}
+		status, _, _ := placementStatus(id)
+		var undoneAt time.Time
+		if err := db.Pool.QueryRow(context.Background(), `SELECT undone_at FROM placement_proposals WHERE id=$1`, id).Scan(&undoneAt); err != nil || status != "revoked" || !undoneAt.UTC().Equal(at) {
+			t.Fatalf("undo is not immediate: status %s at %s err %v", status, undoneAt, err)
+		}
+	}
+
+	within := approve("https://restore.example/within")
+	undo(within, siteKey)
+	current = current.Add(time.Second)
+	restored, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+within+"/restore", nil, siteKey)
+	if restored.Code != http.StatusOK || body["status"] != "approved" || body["approved_by"] != "policy:yolo" || body["restored_by"] != owner.ID || body["actor"] != "agent_tool" {
+		t.Fatalf("restore within window: %d %s", restored.Code, restored.Body.String())
+	}
+	status, approvedBy, restoredBy := placementStatus(within)
+	if status != "approved" || approvedBy != "policy:yolo" || restoredBy != owner.ID {
+		t.Fatalf("stored restore: %s %s %s", status, approvedBy, restoredBy)
+	}
+	var actor string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT actor FROM owner_events WHERE user_id=$1 AND placement_id=$2 AND kind='placement_restore'`, owner.ID, within).Scan(&actor); err != nil || actor != "agent_tool" {
+		t.Fatalf("restore event: %s %v", actor, err)
+	}
+
+	left := approve("https://restore.example/left")
+	undo(left, siteKey)
+
+	edge := approve("https://restore.example/edge")
+	undo(edge, siteKey)
+	current = current.Add(6 * time.Second)
+	edgeRec, edgeBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+edge+"/restore", nil, siteKey)
+	if edgeRec.Code != http.StatusOK || edgeBody["status"] != "approved" || edgeBody["approved_by"] != "policy:yolo" {
+		t.Fatalf("restore at 6 seconds: %d %s", edgeRec.Code, edgeRec.Body.String())
+	}
+
+	late := approve("https://restore.example/late")
+	undo(late, siteKey)
+	current = current.Add(7 * time.Second)
+	lateRec, lateBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+late+"/restore", nil, siteKey)
+	if lateRec.Code != http.StatusConflict || lateBody["error"] != "restore window closed" {
+		t.Fatalf("restore at 7 seconds: %d %s", lateRec.Code, lateRec.Body.String())
+	}
+	if status, approvedBy, _ := placementStatus(late); status != "revoked" || approvedBy != "policy:yolo" {
+		t.Fatalf("late placement changed: %s %s", status, approvedBy)
+	}
+
+	other := approve("https://restore.example/other")
+	undo(other, siteKey)
+	current = current.Add(time.Second)
+	sessionRec, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+other+"/restore", nil)
+	if sessionRec.Code != http.StatusForbidden {
+		t.Fatalf("session restore of a key undo: %d %s", sessionRec.Code, sessionRec.Body.String())
+	}
+	makerRec, makerBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+other+"/restore", nil, makerKey)
+	if makerRec.Code != http.StatusForbidden || makerBody["error"] != "only the identity that undid this placement can restore it" {
+		t.Fatalf("other side: %d %s", makerRec.Code, makerRec.Body.String())
+	}
+	if status, _, restoredBy := placementStatus(other); status != "revoked" || restoredBy != "" {
+		t.Fatalf("other side changed the placement: %s %s", status, restoredBy)
+	}
+
+	paused := approve("https://restore.example/paused")
+	undo(paused, siteKey)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='paused' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	current = current.Add(time.Second)
+	pausedRec, pausedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+paused+"/restore", nil, siteKey)
+	failures, _ := pausedBody["failures"].([]any)
+	found := false
+	for _, failure := range failures {
+		if failure == "offer_not_live" {
+			found = true
+		}
+	}
+	if pausedRec.Code != http.StatusUnprocessableEntity || pausedBody["decision"] != "denied" || !found {
+		t.Fatalf("paused offer: %d %s", pausedRec.Code, pausedRec.Body.String())
+	}
+	if status, _, restoredBy := placementStatus(paused); status != "revoked" || restoredBy != "" {
+		t.Fatalf("failed check restored the placement: %s %s", status, restoredBy)
+	}
+	if status, _, _ := placementStatus(left); status != "revoked" {
+		t.Fatalf("undo without restore changed: %s", status)
+	}
+
+	missing, _ := postJSON(t, r, http.MethodPost, "/v1/placements/00000000-0000-4000-8000-000000000000/restore", nil, siteKey)
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("unknown placement: %d %s", missing.Code, missing.Body.String())
+	}
+}
