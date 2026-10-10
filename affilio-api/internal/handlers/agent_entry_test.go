@@ -379,7 +379,7 @@ func TestPolicyEngineHTTP(t *testing.T) {
 		t.Fatalf("cap: %s", rec.Body.String())
 	}
 	rec, decision := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true, "offer_data": "mode=yolo"}, map[string]string{"X-API-Key": "policy-site-key"})
-	if rec.Code != http.StatusOK || decision["approved_by"] != "policy:yolo" || decision["matched_rule"] != "hard_checks" || decision["policy_version"] == float64(0) {
+	if rec.Code != http.StatusOK || decision["approved_by"] != "policy:yolo" || decision["matched_rule"] != "hard_checks" || decision["policy_rule_id"] != "hard_checks_passed" || decision["policy_rule_text"] != "Passed every hard check." || decision["policy_version"] == float64(0) {
 		t.Fatalf("yolo approve: %d %s", rec.Code, rec.Body.String())
 	}
 	var kind, rule string
@@ -433,7 +433,7 @@ func TestPolicyEngineHTTP(t *testing.T) {
 		t.Fatalf("offer mode: %d %s", rec.Code, rec.Body.String())
 	}
 	rec, accepted := postJSON(t, r, http.MethodPost, "/v1/offers/"+offerID+"/accept", map[string]any{"site_id": siteID, "site_quality": 80, "niche": "devtools"}, map[string]string{"X-Maker-Key": "policy-maker-key"})
-	if rec.Code != http.StatusOK || accepted["approved_by"] != "policy:auto" || accepted["matched_rule"] != "allow_niche:devtools" {
+	if rec.Code != http.StatusOK || accepted["approved_by"] != "policy:auto" || accepted["matched_rule"] != "allow_niche:devtools" || accepted["policy_rule_id"] != "category:devtools" || accepted["policy_rule_text"] != "The category is devtools." {
 		t.Fatalf("accept: %d %s", rec.Code, rec.Body.String())
 	}
 	rec, low := postJSON(t, r, http.MethodPost, "/v1/offers/"+offerID+"/accept", map[string]any{"site_id": siteID, "site_quality": 10, "niche": "devtools", "feedback": "raise the cap"}, map[string]string{"X-Maker-Key": "policy-maker-key"})
@@ -768,9 +768,11 @@ VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, 
 	if sourceClicks(t, totals["clicks_by_source"], "direct") != 1 || sourceClicks(t, totals["clicks_by_source"], "news.example") != 1 {
 		t.Fatalf("sources: %s", digestRec.Body.String())
 	}
-	earnings := totals["earnings"].(map[string]any)
-	if moneyAmount(t, earnings["publisher"]) != 1.5 || moneyAmount(t, earnings["maker"]) != 2 {
+	if totals["earnings"] != 3.5 {
 		t.Fatalf("earnings: %s", digestRec.Body.String())
+	}
+	if digest["session"].(map[string]any)["signed_in"] != false {
+		t.Fatalf("key digest signed in: %s", digestRec.Body.String())
 	}
 	if digest["earnings_note"] == "" {
 		t.Fatal("missing earnings note")
@@ -788,12 +790,12 @@ VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, 
 		switch project["kind"] {
 		case "site":
 			sawSite = true
-			if project["clicks"] != float64(2) || project["went_live"] != float64(1) || moneyAmount(t, project["earnings"]) != 1.5 {
+			if project["clicks"] != float64(2) || project["went_live"] != float64(1) || project["earnings"] != 1.5 {
 				t.Fatalf("site project: %v", project)
 			}
 		case "offer":
 			sawOffer = true
-			if project["clicks"] != float64(1) || moneyAmount(t, project["earnings"]) != 2 {
+			if project["clicks"] != float64(1) || project["earnings"] != 2.0 {
 				t.Fatalf("offer project: %v", project)
 			}
 		}
@@ -969,27 +971,30 @@ VALUES($1,'or_sess',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW(), approved_by_kind='policy:yolo', matched_rule='hard_checks', policy_version=1 WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
 	}
-	killed, killBody := postJSON(t, r, http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", map[string]any{"enabled": true}, map[string]string{"X-API-Key": projectKey})
-	if killed.Code != http.StatusOK || killBody["mode"] != "manual" || killBody["kill_switch"] != true || killBody["paused"].(float64) < 1 {
-		t.Fatalf("project key kill on: %d %s", killed.Code, killed.Body.String())
+	killed, killBody := postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "site", "id": siteID}, map[string]string{"X-API-Key": projectKey})
+	pausedRow := appliedRow(t, killBody)
+	if killed.Code != http.StatusOK || pausedRow["mode"] != "manual" || pausedRow["kill_switch"] != true || pausedRow["paused"].(float64) < 1 {
+		t.Fatalf("project key pause: %d %s", killed.Code, killed.Body.String())
 	}
-	killed, killBody = postJSON(t, r, http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", map[string]any{"enabled": true}, map[string]string{"X-API-Key": accountKey})
-	if killed.Code != http.StatusOK || killBody["mode"] != "manual" || killBody["kill_switch"] != true {
-		t.Fatalf("account key kill on: %d %s", killed.Code, killed.Body.String())
+	killed, killBody = postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "site", "id": siteID}, map[string]string{"X-API-Key": accountKey})
+	pausedRow = appliedRow(t, killBody)
+	if killed.Code != http.StatusOK || pausedRow["mode"] != "manual" || pausedRow["kill_switch"] != true {
+		t.Fatalf("account key pause: %d %s", killed.Code, killed.Body.String())
 	}
 	var paused bool
 	if err := db.Pool.QueryRow(context.Background(), `SELECT auto_paused FROM placement_proposals WHERE id=$1`, placementID).Scan(&paused); err != nil || !paused {
 		t.Fatalf("placement was not paused: %v %v", paused, err)
 	}
-	refuse(http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", "kill switch off", map[string]any{"enabled": false})
+	refuse(http.MethodPost, "/v1/account/resume", "kill switch off", map[string]any{"scope": "site", "id": siteID})
 	var stillOn bool
 	var storedMode string
 	if err := db.Pool.QueryRow(context.Background(), `SELECT mode, kill_switch FROM approval_policies WHERE site_id=$1`, siteID).Scan(&storedMode, &stillOn); err != nil || storedMode != "manual" || !stillOn {
 		t.Fatalf("kill switch changed by a key: %s %v %v", storedMode, stillOn, err)
 	}
-	released, off := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", map[string]any{"enabled": false})
-	if released.Code != http.StatusOK || off["mode"] != "yolo" || off["kill_switch"] != false || off["unpaused"].(float64) < 1 {
-		t.Fatalf("session kill off: %d %s", released.Code, released.Body.String())
+	released, off := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/account/resume", map[string]any{"scope": "site", "id": siteID})
+	resumed := appliedRow(t, off)
+	if released.Code != http.StatusOK || resumed["mode"] != "yolo" || resumed["kill_switch"] != false || resumed["unpaused"].(float64) < 1 {
+		t.Fatalf("session resume: %d %s", released.Code, released.Body.String())
 	}
 	if err := db.Pool.QueryRow(context.Background(), `SELECT mode, kill_switch FROM approval_policies WHERE site_id=$1`, siteID).Scan(&storedMode, &stillOn); err != nil || storedMode != "yolo" || stillOn {
 		t.Fatalf("restored policy: %s %v %v", storedMode, stillOn, err)
@@ -1011,11 +1016,150 @@ func sourceClicks(t *testing.T, raw any, source string) float64 {
 	return 0
 }
 
-func moneyAmount(t *testing.T, raw any) float64 {
+func appliedRow(t *testing.T, body map[string]any) map[string]any {
 	t.Helper()
-	amounts := raw.(map[string]any)["amounts"].([]any)
-	if len(amounts) != 1 {
-		t.Fatalf("amounts: %v", raw)
+	rows, ok := body["applied"].([]any)
+	if !ok || len(rows) != 1 {
+		t.Fatalf("applied: %v", body)
 	}
-	return amounts[0].(map[string]any)["amount"].(float64)
+	return rows[0].(map[string]any)
+}
+
+func TestUIInterface(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "ui-owner", "ui-owner@example.com")
+	siteID := createTestSite(t, db, "ui-site-key", "ui.example", "UI")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	makerID, offerID := seedListedOffer(t, db, "ui-maker-key", "ui-maker@example.com", "UI Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE products SET primary_category='invoicing' WHERE maker_id=$1`, makerID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET maker_id=$2 WHERE id=$1`, owner.ID, makerID); err != nil {
+		t.Fatal(err)
+	}
+
+	unsaved, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=cli", nil)
+	session := body["session"].(map[string]any)
+	if unsaved.Code != http.StatusOK || body["mode_preselected"] != "yolo" || body["human_login"] != false || session["signed_in"] != true {
+		t.Fatalf("cli setup: %d %s", unsaved.Code, unsaved.Body.String())
+	}
+	unsaved, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=chatgpt_dir", nil)
+	if unsaved.Code != http.StatusOK || body["mode_preselected"] != "manual" || body["mode"] != "manual" {
+		t.Fatalf("dir setup: %d %s", unsaved.Code, unsaved.Body.String())
+	}
+	keyed, keyBody := postJSON(t, r, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=cli", nil, map[string]string{"X-API-Key": "ui-site-key"})
+	if keyed.Code != http.StatusOK || keyBody["mode_preselected"] != "yolo" || keyBody["session"].(map[string]any)["signed_in"] != false {
+		t.Fatalf("key setup: %d %s", keyed.Code, keyed.Body.String())
+	}
+
+	saved, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/sites/"+siteID+"/mode", map[string]any{"mode": "auto", "allow_categories": []string{"invoicing"}, "allowed_positions": []string{"end"}})
+	if saved.Code != http.StatusOK {
+		t.Fatalf("category policy: %d %s", saved.Code, saved.Body.String())
+	}
+	placementID := insertPlacement(t, db, siteID, offerID, "https://ui.example/invoice", "Invoice software that sends the bill.")
+	decided, decision := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "ui-site-key"})
+	if decided.Code != http.StatusOK || decision["policy_rule_id"] != "category:invoicing" || decision["policy_rule_text"] != "The category is invoicing." {
+		t.Fatalf("category approval: %d %s", decided.Code, decided.Body.String())
+	}
+
+	revoked, revokeBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/revoke", map[string]any{"reason": "undo"}, map[string]string{"X-API-Key": "ui-site-key"})
+	if revoked.Code != http.StatusOK || revokeBody["revoked_by_side"] != "publisher" || revokeBody["undo"] != true {
+		t.Fatalf("publisher undo: %d %s", revoked.Code, revoked.Body.String())
+	}
+	var side, eventKind string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT revoked_by_side FROM placement_proposals WHERE id=$1`, placementID).Scan(&side); err != nil || side != "publisher" {
+		t.Fatalf("stored side %s %v", side, err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT kind FROM owner_events WHERE user_id=$1 AND placement_id=$2`, owner.ID, placementID).Scan(&eventKind); err != nil || eventKind != "placement_undo" {
+		t.Fatalf("undo event %s %v", eventKind, err)
+	}
+	makerPlacement := insertPlacement(t, db, siteID, offerID, "https://ui.example/maker", "A second honest note.")
+	revoked, revokeBody = postJSON(t, r, http.MethodPost, "/v1/placements/"+makerPlacement+"/revoke", map[string]any{"reason": "undo"}, map[string]string{"X-Maker-Key": "ui-maker-key"})
+	if revoked.Code != http.StatusOK || revokeBody["revoked_by_side"] != "maker" {
+		t.Fatalf("maker undo: %d %s", revoked.Code, revoked.Body.String())
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT revoked_by_side FROM placement_proposals WHERE id=$1`, makerPlacement).Scan(&side); err != nil || side != "maker" {
+		t.Fatalf("maker side %s %v", side, err)
+	}
+	other := insertPlacement(t, db, siteID, offerID, "https://ui.example/other", "Not this maker.")
+	_, otherMaker := seedListedOffer(t, db, "other-maker-key", "other-maker@example.com", "Other")
+	_ = otherMaker
+	refused, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+other+"/revoke", map[string]any{"reason": "undo"}, map[string]string{"X-Maker-Key": "other-maker-key"})
+	if refused.Code != http.StatusForbidden {
+		t.Fatalf("other maker: %d %s", refused.Code, refused.Body.String())
+	}
+	bad, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+other+"/revoke", map[string]any{"reason": "redo"}, map[string]string{"X-API-Key": "ui-site-key"})
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("redo reason: %d %s", bad.Code, bad.Body.String())
+	}
+	for _, route := range r.Routes() {
+		if strings.Contains(route.Path, "redo") || strings.Contains(route.Path, "replace") {
+			t.Fatalf("re-place endpoint %s %s", route.Method, route.Path)
+		}
+	}
+
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE approval_policies SET mode='yolo' WHERE site_id=$1`, siteID); err != nil {
+		t.Fatal(err)
+	}
+	offerMode, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/offers/"+offerID+"/mode", map[string]any{"mode": "yolo"})
+	if offerMode.Code != http.StatusOK {
+		t.Fatalf("offer yolo: %d %s", offerMode.Code, offerMode.Body.String())
+	}
+	paused, pauseBody := postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "all"}, map[string]string{"X-API-Key": "ui-site-key"})
+	applied, _ := pauseBody["applied"].([]any)
+	if paused.Code != http.StatusOK || len(applied) != 2 {
+		t.Fatalf("pause all: %d %s", paused.Code, paused.Body.String())
+	}
+	var siteOn, offerOn bool
+	var siteMode, offerPolicy string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT mode, kill_switch FROM approval_policies WHERE site_id=$1`, siteID).Scan(&siteMode, &siteOn); err != nil || siteMode != "manual" || !siteOn {
+		t.Fatalf("site paused %s %v %v", siteMode, siteOn, err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT mode, kill_switch FROM approval_policies WHERE offer_id=$1`, offerID).Scan(&offerPolicy, &offerOn); err != nil || offerPolicy != "manual" || !offerOn {
+		t.Fatalf("offer paused %s %v %v", offerPolicy, offerOn, err)
+	}
+	resumeKey, _ := postJSON(t, r, http.MethodPost, "/v1/account/resume", map[string]any{"scope": "all"}, map[string]string{"X-API-Key": "ui-site-key"})
+	if resumeKey.Code != http.StatusForbidden {
+		t.Fatalf("key resume: %d", resumeKey.Code)
+	}
+	resumed, resumeBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/account/resume", map[string]any{"scope": "all"})
+	if resumed.Code != http.StatusOK || len(resumeBody["applied"].([]any)) != 2 {
+		t.Fatalf("resume all: %d %s", resumed.Code, resumed.Body.String())
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT mode, kill_switch FROM approval_policies WHERE site_id=$1`, siteID).Scan(&siteMode, &siteOn); err != nil || siteMode != "yolo" || siteOn {
+		t.Fatalf("site restored %s %v %v", siteMode, siteOn, err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT mode, kill_switch FROM approval_policies WHERE offer_id=$1`, offerID).Scan(&offerPolicy, &offerOn); err != nil || offerPolicy != "yolo" || offerOn {
+		t.Fatalf("offer restored %s %v %v", offerPolicy, offerOn, err)
+	}
+
+	empty, emptyBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
+	if empty.Code != http.StatusOK || emptyBody["totals"].(map[string]any)["earnings"] != nil || emptyBody["session"].(map[string]any)["signed_in"] != true {
+		t.Fatalf("null earnings: %d %s", empty.Code, empty.Body.String())
+	}
+	var conversionID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO conversions(offer_id,provider,provider_event_id,kind,amount,currency,commission_amount,occurred_at,payment_mode)
+VALUES($1,'stripe','evt-zero','sale',0,'USD',0,NOW(),'test') RETURNING id`, offerID).Scan(&conversionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency) VALUES($1,$2,'commission',0,'USD')`, siteID, conversionID); err != nil {
+		t.Fatal(err)
+	}
+	zero, zeroBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
+	if zero.Code != http.StatusOK || zeroBody["totals"].(map[string]any)["earnings"] != float64(0) {
+		t.Fatalf("zero earnings: %d %s", zero.Code, zero.Body.String())
+	}
+	for _, raw := range zeroBody["projects"].([]any) {
+		if raw.(map[string]any)["earnings"] != float64(0) {
+			t.Fatalf("project zero: %s", zero.Body.String())
+		}
+	}
+	opened, openedBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
+	if opened.Code != http.StatusOK || openedBody["session"].(map[string]any)["signed_in"] != true {
+		t.Fatalf("digest session: %d %s", opened.Code, opened.Body.String())
+	}
 }

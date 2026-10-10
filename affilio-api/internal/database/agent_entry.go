@@ -381,6 +381,12 @@ FROM owner_setup WHERE owner_id=$1 AND role=$2`, ownerID, role).Scan(&s.OwnerID,
 	return s, err
 }
 
+func (d *DB) OwnerHumanLogin(ctx context.Context, ownerID string) (bool, error) {
+	var human bool
+	err := d.Pool.QueryRow(ctx, `SELECT human_login FROM owners WHERE id=$1`, ownerID).Scan(&human)
+	return human, err
+}
+
 func (d *DB) OwnerIDBySite(ctx context.Context, siteID string) (string, error) {
 	var id string
 	err := d.Pool.QueryRow(ctx, `SELECT id::text FROM owners WHERE site_id=$1`, siteID).Scan(&id)
@@ -544,6 +550,82 @@ WHERE site_id=$1 AND status='approved' AND approved_by_kind IN ('policy:auto','p
 	}
 	if restored != mode {
 		if _, err = tx.Exec(ctx, `INSERT INTO mode_changes(site_id,actor,user_id,from_mode,to_mode) VALUES($1,$2,NULLIF($3,'')::uuid,$4,$5)`, siteID, actor, userID, mode, restored); err != nil {
+			return "", 0, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return "", 0, err
+	}
+	return restored, int(tag.RowsAffected()), nil
+}
+
+func (d *DB) KillOfferSwitch(ctx context.Context, offerID, actor, userID, fromMode string) (int, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE placement_proposals SET auto_paused=true
+WHERE offer_id=$1 AND status='approved' AND approved_by_kind IN ('policy:auto','policy:yolo') AND auto_paused=false`, offerID)
+	if err != nil {
+		return 0, err
+	}
+	var version int
+	err = tx.QueryRow(ctx, `INSERT INTO approval_policies(scope,offer_id,mode,kill_switch,mode_before_kill)
+VALUES('offer',$1,'manual',true,NULLIF($2,''))
+ON CONFLICT(offer_id) DO UPDATE SET
+mode_before_kill=CASE WHEN approval_policies.kill_switch THEN approval_policies.mode_before_kill ELSE NULLIF($2,'') END,
+kill_switch=true, mode='manual', version=approval_policies.version+1, updated_at=NOW()
+RETURNING version`, offerID, fromMode).Scan(&version)
+	if err != nil || version < 1 {
+		if err == nil {
+			err = errors.New("kill switch was not saved")
+		}
+		return 0, err
+	}
+	if fromMode != "manual" {
+		if _, err = tx.Exec(ctx, `INSERT INTO mode_changes(offer_id,actor,user_id,from_mode,to_mode) VALUES($1,$2,NULLIF($3,'')::uuid,NULLIF($4,''),'manual')`, offerID, actor, userID, fromMode); err != nil {
+			return 0, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return int(tag.RowsAffected()), nil
+}
+
+func (d *DB) ReleaseOfferKillSwitch(ctx context.Context, offerID, actor, userID string) (string, int, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return "", 0, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE placement_proposals SET auto_paused=false
+WHERE offer_id=$1 AND status='approved' AND approved_by_kind IN ('policy:auto','policy:yolo') AND auto_paused=true`, offerID)
+	if err != nil {
+		return "", 0, err
+	}
+	var mode, before string
+	var on bool
+	err = tx.QueryRow(ctx, `SELECT mode, kill_switch, COALESCE(mode_before_kill,'') FROM approval_policies WHERE offer_id=$1 FOR UPDATE`, offerID).Scan(&mode, &on, &before)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if err = tx.Commit(ctx); err != nil {
+			return "", 0, err
+		}
+		return "manual", int(tag.RowsAffected()), nil
+	}
+	if err != nil {
+		return "", 0, err
+	}
+	restored := mode
+	if on && before != "" {
+		restored = before
+	}
+	if _, err = tx.Exec(ctx, `UPDATE approval_policies SET mode=$2, kill_switch=false, mode_before_kill=NULL, version=version+1, updated_at=NOW() WHERE offer_id=$1`, offerID, restored); err != nil {
+		return "", 0, err
+	}
+	if restored != mode {
+		if _, err = tx.Exec(ctx, `INSERT INTO mode_changes(offer_id,actor,user_id,from_mode,to_mode) VALUES($1,$2,NULLIF($3,'')::uuid,$4,$5)`, offerID, actor, userID, mode, restored); err != nil {
 			return "", 0, err
 		}
 	}

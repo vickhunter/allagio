@@ -32,8 +32,8 @@ var ScreenActions = []ScreenAction{
 	{Screen: "dashboard", Action: "Read an offer policy", Method: "GET", Path: "/v1/offers/:id/mode"},
 	{Screen: "dashboard", Action: "Number: minimum site quality", Method: "GET", Path: "/v1/offers/:id/mode"},
 	{Screen: "dashboard", Action: "Save an offer mode and policy", Method: "PUT", Path: "/v1/offers/:id/mode"},
-	{Screen: "dashboard", Action: "Turn the kill switch on", Method: "POST", Path: "/v1/sites/:id/kill-switch"},
-	{Screen: "dashboard", Action: "Turn the kill switch off", Method: "POST", Path: "/v1/sites/:id/kill-switch", SessionOnly: true},
+	{Screen: "dashboard", Action: "Turn the kill switch on", Method: "POST", Path: "/v1/account/pause"},
+	{Screen: "dashboard", Action: "Turn the kill switch off", Method: "POST", Path: "/v1/account/resume", SessionOnly: true},
 	{Screen: "dashboard", Action: "Show the hard checks", Method: "GET", Path: "/v1/policy/hard-checks"},
 	{Screen: "dashboard", Action: "Create an account-wide key", Method: "POST", Path: "/v1/account-keys", SessionOnly: true},
 	{Screen: "dashboard", Action: "List account keys", Method: "GET", Path: "/v1/account-keys"},
@@ -46,7 +46,11 @@ var ScreenActions = []ScreenAction{
 
 	{Screen: "digest", Action: "Account totals (went live, clicks, earnings, clicks by source)", Method: "GET", Path: "/v1/account/digest"},
 	{Screen: "digest", Action: "Per project went live, clicks, earnings, clicks by source, and an undo token per item", Method: "GET", Path: "/v1/account/digest"},
-	{Screen: "digest", Action: "Undo one placement or offer", Method: "POST", Path: "/v1/digest/undo"},
+	{Screen: "digest", Action: "Undo a placement as the publisher or the maker", Method: "POST", Path: "/v1/placements/:id/revoke"},
+	{Screen: "setup", Action: "Session signed in and human login", Method: "GET", Path: "/v1/setup/settings"},
+	{Screen: "setup", Action: "Preselected mode from the install path", Method: "GET", Path: "/v1/setup/settings"},
+	{Screen: "digest", Action: "Session signed in", Method: "GET", Path: "/v1/account/digest"},
+	{Screen: "dashboard", Action: "Approval policy rule id and sentence", Method: "POST", Path: "/v1/placements/:id/decide"},
 	{Screen: "digest", Action: "Record digest opened", Method: "POST", Path: "/v1/events"},
 	{Screen: "digest", Action: "List what went live since the last digest open", Method: "GET", Path: "/v1/digest"},
 }

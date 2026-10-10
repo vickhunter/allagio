@@ -107,7 +107,7 @@ One saved answer set per owner and role. The setup screen shows at most four que
 GET /v1/setup/settings?role=publisher&install_path=cli
 ` + "```" + `
 
-Auth is the owner session or a project key. When nothing is saved, ` + "`mode`" + ` and ` + "`mode_shown`" + ` are the default for ` + "`install_path`" + `.
+Auth is the owner session or a project key. When nothing is saved, ` + "`mode`" + ` and ` + "`mode_shown`" + ` are the default for ` + "`install_path`" + `. Every response includes ` + "`mode_preselected`" + `, which the server derives from ` + "`install_path`" + `, ` + "`human_login`" + `, and ` + "`session.signed_in`" + `.
 
 | install_path | default mode |
 | --- | --- |
@@ -219,43 +219,43 @@ POST /v1/placements/:id/decide
 {"relevance":55,"position":"end","rel_sponsored":true,"copy_edited":false,"offer_data":"the offer summary"}
 ` + "```" + `
 
-Manual, or anything outside an auto policy, returns ` + "`decision: needs_owner`" + ` and does not approve. Auto and yolo that pass record ` + "`approved_by`" + ` (` + "`policy:auto`" + ` or ` + "`policy:yolo`" + `), ` + "`policy_version`" + `, and ` + "`matched_rule`" + `.
+Manual, or anything outside an auto policy, returns ` + "`decision: needs_owner`" + ` and does not approve. Auto and yolo that pass record ` + "`approved_by`" + ` (` + "`policy:auto`" + ` or ` + "`policy:yolo`" + `), ` + "`policy_version`" + `, and ` + "`matched_rule`" + `. The response also includes ` + "`policy_rule_id`" + ` (` + "`hard_checks_passed`" + ` or ` + "`category:invoicing`" + `) and ` + "`policy_rule_text`" + `, a sentence written by the server.
 
 ` + "`POST /v1/offers/:id/accept`" + ` with ` + "`site_id`" + `, ` + "`site_quality`" + `, and ` + "`niche`" + ` is the maker mirror.
 
 ## Kill switch
 
 ` + "```" + `
-POST /v1/sites/:id/kill-switch
-{"enabled": true}
+POST /v1/account/pause
+{"scope":"all"}
 ` + "```" + `
 
-` + "`enabled: true`" + `, or a body that omits it, turns the switch on. The site returns to manual. Approved placements that are not published yet are paused, and commit refuses them. A project key or an account key may turn the switch on.
+` + "`scope`" + ` is ` + "`all`" + `, ` + "`site`" + `, or ` + "`offer`" + `. ` + "`site`" + ` and ` + "`offer`" + ` require ` + "`id`" + `. The server sets manual mode on every site and offer in that scope and pauses unpublished policy approvals. A project key, an account key, or a session may pause.
 
 ` + "```" + `
-POST /v1/sites/:id/kill-switch
-{"enabled": false}
+POST /v1/account/resume
+{"scope":"site","id":"<uuid>"}
 ` + "```" + `
 
-Turning the switch off is session-only. Any API key receives 403. The signed-in human restores the mode from before the switch and unpauses those approvals.
+Resume is session-only. Any API key receives 403. The signed-in human restores the mode from before the pause and unpauses those approvals.
 
 ## Digest
 
 ` + "`POST /v1/events`" + ` with ` + "`kind`" + ` ` + "`digest_opened`" + ` or ` + "`dashboard_opened`" + ` stores the user id and the time.
 
-` + "`GET /v1/digest`" + ` lists placements and offers that went live since the last ` + "`digest_opened`" + `. Each item has a one-time ` + "`undo_token`" + `.
+` + "`GET /v1/digest`" + ` lists placements and offers that went live since the last ` + "`digest_opened`" + `. The payload includes ` + "`session.signed_in`" + `.
 
 ` + "```" + `
-POST /v1/digest/undo
-{"undo_token":"<token>"}
+POST /v1/placements/:id/revoke
+{"reason":"undo"}
 ` + "```" + `
 
-Undo revokes the placement or pauses the offer and stores ` + "`placement_undo`" + ` or ` + "`offer_undo`" + `.
+Undo is that revoke. The site owner is recorded as ` + "`revoked_by_side: publisher`" + `. The offer's maker uses the same endpoint and is recorded as ` + "`maker`" + `. Either records a ` + "`placement_undo`" + ` event. Redo stays in the UI. There is no re-place endpoint.
 `
 
 const accountDoc = `# Account keys and digest
 
-Two kinds of key exist. A project key comes from device-code approval and works for one site or one offer. An account key works for every site and offer on the account. Neither key can skip the hard checks, loosen a mode, raise a cap, lower minimum relevance, or turn a kill switch off. Those four actions are session-only.
+Two kinds of key exist. A project key comes from device-code approval and works for one site or one offer. An account key works for every site and offer on the account. Neither key can skip the hard checks, loosen a mode, raise a cap, lower minimum relevance, or resume a pause. Those four actions are session-only. Pause (` + "`POST /v1/account/pause`" + `) is allowed for any key.
 
 ## Account keys
 
@@ -277,22 +277,23 @@ Send the account key as ` + "`X-API-Key`" + ` for the publisher site, or ` + "`X
 
 ## Account digest
 
-` + "`GET /v1/account/digest`" + ` uses the same auth. ` + "`totals`" + ` covers the whole account. ` + "`projects`" + ` repeats the numbers per site and per offer. Each item that went live has an ` + "`undo_token`" + `.
+` + "`GET /v1/account/digest`" + ` uses the same auth. ` + "`totals`" + ` covers the whole account. ` + "`projects`" + ` repeats the numbers per site and per offer. Each item that went live has an ` + "`undo_token`" + `. The payload includes ` + "`session.signed_in`" + `.
 
 ` + "```" + `
 {
   "totals": {
     "went_live": 1,
     "clicks": 2,
-    "earnings": {"mode": "test", "publisher": {"mode": "test", "amounts": [{"currency": "USD", "amount": 1.5}]}, "maker": null},
+    "earnings": 1.5,
     "clicks_by_source": [{"source": "direct", "clicks": 2}]
   },
   "projects": [],
+  "session": {"signed_in": false},
   "earnings_note": "..."
 }
 ` + "```" + `
 
-` + "`earnings`" + ` is null when no test-mode commission is recorded. Publisher amounts are ledger rows joined to conversions with ` + "`payment_mode=test`" + `. Maker amounts are ` + "`commission_amount`" + ` on those test conversions. Live and legacy rows are not included. Click source is the referrer host from the clicks table. A click with an empty referrer, or a referrer with no host, counts as ` + "`direct`" + `. Account click totals count each click once even when it belongs to both a site and an offer on the same account.
+` + "`earnings`" + ` is null when that scope has no test-mode rows, and 0 when the recorded rows add up to zero. Publisher amounts are ledger rows joined to conversions with ` + "`payment_mode=test`" + `. Maker amounts are ` + "`commission_amount`" + ` on those test conversions. Live and legacy rows are not included. Click source is the referrer host from the clicks table. A click with an empty referrer, or a referrer with no host, counts as ` + "`direct`" + `. Account click totals count each click once even when it belongs to both a site and an offer on the same account.
 
 ## Hard checks
 

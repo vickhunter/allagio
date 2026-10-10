@@ -150,11 +150,38 @@ policy_version=COALESCE((SELECT version FROM approval_policies WHERE site_id=pp.
 }
 
 func (d *DB) RevokePlacement(ctx context.Context, siteID, id string) (bool, error) {
-	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='revoked' WHERE id=$1 AND site_id=$2 AND status<>'revoked'`, id, siteID)
+	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='revoked', revoked_by_side='publisher' WHERE id=$1 AND site_id=$2 AND status<>'revoked'`, id, siteID)
 	if err != nil {
 		return false, err
 	}
 	return res.RowsAffected() == 1, nil
+}
+
+func (d *DB) GetPlacementByID(ctx context.Context, id string) (*Placement, error) {
+	return scanPlacement(d.Pool.QueryRow(ctx, `SELECT `+placementColumns+` FROM placement_proposals WHERE id=$1`, id))
+}
+
+// RevokePlacementForSide revokes a placement the caller is allowed to undo.
+// reason "undo" records a placement_undo event for that owner.
+func (d *DB) RevokePlacementForSide(ctx context.Context, placementID, side, userID, reason string, now time.Time) (bool, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE placement_proposals SET status='revoked', revoked_by_side=$2 WHERE id=$1 AND status<>'revoked'`, placementID, side)
+	if err != nil {
+		return false, err
+	}
+	if tag.RowsAffected() != 1 {
+		return false, tx.Commit(ctx)
+	}
+	if reason == "undo" {
+		if _, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at) VALUES('placement_undo',$1,$2,$3)`, userID, placementID, now); err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit(ctx)
 }
 
 func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Placement, error) {

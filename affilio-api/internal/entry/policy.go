@@ -61,6 +61,40 @@ type Decision struct {
 	Failures    []string
 }
 
+// PresentRule turns a stored match into the id and sentence the dashboard shows.
+// hard_checks_passed and category:invoicing are the machine ids.
+func PresentRule(rule string) (id, text string) {
+	if name := ruleValue(rule, "allow_category:"); name != "" {
+		return "category:" + name, "The category is " + name + "."
+	}
+	if name := ruleValue(rule, "allow_niche:"); name != "" {
+		return "category:" + name, "The category is " + name + "."
+	}
+	switch rule {
+	case "hard_checks", "hard_checks_passed", "auto_defaults", "min_site_quality":
+		return "hard_checks_passed", "Passed every hard check."
+	}
+	if strings.Contains(rule, "allow_maker") {
+		return "maker_allowed", "The maker is on the allow list."
+	}
+	if name := ruleValue(rule, "position:"); name != "" {
+		return "position:" + name, "The position is " + name + "."
+	}
+	if rule == "" {
+		return "", ""
+	}
+	return rule, "Matched the saved policy."
+}
+
+func ruleValue(rule, prefix string) string {
+	for _, part := range strings.Split(rule, "+") {
+		if strings.HasPrefix(part, prefix) {
+			return strings.TrimPrefix(part, prefix)
+		}
+	}
+	return ""
+}
+
 var allowedPositions = map[string]bool{
 	"after_intro": true, "matched_section": true, "end": true,
 	"main_post": true, "first_reply": true,

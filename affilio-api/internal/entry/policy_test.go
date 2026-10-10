@@ -108,6 +108,21 @@ func TestAutoPolicyAndYolo(t *testing.T) {
 	}
 }
 
+func TestPresentRule(t *testing.T) {
+	id, text := PresentRule("hard_checks")
+	if id != "hard_checks_passed" || text != "Passed every hard check." {
+		t.Fatalf("hard checks: %s %s", id, text)
+	}
+	id, text = PresentRule("allow_category:invoicing")
+	if id != "category:invoicing" || text != "The category is invoicing." {
+		t.Fatalf("category: %s %s", id, text)
+	}
+	id, text = PresentRule("allow_maker+allow_category:invoicing+position:end")
+	if id != "category:invoicing" {
+		t.Fatalf("combined: %s", id)
+	}
+}
+
 func TestPublisherMirror(t *testing.T) {
 	rules := AutoRules{MinSiteQuality: 60, AllowedNiches: []string{"devtools"}}
 	got := EvaluatePublisher(ModeAuto, rules, PublisherFacts{OfferLive: true, SiteQuality: 70, Niche: "devtools"})

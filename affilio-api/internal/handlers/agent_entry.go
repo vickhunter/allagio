@@ -51,9 +51,12 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.GET("/v1/sites/:id/mode", h.GetSiteMode)
 	r.PUT("/v1/sites/:id/mode", h.PutSiteMode)
 	r.POST("/v1/sites/:id/kill-switch", h.KillSwitch)
+	r.POST("/v1/account/pause", h.AccountPause)
+	r.POST("/v1/account/resume", h.AccountResume)
 	r.GET("/v1/offers/:id/mode", h.GetOfferMode)
 	r.PUT("/v1/offers/:id/mode", h.PutOfferMode)
 	r.POST("/v1/placements/:id/decide", h.DecidePlacement)
+	r.POST("/v1/placements/:id/revoke", h.RevokePlacement)
 	r.POST("/v1/offers/:id/accept", h.AcceptPublisher)
 	r.POST("/v1/listing-cards", h.CreateListing)
 	r.GET("/v1/listing-cards/:id", h.GetListing)
@@ -311,6 +314,12 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be maker or publisher"})
 		return
 	}
+	human, err := h.DB.OwnerHumanLogin(c.Request.Context(), ownerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings unavailable"})
+		return
+	}
+	signedIn := actor.Kind == "owner_ui"
 	saved, err := h.DB.GetSetup(c.Request.Context(), ownerID, role)
 	if errors.Is(err, pgx.ErrNoRows) {
 		path := c.Query("install_path")
@@ -318,14 +327,14 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 			path = "cli"
 		}
 		mode := entry.DefaultMode(path)
-		c.JSON(http.StatusOK, gin.H{"saved": false, "role": role, "install_path": path, "mode": mode, "mode_shown": mode, "promote": "", "avoid_topics": []string{}, "commission": "", "sites_channels": []string{}, "never_topics": []string{}, "box_position": ""})
+		c.JSON(http.StatusOK, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn))
 		return
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings unavailable"})
 		return
 	}
-	c.JSON(http.StatusOK, setupJSON(saved, true))
+	c.JSON(http.StatusOK, setupJSON(saved, true, human, signedIn))
 }
 
 func (h *AgentEntry) PutSetup(c *gin.Context) {
@@ -380,7 +389,12 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "mode was not applied"})
 		return
 	}
-	c.JSON(http.StatusOK, setupJSON(saved, true))
+	human, err := h.DB.OwnerHumanLogin(c.Request.Context(), owner.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
+		return
+	}
+	c.JSON(http.StatusOK, setupJSON(saved, true, human, true))
 }
 
 func (h *AgentEntry) applySetupMode(c *gin.Context, owner *database.Owner, saved database.SetupSettings) error {
@@ -681,7 +695,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "placement cannot be approved"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"decision": "approved", "approved_by": decision.ApprovedBy, "policy_version": policy.Version, "matched_rule": decision.MatchedRule})
+	c.JSON(http.StatusOK, approvalJSON(decision, policy.Version))
 }
 
 func (h *AgentEntry) AcceptPublisher(c *gin.Context) {
@@ -730,7 +744,7 @@ func (h *AgentEntry) AcceptPublisher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "acceptance failed"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"decision": "approved", "approved_by": decision.ApprovedBy, "policy_version": policy.Version, "matched_rule": decision.MatchedRule})
+	c.JSON(http.StatusOK, approvalJSON(decision, policy.Version))
 }
 
 func (h *AgentEntry) CreateListing(c *gin.Context) {
@@ -863,7 +877,7 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 	if since != nil {
 		sinceOut = since.UTC().Format(time.RFC3339)
 	}
-	c.JSON(http.StatusOK, gin.H{"since": sinceOut, "items": items})
+	c.JSON(http.StatusOK, gin.H{"since": sinceOut, "items": items, "session": gin.H{"signed_in": true}})
 }
 
 func (h *AgentEntry) issueUndo(c *gin.Context, ownerID string, item database.DigestItem) (string, error) {
@@ -908,6 +922,98 @@ func (h *AgentEntry) Undo(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "undone", "kind": kind, "placement_id": placementID, "offer_id": offerID, "user_id": owner.ID})
+}
+
+func (h *AgentEntry) RevokePlacement(c *gin.Context) {
+	if !uuidPattern.MatchString(c.Param("id")) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
+		return
+	}
+	reason, ok := revokeReason(c)
+	if !ok {
+		return
+	}
+	actor, ok := h.actorFrom(c)
+	if !ok {
+		return
+	}
+	placement, err := h.DB.GetPlacementByID(c.Request.Context(), c.Param("id"))
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "revocation failed"})
+		return
+	}
+	side, userID, ok := h.revokeSide(c, actor, placement)
+	if !ok {
+		return
+	}
+	if reason == "undo" && userID == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "undo requires an owner"})
+		return
+	}
+	updated, err := h.DB.RevokePlacementForSide(c.Request.Context(), placement.ID, side, userID, reason, time.Now().UTC())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "revocation failed"})
+		return
+	}
+	if !updated {
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "revoked", "revoked_by_side": side, "undo": reason == "undo"})
+}
+
+func revokeReason(c *gin.Context) (string, bool) {
+	body, err := readJSONBody(c, 1024)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return "", false
+	}
+	if len(bytes.TrimSpace(body)) == 0 {
+		return "", true
+	}
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if decodeStrict(body, &req) != nil || (req.Reason != "" && req.Reason != "undo") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "reason must be undo"})
+		return "", false
+	}
+	return req.Reason, true
+}
+
+func (h *AgentEntry) revokeSide(c *gin.Context, actor entryActor, placement *database.Placement) (string, string, bool) {
+	userID := actor.UserID
+	if actor.Owner != nil {
+		userID = actor.Owner.ID
+		if actor.Owner.SiteID != "" && actor.Owner.SiteID == placement.SiteID {
+			return "publisher", userID, true
+		}
+		if h.makerOwnsOffer(c, actor.Owner.MakerID, placement.OfferID) {
+			return "maker", userID, true
+		}
+		c.JSON(http.StatusForbidden, gin.H{"error": "placement is not on this account"})
+		return "", "", false
+	}
+	if actor.SiteID != "" && actor.SiteID == placement.SiteID {
+		return "publisher", userID, true
+	}
+	if h.makerOwnsOffer(c, actor.MakerID, placement.OfferID) {
+		return "maker", userID, true
+	}
+	c.JSON(http.StatusForbidden, gin.H{"error": "placement is not on this account"})
+	return "", "", false
+}
+
+func (h *AgentEntry) makerOwnsOffer(c *gin.Context, makerID, offerID string) bool {
+	if makerID == "" {
+		return false
+	}
+	_, offerMaker, _, err := h.DB.OfferFacts(c.Request.Context(), offerID)
+	return err == nil && offerMaker == makerID
 }
 
 func (h *AgentEntry) FromSource(c *gin.Context) {
@@ -1136,12 +1242,26 @@ func policyJSON(p database.ApprovalPolicy, source string) gin.H {
 	}
 }
 
-func setupJSON(s database.SetupSettings, saved bool) gin.H {
-	return gin.H{
+func setupJSON(s database.SetupSettings, saved, human, signedIn bool) gin.H {
+	body := gin.H{
 		"saved": saved, "role": s.Role, "install_path": s.InstallPath, "mode": s.Mode, "mode_shown": s.ModeShown,
-		"promote": s.Promote, "avoid_topics": listOrEmpty(s.AvoidTopics), "commission": s.Commission,
+		"mode_preselected": entry.DefaultMode(s.InstallPath),
+		"promote":          s.Promote, "avoid_topics": listOrEmpty(s.AvoidTopics), "commission": s.Commission,
 		"sites_channels": listOrEmpty(s.SitesChannels), "never_topics": listOrEmpty(s.NeverTopics), "box_position": s.BoxPosition,
-		"saved_by": s.SavedBy, "saved_at": s.SavedAt.UTC().Format(time.RFC3339),
+		"human_login": human, "session": gin.H{"signed_in": signedIn},
+	}
+	if saved {
+		body["saved_by"] = s.SavedBy
+		body["saved_at"] = s.SavedAt.UTC().Format(time.RFC3339)
+	}
+	return body
+}
+
+func approvalJSON(decision entry.Decision, version int) gin.H {
+	ruleID, ruleText := entry.PresentRule(decision.MatchedRule)
+	return gin.H{
+		"decision": "approved", "approved_by": decision.ApprovedBy, "policy_version": version, "matched_rule": decision.MatchedRule,
+		"policy_rule_id": ruleID, "policy_rule_text": ruleText,
 	}
 }
 
