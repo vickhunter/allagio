@@ -1254,7 +1254,7 @@ func TestPlacementRestore(t *testing.T) {
 	undo(late, siteKey)
 	current = current.Add(7 * time.Second)
 	lateRec, lateBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+late+"/restore", nil, siteKey)
-	if lateRec.Code != http.StatusConflict || lateBody["error"] != "restore window closed" {
+	if lateRec.Code != http.StatusConflict || lateBody["error"] != "restore refused" || lateBody["reason"] != "window_expired" {
 		t.Fatalf("restore at 7 seconds: %d %s", lateRec.Code, lateRec.Body.String())
 	}
 	if status, approvedBy, _ := placementStatus(late); status != "revoked" || approvedBy != "policy:yolo" {

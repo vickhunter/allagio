@@ -188,6 +188,29 @@ func TestHardCheckCatalogIsTheOnlyList(t *testing.T) {
 	}
 }
 
+func TestRestoreRefusalsAreTheOnlyList(t *testing.T) {
+	want := []string{"window_expired", "paused"}
+	if len(RestoreRefusals) != len(want) {
+		t.Fatalf("refusals: %+v", RestoreRefusals)
+	}
+	doc := RestoreRefusalDoc()
+	for i, reason := range want {
+		if RestoreRefusals[i].Reason != reason || RestoreRefusals[i].Text == "" {
+			t.Fatalf("refusal[%d]: %+v", i, RestoreRefusals[i])
+		}
+		got, ok := RestoreRefusalByReason(reason)
+		if !ok || got != RestoreRefusals[i] {
+			t.Fatalf("lookup %s: %+v %v", reason, got, ok)
+		}
+		if !strings.Contains(doc, "`"+reason+"`") || !strings.Contains(doc, RestoreRefusals[i].Text) {
+			t.Fatalf("doc missing %s", reason)
+		}
+	}
+	if _, ok := RestoreRefusalByReason("not_undone"); ok {
+		t.Fatal("placement was not undone is not a restore refusal")
+	}
+}
+
 func hasFailure(d Decision, name string) bool {
 	for _, failure := range d.Failures {
 		if failure == name {

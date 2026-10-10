@@ -17,6 +17,7 @@ func TestPluginState(t *testing.T) {
 		name   string
 		wait   string
 		waitAt *time.Time
+		failed bool
 		want   string
 	}{
 		{name: "brand new", want: "pending"},
@@ -28,10 +29,16 @@ func TestPluginState(t *testing.T) {
 		{name: "acked removal", wait: "removed", waitAt: &stale, want: "removed"},
 		{name: "restore waits for the plugin", wait: "restore", waitAt: &stale, want: "pending"},
 		{name: "acked placement", wait: "placed", waitAt: &stale, want: "placed"},
+		{name: "failed remove inside the window", wait: "remove", waitAt: &fresh, failed: true, want: "failed"},
+		{name: "failed remove after the window", wait: "remove", waitAt: &stale, failed: true, want: "failed"},
+		{name: "failed restore", wait: "restore", waitAt: &fresh, failed: true, want: "failed"},
+		{name: "failed brand new", failed: true, want: "failed"},
+		{name: "placed wins over a leftover failure", wait: "placed", failed: true, want: "placed"},
+		{name: "removed wins over a leftover failure", wait: "removed", failed: true, want: "removed"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := PluginState(tc.wait, tc.waitAt, now, window); got != tc.want {
+			if got := PluginState(tc.wait, tc.waitAt, tc.failed, now, window); got != tc.want {
 				t.Fatalf("got %s, want %s", got, tc.want)
 			}
 		})
@@ -47,15 +54,17 @@ func TestPluginStateNeverEmpty(t *testing.T) {
 		}
 		allowed[state] = true
 	}
-	if len(allowed) != 4 {
+	if len(allowed) != 5 || !allowed["failed"] {
 		t.Fatalf("plugin states: %v", PluginStates)
 	}
 	stamps := []*time.Time{nil, ptrTime(now.Add(-time.Hour)), ptrTime(now.Add(time.Hour))}
 	for _, wait := range []string{"", "remove", "restore", "removed", "placed", "unknown"} {
 		for _, at := range stamps {
-			got := PluginState(wait, at, now, 10*time.Minute)
-			if !allowed[got] {
-				t.Fatalf("wait %q produced %q", wait, got)
+			for _, failed := range []bool{false, true} {
+				got := PluginState(wait, at, failed, now, 10*time.Minute)
+				if !allowed[got] {
+					t.Fatalf("wait %q failed %v produced %q", wait, failed, got)
+				}
 			}
 		}
 	}

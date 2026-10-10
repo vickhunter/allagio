@@ -243,6 +243,43 @@ func HardCheckDoc() string {
 	return b.String()
 }
 
+// RestoreRefusal is one public reason a restore of an undone placement is refused.
+// RestoreRefusals is the only list. "placement was not undone" is a different 409.
+type RestoreRefusal struct {
+	Reason string
+	Text   string
+}
+
+var RestoreRefusals = []RestoreRefusal{
+	{Reason: "window_expired", Text: "The restore window has expired."},
+	{Reason: "paused", Text: "Pause or the kill switch was turned on after the undo."},
+}
+
+// RestoreRefusalByReason returns the catalog entry for one reason.
+func RestoreRefusalByReason(reason string) (RestoreRefusal, bool) {
+	for _, refusal := range RestoreRefusals {
+		if refusal.Reason == reason {
+			return refusal, true
+		}
+	}
+	return RestoreRefusal{}, false
+}
+
+// RestoreRefusalDoc is the restore-refusal section for /llms.txt and the mode docs.
+func RestoreRefusalDoc() string {
+	var b strings.Builder
+	b.WriteString("## Restore refusals\n\n")
+	b.WriteString("A 409 from restore, when the placement was undone, returns `error` `restore refused` and one `reason`:\n\n")
+	for _, refusal := range RestoreRefusals {
+		b.WriteString("- `")
+		b.WriteString(refusal.Reason)
+		b.WriteString("`: ")
+		b.WriteString(refusal.Text)
+		b.WriteString("\n")
+	}
+	return b.String()
+}
+
 func placementHardFailures(in PlacementFacts, claims ClaimChecker) []string {
 	var failures []string
 	if strings.TrimSpace(in.Disclosure) == "" {

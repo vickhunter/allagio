@@ -224,40 +224,42 @@ func TestPluginPlacementState(t *testing.T) {
 		t.Helper()
 		var payload struct {
 			Items []struct {
-				Kind        string  `json:"kind"`
-				PluginState *string `json:"plugin_state"`
+				Kind               string  `json:"kind"`
+				PluginState        *string `json:"plugin_state"`
+				PluginFailedReason *string `json:"plugin_failed_reason"`
 			} `json:"items"`
 			Projects []struct {
 				Items []struct {
-					Kind        string  `json:"kind"`
-					PluginState *string `json:"plugin_state"`
+					Kind               string  `json:"kind"`
+					PluginState        *string `json:"plugin_state"`
+					PluginFailedReason *string `json:"plugin_failed_reason"`
 				} `json:"items"`
 			} `json:"projects"`
 		}
 		if err := json.Unmarshal([]byte(raw), &payload); err != nil {
 			t.Fatal(err)
 		}
-		check := func(kind string, state *string) {
+		check := func(kind string, state, failedReason *string) {
 			t.Helper()
 			if kind == "offer" {
-				if state != nil {
-					t.Fatalf("offer plugin_state is not null: %s", raw)
+				if state != nil || failedReason != nil {
+					t.Fatalf("offer plugin fields are not null: %s", raw)
 				}
 				return
 			}
 			if kind != "placement" {
 				return
 			}
-			if state == nil || (*state != "pending" && *state != "placed" && *state != "removed" && *state != "offline") {
+			if state == nil || (*state != "pending" && *state != "placed" && *state != "removed" && *state != "offline" && *state != "failed") || failedReason == nil {
 				t.Fatalf("plugin_state is null or unknown: %s", raw)
 			}
 		}
 		for _, item := range payload.Items {
-			check(item.Kind, item.PluginState)
+			check(item.Kind, item.PluginState, item.PluginFailedReason)
 		}
 		for _, project := range payload.Projects {
 			for _, item := range project.Items {
-				check(item.Kind, item.PluginState)
+				check(item.Kind, item.PluginState, item.PluginFailedReason)
 			}
 		}
 	}
@@ -559,6 +561,232 @@ func TestEveryHardCheckReturns422(t *testing.T) {
 	expect(restored, restoreBody, "cap")
 }
 
+func TestPluginFailureAndRetry(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	current := time.Date(2026, 10, 10, 7, 0, 0, 0, time.UTC)
+	api.Now = func() time.Time { return current }
+
+	owner, cookie := testOwnerSession(t, h, "fail-owner", "fail-owner@example.com")
+	siteID := createTestSite(t, db, "fail-site-key", "fail.example", "Fail")
+	createTestSite(t, db, "other-site-key", "other.example", "Other")
+	makerID, offerID := seedListedOffer(t, db, "fail-maker-key", "fail-maker@example.com", "Fail Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	siteKey := map[string]string{"X-API-Key": "fail-site-key"}
+	makerKey := map[string]string{"X-Maker-Key": "fail-maker-key"}
+	otherKey := map[string]string{"X-API-Key": "other-site-key"}
+
+	approve := func(surface string) string {
+		t.Helper()
+		id := insertPlacement(t, db, siteID, offerID, surface, "Honest note about the product.")
+		if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW(), approved_by_kind='policy:yolo' WHERE id=$1`, id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	statusOf := func(id string) (state, reason string) {
+		t.Helper()
+		rec, body := postJSON(t, r, http.MethodGet, "/v1/placements/"+id, nil, siteKey)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status %s: %d %s", id, rec.Code, rec.Body.String())
+		}
+		state, _ = body["plugin_state"].(string)
+		reason, _ = body["plugin_failed_reason"].(string)
+		if _, ok := body["plugin_failed_reason"]; !ok || state == "" {
+			t.Fatalf("status payload: %s", rec.Body.String())
+		}
+		return state, reason
+	}
+
+	placementID := approve("https://fail.example/post")
+	early, earlyBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, siteKey)
+	if early.Code != http.StatusConflict || earlyBody["error"] != "not_failed" {
+		t.Fatalf("retry before failure: %d %s", early.Code, early.Body.String())
+	}
+	missing, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed"}, siteKey)
+	blank, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "   "}, siteKey)
+	if missing.Code != http.StatusBadRequest || blank.Code != http.StatusBadRequest {
+		t.Fatalf("empty reason: %d %d", missing.Code, blank.Code)
+	}
+	failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "post re-read failed"}, siteKey)
+	if failed.Code != http.StatusOK || failedBody["plugin_state"] != "failed" || failedBody["plugin_failed_reason"] != "post re-read failed" {
+		t.Fatalf("failed ack: %d %s", failed.Code, failed.Body.String())
+	}
+	digest, digestBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
+	if digest.Code != http.StatusOK || pluginStateOf(t, digestBody, placementID) != "failed" || pluginFailedReasonOf(t, digestBody, placementID) != "post re-read failed" {
+		t.Fatalf("digest failure: %d %s", digest.Code, digest.Body.String())
+	}
+	account, accountBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
+	if account.Code != http.StatusOK || pluginStateOf(t, accountBody, placementID) != "failed" || pluginFailedReasonOf(t, accountBody, placementID) != "post re-read failed" {
+		t.Fatalf("account digest failure: %d %s", account.Code, account.Body.String())
+	}
+	if state, reason := statusOf(placementID); state != "failed" || reason != "post re-read failed" {
+		t.Fatalf("status after failure: %s %s", state, reason)
+	}
+	current = current.Add(11 * time.Minute)
+	if state, reason := statusOf(placementID); state != "failed" || reason != "post re-read failed" {
+		t.Fatalf("aged brand-new failure: %s %s", state, reason)
+	}
+
+	undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if undone.Code != http.StatusOK {
+		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
+	}
+	if state, reason := statusOf(placementID); state != "pending" || reason != "" {
+		t.Fatalf("undo clears failure: %s %q", state, reason)
+	}
+	current = current.Add(11 * time.Minute)
+	if state, _ := statusOf(placementID); state != "offline" {
+		t.Fatalf("silent undo: %s", state)
+	}
+	offlineRetry, offlineBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, siteKey)
+	if offlineRetry.Code != http.StatusConflict || offlineBody["error"] != "not_failed" {
+		t.Fatalf("retry offline: %d %s", offlineRetry.Code, offlineRetry.Body.String())
+	}
+	acked, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "still missing"}, siteKey)
+	if acked.Code != http.StatusOK {
+		t.Fatalf("failed after offline: %d %s", acked.Code, acked.Body.String())
+	}
+	if state, reason := statusOf(placementID); state != "failed" || reason != "still missing" {
+		t.Fatalf("failure beats offline: %s %s", state, reason)
+	}
+	updated, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-read failed again"}, siteKey)
+	if updated.Code != http.StatusOK {
+		t.Fatalf("second failure: %d %s", updated.Code, updated.Body.String())
+	}
+	wrong, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	if wrong.Code != http.StatusConflict {
+		t.Fatalf("wrong ack: %d %s", wrong.Code, wrong.Body.String())
+	}
+	if state, reason := statusOf(placementID); state != "failed" || reason != "re-read failed again" {
+		t.Fatalf("wrong ack cleared failure: %s %s", state, reason)
+	}
+	current = current.Add(11 * time.Minute)
+	if state, _ := statusOf(placementID); state != "failed" {
+		t.Fatalf("aged failure became %s", state)
+	}
+
+	makerRetry, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, makerKey)
+	otherRetry, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, otherKey)
+	if makerRetry.Code != http.StatusForbidden || otherRetry.Code != http.StatusForbidden {
+		t.Fatalf("other side: maker %d other %d", makerRetry.Code, otherRetry.Code)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='paused' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	denied, deniedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, siteKey)
+	if denied.Code != http.StatusUnprocessableEntity || deniedBody["check_id"] != "offer_live" || deniedBody["check_text"] == "" {
+		t.Fatalf("retry check: %d %s", denied.Code, denied.Body.String())
+	}
+	if state, reason := statusOf(placementID); state != "failed" || reason != "re-read failed again" {
+		t.Fatalf("failed check changed the failure: %s %s", state, reason)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='listed' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	current = current.Add(time.Minute)
+	sessionRetry, sessionBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil)
+	if sessionRetry.Code != http.StatusOK || sessionBody["plugin_state"] != "pending" || sessionBody["plugin_failed_reason"] != "" {
+		t.Fatalf("session retry: %d %s", sessionRetry.Code, sessionRetry.Body.String())
+	}
+	var waited time.Time
+	var storedReason, storedWait string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT plugin_wait_at, plugin_failed_reason, plugin_wait FROM placement_proposals WHERE id=$1`, placementID).Scan(&waited, &storedReason, &storedWait); err != nil {
+		t.Fatal(err)
+	}
+	if storedWait != "remove" || storedReason != "" || !waited.UTC().Equal(current) {
+		t.Fatalf("re-queued remove: %s %q %s", storedWait, storedReason, waited.UTC())
+	}
+	removed, removedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "removed"}, siteKey)
+	if removed.Code != http.StatusOK || removedBody["plugin_state"] != "removed" || removedBody["plugin_failed_reason"] != "" {
+		t.Fatalf("ack removed: %d %s", removed.Code, removed.Body.String())
+	}
+
+	second := approve("https://fail.example/restored")
+	undone, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if undone.Code != http.StatusOK {
+		t.Fatalf("second undo: %d %s", undone.Code, undone.Body.String())
+	}
+	current = current.Add(time.Second)
+	restored, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/restore", nil, siteKey)
+	if restored.Code != http.StatusOK {
+		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
+	}
+	failed, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, siteKey)
+	if failed.Code != http.StatusOK {
+		t.Fatalf("restore failure: %d %s", failed.Code, failed.Body.String())
+	}
+	retried, retriedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/retry", nil, siteKey)
+	if retried.Code != http.StatusOK || retriedBody["plugin_state"] != "pending" {
+		t.Fatalf("site retry: %d %s", retried.Code, retried.Body.String())
+	}
+	placed, placedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	if placed.Code != http.StatusOK || placedBody["plugin_state"] != "placed" || placedBody["plugin_failed_reason"] != "" {
+		t.Fatalf("ack restored: %d %s", placed.Code, placed.Body.String())
+	}
+
+	hidden := approve("https://fail.example/hidden")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET approved_at=$2, created_at=$2, plugin_wait='' WHERE id=$1`, hidden, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)); err != nil {
+		t.Fatal(err)
+	}
+	opened, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/events", map[string]any{"kind": "digest_opened"})
+	if opened.Code != http.StatusCreated {
+		t.Fatalf("digest open: %d %s", opened.Code, opened.Body.String())
+	}
+	before, beforeBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
+	if before.Code != http.StatusOK || digestHas(beforeBody, hidden) {
+		t.Fatalf("stale placement stayed in the digest: %s", before.Body.String())
+	}
+	failed, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+hidden+"/plugin-ack", map[string]any{"action": "failed", "reason": "old post re-read failed"}, siteKey)
+	if failed.Code != http.StatusOK {
+		t.Fatalf("hidden failure: %d %s", failed.Code, failed.Body.String())
+	}
+	after, afterBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
+	if after.Code != http.StatusOK || pluginStateOf(t, afterBody, hidden) != "failed" || pluginFailedReasonOf(t, afterBody, hidden) != "old post re-read failed" {
+		t.Fatalf("failed placement returned to the digest: %d %s", after.Code, after.Body.String())
+	}
+}
+
+func pluginFailedReasonOf(t *testing.T, body map[string]any, id string) string {
+	t.Helper()
+	if items, ok := body["items"].([]any); ok {
+		for _, raw := range items {
+			item := raw.(map[string]any)
+			if item["id"] == id {
+				reason, _ := item["plugin_failed_reason"].(string)
+				return reason
+			}
+		}
+	}
+	projects, _ := body["projects"].([]any)
+	for _, raw := range projects {
+		project := raw.(map[string]any)
+		for _, itemRaw := range project["items"].([]any) {
+			item := itemRaw.(map[string]any)
+			if item["id"] == id {
+				reason, _ := item["plugin_failed_reason"].(string)
+				return reason
+			}
+		}
+	}
+	t.Fatalf("placement %s missing", id)
+	return ""
+}
+
+func digestHas(body map[string]any, id string) bool {
+	items, _ := body["items"].([]any)
+	for _, raw := range items {
+		item, _ := raw.(map[string]any)
+		if item["id"] == id {
+			return true
+		}
+	}
+	return false
+}
+
 func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 	llms := llmsBody()
 	modes, ok := agentDoc("modes.md")
@@ -576,6 +804,20 @@ func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 	}
 	if strings.Contains(llms, "disclosure_and_rel_sponsored") || strings.Contains(modes, "`current`") {
 		t.Fatal("docs still describe a retired check or plugin state")
+	}
+	for _, refusal := range entry.RestoreRefusals {
+		needle := "`" + refusal.Reason + "`"
+		if !strings.Contains(llms, needle) || !strings.Contains(llms, refusal.Text) {
+			t.Fatalf("llms.txt drifted on restore reason %s", refusal.Reason)
+		}
+		if !strings.Contains(modes, needle) || !strings.Contains(modes, refusal.Text) {
+			t.Fatalf("modes.md drifted on restore reason %s", refusal.Reason)
+		}
+	}
+	for _, doc := range []string{llms, modes} {
+		if !strings.Contains(doc, "POST /v1/placements/:id/retry") || !strings.Contains(doc, "not_failed") {
+			t.Fatal("docs drifted on plugin retry")
+		}
 	}
 }
 

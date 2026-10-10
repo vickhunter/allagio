@@ -49,6 +49,7 @@ var ScreenActions = []ScreenAction{
 	{Screen: "digest", Action: "Undo a placement as the publisher or the maker", Method: "POST", Path: "/v1/placements/:id/revoke"},
 	{Screen: "digest", Action: "Restore a placement within 6 seconds of its undo", Method: "POST", Path: "/v1/placements/:id/restore"},
 	{Screen: "digest", Action: "Plugin acknowledges a removal or a re-insert", Method: "POST", Path: "/v1/placements/:id/plugin-ack"},
+	{Screen: "digest", Action: "Retry a failed plugin placement", Method: "POST", Path: "/v1/placements/:id/retry"},
 	{Screen: "digest", Action: "Poll a placement status", Method: "GET", Path: "/v1/placements/:id"},
 	{Screen: "setup", Action: "Session signed in and human login", Method: "GET", Path: "/v1/setup/settings"},
 	{Screen: "setup", Action: "Preselected mode from the install path", Method: "GET", Path: "/v1/setup/settings"},

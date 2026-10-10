@@ -22,7 +22,7 @@ Offer Rails is a publisher and maker workflow. Tools return offers, matches, and
 `
 
 func llmsBody() string {
-	return llmsText + "\n" + entry.HardCheckDoc()
+	return llmsText + "\n" + entry.HardCheckDoc() + "\n" + entry.RestoreRefusalDoc() + "\n" + entry.PluginRetryDoc()
 }
 
 const deviceLoginDoc = `# Device login
@@ -262,18 +262,24 @@ Undo is that revoke. It takes effect in the same request in the API and in MCP. 
 POST /v1/placements/:id/restore
 ` + "```" + `
 
-Restore applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. If Pause or the kill switch was turned on for that site, offer, or account at any point after the undo, including when it is still on, restore returns 409 with ` + "`reason: paused`" + `. The server re-runs every hard check first. It also evaluates the current 30-day placement cap and the current minimum relevance against the score stored when the placement was approved. A failing check returns 422 with ` + "`check_id`" + ` and ` + "`check_text`" + ` from the hard-check list below and leaves the placement revoked. On success the placement returns to the status it had before the undo, ` + "`approved_by`" + ` stays the original value, ` + "`restored_by`" + ` records the user, and a ` + "`placement_restore`" + ` event stores the actor.
+Restore applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409 with ` + "`reason: window_expired`" + `. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. If Pause or the kill switch was turned on for that site, offer, or account at any point after the undo, including when it is still on, restore returns 409 with ` + "`reason: paused`" + `. Those two reasons, ` + "`window_expired`" + ` and ` + "`paused`" + `, are the only restore refusals. The server re-runs every hard check first. It also evaluates the current 30-day placement cap and the current minimum relevance against the score stored when the placement was approved. A failing check returns 422 with ` + "`check_id`" + ` and ` + "`check_text`" + ` from the hard-check list below and leaves the placement revoked. On success the placement returns to the status it had before the undo, ` + "`approved_by`" + ` stays the original value, ` + "`restored_by`" + ` records the user, and a ` + "`placement_restore`" + ` event stores the actor.
 
-There is no push channel. Clients poll ` + "`GET /v1/placements/:id`" + `. That read is one row from ` + "`placement_proposals`" + ` and allows at least one request every 4 seconds per placement per session. The body includes ` + "`status`" + ` and ` + "`plugin_state`" + `.
+There is no push channel. Clients poll ` + "`GET /v1/placements/:id`" + `. That read is one row from ` + "`placement_proposals`" + ` and allows at least one request every 4 seconds per placement per session. The body includes ` + "`status`" + `, ` + "`plugin_state`" + `, and ` + "`plugin_failed_reason`" + `.
 
-Every placement in ` + "`GET /v1/digest`" + `, ` + "`GET /v1/account/digest`" + `, and the status read includes ` + "`plugin_state`" + `. It is never null. The values are ` + "`pending`" + `, ` + "`placed`" + `, ` + "`removed`" + `, and ` + "`offline`" + `. A brand-new placement is ` + "`pending`" + ` until the site key's first acknowledgement, then ` + "`placed`" + `. After a restore it is ` + "`pending`" + ` until ` + "`POST /v1/placements/:id/plugin-ack`" + ` with ` + "`action: restored`" + `, which sets ` + "`placed`" + `. After a revoke it is ` + "`pending`" + `, then ` + "`removed`" + ` on ` + "`action: removed`" + `, or ` + "`offline`" + ` after ` + "`PLUGIN_OFFLINE_AFTER`" + ` (default 10 minutes) with no acknowledgement.
+Every placement in ` + "`GET /v1/digest`" + `, ` + "`GET /v1/account/digest`" + `, and the status read includes ` + "`plugin_state`" + ` and ` + "`plugin_failed_reason`" + `. ` + "`plugin_state`" + ` is never null. The values are ` + "`pending`" + `, ` + "`placed`" + `, ` + "`removed`" + `, ` + "`offline`" + `, and ` + "`failed`" + `. A brand-new placement is ` + "`pending`" + ` until the site key's first acknowledgement, then ` + "`placed`" + `. After a restore it is ` + "`pending`" + ` until ` + "`POST /v1/placements/:id/plugin-ack`" + ` with ` + "`action: restored`" + `, which sets ` + "`placed`" + `. After a revoke it is ` + "`pending`" + `, then ` + "`removed`" + ` on ` + "`action: removed`" + `, or ` + "`offline`" + ` after ` + "`PLUGIN_OFFLINE_AFTER`" + ` (default 10 minutes) with no acknowledgement. ` + "`offline`" + ` is only that missing acknowledgement. ` + "`action: failed`" + ` stores ` + "`reason`" + ` in ` + "`plugin_failed_reason`" + ` and sets ` + "`plugin_state`" + ` to ` + "`failed`" + ` after the plugin's post re-read fails and one retry fails. A later verified ` + "`removed`" + ` or ` + "`restored`" + ` acknowledgement for the pending action clears that failure.
 
 ` + "```" + `
 POST /v1/placements/:id/plugin-ack
-{"action":"removed"}
+{"action":"failed","reason":"post re-read failed"}
 ` + "```" + `
 
-` + "`action`" + ` is ` + "`removed`" + ` or ` + "`restored`" + `. The site key is required. The WordPress plugin calls ` + "`restored`" + ` the first time the block is in the post and again after it puts the block back. It calls ` + "`removed`" + ` after it deletes the block. Neither call creates a post revision. A restore acknowledgement is only valid while the placement is brand new or waiting on a re-insert. A removal acknowledgement is only valid while a revoke is waiting, including after the window has already marked it ` + "`offline`" + `.
+` + "`action`" + ` is ` + "`removed`" + `, ` + "`restored`" + `, or ` + "`failed`" + `. The site key is required. ` + "`failed`" + ` requires ` + "`reason`" + `. The WordPress plugin calls ` + "`restored`" + ` the first time the block is in the post and again after it puts the block back. It calls ` + "`removed`" + ` after it deletes the block. It calls ` + "`failed`" + ` with a reason when the post re-read still fails after one retry. None of those calls creates a post revision. A restore acknowledgement is only valid while the placement is brand new or waiting on a re-insert. A removal acknowledgement is only valid while a revoke is waiting, including after the window has already marked it ` + "`offline`" + `. A failure acknowledgement is valid for a brand-new placement, a restore, or a removal that is still waiting, including one already marked ` + "`offline`" + `.
+
+` + "```" + `
+POST /v1/placements/:id/retry
+` + "```" + `
+
+The publisher retries a failed placement with the owner session or the site key. The other side receives 403. Any state other than ` + "`failed`" + ` returns 409 ` + "`not_failed`" + `. The server re-runs every hard check. A failure returns 422 with ` + "`check_id`" + ` and ` + "`check_text`" + ` and leaves the placement failed. Success sets ` + "`plugin_state`" + ` to ` + "`pending`" + ` and re-queues the pending action, so the next acknowledgement moves it to ` + "`placed`" + ` or ` + "`removed`" + `.
 
 A revoked placement's ` + "`/v1/go/...`" + ` link stops immediately. It returns 410 with ` + "`reason: revoked`" + `, no offer redirect, and no click. A successful restore makes that link redirect again. A placement that was removed without a revoke still redirects to the landing page and still records no click.
 `
@@ -334,7 +340,7 @@ func agentDoc(name string) (string, bool) {
 	case "listing-card.md":
 		return listingCardDoc, true
 	case "modes.md":
-		return modesDoc + "\n" + entry.HardCheckDoc(), true
+		return modesDoc + "\n" + entry.HardCheckDoc() + "\n" + entry.RestoreRefusalDoc() + "\n" + entry.PluginRetryDoc(), true
 	case "account.md":
 		return accountDoc, true
 	default:

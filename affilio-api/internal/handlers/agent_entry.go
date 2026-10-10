@@ -63,6 +63,7 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.POST("/v1/placements/:id/revoke", h.RevokePlacement)
 	r.POST("/v1/placements/:id/restore", h.RestorePlacement)
 	r.POST("/v1/placements/:id/plugin-ack", h.PluginAck)
+	r.POST("/v1/placements/:id/retry", h.RetryPlugin)
 	r.GET("/v1/placements/:id", h.PlacementStatus)
 	r.POST("/v1/offers/:id/accept", h.AcceptPublisher)
 	r.POST("/v1/listing-cards", h.CreateListing)
@@ -1012,7 +1013,7 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 	}
 	now := h.now()
 	if now.Sub(row.UndoneAt.UTC()) > restoreWindow {
-		c.JSON(http.StatusConflict, gin.H{"error": "restore window closed"})
+		writeRestoreRefused(c, "window_expired")
 		return
 	}
 	blocked, err := h.DB.PauseBlocksRestore(c.Request.Context(), row.SiteID, row.OfferID, row.UndoneAt.UTC())
@@ -1021,7 +1022,7 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 		return
 	}
 	if blocked {
-		c.JSON(http.StatusConflict, gin.H{"error": "restore refused", "reason": "paused"})
+		writeRestoreRefused(c, "paused")
 		return
 	}
 	failures, err := h.restoreHardFailures(c, row)
@@ -1046,7 +1047,7 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 		return
 	}
 	if !restored {
-		c.JSON(http.StatusConflict, gin.H{"error": "restore window closed"})
+		writeRestoreRefused(c, "window_expired")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": status, "approved_by": approvedBy, "restored_by": userID, "actor": actor.Kind})
@@ -1112,16 +1113,22 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "site key required"})
 		return
 	}
-	body, err := readJSONBody(c, 1024)
+	body, err := readJSONBody(c, 4096)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}
 	var req struct {
 		Action string `json:"action"`
+		Reason string `json:"reason"`
 	}
-	if decodeStrict(body, &req) != nil || (req.Action != "removed" && req.Action != "restored") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "action must be removed or restored"})
+	if decodeStrict(body, &req) != nil || (req.Action != "removed" && req.Action != "restored" && req.Action != "failed") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "action must be removed, restored, or failed"})
+		return
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	if req.Action == "failed" && (req.Reason == "" || utf8.RuneCountInString(req.Reason) > 500) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "reason is required"})
 		return
 	}
 	placement, err := h.DB.GetPlacementByID(c.Request.Context(), c.Param("id"))
@@ -1137,7 +1144,7 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "placement is not on this site"})
 		return
 	}
-	acked, err := h.DB.AckPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, req.Action, h.now())
+	acked, err := h.DB.AckPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, req.Action, req.Reason, h.now())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
 		return
@@ -1146,12 +1153,80 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "nothing to acknowledge"})
 		return
 	}
-	state, err := h.pluginState(c, placement.ID)
+	state, reason, err := h.pluginView(c, placement.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"plugin_state": state})
+	c.JSON(http.StatusOK, gin.H{"plugin_state": state, "plugin_failed_reason": reason})
+}
+
+func (h *AgentEntry) RetryPlugin(c *gin.Context) {
+	if !uuidPattern.MatchString(c.Param("id")) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
+		return
+	}
+	actor, ok := h.actorFrom(c)
+	if !ok {
+		return
+	}
+	if actor.SiteID == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "publisher side required"})
+		return
+	}
+	placement, err := h.DB.GetPlacementByID(c.Request.Context(), c.Param("id"))
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+		return
+	}
+	if placement.SiteID != actor.SiteID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "publisher side required"})
+		return
+	}
+	state, _, err := h.pluginView(c, placement.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+		return
+	}
+	if state != "failed" {
+		c.JSON(http.StatusConflict, gin.H{"error": "not_failed"})
+		return
+	}
+	row, err := h.DB.PlacementUndo(c.Request.Context(), placement.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+		return
+	}
+	failures, err := h.restoreHardFailures(c, row)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+		return
+	}
+	if len(failures) == 0 {
+		failures, err = h.restoreLimitFailures(c, row)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+			return
+		}
+	}
+	if len(failures) > 0 {
+		writeCheckDenied(c, failures)
+		return
+	}
+	retried, err := h.DB.RetryPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, h.now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+		return
+	}
+	if !retried {
+		c.JSON(http.StatusConflict, gin.H{"error": "not_failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"plugin_state": "pending", "plugin_failed_reason": ""})
 }
 
 func (h *AgentEntry) PlacementStatus(c *gin.Context) {
@@ -1170,12 +1245,21 @@ func (h *AgentEntry) PlacementStatus(c *gin.Context) {
 	writePlacementStatus(c, h.DB, h.StatusLimiter, h.now(), h.pluginWindow(), actor.SiteID, actor.UserID)
 }
 
-func (h *AgentEntry) pluginState(c *gin.Context, id string) (string, error) {
-	wait, waitAt, _, err := h.DB.PlacementPlugin(c.Request.Context(), id)
+func (h *AgentEntry) pluginView(c *gin.Context, id string) (state, failedReason string, err error) {
+	wait, waitAt, _, failedReason, err := h.DB.PlacementPlugin(c.Request.Context(), id)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return entry.PluginState(wait, waitAt, h.now(), h.pluginWindow()), nil
+	return entry.PluginState(wait, waitAt, failedReason != "", h.now(), h.pluginWindow()), failedReason, nil
+}
+
+func writeRestoreRefused(c *gin.Context, reason string) {
+	refusal, ok := entry.RestoreRefusalByReason(reason)
+	if !ok {
+		c.JSON(http.StatusConflict, gin.H{"error": "restore refused"})
+		return
+	}
+	c.JSON(http.StatusConflict, gin.H{"error": "restore refused", "reason": refusal.Reason})
 }
 
 func writeCheckDenied(c *gin.Context, failures []string) {
@@ -1510,7 +1594,8 @@ func approvalJSON(decision entry.Decision, version int) gin.H {
 func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 	body := gin.H{"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token}
 	if item.Kind == "placement" {
-		body["plugin_state"] = entry.PluginState(item.PluginWait, item.PluginWaitAt, h.now(), h.pluginWindow())
+		body["plugin_state"] = entry.PluginState(item.PluginWait, item.PluginWaitAt, item.PluginFailedReason != "", h.now(), h.pluginWindow())
+		body["plugin_failed_reason"] = item.PluginFailedReason
 	}
 	return body
 }

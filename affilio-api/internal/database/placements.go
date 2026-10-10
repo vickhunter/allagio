@@ -186,6 +186,7 @@ undone_by_user=CASE WHEN $3='undo' THEN NULLIF($5,'')::uuid ELSE undone_by_user 
 undone_by_key_hash=CASE WHEN $3='undo' THEN NULLIF($6,'') ELSE undone_by_key_hash END,
 plugin_wait=CASE WHEN $3='undo' THEN 'remove' ELSE plugin_wait END,
 plugin_wait_at=CASE WHEN $3='undo' THEN $4 ELSE plugin_wait_at END,
+plugin_failed_reason=CASE WHEN $3='undo' THEN '' ELSE plugin_failed_reason END,
 status='revoked', revoked_by_side=$2
 WHERE id=$1 AND status<>'revoked'`, placementID, side, reason, now, userID, keyHash)
 	if err != nil {
@@ -234,7 +235,7 @@ func (d *DB) RestoreUndonePlacement(ctx context.Context, id, userID, keyHash, ac
 	}
 	defer tx.Rollback(ctx)
 	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL,
-plugin_wait='restore', plugin_wait_at=$4
+plugin_wait='restore', plugin_wait_at=$4, plugin_failed_reason=''
 WHERE id=$1 AND status='revoked' AND status_before_undo<>'' AND undone_at IS NOT NULL
 AND undone_by_user=$2::uuid AND COALESCE(undone_by_key_hash,'')=$3
 AND undone_at >= $4::timestamptz - INTERVAL '6 seconds'
@@ -324,21 +325,34 @@ func (d *DB) TouchPlacementContact(ctx context.Context, siteID string, at time.T
 	return err
 }
 
-func (d *DB) AckPluginPlacement(ctx context.Context, id, siteID, action string, at time.Time) (bool, error) {
-	var query string
+func (d *DB) AckPluginPlacement(ctx context.Context, id, siteID, action, reason string, at time.Time) (bool, error) {
 	switch action {
 	case "restored":
-		query = `UPDATE placement_proposals
-SET plugin_wait='placed', plugin_wait_at=$3, plugin_contact_at=$3
-WHERE id=$1 AND site_id=$2 AND plugin_wait IN ('', 'restore')`
+		tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
+SET plugin_wait='placed', plugin_wait_at=$3, plugin_contact_at=$3, plugin_failed_reason=''
+WHERE id=$1 AND site_id=$2 AND plugin_wait IN ('', 'restore')`, id, siteID, at)
+		return err == nil && tag.RowsAffected() == 1, err
 	case "removed":
-		query = `UPDATE placement_proposals
-SET plugin_wait='removed', plugin_wait_at=$3, plugin_contact_at=$3
-WHERE id=$1 AND site_id=$2 AND plugin_wait='remove'`
+		tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
+SET plugin_wait='removed', plugin_wait_at=$3, plugin_contact_at=$3, plugin_failed_reason=''
+WHERE id=$1 AND site_id=$2 AND plugin_wait='remove'`, id, siteID, at)
+		return err == nil && tag.RowsAffected() == 1, err
+	case "failed":
+		tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
+SET plugin_failed_reason=$4, plugin_contact_at=$3
+WHERE id=$1 AND site_id=$2 AND plugin_wait IN ('', 'restore', 'remove')`, id, siteID, at, reason)
+		return err == nil && tag.RowsAffected() == 1, err
 	default:
 		return false, nil
 	}
-	tag, err := d.Pool.Exec(ctx, query, id, siteID, at)
+}
+
+// RetryPluginPlacement clears a plugin failure and refreshes the pending
+// action so the next acknowledgement can move it to placed or removed.
+func (d *DB) RetryPluginPlacement(ctx context.Context, id, siteID string, at time.Time) (bool, error) {
+	tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
+SET plugin_failed_reason='', plugin_wait_at=$3, plugin_contact_at=$3
+WHERE id=$1 AND site_id=$2 AND plugin_failed_reason <> '' AND plugin_wait IN ('', 'restore', 'remove')`, id, siteID, at)
 	if err != nil {
 		return false, err
 	}
@@ -347,16 +361,16 @@ WHERE id=$1 AND site_id=$2 AND plugin_wait='remove'`
 
 // PlacementStatusSQL is the placement poll. It reads one row by primary key
 // and does not join another table.
-const PlacementStatusSQL = `SELECT status, plugin_wait, plugin_wait_at FROM placement_proposals WHERE id=$1 AND site_id=$2`
+const PlacementStatusSQL = `SELECT status, plugin_wait, plugin_wait_at, plugin_failed_reason FROM placement_proposals WHERE id=$1 AND site_id=$2`
 
-func (d *DB) ReadPlacementStatus(ctx context.Context, siteID, id string) (status, wait string, waitAt *time.Time, err error) {
-	err = d.Pool.QueryRow(ctx, PlacementStatusSQL, id, siteID).Scan(&status, &wait, &waitAt)
-	return status, wait, waitAt, err
+func (d *DB) ReadPlacementStatus(ctx context.Context, siteID, id string) (status, wait, failedReason string, waitAt *time.Time, err error) {
+	err = d.Pool.QueryRow(ctx, PlacementStatusSQL, id, siteID).Scan(&status, &wait, &waitAt, &failedReason)
+	return status, wait, failedReason, waitAt, err
 }
 
-func (d *DB) PlacementPlugin(ctx context.Context, id string) (wait string, waitAt, contact *time.Time, err error) {
-	err = d.Pool.QueryRow(ctx, `SELECT plugin_wait, plugin_wait_at, plugin_contact_at FROM placement_proposals WHERE id=$1`, id).Scan(&wait, &waitAt, &contact)
-	return wait, waitAt, contact, err
+func (d *DB) PlacementPlugin(ctx context.Context, id string) (wait string, waitAt, contact *time.Time, failedReason string, err error) {
+	err = d.Pool.QueryRow(ctx, `SELECT plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason FROM placement_proposals WHERE id=$1`, id).Scan(&wait, &waitAt, &contact, &failedReason)
+	return wait, waitAt, contact, failedReason, err
 }
 
 func (d *DB) CreateAgentAccess(ctx context.Context, siteID, keyHash string) (string, error) {
