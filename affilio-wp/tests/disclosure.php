@@ -60,6 +60,7 @@ class DistributionAPI {
 function check($condition, $message) { if (!$condition) { fwrite(STDERR, $message . "\n"); exit(1); } }
 function added($before, $after, $needle) { return substr_count($after, $needle) - substr_count($before, $needle); }
 
+require_once __DIR__ . '/wp-filters.php';
 require __DIR__ . '/../includes/class-affilio-distribution.php';
 require __DIR__ . '/../includes/class-affilio-inserter.php';
 

@@ -1,34 +1,14 @@
 <?php
 
+require_once __DIR__ . '/wp-filters.php';
+
 $GLOBALS['filters'] = array();
+$GLOBALS['affilio_filter_hooks'] = array();
 $GLOBALS['revision_counts'] = array();
 $GLOBALS['options'] = array();
 
-function add_filter($name, $callback) {
-    $GLOBALS['filters'][$name][] = $callback;
-}
-
-function remove_filter($name, $callback) {
-    $kept = array();
-    if (!isset($GLOBALS['filters'][$name])) {
-        return;
-    }
-    foreach ($GLOBALS['filters'][$name] as $existing) {
-        if ($existing !== $callback) {
-            $kept[] = $existing;
-        }
-    }
-    $GLOBALS['filters'][$name] = $kept;
-}
-
 function apply_filters($name, $value) {
-    $passed = array_slice(func_get_args(), 1);
-    if (!isset($GLOBALS['filters'][$name])) {
-        return $passed[0];
-    }
-    foreach ($GLOBALS['filters'][$name] as $callback) {
-        $passed[0] = call_user_func_array($callback, $passed);
-    }
+    $passed = affilio_test_run_filters($name, array_slice(func_get_args(), 1));
     return $passed[0];
 }
 
@@ -110,4 +90,26 @@ foreach ($GLOBALS['revision_counts'] as $kept) {
     check($kept === 0, 'Plugin write kept revisions: ' . var_export($kept, true));
 }
 check(apply_filters('wp_revisions_to_keep', 12, $GLOBALS['post']) === 12, 'Revision filter was left in place.');
+$added = array();
+$removed = array();
+foreach ($GLOBALS['affilio_filter_hooks'] as $hook) {
+    if ($hook['name'] !== 'wp_revisions_to_keep') {
+        continue;
+    }
+    if ($hook['op'] === 'add') {
+        $added[] = $hook['priority'];
+    }
+    if ($hook['op'] === 'remove') {
+        $removed[] = $hook['priority'];
+    }
+}
+check(count($added) >= 2 && count($removed) === count($added), 'Insert and remove did not both hook wp_revisions_to_keep.');
+foreach ($added as $priority) {
+    check($priority === PHP_INT_MAX, 'wp_revisions_to_keep was hooked at ' . var_export($priority, true) . ' instead of PHP_INT_MAX.');
+}
+foreach ($removed as $priority) {
+    check($priority === PHP_INT_MAX, 'wp_revisions_to_keep was removed at ' . var_export($priority, true) . ' instead of PHP_INT_MAX.');
+}
+$release = file_get_contents(__DIR__ . '/../includes/class-affilio-distribution.php');
+check(strpos($release, 'function add_filter') === false && strpos($release, 'function remove_filter') === false, 'Filter stubs are still shipped in the plugin.');
 echo "Plugin block insert and remove do not create post revisions.\n";

@@ -56,6 +56,7 @@ class DistributionAPI {
     }
 }
 function check($condition, $message) { if (!$condition) { fwrite(STDERR, $message . "\n"); exit(1); } }
+require_once __DIR__ . '/wp-filters.php';
 require __DIR__ . '/../includes/class-affilio-distribution.php';
 $GLOBALS['allowed'] = true;
 $existing = str_repeat('Existing content. ', 2000) . '<p>Use C:\\tools and the "quoted" example.</p>';

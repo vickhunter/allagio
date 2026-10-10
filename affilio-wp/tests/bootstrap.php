@@ -12,6 +12,8 @@ $GLOBALS['styles'] = isset($GLOBALS['styles']) ? $GLOBALS['styles'] : array();
 $GLOBALS['localized'] = isset($GLOBALS['localized']) ? $GLOBALS['localized'] : array();
 $GLOBALS['http'] = isset($GLOBALS['http']) ? $GLOBALS['http'] : array();
 $GLOBALS['filters'] = isset($GLOBALS['filters']) ? $GLOBALS['filters'] : array();
+$GLOBALS['affilio_filter_hooks'] = isset($GLOBALS['affilio_filter_hooks']) ? $GLOBALS['affilio_filter_hooks'] : array();
+require_once __DIR__ . '/wp-filters.php';
 $GLOBALS['posts'] = isset($GLOBALS['posts']) ? $GLOBALS['posts'] : array();
 $GLOBALS['users'] = isset($GLOBALS['users']) ? $GLOBALS['users'] : array();
 $GLOBALS['comments'] = isset($GLOBALS['comments']) ? $GLOBALS['comments'] : array();
@@ -34,7 +36,6 @@ if (!function_exists('check')) {
 
 if (!function_exists('add_action')) {
     function add_action($name, $callback) { $GLOBALS['actions'][$name][] = $callback; }
-    function add_filter($name, $callback) { $GLOBALS['filters'][$name][] = $callback; }
     function apply_filters($name, $value) {
         $args = func_get_args();
         if ($name === 'pre_http_request') {
@@ -45,10 +46,7 @@ if (!function_exists('add_action')) {
             );
         }
         if (isset($GLOBALS['filters'][$name])) {
-            $passed = array_slice($args, 1);
-            foreach ($GLOBALS['filters'][$name] as $callback) {
-                $passed[0] = call_user_func_array($callback, $passed);
-            }
+            $passed = affilio_test_run_filters($name, array_slice($args, 1));
             return $passed[0];
         }
         return $value;

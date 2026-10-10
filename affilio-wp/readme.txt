@@ -8,7 +8,8 @@ AI affiliate copilot for WordPress. Connect from Settings, then review recommend
 == Changelog ==
 
 = 0.1.18 =
-* Inserting or removing an Affilio block does not create a WordPress post revision.
+* Inserting or removing an Affilio block does not create a WordPress post revision. The revision skip runs last, so another plugin cannot turn revisions back on for that write.
+* If a refused receipt cannot be rolled back, even after one retry, the admin sees that the box is live without a receipt.
 
 = 0.1.14 =
 * A post counts as already disclosed only when it matches the receipt rule: the approved disclosure, "commissione", or "link" within 60 characters of "affiliat".
