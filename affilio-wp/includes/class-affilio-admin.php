@@ -260,6 +260,7 @@ class Affilio_Admin {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             check_admin_referer('affilio_settings');
             $this->keep_or_replace_secret('affilio_api_key', 'affilio_api_key');
+            $this->keep_or_replace_secret('affilio_plugin_key', 'affilio_plugin_key');
             $existing_disclosure = isset($_POST['affilio_existing_disclosure']) ? sanitize_text_field(wp_unslash($_POST['affilio_existing_disclosure'])) : '';
             update_option('affilio_existing_disclosure', $existing_disclosure === '1' ? '1' : '');
             $url_error = '';
@@ -304,6 +305,9 @@ class Affilio_Admin {
         echo '<tr><th>' . esc_html($this->t('API Key', 'Chiave API')) . '</th><td>';
         $this->secret_input('affilio_api_key', 'affilio_api_key');
         echo '<p class="description">' . esc_html($this->t('Optional manual setup. The Connect button manages this for new installs.', 'Setup manuale opzionale. Il pulsante Collega lo gestisce per le nuove installazioni.')) . '</p></td></tr>';
+        echo '<tr><th>' . esc_html($this->t('Plugin key', 'Chiave plugin')) . '</th><td>';
+        $this->secret_input('affilio_plugin_key', 'affilio_plugin_key');
+        echo '<p class="description">' . esc_html($this->t('Sent only as X-Plugin-Key when the plugin confirms a box. It is not the site API key. Paste the key recorded for this site. Leave the field empty to keep the saved key.', 'Inviata solo come X-Plugin-Key quando il plugin conferma un riquadro. Non è la chiave API del sito. Incolla la chiave registrata per questo sito. Lascia il campo vuoto per conservare la chiave salvata.')) . '</p></td></tr>';
         $existing_disclosure = get_option('affilio_existing_disclosure', '') === '1';
         echo '<tr><th>' . esc_html($this->t('Disclosure', 'Disclosure')) . '</th><td><label><input type="checkbox" name="affilio_existing_disclosure" value="1"' . ($existing_disclosure ? ' checked' : '') . ' /> ' . esc_html($this->t('My articles already contain a disclosure', 'I miei articoli contengono già una disclosure')) . '</label></td></tr>';
         echo '</table>';

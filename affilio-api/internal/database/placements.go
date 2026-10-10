@@ -267,9 +267,9 @@ func (d *DB) RestoreUndonePlacement(ctx context.Context, id, userID, keyHash, ac
 	err = tx.QueryRow(ctx, `SELECT site_id::text, offer_id::text, undone_at
 FROM placement_proposals
 WHERE id=$1 AND status='revoked' AND status_before_undo<>'' AND undone_at IS NOT NULL
-AND undone_by_user=$2::uuid AND COALESCE(undone_by_key_hash,'')=$3
+AND undone_by_user=$2::uuid AND ($5 = 'owner_ui' OR COALESCE(undone_by_key_hash,'')=$3)
 AND undone_at >= $4::timestamptz - INTERVAL '6 seconds'
-FOR UPDATE`, id, userID, keyHash, now).Scan(&siteID, &offerID, &undoneAt)
+FOR UPDATE`, id, userID, keyHash, now, actor).Scan(&siteID, &offerID, &undoneAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", "", "window_expired", false, nil
 	}
@@ -305,7 +305,7 @@ OR EXISTS (SELECT 1 FROM approval_policies WHERE offer_id=$2::uuid AND kill_swit
 	var used int
 	err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals
 WHERE site_id=$1 AND created_at>$2 AND approved_by_kind IN ('policy:auto','policy:yolo')
-AND (status<>'revoked' OR id=$3)`, siteID, now.Add(-30*24*time.Hour), id).Scan(&used)
+AND status<>'revoked' AND id<>$3`, siteID, now.Add(-30*24*time.Hour), id).Scan(&used)
 	if err != nil {
 		return "", "", "", false, err
 	}
@@ -335,11 +335,11 @@ func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Pla
 	if err != nil {
 		return nil, err
 	}
-	if !time.Now().Before(p.ExpiresAt) {
-		return nil, ErrPlacementAuthority
-	}
 	if p.Status == "committed" {
 		return p, nil
+	}
+	if !time.Now().Before(p.ExpiresAt) {
+		return nil, ErrPlacementAuthority
 	}
 	if p.Status != "approved" || p.AutoPaused {
 		return nil, ErrPlacementAuthority
@@ -368,7 +368,7 @@ func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Pla
 	if err != nil {
 		return nil, err
 	}
-	p, err = scanPlacement(tx.QueryRow(ctx, `UPDATE placement_proposals SET status='committed',campaign_id=$2,receipt=$3 WHERE id=$1 RETURNING `+placementColumns, p.ID, campaignID, receipt))
+	p, err = scanPlacement(tx.QueryRow(ctx, `UPDATE placement_proposals SET status='committed',campaign_id=$2,receipt=$3,plugin_wait_at=COALESCE(plugin_wait_at, NOW()) WHERE id=$1 RETURNING `+placementColumns, p.ID, campaignID, receipt))
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Pla
 
 func (d *DB) PlacementAllowsClick(ctx context.Context, placementID, campaignID string) (bool, error) {
 	var valid bool
-	err := d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM placement_proposals WHERE id=$1 AND campaign_id=$2 AND status='committed' AND expires_at>NOW())`, placementID, campaignID).Scan(&valid)
+	err := d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM placement_proposals WHERE id=$1 AND campaign_id=$2 AND status='committed')`, placementID, campaignID).Scan(&valid)
 	return valid, err
 }
 
@@ -385,7 +385,7 @@ func (d *DB) RecordPlacementReceipt(ctx context.Context, siteID, id, surfaceURL,
 	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET receipt=receipt || jsonb_build_object(
  'publication_status','publisher_reported','surface_url',$3::text,'content_sha256',$4::text,'evidence',$5::text),
  plugin_contact_at=$6
- WHERE id=$1 AND site_id=$2 AND surface_url=$3 AND status='committed' AND expires_at>NOW()
+ WHERE id=$1 AND site_id=$2 AND surface_url=$3 AND status='committed'
  AND receipt->>'publication_status'='awaiting_evidence'`, id, siteID, surfaceURL, contentHash, evidence, at)
 	if err != nil {
 		return false, err
@@ -400,14 +400,14 @@ func (d *DB) TouchPlacementContact(ctx context.Context, siteID string, at time.T
 
 func (d *DB) AckPluginPlacement(ctx context.Context, id, siteID, action, reason string, at time.Time) (bool, error) {
 	switch action {
-	case "restored", "removed":
-		// placed and removed are stored only here, from the site key's ack.
+	case "placed", "restored", "removed":
+		// placed and removed are stored only here, from the plugin key's ack.
 		wait, ok := entry.VerifiedPluginWait(action)
 		if !ok {
 			return false, nil
 		}
 		pending := "plugin_wait='remove'"
-		if action == "restored" {
+		if action == "placed" || action == "restored" {
 			pending = "plugin_wait IN ('', 'restore')"
 		}
 		tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
@@ -449,7 +449,7 @@ AND plugin_wait IN ('', 'restore', 'remove')`, id, siteID, at, wait, action)
 
 // PlacementStatusSQL is the placement poll. It reads one row by primary key
 // and does not join another table.
-const PlacementStatusSQL = `SELECT status, plugin_wait, COALESCE(plugin_wait_at, created_at), plugin_failed_reason, failed_action, COALESCE(matched_rule,'') FROM placement_proposals WHERE id=$1 AND site_id=$2`
+const PlacementStatusSQL = `SELECT status, plugin_wait, plugin_wait_at, plugin_failed_reason, failed_action, COALESCE(matched_rule,'') FROM placement_proposals WHERE id=$1 AND site_id=$2`
 
 func (d *DB) ReadPlacementStatus(ctx context.Context, siteID, id string) (status, wait, failedReason, failedAction, matchedRule string, waitAt *time.Time, err error) {
 	err = d.Pool.QueryRow(ctx, PlacementStatusSQL, id, siteID).Scan(&status, &wait, &waitAt, &failedReason, &failedAction, &matchedRule)
@@ -491,7 +491,7 @@ WHERE pp.site_id=$1`, siteID)
 }
 
 func (d *DB) PlacementPlugin(ctx context.Context, id string) (wait string, waitAt, contact *time.Time, failedReason, failedAction string, err error) {
-	err = d.Pool.QueryRow(ctx, `SELECT plugin_wait, COALESCE(plugin_wait_at, created_at), plugin_contact_at, plugin_failed_reason, failed_action FROM placement_proposals WHERE id=$1`, id).Scan(&wait, &waitAt, &contact, &failedReason, &failedAction)
+	err = d.Pool.QueryRow(ctx, `SELECT plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action FROM placement_proposals WHERE id=$1`, id).Scan(&wait, &waitAt, &contact, &failedReason, &failedAction)
 	return wait, waitAt, contact, failedReason, failedAction, err
 }
 
@@ -499,6 +499,12 @@ func (d *DB) CreateAgentAccess(ctx context.Context, siteID, keyHash string) (str
 	var id string
 	err := d.Pool.QueryRow(ctx, `INSERT INTO publisher_agent_keys(site_id,key_hash,expires_at) VALUES($1,$2,NOW()+INTERVAL '7 days') RETURNING id`, siteID, keyHash).Scan(&id)
 	return id, err
+}
+
+func (d *DB) PluginSite(ctx context.Context, keyHash string) (string, error) {
+	var siteID string
+	err := d.Pool.QueryRow(ctx, `SELECT site_id FROM plugin_keys WHERE key_hash=$1 AND revoked_at IS NULL`, keyHash).Scan(&siteID)
+	return siteID, err
 }
 
 func (d *DB) AgentSite(ctx context.Context, keyHash string) (string, error) {

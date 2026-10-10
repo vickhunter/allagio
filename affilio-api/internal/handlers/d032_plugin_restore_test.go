@@ -242,6 +242,7 @@ func TestPluginPlacementState(t *testing.T) {
 		t.Fatal(err)
 	}
 	siteKey := map[string]string{"X-API-Key": "plugin-site-key"}
+	pluginKey := issuePluginKey(t, db, siteID, "plugin-ack-key")
 	placementID := insertPlacement(t, db, siteID, offerID, "https://plugin.example/post", "Honest note about the product.")
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW(), approved_by_kind='policy:yolo' WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
@@ -302,7 +303,7 @@ func TestPluginPlacementState(t *testing.T) {
 	if digestState() != "pending" {
 		t.Fatal("a brand-new placement should be pending")
 	}
-	firstAck, firstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	firstAck, firstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if firstAck.Code != http.StatusOK || firstBody["plugin_state"] != "placed" || digestState() != "placed" {
 		t.Fatalf("first ack: %d %s", firstAck.Code, firstAck.Body.String())
 	}
@@ -334,7 +335,7 @@ func TestPluginPlacementState(t *testing.T) {
 		t.Fatal("a poll must not clear an offline revoke")
 	}
 
-	acked, ackBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "removed"}, siteKey)
+	acked, ackBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "removed"}, pluginKey)
 	if acked.Code != http.StatusOK || ackBody["plugin_state"] != "removed" || digestState() != "removed" {
 		t.Fatalf("ack removed: %d %s", acked.Code, acked.Body.String())
 	}
@@ -356,7 +357,7 @@ func TestPluginPlacementState(t *testing.T) {
 		t.Fatalf("restore pending: %d %s", rec.Code, rec.Body.String())
 	}
 	assertPlacementStates(rec.Body.String())
-	acked, ackBody = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	acked, ackBody = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if acked.Code != http.StatusOK || ackBody["plugin_state"] != "placed" {
 		t.Fatalf("ack restored: %d %s", acked.Code, acked.Body.String())
 	}
@@ -377,11 +378,11 @@ func TestPluginPlacementState(t *testing.T) {
 	if session.Code != http.StatusForbidden {
 		t.Fatalf("session ack: %d %s", session.Code, session.Body.String())
 	}
-	bad, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "nope"}, siteKey)
+	bad, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "nope"}, pluginKey)
 	if bad.Code != http.StatusBadRequest {
 		t.Fatalf("bad action: %d %s", bad.Code, bad.Body.String())
 	}
-	nothing, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "removed"}, siteKey)
+	nothing, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "removed"}, pluginKey)
 	if nothing.Code != http.StatusConflict {
 		t.Fatalf("nothing to acknowledge: %d %s", nothing.Code, nothing.Body.String())
 	}
@@ -508,6 +509,7 @@ func TestEveryHardCheckReturns422(t *testing.T) {
 		t.Fatalf("yolo: %d %s", saved.Code, saved.Body.String())
 	}
 	siteKey := map[string]string{"X-API-Key": "checks-site-key"}
+	pluginKey := issuePluginKey(t, db, siteID, "checks-plugin-key")
 	textOf := func(id string) string {
 		t.Helper()
 		for _, check := range entry.HardCheckCatalog {
@@ -541,8 +543,16 @@ func TestEveryHardCheckReturns422(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='See the product.' WHERE id=$1`, relID); err != nil {
 		t.Fatal(err)
 	}
-	relRec, relBody := decide(relID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true})
+	relApproved, _ := decide(relID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": false})
+	if relApproved.Code != http.StatusOK {
+		t.Fatalf("disclosure words do not fail rel_sponsored: %d %s", relApproved.Code, relApproved.Body.String())
+	}
+	relRec, relBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+relID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": false}, pluginKey)
 	expect(relRec, relBody, "rel_sponsored")
+	var relWait string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT plugin_wait FROM placement_proposals WHERE id=$1`, relID).Scan(&relWait); err != nil || relWait != "" {
+		t.Fatalf("ack without rel stored %q %v", relWait, err)
+	}
 
 	api.Claims = rejectingClaims{}
 	claimsID := insertPlacement(t, db, siteID, offerID, "https://checks.example/claims", "Honest note about the product.")
@@ -618,6 +628,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	siteKey := map[string]string{"X-API-Key": "fail-site-key"}
+	pluginKey := issuePluginKey(t, db, siteID, "fail-plugin-key")
 	makerKey := map[string]string{"X-Maker-Key": "fail-maker-key"}
 	otherKey := map[string]string{"X-API-Key": "other-site-key"}
 
@@ -669,12 +680,12 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if early.Code != http.StatusConflict || earlyBody["reason"] != "not_failed" || earlyBody["message"] == "" || earlyBody["error"] != nil {
 		t.Fatalf("retry before failure: %d %s", early.Code, early.Body.String())
 	}
-	missing, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed"}, siteKey)
-	blank, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "   "}, siteKey)
+	missing, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed"}, pluginKey)
+	blank, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "   "}, pluginKey)
 	if missing.Code != http.StatusBadRequest || blank.Code != http.StatusBadRequest {
 		t.Fatalf("empty reason: %d %d", missing.Code, blank.Code)
 	}
-	failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "post re-read failed"}, siteKey)
+	failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "post re-read failed"}, pluginKey)
 	if failed.Code != http.StatusOK || failedBody["plugin_state"] != "failed" || failedBody["plugin_failed_reason"] != "post re-read failed" || failedBody["failed_action"] != "restored" {
 		t.Fatalf("failed ack: %d %s", failed.Code, failed.Body.String())
 	}
@@ -710,7 +721,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if offlineRetry.Code != http.StatusConflict || offlineBody["reason"] != "not_failed" || offlineBody["message"] == "" {
 		t.Fatalf("retry offline: %d %s", offlineRetry.Code, offlineRetry.Body.String())
 	}
-	acked, ackedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "still missing"}, siteKey)
+	acked, ackedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "still missing"}, pluginKey)
 	if acked.Code != http.StatusOK || ackedBody["failed_action"] != "removed" {
 		t.Fatalf("failed after offline: %d %s", acked.Code, acked.Body.String())
 	}
@@ -718,11 +729,11 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if state, reason := statusOf(placementID); state != "failed" || reason != "still missing" {
 		t.Fatalf("failure beats offline: %s %s", state, reason)
 	}
-	updated, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-read failed again"}, siteKey)
+	updated, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-read failed again"}, pluginKey)
 	if updated.Code != http.StatusOK {
 		t.Fatalf("second failure: %d %s", updated.Code, updated.Body.String())
 	}
-	wrong, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	wrong, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if wrong.Code != http.StatusConflict {
 		t.Fatalf("wrong ack: %d %s", wrong.Code, wrong.Body.String())
 	}
@@ -759,7 +770,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 		t.Fatalf("re-queued remove: %s %q %s %s", storedWait, storedReason, storedStatus, waited.UTC())
 	}
 	stopped()
-	placedAttempt, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	placedAttempt, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if placedAttempt.Code != http.StatusConflict {
 		t.Fatalf("removal retry accepted restored: %d %s", placedAttempt.Code, placedAttempt.Body.String())
 	}
@@ -767,7 +778,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 		t.Fatalf("removal retry became %s", state)
 	}
 	stopped()
-	removed, removedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "removed"}, siteKey)
+	removed, removedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "removed"}, pluginKey)
 	if removed.Code != http.StatusOK || removedBody["plugin_state"] != "removed" || removedBody["plugin_failed_reason"] != "" || removedBody["failed_action"] != "" {
 		t.Fatalf("ack removed: %d %s", removed.Code, removed.Body.String())
 	}
@@ -783,7 +794,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
-	failed, failedBody = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, siteKey)
+	failed, failedBody = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, pluginKey)
 	if failed.Code != http.StatusOK || failedBody["failed_action"] != "restored" {
 		t.Fatalf("restore failure: %d %s", failed.Code, failed.Body.String())
 	}
@@ -808,7 +819,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if retried.Code != http.StatusOK || retriedBody["plugin_state"] != "pending" {
 		t.Fatalf("site retry: %d %s", retried.Code, retried.Body.String())
 	}
-	placed, placedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	placed, placedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if placed.Code != http.StatusOK || placedBody["plugin_state"] != "placed" || placedBody["plugin_failed_reason"] != "" {
 		t.Fatalf("ack restored: %d %s", placed.Code, placed.Body.String())
 	}
@@ -825,7 +836,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if before.Code != http.StatusOK || digestHas(beforeBody, hidden) {
 		t.Fatalf("stale placement stayed in the digest: %s", before.Body.String())
 	}
-	failed, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+hidden+"/plugin-ack", map[string]any{"action": "failed", "reason": "old post re-read failed"}, siteKey)
+	failed, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+hidden+"/plugin-ack", map[string]any{"action": "failed", "reason": "old post re-read failed"}, pluginKey)
 	if failed.Code != http.StatusOK {
 		t.Fatalf("hidden failure: %d %s", failed.Code, failed.Body.String())
 	}
@@ -850,6 +861,7 @@ func TestFailedRestoreIsNotLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	siteKey := map[string]string{"X-API-Key": "dark-site-key"}
+	pluginKey := issuePluginKey(t, db, siteID, "dark-plugin-key")
 	id := insertPlacement(t, db, siteID, offerID, "https://dark.example/post", "Honest note about the product.")
 	var campaignID string
 	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code,requires_placement,status) VALUES($1,$2,'dark-go',true,'active') RETURNING id`, offerID, siteID).Scan(&campaignID); err != nil {
@@ -917,7 +929,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	if went, earned := numbers(); went != 1 || earned != 3.5 {
 		t.Fatalf("pending before ack: went %v earned %v", went, earned)
 	}
-	placedFirst, placedFirstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	placedFirst, placedFirstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if placedFirst.Code != http.StatusOK || placedFirstBody["plugin_state"] != "placed" {
 		t.Fatalf("first ack: %d %s", placedFirst.Code, placedFirst.Body.String())
 	}
@@ -943,7 +955,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 		t.Fatalf("restore before ack: went %v earned %v", went, earned)
 	}
 
-	failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, siteKey)
+	failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, pluginKey)
 	if failed.Code != http.StatusOK || failedBody["failed_action"] != "restored" || failedBody["plugin_state"] != "failed" {
 		t.Fatalf("failed restore: %d %s", failed.Code, failed.Body.String())
 	}
@@ -971,7 +983,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	}
 	dark()
 
-	placed, placedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	placed, placedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if placed.Code != http.StatusOK || placedBody["plugin_state"] != "placed" {
 		t.Fatalf("ack restored: %d %s", placed.Code, placed.Body.String())
 	}
@@ -1002,6 +1014,7 @@ func TestLeaveFailedRestoreRemoved(t *testing.T) {
 		t.Fatal(err)
 	}
 	siteKey := map[string]string{"X-API-Key": "leave-site-key"}
+	pluginKey := issuePluginKey(t, db, siteID, "leave-plugin-key")
 	var campaignID string
 	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code,requires_placement,status) VALUES($1,$2,'leave-go',true,'active') RETURNING id`, offerID, siteID).Scan(&campaignID); err != nil {
 		t.Fatal(err)
@@ -1053,7 +1066,7 @@ VALUES($1,$2,$3,'stripe',$4,'sale',10,'USD',1.50,NOW(),'test') RETURNING id`, of
 		if restored.Code != http.StatusOK {
 			t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 		}
-		failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, siteKey)
+		failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, pluginKey)
 		if failed.Code != http.StatusOK || failedBody["plugin_state"] != "failed" || failedBody["failed_action"] != "restored" {
 			t.Fatalf("failed restore: %d %s", failed.Code, failed.Body.String())
 		}
@@ -1068,7 +1081,7 @@ VALUES($1,'stripe','leave-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id
 	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency) VALUES($1,$2,'commission',2.00,'USD')`, siteID, other); err != nil {
 		t.Fatal(err)
 	}
-	placedFirst, placedFirstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	placedFirst, placedFirstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if placedFirst.Code != http.StatusOK || placedFirstBody["plugin_state"] != "placed" {
 		t.Fatalf("first ack: %d %s", placedFirst.Code, placedFirst.Body.String())
 	}
@@ -1121,7 +1134,7 @@ VALUES($1,'stripe','leave-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id
 	}
 	notLive()
 	stopped(goPath, id, clicks)
-	confirmed, confirmedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "removed"}, siteKey)
+	confirmed, confirmedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "removed"}, pluginKey)
 	if confirmed.Code != http.StatusOK || confirmedBody["plugin_state"] != "removed" || confirmedBody["failed_action"] != "" {
 		t.Fatalf("ack removed: %d %s", confirmed.Code, confirmed.Body.String())
 	}
@@ -1149,7 +1162,7 @@ VALUES($1,'stripe','leave-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id
 	if thirdLeft.Code != http.StatusOK || view(third)["plugin_state"] != "pending" {
 		t.Fatalf("third undo: %d %s", thirdLeft.Code, thirdLeft.Body.String())
 	}
-	failedAck, failedAckBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+third+"/plugin-ack", map[string]any{"action": "failed", "reason": "remove re-read failed"}, siteKey)
+	failedAck, failedAckBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+third+"/plugin-ack", map[string]any{"action": "failed", "reason": "remove re-read failed"}, pluginKey)
 	if failedAck.Code != http.StatusOK || failedAckBody["plugin_state"] != "failed" || failedAckBody["failed_action"] != "removed" {
 		t.Fatalf("failed ack: %d %s", failedAck.Code, failedAck.Body.String())
 	}
@@ -1193,6 +1206,9 @@ func TestPlacedAndRemovedOnlyFromPluginAck(t *testing.T) {
 		if wait, ok := entry.VerifiedPluginWait(action); ok || wait != "" {
 			t.Fatalf("%s stored %q", action, wait)
 		}
+	}
+	if wait, ok := entry.VerifiedPluginWait("placed"); !ok || wait != "placed" {
+		t.Fatalf("placed ack stored %q ok=%v", wait, ok)
 	}
 	if wait, ok := entry.VerifiedPluginWait("restored"); !ok || wait != "placed" {
 		t.Fatalf("restored ack stored %q ok=%v", wait, ok)

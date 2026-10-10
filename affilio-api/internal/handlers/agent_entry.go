@@ -417,8 +417,16 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		return
 	}
 	now := time.Now().UTC()
+	mode := req.Mode
+	existing, getErr := h.DB.GetSetup(c.Request.Context(), owner.ID, req.Role)
+	if getErr == nil && existing.Mode != "" {
+		mode = existing.Mode
+	} else if getErr != nil && !errors.Is(getErr, pgx.ErrNoRows) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
+		return
+	}
 	saved := database.SetupSettings{
-		OwnerID: owner.ID, Role: req.Role, InstallPath: req.InstallPath, Mode: req.Mode, ModeShown: req.ModeShown,
+		OwnerID: owner.ID, Role: req.Role, InstallPath: req.InstallPath, Mode: mode, ModeShown: req.ModeShown,
 		Promote: req.Promote, AvoidTopics: req.AvoidTopics, Commission: commissionText, ProjectName: req.ProjectName, ListingURL: req.ListingURL,
 		CommissionType: commissionType, CommissionValue: commissionValue, CommissionCurrency: commissionCurrency,
 		ListingPriceValue: priceValue, ListingPriceCurrency: priceCurrency,
@@ -459,7 +467,9 @@ func (h *AgentEntry) applySetupMode(c *gin.Context, owner *database.Owner, saved
 			return err
 		}
 		next := prev
-		next.Mode = saved.Mode
+		if from == "" {
+			next.Mode = saved.Mode
+		}
 		if next.MinRelevance == 0 {
 			next.MinRelevance = 40
 		}
@@ -490,7 +500,9 @@ func (h *AgentEntry) applySetupMode(c *gin.Context, owner *database.Owner, saved
 				return err
 			}
 			next := prev
-			next.Mode = saved.Mode
+			if from == "" {
+				next.Mode = saved.Mode
+			}
 			if next.MinRelevance == 0 {
 				next.MinRelevance = 40
 			}
@@ -672,7 +684,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		return
 	}
 	actor, ok := h.actorFrom(c)
-	if !ok {
+	if !ok || sessionOnlyDecision(c) {
 		return
 	}
 	body, err := readJSONBody(c, 8192)
@@ -727,7 +739,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 	}
 	relevance := services.ScorePlacement(placement.Copy, offer.ProductName, offer.Category, offer.Website)
 	decision := entry.EvaluatePlacement(policy.Mode, rules, entry.PlacementFacts{
-		Disclosure: placement.Disclosure, RelSponsored: entry.RelSponsoredFromMarkup(placement.Disclosure, placement.Copy),
+		Disclosure: placement.Disclosure, RelSponsored: true,
 		Copy: placement.Copy, OfferData: serverOfferData(offer),
 		ExistingBoxes: boxes, Relevance: relevance, OfferLive: offer.Live,
 		RevokeWorks: placement.Status == "pending" || placement.Status == "approved" || placement.Status == "committed",
@@ -791,13 +803,18 @@ func (h *AgentEntry) AcceptPublisher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "mode unavailable"})
 		return
 	}
-	decision := entry.EvaluatePublisher(policy.Mode, rulesOf(policy), entry.PublisherFacts{OfferLive: live, SiteQuality: req.SiteQuality, Niche: req.Niche})
+	decision := entry.EvaluatePublisher(policy.Mode, rulesOf(policy), entry.PublisherFacts{OfferLive: live, SiteQuality: req.SiteQuality, Niche: req.Niche}, h.claims())
 	if len(decision.Failures) > 0 && !decision.NeedsOwner {
 		writeCheckDenied(c, decision.Failures)
 		return
 	}
 	if !decision.Allowed {
-		c.JSON(http.StatusOK, gin.H{"decision": "needs_owner", "failures": decision.Failures})
+		body := gin.H{"decision": "needs_owner", "failures": decision.Failures}
+		if decision.Reason != "" {
+			body["reason"] = decision.Reason
+			body["message"] = decision.Message
+		}
+		c.JSON(http.StatusOK, body)
 		return
 	}
 	if err = h.DB.RecordPublisherAcceptance(c.Request.Context(), c.Param("id"), req.SiteID, decision.ApprovedBy, decision.MatchedRule, policy.Version); err != nil {
@@ -1053,7 +1070,7 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 		return
 	}
 	actor, ok := h.actorFrom(c)
-	if !ok {
+	if !ok || sessionOnlyDecision(c) {
 		return
 	}
 	row, err := h.DB.PlacementUndo(c.Request.Context(), c.Param("id"))
@@ -1073,7 +1090,9 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 	if actor.Owner != nil {
 		userID = actor.Owner.ID
 	}
-	if subtle.ConstantTimeCompare([]byte(row.KeyHash), []byte(actorKeyHash(c))) != 1 || row.UserID == "" || row.UserID != userID {
+	sameUser := row.UserID != "" && row.UserID == userID
+	sameKey := subtle.ConstantTimeCompare([]byte(row.KeyHash), []byte(actorKeyHash(c))) == 1
+	if !sameUser || (actor.Kind != "owner_ui" && !sameKey) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "only the identity that undid this placement can restore it"})
 		return
 	}
@@ -1155,7 +1174,7 @@ func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementU
 		return nil, err
 	}
 	decision := entry.EvaluatePlacement(entry.ModeYolo, rules, entry.PlacementFacts{
-		Disclosure: row.Disclosure, RelSponsored: entry.RelSponsoredFromMarkup(row.Disclosure, row.Copy),
+		Disclosure: row.Disclosure, RelSponsored: true,
 		Copy: row.Copy, OfferData: serverOfferData(offer),
 		ExistingBoxes: boxes, Relevance: services.ScorePlacement(row.Copy, offer.ProductName, offer.Category, offer.Website),
 		OfferLive: offer.Live, RevokeWorks: revokePathAvailable(row),
@@ -1176,29 +1195,34 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
 		return
 	}
-	if c.GetHeader("X-API-Key") == "" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "site key required"})
+	// The plugin sends only X-Plugin-Key. A site, project, account, agent, or
+	// maker key on this route must not be able to set placed.
+	if c.GetHeader("X-API-Key") != "" || c.GetHeader("Authorization") != "" || c.GetHeader("X-Maker-Key") != "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "plugin key required"})
 		return
 	}
-	actor, ok := h.actorFrom(c)
-	if !ok {
+	rawKey := strings.TrimSpace(c.GetHeader("X-Plugin-Key"))
+	if rawKey == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "plugin key required"})
 		return
 	}
-	if actor.SiteID == "" || c.GetString("key_kind") != "" || c.GetBool("agent_access") {
-		c.JSON(http.StatusForbidden, gin.H{"error": "site key required"})
+	siteID, err := h.DB.PluginSite(c.Request.Context(), services.HashAPIKey(rawKey))
+	if err != nil || siteID == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "plugin key required"})
 		return
 	}
-	body, err := readJSONBody(c, 4096)
+	body, err := readJSONBody(c, 65536)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}
 	var req struct {
-		Action string `json:"action"`
-		Reason string `json:"reason"`
+		Action       string `json:"action"`
+		Reason       string `json:"reason"`
+		RelSponsored bool   `json:"rel_sponsored"`
 	}
-	if decodeStrict(body, &req) != nil || (req.Action != "removed" && req.Action != "restored" && req.Action != "failed") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "action must be removed, restored, or failed"})
+	if decodeStrict(body, &req) != nil || (req.Action != "placed" && req.Action != "removed" && req.Action != "restored" && req.Action != "failed") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "action must be placed, removed, restored, or failed"})
 		return
 	}
 	req.Reason = strings.TrimSpace(req.Reason)
@@ -1215,11 +1239,22 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
 		return
 	}
-	if placement.SiteID != actor.SiteID {
+	if placement.SiteID != siteID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "placement is not on this site"})
 		return
 	}
-	acked, err := h.DB.AckPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, req.Action, req.Reason, h.now())
+	if req.Action == "placed" || req.Action == "restored" {
+		wait, _, _, _, _, waitErr := h.DB.PlacementPlugin(c.Request.Context(), placement.ID)
+		if waitErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
+			return
+		}
+		if (wait == "" || wait == "restore") && !req.RelSponsored {
+			writeCheckDenied(c, []string{"rel_sponsored"})
+			return
+		}
+	}
+	acked, err := h.DB.AckPluginPlacement(c.Request.Context(), placement.ID, siteID, req.Action, req.Reason, h.now())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
 		return
@@ -1883,6 +1918,14 @@ func (h *AgentEntry) writePolicy(c *gin.Context, policy database.ApprovalPolicy,
 		body["approval_message"] = message
 	}
 	c.JSON(http.StatusOK, body)
+}
+
+func sessionOnlyDecision(c *gin.Context) bool {
+	if c.GetBool("agent_access") || c.GetString("key_kind") == "project" || c.GetString("key_kind") == "account" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "decide and restore require a signed-in dashboard session"})
+		return true
+	}
+	return false
 }
 
 func (h *AgentEntry) presentMode(mode string) (effective, reason, message string) {

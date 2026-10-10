@@ -380,7 +380,7 @@ func (d *DB) ownerIDs(ctx context.Context, query string) ([]string, error) {
 func (d *DB) SaveSetup(ctx context.Context, s SetupSettings) error {
 	_, err := d.Pool.Exec(ctx, `INSERT INTO owner_setup(owner_id,role,install_path,mode,mode_shown,promote_text,avoid_topics,commission,sites_channels,never_topics,box_position,saved_by,saved_at,project_name,listing_url,commission_type,commission_value,commission_currency,listing_price_value,listing_price_currency)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
-ON CONFLICT(owner_id,role) DO UPDATE SET install_path=EXCLUDED.install_path, mode=EXCLUDED.mode, mode_shown=EXCLUDED.mode_shown,
+ON CONFLICT(owner_id,role) DO UPDATE SET install_path=EXCLUDED.install_path, mode=owner_setup.mode, mode_shown=EXCLUDED.mode_shown,
 promote_text=EXCLUDED.promote_text, avoid_topics=EXCLUDED.avoid_topics, commission=EXCLUDED.commission,
 sites_channels=EXCLUDED.sites_channels, never_topics=EXCLUDED.never_topics, box_position=EXCLUDED.box_position,
 saved_by=EXCLUDED.saved_by, saved_at=EXCLUDED.saved_at,
@@ -740,7 +740,7 @@ func (d *DB) CountPolicyPlacements(ctx context.Context, siteID string, since tim
 	var n int
 	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals
 WHERE site_id=$1 AND created_at>$2 AND approved_by_kind IN ('policy:auto','policy:yolo')
-AND (status<>'revoked' OR id = NULLIF($3,'')::uuid)`, siteID, since, includeID).Scan(&n)
+AND status<>'revoked' AND ($3 = '' OR id <> NULLIF($3,'')::uuid)`, siteID, since, includeID).Scan(&n)
 	return n, err
 }
 
@@ -880,22 +880,30 @@ $3 <> '' AND EXISTS (
 	return pause, err
 }
 
+const digestPlacementWhere = `site_id=$1 AND (
+    (status IN ('approved','committed') AND COALESCE(approved_at, created_at) > $2)
+    OR plugin_wait <> ''
+    OR plugin_failed_reason <> ''
+)`
+
+func (d *DB) CountDigestPlacements(ctx context.Context, siteID string, since time.Time) (int, error) {
+	var n int
+	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals WHERE `+digestPlacementWhere, siteID, since).Scan(&n)
+	return n, err
+}
+
 func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Time) ([]DigestItem, error) {
 	limit := DigestPageSize
 	if limit < 1 {
 		limit = 50
 	}
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
-plugin_wait, COALESCE(plugin_wait_at, created_at), plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
+plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
 COALESCE(post_title,''), COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
 (SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
 COALESCE(approved_by_kind,''), COALESCE(policy_version,0)
 FROM placement_proposals
-WHERE site_id=$1 AND (
-    (status IN ('approved','committed') AND COALESCE(approved_at, created_at) > $2)
-    OR plugin_wait <> ''
-    OR plugin_failed_reason <> ''
-)
+WHERE `+digestPlacementWhere+`
 ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 	if err != nil {
 		return nil, err
@@ -983,12 +991,12 @@ END
 WHERE id=$1 AND status<>'revoked'`, placementID, now, ownerID); err != nil {
 			return "", "", "", err
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at) VALUES('placement_undo',$1,$2,$3)`, ownerID, placementID, now)
+		_, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at,actor) VALUES('placement_undo',$1,$2,$3,$4)`, ownerID, placementID, now, ownerID)
 	case "offer":
 		if _, err = tx.Exec(ctx, `UPDATE offers SET status='paused', updated_at=$2 WHERE id=$1 AND status='listed'`, offerID, now); err != nil {
 			return "", "", "", err
 		}
-		_, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,offer_id,created_at) VALUES('offer_undo',$1,$2,$3)`, ownerID, offerID, now)
+		_, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,offer_id,created_at,actor) VALUES('offer_undo',$1,$2,$3,$4)`, ownerID, offerID, now, ownerID)
 	default:
 		return "", "", "", errors.New("unknown undo kind")
 	}

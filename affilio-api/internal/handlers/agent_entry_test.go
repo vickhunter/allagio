@@ -374,8 +374,11 @@ func TestPolicyEngineHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "rel_sponsored") {
-		t.Fatalf("disclosure: %d %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disclosure words do not fail rel_sponsored: %d %s", rec.Code, rec.Body.String())
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='pending', approved_by_kind=NULL WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='(link sponsorizzato)' WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
@@ -743,8 +746,8 @@ VALUES($1,'or_offe',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPI
 		t.Fatal(err)
 	}
 	denied, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": accountKey})
-	if denied.Code != http.StatusUnprocessableEntity || !strings.Contains(denied.Body.String(), "rel_sponsored") {
-		t.Fatalf("hard check: %d %s", denied.Code, denied.Body.String())
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("account key decide: %d %s", denied.Code, denied.Body.String())
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW() WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
@@ -972,9 +975,12 @@ VALUES($1,'or_sess',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 		{"mode": "auto"},
 	} {
 		rec, _ := postJSON(t, r, http.MethodPut, "/v1/sites/"+siteID+"/mode", payload, map[string]string{"X-API-Key": projectKey})
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("project key policy %v: %d %s", payload, rec.Code, rec.Body.String())
+		if rec.Code != http.StatusOK {
+			t.Fatalf("project key tighten %v: %d %s", payload, rec.Code, rec.Body.String())
 		}
+	}
+	if sessionPut(map[string]any{"mode": "yolo", "max_placements_per_30_days": 10, "min_relevance": 30})["mode"] != "yolo" {
+		t.Fatal("session did not reset yolo before the account key")
 	}
 	if keyPut(accountKey, map[string]any{"mode": "yolo", "max_placements_per_30_days": 2})["max_placements_per_30_days"] != float64(2) {
 		t.Fatal("account key did not lower the cap")
@@ -995,8 +1001,12 @@ VALUES($1,'or_sess',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 		t.Fatal(err)
 	}
 	killed, killBody := postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "site", "id": siteID}, map[string]string{"X-API-Key": projectKey})
-	if killed.Code != http.StatusForbidden {
+	if killed.Code != http.StatusOK || appliedRow(t, killBody)["mode"] != "manual" {
 		t.Fatalf("project key pause: %d %s", killed.Code, killed.Body.String())
+	}
+	releasedEarly, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/account/resume", map[string]any{"scope": "site", "id": siteID})
+	if releasedEarly.Code != http.StatusOK {
+		t.Fatalf("resume before account pause: %d %s", releasedEarly.Code, releasedEarly.Body.String())
 	}
 	killed, killBody = postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "site", "id": siteID}, map[string]string{"X-API-Key": accountKey})
 	pausedRow := appliedRow(t, killBody)
@@ -1306,15 +1316,16 @@ func TestPlacementRestore(t *testing.T) {
 	other := approve("https://restore.example/other")
 	undo(other, siteKey)
 	current = current.Add(time.Second)
-	sessionRec, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+other+"/restore", nil)
-	if sessionRec.Code != http.StatusForbidden {
-		t.Fatalf("session restore of a key undo: %d %s", sessionRec.Code, sessionRec.Body.String())
+	sessionRec, sessionBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+other+"/restore", nil)
+	if sessionRec.Code != http.StatusOK || sessionBody["status"] != "approved" || sessionBody["actor"] != "owner_ui" {
+		t.Fatalf("same user session restores a key undo: %d %s", sessionRec.Code, sessionRec.Body.String())
 	}
-	makerRec, makerBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+other+"/restore", nil, makerKey)
+	undo(other, siteKey)
+	makerRec, makerBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+left+"/restore", nil, makerKey)
 	if makerRec.Code != http.StatusForbidden || makerBody["error"] != "only the identity that undid this placement can restore it" {
 		t.Fatalf("other side: %d %s", makerRec.Code, makerRec.Body.String())
 	}
-	if status, _, restoredBy := placementStatus(other); status != "revoked" || restoredBy != "" {
+	if status, _, restoredBy := placementStatus(left); status != "revoked" || restoredBy != "" {
 		t.Fatalf("other side changed the placement: %s %s", status, restoredBy)
 	}
 

@@ -1,6 +1,12 @@
 package entry
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
+
+// ErrClaimCheckUnavailable is the stub's answer. It is not a claim failure.
+var ErrClaimCheckUnavailable = errors.New("claim check unavailable")
 
 // ClaimCheckReason is why yolo and auto stay on manual approval.
 const ClaimCheckReason = "claim_check_unavailable"
@@ -15,10 +21,11 @@ type ClaimChecker interface {
 	Real() bool
 }
 
-// StubClaimChecker does not reject claims and is not a live checker.
+// StubClaimChecker refuses every claim check and is not a live checker.
+// Production wires this stub. Yolo and auto cannot approve while it is in use.
 type StubClaimChecker struct{}
 
-func (StubClaimChecker) CheckClaims(string, string) error { return nil }
+func (StubClaimChecker) CheckClaims(string, string) error { return ErrClaimCheckUnavailable }
 func (StubClaimChecker) Real() bool                       { return false }
 
 // LiveClaimChecker accepts every claim and allows automatic go-live.
@@ -186,9 +193,15 @@ func EvaluatePlacement(mode string, rules AutoRules, in PlacementFacts, claims C
 	}
 }
 
-func EvaluatePublisher(mode string, rules AutoRules, in PublisherFacts) Decision {
+func EvaluatePublisher(mode string, rules AutoRules, in PublisherFacts, claims ClaimChecker) Decision {
+	if claims == nil {
+		claims = StubClaimChecker{}
+	}
 	if !in.OfferLive {
 		return Decision{Failures: []string{"offer_live"}}
+	}
+	if !claims.Real() && (mode == ModeYolo || mode == ModeAuto) {
+		return Decision{NeedsOwner: true, Reason: ClaimCheckReason, Message: ClaimCheckMessage}
 	}
 	switch mode {
 	case ModeManual:
@@ -340,7 +353,7 @@ func placementHardFailures(in PlacementFacts, rules AutoRules, claims ClaimCheck
 	if !in.RelSponsored {
 		failures = append(failures, "rel_sponsored")
 	}
-	if err := claims.CheckClaims(in.Copy, in.OfferData); err != nil {
+	if err := claims.CheckClaims(in.Copy, in.OfferData); err != nil && (claims.Real() || !errors.Is(err, ErrClaimCheckUnavailable)) {
 		failures = append(failures, "claims_from_offer")
 	}
 	if len([]rune(in.Copy)) > 140 {
@@ -362,6 +375,13 @@ func placementHardFailures(in PlacementFacts, rules AutoRules, claims ClaimCheck
 		failures = append(failures, "cap")
 	}
 	return failures
+}
+
+// RelSponsoredInPost is true only when the plugin's re-read of the post
+// carries rel=sponsored. Disclosure words do not satisfy it.
+func RelSponsoredInPost(html string) bool {
+	blob := strings.ToLower(html)
+	return strings.Contains(blob, `rel="sponsored"`) || strings.Contains(blob, "rel='sponsored'") || strings.Contains(blob, "rel=sponsored")
 }
 
 // RelSponsoredFromMarkup is true when our disclosure or copy carries

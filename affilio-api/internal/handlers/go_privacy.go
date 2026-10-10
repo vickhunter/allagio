@@ -180,14 +180,25 @@ func probeLanding(raw string) bool {
 	req, err := http.NewRequest(http.MethodHead, raw, nil)
 	ok := false
 	if err == nil {
-		resp, err := landingClient.Do(req)
-		if err == nil {
-			ok = resp.StatusCode < 400
+		resp, doErr := landingClient.Do(req)
+		if doErr == nil {
+			ok = landingUp(resp.StatusCode, nil)
 			resp.Body.Close()
 		}
 	}
 	landingCache.Store(raw, landingProbe{ok: ok, at: time.Now()})
 	return ok
+}
+
+// landingUp treats 403 and 405 as up. A network error, 404, 410, or 5xx is down.
+func landingUp(status int, err error) bool {
+	if err != nil {
+		return false
+	}
+	if status == http.StatusNotFound || status == http.StatusGone || status >= 500 {
+		return false
+	}
+	return true
 }
 
 // TruncateReaderIP keeps the IPv4 /24 or the IPv6 /48. IPv4 is dotted decimal

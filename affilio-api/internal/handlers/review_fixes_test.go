@@ -76,16 +76,9 @@ func TestReviewYoloEnforcesCapMinAndIgnoresCaller(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='See the product.' WHERE id=$1`, ignored); err != nil {
 		t.Fatal(err)
 	}
-	rec, body = postJSON(t, r, http.MethodPost, "/v1/placements/"+ignored+"/decide", map[string]any{"relevance": 100, "position": "end", "rel_sponsored": true, "offer_data": "untrusted"}, siteKey)
-	if rec.Code != http.StatusUnprocessableEntity || body["check_id"] != "rel_sponsored" {
-		t.Fatalf("caller rel_sponsored ignored: %d %s", rec.Code, rec.Body.String())
-	}
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='(link sponsorizzato)' WHERE id=$1`, ignored); err != nil {
-		t.Fatal(err)
-	}
 	rec, body = postJSON(t, r, http.MethodPost, "/v1/placements/"+ignored+"/decide", map[string]any{"relevance": 1, "position": "end", "rel_sponsored": false, "offer_data": "not the offer"}, siteKey)
 	if rec.Code != http.StatusOK || body["approved_by"] != "policy:yolo" {
-		t.Fatalf("server score approved: %d %s", rec.Code, rec.Body.String())
+		t.Fatalf("disclosure words do not decide rel_sponsored: %d %s", rec.Code, rec.Body.String())
 	}
 
 	api.Claims = entry.StubClaimChecker{}
@@ -116,16 +109,18 @@ func TestReviewYoloEnforcesCapMinAndIgnoresCaller(t *testing.T) {
 	if undo.Code != http.StatusOK {
 		t.Fatalf("undo: %d %s", undo.Code, undo.Body.String())
 	}
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='See the product.' WHERE id=$1`, ignored); err != nil {
-		t.Fatal(err)
-	}
 	restored, restoredBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+ignored+"/restore", nil, siteKey)
-	if restored.Code != http.StatusUnprocessableEntity || restoredBody["check_id"] != "rel_sponsored" {
-		t.Fatalf("restore reran checks: %d %s", restored.Code, restored.Body.String())
+	if restored.Code != http.StatusOK || restoredBody["status"] == "" {
+		t.Fatalf("restore ignores disclosure words: %d %s", restored.Code, restored.Body.String())
 	}
-	var status string
-	if err := db.Pool.QueryRow(context.Background(), `SELECT status FROM placement_proposals WHERE id=$1`, ignored).Scan(&status); err != nil || status != "revoked" {
-		t.Fatalf("restore left status %s", status)
+	pluginKey := issuePluginKey(t, db, siteID, "review-policy-plugin")
+	relAck, relBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+ignored+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": false}, pluginKey)
+	if relAck.Code != http.StatusUnprocessableEntity || relBody["check_id"] != "rel_sponsored" {
+		t.Fatalf("ack rel: %d %s", relAck.Code, relAck.Body.String())
+	}
+	var wait string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT plugin_wait FROM placement_proposals WHERE id=$1`, ignored).Scan(&wait); err != nil || wait != "restore" {
+		t.Fatalf("ack without rel stored %q %v", wait, err)
 	}
 }
 
@@ -193,13 +188,14 @@ VALUES($1,'or_plug',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 	}
 	accountKey := createdBody["key"].(string)
 	ackID := insertPlacement(t, db, siteID, offerID, "https://plugin.example/ack", "Plugin Product note.")
-	for _, key := range []string{projectKey, accountKey, "review-agent-key"} {
-		rec, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+ackID+"/plugin-ack", map[string]any{"action": "restored"}, map[string]string{"X-API-Key": key})
+	for _, key := range []string{projectKey, accountKey, "review-agent-key", "review-plugin-site"} {
+		rec, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+ackID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, map[string]string{"X-API-Key": key})
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("ack %s: %d %s", key, rec.Code, rec.Body.String())
 		}
 	}
-	acked, ackBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+ackID+"/plugin-ack", map[string]any{"action": "restored"}, map[string]string{"X-API-Key": "review-plugin-site"})
+	pluginKey := issuePluginKey(t, db, siteID, "review-plugin-only")
+	acked, ackBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+ackID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if acked.Code != http.StatusOK || ackBody["plugin_state"] != "placed" {
 		t.Fatalf("site ack: %d %s", acked.Code, acked.Body.String())
 	}

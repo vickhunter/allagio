@@ -152,7 +152,7 @@ func (h *AgentEntry) AccountDigest(c *gin.Context) {
 		}
 		projects = append(projects, gin.H{
 			"kind": project.Kind, "id": project.ID, "name": project.Name, "mode": project.Mode,
-			"went_live": project.WentLive, "clicks": project.Clicks,
+			"went_live": project.WentLive, "clicks": project.Clicks, "total_items": project.TotalItems,
 			"earnings": earningsList(project.Earnings), "clicks_by_source": sourceJSON(project.ClicksBySource),
 			"items": items,
 		})
@@ -338,7 +338,7 @@ func (h *AgentEntry) applyOne(c *gin.Context, actor entryActor, target scopeTarg
 		if err != nil {
 			return nil, err
 		}
-		return gin.H{"kind": target.Kind, "id": target.ID, "mode": "manual", "kill_switch": true, "paused": n}, nil
+		return h.withEffectiveMode(gin.H{"kind": target.Kind, "id": target.ID, "mode": "manual", "kill_switch": true, "paused": n}, "manual"), nil
 	}
 	var mode string
 	var n int
@@ -351,7 +351,18 @@ func (h *AgentEntry) applyOne(c *gin.Context, actor entryActor, target scopeTarg
 	if err != nil {
 		return nil, err
 	}
-	return gin.H{"kind": target.Kind, "id": target.ID, "mode": mode, "kill_switch": false, "unpaused": n}, nil
+	return h.withEffectiveMode(gin.H{"kind": target.Kind, "id": target.ID, "mode": mode, "kill_switch": false, "unpaused": n}, mode), nil
+}
+
+func (h *AgentEntry) withEffectiveMode(row gin.H, stored string) gin.H {
+	effective, reason, message := stored, "", ""
+	if !h.claims().Real() {
+		effective, reason, message = entry.ModeManual, entry.ClaimCheckReason, entry.ClaimCheckMessage
+	}
+	row["effective_mode"] = effective
+	row["approval_reason"] = reason
+	row["approval_message"] = message
+	return row
 }
 
 func (h *AgentEntry) projectMode(c *gin.Context, project database.AccountProject) (string, error) {

@@ -11,6 +11,7 @@ AI affiliate copilot for WordPress. Connect from Settings, then review recommend
 * An inserted box links to this site's `/go/<placement id>` with `rel="sponsored nofollow"` and the label "(link sponsorizzato)".
 * Revoke, restore, and upgrade send a plugin acknowledgement only after the saved post is re-read. A second failed re-read sends `failed` and shows an admin notice.
 * `/go/<placement id>` proxies the API with the site key and falls back when the API is down. Legacy `/v1/go/` links are rewritten only while the post is rendered.
+* Settings stores a plugin key for box acknowledgements. The field renders empty, and an empty save keeps the saved key.
 
 = 0.1.18 =
 * Inserting or removing an Affilio block does not create a WordPress post revision. The revision skip runs last, so another plugin cannot turn revisions back on for that write.

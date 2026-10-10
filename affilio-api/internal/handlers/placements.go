@@ -412,7 +412,8 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		TrackedLink string `json:"tracked_link"`
 	}
 	wantLink := "/v1/go/" + p.ID
-	if json.Unmarshal(p.Receipt, &receipt) != nil || receipt.TrackedLink != wantLink || !strings.Contains(req.PublishedText, p.Copy) || !publishedDisclosureOK(req.PublishedText, p.Disclosure) || !strings.Contains(req.PublishedText, wantLink) {
+	publishedLink := strings.Contains(req.PublishedText, "/go/"+p.ID)
+	if json.Unmarshal(p.Receipt, &receipt) != nil || receipt.TrackedLink != wantLink || !strings.Contains(req.PublishedText, p.Copy) || !publishedDisclosureOK(req.PublishedText, p.Disclosure) || !publishedLink {
 		writeNamedConflict(c, "receipt_mismatch")
 		return
 	}

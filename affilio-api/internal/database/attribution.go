@@ -207,18 +207,15 @@ func (d *DB) InsertCampaignClick(ctx context.Context, campaignID, siteID string,
 	return d.InsertPlacementClick(ctx, campaignID, siteID, programID, ipHash, userAgent, referrer, "")
 }
 
-// LivePlacementForCampaign returns one placement on this campaign that
-// placement_counts_as_live currently includes.
+// LivePlacementForCampaign returns the placement id only when exactly one
+// placement on this campaign is in placement_counts_as_live. Zero or two or
+// more return an empty id so the bare code redirects with no hit.
 func (d *DB) LivePlacementForCampaign(ctx context.Context, campaignID string) (string, error) {
 	var id string
-	err := d.Pool.QueryRow(ctx, `SELECT pp.id::text
+	err := d.Pool.QueryRow(ctx, `SELECT COALESCE(CASE WHEN COUNT(*) = 1 THEN MIN(pp.id::text) ELSE '' END, '')
 FROM placement_proposals pp
 WHERE pp.campaign_id=$1
-  AND EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)
-LIMIT 1`, campaignID).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
-	}
+  AND EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)`, campaignID).Scan(&id)
 	return id, err
 }
 
@@ -240,12 +237,11 @@ func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string
 	var snapshot []byte
 	if placementID != "" {
 		var status string
-		var expires time.Time
-		err = tx.QueryRow(ctx, `SELECT status,expires_at,terms_snapshot FROM placement_proposals WHERE id=$1 AND campaign_id=$2 FOR SHARE`, placementID, campaignID).Scan(&status, &expires, &snapshot)
+		err = tx.QueryRow(ctx, `SELECT status,terms_snapshot FROM placement_proposals WHERE id=$1 AND campaign_id=$2 FOR SHARE`, placementID, campaignID).Scan(&status, &snapshot)
 		if err != nil {
 			return "", err
 		}
-		if status != "committed" || !time.Now().Before(expires) {
+		if status != "committed" {
 			return "", ErrPlacementAuthority
 		}
 	}
