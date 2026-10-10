@@ -269,8 +269,8 @@ func TestPluginPlacementState(t *testing.T) {
 		check := func(kind string, state, failedReason *string) {
 			t.Helper()
 			if kind == "offer" {
-				if state != nil || failedReason != nil {
-					t.Fatalf("offer plugin fields are not null: %s", raw)
+				if state == nil || *state != "" || failedReason != nil {
+					t.Fatalf("offer plugin_state should be empty and plugin_failed_reason absent: %s", raw)
 				}
 				return
 			}
