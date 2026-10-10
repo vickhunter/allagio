@@ -374,8 +374,11 @@ func TestPolicyEngineHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "rel_sponsored") {
-		t.Fatalf("disclosure: %d %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("disclosure words do not fail rel_sponsored: %d %s", rec.Code, rec.Body.String())
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='pending', approved_by_kind=NULL WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='(link sponsorizzato)' WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
@@ -1313,15 +1316,16 @@ func TestPlacementRestore(t *testing.T) {
 	other := approve("https://restore.example/other")
 	undo(other, siteKey)
 	current = current.Add(time.Second)
-	sessionRec, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+other+"/restore", nil)
-	if sessionRec.Code != http.StatusForbidden {
-		t.Fatalf("session restore of a key undo: %d %s", sessionRec.Code, sessionRec.Body.String())
+	sessionRec, sessionBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+other+"/restore", nil)
+	if sessionRec.Code != http.StatusOK || sessionBody["status"] != "approved" || sessionBody["actor"] != "owner_ui" {
+		t.Fatalf("same user session restores a key undo: %d %s", sessionRec.Code, sessionRec.Body.String())
 	}
-	makerRec, makerBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+other+"/restore", nil, makerKey)
+	undo(other, siteKey)
+	makerRec, makerBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+left+"/restore", nil, makerKey)
 	if makerRec.Code != http.StatusForbidden || makerBody["error"] != "only the identity that undid this placement can restore it" {
 		t.Fatalf("other side: %d %s", makerRec.Code, makerRec.Body.String())
 	}
-	if status, _, restoredBy := placementStatus(other); status != "revoked" || restoredBy != "" {
+	if status, _, restoredBy := placementStatus(left); status != "revoked" || restoredBy != "" {
 		t.Fatalf("other side changed the placement: %s %s", status, restoredBy)
 	}
 
