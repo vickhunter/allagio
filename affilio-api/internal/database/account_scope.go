@@ -172,7 +172,11 @@ FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=$1`,
 			return AccountDigest{}, err
 		}
 		project.Clicks = sumSources(project.ClicksBySource)
-		project.WentLive = len(project.Items)
+		for _, item := range project.Items {
+			if item.CountsAsLive {
+				project.WentLive++
+			}
+		}
 		digest.WentLive += project.WentLive
 		mode, modeErr := d.projectMode(ctx, project.Kind, project.ID)
 		if modeErr != nil {

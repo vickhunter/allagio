@@ -69,6 +69,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"020_d032_kill_switch.sql",
 		"021_d032_interface.sql",
 		"022_d032_restore.sql",
+		"023_d032_plugin_restore.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)

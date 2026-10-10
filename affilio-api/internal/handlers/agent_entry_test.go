@@ -552,10 +552,15 @@ func TestDigestUndoAndEvents(t *testing.T) {
 	if later["since"] == nil {
 		t.Fatal("since missing")
 	}
+	var sawPending bool
 	for _, raw := range later["items"].([]any) {
-		if raw.(map[string]any)["id"] == placementID {
-			t.Fatalf("revoked placement still listed: %s", rec.Body.String())
+		item := raw.(map[string]any)
+		if item["id"] == placementID {
+			sawPending = item["kind"] == "placement" && item["plugin_state"] == "pending"
 		}
+	}
+	if !sawPending {
+		t.Fatalf("undone placement should stay pending: %s", rec.Body.String())
 	}
 }
 

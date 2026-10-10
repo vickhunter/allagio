@@ -109,6 +109,15 @@ func (d *DB) PlacementRemoved(ctx context.Context, placementID, campaignID strin
 	return removed, err
 }
 
+func (d *DB) PlacementRevoked(ctx context.Context, placementID, campaignID string) (bool, error) {
+	var revoked bool
+	err := d.Pool.QueryRow(ctx, `SELECT status='revoked' FROM placement_proposals WHERE id=$1 AND campaign_id=$2`, placementID, campaignID).Scan(&revoked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return revoked, err
+}
+
 func (d *DB) CreatePlacement(ctx context.Context, p Placement) (*Placement, error) {
 	return scanPlacement(d.Pool.QueryRow(ctx, `INSERT INTO placement_proposals(site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,expires_at)
  SELECT $1,o.id,$3,$4,$5,$6,$7,`+placementTermsSQL+`,$8 `+placementEligibleSQL+` AND o.id=$2
@@ -175,6 +184,8 @@ status_before_undo=CASE WHEN $3='undo' THEN status ELSE status_before_undo END,
 undone_at=CASE WHEN $3='undo' THEN $4 ELSE undone_at END,
 undone_by_user=CASE WHEN $3='undo' THEN NULLIF($5,'')::uuid ELSE undone_by_user END,
 undone_by_key_hash=CASE WHEN $3='undo' THEN NULLIF($6,'') ELSE undone_by_key_hash END,
+plugin_wait=CASE WHEN $3='undo' THEN 'remove' ELSE plugin_wait END,
+plugin_wait_at=CASE WHEN $3='undo' THEN $4 ELSE plugin_wait_at END,
 status='revoked', revoked_by_side=$2
 WHERE id=$1 AND status<>'revoked'`, placementID, side, reason, now, userID, keyHash)
 	if err != nil {
@@ -204,12 +215,13 @@ type PlacementUndo struct {
 	SiteID       string
 	SurfaceURL   string
 	OfferID      string
+	Relevance    int
 }
 
 func (d *DB) PlacementUndo(ctx context.Context, id string) (PlacementUndo, error) {
 	var row PlacementUndo
-	err := d.Pool.QueryRow(ctx, `SELECT status, COALESCE(status_before_undo,''), undone_at, COALESCE(undone_by_user::text,''), COALESCE(undone_by_key_hash,''), COALESCE(approved_by_kind,''), disclosure, copy, site_id::text, surface_url, offer_id::text
-FROM placement_proposals WHERE id=$1`, id).Scan(&row.Status, &row.StatusBefore, &row.UndoneAt, &row.UserID, &row.KeyHash, &row.ApprovedBy, &row.Disclosure, &row.Copy, &row.SiteID, &row.SurfaceURL, &row.OfferID)
+	err := d.Pool.QueryRow(ctx, `SELECT status, COALESCE(status_before_undo,''), undone_at, COALESCE(undone_by_user::text,''), COALESCE(undone_by_key_hash,''), COALESCE(approved_by_kind,''), disclosure, copy, site_id::text, surface_url, offer_id::text, COALESCE(relevance,-1)
+FROM placement_proposals WHERE id=$1`, id).Scan(&row.Status, &row.StatusBefore, &row.UndoneAt, &row.UserID, &row.KeyHash, &row.ApprovedBy, &row.Disclosure, &row.Copy, &row.SiteID, &row.SurfaceURL, &row.OfferID, &row.Relevance)
 	return row, err
 }
 
@@ -221,7 +233,8 @@ func (d *DB) RestoreUndonePlacement(ctx context.Context, id, userID, keyHash, ac
 		return "", "", false, err
 	}
 	defer tx.Rollback(ctx)
-	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL
+	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL,
+plugin_wait='restore', plugin_wait_at=$4
 WHERE id=$1 AND status='revoked' AND status_before_undo<>'' AND undone_at IS NOT NULL
 AND undone_by_user=$2::uuid AND COALESCE(undone_by_key_hash,'')=$3
 AND undone_at >= $4::timestamptz - INTERVAL '6 seconds'
@@ -294,15 +307,40 @@ func (d *DB) PlacementAllowsClick(ctx context.Context, placementID, campaignID s
 	return valid, err
 }
 
-func (d *DB) RecordPlacementReceipt(ctx context.Context, siteID, id, surfaceURL, contentHash, evidence string) (bool, error) {
+func (d *DB) RecordPlacementReceipt(ctx context.Context, siteID, id, surfaceURL, contentHash, evidence string, at time.Time) (bool, error) {
 	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET receipt=receipt || jsonb_build_object(
- 'publication_status','publisher_reported','surface_url',$3::text,'content_sha256',$4::text,'evidence',$5::text)
+ 'publication_status','publisher_reported','surface_url',$3::text,'content_sha256',$4::text,'evidence',$5::text),
+ plugin_contact_at=$6
  WHERE id=$1 AND site_id=$2 AND surface_url=$3 AND status='committed' AND expires_at>NOW()
- AND receipt->>'publication_status'='awaiting_evidence'`, id, siteID, surfaceURL, contentHash, evidence)
+ AND receipt->>'publication_status'='awaiting_evidence'`, id, siteID, surfaceURL, contentHash, evidence, at)
 	if err != nil {
 		return false, err
 	}
 	return res.RowsAffected() == 1, nil
+}
+
+func (d *DB) TouchPlacementContact(ctx context.Context, siteID string, at time.Time) error {
+	_, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET plugin_contact_at=$2 WHERE site_id=$1`, siteID, at)
+	return err
+}
+
+func (d *DB) AckPluginPlacement(ctx context.Context, id, siteID, action string, at time.Time) (bool, error) {
+	from, to := "remove", "removed"
+	if action == "restored" {
+		from, to = "restore", ""
+	}
+	tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
+SET plugin_wait=$4, plugin_wait_at=CASE WHEN $4='' THEN NULL ELSE plugin_wait_at END, plugin_contact_at=$5
+WHERE id=$1 AND site_id=$2 AND plugin_wait=$3`, id, siteID, from, to, at)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+func (d *DB) PlacementPlugin(ctx context.Context, id string) (wait string, waitAt, contact *time.Time, err error) {
+	err = d.Pool.QueryRow(ctx, `SELECT plugin_wait, plugin_wait_at, plugin_contact_at FROM placement_proposals WHERE id=$1`, id).Scan(&wait, &waitAt, &contact)
+	return wait, waitAt, contact, err
 }
 
 func (d *DB) CreateAgentAccess(ctx context.Context, siteID, keyHash string) (string, error) {

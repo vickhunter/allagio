@@ -152,7 +152,7 @@ func (h *AgentEntry) AccountDigest(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 				return
 			}
-			items = append(items, digestJSON(item, token))
+			items = append(items, h.digestJSON(item, token))
 		}
 		projects = append(projects, gin.H{
 			"kind": project.Kind, "id": project.ID, "name": project.Name, "mode": project.Mode,
@@ -211,6 +211,12 @@ func (h *AgentEntry) applyScope(c *gin.Context, pause bool) {
 			return
 		}
 		applied = append(applied, row)
+	}
+	if pause && scope == "all" {
+		if err := h.DB.RecordOwnerPause(c.Request.Context(), owner.ID, h.now()); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "scope was not updated"})
+			return
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"scope": scope, "id": id, "applied": applied})
 }
@@ -324,9 +330,9 @@ func (h *AgentEntry) applyOne(c *gin.Context, actor entryActor, target scopeTarg
 		var n int
 		var err error
 		if target.Kind == "site" {
-			n, err = h.DB.KillSiteSwitch(c.Request.Context(), target.ID, actor.Kind, actor.UserID, target.Mode)
+			n, err = h.DB.KillSiteSwitch(c.Request.Context(), target.ID, actor.Kind, actor.UserID, target.Mode, h.now())
 		} else {
-			n, err = h.DB.KillOfferSwitch(c.Request.Context(), target.ID, actor.Kind, actor.UserID, target.Mode)
+			n, err = h.DB.KillOfferSwitch(c.Request.Context(), target.ID, actor.Kind, actor.UserID, target.Mode, h.now())
 		}
 		if err != nil {
 			return nil, err

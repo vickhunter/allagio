@@ -31,6 +31,7 @@ type Config struct {
 	APIKeySecret           string
 	AdminAPIKey            string
 	KeyRotationGracePeriod time.Duration
+	PluginOfflineAfter     time.Duration
 
 	ConnectionEncryptionKey   string
 	StripeWebhookSecret       string
@@ -42,6 +43,12 @@ func Load() Config {
 	graceHours, _ := strconv.Atoi(getEnvValue("KEY_ROTATION_GRACE_HOURS", "24"))
 	if graceHours <= 0 {
 		graceHours = 24
+	}
+	offlineAfter := 10 * time.Minute
+	if raw := strings.TrimSpace(os.Getenv("PLUGIN_OFFLINE_AFTER")); raw != "" {
+		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
+			offlineAfter = parsed
+		}
 	}
 	return Config{
 		Port:                   getEnvValue("PORT", "8080"),
@@ -66,6 +73,7 @@ func Load() Config {
 		APIKeySecret:           getEnvValue("API_KEY_SECRET", "dev-secret"),
 		AdminAPIKey:            getEnvValue("ADMIN_API_KEY", ""),
 		KeyRotationGracePeriod: time.Duration(graceHours) * time.Hour,
+		PluginOfflineAfter:     offlineAfter,
 
 		ConnectionEncryptionKey:   os.Getenv("CONNECTION_ENCRYPTION_KEY"),
 		StripeWebhookSecret:       os.Getenv("STRIPE_WEBHOOK_SECRET"),

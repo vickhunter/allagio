@@ -26,6 +26,7 @@ import (
 type PlacementsHandler struct {
 	DB                        *database.DB
 	RequireVerifiedConnection bool
+	Now                       func() time.Time
 }
 
 type opportunity struct {
@@ -197,8 +198,22 @@ func (h *PlacementsHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"placement": p})
 }
 
+func (h *PlacementsHandler) now() time.Time {
+	if h.Now != nil {
+		return h.Now().UTC()
+	}
+	return time.Now().UTC()
+}
+
 func (h *PlacementsHandler) List(c *gin.Context) {
-	p, err := h.DB.ListPlacements(c.Request.Context(), siteIDFrom(c))
+	siteID := siteIDFrom(c)
+	if siteID != "" {
+		if err := h.DB.TouchPlacementContact(c.Request.Context(), siteID, h.now()); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "task inbox unavailable"})
+			return
+		}
+	}
+	p, err := h.DB.ListPlacements(c.Request.Context(), siteID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "task inbox unavailable"})
 		return
@@ -316,7 +331,7 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		return
 	}
 	hash := sha256.Sum256([]byte(req.PublishedText))
-	updated, err := h.DB.RecordPlacementReceipt(c.Request.Context(), siteIDFrom(c), p.ID, req.SurfaceURL, hex.EncodeToString(hash[:]), req.Evidence)
+	updated, err := h.DB.RecordPlacementReceipt(c.Request.Context(), siteIDFrom(c), p.ID, req.SurfaceURL, hex.EncodeToString(hash[:]), req.Evidence, h.now())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "receipt recording failed"})
 		return

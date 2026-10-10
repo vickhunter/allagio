@@ -83,10 +83,14 @@ type ListingCardRow struct {
 }
 
 type DigestItem struct {
-	Kind       string
-	ID         string
-	Summary    string
-	WentLiveAt time.Time
+	Kind            string
+	ID              string
+	Summary         string
+	WentLiveAt      time.Time
+	CountsAsLive    bool
+	PluginWait      string
+	PluginWaitAt    *time.Time
+	PluginContactAt *time.Time
 }
 
 func textList(items []string) []string {
@@ -481,7 +485,7 @@ RETURNING version`, offerID, p.Mode, textList(p.AllowMakers), textList(p.DenyMak
 	return version, tx.Commit(ctx)
 }
 
-func (d *DB) KillSiteSwitch(ctx context.Context, siteID, actor, userID, fromMode string) (int, error) {
+func (d *DB) KillSiteSwitch(ctx context.Context, siteID, actor, userID, fromMode string, at time.Time) (int, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return 0, err
@@ -509,6 +513,9 @@ RETURNING version`, siteID, fromMode).Scan(&version)
 		if _, err = tx.Exec(ctx, `INSERT INTO mode_changes(site_id,actor,user_id,from_mode,to_mode) VALUES($1,$2,NULLIF($3,'')::uuid,NULLIF($4,''),'manual')`, siteID, actor, userID, fromMode); err != nil {
 			return 0, err
 		}
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO pause_activations(site_id, created_at) VALUES($1,$2)`, siteID, at); err != nil {
+		return 0, err
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return 0, err
@@ -559,7 +566,7 @@ WHERE site_id=$1 AND status='approved' AND approved_by_kind IN ('policy:auto','p
 	return restored, int(tag.RowsAffected()), nil
 }
 
-func (d *DB) KillOfferSwitch(ctx context.Context, offerID, actor, userID, fromMode string) (int, error) {
+func (d *DB) KillOfferSwitch(ctx context.Context, offerID, actor, userID, fromMode string, at time.Time) (int, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return 0, err
@@ -587,6 +594,9 @@ RETURNING version`, offerID, fromMode).Scan(&version)
 		if _, err = tx.Exec(ctx, `INSERT INTO mode_changes(offer_id,actor,user_id,from_mode,to_mode) VALUES($1,$2,NULLIF($3,'')::uuid,NULLIF($4,''),'manual')`, offerID, actor, userID, fromMode); err != nil {
 			return 0, err
 		}
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO pause_activations(offer_id, created_at) VALUES($1,$2)`, offerID, at); err != nil {
+		return 0, err
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return 0, err
@@ -666,17 +676,49 @@ WHERE site_id=$1 AND surface_url=$2 AND id<>$3 AND status<>'revoked' AND removed
 	return n, err
 }
 
-func (d *DB) CountPolicyPlacements(ctx context.Context, siteID string, since time.Time) (int, error) {
+func (d *DB) CountPolicyPlacements(ctx context.Context, siteID string, since time.Time, includeID string) (int, error) {
 	var n int
 	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals
-WHERE site_id=$1 AND created_at>$2 AND approved_by_kind IN ('policy:auto','policy:yolo') AND status<>'revoked'`, siteID, since).Scan(&n)
+WHERE site_id=$1 AND created_at>$2 AND approved_by_kind IN ('policy:auto','policy:yolo')
+AND (status<>'revoked' OR id = NULLIF($3,'')::uuid)`, siteID, since, includeID).Scan(&n)
 	return n, err
 }
 
-func (d *DB) RecordPolicyApproval(ctx context.Context, placementID, siteID, ownerID, kind, rule string, version int) (bool, error) {
+// PauseBlocksRestore is true when a pause or kill switch for the site, the
+// offer, or either account was turned on at or after the undo, or is still on.
+func (d *DB) PauseBlocksRestore(ctx context.Context, siteID, offerID string, undoneAt time.Time) (bool, error) {
+	var blocked bool
+	err := d.Pool.QueryRow(ctx, `SELECT
+EXISTS (
+    SELECT 1 FROM pause_activations pa
+    WHERE pa.created_at >= $3
+      AND (
+        pa.site_id = $1::uuid
+        OR pa.offer_id = $2::uuid
+        OR pa.owner_id IN (
+            SELECT id FROM owners WHERE site_id = $1::uuid
+            UNION
+            SELECT o.id FROM owners o
+            JOIN products p ON p.maker_id = o.maker_id
+            JOIN offers f ON f.product_id = p.id
+            WHERE f.id = $2::uuid
+        )
+      )
+)
+OR EXISTS (SELECT 1 FROM approval_policies WHERE site_id=$1::uuid AND kill_switch)
+OR EXISTS (SELECT 1 FROM approval_policies WHERE offer_id=$2::uuid AND kill_switch)`, siteID, offerID, undoneAt).Scan(&blocked)
+	return blocked, err
+}
+
+func (d *DB) RecordOwnerPause(ctx context.Context, ownerID string, at time.Time) error {
+	_, err := d.Pool.Exec(ctx, `INSERT INTO pause_activations(owner_id, created_at) VALUES($1,$2)`, ownerID, at)
+	return err
+}
+
+func (d *DB) RecordPolicyApproval(ctx context.Context, placementID, siteID, ownerID, kind, rule string, version, relevance int) (bool, error) {
 	tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='approved', approved_at=NOW(),
-approved_by=NULLIF($3,'')::uuid, approved_by_kind=$4, policy_version=$5, matched_rule=$6
-WHERE id=$1 AND site_id=$2 AND status='pending' AND expires_at>NOW() AND auto_paused=false`, placementID, siteID, ownerID, kind, version, rule)
+approved_by=NULLIF($3,'')::uuid, approved_by_kind=$4, policy_version=$5, matched_rule=$6, relevance=$7
+WHERE id=$1 AND site_id=$2 AND status='pending' AND expires_at>NOW() AND auto_paused=false`, placementID, siteID, ownerID, kind, version, rule, relevance)
 	if err != nil {
 		return false, err
 	}
@@ -731,15 +773,28 @@ func (d *DB) LastDigestOpen(ctx context.Context, userID string) (*time.Time, err
 }
 
 func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Time) ([]DigestItem, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at)
+	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
+plugin_wait, plugin_wait_at, plugin_contact_at, status IN ('approved','committed')
 FROM placement_proposals
-WHERE site_id=$1 AND status IN ('approved','committed') AND COALESCE(approved_at, created_at) > $2
+WHERE site_id=$1 AND (
+    (status IN ('approved','committed') AND COALESCE(approved_at, created_at) > $2)
+    OR plugin_wait <> ''
+)
 ORDER BY COALESCE(approved_at, created_at) DESC LIMIT 50`, siteID, since)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanDigest(rows, "placement")
+	out := []DigestItem{}
+	for rows.Next() {
+		var item DigestItem
+		item.Kind = "placement"
+		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.CountsAsLive); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
 }
 
 func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) ([]DigestItem, error) {
@@ -762,6 +817,7 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt); err != nil {
 			return nil, err
 		}
+		item.CountsAsLive = true
 		out = append(out, item)
 	}
 	return out, rows.Err()
@@ -787,7 +843,7 @@ RETURNING kind, COALESCE(placement_id::text,''), COALESCE(offer_id::text,'')`, h
 	}
 	switch kind {
 	case "placement":
-		if _, err = tx.Exec(ctx, `UPDATE placement_proposals SET status='revoked' WHERE id=$1 AND status<>'revoked'`, placementID); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE placement_proposals SET status='revoked', plugin_wait='remove', plugin_wait_at=$2 WHERE id=$1 AND status<>'revoked'`, placementID, now); err != nil {
 			return "", "", "", err
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at) VALUES('placement_undo',$1,$2,$3)`, ownerID, placementID, now)

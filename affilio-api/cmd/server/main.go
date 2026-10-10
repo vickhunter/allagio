@@ -214,11 +214,12 @@ func main() {
 	v1.POST("/mcp", mcp.Receive)
 
 	agentEntry := &handlers.AgentEntry{
-		DB:             db,
-		BaseURL:        strings.TrimRight(cfg.PublicBaseURL, "/"),
-		Claims:         entry.StubClaimChecker{},
-		AccountLimiter: handlers.NewIPRateLimiter(8, time.Minute),
-		DeviceLimiter:  handlers.NewIPRateLimiter(30, time.Minute),
+		DB:                 db,
+		BaseURL:            strings.TrimRight(cfg.PublicBaseURL, "/"),
+		Claims:             entry.StubClaimChecker{},
+		AccountLimiter:     handlers.NewIPRateLimiter(8, time.Minute),
+		DeviceLimiter:      handlers.NewIPRateLimiter(30, time.Minute),
+		PluginOfflineAfter: cfg.PluginOfflineAfter,
 	}
 	if hosted != nil {
 		agentEntry.Owner = hosted.RequireOwnerSession

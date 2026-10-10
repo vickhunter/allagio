@@ -25,13 +25,14 @@ const userCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 // AgentEntry is the D-032 HTTP API: device login, setup, policy, listing cards, and digest.
 type AgentEntry struct {
-	DB             *database.DB
-	BaseURL        string
-	Claims         entry.ClaimChecker
-	Owner          func(*gin.Context)
-	AccountLimiter *IPRateLimiter
-	DeviceLimiter  *IPRateLimiter
-	Now            func() time.Time
+	DB                 *database.DB
+	BaseURL            string
+	Claims             entry.ClaimChecker
+	Owner              func(*gin.Context)
+	AccountLimiter     *IPRateLimiter
+	DeviceLimiter      *IPRateLimiter
+	Now                func() time.Time
+	PluginOfflineAfter time.Duration
 }
 
 type entryActor struct {
@@ -60,6 +61,7 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.POST("/v1/placements/:id/decide", h.DecidePlacement)
 	r.POST("/v1/placements/:id/revoke", h.RevokePlacement)
 	r.POST("/v1/placements/:id/restore", h.RestorePlacement)
+	r.POST("/v1/placements/:id/plugin-ack", h.PluginAck)
 	r.POST("/v1/offers/:id/accept", h.AcceptPublisher)
 	r.POST("/v1/listing-cards", h.CreateListing)
 	r.GET("/v1/listing-cards/:id", h.GetListing)
@@ -613,7 +615,7 @@ func (h *AgentEntry) KillSwitch(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "agent tools can only tighten a mode"})
 		return
 	}
-	paused, err := h.DB.KillSiteSwitch(c.Request.Context(), c.Param("id"), actor.Kind, actor.UserID, prev.Mode)
+	paused, err := h.DB.KillSiteSwitch(c.Request.Context(), c.Param("id"), actor.Kind, actor.UserID, prev.Mode, h.now())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "kill switch failed"})
 		return
@@ -666,7 +668,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
 		return
 	}
-	used, err := h.DB.CountPolicyPlacements(c.Request.Context(), siteID, time.Now().Add(-30*24*time.Hour))
+	used, err := h.DB.CountPolicyPlacements(c.Request.Context(), siteID, h.now().Add(-30*24*time.Hour), "")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
 		return
@@ -689,7 +691,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"decision": "needs_owner", "failures": decision.Failures})
 		return
 	}
-	updated, err := h.DB.RecordPolicyApproval(c.Request.Context(), placement.ID, siteID, actor.UserID, decision.ApprovedBy, decision.MatchedRule, policy.Version)
+	updated, err := h.DB.RecordPolicyApproval(c.Request.Context(), placement.ID, siteID, actor.UserID, decision.ApprovedBy, decision.MatchedRule, policy.Version, req.Relevance)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "approval failed"})
 		return
@@ -858,7 +860,7 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 				return
 			}
-			items = append(items, digestJSON(item, token))
+			items = append(items, h.digestJSON(item, token))
 		}
 	}
 	if owner.MakerID != "" {
@@ -873,7 +875,7 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 				return
 			}
-			items = append(items, digestJSON(item, token))
+			items = append(items, h.digestJSON(item, token))
 		}
 	}
 	var sinceOut any
@@ -1011,10 +1013,26 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "restore window closed"})
 		return
 	}
+	blocked, err := h.DB.PauseBlocksRestore(c.Request.Context(), row.SiteID, row.OfferID, row.UndoneAt.UTC())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+		return
+	}
+	if blocked {
+		c.JSON(http.StatusConflict, gin.H{"error": "restore refused", "reason": "paused"})
+		return
+	}
 	failures, err := h.restoreHardFailures(c, row)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
 		return
+	}
+	if len(failures) == 0 {
+		failures, err = h.restoreLimitFailures(c, row)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+			return
+		}
 	}
 	if len(failures) > 0 {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"decision": "denied", "failures": failures})
@@ -1046,6 +1064,107 @@ func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementU
 		ExistingBoxes: boxes, Relevance: 100, OfferLive: live, RevokeWorks: true, Position: "end",
 	}, h.claims())
 	return decision.Failures, nil
+}
+
+func (h *AgentEntry) restoreLimitFailures(c *gin.Context, row database.PlacementUndo) ([]string, error) {
+	policy, source, err := h.sitePolicy(c, row.SiteID)
+	if err != nil {
+		return nil, err
+	}
+	placementCap := policy.MaxPlacementsPer30Days
+	if source != "policy" && placementCap == 0 {
+		placementCap = 3
+	}
+	used, err := h.DB.CountPolicyPlacements(c.Request.Context(), row.SiteID, h.now().Add(-30*24*time.Hour), c.Param("id"))
+	if err != nil {
+		return nil, err
+	}
+	var failures []string
+	if used >= placementCap {
+		failures = append(failures, "placement_cap")
+	}
+	minRel := policy.MinRelevance
+	if minRel == 0 {
+		minRel = 40
+	}
+	if row.Relevance >= 0 && row.Relevance < minRel {
+		failures = append(failures, "below_min_relevance")
+	}
+	return failures, nil
+}
+
+func (h *AgentEntry) PluginAck(c *gin.Context) {
+	if !uuidPattern.MatchString(c.Param("id")) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
+		return
+	}
+	if c.GetHeader("X-API-Key") == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "site key required"})
+		return
+	}
+	actor, ok := h.actorFrom(c)
+	if !ok {
+		return
+	}
+	if actor.SiteID == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "site key required"})
+		return
+	}
+	body, err := readJSONBody(c, 1024)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return
+	}
+	var req struct {
+		Action string `json:"action"`
+	}
+	if decodeStrict(body, &req) != nil || (req.Action != "removed" && req.Action != "restored") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "action must be removed or restored"})
+		return
+	}
+	placement, err := h.DB.GetPlacementByID(c.Request.Context(), c.Param("id"))
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
+		return
+	}
+	if placement.SiteID != actor.SiteID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "placement is not on this site"})
+		return
+	}
+	acked, err := h.DB.AckPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, req.Action, h.now())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
+		return
+	}
+	if !acked {
+		c.JSON(http.StatusConflict, gin.H{"error": "nothing to acknowledge"})
+		return
+	}
+	state, err := h.pluginState(c, placement.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"plugin_state": state})
+}
+
+func (h *AgentEntry) pluginState(c *gin.Context, id string) (string, error) {
+	wait, waitAt, contact, err := h.DB.PlacementPlugin(c.Request.Context(), id)
+	if err != nil {
+		return "", err
+	}
+	return entry.PluginState(wait, waitAt, contact, h.now(), h.pluginWindow()), nil
+}
+
+func (h *AgentEntry) pluginWindow() time.Duration {
+	if h.PluginOfflineAfter > 0 {
+		return h.PluginOfflineAfter
+	}
+	return 10 * time.Minute
 }
 
 func (h *AgentEntry) now() time.Time {
@@ -1361,8 +1480,12 @@ func approvalJSON(decision entry.Decision, version int) gin.H {
 	}
 }
 
-func digestJSON(item database.DigestItem, token string) gin.H {
-	return gin.H{"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token}
+func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
+	body := gin.H{"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token}
+	if item.Kind == "placement" {
+		body["plugin_state"] = entry.PluginState(item.PluginWait, item.PluginWaitAt, item.PluginContactAt, h.now(), h.pluginWindow())
+	}
+	return body
 }
 
 func listOrEmpty(items []string) []string {
