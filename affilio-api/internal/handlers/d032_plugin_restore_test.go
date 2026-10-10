@@ -659,13 +659,13 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if undone.Code != http.StatusOK {
 		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
 	}
-	if state, reason := statusOf(placementID); state != "pending" || reason != "" {
-		t.Fatalf("undo clears failure: %s %q", state, reason)
+	if state, reason := statusOf(placementID); state != "removed" || reason != "" {
+		t.Fatalf("leave failed restore removed: %s %q", state, reason)
 	}
 	stopped()
 	current = current.Add(11 * time.Minute)
-	if state, _ := statusOf(placementID); state != "offline" {
-		t.Fatalf("silent undo: %s", state)
+	if state, _ := statusOf(placementID); state != "removed" {
+		t.Fatalf("left removed stays removed: %s", state)
 	}
 	offlineRetry, offlineBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, siteKey)
 	if offlineRetry.Code != http.StatusConflict || offlineBody["reason"] != "not_failed" || offlineBody["message"] == "" {
@@ -943,6 +943,208 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	}
 }
 
+func TestLeaveFailedRestoreRemoved(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	r.GET("/v1/go/:code", (&RedirectsHandler{DB: db}).Go)
+	current := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
+	api.Now = func() time.Time { return current }
+
+	owner, cookie := testOwnerSession(t, h, "leave-owner", "leave-owner@example.com")
+	siteID := createTestSite(t, db, "leave-site-key", "leave.example", "Leave")
+	makerID, offerID := seedListedOffer(t, db, "leave-maker-key", "leave-maker@example.com", "Leave Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	siteKey := map[string]string{"X-API-Key": "leave-site-key"}
+	var campaignID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code,requires_placement,status) VALUES($1,$2,'leave-go',true,'active') RETURNING id`, offerID, siteID).Scan(&campaignID); err != nil {
+		t.Fatal(err)
+	}
+	liveNumbers := func() (wentLive float64, siteLive float64) {
+		t.Helper()
+		rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("digest: %d %s", rec.Code, rec.Body.String())
+		}
+		wentLive = body["totals"].(map[string]any)["went_live"].(float64)
+		for _, raw := range body["projects"].([]any) {
+			project := raw.(map[string]any)
+			if project["id"] == siteID {
+				siteLive = project["went_live"].(float64)
+			}
+		}
+		return wentLive, siteLive
+	}
+	commit := func(surface, label string) (id, goPath string) {
+		t.Helper()
+		id = insertPlacement(t, db, siteID, offerID, surface, "Honest note about the product.")
+		if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', approved_at=NOW(), campaign_id=$2 WHERE id=$1`, id, campaignID); err != nil {
+			t.Fatal(err)
+		}
+		var clickID string
+		if err := db.Pool.QueryRow(context.Background(), `INSERT INTO clicks(site_id,campaign_id,placement_id,referrer) VALUES($1,$2,$3,'https://news.example/story') RETURNING id`, siteID, campaignID, id).Scan(&clickID); err != nil {
+			t.Fatal(err)
+		}
+		var attributed string
+		if err := db.Pool.QueryRow(context.Background(), `INSERT INTO conversions(offer_id,campaign_id,click_id,provider,provider_event_id,kind,amount,currency,commission_amount,occurred_at,payment_mode)
+VALUES($1,$2,$3,'stripe',$4,'sale',10,'USD',1.50,NOW(),'test') RETURNING id`, offerID, campaignID, clickID, label+"-attributed").Scan(&attributed); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Pool.Exec(context.Background(), `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency) VALUES($1,$2,'commission',1.50,'USD')`, siteID, attributed); err != nil {
+			t.Fatal(err)
+		}
+		goPath = "/v1/go/leave-go?placement=" + id
+		return id, goPath
+	}
+	failRestore := func(id string) {
+		t.Helper()
+		undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+		if undone.Code != http.StatusOK {
+			t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
+		}
+		current = current.Add(time.Second)
+		restored, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/restore", nil, siteKey)
+		if restored.Code != http.StatusOK {
+			t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
+		}
+		failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, siteKey)
+		if failed.Code != http.StatusOK || failedBody["plugin_state"] != "failed" || failedBody["failed_action"] != "restored" {
+			t.Fatalf("failed restore: %d %s", failed.Code, failed.Body.String())
+		}
+	}
+
+	id, goPath := commit("https://leave.example/post", "leave")
+	var other string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO conversions(offer_id,provider,provider_event_id,kind,amount,currency,commission_amount,occurred_at,payment_mode)
+VALUES($1,'stripe','leave-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`, offerID).Scan(&other); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency) VALUES($1,$2,'commission',2.00,'USD')`, siteID, other); err != nil {
+		t.Fatal(err)
+	}
+	if went, site := liveNumbers(); went != 2 || site != 1 {
+		t.Fatalf("live counts: totals %v site %v", went, site)
+	}
+	failRestore(id)
+	if went, site := liveNumbers(); went != 1 || site != 0 {
+		t.Fatalf("failed restore still live: totals %v site %v", went, site)
+	}
+	clicks := placementClickCount(t, db, id)
+	left, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if left.Code != http.StatusOK {
+		t.Fatalf("leave removed: %d %s", left.Code, left.Body.String())
+	}
+	status, statusBody := postJSON(t, r, http.MethodGet, "/v1/placements/"+id, nil, siteKey)
+	if status.Code != http.StatusOK || statusBody["plugin_state"] != "removed" || statusBody["failed_action"] != "" || statusBody["remove_confirm"] != true || statusBody["status"] != "revoked" {
+		t.Fatalf("left removed: %d %s", status.Code, status.Body.String())
+	}
+	digest, digestBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
+	if digest.Code != http.StatusOK || pluginStateOf(t, digestBody, id) != "removed" || removeConfirmOf(t, digestBody, id) != true {
+		t.Fatalf("digest confirm: %d %s", digest.Code, digest.Body.String())
+	}
+	account, accountBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
+	if account.Code != http.StatusOK || pluginStateOf(t, accountBody, id) != "removed" || removeConfirmOf(t, accountBody, id) != true {
+		t.Fatalf("site digest confirm: %d %s", account.Code, account.Body.String())
+	}
+	if went, site := liveNumbers(); went != 1 || site != 0 {
+		t.Fatalf("left removed still live: totals %v site %v", went, site)
+	}
+	hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	if hit.Code != http.StatusGone || hit.Header().Get("Location") != "" || bodyReason(t, hit) != "revoked" || placementClickCount(t, db, id) != clicks {
+		t.Fatalf("left removed go link: %d %s %s", hit.Code, hit.Header().Get("Location"), hit.Body.String())
+	}
+	confirmed, confirmedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "removed"}, siteKey)
+	if confirmed.Code != http.StatusOK || confirmedBody["plugin_state"] != "removed" || confirmedBody["failed_action"] != "" || confirmedBody["remove_confirm"] != false {
+		t.Fatalf("confirm removed: %d %s", confirmed.Code, confirmed.Body.String())
+	}
+	if went, site := liveNumbers(); went != 1 || site != 0 {
+		t.Fatalf("confirmed removal became live: totals %v site %v", went, site)
+	}
+
+	second, secondPath := commit("https://leave.example/again", "again")
+	failRestore(second)
+	againLeft, againBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if againLeft.Code != http.StatusOK || againBody["undo"] != true {
+		t.Fatalf("second leave: %d %s", againLeft.Code, againLeft.Body.String())
+	}
+	failedAck, failedAckBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "failed", "reason": "remove re-read failed"}, siteKey)
+	if failedAck.Code != http.StatusOK || failedAckBody["plugin_state"] != "failed" || failedAckBody["failed_action"] != "removed" || failedAckBody["remove_confirm"] != false {
+		t.Fatalf("failed confirm: %d %s", failedAck.Code, failedAck.Body.String())
+	}
+	before := placementUndoSnapshot(t, db, second)
+	current = current.Add(time.Minute)
+	repeat, repeatBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if repeat.Code != http.StatusOK || repeatBody["undo"] != true || repeatBody["undone_at"] != againBody["undone_at"] {
+		t.Fatalf("idempotent revoke: %d %s", repeat.Code, repeat.Body.String())
+	}
+	after := placementUndoSnapshot(t, db, second)
+	if after != before {
+		t.Fatalf("revoke changed a failed removal\nbefore %+v\nafter  %+v", before, after)
+	}
+	retried, retriedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/retry", nil, siteKey)
+	if retried.Code != http.StatusOK || retriedBody["plugin_state"] != "pending" || retriedBody["failed_action"] != "" {
+		t.Fatalf("retry after idempotent revoke: %d %s", retried.Code, retried.Body.String())
+	}
+	held := hitGo(t, r, http.MethodGet, secondPath, "Mozilla/5.0")
+	if held.Code != http.StatusGone || held.Header().Get("Location") != "" || bodyReason(t, held) != "revoked" {
+		t.Fatalf("retry of a failed removal redirected: %d %s %s", held.Code, held.Header().Get("Location"), held.Body.String())
+	}
+}
+
+type undoSnapshot struct {
+	Wait     string
+	WaitAt   time.Time
+	UndoneAt time.Time
+	Action   string
+	Reason   string
+	Confirm  bool
+	Status   string
+	Side     string
+	Undos    int
+}
+
+func placementUndoSnapshot(t *testing.T, db *database.DB, id string) undoSnapshot {
+	t.Helper()
+	var snap undoSnapshot
+	err := db.Pool.QueryRow(context.Background(), `SELECT plugin_wait, plugin_wait_at, undone_at, failed_action, plugin_failed_reason, remove_confirm, status, revoked_by_side,
+(SELECT COUNT(*) FROM owner_events WHERE placement_id=$1 AND kind='placement_undo')
+FROM placement_proposals WHERE id=$1`, id).Scan(&snap.Wait, &snap.WaitAt, &snap.UndoneAt, &snap.Action, &snap.Reason, &snap.Confirm, &snap.Status, &snap.Side, &snap.Undos)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap.WaitAt = snap.WaitAt.UTC()
+	snap.UndoneAt = snap.UndoneAt.UTC()
+	return snap
+}
+
+func removeConfirmOf(t *testing.T, body map[string]any, id string) bool {
+	t.Helper()
+	if items, ok := body["items"].([]any); ok {
+		for _, raw := range items {
+			item := raw.(map[string]any)
+			if item["id"] == id {
+				confirm, _ := item["remove_confirm"].(bool)
+				return confirm
+			}
+		}
+	}
+	projects, _ := body["projects"].([]any)
+	for _, raw := range projects {
+		project := raw.(map[string]any)
+		for _, itemRaw := range project["items"].([]any) {
+			item := itemRaw.(map[string]any)
+			if item["id"] == id {
+				confirm, _ := item["remove_confirm"].(bool)
+				return confirm
+			}
+		}
+	}
+	t.Fatalf("placement %s missing", id)
+	return false
+}
+
 func pluginFailedReasonOf(t *testing.T, body map[string]any, id string) string {
 	t.Helper()
 	if items, ok := body["items"].([]any); ok {
@@ -1013,6 +1215,9 @@ func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 		}
 		if !strings.Contains(doc, "A 409 returns `reason` and `message`") || !strings.Contains(doc, "A 422 returns `check_id` and `check_text`") {
 			t.Fatal("docs drifted on the 409 and 422 body shapes")
+		}
+		if !strings.Contains(doc, "Digest totals, site totals, and Live now exclude") || !strings.Contains(doc, "Leave a failed restore removed") {
+			t.Fatal("docs drifted on leave-it-removed")
 		}
 	}
 }

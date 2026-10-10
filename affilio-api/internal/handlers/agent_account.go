@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const earningsNote = "Earnings are recorded test-mode commission only. The number is null when that scope has no test-mode rows, and 0 when those rows add up to zero. Publisher amounts are ledger rows joined to test conversions. Maker amounts are test conversion commissions. Live and legacy rows are omitted. Earnings from a click on a placement whose restore failed are omitted until that restore is confirmed placed. Click source is the referrer host; a click with no host counts as direct."
+const earningsNote = "Earnings are recorded test-mode commission only. The number is null when that scope has no test-mode rows, and 0 when those rows add up to zero. Publisher amounts are ledger rows joined to test conversions. Maker amounts are test conversion commissions. Live and legacy rows are omitted. Earnings from a click on a placement whose restore failed are omitted until that restore is confirmed placed. Digest totals, site totals, and Live now exclude a failed restore. Click source is the referrer host; a click with no host counts as direct."
 
 func (h *AgentEntry) HardChecks(c *gin.Context) {
 	out := make([]gin.H, 0, len(entry.HardCheckCatalog))
