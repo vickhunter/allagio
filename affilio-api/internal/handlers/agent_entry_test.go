@@ -584,7 +584,7 @@ func TestSourcePathsAndDocs(t *testing.T) {
 	if docs.Code != http.StatusOK || !strings.Contains(docs.Header().Get("Content-Type"), "text/plain") || !strings.Contains(docs.Body.String(), "/docs/device-login.md") {
 		t.Fatalf("llms: %d %s", docs.Code, docs.Body.String())
 	}
-	for _, name := range []string{"device-login.md", "settings.md", "listing-card.md", "modes.md"} {
+	for _, name := range []string{"device-login.md", "settings.md", "listing-card.md", "modes.md", "account.md"} {
 		page := httptest.NewRecorder()
 		r.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/docs/"+name, nil))
 		if page.Code != http.StatusOK || !strings.Contains(page.Header().Get("Content-Type"), "text/markdown") || !strings.Contains(page.Body.String(), "/v1/") {
@@ -596,4 +596,232 @@ func TestSourcePathsAndDocs(t *testing.T) {
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("missing doc: %d", missing.Code)
 	}
+}
+
+func TestDocumentedScreenActionsHaveEndpoints(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	(&AgentEntry{}).Mount(r)
+	mounted := map[string]bool{}
+	for _, route := range r.Routes() {
+		mounted[route.Method+" "+route.Path] = true
+	}
+	if len(entry.ScreenActions) == 0 {
+		t.Fatal("no documented screen actions")
+	}
+	seen := map[string]bool{}
+	for _, action := range entry.ScreenActions {
+		if action.Screen == "" || action.Action == "" || action.Method == "" || action.Path == "" {
+			t.Fatalf("incomplete screen action: %+v", action)
+		}
+		if action.Screen != "setup" && action.Screen != "dashboard" && action.Screen != "digest" {
+			t.Fatalf("unknown screen %s", action.Screen)
+		}
+		seen[action.Screen] = true
+		if !mounted[action.Method+" "+action.Path] {
+			t.Errorf("%s: %q has no endpoint %s %s", action.Screen, action.Action, action.Method, action.Path)
+		}
+	}
+	for _, screen := range []string{"setup", "dashboard", "digest"} {
+		if !seen[screen] {
+			t.Errorf("no documented actions for %s", screen)
+		}
+	}
+}
+
+func TestProjectKeyAndAccountKeyBoundaries(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "keys-owner", "keys-owner@example.com")
+	siteID := createTestSite(t, db, "keys-site-key", "keys.example", "Keys Blog")
+	otherSite := createTestSite(t, db, "other-site-key", "other.example", "Other Blog")
+	makerID, offerID := seedListedOffer(t, db, "keys-maker-key", "keys-maker@example.com", "Keys Product")
+	_, otherOffer := seedListedOffer(t, db, "keys-other-maker", "keys-other@example.com", "Other Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	siteKey := "or_site_project_key"
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO project_keys(key_hash,key_prefix,owner_id,scope,site_id,expires_at)
+VALUES($1,'or_site_',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(siteKey), owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	offerKey := "or_offer_project_key"
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO project_keys(key_hash,key_prefix,owner_id,scope,offer_id,maker_id,expires_at)
+VALUES($1,'or_offe',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(offerKey), owner.ID, offerID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	blocked, _ := postJSON(t, r, http.MethodGet, "/v1/sites/"+otherSite+"/mode", nil, map[string]string{"X-API-Key": siteKey})
+	if blocked.Code != http.StatusForbidden {
+		t.Fatalf("project key on another site: %d %s", blocked.Code, blocked.Body.String())
+	}
+	own, _ := postJSON(t, r, http.MethodGet, "/v1/sites/"+siteID+"/mode", nil, map[string]string{"X-API-Key": siteKey})
+	if own.Code != http.StatusOK {
+		t.Fatalf("project key on its site: %d %s", own.Code, own.Body.String())
+	}
+	blocked, _ = postJSON(t, r, http.MethodGet, "/v1/offers/"+otherOffer+"/mode", nil, map[string]string{"X-Maker-Key": offerKey})
+	if blocked.Code != http.StatusForbidden {
+		t.Fatalf("project key on another offer: %d %s", blocked.Code, blocked.Body.String())
+	}
+	for _, headers := range []map[string]string{
+		{"X-API-Key": "keys-site-key"},
+		{"X-API-Key": siteKey},
+		{"X-Maker-Key": "keys-maker-key"},
+		{"X-Maker-Key": offerKey},
+		{"Authorization": "Bearer " + siteKey},
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/v1/account-keys", nil)
+		req.Header.Set("Origin", h.BaseURL)
+		req.Header.Set("X-CSRF-Token", owner.CSRF)
+		req.AddCookie(cookie)
+		for key, value := range headers {
+			req.Header.Set(key, value)
+		}
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("create account key with %v: %d %s", headers, rec.Code, rec.Body.String())
+		}
+	}
+	rec, created := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/account-keys", nil)
+	if rec.Code != http.StatusCreated || created["kind"] != "account" || created["key"] == "" {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+	}
+	accountKey := created["key"].(string)
+	rec, listed := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account-keys", nil)
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), accountKey) {
+		t.Fatalf("list leaked the key or failed: %d %s", rec.Code, rec.Body.String())
+	}
+	keyID := listed["keys"].([]any)[0].(map[string]any)["id"].(string)
+	listWithKey, _ := postJSON(t, r, http.MethodGet, "/v1/account-keys", nil, map[string]string{"X-API-Key": accountKey})
+	if listWithKey.Code != http.StatusForbidden {
+		t.Fatalf("list with api key: %d", listWithKey.Code)
+	}
+	loosened, _ := postJSON(t, r, http.MethodPut, "/v1/sites/"+siteID+"/mode", map[string]any{"mode": "yolo"}, map[string]string{"X-API-Key": accountKey})
+	if loosened.Code != http.StatusForbidden {
+		t.Fatalf("account key loosened mode: %d %s", loosened.Code, loosened.Body.String())
+	}
+	placementID := insertPlacement(t, db, siteID, offerID, "https://keys.example/post", "A short note.")
+	denied, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": false}, map[string]string{"X-API-Key": accountKey})
+	if denied.Code != http.StatusUnprocessableEntity || !strings.Contains(denied.Body.String(), "disclosure_and_rel_sponsored") {
+		t.Fatalf("hard check: %d %s", denied.Code, denied.Body.String())
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW() WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
+	var campaignID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code) VALUES($1,$2,'keys-track') RETURNING id`, offerID, siteID).Scan(&campaignID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO clicks(site_id,campaign_id,referrer) VALUES($1,$2,'https://News.Example/story')`, siteID, campaignID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO clicks(site_id,referrer) VALUES($1,'')`, siteID); err != nil {
+		t.Fatal(err)
+	}
+	var testConversion string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO conversions(offer_id,provider,provider_event_id,kind,amount,currency,commission_amount,occurred_at,payment_mode)
+VALUES($1,'stripe','evt-test','sale',10,'USD',2.00,NOW(),'test') RETURNING id`, offerID).Scan(&testConversion); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency) VALUES($1,$2,'commission',1.50,'USD')`, siteID, testConversion); err != nil {
+		t.Fatal(err)
+	}
+	var liveConversion string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO conversions(offer_id,provider,provider_event_id,kind,amount,currency,commission_amount,occurred_at,payment_mode)
+VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, offerID).Scan(&liveConversion); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency) VALUES($1,$2,'commission',9.00,'USD')`, siteID, liveConversion); err != nil {
+		t.Fatal(err)
+	}
+	projectDigest, _ := postJSON(t, r, http.MethodGet, "/v1/account/digest", nil, map[string]string{"X-API-Key": siteKey})
+	if projectDigest.Code != http.StatusForbidden {
+		t.Fatalf("project key digest: %d %s", projectDigest.Code, projectDigest.Body.String())
+	}
+	digestRec, digest := postJSON(t, r, http.MethodGet, "/v1/account/digest", nil, map[string]string{"X-API-Key": accountKey})
+	if digestRec.Code != http.StatusOK {
+		t.Fatalf("account digest: %d %s", digestRec.Code, digestRec.Body.String())
+	}
+	totals := digest["totals"].(map[string]any)
+	if totals["went_live"] != float64(2) || totals["clicks"] != float64(2) {
+		t.Fatalf("totals: %s", digestRec.Body.String())
+	}
+	if sourceClicks(t, totals["clicks_by_source"], "direct") != 1 || sourceClicks(t, totals["clicks_by_source"], "news.example") != 1 {
+		t.Fatalf("sources: %s", digestRec.Body.String())
+	}
+	earnings := totals["earnings"].(map[string]any)
+	if moneyAmount(t, earnings["publisher"]) != 1.5 || moneyAmount(t, earnings["maker"]) != 2 {
+		t.Fatalf("earnings: %s", digestRec.Body.String())
+	}
+	if digest["earnings_note"] == "" {
+		t.Fatal("missing earnings note")
+	}
+	var sawSite, sawOffer bool
+	for _, raw := range digest["projects"].([]any) {
+		project := raw.(map[string]any)
+		if project["id"] == otherSite || project["id"] == otherOffer {
+			t.Fatalf("foreign project listed: %s", digestRec.Body.String())
+		}
+		items := project["items"].([]any)
+		if len(items) != 1 || items[0].(map[string]any)["undo_token"] == "" {
+			t.Fatalf("item undo: %v", project)
+		}
+		switch project["kind"] {
+		case "site":
+			sawSite = true
+			if project["clicks"] != float64(2) || project["went_live"] != float64(1) || moneyAmount(t, project["earnings"]) != 1.5 {
+				t.Fatalf("site project: %v", project)
+			}
+		case "offer":
+			sawOffer = true
+			if project["clicks"] != float64(1) || moneyAmount(t, project["earnings"]) != 2 {
+				t.Fatalf("offer project: %v", project)
+			}
+		}
+	}
+	if !sawSite || !sawOffer {
+		t.Fatalf("projects: %s", digestRec.Body.String())
+	}
+	sessionDigest, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
+	if sessionDigest.Code != http.StatusOK {
+		t.Fatalf("session digest: %d", sessionDigest.Code)
+	}
+	checks, _ := postJSON(t, r, http.MethodGet, "/v1/policy/hard-checks", nil, nil)
+	if checks.Code != http.StatusOK || len(checks.Body.String()) == 0 || !strings.Contains(checks.Body.String(), "relevance_below_25") {
+		t.Fatalf("hard checks: %d %s", checks.Code, checks.Body.String())
+	}
+	projectsRec, projects := postJSON(t, r, http.MethodGet, "/v1/account/projects", nil, map[string]string{"X-API-Key": accountKey})
+	if projectsRec.Code != http.StatusOK || len(projects["projects"].([]any)) != 2 {
+		t.Fatalf("projects: %d %s", projectsRec.Code, projectsRec.Body.String())
+	}
+	revoked, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/account-keys/"+keyID+"/revoke", nil)
+	if revoked.Code != http.StatusOK {
+		t.Fatalf("revoke: %d %s", revoked.Code, revoked.Body.String())
+	}
+	after, _ := postJSON(t, r, http.MethodGet, "/v1/account/digest", nil, map[string]string{"X-API-Key": accountKey})
+	if after.Code != http.StatusForbidden {
+		t.Fatalf("revoked key: %d", after.Code)
+	}
+}
+
+func sourceClicks(t *testing.T, raw any, source string) float64 {
+	t.Helper()
+	for _, item := range raw.([]any) {
+		row := item.(map[string]any)
+		if row["source"] == source {
+			return row["clicks"].(float64)
+		}
+	}
+	t.Fatalf("missing source %s in %v", source, raw)
+	return 0
+}
+
+func moneyAmount(t *testing.T, raw any) float64 {
+	t.Helper()
+	amounts := raw.(map[string]any)["amounts"].([]any)
+	if len(amounts) != 1 {
+		t.Fatalf("amounts: %v", raw)
+	}
+	return amounts[0].(map[string]any)["amount"].(float64)
 }

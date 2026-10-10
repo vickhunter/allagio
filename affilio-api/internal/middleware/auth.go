@@ -60,6 +60,20 @@ func APIKeyAuth(db *database.DB, audit *services.AuditLogger, resources ...strin
 			if projectErr == nil {
 				c.Set("api_key_hash", keyHash)
 				c.Set("site_id", projectSiteID)
+				c.Set("key_kind", "project")
+				c.Next()
+				return
+			}
+			account, accountErr := db.ActiveAccountKey(c.Request.Context(), keyHash)
+			if accountErr == nil {
+				if account.SiteID == "" {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "this account has no publisher site"})
+					return
+				}
+				c.Set("api_key_hash", keyHash)
+				c.Set("site_id", account.SiteID)
+				c.Set("owner_id", account.OwnerID)
+				c.Set("key_kind", "account")
 				c.Next()
 				return
 			}

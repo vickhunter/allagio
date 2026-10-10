@@ -12,6 +12,7 @@ Offer Rails is a publisher and maker workflow. Tools return offers, matches, and
 - [Settings](/docs/settings.md): the setup questions and default modes
 - [Listing card](/docs/listing-card.md): the only scan payload that may be uploaded
 - [Modes](/docs/modes.md): manual, auto, and yolo
+- [Account](/docs/account.md): account keys and the account digest
 
 ## Start
 
@@ -244,6 +245,52 @@ POST /v1/digest/undo
 Undo revokes the placement or pauses the offer and stores ` + "`placement_undo`" + ` or ` + "`offer_undo`" + `.
 `
 
+const accountDoc = `# Account keys and digest
+
+Two kinds of key exist. A project key comes from device-code approval and works for one site or one offer. An account key works for every site and offer on the account. Neither key can skip the hard checks or loosen a mode.
+
+## Account keys
+
+Create, list, and revoke require the owner session. ` + "`X-API-Key`" + `, ` + "`X-Maker-Key`" + `, and ` + "`Authorization`" + ` are refused with 403.
+
+` + "```" + `
+POST /v1/account-keys
+GET /v1/account-keys
+POST /v1/account-keys/:id/revoke
+` + "```" + `
+
+The plaintext key is returned once, on create. The list shows ` + "`key_prefix`" + ` and whether the key is revoked.
+
+Send the account key as ` + "`X-API-Key`" + ` for the publisher site, or ` + "`X-Maker-Key`" + ` for the maker's offers. It is not limited to one offer. A project key sent to another site or offer is 403.
+
+## Projects
+
+` + "`GET /v1/account/projects`" + ` lists the account's sites and offers with the current mode. A project key is 403. An account key or the owner session is accepted.
+
+## Account digest
+
+` + "`GET /v1/account/digest`" + ` uses the same auth. ` + "`totals`" + ` covers the whole account. ` + "`projects`" + ` repeats the numbers per site and per offer. Each item that went live has an ` + "`undo_token`" + `.
+
+` + "```" + `
+{
+  "totals": {
+    "went_live": 1,
+    "clicks": 2,
+    "earnings": {"mode": "test", "publisher": {"mode": "test", "amounts": [{"currency": "USD", "amount": 1.5}]}, "maker": null},
+    "clicks_by_source": [{"source": "direct", "clicks": 2}]
+  },
+  "projects": [],
+  "earnings_note": "..."
+}
+` + "```" + `
+
+` + "`earnings`" + ` is null when no test-mode commission is recorded. Publisher amounts are ledger rows joined to conversions with ` + "`payment_mode=test`" + `. Maker amounts are ` + "`commission_amount`" + ` on those test conversions. Live and legacy rows are not included. Click source is the referrer host from the clicks table. A click with an empty referrer, or a referrer with no host, counts as ` + "`direct`" + `. Account click totals count each click once even when it belongs to both a site and an offer on the same account.
+
+## Hard checks
+
+` + "`GET /v1/policy/hard-checks`" + ` returns the fixed list the dashboard shows. The codes match the decision failures.
+`
+
 func agentDoc(name string) (string, bool) {
 	switch name {
 	case "device-login.md":
@@ -254,6 +301,8 @@ func agentDoc(name string) (string, bool) {
 		return listingCardDoc, true
 	case "modes.md":
 		return modesDoc, true
+	case "account.md":
+		return accountDoc, true
 	default:
 		return "", false
 	}

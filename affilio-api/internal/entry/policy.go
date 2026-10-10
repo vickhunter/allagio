@@ -143,6 +143,33 @@ func EvaluatePublisher(mode string, rules AutoRules, in PublisherFacts) Decision
 	}
 }
 
+// HardChecks are the failure codes that run in every mode. The dashboard
+// shows the matching labels. D-028 replaces the claim-check stub.
+func HardChecks() []string {
+	return []string{
+		"disclosure_and_rel_sponsored",
+		"claim_check",
+		"copy_over_140",
+		"one_box_per_post",
+		"relevance_below_25",
+		"offer_not_live",
+		"revoke_unavailable",
+	}
+}
+
+// HardCheckLabels are the plain words the dashboard shows for HardChecks.
+func HardCheckLabels() []string {
+	return []string{
+		"Disclosure label and rel=sponsored",
+		"Claim check",
+		"140-character cap",
+		"One box per post",
+		"Relevance at least 25",
+		"Live offer",
+		"Working revoke",
+	}
+}
+
 func placementHardFailures(in PlacementFacts, claims ClaimChecker) []string {
 	var failures []string
 	if strings.TrimSpace(in.Disclosure) == "" || !in.RelSponsored {

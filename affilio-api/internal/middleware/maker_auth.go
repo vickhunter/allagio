@@ -32,14 +32,28 @@ func MakerKeyAuth(db *database.DB, resources ...string) gin.HandlerFunc {
 		}
 		maker, err := db.GetMakerByAnyAPIKey(c.Request.Context(), apiKey)
 		if err != nil {
-			makerID, offerID, keyErr := db.ProjectOfferKey(c.Request.Context(), services.HashAPIKey(apiKey))
-			if keyErr != nil {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid maker key"})
+			keyHash := services.HashAPIKey(apiKey)
+			makerID, offerID, keyErr := db.ProjectOfferKey(c.Request.Context(), keyHash)
+			if keyErr == nil {
+				c.Set("maker_id", makerID)
+				c.Set("offer_scope_id", offerID)
+				c.Set("key_kind", "project")
+				c.Next()
 				return
 			}
-			c.Set("maker_id", makerID)
-			c.Set("offer_scope_id", offerID)
-			c.Next()
+			account, accountErr := db.ActiveAccountKey(c.Request.Context(), keyHash)
+			if accountErr == nil {
+				if account.MakerID == "" {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "this account has no maker"})
+					return
+				}
+				c.Set("maker_id", account.MakerID)
+				c.Set("owner_id", account.OwnerID)
+				c.Set("key_kind", "account")
+				c.Next()
+				return
+			}
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid maker key"})
 			return
 		}
 		c.Set("maker_id", maker.ID)
