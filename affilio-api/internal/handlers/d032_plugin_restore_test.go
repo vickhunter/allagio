@@ -1192,7 +1192,11 @@ func TestPlacedAndRemovedOnlyFromPluginAck(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(root, path)
 		text := string(data)
-		if loc := forbidden.FindStringIndex(text); loc != nil {
+		for _, loc := range forbidden.FindAllStringIndex(text, -1) {
+			// A qualified column, as in the live-count view, is a read.
+			if loc[0] > 0 && text[loc[0]-1] == '.' {
+				continue
+			}
 			line := 1 + strings.Count(text[:loc[0]], "\n")
 			t.Errorf("%s:%d assigns plugin_wait to placed or removed", rel, line)
 		}
