@@ -61,6 +61,7 @@ func testPaidCampaign(t *testing.T) (*database.DB, *gin.Engine, string, string, 
 	if err != nil || rec.Code != http.StatusFound {
 		t.Fatalf("click failed: %d %v", rec.Code, err)
 	}
+	requireGoLinkHeaders(t, rec)
 	return db, r, siteKey, offerID, u.Query().Get("via")
 }
 

@@ -396,6 +396,7 @@ func hitGo(t *testing.T, r *gin.Engine, method, path, agent string) *httptest.Re
 	req.Header.Set("User-Agent", agent)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
+	requireGoLinkHeaders(t, rec)
 	return rec
 }
 

@@ -22,7 +22,7 @@ func TestPreviewBotsAndHeadRedirectWithoutClicks(t *testing.T) {
 	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
 	code := join["tracking_code"].(string)
 
-	browser := followGo(r, http.MethodGet, code, "Mozilla/5.0")
+	browser := followGo(t, r, http.MethodGet, code, "Mozilla/5.0")
 	if browser.Code != http.StatusFound || !strings.Contains(browser.Header().Get("Location"), "via=") {
 		t.Fatalf("browser click must stay a 302 with via=, got %d %q", browser.Code, browser.Header().Get("Location"))
 	}
@@ -48,7 +48,7 @@ func TestPreviewBotsAndHeadRedirectWithoutClicks(t *testing.T) {
 		"SkypeUriPreview/1.0",
 	}
 	for _, ua := range previews {
-		rec := followGo(r, http.MethodGet, code, ua)
+		rec := followGo(t, r, http.MethodGet, code, ua)
 		if rec.Code != http.StatusFound {
 			t.Fatalf("%s: expected 302, got %d", ua, rec.Code)
 		}
@@ -59,7 +59,7 @@ func TestPreviewBotsAndHeadRedirectWithoutClicks(t *testing.T) {
 			t.Fatalf("%s: expected the offer landing URL, got %q", ua, rec.Header().Get("Location"))
 		}
 	}
-	head := followGo(r, http.MethodHead, code, "Mozilla/5.0")
+	head := followGo(t, r, http.MethodHead, code, "Mozilla/5.0")
 	if head.Code != http.StatusFound {
 		t.Fatalf("HEAD: expected 302, got %d %s", head.Code, head.Body.String())
 	}
@@ -71,11 +71,13 @@ func TestPreviewBotsAndHeadRedirectWithoutClicks(t *testing.T) {
 	}
 }
 
-func followGo(r http.Handler, method, code, userAgent string) *httptest.ResponseRecorder {
+func followGo(t *testing.T, r http.Handler, method, code, userAgent string) *httptest.ResponseRecorder {
+	t.Helper()
 	req := httptest.NewRequest(method, "/v1/go/"+code, nil)
 	req.Header.Set("User-Agent", userAgent)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
+	requireGoLinkHeaders(t, rec)
 	return rec
 }
 

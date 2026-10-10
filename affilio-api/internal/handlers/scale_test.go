@@ -147,6 +147,7 @@ func TestFraudFlagsHoldCommissionsUntilCleared(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
 	rrec := httptest.NewRecorder()
 	r.ServeHTTP(rrec, req)
+	requireGoLinkHeaders(t, rrec)
 	location := rrec.Header().Get("Location")
 	clickID := location[strings.Index(location, "via=")+4:]
 
@@ -222,6 +223,7 @@ func TestVelocityCapPausesCampaign(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
 	rrec := httptest.NewRecorder()
 	r.ServeHTTP(rrec, req)
+	requireGoLinkHeaders(t, rrec)
 	location := rrec.Header().Get("Location")
 	clickID := location[strings.Index(location, "via=")+4:]
 

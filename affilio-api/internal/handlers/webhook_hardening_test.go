@@ -124,6 +124,7 @@ func TestStripeWebhookKeepsOurSalesAndRefunds(t *testing.T) {
 	if rec.Code != http.StatusFound || !strings.Contains(rec.Header().Get("Location"), "via=") {
 		t.Fatalf("expected attributed redirect, got %d %q", rec.Code, rec.Header().Get("Location"))
 	}
+	requireGoLinkHeaders(t, rec)
 	clickID := rec.Header().Get("Location")
 	clickID = clickID[strings.Index(clickID, "via=")+4:]
 

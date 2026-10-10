@@ -190,6 +190,7 @@ func TestAttributionEndToEnd(t *testing.T) {
 	if rrec.Code != http.StatusFound {
 		t.Fatalf("redirect: expected 302, got %d", rrec.Code)
 	}
+	requireGoLinkHeaders(t, rrec)
 	location := rrec.Header().Get("Location")
 	if !strings.Contains(location, "inboxpilot.example.com") || !strings.Contains(location, "via=") {
 		t.Fatalf("unexpected redirect location %q", location)
@@ -318,6 +319,7 @@ func TestRedirectStopsAttributingWhenPaused(t *testing.T) {
 	if rrec.Code != http.StatusGone || rrec.Header().Get("Location") != "" || !strings.Contains(rrec.Body.String(), "paused") {
 		t.Fatalf("expected 410 for paused offer with no redirect, got %d %q %s", rrec.Code, rrec.Header().Get("Location"), rrec.Body.String())
 	}
+	requireGoLinkHeaders(t, rrec)
 	var clicks int
 	_ = db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks`).Scan(&clicks)
 	if clicks != 0 {
@@ -331,6 +333,7 @@ func TestRedirectStopsAttributingWhenPaused(t *testing.T) {
 	if rrec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for unknown code, got %d", rrec.Code)
 	}
+	requireGoLinkHeaders(t, rrec)
 }
 
 func TestRedirectRefusesPausedUnlistedAndDeleted(t *testing.T) {
@@ -358,6 +361,7 @@ func TestRedirectRefusesPausedUnlistedAndDeleted(t *testing.T) {
 		if botRec.Code != http.StatusGone || botRec.Header().Get("Location") != "" {
 			t.Fatalf("preview bot must not be redirected to a paused offer, got %d %q", botRec.Code, botRec.Header().Get("Location"))
 		}
+		requireGoLinkHeaders(t, botRec)
 	})
 
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='draft' WHERE id=$1`, offerID); err != nil {
@@ -382,6 +386,7 @@ func assertUnavailable(t *testing.T, r *gin.Engine, db *database.DB, path string
 	if rec.Code != want {
 		t.Fatalf("%s: expected %d, got %d %s", path, want, rec.Code, rec.Body.String())
 	}
+	requireGoLinkHeaders(t, rec)
 	if loc := rec.Header().Get("Location"); loc != "" {
 		t.Fatalf("%s: must not redirect, got %q", path, loc)
 	}
@@ -463,6 +468,7 @@ func TestDestinationURLsRejectHTTP(t *testing.T) {
 		if botRec.Code == http.StatusFound || botRec.Header().Get("Location") != "" {
 			t.Fatalf("preview bot must not be sent to a non-https destination, got %d %q", botRec.Code, botRec.Header().Get("Location"))
 		}
+		requireGoLinkHeaders(t, botRec)
 	})
 }
 

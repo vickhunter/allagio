@@ -99,6 +99,7 @@ func TestPlacementRemoval(t *testing.T) {
 	if staleRes.Code != http.StatusFound {
 		t.Fatalf("removed go link: %d %s", staleRes.Code, staleRes.Body.String())
 	}
+	requireGoLinkHeaders(t, staleRes)
 	location := staleRes.Header().Get("Location")
 	if location != "https://inboxpilot.example.com" || strings.Contains(location, "via=") {
 		t.Fatalf("removed redirect = %q", location)

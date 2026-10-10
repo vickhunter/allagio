@@ -49,6 +49,13 @@ func TestGoLinkHashTruncatesAndRotates(t *testing.T) {
 	}
 }
 
+func requireGoLinkHeaders(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
+		t.Fatalf("go link cache %q robots %q", rec.Header().Get("Cache-Control"), rec.Header().Get("X-Robots-Tag"))
+	}
+}
+
 func TestGoLinkAccessLogScrubsIPs(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/00000000-0000-4000-8000-000000000001?ref=1", nil)
 	req.RemoteAddr = "203.0.113.77:1000"
@@ -142,6 +149,7 @@ WHERE id=$1`, id, now, campaignID, now.Add(48*time.Hour)); err != nil {
 	if second.Code != http.StatusFound {
 		t.Fatalf("same /24: %d", second.Code)
 	}
+	requireGoLinkHeaders(t, second)
 	var n int
 	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks WHERE placement_id=$1`, id).Scan(&n); err != nil {
 		t.Fatal(err)
@@ -168,10 +176,45 @@ WHERE id=$1`, id, now, campaignID, now.Add(48*time.Hour)); err != nil {
 	missing.Header.Set("X-Forwarded-For", forwarded)
 	missed := httptest.NewRecorder()
 	r.ServeHTTP(missed, missing)
-	if missed.Code != http.StatusNotFound || missed.Header().Get("Cache-Control") != "no-store" || missed.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
-		t.Fatalf("unknown code: %d cache %q robots %q", missed.Code, missed.Header().Get("Cache-Control"), missed.Header().Get("X-Robots-Tag"))
+	if missed.Code != http.StatusNotFound {
+		t.Fatalf("unknown code: %d", missed.Code)
 	}
+	requireGoLinkHeaders(t, missed)
 	if strings.Contains(logs.String(), rawIP) || strings.Contains(logs.String(), forwarded) {
 		t.Fatalf("unknown code logged an address: %s", logs.String())
+	}
+}
+
+func TestGoLinkRateLimitKeepsHeaders(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	if err := r.SetTrustedProxies(nil); err != nil {
+		t.Fatal(err)
+	}
+	fixed := time.Date(2026, 10, 10, 15, 0, 0, 0, time.UTC)
+	redirects := &RedirectsHandler{
+		DB: db, IPSaltSecret: "privacy-salt", RateLimiter: NewIPRateLimiter(1, time.Hour),
+		now: func() time.Time { return fixed },
+	}
+	r.GET("/v1/go/:code", redirects.Go)
+
+	hit := func() *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/v1/go/not-a-placement", nil)
+		req.RemoteAddr = "203.0.113.77:1000"
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		requireGoLinkHeaders(t, rec)
+		return rec
+	}
+	first := hit()
+	if first.Code != http.StatusNotFound {
+		t.Fatalf("first: %d %s", first.Code, first.Body.String())
+	}
+	second := hit()
+	if second.Code != http.StatusTooManyRequests {
+		t.Fatalf("rate limit: %d %s", second.Code, second.Body.String())
 	}
 }
