@@ -3,8 +3,13 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -659,13 +664,13 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if undone.Code != http.StatusOK {
 		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
 	}
-	if state, reason := statusOf(placementID); state != "removed" || reason != "" {
-		t.Fatalf("leave failed restore removed: %s %q", state, reason)
+	if state, reason := statusOf(placementID); state != "pending" || reason != "" {
+		t.Fatalf("undo clears failure: %s %q", state, reason)
 	}
 	stopped()
 	current = current.Add(11 * time.Minute)
-	if state, _ := statusOf(placementID); state != "removed" {
-		t.Fatalf("left removed stays removed: %s", state)
+	if state, _ := statusOf(placementID); state != "offline" {
+		t.Fatalf("silent undo: %s", state)
 	}
 	offlineRetry, offlineBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, siteKey)
 	if offlineRetry.Code != http.StatusConflict || offlineBody["reason"] != "not_failed" || offlineBody["message"] == "" {
@@ -1036,113 +1041,195 @@ VALUES($1,'stripe','leave-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id
 	if left.Code != http.StatusOK {
 		t.Fatalf("leave removed: %d %s", left.Code, left.Body.String())
 	}
-	status, statusBody := postJSON(t, r, http.MethodGet, "/v1/placements/"+id, nil, siteKey)
-	if status.Code != http.StatusOK || statusBody["plugin_state"] != "removed" || statusBody["failed_action"] != "" || statusBody["remove_confirm"] != true || statusBody["status"] != "revoked" {
-		t.Fatalf("left removed: %d %s", status.Code, status.Body.String())
+	view := func(id string) map[string]any {
+		t.Helper()
+		status, body := postJSON(t, r, http.MethodGet, "/v1/placements/"+id, nil, siteKey)
+		if status.Code != http.StatusOK {
+			t.Fatalf("status %s: %d %s", id, status.Code, status.Body.String())
+		}
+		return body
+	}
+	stopped := func(path, id string, clicks int) {
+		t.Helper()
+		hit := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
+		if hit.Code != http.StatusGone || hit.Header().Get("Location") != "" || bodyReason(t, hit) != "revoked" || placementClickCount(t, db, id) != clicks {
+			t.Fatalf("go link: %d %s %s", hit.Code, hit.Header().Get("Location"), hit.Body.String())
+		}
+	}
+	notLive := func() {
+		t.Helper()
+		if went, site := liveNumbers(); went != 1 || site != 0 {
+			t.Fatalf("still live: totals %v site %v", went, site)
+		}
+	}
+
+	body := view(id)
+	if body["plugin_state"] != "pending" || body["failed_action"] != "" || body["status"] != "revoked" {
+		t.Fatalf("undo of a failed restore: %v", body)
 	}
 	digest, digestBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
-	if digest.Code != http.StatusOK || pluginStateOf(t, digestBody, id) != "removed" || removeConfirmOf(t, digestBody, id) != true {
-		t.Fatalf("digest confirm: %d %s", digest.Code, digest.Body.String())
+	if digest.Code != http.StatusOK || pluginStateOf(t, digestBody, id) != "pending" {
+		t.Fatalf("digest pending: %d %s", digest.Code, digest.Body.String())
 	}
 	account, accountBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
-	if account.Code != http.StatusOK || pluginStateOf(t, accountBody, id) != "removed" || removeConfirmOf(t, accountBody, id) != true {
-		t.Fatalf("site digest confirm: %d %s", account.Code, account.Body.String())
+	if account.Code != http.StatusOK || pluginStateOf(t, accountBody, id) != "pending" {
+		t.Fatalf("site digest pending: %d %s", account.Code, account.Body.String())
 	}
-	if went, site := liveNumbers(); went != 1 || site != 0 {
-		t.Fatalf("left removed still live: totals %v site %v", went, site)
-	}
-	hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
-	if hit.Code != http.StatusGone || hit.Header().Get("Location") != "" || bodyReason(t, hit) != "revoked" || placementClickCount(t, db, id) != clicks {
-		t.Fatalf("left removed go link: %d %s %s", hit.Code, hit.Header().Get("Location"), hit.Body.String())
-	}
+	notLive()
+	stopped(goPath, id, clicks)
 	confirmed, confirmedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "removed"}, siteKey)
-	if confirmed.Code != http.StatusOK || confirmedBody["plugin_state"] != "removed" || confirmedBody["failed_action"] != "" || confirmedBody["remove_confirm"] != false {
-		t.Fatalf("confirm removed: %d %s", confirmed.Code, confirmed.Body.String())
+	if confirmed.Code != http.StatusOK || confirmedBody["plugin_state"] != "removed" || confirmedBody["failed_action"] != "" {
+		t.Fatalf("ack removed: %d %s", confirmed.Code, confirmed.Body.String())
 	}
-	if went, site := liveNumbers(); went != 1 || site != 0 {
-		t.Fatalf("confirmed removal became live: totals %v site %v", went, site)
-	}
+	notLive()
+	stopped(goPath, id, clicks)
 
 	second, secondPath := commit("https://leave.example/again", "again")
 	failRestore(second)
-	againLeft, againBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/revoke", map[string]any{"reason": "undo"}, siteKey)
-	if againLeft.Code != http.StatusOK || againBody["undo"] != true {
-		t.Fatalf("second leave: %d %s", againLeft.Code, againLeft.Body.String())
+	secondClicks := placementClickCount(t, db, second)
+	againLeft, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if againLeft.Code != http.StatusOK || view(second)["plugin_state"] != "pending" {
+		t.Fatalf("second undo: %d %s", againLeft.Code, againLeft.Body.String())
 	}
-	failedAck, failedAckBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "failed", "reason": "remove re-read failed"}, siteKey)
-	if failedAck.Code != http.StatusOK || failedAckBody["plugin_state"] != "failed" || failedAckBody["failed_action"] != "removed" || failedAckBody["remove_confirm"] != false {
-		t.Fatalf("failed confirm: %d %s", failedAck.Code, failedAck.Body.String())
+	current = current.Add(11 * time.Minute)
+	if view(second)["plugin_state"] != "offline" {
+		t.Fatalf("silent undo: %v", view(second))
 	}
-	before := placementUndoSnapshot(t, db, second)
-	current = current.Add(time.Minute)
-	repeat, repeatBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/revoke", map[string]any{"reason": "undo"}, siteKey)
-	if repeat.Code != http.StatusOK || repeatBody["undo"] != true || repeatBody["undone_at"] != againBody["undone_at"] {
-		t.Fatalf("idempotent revoke: %d %s", repeat.Code, repeat.Body.String())
+	notLive()
+	stopped(secondPath, second, secondClicks)
+
+	third, thirdPath := commit("https://leave.example/third", "third")
+	failRestore(third)
+	thirdClicks := placementClickCount(t, db, third)
+	thirdLeft, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+third+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if thirdLeft.Code != http.StatusOK || view(third)["plugin_state"] != "pending" {
+		t.Fatalf("third undo: %d %s", thirdLeft.Code, thirdLeft.Body.String())
 	}
-	after := placementUndoSnapshot(t, db, second)
-	if after != before {
-		t.Fatalf("revoke changed a failed removal\nbefore %+v\nafter  %+v", before, after)
+	failedAck, failedAckBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+third+"/plugin-ack", map[string]any{"action": "failed", "reason": "remove re-read failed"}, siteKey)
+	if failedAck.Code != http.StatusOK || failedAckBody["plugin_state"] != "failed" || failedAckBody["failed_action"] != "removed" {
+		t.Fatalf("failed ack: %d %s", failedAck.Code, failedAck.Body.String())
 	}
-	retried, retriedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/retry", nil, siteKey)
+	notLive()
+	stopped(thirdPath, third, thirdClicks)
+	retried, retriedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+third+"/retry", nil, siteKey)
 	if retried.Code != http.StatusOK || retriedBody["plugin_state"] != "pending" || retriedBody["failed_action"] != "" {
-		t.Fatalf("retry after idempotent revoke: %d %s", retried.Code, retried.Body.String())
+		t.Fatalf("removal retry: %d %s", retried.Code, retried.Body.String())
 	}
-	held := hitGo(t, r, http.MethodGet, secondPath, "Mozilla/5.0")
-	if held.Code != http.StatusGone || held.Header().Get("Location") != "" || bodyReason(t, held) != "revoked" {
-		t.Fatalf("retry of a failed removal redirected: %d %s %s", held.Code, held.Header().Get("Location"), held.Body.String())
+	stopped(thirdPath, third, thirdClicks)
+
+	fourth, _ := commit("https://leave.example/fourth", "fourth")
+	failRestore(fourth)
+	fourthLeft, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+fourth+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if fourthLeft.Code != http.StatusOK || view(fourth)["plugin_state"] != "pending" {
+		t.Fatalf("fourth undo: %d %s", fourthLeft.Code, fourthLeft.Body.String())
+	}
+	earlyRetry, earlyBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+fourth+"/retry", nil, siteKey)
+	if earlyRetry.Code != http.StatusConflict || earlyBody["reason"] != "not_failed" || view(fourth)["plugin_state"] != "pending" {
+		t.Fatalf("retry while pending: %d %s", earlyRetry.Code, earlyRetry.Body.String())
+	}
+	restored, restoredBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+fourth+"/restore", nil, siteKey)
+	if restored.Code != http.StatusOK || restoredBody["plugin_state"] == "placed" || view(fourth)["plugin_state"] != "pending" {
+		t.Fatalf("restore queued placed: %d %s %v", restored.Code, restored.Body.String(), view(fourth))
+	}
+	paused, _ := postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "site", "id": siteID}, siteKey)
+	if paused.Code != http.StatusOK || view(fourth)["plugin_state"] == "placed" || view(fourth)["plugin_state"] == "removed" {
+		t.Fatalf("pause set a terminal plugin state: %d %v", paused.Code, view(fourth))
+	}
+	killed, _ := postJSON(t, r, http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", map[string]any{}, siteKey)
+	if killed.Code != http.StatusOK || view(fourth)["plugin_state"] == "placed" || view(fourth)["plugin_state"] == "removed" {
+		t.Fatalf("kill switch set a terminal plugin state: %d %v", killed.Code, view(fourth))
 	}
 }
 
-type undoSnapshot struct {
-	Wait     string
-	WaitAt   time.Time
-	UndoneAt time.Time
-	Action   string
-	Reason   string
-	Confirm  bool
-	Status   string
-	Side     string
-	Undos    int
-}
+// TestPlacedAndRemovedOnlyFromPluginAck scans every plugin_wait write.
+// placed and removed are stored only by AckPluginPlacement, and only through
+// VerifiedPluginWait. Revoke, restore, retry, pause, and the kill switch cannot.
+func TestPlacedAndRemovedOnlyFromPluginAck(t *testing.T) {
+	for _, action := range []string{"revoke", "restore", "retry", "pause", "kill", "kill_switch", "undo"} {
+		if wait, ok := entry.VerifiedPluginWait(action); ok || wait != "" {
+			t.Fatalf("%s stored %q", action, wait)
+		}
+	}
+	if wait, ok := entry.VerifiedPluginWait("restored"); !ok || wait != "placed" {
+		t.Fatalf("restored ack stored %q ok=%v", wait, ok)
+	}
+	if wait, ok := entry.VerifiedPluginWait("removed"); !ok || wait != "removed" {
+		t.Fatalf("removed ack stored %q ok=%v", wait, ok)
+	}
 
-func placementUndoSnapshot(t *testing.T, db *database.DB, id string) undoSnapshot {
-	t.Helper()
-	var snap undoSnapshot
-	err := db.Pool.QueryRow(context.Background(), `SELECT plugin_wait, plugin_wait_at, undone_at, failed_action, plugin_failed_reason, remove_confirm, status, revoked_by_side,
-(SELECT COUNT(*) FROM owner_events WHERE placement_id=$1 AND kind='placement_undo')
-FROM placement_proposals WHERE id=$1`, id).Scan(&snap.Wait, &snap.WaitAt, &snap.UndoneAt, &snap.Action, &snap.Reason, &snap.Confirm, &snap.Status, &snap.Side, &snap.Undos)
+	root := apiModuleRoot(t)
+	forbidden := regexp.MustCompile(`plugin_wait\s*=\s*(?:CASE\b[\s\S]{0,800}?THEN\s+)?'(?:placed|removed)'`)
+	var callers []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			switch info.Name() {
+			case "vendor", ".git":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		name := info.Name()
+		if strings.HasSuffix(name, "_test.go") || !(strings.HasSuffix(name, ".go") || strings.HasSuffix(name, ".sql")) {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(root, path)
+		text := string(data)
+		if loc := forbidden.FindStringIndex(text); loc != nil {
+			line := 1 + strings.Count(text[:loc[0]], "\n")
+			t.Errorf("%s:%d assigns plugin_wait to placed or removed", rel, line)
+		}
+		if !strings.Contains(text, "VerifiedPluginWait(") {
+			return nil
+		}
+		for i, line := range strings.Split(text, "\n") {
+			if strings.Contains(line, "VerifiedPluginWait(") && !strings.HasPrefix(strings.TrimSpace(line), "func ") {
+				callers = append(callers, fmt.Sprintf("%s:%d", rel, i+1))
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	snap.WaitAt = snap.WaitAt.UTC()
-	snap.UndoneAt = snap.UndoneAt.UTC()
-	return snap
+	if len(callers) != 1 || !strings.HasPrefix(callers[0], "internal/database/placements.go:") {
+		t.Fatalf("VerifiedPluginWait callers: %v", callers)
+	}
+	ack, err := os.ReadFile(filepath.Join(root, "internal/database/placements.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(ack)
+	call := strings.Index(body, "entry.VerifiedPluginWait(")
+	fn := strings.LastIndex(body[:call], "func ")
+	if call < 0 || fn < 0 || !strings.Contains(body[fn:call], "AckPluginPlacement") {
+		t.Fatal("VerifiedPluginWait is not called from AckPluginPlacement")
+	}
 }
 
-func removeConfirmOf(t *testing.T, body map[string]any, id string) bool {
+func apiModuleRoot(t *testing.T) string {
 	t.Helper()
-	if items, ok := body["items"].([]any); ok {
-		for _, raw := range items {
-			item := raw.(map[string]any)
-			if item["id"] == id {
-				confirm, _ := item["remove_confirm"].(bool)
-				return confirm
-			}
-		}
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("caller")
 	}
-	projects, _ := body["projects"].([]any)
-	for _, raw := range projects {
-		project := raw.(map[string]any)
-		for _, itemRaw := range project["items"].([]any) {
-			item := itemRaw.(map[string]any)
-			if item["id"] == id {
-				confirm, _ := item["remove_confirm"].(bool)
-				return confirm
-			}
+	dir := filepath.Dir(file)
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
 		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("go.mod not found")
+		}
+		dir = parent
 	}
-	t.Fatalf("placement %s missing", id)
-	return false
 }
 
 func pluginFailedReasonOf(t *testing.T, body map[string]any, id string) string {

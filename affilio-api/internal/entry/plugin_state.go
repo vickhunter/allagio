@@ -6,6 +6,20 @@ import "time"
 // null and never omitted on a placement.
 var PluginStates = []string{"pending", "placed", "removed", "offline", "failed"}
 
+// VerifiedPluginWait is the only value that may be stored as placed or removed.
+// The site key's plugin-ack is the only caller. Revoke, restore, retry, pause,
+// and the kill switch do not use it.
+func VerifiedPluginWait(action string) (string, bool) {
+	switch action {
+	case "restored":
+		return "placed", true
+	case "removed":
+		return "removed", true
+	default:
+		return "", false
+	}
+}
+
 // PluginState reports the plugin's view of one placement.
 // A brand-new placement and a restore stay pending until the site key
 // acknowledges them, which stores placed. A revoke stays pending until the
@@ -41,5 +55,5 @@ func PluginRetryDoc() string {
 		"A failed removal re-queues only the removal. `plugin_state` becomes `pending`, then `removed` on `action: removed`. It does not re-run the hard checks, it does not become `placed`, and it does not reactivate the go link.\n\n" +
 		"A failed restore re-runs every hard check. A failure returns 422 with `check_id` and `check_text` and leaves the placement failed. Success re-queues the restore: `plugin_state` becomes `pending`, then `placed` on `action: restored`.\n\n" +
 		"A failed restore is not live. `failed_action` `restored` stops the go link. Digest totals, site totals, and Live now exclude it, including the went-live count and earnings attributed to its clicks. Retry leaves it dark. The link redirects and the counts include it again only after `action: restored` confirms `placed`.\n\n" +
-		"Leave a failed restore removed with `POST /v1/placements/:id/revoke` and `{\"reason\":\"undo\"}` while `plugin_state` is `failed` and `failed_action` is `restored`. That request sets `plugin_state` to `removed`, clears `failed_action`, keeps the go link off, and sets `remove_confirm`. The placement does not count as live. The plugin re-reads the post and calls `plugin-ack`. `action: removed` confirms `removed` and clears `remove_confirm`. `action: failed` returns `failed` with `failed_action` `removed`. When `failed_action` is `removed`, that same revoke returns 200 and changes nothing. Retry is the only path.\n"
+		"Leave a failed restore removed with `POST /v1/placements/:id/revoke` and `{\"reason\":\"undo\"}` while `plugin_state` is `failed` and `failed_action` is `restored`. That request sets `plugin_state` to `pending`, clears `failed_action`, and stops the go link. The placement does not count as live. It becomes `removed` only when the site key acknowledges `action: removed`. With no acknowledgement it becomes `offline` after 10 minutes. `action: failed` there sets `failed` with `failed_action` `removed`. `placed` and `removed` are stored only by that verified plugin acknowledgement. Revoke, restore, retry, pause, and the kill switch do not set them.\n"
 }
