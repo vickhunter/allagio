@@ -37,5 +37,7 @@ func PluginState(wait string, waitAt *time.Time, failed bool, now time.Time, win
 // PluginRetryDoc is the retry section for /llms.txt and the mode docs.
 func PluginRetryDoc() string {
 	return "## Plugin retry\n\n" +
-		"`POST /v1/placements/:id/retry` is the publisher retry. A session or a site key for that placement may call it. The other side receives 403. It is allowed only while `plugin_state` is `failed`. Any other state returns 409 `not_failed`. It re-runs every hard check. A failure returns 422 with `check_id` and `check_text` and leaves the placement failed. Success sets the state to `pending` and re-queues the pending action, so the next acknowledgement moves it to `placed` or `removed`.\n"
+		"`POST /v1/placements/:id/retry` repeats only the action that failed. The site key's `failed` acknowledgement stores `failed_action` as `removed` or `restored`. A session or a site key for that placement may call retry. The other side receives 403. Any state other than `failed` returns 409 `not_failed`.\n\n" +
+		"A failed removal re-queues only the removal. `plugin_state` becomes `pending`, then `removed` on `action: removed`. It does not re-run the hard checks, it does not become `placed`, and it does not reactivate the go link.\n\n" +
+		"A failed restore re-runs every hard check. A failure returns 422 with `check_id` and `check_text` and leaves the placement failed. Success re-queues the restore: `plugin_state` becomes `pending`, then `placed` on `action: restored`.\n"
 }

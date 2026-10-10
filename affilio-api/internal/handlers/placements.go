@@ -221,7 +221,7 @@ func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimite
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
 	}
-	status, wait, failedReason, waitAt, err := db.ReadPlacementStatus(c.Request.Context(), siteID, id)
+	status, wait, failedReason, failedAction, waitAt, err := db.ReadPlacementStatus(c.Request.Context(), siteID, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
@@ -235,6 +235,7 @@ func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimite
 		"status":               status,
 		"plugin_state":         entry.PluginState(wait, waitAt, failedReason != "", now, window),
 		"plugin_failed_reason": failedReason,
+		"failed_action":        failedAction,
 	})
 }
 

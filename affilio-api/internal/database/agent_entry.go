@@ -92,6 +92,7 @@ type DigestItem struct {
 	PluginWaitAt       *time.Time
 	PluginContactAt    *time.Time
 	PluginFailedReason string
+	FailedAction       string
 }
 
 func textList(items []string) []string {
@@ -775,7 +776,7 @@ func (d *DB) LastDigestOpen(ctx context.Context, userID string) (*time.Time, err
 
 func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Time) ([]DigestItem, error) {
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
-plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, status IN ('approved','committed')
+plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, status IN ('approved','committed')
 FROM placement_proposals
 WHERE site_id=$1 AND (
     (status IN ('approved','committed') AND COALESCE(approved_at, created_at) > $2)
@@ -791,7 +792,7 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT 50`, siteID, since)
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = "placement"
-		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.CountsAsLive); err != nil {
+		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -845,7 +846,7 @@ RETURNING kind, COALESCE(placement_id::text,''), COALESCE(offer_id::text,'')`, h
 	}
 	switch kind {
 	case "placement":
-		if _, err = tx.Exec(ctx, `UPDATE placement_proposals SET status='revoked', plugin_wait='remove', plugin_wait_at=$2, plugin_failed_reason='' WHERE id=$1 AND status<>'revoked'`, placementID, now); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE placement_proposals SET status='revoked', plugin_wait='remove', plugin_wait_at=$2, plugin_failed_reason='', failed_action='' WHERE id=$1 AND status<>'revoked'`, placementID, now); err != nil {
 			return "", "", "", err
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at) VALUES('placement_undo',$1,$2,$3)`, ownerID, placementID, now)

@@ -243,8 +243,8 @@ func HardCheckDoc() string {
 	return b.String()
 }
 
-// RestoreRefusal is one public reason a restore of an undone placement is refused.
-// RestoreRefusals is the only list. "placement was not undone" is a different 409.
+// RestoreRefusal is one public 409 reason. RestoreRefusals is the only list.
+// "placement was not undone" is a different 409 and is not in this list.
 type RestoreRefusal struct {
 	Reason string
 	Text   string
@@ -253,6 +253,7 @@ type RestoreRefusal struct {
 var RestoreRefusals = []RestoreRefusal{
 	{Reason: "window_expired", Text: "The restore window has expired."},
 	{Reason: "paused", Text: "Pause or the kill switch was turned on after the undo."},
+	{Reason: "not_failed", Text: "The placement is not failed."},
 }
 
 // RestoreRefusalByReason returns the catalog entry for one reason.
@@ -265,11 +266,11 @@ func RestoreRefusalByReason(reason string) (RestoreRefusal, bool) {
 	return RestoreRefusal{}, false
 }
 
-// RestoreRefusalDoc is the restore-refusal section for /llms.txt and the mode docs.
+// RestoreRefusalDoc is the 409-reason section for /llms.txt and the mode docs.
 func RestoreRefusalDoc() string {
 	var b strings.Builder
-	b.WriteString("## Restore refusals\n\n")
-	b.WriteString("A 409 from restore, when the placement was undone, returns `error` `restore refused` and one `reason`:\n\n")
+	b.WriteString("## 409 reasons\n\n")
+	b.WriteString("A 409 that names a reason uses one of these values. Restore returns `error` `restore refused` with `window_expired` or `paused`. Retry returns `not_failed` when the placement is not failed:\n\n")
 	for _, refusal := range RestoreRefusals {
 		b.WriteString("- `")
 		b.WriteString(refusal.Reason)

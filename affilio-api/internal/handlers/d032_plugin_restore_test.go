@@ -565,6 +565,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	h, api, r := newEntryTest(t, db)
+	r.GET("/v1/go/:code", (&RedirectsHandler{DB: db}).Go)
 	current := time.Date(2026, 10, 10, 7, 0, 0, 0, time.UTC)
 	api.Now = func() time.Time { return current }
 
@@ -602,8 +603,31 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	}
 
 	placementID := approve("https://fail.example/post")
+	var campaignID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code,requires_placement,status) VALUES($1,$2,'fail-go',true,'active') RETURNING id`, offerID, siteID).Scan(&campaignID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', campaign_id=$2 WHERE id=$1`, placementID, campaignID); err != nil {
+		t.Fatal(err)
+	}
+	goPath := "/v1/go/fail-go?placement=" + placementID
+	live := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	if live.Code != http.StatusFound {
+		t.Fatalf("live redirect: %d", live.Code)
+	}
+	clicks := placementClickCount(t, db, placementID)
+	stopped := func() {
+		t.Helper()
+		hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+		if hit.Code != http.StatusGone || hit.Header().Get("Location") != "" || bodyReason(t, hit) != "revoked" {
+			t.Fatalf("go link left revoked: %d %s %s", hit.Code, hit.Header().Get("Location"), hit.Body.String())
+		}
+		if placementClickCount(t, db, placementID) != clicks {
+			t.Fatal("revoked go link credited a click")
+		}
+	}
 	early, earlyBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, siteKey)
-	if early.Code != http.StatusConflict || earlyBody["error"] != "not_failed" {
+	if early.Code != http.StatusConflict || earlyBody["error"] != "not_failed" || earlyBody["reason"] != "not_failed" {
 		t.Fatalf("retry before failure: %d %s", early.Code, early.Body.String())
 	}
 	missing, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed"}, siteKey)
@@ -612,7 +636,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 		t.Fatalf("empty reason: %d %d", missing.Code, blank.Code)
 	}
 	failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "post re-read failed"}, siteKey)
-	if failed.Code != http.StatusOK || failedBody["plugin_state"] != "failed" || failedBody["plugin_failed_reason"] != "post re-read failed" {
+	if failed.Code != http.StatusOK || failedBody["plugin_state"] != "failed" || failedBody["plugin_failed_reason"] != "post re-read failed" || failedBody["failed_action"] != "restored" {
 		t.Fatalf("failed ack: %d %s", failed.Code, failed.Body.String())
 	}
 	digest, digestBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
@@ -638,6 +662,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if state, reason := statusOf(placementID); state != "pending" || reason != "" {
 		t.Fatalf("undo clears failure: %s %q", state, reason)
 	}
+	stopped()
 	current = current.Add(11 * time.Minute)
 	if state, _ := statusOf(placementID); state != "offline" {
 		t.Fatalf("silent undo: %s", state)
@@ -646,10 +671,11 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if offlineRetry.Code != http.StatusConflict || offlineBody["error"] != "not_failed" {
 		t.Fatalf("retry offline: %d %s", offlineRetry.Code, offlineRetry.Body.String())
 	}
-	acked, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "still missing"}, siteKey)
-	if acked.Code != http.StatusOK {
+	acked, ackedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "failed", "reason": "still missing"}, siteKey)
+	if acked.Code != http.StatusOK || ackedBody["failed_action"] != "removed" {
 		t.Fatalf("failed after offline: %d %s", acked.Code, acked.Body.String())
 	}
+	stopped()
 	if state, reason := statusOf(placementID); state != "failed" || reason != "still missing" {
 		t.Fatalf("failure beats offline: %s %s", state, reason)
 	}
@@ -677,33 +703,36 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='paused' WHERE id=$1`, offerID); err != nil {
 		t.Fatal(err)
 	}
-	denied, deniedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil, siteKey)
-	if denied.Code != http.StatusUnprocessableEntity || deniedBody["check_id"] != "offer_live" || deniedBody["check_text"] == "" {
-		t.Fatalf("retry check: %d %s", denied.Code, denied.Body.String())
-	}
-	if state, reason := statusOf(placementID); state != "failed" || reason != "re-read failed again" {
-		t.Fatalf("failed check changed the failure: %s %s", state, reason)
+	current = current.Add(time.Minute)
+	sessionRetry, sessionBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil)
+	if sessionRetry.Code != http.StatusOK || sessionBody["plugin_state"] != "pending" || sessionBody["plugin_failed_reason"] != "" || sessionBody["failed_action"] != "" {
+		t.Fatalf("removal retry: %d %s", sessionRetry.Code, sessionRetry.Body.String())
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='listed' WHERE id=$1`, offerID); err != nil {
 		t.Fatal(err)
 	}
-	current = current.Add(time.Minute)
-	sessionRetry, sessionBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/retry", nil)
-	if sessionRetry.Code != http.StatusOK || sessionBody["plugin_state"] != "pending" || sessionBody["plugin_failed_reason"] != "" {
-		t.Fatalf("session retry: %d %s", sessionRetry.Code, sessionRetry.Body.String())
-	}
 	var waited time.Time
-	var storedReason, storedWait string
-	if err := db.Pool.QueryRow(context.Background(), `SELECT plugin_wait_at, plugin_failed_reason, plugin_wait FROM placement_proposals WHERE id=$1`, placementID).Scan(&waited, &storedReason, &storedWait); err != nil {
+	var storedReason, storedWait, storedStatus string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT plugin_wait_at, plugin_failed_reason, plugin_wait, status FROM placement_proposals WHERE id=$1`, placementID).Scan(&waited, &storedReason, &storedWait, &storedStatus); err != nil {
 		t.Fatal(err)
 	}
-	if storedWait != "remove" || storedReason != "" || !waited.UTC().Equal(current) {
-		t.Fatalf("re-queued remove: %s %q %s", storedWait, storedReason, waited.UTC())
+	if storedWait != "remove" || storedReason != "" || storedStatus != "revoked" || !waited.UTC().Equal(current) {
+		t.Fatalf("re-queued remove: %s %q %s %s", storedWait, storedReason, storedStatus, waited.UTC())
 	}
+	stopped()
+	placedAttempt, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	if placedAttempt.Code != http.StatusConflict {
+		t.Fatalf("removal retry accepted restored: %d %s", placedAttempt.Code, placedAttempt.Body.String())
+	}
+	if state, _ := statusOf(placementID); state != "pending" {
+		t.Fatalf("removal retry became %s", state)
+	}
+	stopped()
 	removed, removedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "removed"}, siteKey)
-	if removed.Code != http.StatusOK || removedBody["plugin_state"] != "removed" || removedBody["plugin_failed_reason"] != "" {
+	if removed.Code != http.StatusOK || removedBody["plugin_state"] != "removed" || removedBody["plugin_failed_reason"] != "" || removedBody["failed_action"] != "" {
 		t.Fatalf("ack removed: %d %s", removed.Code, removed.Body.String())
 	}
+	stopped()
 
 	second := approve("https://fail.example/restored")
 	undone, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/revoke", map[string]any{"reason": "undo"}, siteKey)
@@ -715,9 +744,26 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
-	failed, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, siteKey)
-	if failed.Code != http.StatusOK {
+	failed, failedBody = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, siteKey)
+	if failed.Code != http.StatusOK || failedBody["failed_action"] != "restored" {
 		t.Fatalf("restore failure: %d %s", failed.Code, failed.Body.String())
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='paused' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	denied, deniedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/retry", nil, siteKey)
+	if denied.Code != http.StatusUnprocessableEntity || deniedBody["check_id"] != "offer_live" || deniedBody["check_text"] == "" {
+		t.Fatalf("restore retry check: %d %s", denied.Code, denied.Body.String())
+	}
+	if state, reason := statusOf(second); state != "failed" || reason != "re-insert re-read failed" {
+		t.Fatalf("failed restore check changed the failure: %s %s", state, reason)
+	}
+	var stillAction string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT failed_action FROM placement_proposals WHERE id=$1`, second).Scan(&stillAction); err != nil || stillAction != "restored" {
+		t.Fatalf("failed action after 422: %s %v", stillAction, err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='listed' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
 	}
 	retried, retriedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/retry", nil, siteKey)
 	if retried.Code != http.StatusOK || retriedBody["plugin_state"] != "pending" {

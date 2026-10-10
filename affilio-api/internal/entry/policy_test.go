@@ -189,7 +189,7 @@ func TestHardCheckCatalogIsTheOnlyList(t *testing.T) {
 }
 
 func TestRestoreRefusalsAreTheOnlyList(t *testing.T) {
-	want := []string{"window_expired", "paused"}
+	want := []string{"window_expired", "paused", "not_failed"}
 	if len(RestoreRefusals) != len(want) {
 		t.Fatalf("refusals: %+v", RestoreRefusals)
 	}
