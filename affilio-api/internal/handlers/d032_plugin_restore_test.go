@@ -124,6 +124,10 @@ func TestRestorePauseAndLimits(t *testing.T) {
 		t.Fatal("min relevance failure restored the placement")
 	}
 	current = current.Add(time.Second)
+	opened, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/sites/"+siteID+"/mode", map[string]any{"mode": "yolo", "min_relevance": 40})
+	if opened.Code != http.StatusOK {
+		t.Fatalf("reopen min relevance: %d %s", opened.Code, opened.Body.String())
+	}
 
 	capped := approve("https://limits.example/cap", 90)
 	undo(capped)

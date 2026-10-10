@@ -706,7 +706,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		Copy: placement.Copy, OfferData: serverOfferData(offer),
 		ExistingBoxes: boxes, Relevance: relevance, OfferLive: offer.Live,
 		RevokeWorks: placement.Status == "pending" || placement.Status == "approved" || placement.Status == "committed",
-		Position: req.Position, MakerID: offer.MakerID, Category: offer.Category, CopyEdited: req.CopyEdited, PlacementsIn30Days: used,
+		Position:    req.Position, MakerID: offer.MakerID, Category: offer.Category, CopyEdited: req.CopyEdited, PlacementsIn30Days: used,
 	}, h.claims())
 	if len(decision.Failures) > 0 && !decision.NeedsOwner {
 		writeCheckDenied(c, decision.Failures)
@@ -1096,6 +1096,19 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": status, "approved_by": approvedBy, "restored_by": userID, "actor": actor.Kind})
 }
 
+// revokePathAvailable is true when this placement can still be undone, or
+// when it is revoked because that undo already ran.
+func revokePathAvailable(row database.PlacementUndo) bool {
+	switch row.Status {
+	case "pending", "approved", "committed":
+		return true
+	case "revoked":
+		return row.UndoneAt != nil && row.StatusBefore != ""
+	default:
+		return false
+	}
+}
+
 func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementUndo) ([]string, error) {
 	offer, err := h.DB.OfferCopy(c.Request.Context(), row.OfferID)
 	if err != nil {
@@ -1121,7 +1134,7 @@ func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementU
 		Disclosure: row.Disclosure, RelSponsored: entry.RelSponsoredFromMarkup(row.Disclosure, row.Copy),
 		Copy: row.Copy, OfferData: serverOfferData(offer),
 		ExistingBoxes: boxes, Relevance: services.ScorePlacement(row.Copy, offer.ProductName, offer.Category, offer.Website),
-		OfferLive: offer.Live, RevokeWorks: row.Status == "revoked" && row.UndoneAt != nil && row.StatusBefore != "",
+		OfferLive: offer.Live, RevokeWorks: revokePathAvailable(row),
 		PlacementsIn30Days: used,
 	}, h.claims())
 	if decision.NeedsOwner && decision.Reason == entry.ClaimCheckReason {

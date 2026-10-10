@@ -84,7 +84,7 @@ ORDER BY pp.created_at DESC LIMIT 50`, makerID)
 }
 
 func (d *DB) MarkPlacementRemoved(ctx context.Context, siteID, id string) (already bool, at time.Time, found bool, err error) {
-	err = d.Pool.QueryRow(ctx, `UPDATE placement_proposals SET removed_at=NOW()
+	err = d.Pool.QueryRow(ctx, `UPDATE placement_proposals SET removed_at=NOW(), plugin_wait='remove', plugin_wait_at=NOW()
 WHERE id=$1 AND site_id=$2 AND removed_at IS NULL RETURNING removed_at`, id, siteID).Scan(&at)
 	if err == nil {
 		return false, at, true, nil
@@ -313,9 +313,9 @@ AND (status<>'revoked' OR id=$3)`, siteID, now.Add(-30*24*time.Hour), id).Scan(&
 		return "", "", "cap", false, nil
 	}
 	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL,
-plugin_wait='restore', plugin_wait_at=$4, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
+plugin_wait='restore', plugin_wait_at=$3, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
 WHERE id=$1
-RETURNING status, COALESCE(approved_by_kind,'')`, id, userID, keyHash, now).Scan(&status, &approvedBy)
+RETURNING status, COALESCE(approved_by_kind,'')`, id, userID, now).Scan(&status, &approvedBy)
 	if err != nil {
 		return "", "", "", false, err
 	}
