@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -43,9 +42,10 @@ func main() {
 	defer audit.Close()
 
 	r := gin.New()
-	r.Use(gin.LoggerWithFormatter(func(p gin.LogFormatterParams) string {
-		return fmt.Sprintf("%s %d %s %s %s\n", p.TimeStamp.Format(time.RFC3339), p.StatusCode, p.Method, p.Request.URL.Path, p.Latency)
-	}), gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ any) { log.Print("request panic recovered"); c.AbortWithStatus(500) }))
+	r.Use(gin.LoggerWithFormatter(middleware.AccessLogFormatter), gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ any) {
+		log.Print(middleware.ScrubLoggedIPs("request panic recovered"))
+		c.AbortWithStatus(500)
+	}))
 	if err := middleware.ConfigureTrustedProxies(r, cfg.TrustedProxies); err != nil {
 		log.Fatalf("failed to set trusted proxies: %v", err)
 	}
@@ -148,9 +148,10 @@ func main() {
 	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != ""}
 	payouts := &handlers.PayoutsHandler{DB: db}
 	redirects := &handlers.RedirectsHandler{
-		DB:          db,
-		RateLimiter: handlers.NewIPRateLimiter(120, time.Minute),
-		HomeURL:     "https://offerrails.com/",
+		DB:           db,
+		RateLimiter:  handlers.NewIPRateLimiter(120, time.Minute),
+		HomeURL:      "https://offerrails.com/",
+		IPSaltSecret: cfg.APIKeySecret,
 	}
 	var connectionCipher *services.ConnectionCipher
 	if cfg.ConnectionEncryptionKey != "" {

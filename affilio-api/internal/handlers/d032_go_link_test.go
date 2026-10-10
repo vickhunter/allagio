@@ -19,7 +19,11 @@ func TestPlacementGoLink(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	h, _, r := newEntryTest(t, db)
-	redirects := &RedirectsHandler{DB: db, HomeURL: "https://offerrails.example/"}
+	fixed := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	redirects := &RedirectsHandler{
+		DB: db, HomeURL: "https://offerrails.example/", IPSaltSecret: "test-salt",
+		now: func() time.Time { return fixed },
+	}
 	r.GET("/v1/go/:code", redirects.Go)
 	r.HEAD("/v1/go/:code", redirects.Go)
 
@@ -86,6 +90,9 @@ WHERE id=$1`, id, current, campaignID, current.Add(48*time.Hour), postURL); err 
 		r.ServeHTTP(rec, req)
 		if rec.Code != http.StatusFound {
 			t.Fatalf("%s: status %d body %s", label, rec.Code, rec.Body.String())
+		}
+		if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
+			t.Fatalf("%s: cache %q robots %q", label, rec.Header().Get("Cache-Control"), rec.Header().Get("X-Robots-Tag"))
 		}
 		return rec
 	}
@@ -200,11 +207,14 @@ WHERE id=$1`, id); err != nil {
 	if clicks() != beforeLive+1 {
 		t.Fatalf("live hit was not recorded: %d", clicks())
 	}
+	readerHash := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	otherHash := "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
 
 	forwarded := map[string]string{
-		"X-OR-Client-IP":  "203.0.113.50",
-		"X-OR-User-Agent": "ForwardedReader/9",
-		"X-OR-Referer":    "https://reader.example/article",
+		"X-OR-Client-IP":   "203.0.113.50",
+		"X-OR-Client-Hash": readerHash,
+		"X-OR-User-Agent":  "ForwardedReader/9",
+		"X-OR-Referer":     "https://reader.example/article",
 	}
 	ignored := goHit("headers without key", "/v1/go/"+id+"?via=plugin", "192.0.2.20:1000", "ConnectionBrowser/1.0", "https://server.internal/", forwarded)
 	if !strings.Contains(ignored.Header().Get("Location"), "via=") {
@@ -214,29 +224,31 @@ WHERE id=$1`, id); err != nil {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT user_agent, referrer, ip_hash FROM clicks WHERE placement_id=$1 ORDER BY clicked_at DESC LIMIT 1`, id).Scan(&ua, &referrer, &ipHash); err != nil {
 		t.Fatal(err)
 	}
-	if ua != "ConnectionBrowser/1.0" || referrer != "https://server.internal/" || ipHash != hashIP("192.0.2.20") {
+	if ua != "ConnectionBrowser/1.0" || referrer != "https://server.internal/" || ipHash != redirects.directReaderHash("192.0.2.20") || ipHash == readerHash {
 		t.Fatalf("forwarded headers were used without a site key: %s %s %s", ua, referrer, ipHash)
 	}
 
 	wrong := map[string]string{
-		"X-API-Key":       "go-other-key",
-		"X-OR-Client-IP":  "203.0.113.51",
-		"X-OR-User-Agent": "OtherSiteReader/1",
-		"X-OR-Referer":    "https://other.example/post",
+		"X-API-Key":        "go-other-key",
+		"X-OR-Client-IP":   "203.0.113.51",
+		"X-OR-Client-Hash": otherHash,
+		"X-OR-User-Agent":  "OtherSiteReader/1",
+		"X-OR-Referer":     "https://other.example/post",
 	}
 	goHit("headers with other site key", "/v1/go/"+id+"?via=plugin", "192.0.2.21:1000", "ConnectionBrowser/2.0", "https://server.internal/other", wrong)
 	if err := db.Pool.QueryRow(context.Background(), `SELECT user_agent, referrer, ip_hash FROM clicks WHERE placement_id=$1 ORDER BY clicked_at DESC LIMIT 1`, id).Scan(&ua, &referrer, &ipHash); err != nil {
 		t.Fatal(err)
 	}
-	if ua != "ConnectionBrowser/2.0" || referrer != "https://server.internal/other" || ipHash != hashIP("192.0.2.21") {
+	if ua != "ConnectionBrowser/2.0" || referrer != "https://server.internal/other" || ipHash != redirects.directReaderHash("192.0.2.21") || ipHash == otherHash {
 		t.Fatalf("forwarded headers were used for another site's key: %s %s %s", ua, referrer, ipHash)
 	}
 
 	matched := map[string]string{
-		"X-API-Key":       "go-site-key",
-		"X-OR-Client-IP":  "203.0.113.60",
-		"X-OR-User-Agent": "ForwardedReader/9",
-		"X-OR-Referer":    "https://reader.example/article",
+		"X-API-Key":        "go-site-key",
+		"X-OR-Client-IP":   "203.0.113.60",
+		"X-OR-Client-Hash": readerHash,
+		"X-OR-User-Agent":  "ForwardedReader/9",
+		"X-OR-Referer":     "https://reader.example/article",
 	}
 	tracked := goHit("plugin proxy", "/v1/go/"+id+"?via=plugin", "192.0.2.30:1000", "PublisherServer/1.0", "https://plugin.internal/", matched)
 	if !strings.Contains(tracked.Header().Get("Location"), "via=") {
@@ -245,16 +257,27 @@ WHERE id=$1`, id); err != nil {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT user_agent, referrer, ip_hash FROM clicks WHERE placement_id=$1 ORDER BY clicked_at DESC LIMIT 1`, id).Scan(&ua, &referrer, &ipHash); err != nil {
 		t.Fatal(err)
 	}
-	if ua != "ForwardedReader/9" || referrer != "https://reader.example/article" || ipHash != hashIP("203.0.113.60") {
+	if ua != "ForwardedReader/9" || referrer != "https://reader.example/article" || ipHash != readerHash || strings.Contains(ipHash, "203.0.113.60") {
 		t.Fatalf("plugin proxy did not use reader context: %s %s %s", ua, referrer, ipHash)
+	}
+	beforeDup := clicks()
+	goHit("plugin dedup", "/v1/go/"+id+"?via=plugin", "192.0.2.31:1000", "PublisherServer/1.0", "https://plugin.internal/", matched)
+	if clicks() != beforeDup {
+		t.Fatalf("same hash and user agent was not deduped: %d to %d", beforeDup, clicks())
+	}
+	matched["X-OR-User-Agent"] = "OtherReader/2"
+	goHit("plugin different agent", "/v1/go/"+id+"?via=plugin", "192.0.2.32:1000", "PublisherServer/1.0", "https://plugin.internal/", matched)
+	if clicks() != beforeDup+1 {
+		t.Fatalf("a different user agent should be a new hit: %d", clicks())
 	}
 
 	beforeBot := clicks()
 	botHeaders := map[string]string{
-		"X-API-Key":       "go-site-key",
-		"X-OR-Client-IP":  "203.0.113.70",
-		"X-OR-User-Agent": "Twitterbot/1.0",
-		"X-OR-Referer":    "https://reader.example/article",
+		"X-API-Key":        "go-site-key",
+		"X-OR-Client-IP":   "203.0.113.70",
+		"X-OR-Client-Hash": readerHash,
+		"X-OR-User-Agent":  "Twitterbot/1.0",
+		"X-OR-Referer":     "https://reader.example/article",
 	}
 	bot := goHit("forwarded bot", "/v1/go/"+id+"?via=plugin", "192.0.2.40:1000", "Mozilla/5.0 reader", "https://go.example/the-post", botHeaders)
 	if bot.Header().Get("Location") != plain || clicks() != beforeBot {

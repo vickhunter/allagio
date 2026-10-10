@@ -1493,7 +1493,7 @@ func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 		if !strings.Contains(doc, "A 409 returns `reason` and `message`") || !strings.Contains(doc, "A 422 returns `check_id` and `check_text`") {
 			t.Fatal("docs drifted on the 409 and 422 body shapes")
 		}
-		if !strings.Contains(doc, "Digest totals, site totals, and Live now exclude") || !strings.Contains(doc, "Leave a failed restore removed") || !strings.Contains(doc, "counts as live only when `plugin_state` is `placed`") || !strings.Contains(doc, "`GET /v1/go/<placement_id>` always returns 302") || !strings.Contains(doc, "`fallback_url`") || !strings.Contains(doc, "`X-OR-Client-IP`") {
+		if !strings.Contains(doc, "Digest totals, site totals, and Live now exclude") || !strings.Contains(doc, "Leave a failed restore removed") || !strings.Contains(doc, "counts as live only when `plugin_state` is `placed`") || !strings.Contains(doc, "`GET /v1/go/<placement_id>` always returns 302") || !strings.Contains(doc, "`fallback_url`") || !strings.Contains(doc, "`X-OR-Client-Hash`") || !strings.Contains(doc, "/24") || !strings.Contains(doc, "00:00 UTC") {
 			t.Fatal("docs drifted on leave-it-removed")
 		}
 	}

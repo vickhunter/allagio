@@ -135,13 +135,18 @@ func (d *DB) LookupPlacementRedirect(ctx context.Context, placementID string) (P
 	return out, nil
 }
 
-// RecentPlacementClick returns a hit from the same reader on this placement
-// inside the dedup window. An empty id means there is no recent hit.
-func (d *DB) RecentPlacementClick(ctx context.Context, placementID, ipHash string, withinSeconds int) (string, error) {
+// RecentPlacementClick returns a hit from the same reader hash and user agent
+// on this site and placement inside the dedup window. An empty hash is not a
+// reader, so it never matches. An empty id means there is no recent hit.
+func (d *DB) RecentPlacementClick(ctx context.Context, siteID, placementID, ipHash, userAgent string, withinSeconds int) (string, error) {
+	if ipHash == "" {
+		return "", nil
+	}
 	var id string
 	err := d.Pool.QueryRow(ctx, `SELECT id::text FROM clicks
-WHERE placement_id=$1 AND ip_hash=$2 AND clicked_at >= NOW() - ($3 * INTERVAL '1 second')
-ORDER BY clicked_at DESC LIMIT 1`, placementID, ipHash, withinSeconds).Scan(&id)
+WHERE site_id=$1 AND placement_id=$2 AND ip_hash=$3 AND COALESCE(user_agent,'')=$4
+AND clicked_at >= NOW() - ($5 * INTERVAL '1 second')
+ORDER BY clicked_at DESC LIMIT 1`, siteID, placementID, ipHash, userAgent, withinSeconds).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil
 	}

@@ -2,11 +2,10 @@ package handlers
 
 import (
 	"errors"
-	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/services"
@@ -20,14 +19,15 @@ type RedirectsHandler struct {
 	// HomeURL is the Offer Rails home page. Unknown placement ids land here
 	// when the site is not known.
 	HomeURL string
+	// IPSaltSecret is mixed into the daily server salt for direct go links.
+	// Empty uses the development secret.
+	IPSaltSecret string
+	now          func() time.Time
 }
 
 const (
 	offerRailsHome             = "https://offerrails.com/"
 	placementClickDedupSeconds = 45
-	headerORClientIP           = "X-OR-Client-IP"
-	headerORUserAgent          = "X-OR-User-Agent"
-	headerORReferer            = "X-OR-Referer"
 )
 
 // Go is the tracked-link entry point published in publisher posts: it logs the
@@ -35,16 +35,15 @@ const (
 // in the offer's ref parameter, which the maker's checkout carries back to us
 // through provider metadata.
 func (h *RedirectsHandler) Go(c *gin.Context) {
+	stampGoResponse(c)
 	code := strings.TrimSpace(c.Param("code"))
+	req := captureGoRequest(c)
+	scrubGoRequest(c.Request)
 	if uuidPattern.MatchString(code) {
-		h.goPlacement(c, code)
+		h.goPlacement(c, code, req)
 		return
 	}
-	clientIP := strings.TrimSpace(c.ClientIP())
-	if clientIP == "" {
-		clientIP = "unknown"
-	}
-	if h.RateLimiter != nil && !h.RateLimiter.Allow(clientIP) {
+	if h.RateLimiter != nil && !h.RateLimiter.Allow(h.rateLimitKey(req.clientIP)) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 		return
 	}
@@ -111,13 +110,13 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 	}
 	// Link-preview fetches and HEAD probes still need the destination, but
 	// they are not visitors and must not create a click or an attribution ref.
-	if c.Request.Method == http.MethodHead || isPreviewBot(c.Request.UserAgent()) {
+	if c.Request.Method == http.MethodHead || isPreviewBot(req.userAgent) {
 		c.Redirect(http.StatusFound, link.LandingURL)
 		return
 	}
-	clickID, err := h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, hashIP(c.ClientIP()), c.Request.UserAgent(), c.Request.Referer(), c.Query("placement"))
+	clickID, err := h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, h.directReaderHash(req.clientIP), req.userAgent, req.referer, c.Query("placement"))
 	if err != nil {
-		log.Printf("redirects.go click insert failed campaign=%s err=%v", link.CampaignID, err)
+		logGo("redirects.go click insert failed campaign=%s err=%v", link.CampaignID, err)
 		c.Redirect(http.StatusFound, link.LandingURL)
 		return
 	}
@@ -194,14 +193,14 @@ func appendRefParam(landingURL, refParam, clickID string) string {
 
 // goPlacement is GET /v1/go/<placement_id>. It always answers 302. A ref is
 // attached and a hit is recorded only when placement_counts_as_live is true.
-func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string) {
+func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req goRequest) {
 	link, err := h.DB.LookupPlacementRedirect(c.Request.Context(), placementID)
 	if err != nil {
-		log.Printf("redirects.go placement lookup failed id=%s err=%v", placementID, err)
+		logGo("redirects.go placement lookup failed id=%s err=%v", placementID, err)
 		c.Redirect(http.StatusFound, h.offerRailsHome())
 		return
 	}
-	reader, siteID, domain := h.placementReader(c, link)
+	reader, siteID, domain := h.placementReader(c, link, req)
 	if !link.Found {
 		if siteID != "" {
 			c.Redirect(http.StatusFound, siteHome(domain))
@@ -221,7 +220,7 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string) {
 	}
 	clickID, err := h.recordPlacementHit(c, link, placementID, reader)
 	if err != nil {
-		log.Printf("redirects.go placement click failed id=%s err=%v", placementID, err)
+		logGo("redirects.go placement click failed id=%s err=%v", placementID, err)
 		c.Redirect(http.StatusFound, plain)
 		return
 	}
@@ -229,34 +228,31 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string) {
 }
 
 type goReader struct {
-	ip        string
+	hash      string
 	userAgent string
 	referer   string
 }
 
-// placementReader uses the connection for a public hit. via=plugin forwards
-// the reader's IP, user agent, and referer only when the site key matches
-// this placement's site. Any other key leaves those headers unused.
-func (h *RedirectsHandler) placementReader(c *gin.Context, link database.PlacementRedirect) (goReader, string, string) {
+// placementReader hashes the connection address for a public hit. via=plugin
+// uses the plugin's client hash, user agent, and referer only when the site
+// key matches this placement's site. Any other key leaves those headers unused.
+// A trusted plugin call does not fall back to the publisher server's address.
+func (h *RedirectsHandler) placementReader(c *gin.Context, link database.PlacementRedirect, req goRequest) (goReader, string, string) {
 	reader := goReader{
-		ip:        strings.TrimSpace(c.ClientIP()),
-		userAgent: c.Request.UserAgent(),
-		referer:   c.Request.Referer(),
+		hash:      h.directReaderHash(req.clientIP),
+		userAgent: req.userAgent,
+		referer:   req.referer,
 	}
-	if reader.ip == "" {
-		reader.ip = "unknown"
-	}
-	if c.Query("via") != "plugin" {
+	if req.via != "plugin" {
 		return reader, "", ""
 	}
-	key := strings.TrimSpace(c.GetHeader("X-API-Key"))
-	if key == "" {
+	if req.apiKey == "" {
 		return reader, "", ""
 	}
-	siteID, domain, ok, err := h.DB.SiteForGoKey(c.Request.Context(), services.HashAPIKey(key), services.KeyPrefix(key))
+	siteID, domain, ok, err := h.DB.SiteForGoKey(c.Request.Context(), services.HashAPIKey(req.apiKey), services.KeyPrefix(req.apiKey))
 	if err != nil || !ok {
 		if err != nil {
-			log.Printf("redirects.go plugin key lookup failed err=%v", err)
+			logGo("redirects.go plugin key lookup failed err=%v", err)
 		}
 		return reader, "", ""
 	}
@@ -266,13 +262,15 @@ func (h *RedirectsHandler) placementReader(c *gin.Context, link database.Placeme
 	if !link.Found {
 		return reader, siteID, domain
 	}
-	if ip := forwardedIP(c.GetHeader(headerORClientIP)); ip != "" {
-		reader.ip = ip
+	if hashed := clientHashHeader(req.pluginHash); hashed != "" {
+		reader.hash = hashed
+	} else {
+		reader.hash = ""
 	}
-	if ua := strings.TrimSpace(c.GetHeader(headerORUserAgent)); ua != "" {
+	if ua := strings.TrimSpace(req.pluginUA); ua != "" {
 		reader.userAgent = ua
 	}
-	if ref := strings.TrimSpace(c.GetHeader(headerORReferer)); ref != "" {
+	if ref := strings.TrimSpace(req.pluginRef); ref != "" {
 		reader.referer = ref
 	}
 	return reader, siteID, domain
@@ -282,15 +280,11 @@ func (h *RedirectsHandler) recordPlacementHit(c *gin.Context, link database.Plac
 	if link.CampaignID == "" {
 		return "", errors.New("live placement has no campaign")
 	}
-	ipHash := hashIP(reader.ip)
-	if ipHash == "" {
-		ipHash = hashIP("unknown")
-	}
-	existing, err := h.DB.RecentPlacementClick(c.Request.Context(), placementID, ipHash, placementClickDedupSeconds)
+	existing, err := h.DB.RecentPlacementClick(c.Request.Context(), link.SiteID, placementID, reader.hash, reader.userAgent, placementClickDedupSeconds)
 	if err != nil || existing != "" {
 		return existing, err
 	}
-	return h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, ipHash, reader.userAgent, reader.referer, placementID)
+	return h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, reader.hash, reader.userAgent, reader.referer, placementID)
 }
 
 func (h *RedirectsHandler) postOrHome(link database.PlacementRedirect) string {
@@ -319,12 +313,4 @@ func siteHome(domain string) string {
 		return strings.TrimRight(domain, "/") + "/"
 	}
 	return "https://" + strings.Trim(domain, "/") + "/"
-}
-
-func forwardedIP(raw string) string {
-	raw = strings.TrimSpace(strings.Split(raw, ",")[0])
-	if net.ParseIP(raw) == nil {
-		return ""
-	}
-	return raw
 }
