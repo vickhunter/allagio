@@ -168,10 +168,9 @@ func (h *AgentEntry) AccountDigest(c *gin.Context) {
 		"earnings_note": earningsNote,
 		"session":       gin.H{"signed_in": !credentialPresented(c)},
 	}
-	if !h.claims().Real() {
-		body["approval_reason"] = entry.ClaimCheckReason
-		body["approval_message"] = entry.ClaimCheckMessage
-		body["effective_mode"] = entry.ModeManual
+	if err = h.attachDigestMeta(c, owner, body); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
 	}
 	c.JSON(http.StatusOK, body)
 }

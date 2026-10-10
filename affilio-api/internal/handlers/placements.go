@@ -33,8 +33,9 @@ type PlacementsHandler struct {
 }
 
 // PlacementPollInterval is the shortest period the placement status read may
-// enforce. A client polling every 4 seconds must still be allowed through.
-const PlacementPollInterval = 4 * time.Second
+// enforce. One call every 2 seconds per placement leaves headroom for a
+// client that polls every 4 seconds.
+const PlacementPollInterval = 2 * time.Second
 
 func NewPlacementPollLimiter() *IPRateLimiter {
 	return NewIPRateLimiter(1, PlacementPollInterval)

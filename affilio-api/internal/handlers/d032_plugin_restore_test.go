@@ -440,8 +440,8 @@ func TestPlacementStatusPollAllowsFourSeconds(t *testing.T) {
 	limiter := NewPlacementPollLimiter()
 	limiter.nowFn = func() time.Time { return now }
 	api.StatusLimiter = limiter
-	if PlacementPollInterval < 4*time.Second || limiter.limit < 1 {
-		t.Fatal("placement status limit is stricter than one request per 4 seconds")
+	if PlacementPollInterval != 2*time.Second || limiter.limit < 1 {
+		t.Fatal("placement status limit must be one request every 2 seconds")
 	}
 	query := strings.ToLower(database.PlacementStatusSQL)
 	if strings.Contains(query, " join ") || strings.Count(query, " from ") != 1 || !strings.Contains(query, "from placement_proposals") {
@@ -473,6 +473,16 @@ func TestPlacementStatusPollAllowsFourSeconds(t *testing.T) {
 	session, sessionBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/placements/"+first, nil)
 	if session.Code != http.StatusOK || sessionBody["plugin_state"] != "pending" {
 		t.Fatalf("other session: %d %s", session.Code, session.Body.String())
+	}
+	now = now.Add(time.Second)
+	tooSoon, _ := postJSON(t, r, http.MethodGet, "/v1/placements/"+first, nil, siteKey)
+	if tooSoon.Code != http.StatusTooManyRequests {
+		t.Fatalf("poll after 1s: %d %s", tooSoon.Code, tooSoon.Body.String())
+	}
+	now = now.Add(time.Second)
+	afterWindow, _ := postJSON(t, r, http.MethodGet, "/v1/placements/"+first, nil, siteKey)
+	if afterWindow.Code != http.StatusOK {
+		t.Fatalf("poll after 2s: %d %s", afterWindow.Code, afterWindow.Body.String())
 	}
 	now = now.Add(4 * time.Second)
 	after, _ := postJSON(t, r, http.MethodGet, "/v1/placements/"+first, nil, siteKey)

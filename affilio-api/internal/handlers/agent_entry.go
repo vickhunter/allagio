@@ -8,6 +8,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -340,7 +342,7 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 			path = ""
 		}
 		mode := entry.DefaultMode(source)
-		c.JSON(http.StatusOK, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn, source, h.claims()))
+		h.finishSetup(c, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn, source, h.claims()), actor.SiteID)
 		return
 	}
 	if err != nil {
@@ -352,7 +354,18 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings unavailable"})
 		return
 	}
-	c.JSON(http.StatusOK, setupJSON(saved, true, human, signedIn, source, h.claims()))
+	h.finishSetup(c, setupJSON(saved, true, human, signedIn, source, h.claims()), actor.SiteID)
+}
+
+type setupCommission struct {
+	Type     string   `json:"type"`
+	Value    *float64 `json:"value"`
+	Currency string   `json:"currency"`
+}
+
+type setupPrice struct {
+	Value    *float64 `json:"value"`
+	Currency string   `json:"currency"`
 }
 
 func (h *AgentEntry) PutSetup(c *gin.Context) {
@@ -370,16 +383,19 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Role          string   `json:"role"`
-		InstallPath   string   `json:"install_path"`
-		Mode          string   `json:"mode"`
-		ModeShown     string   `json:"mode_shown"`
-		Promote       string   `json:"promote"`
-		AvoidTopics   []string `json:"avoid_topics"`
-		Commission    string   `json:"commission"`
-		SitesChannels []string `json:"sites_channels"`
-		NeverTopics   []string `json:"never_topics"`
-		BoxPosition   string   `json:"box_position"`
+		Role          string           `json:"role"`
+		InstallPath   string           `json:"install_path"`
+		Mode          string           `json:"mode"`
+		ModeShown     string           `json:"mode_shown"`
+		Promote       string           `json:"promote"`
+		AvoidTopics   []string         `json:"avoid_topics"`
+		ProjectName   string           `json:"project_name"`
+		ListingURL    string           `json:"listing_url"`
+		Commission    *setupCommission `json:"commission"`
+		ListingPrice  *setupPrice      `json:"listing_price"`
+		SitesChannels []string         `json:"sites_channels"`
+		NeverTopics   []string         `json:"never_topics"`
+		BoxPosition   string           `json:"box_position"`
 	}
 	if decodeStrict(body, &req) != nil || (req.Role != "maker" && req.Role != "publisher") || !entry.ValidInstallPath(req.InstallPath) || !entry.ValidMode(req.Mode) || !entry.ValidMode(req.ModeShown) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "role, install_path, mode, and mode_shown required"})
@@ -389,15 +405,24 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown box position"})
 		return
 	}
-	if utf8.RuneCountInString(req.Promote) > 280 || utf8.RuneCountInString(req.Commission) > 32 || !shortList(req.AvoidTopics) || !shortList(req.NeverTopics) || !shortList(req.SitesChannels) {
+	req.ProjectName = strings.TrimSpace(req.ProjectName)
+	req.ListingURL = strings.TrimSpace(req.ListingURL)
+	if utf8.RuneCountInString(req.Promote) > 280 || utf8.RuneCountInString(req.ProjectName) > 120 || !validListingURL(req.ListingURL) || !shortList(req.AvoidTopics) || !shortList(req.NeverTopics) || !shortList(req.SitesChannels) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "settings are too long"})
+		return
+	}
+	commissionText, commissionType, commissionValue, commissionCurrency, priceValue, priceCurrency, moneyErr := normalizeSetupMoney(req.Commission, req.ListingPrice)
+	if moneyErr != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": moneyErr})
 		return
 	}
 	now := time.Now().UTC()
 	saved := database.SetupSettings{
 		OwnerID: owner.ID, Role: req.Role, InstallPath: req.InstallPath, Mode: req.Mode, ModeShown: req.ModeShown,
-		Promote: req.Promote, AvoidTopics: req.AvoidTopics, Commission: req.Commission, SitesChannels: req.SitesChannels,
-		NeverTopics: req.NeverTopics, BoxPosition: req.BoxPosition, SavedBy: owner.ID, SavedAt: now,
+		Promote: req.Promote, AvoidTopics: req.AvoidTopics, Commission: commissionText, ProjectName: req.ProjectName, ListingURL: req.ListingURL,
+		CommissionType: commissionType, CommissionValue: commissionValue, CommissionCurrency: commissionCurrency,
+		ListingPriceValue: priceValue, ListingPriceCurrency: priceCurrency,
+		SitesChannels: req.SitesChannels, NeverTopics: req.NeverTopics, BoxPosition: req.BoxPosition, SavedBy: owner.ID, SavedAt: now,
 	}
 	if err = h.DB.SaveSetup(c.Request.Context(), saved); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
@@ -417,7 +442,7 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
 		return
 	}
-	c.JSON(http.StatusOK, setupJSON(saved, true, human, true, source, h.claims()))
+	h.finishSetup(c, setupJSON(saved, true, human, true, source, h.claims()), owner.SiteID)
 }
 
 func (h *AgentEntry) applySetupMode(c *gin.Context, owner *database.Owner, saved database.SetupSettings) error {
@@ -721,7 +746,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		c.JSON(http.StatusOK, body)
 		return
 	}
-	updated, err := h.DB.RecordPolicyApproval(c.Request.Context(), placement.ID, siteID, actor.UserID, decision.ApprovedBy, decision.MatchedRule, policy.Version, relevance)
+	updated, err := h.DB.RecordPolicyApproval(c.Request.Context(), placement.ID, siteID, actor.UserID, decision.ApprovedBy, decision.MatchedRule, policy.Version, relevance, req.Position)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "approval failed"})
 		return
@@ -922,10 +947,9 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 		wentLive = n
 	}
 	body := gin.H{"since": sinceOut, "items": items, "went_live": wentLive, "session": gin.H{"signed_in": true}}
-	if !h.claims().Real() {
-		body["approval_reason"] = entry.ClaimCheckReason
-		body["approval_message"] = entry.ClaimCheckMessage
-		body["effective_mode"] = entry.ModeManual
+	if err = h.attachDigestMeta(c, owner, body); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
 	}
 	c.JSON(http.StatusOK, body)
 }
@@ -1284,11 +1308,29 @@ func (h *AgentEntry) PlacementStatus(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if actor.SiteID == "" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "site key required"})
-		return
+	siteID := actor.SiteID
+	if siteID == "" {
+		if actor.MakerID == "" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "site key required"})
+			return
+		}
+		placement, err := h.DB.GetPlacementByID(c.Request.Context(), c.Param("id"))
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "placement status unavailable"})
+			return
+		}
+		_, makerID, _, err := h.DB.OfferFacts(c.Request.Context(), placement.OfferID)
+		if err != nil || makerID != actor.MakerID || (actor.OfferID != "" && actor.OfferID != placement.OfferID) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "offer is not on this key"})
+			return
+		}
+		siteID = placement.SiteID
 	}
-	writePlacementStatus(c, h.DB, h.StatusLimiter, h.now(), h.pluginWindow(), actor.SiteID, actor.UserID)
+	writePlacementStatus(c, h.DB, h.StatusLimiter, h.now(), h.pluginWindow(), siteID, actor.UserID)
 }
 
 func (h *AgentEntry) pluginView(c *gin.Context, id string) (state, failedReason, failedAction string, err error) {
@@ -1621,6 +1663,146 @@ func policyJSON(p database.ApprovalPolicy, source string) gin.H {
 	}
 }
 
+func (h *AgentEntry) finishSetup(c *gin.Context, body gin.H, siteID string) {
+	siteURL, err := h.siteURL(c, siteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings unavailable"})
+		return
+	}
+	body["change_url"] = h.changeURL()
+	body["site_url"] = siteURL
+	c.JSON(http.StatusOK, body)
+}
+
+func (h *AgentEntry) changeURL() string {
+	base := strings.TrimRight(h.BaseURL, "/")
+	if base == "" {
+		return "/owner"
+	}
+	return base + "/owner"
+}
+
+func (h *AgentEntry) siteURL(c *gin.Context, siteID string) (string, error) {
+	if siteID == "" {
+		return "", nil
+	}
+	site, err := h.DB.GetSiteByID(c.Request.Context(), siteID)
+	if err != nil {
+		return "", err
+	}
+	return siteHome(site.Domain), nil
+}
+
+func (h *AgentEntry) attachDigestMeta(c *gin.Context, owner *database.Owner, body gin.H) error {
+	pause, err := h.DB.DigestPause(c.Request.Context(), owner.ID, owner.SiteID, owner.MakerID)
+	if err != nil {
+		return err
+	}
+	since, err := h.DB.LastDigestOpen(c.Request.Context(), owner.ID)
+	if err != nil {
+		return err
+	}
+	floor := time.Unix(0, 0).UTC()
+	if since != nil {
+		floor = *since
+	}
+	wentSince, err := h.DB.CountWentLiveSince(c.Request.Context(), owner.SiteID, floor)
+	if err != nil {
+		return err
+	}
+	siteURL, err := h.siteURL(c, owner.SiteID)
+	if err != nil {
+		return err
+	}
+	body["paused"] = gin.H{"account": pause.Account, "site": pause.Site, "offer": pause.Offer}
+	body["went_live_since_last"] = wentSince
+	body["change_url"] = h.changeURL()
+	body["site_url"] = siteURL
+	body["available_modes"] = entry.AvailableModes()
+	if !h.claims().Real() {
+		body["approval_reason"] = entry.ClaimCheckReason
+		body["approval_message"] = entry.ClaimCheckMessage
+		body["effective_mode"] = entry.ModeManual
+	}
+	return nil
+}
+
+func normalizeSetupMoney(commission *setupCommission, price *setupPrice) (text, kind string, value *float64, currency string, priceValue *float64, priceCurrency, problem string) {
+	if commission != nil {
+		kind = commission.Type
+		if kind != "percent" && kind != "fixed" {
+			return "", "", nil, "", nil, "", "commission type must be percent or fixed"
+		}
+		if commission.Value == nil || *commission.Value < 0 {
+			return "", "", nil, "", nil, "", "commission value is required"
+		}
+		if kind == "percent" && *commission.Value > 100 {
+			return "", "", nil, "", nil, "", "commission percent must be from 0 to 100"
+		}
+		var ok bool
+		currency, ok = normalizeCurrency(commission.Currency)
+		if !ok {
+			return "", "", nil, "", nil, "", "commission currency must be a 3-letter code"
+		}
+		if kind == "fixed" && currency == "" {
+			return "", "", nil, "", nil, "", "currency is required when commission type is fixed"
+		}
+		amount := *commission.Value
+		value = &amount
+		if kind == "percent" {
+			text = strconv.FormatFloat(amount, 'f', -1, 64) + "%"
+		} else {
+			text = strconv.FormatFloat(amount, 'f', -1, 64) + " " + currency
+		}
+	}
+	if price != nil {
+		if price.Value == nil || *price.Value < 0 {
+			return "", "", nil, "", nil, "", "listing_price value is required"
+		}
+		var ok bool
+		priceCurrency, ok = normalizeCurrency(price.Currency)
+		if !ok || priceCurrency == "" {
+			return "", "", nil, "", nil, "", "listing_price currency is required"
+		}
+		if currency != "" && priceCurrency != currency {
+			return "", "", nil, "", nil, "", "listing_price currency must match commission"
+		}
+		amount := *price.Value
+		priceValue = &amount
+	}
+	return text, kind, value, currency, priceValue, priceCurrency, ""
+}
+
+func normalizeCurrency(raw string) (string, bool) {
+	raw = strings.ToUpper(strings.TrimSpace(raw))
+	if raw == "" {
+		return "", true
+	}
+	if len(raw) != 3 {
+		return "", false
+	}
+	for _, r := range raw {
+		if r < 'A' || r > 'Z' {
+			return "", false
+		}
+	}
+	return raw, true
+}
+
+func validListingURL(raw string) bool {
+	if raw == "" {
+		return true
+	}
+	if len(raw) > 2000 {
+		return false
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" || parsed.User != nil {
+		return false
+	}
+	return parsed.Scheme == "https" || parsed.Scheme == "http"
+}
+
 func setupJSON(s database.SetupSettings, saved, human, signedIn bool, source string, claims entry.ClaimChecker) gin.H {
 	mode := s.Mode
 	reason, message := "", ""
@@ -1633,8 +1815,9 @@ func setupJSON(s database.SetupSettings, saved, human, signedIn bool, source str
 	}
 	body := gin.H{
 		"saved": saved, "role": s.Role, "install_path": s.InstallPath, "mode": mode, "mode_shown": s.ModeShown,
-		"mode_preselected": entry.DefaultMode(source),
-		"promote":          s.Promote, "avoid_topics": listOrEmpty(s.AvoidTopics), "commission": s.Commission,
+		"mode_preselected": entry.DefaultMode(source), "available_modes": entry.AvailableModes(),
+		"promote": s.Promote, "avoid_topics": listOrEmpty(s.AvoidTopics), "commission": commissionJSON(s),
+		"project_name": s.ProjectName, "listing_url": s.ListingURL, "listing_price": listingPriceJSON(s),
 		"sites_channels": listOrEmpty(s.SitesChannels), "never_topics": listOrEmpty(s.NeverTopics), "box_position": s.BoxPosition,
 		"human_login": human, "session": gin.H{"signed_in": signedIn},
 	}
@@ -1657,15 +1840,36 @@ func approvalJSON(decision entry.Decision, version int) gin.H {
 	}
 }
 
+func commissionJSON(s database.SetupSettings) any {
+	if s.CommissionType == "" || s.CommissionValue == nil {
+		return nil
+	}
+	return gin.H{"type": s.CommissionType, "value": *s.CommissionValue, "currency": s.CommissionCurrency}
+}
+
+func listingPriceJSON(s database.SetupSettings) any {
+	if s.ListingPriceValue == nil {
+		return nil
+	}
+	return gin.H{"value": *s.ListingPriceValue, "currency": s.ListingPriceCurrency}
+}
+
 func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
-	body := gin.H{"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token}
+	pluginState := ""
 	if item.Kind == "placement" {
-		body["plugin_state"] = entry.PluginState(item.PluginWait, item.PluginWaitAt, item.PluginFailedReason != "", h.now(), h.pluginWindow())
+		pluginState = entry.PluginState(item.PluginWait, item.PluginWaitAt, item.PluginFailedReason != "", h.now(), h.pluginWindow())
+	}
+	ruleID, ruleText := entry.PresentRule(item.MatchedRule)
+	body := gin.H{
+		"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token,
+		"plugin_state": pluginState, "live_now": item.CountsAsLive,
+		"post_title": item.PostTitle, "position": item.Position, "link_text": item.LinkText, "label": item.Label,
+		"clicks": item.Clicks, "approved_by": item.ApprovedBy,
+		"policy_rule_id": ruleID, "policy_rule_text": ruleText, "rules_version": item.PolicyVersion,
+	}
+	if item.Kind == "placement" {
 		body["plugin_failed_reason"] = item.PluginFailedReason
 		body["failed_action"] = item.FailedAction
-		ruleID, ruleText := entry.PresentRule(item.MatchedRule)
-		body["policy_rule_id"] = ruleID
-		body["policy_rule_text"] = ruleText
 	}
 	return body
 }

@@ -121,7 +121,7 @@ VALUES($1,$2,$3,'context for the section',$4,'(link sponsorizzato)','relevant','
 type rejectingClaims struct{}
 
 func (rejectingClaims) CheckClaims(string, string) error { return errors.New("claim") }
-func (rejectingClaims) Real() bool                      { return true }
+func (rejectingClaims) Real() bool                       { return true }
 
 func TestDeviceSignIn(t *testing.T) {
 	db, cleanup := setupTestDB(t)
@@ -395,10 +395,10 @@ func TestPolicyEngineHTTP(t *testing.T) {
 	if rec.Code != http.StatusOK || decision["approved_by"] != "policy:yolo" || decision["matched_rule"] != "hard_checks" || decision["policy_rule_id"] != "hard_checks_passed" || decision["policy_rule_text"] != "Passed every hard check." || decision["policy_version"] == float64(0) {
 		t.Fatalf("yolo approve: %d %s", rec.Code, rec.Body.String())
 	}
-	var kind, rule string
+	var kind, rule, position string
 	var version int
-	if err := db.Pool.QueryRow(context.Background(), `SELECT approved_by_kind, matched_rule, policy_version FROM placement_proposals WHERE id=$1`, placementID).Scan(&kind, &rule, &version); err != nil || kind != "policy:yolo" || rule != "hard_checks" || version < 1 {
-		t.Fatalf("stored approval %s %s %d %v", kind, rule, version, err)
+	if err := db.Pool.QueryRow(context.Background(), `SELECT approved_by_kind, matched_rule, policy_version, position FROM placement_proposals WHERE id=$1`, placementID).Scan(&kind, &rule, &version, &position); err != nil || kind != "policy:yolo" || rule != "hard_checks" || version < 1 || position != "end" {
+		t.Fatalf("stored approval %s %s %d %s %v", kind, rule, version, position, err)
 	}
 	second := insertPlacement(t, db, siteID, offerID, "https://policy.example/post", "Another Policy Product note.")
 	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})

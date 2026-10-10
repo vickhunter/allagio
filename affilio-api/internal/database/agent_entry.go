@@ -34,19 +34,26 @@ type DevicePoll struct {
 }
 
 type SetupSettings struct {
-	OwnerID       string
-	Role          string
-	InstallPath   string
-	Mode          string
-	ModeShown     string
-	Promote       string
-	AvoidTopics   []string
-	Commission    string
-	SitesChannels []string
-	NeverTopics   []string
-	BoxPosition   string
-	SavedBy       string
-	SavedAt       time.Time
+	OwnerID              string
+	Role                 string
+	InstallPath          string
+	Mode                 string
+	ModeShown            string
+	Promote              string
+	AvoidTopics          []string
+	Commission           string
+	ProjectName          string
+	ListingURL           string
+	CommissionType       string
+	CommissionValue      *float64
+	CommissionCurrency   string
+	ListingPriceValue    *float64
+	ListingPriceCurrency string
+	SitesChannels        []string
+	NeverTopics          []string
+	BoxPosition          string
+	SavedBy              string
+	SavedAt              time.Time
 }
 
 type ApprovalPolicy struct {
@@ -94,6 +101,20 @@ type DigestItem struct {
 	PluginFailedReason string
 	FailedAction       string
 	MatchedRule        string
+	PostTitle          string
+	Position           string
+	LinkText           string
+	Label              string
+	Clicks             int
+	ApprovedBy         string
+	PolicyVersion      int
+}
+
+// DigestPause is the account, site, and offer pause state for one digest.
+type DigestPause struct {
+	Account bool
+	Site    bool
+	Offer   bool
 }
 
 // DigestPageSize is the item page. Counts are not limited by it.
@@ -357,13 +378,17 @@ func (d *DB) ownerIDs(ctx context.Context, query string) ([]string, error) {
 }
 
 func (d *DB) SaveSetup(ctx context.Context, s SetupSettings) error {
-	_, err := d.Pool.Exec(ctx, `INSERT INTO owner_setup(owner_id,role,install_path,mode,mode_shown,promote_text,avoid_topics,commission,sites_channels,never_topics,box_position,saved_by,saved_at)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+	_, err := d.Pool.Exec(ctx, `INSERT INTO owner_setup(owner_id,role,install_path,mode,mode_shown,promote_text,avoid_topics,commission,sites_channels,never_topics,box_position,saved_by,saved_at,project_name,listing_url,commission_type,commission_value,commission_currency,listing_price_value,listing_price_currency)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
 ON CONFLICT(owner_id,role) DO UPDATE SET install_path=EXCLUDED.install_path, mode=EXCLUDED.mode, mode_shown=EXCLUDED.mode_shown,
 promote_text=EXCLUDED.promote_text, avoid_topics=EXCLUDED.avoid_topics, commission=EXCLUDED.commission,
 sites_channels=EXCLUDED.sites_channels, never_topics=EXCLUDED.never_topics, box_position=EXCLUDED.box_position,
-saved_by=EXCLUDED.saved_by, saved_at=EXCLUDED.saved_at`,
-		s.OwnerID, s.Role, s.InstallPath, s.Mode, s.ModeShown, nullString(s.Promote), textList(s.AvoidTopics), nullString(s.Commission), textList(s.SitesChannels), textList(s.NeverTopics), nullString(s.BoxPosition), s.SavedBy, s.SavedAt)
+saved_by=EXCLUDED.saved_by, saved_at=EXCLUDED.saved_at,
+project_name=EXCLUDED.project_name, listing_url=EXCLUDED.listing_url,
+commission_type=EXCLUDED.commission_type, commission_value=EXCLUDED.commission_value, commission_currency=EXCLUDED.commission_currency,
+listing_price_value=EXCLUDED.listing_price_value, listing_price_currency=EXCLUDED.listing_price_currency`,
+		s.OwnerID, s.Role, s.InstallPath, s.Mode, s.ModeShown, nullString(s.Promote), textList(s.AvoidTopics), nullString(s.Commission), textList(s.SitesChannels), textList(s.NeverTopics), nullString(s.BoxPosition), s.SavedBy, s.SavedAt,
+		s.ProjectName, s.ListingURL, s.CommissionType, s.CommissionValue, s.CommissionCurrency, s.ListingPriceValue, s.ListingPriceCurrency)
 	return err
 }
 
@@ -377,8 +402,10 @@ func nullString(value string) any {
 func (d *DB) GetSetup(ctx context.Context, ownerID, role string) (SetupSettings, error) {
 	var s SetupSettings
 	var promote, commission, box *string
-	err := d.Pool.QueryRow(ctx, `SELECT owner_id::text, role, install_path, mode, mode_shown, promote_text, avoid_topics, commission, sites_channels, never_topics, box_position, saved_by::text, saved_at
-FROM owner_setup WHERE owner_id=$1 AND role=$2`, ownerID, role).Scan(&s.OwnerID, &s.Role, &s.InstallPath, &s.Mode, &s.ModeShown, &promote, &s.AvoidTopics, &commission, &s.SitesChannels, &s.NeverTopics, &box, &s.SavedBy, &s.SavedAt)
+	err := d.Pool.QueryRow(ctx, `SELECT owner_id::text, role, install_path, mode, mode_shown, promote_text, avoid_topics, commission, sites_channels, never_topics, box_position, saved_by::text, saved_at,
+project_name, listing_url, commission_type, commission_value, commission_currency, listing_price_value, listing_price_currency
+FROM owner_setup WHERE owner_id=$1 AND role=$2`, ownerID, role).Scan(&s.OwnerID, &s.Role, &s.InstallPath, &s.Mode, &s.ModeShown, &promote, &s.AvoidTopics, &commission, &s.SitesChannels, &s.NeverTopics, &box, &s.SavedBy, &s.SavedAt,
+		&s.ProjectName, &s.ListingURL, &s.CommissionType, &s.CommissionValue, &s.CommissionCurrency, &s.ListingPriceValue, &s.ListingPriceCurrency)
 	if promote != nil {
 		s.Promote = *promote
 	}
@@ -748,10 +775,10 @@ func (d *DB) RecordOwnerPause(ctx context.Context, ownerID string, at time.Time)
 	return err
 }
 
-func (d *DB) RecordPolicyApproval(ctx context.Context, placementID, siteID, ownerID, kind, rule string, version, relevance int) (bool, error) {
+func (d *DB) RecordPolicyApproval(ctx context.Context, placementID, siteID, ownerID, kind, rule string, version, relevance int, position string) (bool, error) {
 	tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='approved', approved_at=NOW(),
-approved_by=NULLIF($3,'')::uuid, approved_by_kind=$4, policy_version=$5, matched_rule=$6, relevance=$7
-WHERE id=$1 AND site_id=$2 AND status='pending' AND expires_at>NOW() AND auto_paused=false`, placementID, siteID, ownerID, kind, version, rule, relevance)
+approved_by=NULLIF($3,'')::uuid, approved_by_kind=$4, policy_version=$5, matched_rule=$6, relevance=$7, position=$8
+WHERE id=$1 AND site_id=$2 AND status='pending' AND expires_at>NOW() AND auto_paused=false`, placementID, siteID, ownerID, kind, version, rule, relevance, position)
 	if err != nil {
 		return false, err
 	}
@@ -816,13 +843,53 @@ func (d *DB) CountLivePlacements(ctx context.Context, siteID string) (int, error
 	return n, err
 }
 
+// CountWentLiveSince counts placements on the site that count as live and
+// whose live timestamp is after the previous digest open.
+func (d *DB) CountWentLiveSince(ctx context.Context, siteID string, since time.Time) (int, error) {
+	if siteID == "" {
+		return 0, nil
+	}
+	var n int
+	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals
+WHERE site_id=$1 AND `+PlacementCountsAsLiveSQL+`
+AND COALESCE(plugin_wait_at, approved_at, created_at) > $2`, siteID, since).Scan(&n)
+	return n, err
+}
+
+// DigestPause reports whether the account, the site, or an offer is paused.
+// Account is on only when an account pause was recorded and every site and
+// offer on the account is still on the kill switch.
+func (d *DB) DigestPause(ctx context.Context, ownerID, siteID, makerID string) (DigestPause, error) {
+	var pause DigestPause
+	err := d.Pool.QueryRow(ctx, `SELECT
+EXISTS (SELECT 1 FROM pause_activations WHERE owner_id = NULLIF($1,'')::uuid)
+AND ($2 = '' OR EXISTS (SELECT 1 FROM approval_policies WHERE site_id = NULLIF($2,'')::uuid AND kill_switch))
+AND ($3 = '' OR NOT EXISTS (
+    SELECT 1 FROM offers o
+    JOIN products pr ON pr.id = o.product_id
+    LEFT JOIN approval_policies ap ON ap.offer_id = o.id
+    WHERE pr.maker_id = NULLIF($3,'')::uuid AND COALESCE(ap.kill_switch, false) = false
+)),
+$2 <> '' AND EXISTS (SELECT 1 FROM approval_policies WHERE site_id = NULLIF($2,'')::uuid AND kill_switch),
+$3 <> '' AND EXISTS (
+    SELECT 1 FROM approval_policies ap
+    JOIN offers o ON o.id = ap.offer_id
+    JOIN products pr ON pr.id = o.product_id
+    WHERE pr.maker_id = NULLIF($3,'')::uuid AND ap.kill_switch
+)`, ownerID, siteID, makerID).Scan(&pause.Account, &pause.Site, &pause.Offer)
+	return pause, err
+}
+
 func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Time) ([]DigestItem, error) {
 	limit := DigestPageSize
 	if limit < 1 {
 		limit = 50
 	}
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
-plugin_wait, COALESCE(plugin_wait_at, created_at), plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,'')
+plugin_wait, COALESCE(plugin_wait_at, created_at), plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
+COALESCE(post_title,''), COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
+(SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
+COALESCE(approved_by_kind,''), COALESCE(policy_version,0)
 FROM placement_proposals
 WHERE site_id=$1 AND (
     (status IN ('approved','committed') AND COALESCE(approved_at, created_at) > $2)
@@ -838,7 +905,7 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = "placement"
-		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule); err != nil {
+		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -851,7 +918,8 @@ func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) 
 	if limit < 1 {
 		limit = 50
 	}
-	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, o.updated_at
+	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, o.updated_at,
+(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id)
 FROM offers o JOIN products p ON p.id=o.product_id
 WHERE p.maker_id=$1 AND o.status='listed' AND o.updated_at > $2
 ORDER BY o.updated_at DESC LIMIT $3`, makerID, since, limit)
@@ -867,9 +935,10 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = kind
-		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks); err != nil {
 			return nil, err
 		}
+		item.Label = item.Summary
 		item.CountsAsLive = true // a listed offer, not a placement
 		out = append(out, item)
 	}

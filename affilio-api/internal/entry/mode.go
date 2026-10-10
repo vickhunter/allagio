@@ -36,6 +36,11 @@ func ValidMode(mode string) bool {
 	}
 }
 
+// AvailableModes is the mode list the setup page and the digest show.
+func AvailableModes() []string {
+	return []string{ModeManual, ModeAuto, ModeYolo}
+}
+
 // modeRank orders modes from strictest to loosest.
 func modeRank(mode string) int {
 	switch mode {

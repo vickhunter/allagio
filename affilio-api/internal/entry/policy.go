@@ -270,6 +270,7 @@ func FirstCheck(failures []string) (HardCheck, bool) {
 func HardCheckDoc() string {
 	var b strings.Builder
 	b.WriteString("## Hard checks\n\n")
+	b.WriteString("`GET /v1/policy/hard-checks` is the single source the UI renders. The response `checks` list is this catalog, in this order. The UI does not keep a second copy.\n\n")
 	b.WriteString("A 422 returns `check_id` and `check_text`:\n\n")
 	for _, check := range HardCheckCatalog {
 		b.WriteString("- `")

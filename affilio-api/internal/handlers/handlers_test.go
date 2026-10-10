@@ -76,6 +76,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"027_d032_restore_unconfirmed.sql",
 		"028_d032_placement_live.sql",
 		"029_d032_post_url.sql",
+		"030_d032_ui_wiring.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)

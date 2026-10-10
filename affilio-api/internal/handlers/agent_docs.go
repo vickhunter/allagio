@@ -133,9 +133,14 @@ PUT /v1/setup/settings
   "mode": "auto",
   "promote": "API toolkit",
   "avoid_topics": ["gambling"],
-  "commission": "30%"
+  "project_name": "Prompt Forge",
+  "listing_url": "https://promptforge.example",
+  "commission": {"type": "percent", "value": 30, "currency": ""},
+  "listing_price": {"value": 49, "currency": "USD"}
 }
 ` + "```" + `
+
+` + "`project_name`" + ` and ` + "`listing_url`" + ` are returned on every setup response. ` + "`commission`" + ` is ` + "`{type, value, currency}`" + ` with ` + "`type`" + ` ` + "`percent`" + ` or ` + "`fixed`" + `. ` + "`currency`" + ` is required when ` + "`type`" + ` is ` + "`fixed`" + `. ` + "`listing_price`" + ` is optional and is ` + "`{value, currency}`" + `. When both name a currency, they are the same code. Readiness signals and publisher types to avoid are not accepted. Every setup response also includes ` + "`change_url`" + ` (the dashboard URL for the approval mode and the rules) and ` + "`site_url`" + `, plus ` + "`available_modes`" + ` (` + "`manual`" + `, ` + "`auto`" + `, ` + "`yolo`" + `). ` + "`mode`" + ` is the effective mode. While claim checks are not live, a saved yolo or auto is answered as manual with ` + "`approval_reason`" + ` ` + "`claim_check_unavailable`" + ` and ` + "`approval_message`" + `.
 
 Publisher body fields are ` + "`sites_channels`" + `, ` + "`never_topics`" + `, and ` + "`box_position`" + ` (` + "`after_intro`" + `, ` + "`matched_section`" + `, ` + "`end`" + `, ` + "`main_post`" + `, ` + "`first_reply`" + `, ` + "`early_mention`" + `, ` + "`description`" + `, ` + "`pinned_comment`" + `).
 
@@ -250,7 +255,7 @@ Resume is session-only. Any API key receives 403. The signed-in human restores t
 
 ` + "`POST /v1/events`" + ` with ` + "`kind`" + ` ` + "`digest_opened`" + ` or ` + "`dashboard_opened`" + ` stores the user id and the time.
 
-` + "`GET /v1/digest`" + ` lists placements and offers that went live since the last ` + "`digest_opened`" + `. The payload includes ` + "`session.signed_in`" + `.
+` + "`GET /v1/digest`" + ` lists placements and offers that went live since the last ` + "`digest_opened`" + `. The payload includes ` + "`session.signed_in`" + `, ` + "`paused`" + ` (` + "`account`" + `, ` + "`site`" + `, ` + "`offer`" + `), ` + "`went_live_since_last`" + `, ` + "`change_url`" + `, ` + "`site_url`" + `, and ` + "`available_modes`" + `. While claim checks are not live it also includes ` + "`effective_mode`" + ` ` + "`manual`" + `, ` + "`approval_reason`" + `, and ` + "`approval_message`" + `. Each item includes ` + "`plugin_state`" + `, ` + "`live_now`" + ` (from ` + "`placement_counts_as_live`" + ` for a placement), ` + "`post_title`" + `, ` + "`position`" + `, ` + "`link_text`" + `, ` + "`label`" + `, ` + "`clicks`" + `, ` + "`approved_by`" + `, ` + "`policy_rule_id`" + `, ` + "`policy_rule_text`" + `, and ` + "`rules_version`" + `. Undoing a listing uses the offer undo token. There is no redo for a listing in v1.
 
 ` + "```" + `
 POST /v1/placements/:id/revoke
@@ -263,9 +268,9 @@ Undo is that revoke. It takes effect in the same request in the API and in MCP. 
 POST /v1/placements/:id/restore
 ` + "```" + `
 
-Restore applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409 ` + "`{reason, message}`" + ` with ` + "`reason: window_expired`" + `. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. If Pause or the kill switch was turned on for that site, offer, or account at any point after the undo, including when it is still on, restore returns 409 ` + "`{reason, message}`" + ` with ` + "`reason: paused`" + `. Every 409 from this list returns ` + "`reason`" + ` and ` + "`message`" + `. ` + "`reason`" + ` is ` + "`window_expired`" + `, ` + "`paused`" + `, or ` + "`not_failed`" + `. ` + "`message`" + ` is the plain-English text. A 422 returns ` + "`check_id`" + ` and ` + "`check_text`" + `. The server re-runs every hard check first. It also evaluates the current 30-day placement cap and the current minimum relevance Relevance is scored on the server from the approved copy and the offer. The caller cannot supply it. A failing check returns 422 ` + "`{check_id, check_text}`" + ` from the hard-check list below and leaves the placement revoked. On success the placement returns to the status it had before the undo, ` + "`approved_by`" + ` stays the original value, ` + "`restored_by`" + ` records the user, and a ` + "`placement_restore`" + ` event stores the actor.
+Restore applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409 ` + "`{reason, message}`" + ` with ` + "`reason: window_expired`" + `. Restore, which the UI calls redo, on a placement that was not undone returns 409 ` + "`{reason: not_undone, message}`" + `. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. If Pause or the kill switch was turned on for that site, offer, or account at any point after the undo, including when it is still on, restore returns 409 ` + "`{reason, message}`" + ` with ` + "`reason: paused`" + `. Every 409 from this list returns ` + "`reason`" + ` and ` + "`message`" + `. ` + "`reason`" + ` is ` + "`window_expired`" + `, ` + "`paused`" + `, ` + "`not_undone`" + `, or ` + "`not_failed`" + `. ` + "`message`" + ` is the plain-English text. A 422 returns ` + "`check_id`" + ` and ` + "`check_text`" + `. The server re-runs every hard check first. It also evaluates the current 30-day placement cap and the current minimum relevance Relevance is scored on the server from the approved copy and the offer. The caller cannot supply it. A failing check returns 422 ` + "`{check_id, check_text}`" + ` from the hard-check list below and leaves the placement revoked. On success the placement returns to the status it had before the undo, ` + "`approved_by`" + ` stays the original value, ` + "`restored_by`" + ` records the user, and a ` + "`placement_restore`" + ` event stores the actor.
 
-There is no push channel. Clients poll ` + "`GET /v1/placements/:id`" + `. That read is one row from ` + "`placement_proposals`" + ` and allows at least one request every 4 seconds per placement per session. The body includes ` + "`status`" + `, ` + "`plugin_state`" + `, ` + "`plugin_failed_reason`" + `, ` + "`failed_action`" + `, and ` + "`fallback_url`" + `. ` + "`fallback_url`" + ` is the offer's plain URL, so the plugin can cache it.
+There is no push channel. Clients poll ` + "`GET /v1/placements/:id`" + `. That read is one row from ` + "`placement_proposals`" + ` and allows one request every 2 seconds per placement per session, so a poll every 4 seconds still succeeds. The body includes ` + "`status`" + `, ` + "`plugin_state`" + `, ` + "`plugin_failed_reason`" + `, ` + "`failed_action`" + `, and ` + "`fallback_url`" + `. ` + "`fallback_url`" + ` is the offer's plain URL, so the plugin can cache it. A maker project key can read the status of a placement on its own offer. Retry stays publisher-only and returns 403 for a maker.
 
 Every placement in ` + "`GET /v1/digest`" + `, ` + "`GET /v1/account/digest`" + `, and the status read includes ` + "`plugin_state`" + ` and ` + "`plugin_failed_reason`" + `. ` + "`plugin_state`" + ` is never null. The values are ` + "`pending`" + `, ` + "`placed`" + `, ` + "`removed`" + `, ` + "`offline`" + `, and ` + "`failed`" + `. A brand-new placement is ` + "`pending`" + ` until the site key's first acknowledgement, then ` + "`placed`" + `. After a restore it is ` + "`pending`" + ` until ` + "`POST /v1/placements/:id/plugin-ack`" + ` with ` + "`action: restored`" + `, which sets ` + "`placed`" + `. After a revoke it is ` + "`pending`" + `, then ` + "`removed`" + ` on ` + "`action: removed`" + `, or ` + "`offline`" + ` after ` + "`PLUGIN_OFFLINE_AFTER`" + ` (default 10 minutes) with no acknowledgement. ` + "`offline`" + ` is only that missing acknowledgement. ` + "`action: failed`" + ` stores ` + "`reason`" + ` in ` + "`plugin_failed_reason`" + `, stores ` + "`failed_action`" + ` as ` + "`removed`" + ` or ` + "`restored`" + `, and sets ` + "`plugin_state`" + ` to ` + "`failed`" + ` after the plugin's post re-read fails and one retry fails. A later verified acknowledgement for that same action clears the failure.
 
@@ -333,7 +338,7 @@ Send the account key as ` + "`X-API-Key`" + ` for the publisher site, or ` + "`X
 
 ## Hard checks
 
-` + "`GET /v1/policy/hard-checks`" + ` returns ` + "`check_id`" + ` and ` + "`check_text`" + ` from the same list a 422 uses. There is no push channel; clients poll placement status.
+` + "`GET /v1/policy/hard-checks`" + ` is the single source the UI renders. It returns ` + "`checks`" + ` of ` + "`check_id`" + ` and ` + "`check_text`" + ` from the same list a 422 uses. The UI does not keep a second copy. There is no push channel; clients poll placement status.
 `
 
 func agentDoc(name string) (string, bool) {
