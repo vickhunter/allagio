@@ -45,9 +45,14 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 	h.goCampaign(c, code, req)
 }
 
-// goCampaign is GET /v1/go/<tracking_code>. Readers never see a 4xx or a 5xx.
-// ?placement= follows the placement rules. Without it, a hit is recorded only
-// through placement_counts_as_live. An unknown code redirects home.
+// goCampaign is the permanent GET /v1/go/<tracking_code> route. Saved posts,
+// feeds, and caches keep this link, and nothing rewrites them, so both this
+// form and /v1/go/<placement_id> follow the go-link rules forever. Readers
+// never see a 4xx or a 5xx. ?placement= delegates to goPlacement. Without it,
+// a hit is recorded only when a placement on this campaign counts as live.
+// Anything else is a 302 to the plain offer URL with no hit. An offer that is
+// not live redirects to the site home, and an unknown code redirects to the
+// Offer Rails home. A rate limit is that untracked 302, never a 429.
 func (h *RedirectsHandler) goCampaign(c *gin.Context, code string, req goRequest) {
 	if placementID := strings.TrimSpace(c.Query("placement")); placementID != "" {
 		h.goPlacement(c, placementID, req)
