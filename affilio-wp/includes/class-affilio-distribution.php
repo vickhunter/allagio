@@ -1,29 +1,5 @@
 <?php
 
-if (!function_exists('add_filter')) {
-    function add_filter($name, $callback) {
-        if (!isset($GLOBALS['filters']) || !is_array($GLOBALS['filters'])) {
-            $GLOBALS['filters'] = array();
-        }
-        $GLOBALS['filters'][$name][] = $callback;
-    }
-}
-
-if (!function_exists('remove_filter')) {
-    function remove_filter($name, $callback) {
-        if (!isset($GLOBALS['filters'][$name]) || !is_array($GLOBALS['filters'][$name])) {
-            return;
-        }
-        $kept = array();
-        foreach ($GLOBALS['filters'][$name] as $existing) {
-            if ($existing !== $callback) {
-                $kept[] = $existing;
-            }
-        }
-        $GLOBALS['filters'][$name] = $kept;
-    }
-}
-
 if (class_exists('Affilio_Distribution')) {
     return;
 }
@@ -41,11 +17,11 @@ class Affilio_Distribution {
         $keep = function ($count = null, $post = null) {
             return 0;
         };
-        add_filter('wp_revisions_to_keep', $keep);
+        add_filter('wp_revisions_to_keep', $keep, PHP_INT_MAX, 2);
         try {
             return call_user_func($callback);
         } finally {
-            remove_filter('wp_revisions_to_keep', $keep);
+            remove_filter('wp_revisions_to_keep', $keep, PHP_INT_MAX);
         }
     }
 
@@ -53,6 +29,44 @@ class Affilio_Distribution {
         return self::without_revisions(function () use ($post_id, $content) {
             return wp_update_post(array('ID' => $post_id, 'post_content' => wp_slash($content)), true);
         });
+    }
+
+    private function rollback_inserted_placement($post_id, $placement_id) {
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $fresh = get_post($post_id);
+            if (!self::placement_still_live($fresh, $placement_id)) {
+                return true;
+            }
+            $reverted = self::revert_content($fresh->post_content, $placement_id);
+            $this->save_content($post_id, $reverted['content']);
+        }
+        return !self::placement_still_live(get_post($post_id), $placement_id);
+    }
+
+    private static function placement_still_live($post, $placement_id) {
+        if (!$post || !isset($post->post_content)) {
+            return true;
+        }
+        $content = (string) $post->post_content;
+        if (strpos($content, 'affilio-placement-' . $placement_id) !== false) {
+            return true;
+        }
+        return strpos($content, 'placement=' . $placement_id) !== false;
+    }
+
+    private function report_live_without_receipt($post_id, $placement_id, $reason) {
+        error_log('affilio receipt rollback failed placement_id=' . $placement_id . ' post_id=' . $post_id . ' reason=' . $reason);
+        $notices = get_option('affilio_unreceipted_boxes', array());
+        if (!is_array($notices)) {
+            $notices = array();
+        }
+        $notices[] = array(
+            'placement_id' => (string) $placement_id,
+            'post_id' => (int) $post_id,
+            'reason' => (string) $reason,
+            'message' => 'The Affilio box is live without a receipt.',
+        );
+        update_option('affilio_unreceipted_boxes', $notices);
     }
 
     public static function disclosure_suppressed($content) {
@@ -320,10 +334,12 @@ class Affilio_Distribution {
             }
             $receipt = $this->request('POST', '/placements/' . $id . '/receipt', array('surface_url' => get_permalink($post), 'published_text' => $published, 'evidence' => 'WordPress administrator inserted the approved placement in published post ' . $post->ID));
             if (is_wp_error($receipt)) {
-                if ($inserted) {
-                    $fresh = get_post($post->ID);
-                    $reverted = self::revert_content($fresh->post_content, $id);
-                    $this->save_content($post->ID, $reverted['content']);
+                if ($inserted && !$this->rollback_inserted_placement($post->ID, $id)) {
+                    $reason = trim((string) $receipt->get_error_message());
+                    if ($reason === '') {
+                        $reason = 'block still present after rollback retry';
+                    }
+                    $this->report_live_without_receipt($post->ID, $id, $reason);
                 }
                 $status = 502;
                 if (is_array($receipt->data) && isset($receipt->data['status'])) {
@@ -516,7 +532,11 @@ class Affilio_Distribution {
     }
 
     public function render_revert_notice() {
-        if (!isset($_GET['affilio_notice']) || !current_user_can('edit_posts')) {
+        if (!current_user_can('edit_posts')) {
+            return;
+        }
+        $this->render_unreceipted_notices();
+        if (!isset($_GET['affilio_notice'])) {
             return;
         }
         $notice = sanitize_text_field(wp_unslash(rawurldecode($_GET['affilio_notice'])));
@@ -524,6 +544,22 @@ class Affilio_Distribution {
             return;
         }
         echo '<div class="notice notice-success"><p>' . esc_html($notice) . '</p></div>';
+    }
+
+    private function render_unreceipted_notices() {
+        $notices = get_option('affilio_unreceipted_boxes', array());
+        if (!is_array($notices) || !$notices) {
+            return;
+        }
+        foreach ($notices as $notice) {
+            if (!is_array($notice)) {
+                continue;
+            }
+            $message = isset($notice['message']) ? (string) $notice['message'] : 'The Affilio box is live without a receipt.';
+            $placement_id = isset($notice['placement_id']) ? (string) $notice['placement_id'] : '';
+            $post_id = isset($notice['post_id']) ? (string) $notice['post_id'] : '';
+            echo '<div class="notice notice-error"><p>' . esc_html($message) . ' Placement ' . esc_html($placement_id) . ', post ' . esc_html($post_id) . '.</p></div>';
+        }
     }
 
     public static function removal_notice($title, $anchor, $href, $api_state, $matched) {

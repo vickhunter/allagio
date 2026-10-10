@@ -141,6 +141,7 @@ function parse_blocks($content) {
     return $blocks;
 }
 
+require_once __DIR__ . '/wp-filters.php';
 require __DIR__ . '/../includes/class-affilio-distribution.php';
 require __DIR__ . '/../includes/class-affilio-cli.php';
 

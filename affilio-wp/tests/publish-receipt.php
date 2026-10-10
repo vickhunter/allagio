@@ -84,6 +84,7 @@ function check($condition, $message) {
     }
 }
 
+require_once __DIR__ . '/wp-filters.php';
 require __DIR__ . '/../includes/class-affilio-distribution.php';
 
 $GLOBALS['allowed'] = true;
