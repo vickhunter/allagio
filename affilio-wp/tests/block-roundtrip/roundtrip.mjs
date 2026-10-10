@@ -35,11 +35,13 @@ const id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const copy = 'Uno strumento utile per il team.';
 const disclosure = 'Affiliate disclosure: I may earn a commission if you buy through this link.';
 const href = `https://distribution.example/v1/go/test?placement=${id}`;
-const anchor = 'Vedi il prodotto';
+const anchor = 'Vedi&nbsp;il&nbsp;prodotto';
+const legacyAnchor = 'Vedi il prodotto';
 const kept = '<!-- wp:paragraph -->\n<p>Articolo da conservare.</p>\n<!-- /wp:paragraph -->';
 const placementClass = `affilio-placement-${id}`;
 const disclosureClass = `affilio-disclosure-${id}`;
-const link = `${copy} <a href="${href}" rel="sponsored nofollow">${anchor}</a>`;
+const link = `${copy} <a href="${href}" rel="sponsored nofollow">${anchor}</a> (link sponsorizzato)`;
+const legacyLink = `${copy} <a href="${href}" rel="sponsored nofollow">${legacyAnchor}</a>`;
 const inserted = [
   kept,
   `<!-- wp:paragraph {"className":"${placementClass}"} -->`,
@@ -86,6 +88,25 @@ if (!placement.isValid) {
 if (parsed.logs.some((line) => line.includes('Block successfully updated'))) {
   fail('placement block used a deprecation');
 }
+const saved = String(placement.attributes.content || '');
+if (!saved.includes('Vedi&nbsp;il&nbsp;prodotto') && !saved.includes('Vedi\u00A0il\u00A0prodotto')) {
+  fail('anchor text lost the non-breaking spaces');
+}
+if (!saved.includes('(link sponsorizzato)') || /<(span|badge)\b/i.test(saved)) {
+  fail('sponsor label is not plain text in the same paragraph');
+}
+if (!/<\/a>\s*\(link sponsorizzato\)/.test(saved)) {
+  fail('sponsor label is inside the link or missing after it');
+}
+const nbspInserted = inserted.replaceAll(anchor, 'Vedi\u00A0il\u00A0prodotto');
+const nbspParsed = capturing(() => parse(nbspInserted));
+const nbspPlacement = placementBlock(nbspParsed.value);
+if (!nbspPlacement || nbspPlacement.name !== 'core/paragraph' || !nbspPlacement.isValid) {
+  fail('placement with a raw U+00A0 anchor was not a valid core/paragraph');
+}
+if (nbspParsed.logs.some((line) => line.includes('Block successfully updated'))) {
+  fail('raw U+00A0 anchor used a deprecation');
+}
 const extraSource = inserted
   .replaceAll(`"className":"${placementClass}"`, `"className":"${placementClass} my-extra"`)
   .replaceAll(`<p class="${placementClass}">`, `<p class="${placementClass} my-extra">`);
@@ -95,7 +116,7 @@ if (!extraBlock || !extraBlock.isValid || extraParsed.logs.some((line) => line.i
   fail('an extra editor class did not stay valid on the current save()');
 }
 const roundTripped = capturing(() => serialize(parsed.value)).value;
-const legacy = `${kept}\n<!-- wp:paragraph -->\n<!-- distributoor-placement:${id} --><p>${link}</p>\n<!-- /wp:paragraph -->`;
+const legacy = `${kept}\n<!-- wp:paragraph -->\n<!-- distributoor-placement:${id} --><p>${legacyLink}</p>\n<!-- /wp:paragraph -->`;
 const resaved = capturing(() => serialize(parse(legacy.replace(`${kept}\n`, '')))).value;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = readFileSync(path.join(here, '../fixtures/editor-resave-013.txt'), 'utf8');
@@ -107,6 +128,31 @@ if (!note.includes('@wordpress/blocks') || !note.includes('serialize(parse(')) {
   fail('editor re-save note does not say how the fixture was made');
 }
 
+const otherId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const otherBlock = [
+  '<!-- wp:paragraph -->',
+  `<p>Altro <a href="https://distribution.example/v1/go/other?placement=${otherId}" rel="sponsored nofollow">${anchor}</a> (link sponsorizzato)</p>`,
+  '<!-- /wp:paragraph -->',
+].join('\n');
+const mentionBlock = [
+  '<!-- wp:paragraph -->',
+  `<p>Il placement ${id} compare solo nel testo.</p>`,
+  '<!-- /wp:paragraph -->',
+].join('\n');
+const stripped = [
+  kept,
+  '<!-- wp:paragraph -->',
+  `<p>${copy} <a href="${href}" rel="sponsored nofollow">${anchor}</a> (link sponsorizzato)</p>`,
+  '<!-- /wp:paragraph -->',
+  otherBlock,
+  mentionBlock,
+].join('\n');
+const foreign = [
+  kept,
+  '<!-- wp:paragraph -->',
+  `<p><a href="https://shop.example/item?placement=${id}" rel="sponsored nofollow">${anchor}</a> (link sponsorizzato)</p>`,
+  '<!-- /wp:paragraph -->',
+].join('\n');
 const php = spawnSync('php', [path.join(here, 'revert-fixture.php')], {
   input: JSON.stringify({
     inserted: roundTripped,
@@ -114,6 +160,10 @@ const php = spawnSync('php', [path.join(here, 'revert-fixture.php')], {
     resaved: `${kept}\n${resaved}`,
     kept,
     id,
+    otherId,
+    stripped,
+    strippedKept: [kept, otherBlock, mentionBlock].join('\n'),
+    foreign,
   }),
   encoding: 'utf8',
 });

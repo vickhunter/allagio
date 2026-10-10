@@ -102,9 +102,10 @@ foreach ($blocks as $block) {
     check(strpos($block['innerHTML'], '<!-- wp:') === false, 'A block delimiter was left inside the paragraph');
 }
 $joined = implode('', array_map(function ($block) { return $block['innerHTML']; }, $blocks));
-check(strpos($joined, '/v1/go/') !== false, 'The block is missing the tracked /v1/go/ link');
+check(strpos($joined, '/go/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') !== false, 'The block is missing the site-local /go/ link');
 check(strpos($joined, 'rel="sponsored nofollow"') !== false, 'The tracked link is missing rel="sponsored nofollow"');
-check(strpos($joined, 'Vedi il prodotto') !== false, 'The product link is not in Italian');
+check(strpos($joined, 'Vedi&nbsp;il&nbsp;prodotto') !== false || strpos($joined, "Vedi\xc2\xa0il\xc2\xa0prodotto") !== false, 'The product link is not in Italian');
+check(strpos($joined, '(link sponsorizzato)') !== false, 'The sponsor label is missing');
 check(strpos($content, 'View product') === false, 'The English product link is still inserted');
 check(strpos($joined, '<utile>') === false, 'Recommendation copy was not escaped');
 check(strpos($joined, 'Uno strumento &lt;utile&gt; &amp; pronto.') !== false, 'Escaped recommendation copy is missing');

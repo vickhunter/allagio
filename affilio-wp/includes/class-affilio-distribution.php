@@ -51,7 +51,10 @@ class Affilio_Distribution {
         if (strpos($content, 'affilio-placement-' . $placement_id) !== false) {
             return true;
         }
-        return strpos($content, 'placement=' . $placement_id) !== false;
+        if (strpos($content, 'placement=' . $placement_id) !== false) {
+            return true;
+        }
+        return (bool) preg_match('#/go/' . preg_quote((string) $placement_id, '#') . '(?![a-f0-9-])#i', $content);
     }
 
     private function report_live_without_receipt($post_id, $placement_id, $reason) {
@@ -160,7 +163,12 @@ class Affilio_Distribution {
         }
         if ($response['code'] < 200 || $response['code'] >= 300) {
             $message = isset($response['data']['error']) ? $response['data']['error'] : 'The distribution service could not complete this request.';
-            return new WP_Error('affilio_distribution', $message, array('status' => $response['code'] >= 400 && $response['code'] < 500 ? $response['code'] : 502));
+            $status = $response['code'] >= 400 && $response['code'] < 500 ? (int) $response['code'] : 502;
+            $error_data = array('status' => $status);
+            if (isset($response['data']['reason']) && is_string($response['data']['reason'])) {
+                $error_data['reason'] = $response['data']['reason'];
+            }
+            return new WP_Error('affilio_distribution', $message, $error_data);
         }
         return $response['data'];
     }
@@ -297,21 +305,15 @@ class Affilio_Distribution {
             return $data;
         }
         $placement = $data['placement'];
-        $link = $placement['receipt']['tracked_link'];
-        if (!is_string($link) || strpos($link, '/v1/go/') !== 0 || strpos($link, 'placement=' . $id) === false) {
+        $link = isset($placement['receipt']['tracked_link']) ? $placement['receipt']['tracked_link'] : '';
+        if (!self::tracked_link_ok($link, $id)) {
             return new WP_Error('affilio_link', 'Invalid tracked link.', array('status' => 502));
         }
         $original = $post->post_content;
         $content = $original;
         $inserted = false;
         if (!self::placement_present($content, $id)) {
-            $class = 'affilio-placement-' . $id;
-            $inner = esc_html($placement['copy']) . ' <a href="' . esc_url($this->origin() . $link) . '" rel="sponsored nofollow">' . esc_html('Vedi il prodotto') . '</a>';
-            $content .= "\n" . $this->paragraph_block('<p class="' . $class . '">' . $inner . '</p>', $class);
-            if (!self::disclosure_suppressed($content) && strpos($content, esc_html($placement['disclosure'])) === false) {
-                $disclosure_class = 'affilio-disclosure-' . $id;
-                $content .= "\n" . $this->paragraph_block('<p class="' . $disclosure_class . '">' . esc_html($placement['disclosure']) . '</p>', $disclosure_class);
-            }
+            $content = $this->append_box($content, $placement, $id);
             $updated = $this->save_content($post->ID, $content);
             if (is_wp_error($updated)) {
                 return $updated;
@@ -351,7 +353,58 @@ class Affilio_Distribution {
                 return new WP_Error('affilio_receipt', self::receipt_refusal_message($receipt->get_error_message()), array('status' => $status));
             }
         }
+        $fallback = isset($placement['fallback_url']) ? (string) $placement['fallback_url'] : '';
+        $this->remember_box($id, $post->ID, isset($placement['copy']) ? (string) $placement['copy'] : '', isset($placement['disclosure']) ? (string) $placement['disclosure'] : '', $fallback, 'pending');
+        if (class_exists('Affilio_Plugin_Ack') && defined('AFFILIO_PLUGIN_ACK_PLACED')) {
+            $copy = isset($placement['copy']) ? (string) $placement['copy'] : '';
+            $disclosure = isset($placement['disclosure']) ? (string) $placement['disclosure'] : '';
+            $this->confirm_box($post->ID, $id, true, AFFILIO_PLUGIN_ACK_PLACED, function ($current) use ($copy, $disclosure, $id) {
+                if (self::box_in_content($current, $id)) {
+                    return $current;
+                }
+                return $this->append_box($current, array('copy' => $copy, 'disclosure' => $disclosure), $id);
+            });
+        }
         return rest_ensure_response(array('published' => true, 'url' => get_permalink($post)));
+    }
+
+    public static function tracked_link_ok($link, $id) {
+        if (!is_string($link) || $link === '' || $id === '') {
+            return false;
+        }
+        $go = strpos($link, '/v1/go/') !== false || (bool) preg_match('#/go/#', $link);
+        if (!$go) {
+            return false;
+        }
+        if (strpos($link, 'placement=' . $id) !== false) {
+            return true;
+        }
+        return (bool) preg_match('#/go/' . preg_quote($id, '#') . '(?![a-f0-9-])#i', $link);
+    }
+
+    public static function local_go_href($id) {
+        if (class_exists('Affilio_Go')) {
+            return Affilio_Go::local_href($id);
+        }
+        $path = '/go/' . $id;
+        if (function_exists('home_url')) {
+            return home_url($path);
+        }
+        return $path;
+    }
+
+    private function append_box($content, $placement, $id) {
+        $class = 'affilio-placement-' . $id;
+        $href = self::local_go_href($id);
+        $copy = isset($placement['copy']) ? (string) $placement['copy'] : '';
+        $disclosure = isset($placement['disclosure']) ? (string) $placement['disclosure'] : '';
+        $inner = esc_html($copy) . ' <a href="' . esc_url($href) . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)';
+        $content .= "\n" . $this->paragraph_block('<p class="' . $class . '">' . $inner . '</p>', $class);
+        if (!self::disclosure_suppressed($content) && ($disclosure === '' || strpos($content, esc_html($disclosure)) === false)) {
+            $disclosure_class = 'affilio-disclosure-' . $id;
+            $content .= "\n" . $this->paragraph_block('<p class="' . $disclosure_class . '">' . esc_html($disclosure) . '</p>', $disclosure_class);
+        }
+        return $content;
     }
 
     public static function placement_present($content, $id) {
@@ -495,6 +548,9 @@ class Affilio_Distribution {
     }
 
     public function handle_revert_post() {
+        if (function_exists('delete_option')) {
+            delete_option('affilio_setup_redirect');
+        }
         $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
         $placement = isset($_POST['placement']) ? sanitize_text_field(wp_unslash($_POST['placement'])) : '';
         $nonce = isset($_POST['_wpnonce']) ? sanitize_text_field(wp_unslash($_POST['_wpnonce'])) : '';
@@ -536,6 +592,7 @@ class Affilio_Distribution {
             return;
         }
         $this->render_unreceipted_notices();
+        $this->render_ack_notices();
         if (!isset($_GET['affilio_notice'])) {
             return;
         }
@@ -566,13 +623,39 @@ class Affilio_Distribution {
         if (!$matched) {
             return 'Nessun inserimento da rimuovere.';
         }
-        $states = array(
-            'reported' => 'API: segnalato',
-            'already' => 'API: già rimosso',
-            'unreachable' => 'API: non raggiungibile, riprovo più tardi',
-        );
-        $line = isset($states[$api_state]) ? $states[$api_state] : $states['unreachable'];
+        $outcome = is_array($api_state) ? $api_state : array('state' => (string) $api_state);
+        $state = isset($outcome['state']) ? $outcome['state'] : 'unreachable';
+        if ($state === 'not_published') {
+            return "Rimosso dal post. L'inserimento non era pubblicato, quindi non c'è niente da segnalare.";
+        }
+        if ($state === 'client_error') {
+            $code = isset($outcome['code']) ? (int) $outcome['code'] : 0;
+            $line = self::admin_client_error_line($code);
+        } else {
+            $states = array(
+                'reported' => 'API: segnalato',
+                'already' => 'API: già rimosso',
+                'unreachable' => 'API: non raggiungibile, riprovo più tardi',
+            );
+            $line = isset($states[$state]) ? $states[$state] : $states['unreachable'];
+        }
         return 'Inserimento rimosso da «' . $title . '»: ' . $anchor . ' ' . $href . '. ' . $line;
+    }
+
+    public static function client_error_line($code, $reason) {
+        $reason = trim((string) $reason);
+        if ($reason === '') {
+            $reason = 'richiesta rifiutata';
+        }
+        return 'API: errore 4xx (' . (int) $code . '): ' . $reason . '. Non riprovo.';
+    }
+
+    public static function admin_client_error_line($code) {
+        $code = (int) $code;
+        if ($code === 401) {
+            return 'Chiave API non valida: controlla la chiave in Impostazioni › Affilio.';
+        }
+        return 'Errore dall\'API (' . $code . '), non riprovo.';
     }
 
     public function retry_removals() {
@@ -590,8 +673,9 @@ class Affilio_Distribution {
             if ($next > $now) {
                 continue;
             }
-            $state = $this->post_removed($id);
-            if ($state === 'reported' || $state === 'already') {
+            $outcome = $this->post_removed($id);
+            $state = isset($outcome['state']) ? $outcome['state'] : '';
+            if ($state === 'reported' || $state === 'already' || $state === 'not_published' || $state === 'client_error') {
                 unset($queue[$id]);
                 continue;
             }
@@ -609,24 +693,37 @@ class Affilio_Distribution {
     }
 
     private function report_removed($id) {
-        $state = $this->post_removed($id);
+        $outcome = $this->post_removed($id);
+        $state = isset($outcome['state']) ? $outcome['state'] : 'unreachable';
         if ($state === 'unreachable') {
             $this->enqueue_removal($id);
         } else {
             $this->dequeue_removal($id);
         }
-        return $state;
+        return $outcome;
     }
 
     private function post_removed($id) {
         $data = $this->request('POST', '/placements/' . $id . '/removed', array());
-        if (is_wp_error($data)) {
-            return 'unreachable';
+        if (!is_wp_error($data)) {
+            if (is_array($data) && !empty($data['already_removed'])) {
+                return array('state' => 'already');
+            }
+            return array('state' => 'reported');
         }
-        if (is_array($data) && !empty($data['already_removed'])) {
-            return 'already';
+        $error_data = method_exists($data, 'get_error_data') ? $data->get_error_data() : array();
+        if (!is_array($error_data)) {
+            $error_data = array();
         }
-        return 'reported';
+        $status = isset($error_data['status']) ? (int) $error_data['status'] : 0;
+        $reason = isset($error_data['reason']) ? (string) $error_data['reason'] : '';
+        if ($status === 409 && $reason === 'not_published') {
+            return array('state' => 'not_published');
+        }
+        if ($status >= 400 && $status < 500) {
+            return array('state' => 'client_error', 'code' => $status, 'reason' => $data->get_error_message());
+        }
+        return array('state' => 'unreachable');
     }
 
     private function enqueue_removal($id) {
@@ -731,6 +828,35 @@ class Affilio_Distribution {
                 return $id;
             }
         }
+        return self::id_from_placement_href($block, $wanted);
+    }
+
+    private static function id_from_placement_href($block, $wanted) {
+        if (!isset($block['blockName']) || $block['blockName'] !== 'core/paragraph') {
+            return '';
+        }
+        if (!preg_match_all('/<a\b[^>]*\bhref="([^"]*)"/i', $block['innerHTML'], $hrefs)) {
+            return '';
+        }
+        foreach ($hrefs[1] as $href) {
+            $decoded = html_entity_decode($href, ENT_QUOTES, 'UTF-8');
+            if (preg_match('#/(?:v1/)?go/([a-f0-9-]{36})(?![a-f0-9-])#i', $decoded, $match)) {
+                $id = $match[1];
+                if ($wanted === '' || strcasecmp($wanted, $id) === 0) {
+                    return $id;
+                }
+                continue;
+            }
+            if (!preg_match('/placement=([a-f0-9-]{36})(?![a-f0-9-])/i', $decoded, $match)) {
+                continue;
+            }
+            $id = $match[1];
+            $specific = $wanted !== '' && strcasecmp($wanted, $id) === 0;
+            $go = strpos($decoded, '/v1/go/') !== false || (bool) preg_match('#/go/#i', $decoded);
+            if ($specific || ($wanted === '' && $go)) {
+                return $id;
+            }
+        }
         return '';
     }
 
@@ -768,5 +894,292 @@ class Affilio_Distribution {
             return true;
         }
         return strpos($block['innerHTML'], 'affiliate-disclosure') !== false;
+    }
+
+    public static function box_in_content($content, $id) {
+        if (self::placement_present($content, $id)) {
+            return true;
+        }
+        return self::go_link_present($content, $id);
+    }
+
+    public static function go_link_present($content, $id) {
+        $quoted = preg_quote((string) $id, '#');
+        if (preg_match('#/go/' . $quoted . '(?![a-f0-9-])#i', (string) $content)) {
+            return true;
+        }
+        return (bool) preg_match('/placement=' . $quoted . '(?![a-f0-9-])/i', (string) $content)
+            && (strpos((string) $content, '/v1/go/') !== false || strpos((string) $content, '/go/') !== false);
+    }
+
+    public static function placement_ids_in_content($content) {
+        $ids = array();
+        $patterns = array(
+            '/affilio-placement-([a-f0-9-]{36})/i',
+            '#/go/([a-f0-9-]{36})(?![a-f0-9-])#i',
+            '/placement=([a-f0-9-]{36})(?![a-f0-9-])/i',
+        );
+        foreach ($patterns as $pattern) {
+            if (!preg_match_all($pattern, (string) $content, $matches)) {
+                continue;
+            }
+            foreach ($matches[1] as $found) {
+                $ids[strtolower($found)] = $found;
+            }
+        }
+        return array_values($ids);
+    }
+
+    public static function rel_sponsored_from_content($content, $placement_id) {
+        if (!preg_match_all('#<a\b[^>]*>#i', (string) $content, $tags)) {
+            return false;
+        }
+        $quoted = preg_quote((string) $placement_id, '#');
+        foreach ($tags[0] as $html) {
+            if (!preg_match('/href="([^"]*)"/i', $html, $href)) {
+                continue;
+            }
+            $url = html_entity_decode($href[1], ENT_QUOTES, 'UTF-8');
+            $matches = (bool) preg_match('#/go/' . $quoted . '(?![a-f0-9-])#i', $url)
+                || (bool) preg_match('/placement=' . $quoted . '(?![a-f0-9-])/i', $url);
+            if (!$matches) {
+                continue;
+            }
+            if (!preg_match('/\brel="([^"]*)"/i', $html, $rel)) {
+                return false;
+            }
+            $tokens = preg_split('/\s+/', strtolower($rel[1]));
+            return is_array($tokens) && in_array('sponsored', $tokens, true);
+        }
+        return false;
+    }
+
+    public function revoke_box($post_id, $placement_id) {
+        if (!defined('AFFILIO_PLUGIN_ACK_REMOVED')) {
+            return false;
+        }
+        return $this->confirm_box($post_id, $placement_id, false, AFFILIO_PLUGIN_ACK_REMOVED, function ($content) use ($placement_id) {
+            return self::revert_content($content, $placement_id)['content'];
+        });
+    }
+
+    public function restore_box($post_id, $placement_id, $box = null) {
+        if (!defined('AFFILIO_PLUGIN_ACK_RESTORED')) {
+            return false;
+        }
+        if (!is_array($box)) {
+            $index = function_exists('get_option') ? get_option('affilio_box_index', array()) : array();
+            $box = (is_array($index) && isset($index[$placement_id]) && is_array($index[$placement_id])) ? $index[$placement_id] : array();
+        }
+        $copy = isset($box['copy']) ? (string) $box['copy'] : '';
+        $disclosure = isset($box['disclosure']) ? (string) $box['disclosure'] : '';
+        return $this->confirm_box($post_id, $placement_id, true, AFFILIO_PLUGIN_ACK_RESTORED, function ($content) use ($placement_id, $copy, $disclosure) {
+            if (self::box_in_content($content, $placement_id)) {
+                return $content;
+            }
+            return $this->append_box($content, array('copy' => $copy, 'disclosure' => $disclosure), $placement_id);
+        });
+    }
+
+    public function sync_known_boxes() {
+        if (!function_exists('get_option')) {
+            return;
+        }
+        $index = get_option('affilio_box_index', array());
+        if (!is_array($index)) {
+            return;
+        }
+        foreach ($index as $id => $row) {
+            if (!is_array($row) || empty($row['post_id'])) {
+                continue;
+            }
+            $data = $this->request('GET', '/placements/' . $id);
+            if (is_wp_error($data) || !is_array($data)) {
+                continue;
+            }
+            if (!empty($data['fallback_url']) && class_exists('Affilio_Go')) {
+                Affilio_Go::remember_fallback($id, $data['fallback_url']);
+            }
+            $wait = isset($data['plugin_wait']) ? (string) $data['plugin_wait'] : '';
+            $status = isset($data['status']) ? (string) $data['status'] : '';
+            $phase = isset($row['phase']) ? (string) $row['phase'] : '';
+            if ($wait === 'remove' || ($status === 'revoked' && $phase === 'placed')) {
+                $this->revoke_box((int) $row['post_id'], $id);
+                continue;
+            }
+            if ($wait === 'restore' || ($status === 'committed' && $phase === 'removed')) {
+                $this->restore_box((int) $row['post_id'], $id, $row);
+            }
+        }
+    }
+
+    public function maybe_upgrade() {
+        if (!function_exists('get_option') || !defined('AFFILIO_VERSION')) {
+            return;
+        }
+        $seen = (string) get_option('affilio_seen_version', '');
+        if ($seen === AFFILIO_VERSION) {
+            return;
+        }
+        if (class_exists('Affilio_Go')) {
+            Affilio_Go::register_rewrites();
+            if (function_exists('flush_rewrite_rules')) {
+                flush_rewrite_rules(false);
+            }
+        }
+        if (($seen !== '' || $this->plugin_already_installed()) && class_exists('Affilio_Plugin_Ack')) {
+            $this->ack_existing_boxes();
+        }
+        if (function_exists('update_option')) {
+            update_option('affilio_seen_version', AFFILIO_VERSION, false);
+        }
+    }
+
+    public function ack_existing_boxes() {
+        if (!defined('AFFILIO_PLUGIN_ACK_PLACED')) {
+            return;
+        }
+        foreach ($this->published_box_posts() as $post) {
+            foreach (self::placement_ids_in_content($post->post_content) as $id) {
+                $this->confirm_box((int) $post->ID, $id, true, AFFILIO_PLUGIN_ACK_PLACED, function ($content) {
+                    return $content;
+                });
+            }
+        }
+    }
+
+    private function plugin_already_installed() {
+        if (trim((string) get_option('affilio_api_key', '')) !== '') {
+            return true;
+        }
+        if (defined('AFFILIO_PLUGIN_ACK_OPTION') && trim((string) get_option(AFFILIO_PLUGIN_ACK_OPTION, '')) !== '') {
+            return true;
+        }
+        return $this->published_box_posts() !== array();
+    }
+
+    private function published_box_posts() {
+        if (!function_exists('get_posts')) {
+            return array();
+        }
+        $posts = get_posts(array('post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => -1));
+        if (!is_array($posts)) {
+            return array();
+        }
+        $matched = array();
+        foreach ($posts as $post) {
+            if (!is_object($post) || !isset($post->post_content)) {
+                continue;
+            }
+            if (self::placement_ids_in_content($post->post_content)) {
+                $matched[] = $post;
+            }
+        }
+        return $matched;
+    }
+
+    private function confirm_box($post_id, $placement_id, $expect_present, $action, $mutate) {
+        if (!class_exists('Affilio_Plugin_Ack')) {
+            return false;
+        }
+        $write = function () use ($post_id, $placement_id, $expect_present, $mutate) {
+            $post = get_post($post_id);
+            if (!$post || !isset($post->post_content)) {
+                return;
+            }
+            $content = (string) $post->post_content;
+            if (self::box_in_content($content, $placement_id) === $expect_present) {
+                return;
+            }
+            $next = call_user_func($mutate, $content, $post);
+            if (!is_string($next) || $next === $content) {
+                return;
+            }
+            $this->save_content($post_id, $next);
+        };
+        $write();
+        for ($try = 0; $try < 2; $try++) {
+            $fresh = get_post($post_id);
+            $content = ($fresh && isset($fresh->post_content)) ? (string) $fresh->post_content : '';
+            if (self::box_in_content($content, $placement_id) === $expect_present) {
+                $rel = self::rel_sponsored_from_content($content, $placement_id);
+                (new Affilio_Plugin_Ack())->send($placement_id, $action, $rel, '');
+                $this->remember_phase($placement_id, $post_id, $action);
+                return true;
+            }
+            if ($try === 0) {
+                $write();
+            }
+        }
+        (new Affilio_Plugin_Ack())->send($placement_id, AFFILIO_PLUGIN_ACK_FAILED, false, 're-read failed');
+        error_log('affilio plugin ack failed placement_id=' . $placement_id . ' post_id=' . (int) $post_id . ' action=' . $action);
+        $this->remember_ack_notice($post_id, $placement_id, $action);
+        return false;
+    }
+
+    private function remember_box($id, $post_id, $copy, $disclosure, $fallback, $phase) {
+        if (!function_exists('get_option') || !function_exists('update_option')) {
+            return;
+        }
+        $index = get_option('affilio_box_index', array());
+        if (!is_array($index)) {
+            $index = array();
+        }
+        $prev = isset($index[$id]) && is_array($index[$id]) ? $index[$id] : array();
+        $index[$id] = array(
+            'post_id' => (int) $post_id,
+            'copy' => $copy !== '' ? $copy : (isset($prev['copy']) ? $prev['copy'] : ''),
+            'disclosure' => $disclosure !== '' ? $disclosure : (isset($prev['disclosure']) ? $prev['disclosure'] : ''),
+            'fallback_url' => $fallback !== '' ? $fallback : (isset($prev['fallback_url']) ? $prev['fallback_url'] : ''),
+            'phase' => $phase,
+        );
+        update_option('affilio_box_index', $index, false);
+        if ($fallback !== '' && class_exists('Affilio_Go')) {
+            Affilio_Go::remember_fallback($id, $fallback);
+        }
+    }
+
+    private function remember_phase($id, $post_id, $action) {
+        $phase = 'placed';
+        if ($action === (defined('AFFILIO_PLUGIN_ACK_REMOVED') ? AFFILIO_PLUGIN_ACK_REMOVED : 'removed')) {
+            $phase = 'removed';
+        }
+        $this->remember_box($id, $post_id, '', '', '', $phase);
+    }
+
+    private function remember_ack_notice($post_id, $placement_id, $action) {
+        if (!function_exists('get_option') || !function_exists('update_option')) {
+            return;
+        }
+        $notices = get_option('affilio_plugin_ack_notices', array());
+        if (!is_array($notices)) {
+            $notices = array();
+        }
+        $notices[] = array(
+            'placement_id' => (string) $placement_id,
+            'post_id' => (int) $post_id,
+            'action' => (string) $action,
+            'message' => 'Affilio could not confirm the box change.',
+        );
+        update_option('affilio_plugin_ack_notices', $notices);
+    }
+
+    private function render_ack_notices() {
+        if (!function_exists('get_option')) {
+            return;
+        }
+        $notices = get_option('affilio_plugin_ack_notices', array());
+        if (!is_array($notices)) {
+            return;
+        }
+        foreach ($notices as $notice) {
+            if (!is_array($notice)) {
+                continue;
+            }
+            $message = isset($notice['message']) ? (string) $notice['message'] : 'Affilio could not confirm the box change.';
+            $placement_id = isset($notice['placement_id']) ? (string) $notice['placement_id'] : '';
+            $post_id = isset($notice['post_id']) ? (string) $notice['post_id'] : '';
+            echo '<div class="notice notice-error"><p>' . esc_html($message) . ' Placement ' . esc_html($placement_id) . ', post ' . esc_html($post_id) . '.</p></div>';
+        }
     }
 }

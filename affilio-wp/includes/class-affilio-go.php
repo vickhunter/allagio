@@ -1,0 +1,362 @@
+<?php
+
+if (!defined('AFFILIO_GO_CIRCUIT_SECONDS')) {
+    define('AFFILIO_GO_CIRCUIT_SECONDS', 60);
+}
+if (!defined('AFFILIO_GO_TIMEOUT')) {
+    define('AFFILIO_GO_TIMEOUT', 1.5);
+}
+if (!defined('AFFILIO_GO_CIRCUIT_OPTION')) {
+    define('AFFILIO_GO_CIRCUIT_OPTION', 'affilio_go_circuit_until');
+}
+if (!defined('AFFILIO_GO_FALLBACKS_OPTION')) {
+    define('AFFILIO_GO_FALLBACKS_OPTION', 'affilio_go_fallbacks');
+}
+
+if (class_exists('Affilio_Go')) {
+    return;
+}
+
+class Affilio_Go {
+    public static function register_rewrites() {
+        if (function_exists('add_rewrite_rule')) {
+            add_rewrite_rule('^go/([a-f0-9-]{36})/?$', 'index.php?affilio_go=$matches[1]', 'top');
+        }
+        if (function_exists('add_rewrite_tag')) {
+            add_rewrite_tag('%affilio_go%', '([a-f0-9-]{36})');
+        }
+    }
+
+    public static function query_vars($vars) {
+        $vars[] = 'affilio_go';
+        return $vars;
+    }
+
+    public static function privacy_headers() {
+        return array(
+            'Cache-Control' => 'no-store',
+            'X-Robots-Tag' => 'noindex, nofollow',
+        );
+    }
+
+    public static function send_headers() {
+        if (!headers_sent()) {
+            foreach (self::privacy_headers() as $name => $value) {
+                header($name . ': ' . $value);
+            }
+        }
+    }
+
+    public static function mark_uncacheable() {
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+    }
+
+    public static function exclude_cache($exclude) {
+        if (self::is_go_request()) {
+            return true;
+        }
+        return $exclude;
+    }
+
+    public static function robots_txt($output, $public = true) {
+        $line = 'Disallow: /go/';
+        if (strpos((string) $output, $line) !== false) {
+            return $output;
+        }
+        return rtrim((string) $output, "\n") . "\n" . $line . "\n";
+    }
+
+    public static function is_go_request() {
+        return self::current_id() !== '';
+    }
+
+    public static function current_id() {
+        $candidates = array();
+        if (isset($_GET['affilio_go'])) {
+            $raw = (string) $_GET['affilio_go'];
+            $candidates[] = function_exists('wp_unslash') ? (string) wp_unslash($raw) : $raw;
+        }
+        if (function_exists('get_query_var')) {
+            $candidates[] = (string) get_query_var('affilio_go');
+        }
+        foreach ($candidates as $candidate) {
+            if (preg_match('/^[a-f0-9-]{36}$/i', $candidate)) {
+                return $candidate;
+            }
+        }
+        $uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
+        if (preg_match('#/go/([a-f0-9-]{36})(?![a-f0-9-])#i', $uri, $match)) {
+            return $match[1];
+        }
+        return '';
+    }
+
+    public static function rewrite_legacy_links($content) {
+        if (!is_string($content) || strpos($content, '/v1/go/') === false) {
+            return $content;
+        }
+        $rewritten = preg_replace_callback(
+            '#(?:https?:)?(?://[^"\'\s>]*)?/v1/go/([A-Za-z0-9_-]+)(\?[^"\'\s>]*)?#',
+            array('Affilio_Go', 'legacy_link_replacement'),
+            $content
+        );
+        return is_string($rewritten) ? $rewritten : $content;
+    }
+
+    public static function legacy_link_replacement($match) {
+        $code = $match[1];
+        $query = isset($match[2]) ? $match[2] : '';
+        $id = '';
+        if (preg_match('/placement=([a-f0-9-]{36})/i', $query, $placement)) {
+            $id = $placement[1];
+        } elseif (preg_match('/^[a-f0-9-]{36}$/i', $code)) {
+            $id = $code;
+        }
+        if ($id === '') {
+            return $match[0];
+        }
+        return self::local_href($id);
+    }
+
+    public static function local_href($id) {
+        $path = '/go/' . $id;
+        if (function_exists('home_url')) {
+            return home_url($path);
+        }
+        return $path;
+    }
+
+    public static function remember_fallback($id, $url) {
+        $url = trim((string) $url);
+        if ($url === '' || !preg_match('/^[a-f0-9-]{36}$/i', (string) $id) || !function_exists('get_option') || !function_exists('update_option')) {
+            return;
+        }
+        $all = get_option(AFFILIO_GO_FALLBACKS_OPTION, array());
+        if (!is_array($all)) {
+            $all = array();
+        }
+        $all[(string) $id] = $url;
+        update_option(AFFILIO_GO_FALLBACKS_OPTION, $all, false);
+    }
+
+    public static function fallback_for($id) {
+        $all = function_exists('get_option') ? get_option(AFFILIO_GO_FALLBACKS_OPTION, array()) : array();
+        if (is_array($all) && isset($all[$id]) && $all[$id] !== '') {
+            return (string) $all[$id];
+        }
+        if (function_exists('home_url')) {
+            return home_url('/');
+        }
+        return '/';
+    }
+
+    public static function truncate_ip($ip) {
+        $ip = trim((string) $ip);
+        if ($ip === '') {
+            return '';
+        }
+        if ($ip[0] === '[') {
+            $end = strpos($ip, ']');
+            $ip = $end === false ? trim($ip, '[]') : substr($ip, 1, $end - 1);
+        }
+        $zone = strpos($ip, '%');
+        if ($zone !== false) {
+            $ip = substr($ip, 0, $zone);
+        }
+        if (substr_count($ip, ':') === 1 && strpos($ip, '.') !== false) {
+            $ip = substr($ip, 0, strpos($ip, ':'));
+        }
+        if (stripos($ip, '::ffff:') === 0) {
+            $mapped = substr($ip, 7);
+            if (filter_var($mapped, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                $ip = $mapped;
+            }
+        }
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $parts = explode('.', $ip);
+            if (count($parts) !== 4) {
+                return '';
+            }
+            return intval($parts[0]) . '.' . intval($parts[1]) . '.' . intval($parts[2]) . '.0';
+        }
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            return '';
+        }
+        $bin = inet_pton($ip);
+        if ($bin === false || strlen($bin) !== 16) {
+            return '';
+        }
+        $v4prefix = str_repeat("\0", 10) . "\xff\xff";
+        if (substr($bin, 0, 12) === $v4prefix) {
+            $v4 = inet_ntop(substr($bin, 12, 4));
+            return self::truncate_ip($v4);
+        }
+        $bin = substr($bin, 0, 6) . str_repeat("\0", 10);
+        return self::ipv6_rfc5952($bin);
+    }
+
+    public static function ipv6_rfc5952($bin) {
+        $groups = array();
+        for ($i = 0; $i < 16; $i += 2) {
+            $unpacked = unpack('n', substr($bin, $i, 2));
+            $groups[] = $unpacked[1];
+        }
+        $best_start = -1;
+        $best_len = 0;
+        $index = 0;
+        while ($index < 8) {
+            if ($groups[$index] !== 0) {
+                $index++;
+                continue;
+            }
+            $end = $index;
+            while ($end < 8 && $groups[$end] === 0) {
+                $end++;
+            }
+            $len = $end - $index;
+            if ($len > $best_len) {
+                $best_len = $len;
+                $best_start = $index;
+            }
+            $index = $end;
+        }
+        $parts = array();
+        for ($index = 0; $index < 8;) {
+            if ($best_len >= 2 && $index === $best_start) {
+                $parts[] = '';
+                $index += $best_len;
+                if ($index >= 8) {
+                    $parts[] = '';
+                }
+                continue;
+            }
+            $parts[] = dechex($groups[$index]);
+            $index++;
+        }
+        $out = implode(':', $parts);
+        return preg_replace('/:{3,}/', '::', $out);
+    }
+
+    public static function daily_salt($site_secret, $utc_date) {
+        return hash('sha256', (string) $site_secret . '|go-link|' . (string) $utc_date);
+    }
+
+    public static function client_hash($truncated, $salt) {
+        return hash_hmac('sha256', (string) $truncated, (string) $salt);
+    }
+
+    public static function utc_date() {
+        $date = gmdate('Y-m-d');
+        if (function_exists('apply_filters')) {
+            $filtered = apply_filters('affilio_go_utc_date', $date);
+            if (is_string($filtered) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtered)) {
+                return $filtered;
+            }
+        }
+        return $date;
+    }
+
+    public static function visitor_hash() {
+        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        $truncated = self::truncate_ip($ip);
+        $secret = function_exists('get_option') ? trim((string) get_option('affilio_api_key', '')) : '';
+        return self::client_hash($truncated, self::daily_salt($secret, self::utc_date()));
+    }
+
+    public function resolve($placement_id) {
+        $fallback = self::fallback_for($placement_id);
+        $until = function_exists('get_option') ? (int) get_option(AFFILIO_GO_CIRCUIT_OPTION, 0) : 0;
+        if ($until > time()) {
+            $this->log_fallback($placement_id, 'circuit_open');
+            return $fallback;
+        }
+        $response = $this->call_upstream($placement_id);
+        $location = self::location_header($response);
+        $code = self::response_code($response);
+        if (!is_wp_error($response) && $code === 302 && $location !== '') {
+            return $location;
+        }
+        if (function_exists('update_option')) {
+            update_option(AFFILIO_GO_CIRCUIT_OPTION, time() + (int) AFFILIO_GO_CIRCUIT_SECONDS, false);
+        }
+        $reason = is_wp_error($response) ? 'upstream_failed' : 'upstream_status_' . $code;
+        $this->log_fallback($placement_id, $reason);
+        return $fallback;
+    }
+
+    public function handle() {
+        $id = self::current_id();
+        if ($id === '') {
+            return;
+        }
+        self::mark_uncacheable();
+        self::send_headers();
+        $location = $this->resolve($id);
+        if (function_exists('wp_redirect')) {
+            wp_redirect($location, 302);
+            exit;
+        }
+        if (!headers_sent()) {
+            header('Location: ' . $location, true, 302);
+        }
+        exit;
+    }
+
+    private function call_upstream($placement_id) {
+        $base = class_exists('Affilio_API') ? Affilio_API::resolve_base_url() : '';
+        $path = 'go/' . rawurlencode((string) $placement_id) . '?via=plugin';
+        $url = $base === '' ? $path : trailingslashit($base) . $path;
+        $site_key = function_exists('get_option') ? trim((string) get_option('affilio_api_key', '')) : '';
+        $headers = array(
+            'X-API-Key' => $site_key,
+            'X-OR-Client-Hash' => self::visitor_hash(),
+            'X-OR-User-Agent' => isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : '',
+            'X-OR-Referer' => isset($_SERVER['HTTP_REFERER']) ? (string) $_SERVER['HTTP_REFERER'] : '',
+        );
+        if (!function_exists('wp_remote_request')) {
+            return new WP_Error('affilio_go', 'go transport unavailable');
+        }
+        return wp_remote_request($url, array(
+            'method' => 'GET',
+            'timeout' => (float) AFFILIO_GO_TIMEOUT,
+            'redirection' => 0,
+            'headers' => $headers,
+        ));
+    }
+
+    private function log_fallback($placement_id, $reason) {
+        error_log('affilio go fallback placement_id=' . $placement_id . ' reason=' . $reason);
+    }
+
+    public static function location_header($response) {
+        if (is_wp_error($response) || !is_array($response)) {
+            return '';
+        }
+        if (isset($response['headers']) && is_array($response['headers'])) {
+            foreach ($response['headers'] as $name => $value) {
+                if (strtolower((string) $name) === 'location') {
+                    return (string) $value;
+                }
+            }
+        }
+        if (function_exists('wp_remote_retrieve_header')) {
+            return (string) wp_remote_retrieve_header($response, 'location');
+        }
+        return '';
+    }
+
+    public static function response_code($response) {
+        if (is_wp_error($response) || !is_array($response)) {
+            return 0;
+        }
+        if (isset($response['response']['code'])) {
+            return (int) $response['response']['code'];
+        }
+        if (function_exists('wp_remote_retrieve_response_code')) {
+            return (int) wp_remote_retrieve_response_code($response);
+        }
+        return 0;
+    }
+}

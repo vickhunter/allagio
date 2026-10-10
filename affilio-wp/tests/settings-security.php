@@ -48,7 +48,10 @@ function run_scan($administrator, $nonce) {
 require {$bootstrap};
 require {$plugin};
 class Affilio_ScanSpy {
-    public function scan_all_posts() { fwrite(STDERR, "SCANNED\n"); }
+    public function scan_published_batch(\$offset = 0) {
+        fwrite(STDERR, "SCANNED\n");
+        return array('scanned' => 0, 'skipped' => array(), 'fetched' => 0, 'done' => true, 'next_offset' => 0);
+    }
 }
 class Affilio_QuietAPI {
     public function get_connection_status(\$force = false) {
@@ -229,6 +232,51 @@ foreach ($GLOBALS['probe_urls'] as $url) {
 }
 if (!$saw_new_host) {
     fail_security('changing the API URL kept the cached connection host');
+}
+
+$GLOBALS['options']['affilio_api_url_override'] = 'https://kept.example/v1';
+$_SERVER['REQUEST_METHOD'] = 'POST';
+$_POST = array(
+    'affilio_api_key' => '',
+    'affilio_admin_api_key' => '',
+    'affilio_api_url_override' => 'http://evil.example/v1',
+    '_wpnonce' => wp_create_nonce('affilio_settings'),
+);
+$_REQUEST = $_POST;
+ob_start();
+$page->render_settings();
+$rejected_url = ob_get_clean();
+if (get_option('affilio_api_url_override', '') !== 'https://kept.example/v1') {
+    fail_security('an http API URL override replaced the stored https URL');
+}
+if (strpos($rejected_url, 'deve usare https, salvo localhost.') === false) {
+    fail_security('API URL override did not explain the https rule in Italian');
+}
+foreach (array('http://localhost/v1', 'http://127.0.0.1:8080/v1', 'https://ok.example/v1') as $allowed_url) {
+    $_POST['affilio_api_url_override'] = $allowed_url;
+    $_REQUEST = $_POST;
+    ob_start();
+    $page->render_settings();
+    ob_end_clean();
+    if (get_option('affilio_api_url_override', '') !== $allowed_url) {
+        fail_security('allowed API URL was rejected: ' . $allowed_url);
+    }
+}
+$_POST['affilio_api_url_override'] = 'http://localhost.evil.com/v1';
+$_REQUEST = $_POST;
+ob_start();
+$page->render_settings();
+ob_end_clean();
+if (get_option('affilio_api_url_override', '') !== 'https://ok.example/v1') {
+    fail_security('a lookalike localhost host replaced the stored API URL');
+}
+$_POST['affilio_api_url_override'] = '';
+$_REQUEST = $_POST;
+ob_start();
+$page->render_settings();
+ob_end_clean();
+if (get_option('affilio_api_url_override', '') !== '') {
+    fail_security('an empty API URL override did not clear the stored URL');
 }
 
 if ($failures) {

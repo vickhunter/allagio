@@ -49,7 +49,7 @@ WP_FILES = {
     "affilio-wp/readme.txt",
 }
 PLUGIN_ROOT = "affilio-wp/"
-PLUGIN_VERSION = "0.1.18"
+PLUGIN_VERSION = "0.1.19"
 ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
 DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
 QUOTED_BUILD = re.compile(r"""(['"])([A-Za-z0-9_.-]+\.(?:js|css))\1""")

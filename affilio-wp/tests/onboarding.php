@@ -1,6 +1,7 @@
 <?php
 
 define('ABSPATH', __DIR__);
+require_once __DIR__ . '/wp-filters.php';
 $options = array();
 $actions = array();
 $cron = array();
@@ -30,6 +31,9 @@ function is_wp_error($value) { return $value instanceof WP_Error; }
 function wp_next_scheduled($hook) { return $GLOBALS['cron'][$hook] ?? false; }
 function wp_schedule_single_event($time, $hook) { $GLOBALS['cron'][$hook] = $time; }
 function get_posts($args) {
+    if (isset($args['posts_per_page']) && (int) $args['posts_per_page'] < 0) {
+        return array();
+    }
     check($args['post_status'] === 'publish', 'Setup included unpublished content');
     check($args['posts_per_page'] === 10, 'Setup did not bound scan size');
     return array_slice($GLOBALS['posts'], $args['offset'], $args['posts_per_page']);

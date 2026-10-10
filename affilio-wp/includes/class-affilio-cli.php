@@ -40,19 +40,33 @@ class Affilio_Revert_Command {
         if ($dry_run) {
             return 0;
         }
+        $exit = 0;
         foreach ($result['placement_ids'] as $id) {
-            $state = isset($result['api'][$id]) ? $result['api'][$id] : 'unreachable';
+            $state = isset($result['api'][$id]) ? $result['api'][$id] : array('state' => 'unreachable');
             $this->line(self::api_line($state));
+            if (is_array($state) && isset($state['state']) && $state['state'] === 'client_error') {
+                $exit = 1;
+            }
         }
-        return 0;
+        return $exit;
     }
 
     public static function api_line($state) {
-        if ($state === 'reported') {
+        $outcome = is_array($state) ? $state : array('state' => (string) $state);
+        $name = isset($outcome['state']) ? $outcome['state'] : 'unreachable';
+        if ($name === 'reported') {
             return 'API: segnalato';
         }
-        if ($state === 'already') {
+        if ($name === 'already') {
             return 'API: già rimosso';
+        }
+        if ($name === 'not_published') {
+            return "Rimosso dal post. L'inserimento non era pubblicato, quindi non c'è niente da segnalare.";
+        }
+        if ($name === 'client_error') {
+            $code = isset($outcome['code']) ? (int) $outcome['code'] : 0;
+            $reason = isset($outcome['reason']) ? $outcome['reason'] : '';
+            return Affilio_Distribution::client_error_line($code, $reason);
         }
         return 'API: non raggiungibile, riprovo più tardi';
     }

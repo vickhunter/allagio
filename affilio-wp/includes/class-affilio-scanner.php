@@ -16,6 +16,27 @@ class Affilio_Scanner {
         return $this->scan_posts($posts);
     }
 
+    public function scan_published_batch($offset) {
+        $offset = max(0, (int) $offset);
+        $posts = get_posts(array(
+            'post_type' => 'post',
+            'post_status' => 'publish',
+            'posts_per_page' => 10,
+            'offset' => $offset,
+            'orderby' => 'ID',
+            'order' => 'ASC',
+        ));
+        if (!is_array($posts)) {
+            $posts = array();
+        }
+        $result = $this->scan_posts($posts);
+        $fetched = count($posts);
+        $result['fetched'] = $fetched;
+        $result['next_offset'] = $offset + $fetched;
+        $result['done'] = $fetched < 10;
+        return $result;
+    }
+
     public function scan_posts($posts) {
         $ready = array();
         foreach ($posts as $post) {
