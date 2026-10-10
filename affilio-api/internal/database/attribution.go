@@ -87,6 +87,7 @@ type CampaignLink struct {
 	RefParam          string
 	ProgramID         *string
 	RequiresPlacement bool
+	SiteDomain        string
 }
 
 // PlacementRedirectSQL is the placement go-link lookup. CountsAsLive is the
@@ -190,12 +191,13 @@ func (d *DB) SiteForGoKey(ctx context.Context, keyHash, keyPrefix string) (siteI
 
 func (d *DB) GetCampaignByTrackingCode(ctx context.Context, code string) (*CampaignLink, error) {
 	row := d.Pool.QueryRow(ctx, `
-SELECT c.id, c.site_id, c.offer_id, c.status, o.status, o.landing_url, o.ref_param, o.program_id,c.requires_placement
+SELECT c.id, c.site_id, c.offer_id, c.status, o.status, o.landing_url, o.ref_param, o.program_id, c.requires_placement, s.domain
 FROM campaigns c
 JOIN offers o ON o.id = c.offer_id
+JOIN sites s ON s.id = c.site_id
 WHERE c.tracking_code=$1`, code)
 	var link CampaignLink
-	if err := row.Scan(&link.CampaignID, &link.SiteID, &link.OfferID, &link.CampaignStatus, &link.OfferStatus, &link.LandingURL, &link.RefParam, &link.ProgramID, &link.RequiresPlacement); err != nil {
+	if err := row.Scan(&link.CampaignID, &link.SiteID, &link.OfferID, &link.CampaignStatus, &link.OfferStatus, &link.LandingURL, &link.RefParam, &link.ProgramID, &link.RequiresPlacement, &link.SiteDomain); err != nil {
 		return nil, err
 	}
 	return &link, nil

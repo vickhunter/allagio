@@ -43,84 +43,110 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 		h.goPlacement(c, code, req)
 		return
 	}
-	if h.RateLimiter != nil && !h.RateLimiter.Allow(h.rateLimitKey(req.clientIP)) {
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
-		return
-	}
+	h.goCampaign(c, code, req)
+}
+
+// goCampaign is GET /v1/go/<tracking_code>. Readers never see a 4xx or a 5xx
+// for a code that resolves. Clicks-off states redirect to the plain offer URL.
+// An offer that is not live redirects to the referring post or the site home.
+func (h *RedirectsHandler) goCampaign(c *gin.Context, code string, req goRequest) {
 	link, err := h.DB.GetCampaignByTrackingCode(c.Request.Context(), code)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "unknown link"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
+		logGo("redirects.go campaign lookup failed code=%s err=%v", code, err)
+		c.Redirect(http.StatusFound, h.offerRailsHome())
 		return
 	}
-	// Paused, unlisted, and removed links are gone. Do not send the visitor
-	// onward and do not record a click, including for preview bots and HEAD.
-	if status, reason, stop := trackingUnavailable(link); stop {
-		c.JSON(status, gin.H{"error": "link unavailable", "reason": reason})
+	placementID := c.Query("placement")
+	if !campaignOfferLive(link) {
+		c.Redirect(http.StatusFound, h.campaignFallback(c, link, placementID))
 		return
 	}
-	if !httpsDestination(link.LandingURL) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "destination must be https"})
+	plain := link.LandingURL
+	if h.campaignClicksOff(c, link, placementID) || c.Request.Method == http.MethodHead || isPreviewBot(req.userAgent) {
+		c.Redirect(http.StatusFound, plain)
 		return
 	}
-	if link.RequiresPlacement && c.Query("placement") == "" {
-		c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "removed"})
+	if h.RateLimiter != nil && !h.RateLimiter.Allow(h.rateLimitKey(req.clientIP)) {
+		c.Redirect(http.StatusFound, plain)
 		return
 	}
-	if placementID := c.Query("placement"); placementID != "" {
-		if !uuidPattern.MatchString(placementID) {
-			c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "removed"})
-			return
-		}
-		revoked, err := h.DB.PlacementRevoked(c.Request.Context(), placementID, link.CampaignID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
-			return
-		}
-		if revoked {
-			c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "revoked"})
-			return
-		}
-		held, err := h.DB.PlacementRestoreUnconfirmed(c.Request.Context(), placementID, link.CampaignID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
-			return
-		}
-		if held {
-			c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "failed"})
-			return
-		}
-		removed, err := h.DB.PlacementRemoved(c.Request.Context(), placementID, link.CampaignID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
-			return
-		}
-		if removed {
-			c.Redirect(http.StatusFound, link.LandingURL)
-			return
-		}
-		valid, err := h.DB.PlacementAllowsClick(c.Request.Context(), placementID, link.CampaignID)
-		if err != nil || !valid {
-			c.JSON(http.StatusGone, gin.H{"error": "link unavailable", "reason": "removed"})
-			return
-		}
-	}
-	// Link-preview fetches and HEAD probes still need the destination, but
-	// they are not visitors and must not create a click or an attribution ref.
-	if c.Request.Method == http.MethodHead || isPreviewBot(req.userAgent) {
-		c.Redirect(http.StatusFound, link.LandingURL)
-		return
-	}
-	clickID, err := h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, h.directReaderHash(req.clientIP), req.userAgent, req.referer, c.Query("placement"))
+	clickID, err := h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, h.directReaderHash(req.clientIP), req.userAgent, req.referer, placementID)
 	if err != nil {
 		logGo("redirects.go click insert failed campaign=%s err=%v", link.CampaignID, err)
-		c.Redirect(http.StatusFound, link.LandingURL)
+		c.Redirect(http.StatusFound, plain)
 		return
 	}
-	c.Redirect(http.StatusFound, appendRefParam(link.LandingURL, link.RefParam, clickID))
+	c.Redirect(http.StatusFound, appendRefParam(plain, link.RefParam, clickID))
+}
+
+// campaignOfferLive is the offer a reader can be sent to: listed, with an
+// https landing URL.
+func campaignOfferLive(link *database.CampaignLink) bool {
+	return link != nil && link.OfferStatus == "listed" && httpsDestination(link.LandingURL)
+}
+
+// campaignClicksOff is true when a resolved tracking code must not record a
+// hit. A lookup error is clicks-off too, so the reader still gets a redirect.
+func (h *RedirectsHandler) campaignClicksOff(c *gin.Context, link *database.CampaignLink, placementID string) bool {
+	if link.CampaignStatus != "active" || (link.RequiresPlacement && strings.TrimSpace(placementID) == "") {
+		return true
+	}
+	if strings.TrimSpace(placementID) == "" {
+		return false
+	}
+	if !uuidPattern.MatchString(placementID) {
+		return true
+	}
+	revoked, err := h.DB.PlacementRevoked(c.Request.Context(), placementID, link.CampaignID)
+	if err != nil || revoked {
+		if err != nil {
+			logGo("redirects.go placement revoked lookup failed campaign=%s err=%v", link.CampaignID, err)
+		}
+		return true
+	}
+	held, err := h.DB.PlacementRestoreUnconfirmed(c.Request.Context(), placementID, link.CampaignID)
+	if err != nil || held {
+		if err != nil {
+			logGo("redirects.go placement restore lookup failed campaign=%s err=%v", link.CampaignID, err)
+		}
+		return true
+	}
+	removed, err := h.DB.PlacementRemoved(c.Request.Context(), placementID, link.CampaignID)
+	if err != nil || removed {
+		if err != nil {
+			logGo("redirects.go placement removed lookup failed campaign=%s err=%v", link.CampaignID, err)
+		}
+		return true
+	}
+	valid, err := h.DB.PlacementAllowsClick(c.Request.Context(), placementID, link.CampaignID)
+	if err != nil || !valid {
+		if err != nil {
+			logGo("redirects.go placement click lookup failed campaign=%s err=%v", link.CampaignID, err)
+		}
+		return true
+	}
+	return false
+}
+
+// campaignFallback is where a reader goes when the offer itself is not live:
+// the placement's post, then the site home, then the Offer Rails home.
+func (h *RedirectsHandler) campaignFallback(c *gin.Context, link *database.CampaignLink, placementID string) string {
+	if uuidPattern.MatchString(placementID) {
+		post, err := h.DB.PlacementPostURL(c.Request.Context(), placementID, link.CampaignID)
+		if err != nil {
+			logGo("redirects.go post url lookup failed campaign=%s err=%v", link.CampaignID, err)
+		} else if httpsDestination(post) {
+			return post
+		}
+	}
+	if home := siteHome(link.SiteDomain); home != "" {
+		return home
+	}
+	return h.offerRailsHome()
 }
 
 // previewBotMarkers are link-unfurl clients. Matching is a case-insensitive
@@ -152,19 +178,6 @@ var previewBotMarkers = []string{
 func httpsDestination(raw string) bool {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	return err == nil && parsed.Scheme == "https" && parsed.Host != ""
-}
-
-func trackingUnavailable(link *database.CampaignLink) (int, string, bool) {
-	if link.CampaignStatus == "paused" || link.OfferStatus == "paused" {
-		return http.StatusGone, "paused", true
-	}
-	if link.OfferStatus == "retired" || link.CampaignStatus == "retired" || link.CampaignStatus == "inactive" {
-		return http.StatusGone, "removed", true
-	}
-	if link.CampaignStatus != "active" || link.OfferStatus != "listed" {
-		return http.StatusGone, "unlisted", true
-	}
-	return 0, "", false
 }
 
 func isPreviewBot(userAgent string) bool {

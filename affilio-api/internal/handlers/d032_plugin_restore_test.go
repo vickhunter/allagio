@@ -185,12 +185,7 @@ func TestRevokedGoLink(t *testing.T) {
 		{http.MethodGet, "Twitterbot/1.0"},
 	} {
 		stopped := hitGo(t, r, hit.method, path, hit.agent)
-		if stopped.Code != http.StatusGone || stopped.Header().Get("Location") != "" {
-			t.Fatalf("%s %s still redirects: %d %s", hit.method, hit.agent, stopped.Code, stopped.Header().Get("Location"))
-		}
-		if hit.method == http.MethodGet && (bodyReason(t, stopped) != "revoked") {
-			t.Fatalf("%s body: %s", hit.agent, stopped.Body.String())
-		}
+		requirePlainRedirect(t, stopped, "https://example.com")
 	}
 	if placementClickCount(t, db, placementID) != 1 {
 		t.Fatal("revoked link credited a click")
@@ -207,6 +202,23 @@ func TestRevokedGoLink(t *testing.T) {
 	if placementClickCount(t, db, placementID) != 2 {
 		t.Fatal("restored link did not credit a click")
 	}
+
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET post_url='https://golink.example/post' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='paused' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	paused := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
+	requirePlainRedirect(t, paused, "https://golink.example/post")
+	if placementClickCount(t, db, placementID) != 2 {
+		t.Fatal("an offer that is not live credited a click")
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET post_url='' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
+	home := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
+	requirePlainRedirect(t, home, "https://golink.example/")
 }
 
 func TestPluginPlacementState(t *testing.T) {
@@ -625,9 +637,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	stopped := func() {
 		t.Helper()
 		hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
-		if hit.Code != http.StatusGone || hit.Header().Get("Location") != "" || bodyReason(t, hit) != "revoked" {
-			t.Fatalf("go link left revoked: %d %s %s", hit.Code, hit.Header().Get("Location"), hit.Body.String())
-		}
+		requirePlainRedirect(t, hit, "https://example.com")
 		if placementClickCount(t, db, placementID) != clicks {
 			t.Fatal("revoked go link credited a click")
 		}
@@ -917,9 +927,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	dark := func() {
 		t.Helper()
 		hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
-		if hit.Code != http.StatusGone || hit.Header().Get("Location") != "" || bodyReason(t, hit) != "failed" {
-			t.Fatalf("failed restore still redirected: %d %s %s", hit.Code, hit.Header().Get("Location"), hit.Body.String())
-		}
+		requirePlainRedirect(t, hit, "https://example.com")
 		if placementClickCount(t, db, id) != clicks {
 			t.Fatal("failed restore credited a click")
 		}
@@ -1064,8 +1072,9 @@ VALUES($1,'stripe','leave-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id
 	stopped := func(path, id string, clicks int) {
 		t.Helper()
 		hit := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
-		if hit.Code != http.StatusGone || hit.Header().Get("Location") != "" || bodyReason(t, hit) != "revoked" || placementClickCount(t, db, id) != clicks {
-			t.Fatalf("go link: %d %s %s", hit.Code, hit.Header().Get("Location"), hit.Body.String())
+		requirePlainRedirect(t, hit, "https://example.com")
+		if placementClickCount(t, db, id) != clicks {
+			t.Fatal("clicks-off go link credited a click")
 		}
 	}
 	notLive := func() {
@@ -1455,9 +1464,7 @@ WHERE id=$1`, id); err != nil {
 	}
 	expect("revoked but placed", 1, 0, "placed", false)
 	stopped := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
-	if stopped.Code != http.StatusGone || stopped.Header().Get("Location") != "" || bodyReason(t, stopped) != "revoked" {
-		t.Fatalf("revoked placed go link: %d %s %s", stopped.Code, stopped.Header().Get("Location"), stopped.Body.String())
-	}
+	requirePlainRedirect(t, stopped, "https://example.com")
 }
 
 func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
@@ -1494,7 +1501,7 @@ func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 		if !strings.Contains(doc, "A 409 returns `reason` and `message`") || !strings.Contains(doc, "A 422 returns `check_id` and `check_text`") {
 			t.Fatal("docs drifted on the 409 and 422 body shapes")
 		}
-		if !strings.Contains(doc, "Digest totals, site totals, and Live now exclude") || !strings.Contains(doc, "Leave a failed restore removed") || !strings.Contains(doc, "counts as live only when `plugin_state` is `placed`") || !strings.Contains(doc, "`GET /v1/go/<placement_id>` always returns 302") || !strings.Contains(doc, "`fallback_url`") || !strings.Contains(doc, "`X-OR-Client-Hash`") || !strings.Contains(doc, "/24") || !strings.Contains(doc, "00:00 UTC") {
+		if !strings.Contains(doc, "Digest totals, site totals, and Live now exclude") || !strings.Contains(doc, "Leave a failed restore removed") || !strings.Contains(doc, "counts as live only when `plugin_state` is `placed`") || !strings.Contains(doc, "`GET /v1/go/<placement_id>` always returns 302") || !strings.Contains(doc, "`GET /v1/go/<code>`") || !strings.Contains(doc, "never returns a 4xx") || !strings.Contains(doc, "`fallback_url`") || !strings.Contains(doc, "`X-OR-Client-Hash`") || !strings.Contains(doc, "/24") || !strings.Contains(doc, "00:00 UTC") {
 			t.Fatal("docs drifted on leave-it-removed")
 		}
 	}

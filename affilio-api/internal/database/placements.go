@@ -111,6 +111,17 @@ func (d *DB) PlacementRemoved(ctx context.Context, placementID, campaignID strin
 	return removed, err
 }
 
+// PlacementPostURL is the referring post stored for this placement on the
+// campaign. An unknown placement returns an empty string.
+func (d *DB) PlacementPostURL(ctx context.Context, placementID, campaignID string) (string, error) {
+	var post string
+	err := d.Pool.QueryRow(ctx, `SELECT COALESCE(post_url,'') FROM placement_proposals WHERE id=$1 AND campaign_id=$2`, placementID, campaignID).Scan(&post)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return post, err
+}
+
 func (d *DB) PlacementRevoked(ctx context.Context, placementID, campaignID string) (bool, error) {
 	var revoked bool
 	err := d.Pool.QueryRow(ctx, `SELECT status='revoked' FROM placement_proposals WHERE id=$1 AND campaign_id=$2`, placementID, campaignID).Scan(&revoked)

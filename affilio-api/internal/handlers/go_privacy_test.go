@@ -56,6 +56,17 @@ func requireGoLinkHeaders(t *testing.T, rec *httptest.ResponseRecorder) {
 	}
 }
 
+func requirePlainRedirect(t *testing.T, rec *httptest.ResponseRecorder, want string) {
+	t.Helper()
+	if rec.Code != http.StatusFound {
+		t.Fatalf("go link status %d body %s", rec.Code, rec.Body.String())
+	}
+	requireGoLinkHeaders(t, rec)
+	if rec.Header().Get("Location") != want {
+		t.Fatalf("go link location %s want %s", rec.Header().Get("Location"), want)
+	}
+}
+
 func TestGoLinkAccessLogScrubsIPs(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/00000000-0000-4000-8000-000000000001?ref=1", nil)
 	req.RemoteAddr = "203.0.113.77:1000"
@@ -188,6 +199,19 @@ WHERE id=$1`, id, now, campaignID, now.Add(48*time.Hour)); err != nil {
 func TestGoLinkRateLimitKeepsHeaders(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
+	createTestSite(t, db, "rate-site-key", "rate.example", "Rate")
+	_, offerID := seedListedOffer(t, db, "rate-maker-key", "rate-maker@example.com", "Rate Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET landing_url='https://offer.example/buy', status='listed' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	var siteID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT id FROM sites WHERE domain='rate.example'`).Scan(&siteID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code,requires_placement,status) VALUES($1,$2,'rate-go',false,'active')`, offerID, siteID); err != nil {
+		t.Fatal(err)
+	}
+
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	if err := r.SetTrustedProxies(nil); err != nil {
@@ -200,21 +224,31 @@ func TestGoLinkRateLimitKeepsHeaders(t *testing.T) {
 	}
 	r.GET("/v1/go/:code", redirects.Go)
 
-	hit := func() *httptest.ResponseRecorder {
+	hit := func(path string) *httptest.ResponseRecorder {
 		t.Helper()
-		req := httptest.NewRequest(http.MethodGet, "/v1/go/not-a-placement", nil)
+		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.RemoteAddr = "203.0.113.77:1000"
+		req.Header.Set("User-Agent", "Mozilla/5.0 reader")
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 		requireGoLinkHeaders(t, rec)
 		return rec
 	}
-	first := hit()
-	if first.Code != http.StatusNotFound {
-		t.Fatalf("first: %d %s", first.Code, first.Body.String())
+	first := hit("/v1/go/rate-go")
+	if first.Code != http.StatusFound || !strings.Contains(first.Header().Get("Location"), "via=") {
+		t.Fatalf("first: %d %s", first.Code, first.Header().Get("Location"))
 	}
-	second := hit()
-	if second.Code != http.StatusTooManyRequests {
-		t.Fatalf("rate limit: %d %s", second.Code, second.Body.String())
+	second := hit("/v1/go/rate-go")
+	requirePlainRedirect(t, second, "https://offer.example/buy")
+	var n int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("rate limit recorded %d clicks", n)
+	}
+	missing := hit("/v1/go/not-a-placement")
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("unknown code: %d %s", missing.Code, missing.Body.String())
 	}
 }
