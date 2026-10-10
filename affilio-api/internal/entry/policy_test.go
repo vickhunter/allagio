@@ -138,15 +138,15 @@ func TestPresentRule(t *testing.T) {
 
 func TestPublisherMirror(t *testing.T) {
 	rules := AutoRules{MinSiteQuality: 60, AllowedNiches: []string{"devtools"}}
-	got := EvaluatePublisher(ModeAuto, rules, PublisherFacts{OfferLive: true, SiteQuality: 70, Niche: "devtools"})
+	got := EvaluatePublisher(ModeAuto, rules, PublisherFacts{OfferLive: true, SiteQuality: 70, Niche: "devtools"}, LiveClaimChecker{})
 	if !got.Allowed || got.ApprovedBy != "policy:auto" || got.MatchedRule != "allow_niche:devtools" {
 		t.Fatalf("%+v", got)
 	}
-	low := EvaluatePublisher(ModeAuto, rules, PublisherFacts{OfferLive: true, SiteQuality: 10, Niche: "devtools"})
+	low := EvaluatePublisher(ModeAuto, rules, PublisherFacts{OfferLive: true, SiteQuality: 10, Niche: "devtools"}, LiveClaimChecker{})
 	if low.Allowed || !low.NeedsOwner {
 		t.Fatalf("quality: %+v", low)
 	}
-	if got := EvaluatePublisher(ModeYolo, rules, PublisherFacts{OfferLive: false, SiteQuality: 100, Niche: "devtools"}); got.Allowed || !hasFailure(got, "offer_live") {
+	if got := EvaluatePublisher(ModeYolo, rules, PublisherFacts{OfferLive: false, SiteQuality: 100, Niche: "devtools"}, LiveClaimChecker{}); got.Allowed || !hasFailure(got, "offer_live") {
 		t.Fatalf("dead offer: %+v", got)
 	}
 }

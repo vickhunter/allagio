@@ -743,8 +743,8 @@ VALUES($1,'or_offe',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPI
 		t.Fatal(err)
 	}
 	denied, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": accountKey})
-	if denied.Code != http.StatusUnprocessableEntity || !strings.Contains(denied.Body.String(), "rel_sponsored") {
-		t.Fatalf("hard check: %d %s", denied.Code, denied.Body.String())
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("account key decide: %d %s", denied.Code, denied.Body.String())
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW() WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
@@ -972,9 +972,12 @@ VALUES($1,'or_sess',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 		{"mode": "auto"},
 	} {
 		rec, _ := postJSON(t, r, http.MethodPut, "/v1/sites/"+siteID+"/mode", payload, map[string]string{"X-API-Key": projectKey})
-		if rec.Code != http.StatusForbidden {
-			t.Fatalf("project key policy %v: %d %s", payload, rec.Code, rec.Body.String())
+		if rec.Code != http.StatusOK {
+			t.Fatalf("project key tighten %v: %d %s", payload, rec.Code, rec.Body.String())
 		}
+	}
+	if sessionPut(map[string]any{"mode": "yolo", "max_placements_per_30_days": 10, "min_relevance": 30})["mode"] != "yolo" {
+		t.Fatal("session did not reset yolo before the account key")
 	}
 	if keyPut(accountKey, map[string]any{"mode": "yolo", "max_placements_per_30_days": 2})["max_placements_per_30_days"] != float64(2) {
 		t.Fatal("account key did not lower the cap")
@@ -995,8 +998,12 @@ VALUES($1,'or_sess',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 		t.Fatal(err)
 	}
 	killed, killBody := postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "site", "id": siteID}, map[string]string{"X-API-Key": projectKey})
-	if killed.Code != http.StatusForbidden {
+	if killed.Code != http.StatusOK || appliedRow(t, killBody)["mode"] != "manual" {
 		t.Fatalf("project key pause: %d %s", killed.Code, killed.Body.String())
+	}
+	releasedEarly, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/account/resume", map[string]any{"scope": "site", "id": siteID})
+	if releasedEarly.Code != http.StatusOK {
+		t.Fatalf("resume before account pause: %d %s", releasedEarly.Code, releasedEarly.Body.String())
 	}
 	killed, killBody = postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "site", "id": siteID}, map[string]string{"X-API-Key": accountKey})
 	pausedRow := appliedRow(t, killBody)

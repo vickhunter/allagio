@@ -15,6 +15,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func issuePluginKey(t *testing.T, db *database.DB, siteID, raw string) map[string]string {
+	t.Helper()
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO plugin_keys(key_hash,key_prefix,site_id) VALUES($1,$2,$3)`, services.HashAPIKey(raw), services.KeyPrefix(raw), siteID); err != nil {
+		t.Fatal(err)
+	}
+	return map[string]string{"X-Plugin-Key": raw}
+}
+
 func setupTestDB(t *testing.T) (*database.DB, func()) {
 	t.Helper()
 	url := strings.TrimSpace(os.Getenv("AFFILIO_TEST_DATABASE_URL"))
@@ -77,6 +85,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"028_d032_placement_live.sql",
 		"029_d032_post_url.sql",
 		"030_d032_ui_wiring.sql",
+		"031_d032_committed_live_plugin_keys.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)

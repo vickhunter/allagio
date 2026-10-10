@@ -45,6 +45,7 @@ type AccountProject struct {
 	ClicksBySource []SourceCount
 	Earnings       []MoneyAmount
 	Items          []DigestItem
+	TotalItems     int
 }
 
 type AccountDigest struct {
@@ -150,6 +151,10 @@ func (d *DB) AccountDigest(ctx context.Context, ownerID string) (AccountDigest, 
 			if err != nil {
 				return AccountDigest{}, err
 			}
+			project.TotalItems, err = d.CountDigestPlacements(ctx, project.ID, time.Unix(0, 0).UTC())
+			if err != nil {
+				return AccountDigest{}, err
+			}
 			project.WentLive, err = d.CountLivePlacements(ctx, project.ID)
 			if err != nil {
 				return AccountDigest{}, err
@@ -165,6 +170,7 @@ func (d *DB) AccountDigest(ctx context.Context, ownerID string) (AccountDigest, 
 			if err != nil {
 				return AccountDigest{}, err
 			}
+			project.TotalItems = len(project.Items)
 			project.ClicksBySource, err = d.clickSources(ctx, `SELECT c.id::text, COALESCE(c.referrer,'')
 FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=$1`, project.ID)
 			if err != nil {
