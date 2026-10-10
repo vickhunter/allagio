@@ -113,12 +113,12 @@ One saved answer set per owner and role. The setup screen shows at most four que
 GET /v1/setup/settings?role=publisher&install_path=cli
 ` + "```" + `
 
-Auth is the owner session or a project key. When nothing is saved, ` + "`mode`" + ` and ` + "`mode_shown`" + ` are the default for ` + "`install_path`" + `. Every response includes ` + "`mode_preselected`" + `, which the server derives from ` + "`install_path`" + `, ` + "`human_login`" + `, and ` + "`session.signed_in`" + `.
+Auth is the owner session or the site key. A project key is limited to the agent route allow-list and cannot read setup. When nothing is saved, ` + "`mode`" + ` and ` + "`mode_shown`" + ` are the default for ` + "`owners.source`" + `. Every response includes ` + "`mode_preselected`" + `, which the server derives from ` + "`owners.source`" + `. A query ` + "`install_path`" + ` does not select the mode. ` + "`human_login`" + ` and ` + "`session.signed_in`" + ` are included too. While claim checks are not live, a preselected or saved yolo or auto is answered as manual, and the response includes ` + "`approval_reason`" + ` and ` + "`approval_message`" + `. ` + "`mode_preselected`" + ` stays the source default.
 
-| install_path | default mode |
+| owners.source | default mode |
 | --- | --- |
-| cli, cursor, connector, grok | yolo |
-| chatgpt_dir, claude_dir | manual |
+| cli, cursor, grok, mcp | yolo |
+| chatgpt, claude, direct, and anything else | manual |
 
 ## Save
 
@@ -204,7 +204,7 @@ PUT /v1/offers/:id/mode
 
 ` + "`min_relevance`" + ` defaults to 40 and cannot be below 25. The placement cap defaults to 3 per 30 days. Maker auto rules are ` + "`min_site_quality`" + ` and ` + "`allowed_niches`" + `.
 
-An owner session may loosen or tighten. A project key or an account key may only make the rules stricter: a tighter mode (` + "`yolo`" + ` to ` + "`auto`" + ` to ` + "`manual`" + `), a lower cap, a higher minimum relevance, or pausing. Loosening the mode (` + "`manual`" + ` to ` + "`auto`" + `, ` + "`auto`" + ` to ` + "`yolo`" + `, or ` + "`manual`" + ` to ` + "`yolo`" + `), raising a cap, and lowering minimum relevance are session-only and return 403 when any API key is present. Offer copy, page content, and feedback are rejected and do not change the policy. Every mode change stores ` + "`owner_ui`" + ` or ` + "`agent_tool`" + `, the user id, and the time.
+An owner session may loosen or tighten. An account key may only make the rules stricter: a tighter mode (` + "`yolo`" + ` to ` + "`auto`" + ` to ` + "`manual`" + `), a lower cap, a higher minimum relevance, or pausing. A project key is limited to the agent route allow-list. Loosening the mode (` + "`manual`" + ` to ` + "`auto`" + `, ` + "`auto`" + ` to ` + "`yolo`" + `, or ` + "`manual`" + ` to ` + "`yolo`" + `), raising a cap, and lowering minimum relevance are session-only and return 403 when any API key is present. Offer copy, page content, and feedback are rejected and do not change the policy. Every mode change stores ` + "`owner_ui`" + ` or ` + "`agent_tool`" + `, the user id, and the time.
 
 ## Hard checks
 
@@ -214,9 +214,10 @@ These run in every mode:
 - claim check (stub until D-028)
 - copy at most 140 characters
 - one box per post
-- relevance at least 25
+- relevance at least the saved minimum, which defaults to 40 and cannot be below 25
 - offer is listed
 - revoke still works
+- the 30-day placement cap
 
 ## Decide
 
@@ -225,7 +226,7 @@ POST /v1/placements/:id/decide
 {"relevance":55,"position":"end","rel_sponsored":true,"copy_edited":false,"offer_data":"the offer summary"}
 ` + "```" + `
 
-Manual, or anything outside an auto policy, returns ` + "`decision: needs_owner`" + ` and does not approve. Auto and yolo that pass record ` + "`approved_by`" + ` (` + "`policy:auto`" + ` or ` + "`policy:yolo`" + `), ` + "`policy_version`" + `, and ` + "`matched_rule`" + `. The response also includes ` + "`policy_rule_id`" + ` (` + "`hard_checks_passed`" + ` or ` + "`category:invoicing`" + `) and ` + "`policy_rule_text`" + `, a sentence written by the server.
+The body still requires ` + "`relevance`" + `, ` + "`position`" + `, and ` + "`rel_sponsored`" + `. The server scores relevance from the approved copy and the offer, and it sets rel=sponsored from the disclosure and the copy. Caller ` + "`relevance`" + `, ` + "`rel_sponsored`" + `, and ` + "`offer_data`" + ` are ignored. ` + "`position`" + ` is still read from the body. Manual, or anything outside an auto policy, returns ` + "`decision: needs_owner`" + ` and does not approve. While the claim checker is not live, yolo and auto also return ` + "`needs_owner`" + ` with ` + "`reason: claim_check_unavailable`" + ` after the hard checks pass. Auto and yolo that pass record ` + "`approved_by`" + ` (` + "`policy:auto`" + ` or ` + "`policy:yolo`" + `), ` + "`policy_version`" + `, and ` + "`matched_rule`" + `. The response also includes ` + "`policy_rule_id`" + ` (` + "`hard_checks_passed`" + ` or ` + "`category:invoicing`" + `) and ` + "`policy_rule_text`" + `, a sentence written by the server. Digest items and placement reads include those two fields.
 
 ` + "`POST /v1/offers/:id/accept`" + ` with ` + "`site_id`" + `, ` + "`site_quality`" + `, and ` + "`niche`" + ` is the maker mirror.
 
@@ -236,7 +237,7 @@ POST /v1/account/pause
 {"scope":"all"}
 ` + "```" + `
 
-` + "`scope`" + ` is ` + "`all`" + `, ` + "`site`" + `, or ` + "`offer`" + `. ` + "`site`" + ` and ` + "`offer`" + ` require ` + "`id`" + `. The server sets manual mode on every site and offer in that scope and pauses unpublished policy approvals. A project key, an account key, or a session may pause.
+` + "`scope`" + ` is ` + "`all`" + `, ` + "`site`" + `, or ` + "`offer`" + `. ` + "`site`" + ` and ` + "`offer`" + ` require ` + "`id`" + `. The server sets manual mode on every site and offer in that scope and pauses unpublished policy approvals. An account key or a session may pause. A project key is limited to the agent route allow-list.
 
 ` + "```" + `
 POST /v1/account/resume
@@ -262,7 +263,7 @@ Undo is that revoke. It takes effect in the same request in the API and in MCP. 
 POST /v1/placements/:id/restore
 ` + "```" + `
 
-Restore applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409 ` + "`{reason, message}`" + ` with ` + "`reason: window_expired`" + `. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. If Pause or the kill switch was turned on for that site, offer, or account at any point after the undo, including when it is still on, restore returns 409 ` + "`{reason, message}`" + ` with ` + "`reason: paused`" + `. Every 409 from this list returns ` + "`reason`" + ` and ` + "`message`" + `. ` + "`reason`" + ` is ` + "`window_expired`" + `, ` + "`paused`" + `, or ` + "`not_failed`" + `. ` + "`message`" + ` is the plain-English text. A 422 returns ` + "`check_id`" + ` and ` + "`check_text`" + `. The server re-runs every hard check first. It also evaluates the current 30-day placement cap and the current minimum relevance against the score stored when the placement was approved. A failing check returns 422 ` + "`{check_id, check_text}`" + ` from the hard-check list below and leaves the placement revoked. On success the placement returns to the status it had before the undo, ` + "`approved_by`" + ` stays the original value, ` + "`restored_by`" + ` records the user, and a ` + "`placement_restore`" + ` event stores the actor.
+Restore applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409 ` + "`{reason, message}`" + ` with ` + "`reason: window_expired`" + `. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. If Pause or the kill switch was turned on for that site, offer, or account at any point after the undo, including when it is still on, restore returns 409 ` + "`{reason, message}`" + ` with ` + "`reason: paused`" + `. Every 409 from this list returns ` + "`reason`" + ` and ` + "`message`" + `. ` + "`reason`" + ` is ` + "`window_expired`" + `, ` + "`paused`" + `, or ` + "`not_failed`" + `. ` + "`message`" + ` is the plain-English text. A 422 returns ` + "`check_id`" + ` and ` + "`check_text`" + `. The server re-runs every hard check first. It also evaluates the current 30-day placement cap and the current minimum relevance Relevance is scored on the server from the approved copy and the offer. The caller cannot supply it. A failing check returns 422 ` + "`{check_id, check_text}`" + ` from the hard-check list below and leaves the placement revoked. On success the placement returns to the status it had before the undo, ` + "`approved_by`" + ` stays the original value, ` + "`restored_by`" + ` records the user, and a ` + "`placement_restore`" + ` event stores the actor.
 
 There is no push channel. Clients poll ` + "`GET /v1/placements/:id`" + `. That read is one row from ` + "`placement_proposals`" + ` and allows at least one request every 4 seconds per placement per session. The body includes ` + "`status`" + `, ` + "`plugin_state`" + `, ` + "`plugin_failed_reason`" + `, ` + "`failed_action`" + `, and ` + "`fallback_url`" + `. ` + "`fallback_url`" + ` is the offer's plain URL, so the plugin can cache it.
 
@@ -285,12 +286,12 @@ A failed restore is not live. ` + "`GET /v1/go/<placement_id>`" + ` redirects to
 
 Leave a failed restore removed with the same undo while ` + "`plugin_state`" + ` is ` + "`failed`" + ` and ` + "`failed_action`" + ` is ` + "`restored`" + `. That request sets ` + "`plugin_state`" + ` to ` + "`pending`" + `, clears ` + "`failed_action`" + `, and stops the go link. The placement does not count as live. It becomes ` + "`removed`" + ` only on a verified ` + "`action: removed`" + `. With no acknowledgement it becomes ` + "`offline`" + ` after ` + "`PLUGIN_OFFLINE_AFTER`" + ` (default 10 minutes). ` + "`action: failed`" + ` there sets ` + "`failed`" + ` with ` + "`failed_action`" + ` ` + "`removed`" + `. ` + "`placed`" + ` and ` + "`removed`" + ` are stored only by that verified plugin acknowledgement. Revoke, restore, retry, pause, and the kill switch do not set them.
 
-` + "`GET /v1/go/<code>`" + ` is a campaign tracking code readers follow. It never returns a 4xx or a 5xx when the code resolves. A revoked code, and any other clicks-off state, redirects to the offer's plain URL with no ref and no hit. When the offer is not live, the redirect is the referring post, or the site home when that post is missing. An unknown code stays 404. ` + "`GET /v1/go/<placement_id>`" + ` always returns 302. A ref is attached and a hit is recorded only when ` + "`placement_counts_as_live`" + ` is true. Revoked, pending undo, paused, kill switch, offline, failed, and removed placements redirect to the offer's plain URL with no ref and no hit. When the offer is not live, the redirect is ` + "`post_url`" + `, or the site home when that is missing. An unknown id redirects to the site home when ` + "`?via=plugin`" + ` carries that site's key, and otherwise to the Offer Rails home page. Every response sends ` + "`Cache-Control: no-store`" + ` and ` + "`X-Robots-Tag: noindex, nofollow`" + `. The plugin calls ` + "`GET /v1/go/<placement_id>?via=plugin`" + ` with ` + "`X-API-Key`" + ` and may send ` + "`X-OR-Client-Hash`" + `, ` + "`X-OR-User-Agent`" + `, and ` + "`X-OR-Referer`" + `. ` + "`X-OR-Client-Hash`" + ` is the lowercase hex SHA-256 of the truncated address (` + "`/24`" + ` for IPv4, ` + "`/48`" + ` for IPv6) plus the site salt, joined with a vertical bar. The site salt rotates at 00:00 UTC. Those headers are used only when the key matches the placement's site. A direct hit uses the server salt for the same truncation and the same UTC day. The raw address is not stored or logged. ` + "`fallback_url`" + ` on the placement payload is that plain offer URL.
+` + "`GET /v1/go/<code>`" + ` is a campaign tracking code readers follow. It never returns a 4xx or a 5xx when the code resolves. A revoked code, and any other clicks-off state, redirects to the offer's plain URL with no ref and no hit. When the offer is not live, the redirect is the referring post, or the site home when that post is missing. An unknown code redirects to the Offer Rails home page. A code with ` + "`?placement=`" + ` follows the placement rules. Without that query, a hit is recorded only when ` + "`placement_counts_as_live`" + ` matches a placement on the campaign. ` + "`GET /v1/go/<placement_id>`" + ` always returns 302. A ref is attached and a hit is recorded only when ` + "`placement_counts_as_live`" + ` is true. Revoked, pending undo, paused, kill switch, offline, failed, and removed placements redirect to the offer's plain URL with no ref and no hit. When the offer is not live, the redirect is ` + "`post_url`" + `, or the site home when that is missing. An unknown id redirects to the site home when ` + "`?via=plugin`" + ` carries that site's key, and otherwise to the Offer Rails home page. Every response sends ` + "`Cache-Control: no-store`" + ` and ` + "`X-Robots-Tag: noindex, nofollow`" + `. The plugin calls ` + "`GET /v1/go/<placement_id>?via=plugin`" + ` with ` + "`X-API-Key`" + ` and may send ` + "`X-OR-Client-Hash`" + `, ` + "`X-OR-User-Agent`" + `, and ` + "`X-OR-Referer`" + `. ` + "`X-OR-Client-Hash`" + ` is the lowercase hex HMAC-SHA256 of the truncated address (` + "`/24`" + ` for IPv4, ` + "`/48`" + ` for IPv6), keyed by the daily salt. The site salt rotates at 00:00 UTC. Those headers are used only when the key matches the placement's site. A direct hit uses the server salt for the same truncation and the same UTC day. The raw address is not stored or logged. ` + "`fallback_url`" + ` on the placement payload is that plain offer URL.
 `
 
 const accountDoc = `# Account keys and digest
 
-Two kinds of key exist. A project key comes from device-code approval and works for one site or one offer. An account key works for every site and offer on the account. Neither key can skip the hard checks, loosen a mode, raise a cap, lower minimum relevance, or resume a pause. Those four actions are session-only. Pause (` + "`POST /v1/account/pause`" + `) is allowed for any key.
+Two kinds of key exist. A project key comes from device-code approval and works for one site or one offer. An account key works for every site and offer on the account. Neither key can skip the hard checks, loosen a mode, raise a cap, lower minimum relevance, or resume a pause. Those four actions are session-only. Pause (` + "`POST /v1/account/pause`" + `) is allowed for an account key or a session. A project key is limited to the agent route allow-list and receives 403.
 
 ## Account keys
 

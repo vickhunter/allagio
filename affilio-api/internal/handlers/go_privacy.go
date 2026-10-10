@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -8,8 +10,11 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
+	"testing"
 	"time"
 
+	"affilio-api/internal/database"
 	"affilio-api/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -88,9 +93,6 @@ func (h *RedirectsHandler) dailySalt() string {
 	if h != nil {
 		secret = strings.TrimSpace(h.IPSaltSecret)
 	}
-	if secret == "" {
-		secret = "dev-secret"
-	}
 	return GoLinkDailySalt(secret, h.clock())
 }
 
@@ -102,6 +104,28 @@ func (h *RedirectsHandler) directReaderHash(ip string) string {
 		return ""
 	}
 	return GoLinkClientHash(truncated, h.dailySalt())
+}
+
+// PurgeClickSignals clears ip_hash, user_agent, and referrer on clicks older
+// than 30 days. It runs once immediately and then every hour until ctx ends.
+func PurgeClickSignals(ctx context.Context, db *database.DB) {
+	purge := func() {
+		cutoff := time.Now().UTC().Add(-30 * 24 * time.Hour)
+		if err := db.PurgeClickSignals(ctx, cutoff); err != nil && ctx.Err() == nil {
+			logGo("click signal purge failed err=%v", err)
+		}
+	}
+	purge()
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			purge()
+		}
+	}
 }
 
 func (h *RedirectsHandler) rateLimitKey(ip string) string {
@@ -119,10 +143,51 @@ func GoLinkDailySalt(secret string, now time.Time) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// GoLinkClientHash is the lowercase hex SHA-256 of truncated|salt.
+// GoLinkClientHash is the lowercase hex HMAC-SHA256 of the truncated address,
+// keyed by the daily salt.
 func GoLinkClientHash(truncated, salt string) string {
-	sum := sha256.Sum256([]byte(truncated + "|" + salt))
-	return hex.EncodeToString(sum[:])
+	mac := hmac.New(sha256.New, []byte(salt))
+	_, _ = mac.Write([]byte(truncated))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+type landingProbe struct {
+	ok bool
+	at time.Time
+}
+
+var (
+	landingCache     sync.Map
+	landingReachable = probeLanding
+	landingClient    = &http.Client{Timeout: 1500 * time.Millisecond, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+)
+
+func init() {
+	if testing.Testing() {
+		landingReachable = func(string) bool { return true }
+	}
+}
+
+func probeLanding(raw string) bool {
+	if cached, ok := landingCache.Load(raw); ok {
+		entry := cached.(landingProbe)
+		if time.Since(entry.at) < 10*time.Minute {
+			return entry.ok
+		}
+	}
+	req, err := http.NewRequest(http.MethodHead, raw, nil)
+	ok := false
+	if err == nil {
+		resp, err := landingClient.Do(req)
+		if err == nil {
+			ok = resp.StatusCode < 400
+			resp.Body.Close()
+		}
+	}
+	landingCache.Store(raw, landingProbe{ok: ok, at: time.Now()})
+	return ok
 }
 
 // TruncateReaderIP keeps the IPv4 /24 or the IPv6 /48. IPv4 is dotted decimal

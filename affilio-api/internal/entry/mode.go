@@ -7,14 +7,12 @@ const (
 	ModeYolo   = "yolo"
 )
 
-// DefaultMode is the setup preselection. CLI, Cursor, custom connector, and
-// Grok start on yolo. ChatGPT and Claude directory installs start on manual.
-func DefaultMode(installPath string) string {
-	switch installPath {
-	case "cli", "cursor", "connector", "grok":
+// DefaultMode is the setup preselection from owners.source. cli, cursor, grok,
+// mcp, and connector start on yolo. Every other source starts on manual.
+func DefaultMode(source string) string {
+	switch source {
+	case "cli", "cursor", "grok", "mcp", "connector":
 		return ModeYolo
-	case "chatgpt_dir", "claude_dir":
-		return ModeManual
 	default:
 		return ModeManual
 	}

@@ -32,7 +32,8 @@ ledger entry: commission, pending, clears_at = occurred_at + refund_window_days
    offer is not listed, paused, or the stored landing URL is not `https`, the
    `302` goes to the referring post, or the site home when that post is
    missing. Link-preview clients and `HEAD` get the same redirect and record
-   no click. A deleted tracking code returns `404`. Every go-link response
+   no click. A deleted or unknown tracking code returns `302` to the Offer Rails
+   home page. Readers never see a 4xx or a 5xx. Every go-link response
    sends `Cache-Control: no-store` and `X-Robots-Tag: noindex, nofollow`.
 3. **Webhook authenticity.** Every provider event is verified with the
    provider's signature scheme before it touches storage. Unverifiable events

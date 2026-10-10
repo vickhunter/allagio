@@ -150,6 +150,10 @@ func (d *DB) AccountDigest(ctx context.Context, ownerID string) (AccountDigest, 
 			if err != nil {
 				return AccountDigest{}, err
 			}
+			project.WentLive, err = d.CountLivePlacements(ctx, project.ID)
+			if err != nil {
+				return AccountDigest{}, err
+			}
 			project.ClicksBySource, err = d.clickSources(ctx, `SELECT c.id::text, COALESCE(c.referrer,'') FROM clicks c WHERE c.site_id=$1`, project.ID)
 			if err != nil {
 				return AccountDigest{}, err
@@ -172,10 +176,11 @@ FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=$1`,
 			return AccountDigest{}, err
 		}
 		project.Clicks = sumSources(project.ClicksBySource)
-		for _, item := range project.Items {
-			// Placements use placement_counts_as_live. Listed offers are separate.
-			if item.CountsAsLive {
-				project.WentLive++
+		if project.Kind == "offer" {
+			for _, item := range project.Items {
+				if item.CountsAsLive {
+					project.WentLive++
+				}
 			}
 		}
 		digest.WentLive += project.WentLive

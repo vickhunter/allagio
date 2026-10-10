@@ -34,8 +34,10 @@ func TestHardChecksAlwaysRun(t *testing.T) {
 		{"over 140", func(in *PlacementFacts) { in.Copy = strings.Repeat("a", 141) }, "copy_length"},
 		{"second box", func(in *PlacementFacts) { in.ExistingBoxes = 1 }, "one_per_post"},
 		{"relevance 24", func(in *PlacementFacts) { in.Relevance = 24 }, "relevance_min"},
+		{"relevance 30", func(in *PlacementFacts) { in.Relevance = 30 }, "relevance_min"},
 		{"paused offer", func(in *PlacementFacts) { in.OfferLive = false }, "offer_live"},
 		{"revoke broken", func(in *PlacementFacts) { in.RevokeWorks = false }, "revoke_path"},
+		{"cap full", func(in *PlacementFacts) { in.PlacementsIn30Days = 3 }, "cap"},
 	}
 	for _, mode := range []string{ModeManual, ModeAuto, ModeYolo} {
 		for _, tc := range cases {
@@ -52,15 +54,20 @@ func TestHardChecksAlwaysRun(t *testing.T) {
 type rejectClaims struct{}
 
 func (rejectClaims) CheckClaims(string, string) error { return errors.New("number not in offer") }
+func (rejectClaims) Real() bool                       { return true }
 
 func TestClaimCheckHookBlocks(t *testing.T) {
 	got := EvaluatePlacement(ModeYolo, AutoRules{}, passingFacts(), rejectClaims{})
 	if got.Allowed || !hasFailure(got, "claims_from_offer") {
 		t.Fatalf("%+v", got)
 	}
-	ok := EvaluatePlacement(ModeYolo, AutoRules{}, passingFacts(), StubClaimChecker{})
+	ok := EvaluatePlacement(ModeYolo, AutoRules{}, passingFacts(), LiveClaimChecker{})
 	if !ok.Allowed || ok.ApprovedBy != "policy:yolo" || ok.MatchedRule != "hard_checks" {
-		t.Fatalf("stub should pass yolo: %+v", ok)
+		t.Fatalf("live checker should pass yolo: %+v", ok)
+	}
+	stub := EvaluatePlacement(ModeYolo, AutoRules{}, passingFacts(), StubClaimChecker{})
+	if stub.Allowed || !stub.NeedsOwner || stub.Reason != ClaimCheckReason || stub.Message != ClaimCheckMessage {
+		t.Fatalf("stub should hold automatic go-live: %+v", stub)
 	}
 }
 
@@ -72,34 +79,40 @@ func TestAutoPolicyAndYolo(t *testing.T) {
 		AllowedPositions:       []string{"end"},
 		MaxPlacementsPer30Days: 3,
 	}
+	live := LiveClaimChecker{}
 	in := passingFacts()
-	got := EvaluatePlacement(ModeAuto, rules, in, nil)
+	got := EvaluatePlacement(ModeAuto, rules, in, live)
 	if !got.Allowed || got.ApprovedBy != "policy:auto" || !strings.Contains(got.MatchedRule, "allow_maker") {
 		t.Fatalf("auto match: %+v", got)
 	}
 	in.MakerID = "maker-2"
-	if got = EvaluatePlacement(ModeAuto, rules, in, nil); got.Allowed || !got.NeedsOwner {
+	if got = EvaluatePlacement(ModeAuto, rules, in, live); got.Allowed || !got.NeedsOwner {
 		t.Fatalf("outside allow list should wait for the owner: %+v", got)
 	}
 	in = passingFacts()
 	in.Relevance = 30
-	if got = EvaluatePlacement(ModeAuto, rules, in, nil); got.Allowed || !hasFailure(got, "below_min_relevance") {
+	if got = EvaluatePlacement(ModeAuto, rules, in, live); got.Allowed || got.NeedsOwner || !hasFailure(got, "relevance_min") {
 		t.Fatalf("below policy relevance: %+v", got)
 	}
 	in = passingFacts()
 	in.Relevance = 25
-	yolo := EvaluatePlacement(ModeYolo, rules, in, nil)
-	if !yolo.Allowed || yolo.ApprovedBy != "policy:yolo" {
-		t.Fatalf("yolo uses the hard floor, not the auto minimum: %+v", yolo)
+	yolo := EvaluatePlacement(ModeYolo, rules, in, live)
+	if yolo.Allowed || !hasFailure(yolo, "relevance_min") {
+		t.Fatalf("yolo enforces min relevance: %+v", yolo)
+	}
+	floor := rules
+	floor.MinRelevance = 25
+	if yolo = EvaluatePlacement(ModeYolo, floor, in, live); !yolo.Allowed || yolo.ApprovedBy != "policy:yolo" {
+		t.Fatalf("yolo at the saved minimum: %+v", yolo)
 	}
 	in = passingFacts()
 	in.PlacementsIn30Days = 3
-	if got = EvaluatePlacement(ModeAuto, rules, in, nil); !hasFailure(got, "placement_cap") {
-		t.Fatalf("cap: %+v", got)
+	if got = EvaluatePlacement(ModeYolo, rules, in, live); got.Allowed || !hasFailure(got, "cap") {
+		t.Fatalf("yolo cap: %+v", got)
 	}
 	in = passingFacts()
 	in.CopyEdited = true
-	if got = EvaluatePlacement(ModeAuto, rules, in, nil); !hasFailure(got, "copy_edits_denied") {
+	if got = EvaluatePlacement(ModeAuto, rules, in, live); !hasFailure(got, "copy_edits_denied") {
 		t.Fatalf("copy edits: %+v", got)
 	}
 	manual := EvaluatePlacement(ModeManual, rules, passingFacts(), nil)
@@ -189,7 +202,11 @@ func TestHardCheckCatalogIsTheOnlyList(t *testing.T) {
 }
 
 func TestRestoreRefusalsAreTheOnlyList(t *testing.T) {
-	want := []string{"window_expired", "paused", "not_failed"}
+	want := []string{
+		"window_expired", "paused", "not_failed", "device_used", "account_exists",
+		"not_approvable", "not_undone", "nothing_to_ack", "offer_ineligible", "offer_unavailable",
+		"placement_unavailable", "receipt_mismatch", "receipt_recorded", "publisher_missing", "restore_refused",
+	}
 	if len(RestoreRefusals) != len(want) {
 		t.Fatalf("refusals: %+v", RestoreRefusals)
 	}
@@ -205,9 +222,6 @@ func TestRestoreRefusalsAreTheOnlyList(t *testing.T) {
 		if !strings.Contains(doc, "`"+reason+"`") || !strings.Contains(doc, RestoreRefusals[i].Text) {
 			t.Fatalf("doc missing %s", reason)
 		}
-	}
-	if _, ok := RestoreRefusalByReason("not_undone"); ok {
-		t.Fatal("placement was not undone is not a restore refusal")
 	}
 }
 

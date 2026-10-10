@@ -209,7 +209,7 @@ func (h *AgentEntry) ApproveDevice(c *gin.Context) {
 		return
 	}
 	if errors.Is(err, database.ErrDeviceUsed) {
-		c.JSON(http.StatusConflict, gin.H{"error": "user code already used"})
+		writeNamedConflict(c, "device_used")
 		return
 	}
 	if errors.Is(err, database.ErrProjectScope) {
@@ -269,7 +269,7 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 	}
 	account, err := h.DB.CreateAgentOnlyAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey)
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "account already exists"})
+		writeNamedConflict(c, "account_exists")
 		return
 	}
 	resp := gin.H{"owner_id": account.OwnerID, "agent_only": true, "human_login": false, "role": req.Role}
@@ -330,19 +330,29 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 	signedIn := actor.Kind == "owner_ui"
 	saved, err := h.DB.GetSetup(c.Request.Context(), ownerID, role)
 	if errors.Is(err, pgx.ErrNoRows) {
-		path := c.Query("install_path")
-		if path == "" {
-			path = "cli"
+		source, sourceErr := h.DB.OwnerSource(c.Request.Context(), ownerID)
+		if sourceErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "settings unavailable"})
+			return
 		}
-		mode := entry.DefaultMode(path)
-		c.JSON(http.StatusOK, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn))
+		path := c.Query("install_path")
+		if !entry.ValidInstallPath(path) {
+			path = ""
+		}
+		mode := entry.DefaultMode(source)
+		c.JSON(http.StatusOK, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn, source, h.claims()))
 		return
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings unavailable"})
 		return
 	}
-	c.JSON(http.StatusOK, setupJSON(saved, true, human, signedIn))
+	source, sourceErr := h.DB.OwnerSource(c.Request.Context(), ownerID)
+	if sourceErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, setupJSON(saved, true, human, signedIn, source, h.claims()))
 }
 
 func (h *AgentEntry) PutSetup(c *gin.Context) {
@@ -402,7 +412,12 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
 		return
 	}
-	c.JSON(http.StatusOK, setupJSON(saved, true, human, true))
+	source, sourceErr := h.DB.OwnerSource(c.Request.Context(), owner.ID)
+	if sourceErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
+		return
+	}
+	c.JSON(http.StatusOK, setupJSON(saved, true, human, true, source, h.claims()))
 }
 
 func (h *AgentEntry) applySetupMode(c *gin.Context, owner *database.Owner, saved database.SetupSettings) error {
@@ -479,7 +494,7 @@ func (h *AgentEntry) GetSiteMode(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "mode unavailable"})
 		return
 	}
-	c.JSON(http.StatusOK, policyJSON(policy, source))
+	h.writePolicy(c, policy, source)
 }
 
 func (h *AgentEntry) PutSiteMode(c *gin.Context) {
@@ -500,7 +515,7 @@ func (h *AgentEntry) GetOfferMode(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "mode unavailable"})
 		return
 	}
-	c.JSON(http.StatusOK, policyJSON(policy, source))
+	h.writePolicy(c, policy, source)
 }
 
 func (h *AgentEntry) PutOfferMode(c *gin.Context) {
@@ -566,7 +581,7 @@ func (h *AgentEntry) putMode(c *gin.Context, scope string) {
 		return
 	}
 	next.Version = version
-	c.JSON(http.StatusOK, policyJSON(next, "policy"))
+	h.writePolicy(c, next, "policy")
 }
 
 func (h *AgentEntry) KillSwitch(c *gin.Context) {
@@ -661,7 +676,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
 	}
-	live, makerID, category, err := h.DB.OfferFacts(c.Request.Context(), placement.OfferID)
+	offer, err := h.DB.OfferCopy(c.Request.Context(), placement.OfferID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "offer lookup failed"})
 		return
@@ -676,31 +691,43 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
 		return
 	}
-	policy, _, err := h.sitePolicy(c, siteID)
+	policy, source, err := h.sitePolicy(c, siteID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "mode unavailable"})
 		return
 	}
-	decision := entry.EvaluatePlacement(policy.Mode, rulesOf(policy), entry.PlacementFacts{
-		Disclosure: placement.Disclosure, RelSponsored: req.RelSponsored, Copy: placement.Copy, OfferData: req.OfferData,
-		ExistingBoxes: boxes, Relevance: req.Relevance, OfferLive: live, RevokeWorks: placement.Status == "pending" || placement.Status == "approved" || placement.Status == "committed",
-		Position: req.Position, MakerID: makerID, Category: category, CopyEdited: req.CopyEdited, PlacementsIn30Days: used,
+	rules := rulesOf(policy)
+	if source == "policy" {
+		rules.UseStoredCap = true
+	}
+	relevance := services.ScorePlacement(placement.Copy, offer.ProductName, offer.Category, offer.Website)
+	decision := entry.EvaluatePlacement(policy.Mode, rules, entry.PlacementFacts{
+		Disclosure: placement.Disclosure, RelSponsored: entry.RelSponsoredFromMarkup(placement.Disclosure, placement.Copy),
+		Copy: placement.Copy, OfferData: serverOfferData(offer),
+		ExistingBoxes: boxes, Relevance: relevance, OfferLive: offer.Live,
+		RevokeWorks: placement.Status == "pending" || placement.Status == "approved" || placement.Status == "committed",
+		Position: req.Position, MakerID: offer.MakerID, Category: offer.Category, CopyEdited: req.CopyEdited, PlacementsIn30Days: used,
 	}, h.claims())
 	if len(decision.Failures) > 0 && !decision.NeedsOwner {
 		writeCheckDenied(c, decision.Failures)
 		return
 	}
 	if !decision.Allowed {
-		c.JSON(http.StatusOK, gin.H{"decision": "needs_owner", "failures": decision.Failures})
+		body := gin.H{"decision": "needs_owner", "failures": decision.Failures}
+		if decision.Reason != "" {
+			body["reason"] = decision.Reason
+			body["message"] = decision.Message
+		}
+		c.JSON(http.StatusOK, body)
 		return
 	}
-	updated, err := h.DB.RecordPolicyApproval(c.Request.Context(), placement.ID, siteID, actor.UserID, decision.ApprovedBy, decision.MatchedRule, policy.Version, req.Relevance)
+	updated, err := h.DB.RecordPolicyApproval(c.Request.Context(), placement.ID, siteID, actor.UserID, decision.ApprovedBy, decision.MatchedRule, policy.Version, relevance)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "approval failed"})
 		return
 	}
 	if !updated {
-		c.JSON(http.StatusConflict, gin.H{"error": "placement cannot be approved"})
+		writeNamedConflict(c, "not_approvable")
 		return
 	}
 	c.JSON(http.StatusOK, approvalJSON(decision, policy.Version))
@@ -885,7 +912,22 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 	if since != nil {
 		sinceOut = since.UTC().Format(time.RFC3339)
 	}
-	c.JSON(http.StatusOK, gin.H{"since": sinceOut, "items": items, "session": gin.H{"signed_in": true}})
+	wentLive := 0
+	if owner.SiteID != "" {
+		n, countErr := h.DB.CountLivePlacements(c.Request.Context(), owner.SiteID)
+		if countErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+			return
+		}
+		wentLive = n
+	}
+	body := gin.H{"since": sinceOut, "items": items, "went_live": wentLive, "session": gin.H{"signed_in": true}}
+	if !h.claims().Real() {
+		body["approval_reason"] = entry.ClaimCheckReason
+		body["approval_message"] = entry.ClaimCheckMessage
+		body["effective_mode"] = entry.ModeManual
+	}
+	c.JSON(http.StatusOK, body)
 }
 
 func (h *AgentEntry) issueUndo(c *gin.Context, ownerID string, item database.DigestItem) (string, error) {
@@ -1000,7 +1042,7 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 		return
 	}
 	if row.Status != "revoked" || row.UndoneAt == nil || row.StatusBefore == "" {
-		c.JSON(http.StatusConflict, gin.H{"error": "placement was not undone"})
+		writeNamedConflict(c, "not_undone")
 		return
 	}
 	userID := actor.UserID
@@ -1016,34 +1058,35 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 		writeRestoreRefused(c, "window_expired")
 		return
 	}
-	blocked, err := h.DB.PauseBlocksRestore(c.Request.Context(), row.SiteID, row.OfferID, row.UndoneAt.UTC())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
-		return
-	}
-	if blocked {
-		writeRestoreRefused(c, "paused")
-		return
-	}
 	failures, err := h.restoreHardFailures(c, row)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
 		return
 	}
-	if len(failures) == 0 {
-		failures, err = h.restoreLimitFailures(c, row)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
-			return
-		}
-	}
 	if len(failures) > 0 {
 		writeCheckDenied(c, failures)
 		return
 	}
-	status, approvedBy, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now)
+	policy, source, err := h.sitePolicy(c, row.SiteID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+		return
+	}
+	rules := rulesOf(policy)
+	if source == "policy" {
+		rules.UseStoredCap = true
+	}
+	status, approvedBy, block, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now, entry.CapLimit(rules))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+		return
+	}
+	if block == "cap" {
+		writeCheckDenied(c, []string{"cap"})
+		return
+	}
+	if block == "paused" {
+		writeRestoreRefused(c, "paused")
 		return
 	}
 	if !restored {
@@ -1054,7 +1097,7 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 }
 
 func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementUndo) ([]string, error) {
-	live, _, _, err := h.DB.OfferFacts(c.Request.Context(), row.OfferID)
+	offer, err := h.DB.OfferCopy(c.Request.Context(), row.OfferID)
 	if err != nil {
 		return nil, err
 	}
@@ -1062,38 +1105,33 @@ func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementU
 	if err != nil {
 		return nil, err
 	}
-	decision := entry.EvaluatePlacement(entry.ModeYolo, entry.AutoRules{}, entry.PlacementFacts{
-		Disclosure: row.Disclosure, RelSponsored: true, Copy: row.Copy,
-		ExistingBoxes: boxes, Relevance: 100, OfferLive: live, RevokeWorks: true, Position: "end",
-	}, h.claims())
-	return decision.Failures, nil
-}
-
-func (h *AgentEntry) restoreLimitFailures(c *gin.Context, row database.PlacementUndo) ([]string, error) {
 	policy, source, err := h.sitePolicy(c, row.SiteID)
 	if err != nil {
 		return nil, err
 	}
-	placementCap := policy.MaxPlacementsPer30Days
-	if source != "policy" && placementCap == 0 {
-		placementCap = 3
+	rules := rulesOf(policy)
+	if source == "policy" {
+		rules.UseStoredCap = true
 	}
 	used, err := h.DB.CountPolicyPlacements(c.Request.Context(), row.SiteID, h.now().Add(-30*24*time.Hour), c.Param("id"))
 	if err != nil {
 		return nil, err
 	}
-	var failures []string
-	if used >= placementCap {
-		failures = append(failures, "cap")
+	decision := entry.EvaluatePlacement(entry.ModeYolo, rules, entry.PlacementFacts{
+		Disclosure: row.Disclosure, RelSponsored: entry.RelSponsoredFromMarkup(row.Disclosure, row.Copy),
+		Copy: row.Copy, OfferData: serverOfferData(offer),
+		ExistingBoxes: boxes, Relevance: services.ScorePlacement(row.Copy, offer.ProductName, offer.Category, offer.Website),
+		OfferLive: offer.Live, RevokeWorks: row.Status == "revoked" && row.UndoneAt != nil && row.StatusBefore != "",
+		PlacementsIn30Days: used,
+	}, h.claims())
+	if decision.NeedsOwner && decision.Reason == entry.ClaimCheckReason {
+		return nil, nil
 	}
-	minRel := policy.MinRelevance
-	if minRel == 0 {
-		minRel = 40
-	}
-	if row.Relevance >= 0 && row.Relevance < minRel {
-		failures = append(failures, "relevance_min")
-	}
-	return failures, nil
+	return decision.Failures, nil
+}
+
+func serverOfferData(offer database.OfferCopy) string {
+	return strings.TrimSpace(offer.ProductName + "\n" + offer.Category + "\n" + offer.Website)
 }
 
 func (h *AgentEntry) PluginAck(c *gin.Context) {
@@ -1109,7 +1147,7 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if actor.SiteID == "" {
+	if actor.SiteID == "" || c.GetString("key_kind") != "" || c.GetBool("agent_access") {
 		c.JSON(http.StatusForbidden, gin.H{"error": "site key required"})
 		return
 	}
@@ -1150,7 +1188,7 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		return
 	}
 	if !acked {
-		c.JSON(http.StatusConflict, gin.H{"error": "nothing to acknowledge"})
+		writeNamedConflict(c, "nothing_to_ack")
 		return
 	}
 	state, reason, action, err := h.pluginView(c, placement.ID)
@@ -1207,13 +1245,6 @@ func (h *AgentEntry) RetryPlugin(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
 			return
 		}
-		if len(failures) == 0 {
-			failures, err = h.restoreLimitFailures(c, row)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
-				return
-			}
-		}
 		if len(failures) > 0 {
 			writeCheckDenied(c, failures)
 			return
@@ -1262,8 +1293,7 @@ func writeRestoreRefused(c *gin.Context, reason string) {
 func writeNamedConflict(c *gin.Context, reason string) {
 	refusal, ok := entry.RestoreRefusalByReason(reason)
 	if !ok {
-		c.JSON(http.StatusConflict, gin.H{"error": "restore refused"})
-		return
+		refusal, _ = entry.RestoreRefusalByReason("restore_refused")
 	}
 	c.JSON(http.StatusConflict, gin.H{"reason": refusal.Reason, "message": refusal.Text})
 }
@@ -1318,6 +1348,10 @@ func revokeReason(c *gin.Context) (string, bool) {
 }
 
 func (h *AgentEntry) revokeSide(c *gin.Context, actor entryActor, placement *database.Placement) (string, string, bool) {
+	if scope := strings.TrimSpace(c.GetString("offer_scope_id")); scope != "" && scope != placement.OfferID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "maker key is limited to its offer"})
+		return "", "", false
+	}
 	userID := actor.UserID
 	if actor.Owner != nil {
 		userID = actor.Owner.ID
@@ -1574,13 +1608,26 @@ func policyJSON(p database.ApprovalPolicy, source string) gin.H {
 	}
 }
 
-func setupJSON(s database.SetupSettings, saved, human, signedIn bool) gin.H {
+func setupJSON(s database.SetupSettings, saved, human, signedIn bool, source string, claims entry.ClaimChecker) gin.H {
+	mode := s.Mode
+	reason, message := "", ""
+	if claims == nil || !claims.Real() {
+		if mode == entry.ModeYolo || mode == entry.ModeAuto {
+			mode = entry.ModeManual
+			reason = entry.ClaimCheckReason
+			message = entry.ClaimCheckMessage
+		}
+	}
 	body := gin.H{
-		"saved": saved, "role": s.Role, "install_path": s.InstallPath, "mode": s.Mode, "mode_shown": s.ModeShown,
-		"mode_preselected": entry.DefaultMode(s.InstallPath),
+		"saved": saved, "role": s.Role, "install_path": s.InstallPath, "mode": mode, "mode_shown": s.ModeShown,
+		"mode_preselected": entry.DefaultMode(source),
 		"promote":          s.Promote, "avoid_topics": listOrEmpty(s.AvoidTopics), "commission": s.Commission,
 		"sites_channels": listOrEmpty(s.SitesChannels), "never_topics": listOrEmpty(s.NeverTopics), "box_position": s.BoxPosition,
 		"human_login": human, "session": gin.H{"signed_in": signedIn},
+	}
+	if reason != "" {
+		body["approval_reason"] = reason
+		body["approval_message"] = message
 	}
 	if saved {
 		body["saved_by"] = s.SavedBy
@@ -1603,8 +1650,29 @@ func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 		body["plugin_state"] = entry.PluginState(item.PluginWait, item.PluginWaitAt, item.PluginFailedReason != "", h.now(), h.pluginWindow())
 		body["plugin_failed_reason"] = item.PluginFailedReason
 		body["failed_action"] = item.FailedAction
+		ruleID, ruleText := entry.PresentRule(item.MatchedRule)
+		body["policy_rule_id"] = ruleID
+		body["policy_rule_text"] = ruleText
 	}
 	return body
+}
+
+func (h *AgentEntry) writePolicy(c *gin.Context, policy database.ApprovalPolicy, source string) {
+	body := policyJSON(policy, source)
+	mode, reason, message := h.presentMode(policy.Mode)
+	body["mode"] = mode
+	if reason != "" {
+		body["approval_reason"] = reason
+		body["approval_message"] = message
+	}
+	c.JSON(http.StatusOK, body)
+}
+
+func (h *AgentEntry) presentMode(mode string) (effective, reason, message string) {
+	if h.claims().Real() || (mode != entry.ModeYolo && mode != entry.ModeAuto) {
+		return mode, "", ""
+	}
+	return entry.ModeManual, entry.ClaimCheckReason, entry.ClaimCheckMessage
 }
 
 func listOrEmpty(items []string) []string {

@@ -47,6 +47,9 @@ func TestPlacementRemoval(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("commit: %d %s", rec.Code, rec.Body.String())
 	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='placed', plugin_wait_at=NOW() WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
 	receipt := committed["placement"].(map[string]interface{})["receipt"].(map[string]interface{})
 	tracked, _ := receipt["tracked_link"].(string)
 	parsed, err := url.Parse(tracked)

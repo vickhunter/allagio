@@ -3,6 +3,8 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"log"
 	"net/http"
@@ -43,6 +45,10 @@ func TestGoLinkHashTruncatesAndRotates(t *testing.T) {
 	tomorrow := GoLinkClientHash(TruncateReaderIP("203.0.113.9"), rotated)
 	if same != neighbor || same == tomorrow || len(same) != 64 {
 		t.Fatalf("client hash: same %s neighbor %s tomorrow %s", same, neighbor, tomorrow)
+	}
+	joined := sha256.Sum256([]byte(TruncateReaderIP("203.0.113.9") + "|" + salt))
+	if same == hex.EncodeToString(joined[:]) {
+		t.Fatal("client hash is still SHA-256 of the truncated address joined to the salt")
 	}
 	if clientHashHeader(strings.ToUpper(same)) != same || clientHashHeader("203.0.113.9") != "" || clientHashHeader(same+"aa") != "" {
 		t.Fatal("plugin hash header was not limited to 64 hex characters")
@@ -187,10 +193,7 @@ WHERE id=$1`, id, now, campaignID, now.Add(48*time.Hour)); err != nil {
 	missing.Header.Set("X-Forwarded-For", forwarded)
 	missed := httptest.NewRecorder()
 	r.ServeHTTP(missed, missing)
-	if missed.Code != http.StatusNotFound {
-		t.Fatalf("unknown code: %d", missed.Code)
-	}
-	requireGoLinkHeaders(t, missed)
+	requirePlainRedirect(t, missed, "https://offerrails.com/")
 	if strings.Contains(logs.String(), rawIP) || strings.Contains(logs.String(), forwarded) {
 		t.Fatalf("unknown code logged an address: %s", logs.String())
 	}
@@ -208,9 +211,8 @@ func TestGoLinkRateLimitKeepsHeaders(t *testing.T) {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT id FROM sites WHERE domain='rate.example'`).Scan(&siteID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code,requires_placement,status) VALUES($1,$2,'rate-go',false,'active')`, offerID, siteID); err != nil {
-		t.Fatal(err)
-	}
+	id := insertPlacement(t, db, siteID, offerID, "https://rate.example/the-post", "Rate Product is worth a look.")
+	markPlacementLive(t, db, siteID, offerID, id, "rate-go", "https://rate.example/the-post")
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -234,11 +236,11 @@ func TestGoLinkRateLimitKeepsHeaders(t *testing.T) {
 		requireGoLinkHeaders(t, rec)
 		return rec
 	}
-	first := hit("/v1/go/rate-go")
+	first := hit("/v1/go/" + id)
 	if first.Code != http.StatusFound || !strings.Contains(first.Header().Get("Location"), "via=") {
 		t.Fatalf("first: %d %s", first.Code, first.Header().Get("Location"))
 	}
-	second := hit("/v1/go/rate-go")
+	second := hit("/v1/go/" + id)
 	requirePlainRedirect(t, second, "https://offer.example/buy")
 	var n int
 	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks`).Scan(&n); err != nil {
@@ -248,7 +250,5 @@ func TestGoLinkRateLimitKeepsHeaders(t *testing.T) {
 		t.Fatalf("rate limit recorded %d clicks", n)
 	}
 	missing := hit("/v1/go/not-a-placement")
-	if missing.Code != http.StatusNotFound {
-		t.Fatalf("unknown code: %d %s", missing.Code, missing.Body.String())
-	}
+	requirePlainRedirect(t, missing, "https://offerrails.com/")
 }

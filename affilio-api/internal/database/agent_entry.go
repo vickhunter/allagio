@@ -93,7 +93,11 @@ type DigestItem struct {
 	PluginContactAt    *time.Time
 	PluginFailedReason string
 	FailedAction       string
+	MatchedRule        string
 }
+
+// DigestPageSize is the item page. Counts are not limited by it.
+var DigestPageSize = 50
 
 func textList(items []string) []string {
 	if items == nil {
@@ -664,6 +668,33 @@ func (d *DB) MakerOfferIDs(ctx context.Context, makerID string) ([]string, error
 	return ids, rows.Err()
 }
 
+// OfferCopy is the stored product text used to score a placement.
+type OfferCopy struct {
+	Live        bool
+	MakerID     string
+	Category    string
+	ProductName string
+	Website     string
+}
+
+func (d *DB) OwnerSource(ctx context.Context, ownerID string) (string, error) {
+	var source string
+	err := d.Pool.QueryRow(ctx, `SELECT COALESCE(source,'') FROM owners WHERE id=$1`, ownerID).Scan(&source)
+	if err != nil {
+		return "", err
+	}
+	return NormalizeAttributionSource(source), nil
+}
+
+func (d *DB) OfferCopy(ctx context.Context, offerID string) (OfferCopy, error) {
+	var row OfferCopy
+	var status string
+	err := d.Pool.QueryRow(ctx, `SELECT o.status, p.maker_id::text, COALESCE(p.primary_category,''), COALESCE(p.name,''), COALESCE(p.website_url,'')
+FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan(&status, &row.MakerID, &row.Category, &row.ProductName, &row.Website)
+	row.Live = status == "listed"
+	return row, err
+}
+
 func (d *DB) OfferFacts(ctx context.Context, offerID string) (live bool, makerID, category string, err error) {
 	var status string
 	err = d.Pool.QueryRow(ctx, `SELECT o.status, p.maker_id::text, COALESCE(p.primary_category,'')
@@ -779,16 +810,26 @@ func (d *DB) LastDigestOpen(ctx context.Context, userID string) (*time.Time, err
 // placement_counts_as_live. Listed offers are not placements.
 const PlacementCountsAsLiveSQL = `EXISTS (SELECT 1 FROM placement_counts_as_live WHERE placement_counts_as_live.id = placement_proposals.id)`
 
+func (d *DB) CountLivePlacements(ctx context.Context, siteID string) (int, error) {
+	var n int
+	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals WHERE site_id=$1 AND `+PlacementCountsAsLiveSQL, siteID).Scan(&n)
+	return n, err
+}
+
 func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Time) ([]DigestItem, error) {
+	limit := DigestPageSize
+	if limit < 1 {
+		limit = 50
+	}
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
-plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`
+plugin_wait, COALESCE(plugin_wait_at, created_at), plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,'')
 FROM placement_proposals
 WHERE site_id=$1 AND (
     (status IN ('approved','committed') AND COALESCE(approved_at, created_at) > $2)
     OR plugin_wait <> ''
     OR plugin_failed_reason <> ''
 )
-ORDER BY COALESCE(approved_at, created_at) DESC LIMIT 50`, siteID, since)
+ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -797,7 +838,7 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT 50`, siteID, since)
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = "placement"
-		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive); err != nil {
+		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -806,10 +847,14 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT 50`, siteID, since)
 }
 
 func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) ([]DigestItem, error) {
+	limit := DigestPageSize
+	if limit < 1 {
+		limit = 50
+	}
 	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, o.updated_at
 FROM offers o JOIN products p ON p.id=o.product_id
 WHERE p.maker_id=$1 AND o.status='listed' AND o.updated_at > $2
-ORDER BY o.updated_at DESC LIMIT 50`, makerID, since)
+ORDER BY o.updated_at DESC LIMIT $3`, makerID, since, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -851,7 +896,22 @@ RETURNING kind, COALESCE(placement_id::text,''), COALESCE(offer_id::text,'')`, h
 	}
 	switch kind {
 	case "placement":
-		if _, err = tx.Exec(ctx, `UPDATE placement_proposals SET status='revoked', plugin_wait='remove', plugin_wait_at=$2, plugin_failed_reason='', failed_action='', restore_unconfirmed=false WHERE id=$1 AND status<>'revoked'`, placementID, now); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE placement_proposals SET
+status_before_undo=status,
+undone_at=$2,
+undone_by_user=$3::uuid,
+undone_by_key_hash='',
+plugin_wait='remove',
+plugin_wait_at=$2,
+plugin_failed_reason='',
+failed_action='',
+restore_unconfirmed=false,
+status='revoked',
+revoked_by_side=CASE
+  WHEN EXISTS (SELECT 1 FROM owners o WHERE o.id=$3::uuid AND o.site_id = placement_proposals.site_id) THEN 'publisher'
+  ELSE 'maker'
+END
+WHERE id=$1 AND status<>'revoked'`, placementID, now, ownerID); err != nil {
 			return "", "", "", err
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at) VALUES('placement_undo',$1,$2,$3)`, ownerID, placementID, now)

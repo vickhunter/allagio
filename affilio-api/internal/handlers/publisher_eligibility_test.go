@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"affilio-api/internal/database"
@@ -112,7 +113,7 @@ func TestPrepareAndCommitProviderlessOffer(t *testing.T) {
 	}
 	receipt := committed["placement"].(map[string]interface{})["receipt"].(map[string]interface{})
 	link, _ := receipt["tracked_link"].(string)
-	if len(link) < len("/v1/go/") || link[:len("/v1/go/")] != "/v1/go/" {
+	if link != "/v1/go/"+placementID || strings.Contains(link, "?placement=") {
 		t.Fatalf("tracked link = %q", link)
 	}
 }

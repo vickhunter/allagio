@@ -2,16 +2,30 @@ package entry
 
 import "strings"
 
-// ClaimChecker is the D-028 claim-check hook. The stub accepts every claim.
-// D-028 replaces it with the deterministic checker.
+// ClaimCheckReason is why yolo and auto stay on manual approval.
+const ClaimCheckReason = "claim_check_unavailable"
+
+// ClaimCheckMessage is the sentence returned with ClaimCheckReason.
+const ClaimCheckMessage = "Automatic approval is off until claim checks are live."
+
+// ClaimChecker is the D-028 claim-check hook. Real reports whether this
+// checker is the live one. The stub is not, so yolo and auto cannot go live.
 type ClaimChecker interface {
 	CheckClaims(copyText, offerData string) error
+	Real() bool
 }
 
-// StubClaimChecker does not reject claims.
+// StubClaimChecker does not reject claims and is not a live checker.
 type StubClaimChecker struct{}
 
 func (StubClaimChecker) CheckClaims(string, string) error { return nil }
+func (StubClaimChecker) Real() bool                       { return false }
+
+// LiveClaimChecker accepts every claim and allows automatic go-live.
+type LiveClaimChecker struct{}
+
+func (LiveClaimChecker) CheckClaims(string, string) error { return nil }
+func (LiveClaimChecker) Real() bool                       { return true }
 
 // AutoRules is the owner policy for auto mode. Maker fields (site quality and
 // niches) apply when an offer accepts a publisher.
@@ -26,6 +40,8 @@ type AutoRules struct {
 	CopyEditsAllowed       bool
 	MinSiteQuality         int
 	AllowedNiches          []string
+	// UseStoredCap keeps a saved cap of 0. An unset cap still defaults to 3.
+	UseStoredCap bool
 }
 
 // PlacementFacts are the inputs for one placement decision.
@@ -59,6 +75,8 @@ type Decision struct {
 	ApprovedBy  string
 	MatchedRule string
 	Failures    []string
+	Reason      string
+	Message     string
 }
 
 // PresentRule turns a stored match into the id and sentence the dashboard shows.
@@ -124,13 +142,33 @@ func (relevanceError) Error() string { return "min relevance must be from 25 to 
 
 var errMinRelevance = relevanceError{}
 
+// CapLimit is the placement cap. A saved 0 is a real cap of zero. An unset
+// cap defaults to 3.
+func CapLimit(rules AutoRules) int {
+	if rules.MaxPlacementsPer30Days == 0 && !rules.UseStoredCap {
+		return 3
+	}
+	return rules.MaxPlacementsPer30Days
+}
+
+// MinRelevanceLimit is the policy minimum. An unset value defaults to 40.
+func MinRelevanceLimit(rules AutoRules) int {
+	if rules.MinRelevance == 0 {
+		return 40
+	}
+	return rules.MinRelevance
+}
+
 func EvaluatePlacement(mode string, rules AutoRules, in PlacementFacts, claims ClaimChecker) Decision {
 	if claims == nil {
 		claims = StubClaimChecker{}
 	}
-	failures := placementHardFailures(in, claims)
+	failures := placementHardFailures(in, rules, claims)
 	if len(failures) > 0 {
 		return Decision{Failures: failures}
+	}
+	if !claims.Real() && (mode == ModeYolo || mode == ModeAuto) {
+		return Decision{NeedsOwner: true, Reason: ClaimCheckReason, Message: ClaimCheckMessage}
 	}
 	switch mode {
 	case ModeManual:
@@ -244,8 +282,7 @@ func HardCheckDoc() string {
 }
 
 // RestoreRefusal is one public 409 reason. RestoreRefusals is the only list.
-// A 409 from this list returns reason and message. "placement was not undone"
-// is a different 409 and is not in this list.
+// Every 409 returns reason and message from this list.
 type RestoreRefusal struct {
 	Reason string
 	Text   string
@@ -255,6 +292,18 @@ var RestoreRefusals = []RestoreRefusal{
 	{Reason: "window_expired", Text: "The restore window has expired."},
 	{Reason: "paused", Text: "Pause or the kill switch was turned on after the undo."},
 	{Reason: "not_failed", Text: "The placement is not failed."},
+	{Reason: "device_used", Text: "That device code was already used."},
+	{Reason: "account_exists", Text: "An account already exists for this email."},
+	{Reason: "not_approvable", Text: "The placement cannot be approved."},
+	{Reason: "not_undone", Text: "The placement was not undone."},
+	{Reason: "nothing_to_ack", Text: "There is nothing to acknowledge."},
+	{Reason: "offer_ineligible", Text: "The offer is not eligible for this content."},
+	{Reason: "offer_unavailable", Text: "The offer is unavailable."},
+	{Reason: "placement_unavailable", Text: "The placement is unavailable, expired, or a self-referral."},
+	{Reason: "receipt_mismatch", Text: "The published text must include the approved copy, the disclosure, and the exact tracked link."},
+	{Reason: "receipt_recorded", Text: "The receipt was already recorded or the placement is unavailable."},
+	{Reason: "publisher_missing", Text: "The publisher was not found."},
+	{Reason: "restore_refused", Text: "The restore was refused."},
 }
 
 // RestoreRefusalByReason returns the catalog entry for one reason.
@@ -282,7 +331,7 @@ func RestoreRefusalDoc() string {
 	return b.String()
 }
 
-func placementHardFailures(in PlacementFacts, claims ClaimChecker) []string {
+func placementHardFailures(in PlacementFacts, rules AutoRules, claims ClaimChecker) []string {
 	var failures []string
 	if strings.TrimSpace(in.Disclosure) == "" {
 		failures = append(failures, "disclosure")
@@ -299,7 +348,7 @@ func placementHardFailures(in PlacementFacts, claims ClaimChecker) []string {
 	if in.ExistingBoxes > 0 {
 		failures = append(failures, "one_per_post")
 	}
-	if in.Relevance < 25 {
+	if in.Relevance < MinRelevanceLimit(rules) {
 		failures = append(failures, "relevance_min")
 	}
 	if !in.OfferLive {
@@ -308,7 +357,25 @@ func placementHardFailures(in PlacementFacts, claims ClaimChecker) []string {
 	if !in.RevokeWorks {
 		failures = append(failures, "revoke_path")
 	}
+	if in.PlacementsIn30Days >= CapLimit(rules) {
+		failures = append(failures, "cap")
+	}
 	return failures
+}
+
+// RelSponsoredFromMarkup is true when our disclosure or copy carries
+// rel=sponsored, or states the commercial relationship in words.
+func RelSponsoredFromMarkup(disclosure, copyText string) bool {
+	blob := strings.ToLower(disclosure + "\n" + copyText)
+	if strings.Contains(blob, `rel="sponsored"`) || strings.Contains(blob, "rel='sponsored'") || strings.Contains(blob, "rel=sponsored") {
+		return true
+	}
+	for _, word := range []string{"sponsor", "affiliate", "commission"} {
+		if strings.Contains(blob, word) {
+			return true
+		}
+	}
+	return false
 }
 
 func matchPlacement(rules AutoRules, in PlacementFacts) (string, bool, string) {

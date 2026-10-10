@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 )
 
@@ -70,7 +71,7 @@ func Load() Config {
 		AllowedOrigins:         getEnvValue("ALLOWED_ORIGINS", "*"),
 		TrustedProxies:         os.Getenv("TRUSTED_PROXIES"),
 		GinMode:                os.Getenv("GIN_MODE"),
-		APIKeySecret:           getEnvValue("API_KEY_SECRET", "dev-secret"),
+		APIKeySecret:           os.Getenv("API_KEY_SECRET"),
 		AdminAPIKey:            getEnvValue("ADMIN_API_KEY", ""),
 		KeyRotationGracePeriod: time.Duration(graceHours) * time.Hour,
 		PluginOfflineAfter:     offlineAfter,
@@ -80,6 +81,24 @@ func Load() Config {
 		LemonSqueezyWebhookSecret: os.Getenv("LEMONSQUEEZY_WEBHOOK_SECRET"),
 		PolarWebhookSecret:        os.Getenv("POLAR_WEBHOOK_SECRET"),
 	}
+}
+
+// SecretRefused reports an API key secret the server must not boot with.
+func SecretRefused(secret string) error {
+	secret = strings.TrimSpace(secret)
+	if secret == "" || secret == "dev-secret" {
+		return errors.New("API_KEY_SECRET must be set to a non-default value")
+	}
+	return nil
+}
+
+// ValidateSecrets refuses to boot outside tests when the API key secret is
+// missing or still the development value.
+func (c Config) ValidateSecrets() error {
+	if testing.Testing() {
+		return nil
+	}
+	return SecretRefused(c.APIKeySecret)
 }
 
 // ValidateRuntime refuses to boot a release process that still has the

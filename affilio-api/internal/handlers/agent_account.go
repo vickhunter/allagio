@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const earningsNote = "Earnings are recorded test-mode commission only. The number is null when that scope has no test-mode rows, and 0 when those rows add up to zero. Publisher amounts are ledger rows joined to test conversions. Maker amounts are test conversion commissions. Live and legacy rows are omitted. Earnings from a click on a placement whose restore failed are omitted until that restore is confirmed placed. A placement counts as live only when plugin_state is placed and its go link is redirecting. Digest totals, site totals, and Live now exclude a failed restore. Click source is the referrer host; a click with no host counts as direct."
+const earningsNote = "Earnings are a list of currency and amount for recorded test-mode commission. The list is null when that scope has no test-mode rows, and includes a zero amount when those rows add up to zero. Publisher amounts are ledger rows joined to test conversions. Maker commission stays on the offer and is not added to publisher income. Live and legacy rows are omitted. Earnings from a click on a placement whose restore failed are omitted until that restore is confirmed placed. A placement counts as live only when plugin_state is placed and its go link is redirecting. Digest totals, site totals, and Live now exclude a failed restore. Click source is the referrer host; a click with no host counts as direct."
 
 func (h *AgentEntry) HardChecks(c *gin.Context) {
 	out := make([]gin.H, 0, len(entry.HardCheckCatalog))
@@ -116,6 +116,7 @@ func (h *AgentEntry) AccountProjects(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "projects unavailable"})
 			return
 		}
+		mode, _, _ = h.presentMode(mode)
 		out = append(out, gin.H{"kind": project.Kind, "id": project.ID, "name": project.Name, "mode": mode})
 	}
 	c.JSON(http.StatusOK, gin.H{"projects": out})
@@ -138,6 +139,7 @@ func (h *AgentEntry) AccountDigest(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 			return
 		}
+		mode, _, _ = h.presentMode(mode)
 		project.Mode = mode
 		items := make([]gin.H, 0, len(project.Items))
 		for _, item := range project.Items {
@@ -151,21 +153,27 @@ func (h *AgentEntry) AccountDigest(c *gin.Context) {
 		projects = append(projects, gin.H{
 			"kind": project.Kind, "id": project.ID, "name": project.Name, "mode": project.Mode,
 			"went_live": project.WentLive, "clicks": project.Clicks,
-			"earnings": earningsNumber(project.Earnings), "clicks_by_source": sourceJSON(project.ClicksBySource),
+			"earnings": earningsList(project.Earnings), "clicks_by_source": sourceJSON(project.ClicksBySource),
 			"items": items,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{
+	body := gin.H{
 		"totals": gin.H{
 			"went_live":        digest.WentLive,
 			"clicks":           digest.Clicks,
-			"earnings":         combineEarnings(digest.PublisherEarnings, digest.MakerEarnings),
+			"earnings":         earningsList(digest.PublisherEarnings),
 			"clicks_by_source": sourceJSON(digest.ClicksBySource),
 		},
 		"projects":      projects,
 		"earnings_note": earningsNote,
 		"session":       gin.H{"signed_in": !credentialPresented(c)},
-	})
+	}
+	if !h.claims().Real() {
+		body["approval_reason"] = entry.ClaimCheckReason
+		body["approval_message"] = entry.ClaimCheckMessage
+		body["effective_mode"] = entry.ModeManual
+	}
+	c.JSON(http.StatusOK, body)
 }
 
 func (h *AgentEntry) AccountPause(c *gin.Context) {
@@ -383,33 +391,15 @@ func presentedKey(c *gin.Context) string {
 	return strings.TrimPrefix(header, "Bearer ")
 }
 
-func earningsNumber(amounts []database.MoneyAmount) any {
+func earningsList(amounts []database.MoneyAmount) any {
 	if len(amounts) == 0 {
 		return nil
 	}
-	total := 0.0
+	out := make([]gin.H, 0, len(amounts))
 	for _, amount := range amounts {
-		total += amount.Amount
+		out = append(out, gin.H{"currency": amount.Currency, "amount": amount.Amount})
 	}
-	return total
-}
-
-func combineEarnings(parts ...[]database.MoneyAmount) any {
-	seen := false
-	total := 0.0
-	for _, part := range parts {
-		if len(part) == 0 {
-			continue
-		}
-		seen = true
-		for _, amount := range part {
-			total += amount.Amount
-		}
-	}
-	if !seen {
-		return nil
-	}
-	return total
+	return out
 }
 
 func sourceJSON(items []database.SourceCount) []gin.H {

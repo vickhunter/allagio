@@ -20,7 +20,6 @@ type RedirectsHandler struct {
 	// when the site is not known.
 	HomeURL string
 	// IPSaltSecret is mixed into the daily server salt for direct go links.
-	// Empty uses the development secret.
 	IPSaltSecret string
 	now          func() time.Time
 }
@@ -46,90 +45,43 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 	h.goCampaign(c, code, req)
 }
 
-// goCampaign is GET /v1/go/<tracking_code>. Readers never see a 4xx or a 5xx
-// for a code that resolves. Clicks-off states redirect to the plain offer URL.
-// An offer that is not live redirects to the referring post or the site home.
+// goCampaign is GET /v1/go/<tracking_code>. Readers never see a 4xx or a 5xx.
+// ?placement= follows the placement rules. Without it, a hit is recorded only
+// through placement_counts_as_live. An unknown code redirects home.
 func (h *RedirectsHandler) goCampaign(c *gin.Context, code string, req goRequest) {
+	if placementID := strings.TrimSpace(c.Query("placement")); placementID != "" {
+		h.goPlacement(c, placementID, req)
+		return
+	}
 	link, err := h.DB.GetCampaignByTrackingCode(c.Request.Context(), code)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "unknown link"})
-			return
+		if !errors.Is(err, pgx.ErrNoRows) {
+			logGo("redirects.go campaign lookup failed code=%s err=%v", code, err)
 		}
-		logGo("redirects.go campaign lookup failed code=%s err=%v", code, err)
 		c.Redirect(http.StatusFound, h.offerRailsHome())
 		return
 	}
-	placementID := c.Query("placement")
 	if !campaignOfferLive(link) {
-		c.Redirect(http.StatusFound, h.campaignFallback(c, link, placementID))
+		c.Redirect(http.StatusFound, h.campaignFallback(c, link, ""))
 		return
 	}
-	plain := link.LandingURL
-	if h.campaignClicksOff(c, link, placementID) || c.Request.Method == http.MethodHead || isPreviewBot(req.userAgent) {
-		c.Redirect(http.StatusFound, plain)
-		return
-	}
-	if h.RateLimiter != nil && !h.RateLimiter.Allow(h.rateLimitKey(req.clientIP)) {
-		c.Redirect(http.StatusFound, plain)
-		return
-	}
-	clickID, err := h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, h.directReaderHash(req.clientIP), req.userAgent, req.referer, placementID)
+	liveID, err := h.DB.LivePlacementForCampaign(c.Request.Context(), link.CampaignID)
 	if err != nil {
-		logGo("redirects.go click insert failed campaign=%s err=%v", link.CampaignID, err)
-		c.Redirect(http.StatusFound, plain)
+		logGo("redirects.go live placement lookup failed campaign=%s err=%v", link.CampaignID, err)
+		c.Redirect(http.StatusFound, link.LandingURL)
 		return
 	}
-	c.Redirect(http.StatusFound, appendRefParam(plain, link.RefParam, clickID))
+	if liveID != "" {
+		h.goPlacement(c, liveID, req)
+		return
+	}
+	c.Redirect(http.StatusFound, link.LandingURL)
 }
 
 // campaignOfferLive is the offer a reader can be sent to: listed, with an
 // https landing URL.
 func campaignOfferLive(link *database.CampaignLink) bool {
 	return link != nil && link.OfferStatus == "listed" && httpsDestination(link.LandingURL)
-}
-
-// campaignClicksOff is true when a resolved tracking code must not record a
-// hit. A lookup error is clicks-off too, so the reader still gets a redirect.
-func (h *RedirectsHandler) campaignClicksOff(c *gin.Context, link *database.CampaignLink, placementID string) bool {
-	if link.CampaignStatus != "active" || (link.RequiresPlacement && strings.TrimSpace(placementID) == "") {
-		return true
-	}
-	if strings.TrimSpace(placementID) == "" {
-		return false
-	}
-	if !uuidPattern.MatchString(placementID) {
-		return true
-	}
-	revoked, err := h.DB.PlacementRevoked(c.Request.Context(), placementID, link.CampaignID)
-	if err != nil || revoked {
-		if err != nil {
-			logGo("redirects.go placement revoked lookup failed campaign=%s err=%v", link.CampaignID, err)
-		}
-		return true
-	}
-	held, err := h.DB.PlacementRestoreUnconfirmed(c.Request.Context(), placementID, link.CampaignID)
-	if err != nil || held {
-		if err != nil {
-			logGo("redirects.go placement restore lookup failed campaign=%s err=%v", link.CampaignID, err)
-		}
-		return true
-	}
-	removed, err := h.DB.PlacementRemoved(c.Request.Context(), placementID, link.CampaignID)
-	if err != nil || removed {
-		if err != nil {
-			logGo("redirects.go placement removed lookup failed campaign=%s err=%v", link.CampaignID, err)
-		}
-		return true
-	}
-	valid, err := h.DB.PlacementAllowsClick(c.Request.Context(), placementID, link.CampaignID)
-	if err != nil || !valid {
-		if err != nil {
-			logGo("redirects.go placement click lookup failed campaign=%s err=%v", link.CampaignID, err)
-		}
-		return true
-	}
-	return false
 }
 
 // campaignFallback is where a reader goes when the offer itself is not live:
@@ -228,6 +180,18 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req g
 	}
 	plain := link.LandingURL
 	if !link.CountsAsLive || c.Request.Method == http.MethodHead || isPreviewBot(reader.userAgent) {
+		c.Redirect(http.StatusFound, plain)
+		return
+	}
+	if !landingReachable(plain) {
+		c.Redirect(http.StatusFound, h.postOrHome(link))
+		return
+	}
+	limitKey := reader.hash
+	if limitKey == "" {
+		limitKey = "unknown"
+	}
+	if h.RateLimiter != nil && !h.RateLimiter.Allow(limitKey) {
 		c.Redirect(http.StatusFound, plain)
 		return
 	}

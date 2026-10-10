@@ -52,7 +52,11 @@ func TestReceiptAcceptsADisclosureThePostAlreadyContains(t *testing.T) {
 		return response.Code, body
 	}
 
-	code, body := post(copy + "\n" + tracked)
+	code, body := post(fixture + "\n" + copy + "\n" + "/v1/go/oldcode?placement=" + placementID)
+	if code != http.StatusConflict || body["reason"] != "receipt_mismatch" || body["message"] == "" {
+		t.Fatalf("old campaign link: %d %v", code, body)
+	}
+	code, body = post(copy + "\n" + tracked)
 	if code != http.StatusConflict {
 		t.Fatalf("copy and tracked link with no disclosure: %d %v", code, body)
 	}

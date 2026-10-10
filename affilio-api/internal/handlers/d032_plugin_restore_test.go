@@ -164,6 +164,14 @@ func TestRevokedGoLink(t *testing.T) {
 	siteKey := map[string]string{"X-API-Key": "golink-site-key"}
 	path := "/v1/go/revoked-go?placement=" + placementID
 
+	pending := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
+	requirePlainRedirect(t, pending, "https://example.com")
+	if placementClickCount(t, db, placementID) != 0 {
+		t.Fatal("a committed placement that is not placed recorded a click")
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='placed', plugin_wait_at=NOW(), plugin_failed_reason='', failed_action='', restore_unconfirmed=false WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
 	live := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
 	if live.Code != http.StatusFound || live.Header().Get("Location") == "" || !containsAll(live.Header().Get("Location"), "https://example.com", "via=") {
 		t.Fatalf("live redirect: %d %s", live.Code, live.Header().Get("Location"))
@@ -196,11 +204,9 @@ func TestRevokedGoLink(t *testing.T) {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
 	again := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
-	if again.Code != http.StatusFound || !containsAll(again.Header().Get("Location"), "https://example.com", "via=") {
-		t.Fatalf("restored redirect: %d %s", again.Code, again.Header().Get("Location"))
-	}
-	if placementClickCount(t, db, placementID) != 2 {
-		t.Fatal("restored link did not credit a click")
+	requirePlainRedirect(t, again, "https://example.com")
+	if placementClickCount(t, db, placementID) != 1 {
+		t.Fatal("a restored placement credited a click before the plugin acknowledged placed")
 	}
 
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET post_url='https://golink.example/post' WHERE id=$1`, placementID); err != nil {
@@ -211,7 +217,7 @@ func TestRevokedGoLink(t *testing.T) {
 	}
 	paused := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
 	requirePlainRedirect(t, paused, "https://golink.example/post")
-	if placementClickCount(t, db, placementID) != 2 {
+	if placementClickCount(t, db, placementID) != 1 {
 		t.Fatal("an offer that is not live credited a click")
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET post_url='' WHERE id=$1`, placementID); err != nil {
@@ -518,20 +524,23 @@ func TestEveryHardCheckReturns422(t *testing.T) {
 	expect(disclosureRec, disclosureBody, "disclosure")
 
 	relID := insertPlacement(t, db, siteID, offerID, "https://checks.example/rel", "Honest note about the product.")
-	relRec, relBody := decide(relID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": false})
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='See the product.' WHERE id=$1`, relID); err != nil {
+		t.Fatal(err)
+	}
+	relRec, relBody := decide(relID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true})
 	expect(relRec, relBody, "rel_sponsored")
 
 	api.Claims = rejectingClaims{}
 	claimsID := insertPlacement(t, db, siteID, offerID, "https://checks.example/claims", "Honest note about the product.")
-	claimsRec, claimsBody := decide(claimsID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true, "offer_data": "A short honest note."})
-	api.Claims = entry.StubClaimChecker{}
+	claimsRec, claimsBody := decide(claimsID, map[string]any{"relevance": 10, "position": "end", "rel_sponsored": false, "offer_data": "unrelated"})
+	api.Claims = entry.LiveClaimChecker{}
 	expect(claimsRec, claimsBody, "claims_from_offer")
 
 	copyID := insertPlacement(t, db, siteID, offerID, "https://checks.example/copy", strings.Repeat("a", 141))
 	copyRec, copyBody := decide(copyID, okPayload)
 	expect(copyRec, copyBody, "copy_length")
 
-	relevanceID := insertPlacement(t, db, siteID, offerID, "https://checks.example/relevance", "Honest note about the product.")
+	relevanceID := insertPlacement(t, db, siteID, offerID, "https://checks.example/relevance", "Unrelated gardening notes.")
 	relevanceRec, relevanceBody := decide(relevanceID, map[string]any{"relevance": 10, "position": "end", "rel_sponsored": true})
 	expect(relevanceRec, relevanceBody, "relevance_min")
 
@@ -557,7 +566,7 @@ func TestEveryHardCheckReturns422(t *testing.T) {
 	if approved.Code != http.StatusOK {
 		t.Fatalf("first box: %d %s", approved.Code, approved.Body.String())
 	}
-	second := insertPlacement(t, db, siteID, offerID, "https://checks.example/one", "Another honest note.")
+	second := insertPlacement(t, db, siteID, offerID, "https://checks.example/one", "Another honest note about Checks Product.")
 	oneRec, oneBody := decide(second, okPayload)
 	expect(oneRec, oneBody, "one_per_post")
 
@@ -865,7 +874,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 		}
 		totals := body["totals"].(map[string]any)
 		wentLive = totals["went_live"].(float64)
-		earnings = totals["earnings"].(float64)
+		earnings = moneyAmount(t, totals["earnings"], "USD")
 		var sawSite bool
 		for _, raw := range body["projects"].([]any) {
 			project := raw.(map[string]any)
@@ -876,7 +885,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 			if project["went_live"] != wentLive-1 {
 				t.Fatalf("site live count: %v totals %v", project["went_live"], wentLive)
 			}
-			if project["earnings"] != earnings/2 {
+			if moneyAmount(t, project["earnings"], "USD") != earnings {
 				t.Fatalf("site earnings: %v totals %v", project["earnings"], earnings)
 			}
 		}
@@ -891,14 +900,14 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 		t.Fatalf("live redirect: %d %s", live.Code, live.Body.String())
 	}
 	clicks = placementClickCount(t, db, id)
-	if went, earned := numbers(); went != 1 || earned != 7 {
+	if went, earned := numbers(); went != 1 || earned != 3.5 {
 		t.Fatalf("pending before ack: went %v earned %v", went, earned)
 	}
 	placedFirst, placedFirstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
 	if placedFirst.Code != http.StatusOK || placedFirstBody["plugin_state"] != "placed" {
 		t.Fatalf("first ack: %d %s", placedFirst.Code, placedFirst.Body.String())
 	}
-	if went, earned := numbers(); went != 2 || earned != 7 {
+	if went, earned := numbers(); went != 2 || earned != 3.5 {
 		t.Fatalf("placed counts: went %v earned %v", went, earned)
 	}
 
@@ -916,7 +925,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 		t.Fatalf("restore redirect: %d %s", again.Code, again.Body.String())
 	}
 	clicks = placementClickCount(t, db, id)
-	if went, earned := numbers(); went != 1 || earned != 7 {
+	if went, earned := numbers(); went != 1 || earned != 3.5 {
 		t.Fatalf("restore before ack: went %v earned %v", went, earned)
 	}
 
@@ -931,7 +940,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 		if placementClickCount(t, db, id) != clicks {
 			t.Fatal("failed restore credited a click")
 		}
-		if went, earned := numbers(); went != 1 || earned != 4 {
+		if went, earned := numbers(); went != 1 || earned != 2 {
 			t.Fatalf("dark counts: went %v earned %v", went, earned)
 		}
 		var status string
@@ -959,7 +968,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	if placementClickCount(t, db, id) != clicks+1 {
 		t.Fatal("confirmed restore did not record a click")
 	}
-	if went, earned := numbers(); went != 2 || earned != 7 {
+	if went, earned := numbers(); went != 2 || earned != 3.5 {
 		t.Fatalf("confirmed counts: went %v earned %v", went, earned)
 	}
 }

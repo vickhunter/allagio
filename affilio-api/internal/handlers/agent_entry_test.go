@@ -23,7 +23,7 @@ func newEntryTest(t *testing.T, db *database.DB) (*HostedHandler, *AgentEntry, *
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	h := &HostedHandler{DB: db, BaseURL: "http://127.0.0.1:8080"}
-	api := &AgentEntry{DB: db, BaseURL: h.BaseURL, Owner: h.RequireOwnerSession, Claims: entry.StubClaimChecker{}}
+	api := &AgentEntry{DB: db, BaseURL: h.BaseURL, Owner: h.RequireOwnerSession, Claims: entry.LiveClaimChecker{}}
 	api.Mount(r)
 	placements := &PlacementsHandler{DB: db}
 	secured := r.Group("/v1", middleware.APIKeyAuth(db, nil))
@@ -121,6 +121,7 @@ VALUES($1,$2,$3,'context for the section',$4,'(link sponsorizzato)','relevant','
 type rejectingClaims struct{}
 
 func (rejectingClaims) CheckClaims(string, string) error { return errors.New("claim") }
+func (rejectingClaims) Real() bool                      { return true }
 
 func TestDeviceSignIn(t *testing.T) {
 	db, cleanup := setupTestDB(t)
@@ -295,13 +296,19 @@ func TestSetupSettings(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
 		t.Fatal(err)
 	}
-	rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=chatgpt_dir", nil)
-	if rec.Code != http.StatusOK || body["mode"] != "manual" || body["mode_shown"] != "manual" || body["saved"] != false {
-		t.Fatalf("directory default: %d %s", rec.Code, rec.Body.String())
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET source='chatgpt' WHERE id=$1`, owner.ID); err != nil {
+		t.Fatal(err)
 	}
-	rec, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=cursor", nil)
-	if body["mode"] != "yolo" {
-		t.Fatalf("cursor default: %s", rec.Body.String())
+	rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=cursor", nil)
+	if rec.Code != http.StatusOK || body["mode"] != "manual" || body["mode_shown"] != "manual" || body["mode_preselected"] != "manual" || body["saved"] != false {
+		t.Fatalf("chatgpt source: %d %s", rec.Code, rec.Body.String())
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET source='cursor' WHERE id=$1`, owner.ID); err != nil {
+		t.Fatal(err)
+	}
+	rec, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=chatgpt_dir", nil)
+	if body["mode"] != "yolo" || body["mode_preselected"] != "yolo" {
+		t.Fatalf("cursor source ignores install_path: %s", rec.Body.String())
 	}
 	rec, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/setup/settings", map[string]any{
 		"role": "publisher", "install_path": "cli", "mode_shown": "yolo", "mode": "auto",
@@ -363,13 +370,19 @@ func TestPolicyEngineHTTP(t *testing.T) {
 		t.Fatalf("hard relevance: %d %s", rec.Code, rec.Body.String())
 	}
 	_ = denied
-	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": false}, map[string]string{"X-API-Key": "policy-site-key"})
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='See the product.', copy='Policy Product is worth a look.' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
+	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "rel_sponsored") {
 		t.Fatalf("disclosure: %d %s", rec.Code, rec.Body.String())
 	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='(link sponsorizzato)' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
 	api.Claims = rejectingClaims{}
-	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true, "offer_data": "A short honest note."}, map[string]string{"X-API-Key": "policy-site-key"})
-	api.Claims = entry.StubClaimChecker{}
+	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 10, "position": "end", "rel_sponsored": false, "offer_data": "unrelated"}, map[string]string{"X-API-Key": "policy-site-key"})
+	api.Claims = entry.LiveClaimChecker{}
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "claims_from_offer") {
 		t.Fatalf("claim hook: %d %s", rec.Code, rec.Body.String())
 	}
@@ -387,7 +400,7 @@ func TestPolicyEngineHTTP(t *testing.T) {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT approved_by_kind, matched_rule, policy_version FROM placement_proposals WHERE id=$1`, placementID).Scan(&kind, &rule, &version); err != nil || kind != "policy:yolo" || rule != "hard_checks" || version < 1 {
 		t.Fatalf("stored approval %s %s %d %v", kind, rule, version, err)
 	}
-	second := insertPlacement(t, db, siteID, offerID, "https://policy.example/post", "Another note.")
+	second := insertPlacement(t, db, siteID, offerID, "https://policy.example/post", "Another Policy Product note.")
 	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
 	if !strings.Contains(rec.Body.String(), "one_per_post") {
 		t.Fatalf("one box: %s", rec.Body.String())
@@ -410,8 +423,8 @@ func TestPolicyEngineHTTP(t *testing.T) {
 		t.Fatalf("lower relevance: %d %s", rec.Code, rec.Body.String())
 	}
 
-	outside := insertPlacement(t, db, siteID, offerID, "https://policy.example/other", "Outside the position.")
-	rec, needs := postJSON(t, r, http.MethodPost, "/v1/placements/"+outside+"/decide", map[string]any{"relevance": 30, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
+	outside := insertPlacement(t, db, siteID, offerID, "https://policy.example/other", "Policy Product sits past the saved position.")
+	rec, needs := postJSON(t, r, http.MethodPost, "/v1/placements/"+outside+"/decide", map[string]any{"relevance": 30, "position": "after_intro", "rel_sponsored": false}, map[string]string{"X-API-Key": "policy-site-key"})
 	if rec.Code != http.StatusOK || needs["decision"] != "needs_owner" {
 		t.Fatalf("outside auto: %d %s", rec.Code, rec.Body.String())
 	}
@@ -533,9 +546,10 @@ func TestDigestUndoAndEvents(t *testing.T) {
 	if rec.Code != http.StatusOK || undone["kind"] != "placement" || undone["user_id"] != owner.ID {
 		t.Fatalf("undo: %d %s", rec.Code, rec.Body.String())
 	}
-	var status, eventKind string
-	if err := db.Pool.QueryRow(context.Background(), `SELECT status FROM placement_proposals WHERE id=$1`, placementID).Scan(&status); err != nil || status != "revoked" {
-		t.Fatalf("status %s %v", status, err)
+	var status, eventKind, before, undoneBy, wait string
+	var undoneAt time.Time
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status, COALESCE(status_before_undo,''), undone_at, COALESCE(undone_by_user::text,''), plugin_wait FROM placement_proposals WHERE id=$1`, placementID).Scan(&status, &before, &undoneAt, &undoneBy, &wait); err != nil || status != "revoked" || before != "approved" || undoneBy != owner.ID || wait != "remove" || undoneAt.IsZero() {
+		t.Fatalf("undo columns %s %s %s %s %v %v", status, before, undoneBy, wait, undoneAt, err)
 	}
 	if err := db.Pool.QueryRow(context.Background(), `SELECT kind FROM owner_events WHERE user_id=$1 AND kind='placement_undo'`, owner.ID).Scan(&eventKind); err != nil {
 		t.Fatal(err)
@@ -679,8 +693,8 @@ VALUES($1,'or_offe',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPI
 		t.Fatalf("project key on another site: %d %s", blocked.Code, blocked.Body.String())
 	}
 	own, _ := postJSON(t, r, http.MethodGet, "/v1/sites/"+siteID+"/mode", nil, map[string]string{"X-API-Key": siteKey})
-	if own.Code != http.StatusOK {
-		t.Fatalf("project key on its site: %d %s", own.Code, own.Body.String())
+	if own.Code != http.StatusForbidden {
+		t.Fatalf("project key on its site mode: %d %s", own.Code, own.Body.String())
 	}
 	blocked, _ = postJSON(t, r, http.MethodGet, "/v1/offers/"+otherOffer+"/mode", nil, map[string]string{"X-Maker-Key": offerKey})
 	if blocked.Code != http.StatusForbidden {
@@ -724,8 +738,11 @@ VALUES($1,'or_offe',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPI
 	if loosened.Code != http.StatusForbidden {
 		t.Fatalf("account key loosened mode: %d %s", loosened.Code, loosened.Body.String())
 	}
-	placementID := insertPlacement(t, db, siteID, offerID, "https://keys.example/post", "A short note.")
-	denied, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": false}, map[string]string{"X-API-Key": accountKey})
+	placementID := insertPlacement(t, db, siteID, offerID, "https://keys.example/post", "Keys Product note.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='See the product.' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
+	denied, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": accountKey})
 	if denied.Code != http.StatusUnprocessableEntity || !strings.Contains(denied.Body.String(), "rel_sponsored") {
 		t.Fatalf("hard check: %d %s", denied.Code, denied.Body.String())
 	}
@@ -773,7 +790,7 @@ VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, 
 	if sourceClicks(t, totals["clicks_by_source"], "direct") != 1 || sourceClicks(t, totals["clicks_by_source"], "news.example") != 1 {
 		t.Fatalf("sources: %s", digestRec.Body.String())
 	}
-	if totals["earnings"] != 3.5 {
+	if moneyAmount(t, totals["earnings"], "USD") != 1.5 {
 		t.Fatalf("earnings: %s", digestRec.Body.String())
 	}
 	if digest["session"].(map[string]any)["signed_in"] != false {
@@ -795,12 +812,12 @@ VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, 
 		switch project["kind"] {
 		case "site":
 			sawSite = true
-			if project["clicks"] != float64(2) || project["went_live"] != float64(0) || project["earnings"] != 1.5 {
+			if project["clicks"] != float64(2) || project["went_live"] != float64(0) || moneyAmount(t, project["earnings"], "USD") != 1.5 {
 				t.Fatalf("site project: %v", project)
 			}
 		case "offer":
 			sawOffer = true
-			if project["clicks"] != float64(1) || project["earnings"] != 2.0 {
+			if project["clicks"] != float64(1) || moneyAmount(t, project["earnings"], "USD") != 2.0 {
 				t.Fatalf("offer project: %v", project)
 			}
 		}
@@ -949,20 +966,21 @@ VALUES($1,'or_sess',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 		t.Fatalf("session min relevance: %v", lowered["min_relevance"])
 	}
 
-	if keyPut(projectKey, map[string]any{"mode": "yolo", "max_placements_per_30_days": 4})["max_placements_per_30_days"] != float64(4) {
-		t.Fatal("project key did not lower the cap")
+	for _, payload := range []map[string]any{
+		{"mode": "yolo", "max_placements_per_30_days": 4},
+		{"mode": "yolo", "min_relevance": 45},
+		{"mode": "auto"},
+	} {
+		rec, _ := postJSON(t, r, http.MethodPut, "/v1/sites/"+siteID+"/mode", payload, map[string]string{"X-API-Key": projectKey})
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("project key policy %v: %d %s", payload, rec.Code, rec.Body.String())
+		}
 	}
 	if keyPut(accountKey, map[string]any{"mode": "yolo", "max_placements_per_30_days": 2})["max_placements_per_30_days"] != float64(2) {
 		t.Fatal("account key did not lower the cap")
 	}
-	if keyPut(projectKey, map[string]any{"mode": "yolo", "min_relevance": 45})["min_relevance"] != float64(45) {
-		t.Fatal("project key did not raise minimum relevance")
-	}
 	if keyPut(accountKey, map[string]any{"mode": "yolo", "min_relevance": 60})["min_relevance"] != float64(60) {
 		t.Fatal("account key did not raise minimum relevance")
-	}
-	if keyPut(projectKey, map[string]any{"mode": "auto"})["mode"] != "auto" {
-		t.Fatal("project key did not tighten to auto")
 	}
 	if keyPut(accountKey, map[string]any{"mode": "manual"})["mode"] != "manual" {
 		t.Fatal("account key did not tighten to manual")
@@ -977,12 +995,11 @@ VALUES($1,'or_sess',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 		t.Fatal(err)
 	}
 	killed, killBody := postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "site", "id": siteID}, map[string]string{"X-API-Key": projectKey})
-	pausedRow := appliedRow(t, killBody)
-	if killed.Code != http.StatusOK || pausedRow["mode"] != "manual" || pausedRow["kill_switch"] != true || pausedRow["paused"].(float64) < 1 {
+	if killed.Code != http.StatusForbidden {
 		t.Fatalf("project key pause: %d %s", killed.Code, killed.Body.String())
 	}
 	killed, killBody = postJSON(t, r, http.MethodPost, "/v1/account/pause", map[string]any{"scope": "site", "id": siteID}, map[string]string{"X-API-Key": accountKey})
-	pausedRow = appliedRow(t, killBody)
+	pausedRow := appliedRow(t, killBody)
 	if killed.Code != http.StatusOK || pausedRow["mode"] != "manual" || pausedRow["kill_switch"] != true {
 		t.Fatalf("account key pause: %d %s", killed.Code, killed.Body.String())
 	}
@@ -1007,6 +1024,22 @@ VALUES($1,'or_sess',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 	if err := db.Pool.QueryRow(context.Background(), `SELECT auto_paused FROM placement_proposals WHERE id=$1`, placementID).Scan(&paused); err != nil || paused {
 		t.Fatalf("placement stayed paused: %v %v", paused, err)
 	}
+}
+
+func moneyAmount(t *testing.T, raw any, currency string) float64 {
+	t.Helper()
+	rows, ok := raw.([]any)
+	if !ok {
+		t.Fatalf("earnings %v", raw)
+	}
+	for _, item := range rows {
+		row := item.(map[string]any)
+		if row["currency"] == currency {
+			return row["amount"].(float64)
+		}
+	}
+	t.Fatalf("missing %s in %v", currency, raw)
+	return 0
 }
 
 func sourceClicks(t *testing.T, raw any, source string) float64 {
@@ -1047,16 +1080,25 @@ func TestUIInterface(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	unsaved, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=cli", nil)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET source='cli' WHERE id=$1`, owner.ID); err != nil {
+		t.Fatal(err)
+	}
+	unsaved, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=chatgpt_dir", nil)
 	session := body["session"].(map[string]any)
-	if unsaved.Code != http.StatusOK || body["mode_preselected"] != "yolo" || body["human_login"] != false || session["signed_in"] != true {
-		t.Fatalf("cli setup: %d %s", unsaved.Code, unsaved.Body.String())
+	if unsaved.Code != http.StatusOK || body["mode_preselected"] != "yolo" || body["mode"] != "yolo" || body["human_login"] != false || session["signed_in"] != true {
+		t.Fatalf("cli source: %d %s", unsaved.Code, unsaved.Body.String())
 	}
-	unsaved, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=chatgpt_dir", nil)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET source='chatgpt' WHERE id=$1`, owner.ID); err != nil {
+		t.Fatal(err)
+	}
+	unsaved, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=cli", nil)
 	if unsaved.Code != http.StatusOK || body["mode_preselected"] != "manual" || body["mode"] != "manual" {
-		t.Fatalf("dir setup: %d %s", unsaved.Code, unsaved.Body.String())
+		t.Fatalf("chatgpt source: %d %s", unsaved.Code, unsaved.Body.String())
 	}
-	keyed, keyBody := postJSON(t, r, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=cli", nil, map[string]string{"X-API-Key": "ui-site-key"})
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET source='cli' WHERE id=$1`, owner.ID); err != nil {
+		t.Fatal(err)
+	}
+	keyed, keyBody := postJSON(t, r, http.MethodGet, "/v1/setup/settings?role=publisher&install_path=chatgpt_dir", nil, map[string]string{"X-API-Key": "ui-site-key"})
 	if keyed.Code != http.StatusOK || keyBody["mode_preselected"] != "yolo" || keyBody["session"].(map[string]any)["signed_in"] != false {
 		t.Fatalf("key setup: %d %s", keyed.Code, keyed.Body.String())
 	}
@@ -1065,7 +1107,7 @@ func TestUIInterface(t *testing.T) {
 	if saved.Code != http.StatusOK {
 		t.Fatalf("category policy: %d %s", saved.Code, saved.Body.String())
 	}
-	placementID := insertPlacement(t, db, siteID, offerID, "https://ui.example/invoice", "Invoice software that sends the bill.")
+	placementID := insertPlacement(t, db, siteID, offerID, "https://ui.example/invoice", "UI Product sends the invoice.")
 	decided, decision := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "ui-site-key"})
 	if decided.Code != http.StatusOK || decision["policy_rule_id"] != "category:invoicing" || decision["policy_rule_text"] != "The category is invoicing." {
 		t.Fatalf("category approval: %d %s", decided.Code, decided.Body.String())
@@ -1155,11 +1197,11 @@ VALUES($1,'stripe','evt-zero','sale',0,'USD',0,NOW(),'test') RETURNING id`, offe
 		t.Fatal(err)
 	}
 	zero, zeroBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
-	if zero.Code != http.StatusOK || zeroBody["totals"].(map[string]any)["earnings"] != float64(0) {
+	if zero.Code != http.StatusOK || moneyAmount(t, zeroBody["totals"].(map[string]any)["earnings"], "USD") != 0 {
 		t.Fatalf("zero earnings: %d %s", zero.Code, zero.Body.String())
 	}
 	for _, raw := range zeroBody["projects"].([]any) {
-		if raw.(map[string]any)["earnings"] != float64(0) {
+		if moneyAmount(t, raw.(map[string]any)["earnings"], "USD") != 0 {
 			t.Fatalf("project zero: %s", zero.Body.String())
 		}
 	}

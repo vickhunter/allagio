@@ -184,13 +184,13 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		}
 	}
 	if reason == "" {
-		c.JSON(http.StatusConflict, gin.H{"error": "offer is not eligible or relevant to this content"})
+		writeNamedConflict(c, "offer_ineligible")
 		return
 	}
 	p, err := h.DB.CreatePlacement(c.Request.Context(), database.Placement{SiteID: site.ID, OfferID: req.OfferID, SurfaceURL: req.SurfaceURL,
 		Context: req.Context, Copy: strings.TrimSpace(req.Copy), Disclosure: "Affiliate disclosure: I may earn a commission if you buy through this link.", Reason: reason, ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour)})
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "offer unavailable"})
+		writeNamedConflict(c, "offer_unavailable")
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"placement": p, "next_action": "Owner reviews exact copy, disclosure, surface and terms; pilot operator records their approval."})
@@ -221,7 +221,7 @@ func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimite
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
 	}
-	status, wait, failedReason, failedAction, waitAt, err := db.ReadPlacementStatus(c.Request.Context(), siteID, id)
+	status, wait, failedReason, failedAction, matchedRule, waitAt, err := db.ReadPlacementStatus(c.Request.Context(), siteID, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
@@ -235,6 +235,7 @@ func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimite
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement status unavailable"})
 		return
 	}
+	ruleID, ruleText := entry.PresentRule(matchedRule)
 	c.JSON(http.StatusOK, gin.H{
 		"id":                   id,
 		"status":               status,
@@ -242,6 +243,8 @@ func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimite
 		"plugin_failed_reason": failedReason,
 		"failed_action":        failedAction,
 		"fallback_url":         fallback,
+		"policy_rule_id":       ruleID,
+		"policy_rule_text":     ruleText,
 	})
 }
 
@@ -353,7 +356,7 @@ func (h *PlacementsHandler) Approve(c *gin.Context) {
 		return
 	}
 	if !updated {
-		c.JSON(http.StatusConflict, gin.H{"error": "placement unavailable, expired or self referral"})
+		writeNamedConflict(c, "placement_unavailable")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "approved", "placement_id": c.Param("id")})
@@ -407,8 +410,9 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 	var receipt struct {
 		TrackedLink string `json:"tracked_link"`
 	}
-	if json.Unmarshal(p.Receipt, &receipt) != nil || receipt.TrackedLink == "" || !strings.Contains(req.PublishedText, p.Copy) || !publishedDisclosureOK(req.PublishedText, p.Disclosure) || !strings.Contains(req.PublishedText, receipt.TrackedLink) {
-		c.JSON(http.StatusConflict, gin.H{"error": "published text must include approved copy, disclosure and exact tracked link"})
+	wantLink := "/v1/go/" + p.ID
+	if json.Unmarshal(p.Receipt, &receipt) != nil || receipt.TrackedLink != wantLink || !strings.Contains(req.PublishedText, p.Copy) || !publishedDisclosureOK(req.PublishedText, p.Disclosure) || !strings.Contains(req.PublishedText, wantLink) {
+		writeNamedConflict(c, "receipt_mismatch")
 		return
 	}
 	hash := sha256.Sum256([]byte(req.PublishedText))
@@ -418,7 +422,7 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		return
 	}
 	if !updated {
-		c.JSON(http.StatusConflict, gin.H{"error": "receipt already recorded or placement unavailable"})
+		writeNamedConflict(c, "receipt_recorded")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "publisher_reported", "content_sha256": hex.EncodeToString(hash[:])})
@@ -473,7 +477,7 @@ func (h *PlacementsHandler) CreateAgentAccess(c *gin.Context) {
 	key = "agent_" + key
 	id, err := h.DB.CreateAgentAccess(c.Request.Context(), c.Param("site_id"), services.HashAPIKey(key))
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "publisher not found"})
+		writeNamedConflict(c, "publisher_missing")
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"id": id, "api_key": key, "expires_in_days": 7, "scope": "opportunities, placements and revenue reads; no owner approvals, payout confirmation or legacy joins"})

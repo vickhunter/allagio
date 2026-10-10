@@ -22,6 +22,9 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err := cfg.ValidateSecrets(); err != nil {
+		log.Fatalf("refusing to start: %v", err)
+	}
 	if err := cfg.ValidateRuntime(); err != nil {
 		log.Fatalf("refusing to start: %v", err)
 	}
@@ -210,6 +213,7 @@ func main() {
 	workerCtx, cancelWorker := context.WithCancel(ctx)
 	defer cancelWorker()
 	go webhooks.RunWorker(workerCtx)
+	go handlers.PurgeClickSignals(workerCtx, db)
 	mcp := &handlers.MCPHandler{
 		LoopbackURL: "http://127.0.0.1:" + cfg.Port,
 		RateLimiter: handlers.NewIPRateLimiter(240, time.Minute),

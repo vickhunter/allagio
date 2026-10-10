@@ -183,7 +183,7 @@ policy_version=COALESCE((SELECT version FROM approval_policies WHERE site_id=pp.
 }
 
 func (d *DB) RevokePlacement(ctx context.Context, siteID, id string) (bool, error) {
-	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='revoked', revoked_by_side='publisher' WHERE id=$1 AND site_id=$2 AND status<>'revoked'`, id, siteID)
+	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='revoked', revoked_by_side='publisher', plugin_wait='remove', plugin_wait_at=NOW() WHERE id=$1 AND site_id=$2 AND status<>'revoked'`, id, siteID)
 	if err != nil {
 		return false, err
 	}
@@ -208,8 +208,8 @@ status_before_undo=CASE WHEN $3='undo' THEN status ELSE status_before_undo END,
 undone_at=CASE WHEN $3='undo' THEN $4 ELSE undone_at END,
 undone_by_user=CASE WHEN $3='undo' THEN NULLIF($5,'')::uuid ELSE undone_by_user END,
 undone_by_key_hash=CASE WHEN $3='undo' THEN NULLIF($6,'') ELSE undone_by_key_hash END,
-plugin_wait=CASE WHEN $3='undo' THEN 'remove' ELSE plugin_wait END,
-plugin_wait_at=CASE WHEN $3='undo' THEN $4 ELSE plugin_wait_at END,
+plugin_wait='remove',
+plugin_wait_at=$4,
 plugin_failed_reason=CASE WHEN $3='undo' THEN '' ELSE plugin_failed_reason END,
 failed_action=CASE WHEN $3='undo' THEN '' ELSE failed_action END,
 restore_unconfirmed=CASE WHEN $3='undo' THEN false ELSE restore_unconfirmed END,
@@ -253,29 +253,76 @@ FROM placement_proposals WHERE id=$1`, id).Scan(&row.Status, &row.StatusBefore, 
 }
 
 // RestoreUndonePlacement puts the placement back only when the same identity
-// is still inside the undo window. approved_by_kind is left as it was.
-func (d *DB) RestoreUndonePlacement(ctx context.Context, id, userID, keyHash, actor string, now time.Time) (status, approvedBy string, ok bool, err error) {
+// is still inside the undo window. Pause and the placement cap are checked
+// in this transaction, after the row is locked. approved_by_kind is left as
+// it was. block is paused, cap, or window_expired when the update does not run.
+func (d *DB) RestoreUndonePlacement(ctx context.Context, id, userID, keyHash, actor string, now time.Time, cap int) (status, approvedBy, block string, ok bool, err error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
-		return "", "", false, err
+		return "", "", "", false, err
 	}
 	defer tx.Rollback(ctx)
-	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL,
-plugin_wait='restore', plugin_wait_at=$4, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
+	var siteID, offerID string
+	var undoneAt time.Time
+	err = tx.QueryRow(ctx, `SELECT site_id::text, offer_id::text, undone_at
+FROM placement_proposals
 WHERE id=$1 AND status='revoked' AND status_before_undo<>'' AND undone_at IS NOT NULL
 AND undone_by_user=$2::uuid AND COALESCE(undone_by_key_hash,'')=$3
 AND undone_at >= $4::timestamptz - INTERVAL '6 seconds'
-RETURNING status, COALESCE(approved_by_kind,''), COALESCE(restored_by,'')`, id, userID, keyHash, now).Scan(&status, &approvedBy, &userID)
+FOR UPDATE`, id, userID, keyHash, now).Scan(&siteID, &offerID, &undoneAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", "", false, nil
+		return "", "", "window_expired", false, nil
 	}
 	if err != nil {
-		return "", "", false, err
+		return "", "", "", false, err
+	}
+	var paused bool
+	err = tx.QueryRow(ctx, `SELECT
+EXISTS (
+    SELECT 1 FROM pause_activations pa
+    WHERE pa.created_at >= $3
+      AND (
+        pa.site_id = $1::uuid
+        OR pa.offer_id = $2::uuid
+        OR pa.owner_id IN (
+            SELECT id FROM owners WHERE site_id = $1::uuid
+            UNION
+            SELECT o.id FROM owners o
+            JOIN products p ON p.maker_id = o.maker_id
+            JOIN offers f ON f.product_id = p.id
+            WHERE f.id = $2::uuid
+        )
+      )
+)
+OR EXISTS (SELECT 1 FROM approval_policies WHERE site_id=$1::uuid AND kill_switch)
+OR EXISTS (SELECT 1 FROM approval_policies WHERE offer_id=$2::uuid AND kill_switch)`, siteID, offerID, undoneAt).Scan(&paused)
+	if err != nil {
+		return "", "", "", false, err
+	}
+	if paused {
+		return "", "", "paused", false, nil
+	}
+	var used int
+	err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals
+WHERE site_id=$1 AND created_at>$2 AND approved_by_kind IN ('policy:auto','policy:yolo')
+AND (status<>'revoked' OR id=$3)`, siteID, now.Add(-30*24*time.Hour), id).Scan(&used)
+	if err != nil {
+		return "", "", "", false, err
+	}
+	if used >= cap {
+		return "", "", "cap", false, nil
+	}
+	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL,
+plugin_wait='restore', plugin_wait_at=$4, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
+WHERE id=$1
+RETURNING status, COALESCE(approved_by_kind,'')`, id, userID, keyHash, now).Scan(&status, &approvedBy)
+	if err != nil {
+		return "", "", "", false, err
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO owner_events(kind,user_id,placement_id,created_at,actor) VALUES('placement_restore',$1,$2,$3,$4)`, userID, id, now, actor); err != nil {
-		return "", "", false, err
+		return "", "", "", false, err
 	}
-	return status, approvedBy, true, tx.Commit(ctx)
+	return status, approvedBy, "", true, tx.Commit(ctx)
 }
 
 func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Placement, error) {
@@ -316,7 +363,7 @@ func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Pla
 		return nil, ErrPlacementAuthority
 	}
 	receipt, err := json.Marshal(map[string]interface{}{"placement_id": p.ID, "campaign_id": campaignID,
-		"tracked_link": "/v1/go/" + trackingCode + "?placement=" + p.ID, "publication_status": "awaiting_evidence",
+		"tracked_link": "/v1/go/" + p.ID, "publication_status": "awaiting_evidence",
 		"approved_text": p.Copy + "\n\n" + p.Disclosure, "terms": p.Terms})
 	if err != nil {
 		return nil, err
@@ -402,11 +449,11 @@ AND plugin_wait IN ('', 'restore', 'remove')`, id, siteID, at, wait, action)
 
 // PlacementStatusSQL is the placement poll. It reads one row by primary key
 // and does not join another table.
-const PlacementStatusSQL = `SELECT status, plugin_wait, plugin_wait_at, plugin_failed_reason, failed_action FROM placement_proposals WHERE id=$1 AND site_id=$2`
+const PlacementStatusSQL = `SELECT status, plugin_wait, COALESCE(plugin_wait_at, created_at), plugin_failed_reason, failed_action, COALESCE(matched_rule,'') FROM placement_proposals WHERE id=$1 AND site_id=$2`
 
-func (d *DB) ReadPlacementStatus(ctx context.Context, siteID, id string) (status, wait, failedReason, failedAction string, waitAt *time.Time, err error) {
-	err = d.Pool.QueryRow(ctx, PlacementStatusSQL, id, siteID).Scan(&status, &wait, &waitAt, &failedReason, &failedAction)
-	return status, wait, failedReason, failedAction, waitAt, err
+func (d *DB) ReadPlacementStatus(ctx context.Context, siteID, id string) (status, wait, failedReason, failedAction, matchedRule string, waitAt *time.Time, err error) {
+	err = d.Pool.QueryRow(ctx, PlacementStatusSQL, id, siteID).Scan(&status, &wait, &waitAt, &failedReason, &failedAction, &matchedRule)
+	return status, wait, failedReason, failedAction, matchedRule, waitAt, err
 }
 
 // PlacementFallbackURL is the offer's plain landing URL for one placement.
@@ -444,7 +491,7 @@ WHERE pp.site_id=$1`, siteID)
 }
 
 func (d *DB) PlacementPlugin(ctx context.Context, id string) (wait string, waitAt, contact *time.Time, failedReason, failedAction string, err error) {
-	err = d.Pool.QueryRow(ctx, `SELECT plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action FROM placement_proposals WHERE id=$1`, id).Scan(&wait, &waitAt, &contact, &failedReason, &failedAction)
+	err = d.Pool.QueryRow(ctx, `SELECT plugin_wait, COALESCE(plugin_wait_at, created_at), plugin_contact_at, plugin_failed_reason, failed_action FROM placement_proposals WHERE id=$1`, id).Scan(&wait, &waitAt, &contact, &failedReason, &failedAction)
 	return wait, waitAt, contact, failedReason, failedAction, err
 }
 

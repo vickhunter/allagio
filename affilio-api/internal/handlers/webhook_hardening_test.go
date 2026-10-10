@@ -121,12 +121,8 @@ func TestStripeWebhookKeepsOurSalesAndRefunds(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusFound || !strings.Contains(rec.Header().Get("Location"), "via=") {
-		t.Fatalf("expected attributed redirect, got %d %q", rec.Code, rec.Header().Get("Location"))
-	}
-	requireGoLinkHeaders(t, rec)
-	clickID := rec.Header().Get("Location")
-	clickID = clickID[strings.Index(clickID, "via=")+4:]
+	requirePlainRedirect(t, rec, "https://inboxpilot.example.com")
+	clickID := insertCampaignClick(t, db, code)
 
 	wrec, wbody := sendStripeEvent(t, db, r, stripeSalePayload("evt_ours_sale", "pi_ours", clickID, 10000))
 	if wrec.Code != http.StatusOK || wbody["status"] != "recorded" {

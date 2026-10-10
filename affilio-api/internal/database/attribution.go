@@ -207,6 +207,30 @@ func (d *DB) InsertCampaignClick(ctx context.Context, campaignID, siteID string,
 	return d.InsertPlacementClick(ctx, campaignID, siteID, programID, ipHash, userAgent, referrer, "")
 }
 
+// LivePlacementForCampaign returns one placement on this campaign that
+// placement_counts_as_live currently includes.
+func (d *DB) LivePlacementForCampaign(ctx context.Context, campaignID string) (string, error) {
+	var id string
+	err := d.Pool.QueryRow(ctx, `SELECT pp.id::text
+FROM placement_proposals pp
+WHERE pp.campaign_id=$1
+  AND EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)
+LIMIT 1`, campaignID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
+}
+
+// PurgeClickSignals clears reader signals older than the cutoff.
+func (d *DB) PurgeClickSignals(ctx context.Context, cutoff time.Time) error {
+	_, err := d.Pool.Exec(ctx, `UPDATE clicks
+SET ip_hash=NULL, user_agent=NULL, referrer=NULL
+WHERE clicked_at < $1
+  AND (ip_hash IS NOT NULL OR user_agent IS NOT NULL OR referrer IS NOT NULL)`, cutoff)
+	return err
+}
+
 func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string, programID *string, ipHash, userAgent, referrer, placementID string) (string, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {

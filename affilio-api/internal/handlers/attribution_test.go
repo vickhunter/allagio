@@ -192,15 +192,13 @@ func TestAttributionEndToEnd(t *testing.T) {
 	}
 	requireGoLinkHeaders(t, rrec)
 	location := rrec.Header().Get("Location")
-	if !strings.Contains(location, "inboxpilot.example.com") || !strings.Contains(location, "via=") {
-		t.Fatalf("unexpected redirect location %q", location)
+	if !strings.Contains(location, "inboxpilot.example.com") || strings.Contains(location, "via=") {
+		t.Fatalf("marketplace link must stay a plain offer URL, got %q", location)
 	}
-	clickID := location[strings.Index(location, "via=")+4:]
-
-	var clickCount int
-	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks WHERE id=$1`, clickID).Scan(&clickCount); err != nil || clickCount != 1 {
-		t.Fatalf("expected click row for %s, err=%v count=%d", clickID, err, clickCount)
+	if n := clickCount(t, db); n != 0 {
+		t.Fatalf("marketplace link recorded %d clicks", n)
 	}
+	clickID := insertCampaignClick(t, db, code)
 
 	// A signed sale webhook books the conversion and a pending ledger entry.
 	wrec, wbody := sendStripeEvent(t, db, r, stripeSalePayload("evt_sale_1", "pi_100", clickID, 10000))
@@ -315,14 +313,10 @@ func TestRedirectStopsAttributingWhenPaused(t *testing.T) {
 
 	assertReaderRedirect(t, r, db, "/v1/go/"+code, "https://blog2.example.com/")
 
-	// Unknown code 404s.
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/doesnotexist", nil)
 	rrec := httptest.NewRecorder()
 	r.ServeHTTP(rrec, req)
-	if rrec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for unknown code, got %d", rrec.Code)
-	}
-	requireGoLinkHeaders(t, rrec)
+	requirePlainRedirect(t, rrec, "https://offerrails.com/")
 }
 
 func TestRedirectRefusesPausedUnlistedAndDeleted(t *testing.T) {
@@ -364,8 +358,26 @@ func TestRedirectRefusesPausedUnlistedAndDeleted(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Run("deleted", func(t *testing.T) {
-		assertUnavailable(t, r, db, "/v1/go/"+code, http.StatusNotFound, "")
+		deleted := httptest.NewRecorder()
+		r.ServeHTTP(deleted, httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil))
+		requirePlainRedirect(t, deleted, "https://offerrails.com/")
+		if n := clickCount(t, db); n != 0 {
+			t.Fatalf("deleted code recorded %d clicks", n)
+		}
 	})
+}
+
+func insertCampaignClick(t *testing.T, db *database.DB, code string) string {
+	t.Helper()
+	var campaignID, siteID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT id::text, site_id::text FROM campaigns WHERE tracking_code=$1`, code).Scan(&campaignID, &siteID); err != nil {
+		t.Fatal(err)
+	}
+	id, err := db.InsertPlacementClick(context.Background(), campaignID, siteID, nil, "test-hash", "Mozilla/5.0", "https://example.com/post", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
 }
 
 func assertReaderRedirect(t *testing.T, r *gin.Engine, db *database.DB, path, want string) {
