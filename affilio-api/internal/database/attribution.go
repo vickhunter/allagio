@@ -89,6 +89,100 @@ type CampaignLink struct {
 	RequiresPlacement bool
 }
 
+// PlacementRedirectSQL is the placement go-link lookup. CountsAsLive is the
+// shared placement_counts_as_live predicate. A hit is recorded only when it
+// is true.
+const PlacementRedirectSQL = `SELECT pp.site_id::text, s.domain, pp.post_url,
+       (o.status = 'listed'), o.landing_url, COALESCE(NULLIF(o.ref_param,''),'via'),
+       pp.campaign_id::text, o.program_id,
+       EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)
+FROM placement_proposals pp
+JOIN sites s ON s.id = pp.site_id
+JOIN offers o ON o.id = pp.offer_id
+WHERE pp.id = $1`
+
+// PlacementRedirect is everything GET /v1/go/<placement_id> needs to choose
+// a 302 target. Found is false when the id is unknown.
+type PlacementRedirect struct {
+	Found        bool
+	SiteID       string
+	SiteDomain   string
+	PostURL      string
+	OfferListed  bool
+	LandingURL   string
+	RefParam     string
+	CampaignID   string
+	ProgramID    *string
+	CountsAsLive bool
+}
+
+func (d *DB) LookupPlacementRedirect(ctx context.Context, placementID string) (PlacementRedirect, error) {
+	var out PlacementRedirect
+	var campaignID *string
+	err := d.Pool.QueryRow(ctx, PlacementRedirectSQL, placementID).Scan(
+		&out.SiteID, &out.SiteDomain, &out.PostURL, &out.OfferListed, &out.LandingURL, &out.RefParam,
+		&campaignID, &out.ProgramID, &out.CountsAsLive)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PlacementRedirect{}, nil
+	}
+	if err != nil {
+		return PlacementRedirect{}, err
+	}
+	out.Found = true
+	if campaignID != nil {
+		out.CampaignID = *campaignID
+	}
+	return out, nil
+}
+
+// RecentPlacementClick returns a hit from the same reader on this placement
+// inside the dedup window. An empty id means there is no recent hit.
+func (d *DB) RecentPlacementClick(ctx context.Context, placementID, ipHash string, withinSeconds int) (string, error) {
+	var id string
+	err := d.Pool.QueryRow(ctx, `SELECT id::text FROM clicks
+WHERE placement_id=$1 AND ip_hash=$2 AND clicked_at >= NOW() - ($3 * INTERVAL '1 second')
+ORDER BY clicked_at DESC LIMIT 1`, placementID, ipHash, withinSeconds).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
+}
+
+// SiteForGoKey resolves a publisher key to the site it may speak for.
+// ok is false when the key is missing or does not identify a site.
+func (d *DB) SiteForGoKey(ctx context.Context, keyHash, keyPrefix string) (siteID, domain string, ok bool, err error) {
+	site, err := d.GetSiteByAnyKeyHash(ctx, keyHash, keyPrefix)
+	if err == nil {
+		return site.ID, site.Domain, true, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, err
+	}
+	siteID, err = d.ProjectSiteKey(ctx, keyHash)
+	if err == nil {
+		site, err = d.GetSiteByID(ctx, siteID)
+		if err != nil {
+			return "", "", false, err
+		}
+		return site.ID, site.Domain, true, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, err
+	}
+	account, err := d.ActiveAccountKey(ctx, keyHash)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && account.SiteID == "") {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, err
+	}
+	site, err = d.GetSiteByID(ctx, account.SiteID)
+	if err != nil {
+		return "", "", false, err
+	}
+	return site.ID, site.Domain, true, nil
+}
+
 func (d *DB) GetCampaignByTrackingCode(ctx context.Context, code string) (*CampaignLink, error) {
 	row := d.Pool.QueryRow(ctx, `
 SELECT c.id, c.site_id, c.offer_id, c.status, o.status, o.landing_url, o.ref_param, o.program_id,c.requires_placement

@@ -230,12 +230,18 @@ func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimite
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement status unavailable"})
 		return
 	}
+	fallback, err := db.PlacementFallbackURL(c.Request.Context(), siteID, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement status unavailable"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"id":                   id,
 		"status":               status,
 		"plugin_state":         entry.PluginState(wait, waitAt, failedReason != "", now, window),
 		"plugin_failed_reason": failedReason,
 		"failed_action":        failedAction,
+		"fallback_url":         fallback,
 	})
 }
 
@@ -270,7 +276,25 @@ func (h *PlacementsHandler) List(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "task inbox unavailable"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"placements": p})
+	fallbacks, err := h.DB.PlacementFallbackURLs(c.Request.Context(), siteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "task inbox unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"placements": withFallbackURLs(p, fallbacks)})
+}
+
+type placementPayload struct {
+	database.Placement
+	FallbackURL string `json:"fallback_url"`
+}
+
+func withFallbackURLs(items []database.Placement, fallbacks map[string]string) []placementPayload {
+	out := make([]placementPayload, 0, len(items))
+	for _, item := range items {
+		out = append(out, placementPayload{Placement: item, FallbackURL: fallbacks[item.ID]})
+	}
+	return out
 }
 
 func (h *PlacementsHandler) Commit(c *gin.Context) {
@@ -299,7 +323,12 @@ func (h *PlacementsHandler) Commit(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "commit failed"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"placement": p, "next_action": "Use the publisher's existing publishing tool for approved copy, tracked link and disclosure, then record the receipt."})
+	fallback, err := h.DB.PlacementFallbackURL(c.Request.Context(), siteIDFrom(c), p.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "commit failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"placement": placementPayload{Placement: *p, FallbackURL: fallback}, "next_action": "Use the publisher's existing publishing tool for approved copy, tracked link and disclosure, then record the receipt."})
 }
 
 func (h *PlacementsHandler) Approve(c *gin.Context) {

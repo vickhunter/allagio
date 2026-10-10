@@ -150,6 +150,7 @@ func main() {
 	redirects := &handlers.RedirectsHandler{
 		DB:          db,
 		RateLimiter: handlers.NewIPRateLimiter(120, time.Minute),
+		HomeURL:     "https://offerrails.com/",
 	}
 	var connectionCipher *services.ConnectionCipher
 	if cfg.ConnectionEncryptionKey != "" {
@@ -166,6 +167,7 @@ func main() {
 			log.Fatal(err)
 		}
 		cfg.PublicBaseURL = strings.TrimRight(cfg.PublicBaseURL, "/")
+		redirects.HomeURL = cfg.PublicBaseURL + "/"
 		assessments.Engine.PublicBaseURL = cfg.PublicBaseURL
 		login, loginErr := services.NewOIDCLogin(ctx, cfg.OIDCIssuer, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.PublicBaseURL+"/auth/callback")
 		if loginErr != nil {

@@ -132,8 +132,8 @@ func (d *DB) PlacementRestoreUnconfirmed(ctx context.Context, placementID, campa
 }
 
 func (d *DB) CreatePlacement(ctx context.Context, p Placement) (*Placement, error) {
-	return scanPlacement(d.Pool.QueryRow(ctx, `INSERT INTO placement_proposals(site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,expires_at)
- SELECT $1,o.id,$3,$4,$5,$6,$7,`+placementTermsSQL+`,$8 `+placementEligibleSQL+` AND o.id=$2
+	return scanPlacement(d.Pool.QueryRow(ctx, `INSERT INTO placement_proposals(site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,expires_at,post_url)
+ SELECT $1,o.id,$3,$4,$5,$6,$7,`+placementTermsSQL+`,$8,$3 `+placementEligibleSQL+` AND o.id=$2
  RETURNING `+placementColumns, p.SiteID, p.OfferID, p.SurfaceURL, p.Context, p.Copy, p.Disclosure, p.Reason, p.ExpiresAt))
 }
 
@@ -396,6 +396,40 @@ const PlacementStatusSQL = `SELECT status, plugin_wait, plugin_wait_at, plugin_f
 func (d *DB) ReadPlacementStatus(ctx context.Context, siteID, id string) (status, wait, failedReason, failedAction string, waitAt *time.Time, err error) {
 	err = d.Pool.QueryRow(ctx, PlacementStatusSQL, id, siteID).Scan(&status, &wait, &waitAt, &failedReason, &failedAction)
 	return status, wait, failedReason, failedAction, waitAt, err
+}
+
+// PlacementFallbackURL is the offer's plain landing URL for one placement.
+func (d *DB) PlacementFallbackURL(ctx context.Context, siteID, id string) (string, error) {
+	var landing string
+	err := d.Pool.QueryRow(ctx, `SELECT o.landing_url
+FROM placement_proposals pp
+JOIN offers o ON o.id = pp.offer_id
+WHERE pp.id=$1 AND pp.site_id=$2`, id, siteID).Scan(&landing)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return landing, err
+}
+
+// PlacementFallbackURLs maps each placement on a site to the offer's plain URL.
+func (d *DB) PlacementFallbackURLs(ctx context.Context, siteID string) (map[string]string, error) {
+	rows, err := d.Pool.Query(ctx, `SELECT pp.id::text, o.landing_url
+FROM placement_proposals pp
+JOIN offers o ON o.id = pp.offer_id
+WHERE pp.site_id=$1`, siteID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var id, landing string
+		if err = rows.Scan(&id, &landing); err != nil {
+			return nil, err
+		}
+		out[id] = landing
+	}
+	return out, rows.Err()
 }
 
 func (d *DB) PlacementPlugin(ctx context.Context, id string) (wait string, waitAt, contact *time.Time, failedReason, failedAction string, err error) {
