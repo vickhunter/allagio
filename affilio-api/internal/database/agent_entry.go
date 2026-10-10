@@ -774,9 +774,14 @@ func (d *DB) LastDigestOpen(ctx context.Context, userID string) (*time.Time, err
 	return at, err
 }
 
+// PlacementCountsAsLiveSQL is the only placement live-count predicate.
+// Live now, site totals, digest went-live, and account totals all read
+// placement_counts_as_live. Listed offers are not placements.
+const PlacementCountsAsLiveSQL = `EXISTS (SELECT 1 FROM placement_counts_as_live WHERE placement_counts_as_live.id = placement_proposals.id)`
+
 func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Time) ([]DigestItem, error) {
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
-plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, status IN ('approved','committed') AND NOT restore_unconfirmed
+plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`
 FROM placement_proposals
 WHERE site_id=$1 AND (
     (status IN ('approved','committed') AND COALESCE(approved_at, created_at) > $2)
@@ -820,7 +825,7 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt); err != nil {
 			return nil, err
 		}
-		item.CountsAsLive = true
+		item.CountsAsLive = true // a listed offer, not a placement
 		out = append(out, item)
 	}
 	return out, rows.Err()

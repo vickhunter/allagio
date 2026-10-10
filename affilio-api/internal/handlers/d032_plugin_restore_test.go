@@ -880,8 +880,15 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 		t.Fatalf("live redirect: %d %s", live.Code, live.Body.String())
 	}
 	clicks = placementClickCount(t, db, id)
+	if went, earned := numbers(); went != 1 || earned != 7 {
+		t.Fatalf("pending before ack: went %v earned %v", went, earned)
+	}
+	placedFirst, placedFirstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	if placedFirst.Code != http.StatusOK || placedFirstBody["plugin_state"] != "placed" {
+		t.Fatalf("first ack: %d %s", placedFirst.Code, placedFirst.Body.String())
+	}
 	if went, earned := numbers(); went != 2 || earned != 7 {
-		t.Fatalf("live counts: went %v earned %v", went, earned)
+		t.Fatalf("placed counts: went %v earned %v", went, earned)
 	}
 
 	undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/revoke", map[string]any{"reason": "undo"}, siteKey)
@@ -898,8 +905,8 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 		t.Fatalf("restore redirect: %d %s", again.Code, again.Body.String())
 	}
 	clicks = placementClickCount(t, db, id)
-	if went, earned := numbers(); went != 2 || earned != 7 {
-		t.Fatalf("restored counts: went %v earned %v", went, earned)
+	if went, earned := numbers(); went != 1 || earned != 7 {
+		t.Fatalf("restore before ack: went %v earned %v", went, earned)
 	}
 
 	failed, failedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "failed", "reason": "re-insert re-read failed"}, siteKey)
@@ -1028,6 +1035,10 @@ VALUES($1,'stripe','leave-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id
 	}
 	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency) VALUES($1,$2,'commission',2.00,'USD')`, siteID, other); err != nil {
 		t.Fatal(err)
+	}
+	placedFirst, placedFirstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	if placedFirst.Code != http.StatusOK || placedFirstBody["plugin_state"] != "placed" {
+		t.Fatalf("first ack: %d %s", placedFirst.Code, placedFirst.Body.String())
 	}
 	if went, site := liveNumbers(); went != 2 || site != 1 {
 		t.Fatalf("live counts: totals %v site %v", went, site)
@@ -1269,6 +1280,181 @@ func digestHas(body map[string]any, id string) bool {
 	return false
 }
 
+func TestPlacementLiveCountExclusions(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	r.GET("/v1/go/:code", (&RedirectsHandler{DB: db}).Go)
+	current := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+	api.Now = func() time.Time { return current }
+
+	root := apiModuleRoot(t)
+	viewSQL, err := os.ReadFile(filepath.Join(root, "internal/migrations/028_d032_placement_live.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{
+		"plugin_wait = 'placed'",
+		"pp.status = 'committed'",
+		"NOT pp.restore_unconfirmed",
+		"o.status = 'listed'",
+		"c.status = 'active'",
+		"pol.kill_switch",
+	} {
+		if !strings.Contains(string(viewSQL), part) {
+			t.Fatalf("live view missing %s", part)
+		}
+	}
+	entrySQL, err := os.ReadFile(filepath.Join(root, "internal/database/agent_entry.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(entrySQL), "placement_counts_as_live") || strings.Contains(string(entrySQL), "status IN ('approved','committed') AND NOT restore_unconfirmed") {
+		t.Fatal("digest live count does not use placement_counts_as_live")
+	}
+
+	owner, cookie := testOwnerSession(t, h, "live-owner", "live-owner@example.com")
+	siteID := createTestSite(t, db, "live-site-key", "live.example", "Live")
+	makerID, offerID := seedListedOffer(t, db, "live-maker-key", "live-maker@example.com", "Live Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	siteKey := map[string]string{"X-API-Key": "live-site-key"}
+	id := insertPlacement(t, db, siteID, offerID, "https://live.example/post", "Honest note about the product.")
+	var campaignID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code,requires_placement,status) VALUES($1,$2,'live-go',true,'active') RETURNING id`, offerID, siteID).Scan(&campaignID); err != nil {
+		t.Fatal(err)
+	}
+	goPath := "/v1/go/live-go?placement=" + id
+
+	makeLive := func() {
+		t.Helper()
+		if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='listed' WHERE id=$1`, offerID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Pool.Exec(context.Background(), `UPDATE campaigns SET status='active' WHERE id=$1`, campaignID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Pool.Exec(context.Background(), `UPDATE approval_policies SET kill_switch=false WHERE site_id=$1 OR offer_id=$2`, siteID, offerID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals
+SET status='committed', plugin_wait='placed', plugin_wait_at=$2, plugin_failed_reason='', failed_action='', restore_unconfirmed=false,
+campaign_id=$3, expires_at=$4
+WHERE id=$1`, id, current, campaignID, current.Add(48*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func() (totals, site float64, state string, viewed bool) {
+		t.Helper()
+		rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("account digest: %d %s", rec.Code, rec.Body.String())
+		}
+		totals = body["totals"].(map[string]any)["went_live"].(float64)
+		for _, raw := range body["projects"].([]any) {
+			project := raw.(map[string]any)
+			if project["id"] == siteID {
+				site = project["went_live"].(float64)
+			}
+		}
+		state = pluginStateOf(t, body, id)
+		digest, digestBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
+		if digest.Code != http.StatusOK || pluginStateOf(t, digestBody, id) != state {
+			t.Fatalf("digest state: %d %s account %s", digest.Code, digest.Body.String(), state)
+		}
+		if err := db.Pool.QueryRow(context.Background(), `SELECT EXISTS(SELECT 1 FROM placement_counts_as_live WHERE id=$1)`, id).Scan(&viewed); err != nil {
+			t.Fatal(err)
+		}
+		return totals, site, state, viewed
+	}
+	expect := func(label string, totals, site float64, state string, viewed bool) {
+		t.Helper()
+		gotTotals, gotSite, gotState, gotView := read()
+		if gotTotals != totals || gotSite != site || gotState != state || gotView != viewed {
+			t.Fatalf("%s: totals %v site %v state %s view %v", label, gotTotals, gotSite, gotState, gotView)
+		}
+	}
+
+	makeLive()
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='', plugin_failed_reason='', failed_action='', restore_unconfirmed=false WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	expect("pending", 1, 0, "pending", false)
+
+	makeLive()
+	hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	if hit.Code != http.StatusFound {
+		t.Fatalf("placed go link: %d %s", hit.Code, hit.Body.String())
+	}
+	expect("placed", 2, 1, "placed", true)
+
+	makeLive()
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals
+SET plugin_wait='restore', plugin_failed_reason='re-read failed', failed_action='restored', restore_unconfirmed=true
+WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	expect("failed", 1, 0, "failed", false)
+
+	makeLive()
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals
+SET plugin_wait='remove', plugin_wait_at=$2, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
+WHERE id=$1`, id, current.Add(-11*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	expect("offline", 1, 0, "offline", false)
+
+	makeLive()
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals
+SET plugin_wait='removed', plugin_failed_reason='', failed_action='', restore_unconfirmed=false
+WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	expect("removed", 1, 0, "removed", false)
+
+	pauseThen := func(scope string, payload map[string]any) {
+		t.Helper()
+		makeLive()
+		expect("before pause "+scope, 2, 1, "placed", true)
+		paused, _ := postJSON(t, r, http.MethodPost, "/v1/account/pause", payload, siteKey)
+		if paused.Code != http.StatusOK {
+			t.Fatalf("pause %s: %d %s", scope, paused.Code, paused.Body.String())
+		}
+		expect("paused "+scope, 1, 0, "placed", false)
+		resumed, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/account/resume", payload)
+		if resumed.Code != http.StatusOK {
+			t.Fatalf("resume %s: %d %s", scope, resumed.Code, resumed.Body.String())
+		}
+		expect("resumed "+scope, 2, 1, "placed", true)
+	}
+	pauseThen("all", map[string]any{"scope": "all"})
+	pauseThen("site", map[string]any{"scope": "site", "id": siteID})
+	pauseThen("offer", map[string]any{"scope": "offer", "id": offerID})
+
+	makeLive()
+	killed, _ := postJSON(t, r, http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", map[string]any{}, siteKey)
+	if killed.Code != http.StatusOK {
+		t.Fatalf("kill switch: %d %s", killed.Code, killed.Body.String())
+	}
+	expect("kill switch", 1, 0, "placed", false)
+	resumed, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/account/resume", map[string]any{"scope": "site", "id": siteID})
+	if resumed.Code != http.StatusOK {
+		t.Fatalf("resume kill switch: %d %s", resumed.Code, resumed.Body.String())
+	}
+	expect("kill switch off", 2, 1, "placed", true)
+
+	makeLive()
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='revoked', plugin_wait='placed' WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	expect("revoked but placed", 1, 0, "placed", false)
+	stopped := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	if stopped.Code != http.StatusGone || stopped.Header().Get("Location") != "" || bodyReason(t, stopped) != "revoked" {
+		t.Fatalf("revoked placed go link: %d %s %s", stopped.Code, stopped.Header().Get("Location"), stopped.Body.String())
+	}
+}
+
 func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 	llms := llmsBody()
 	modes, ok := agentDoc("modes.md")
@@ -1303,7 +1489,7 @@ func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 		if !strings.Contains(doc, "A 409 returns `reason` and `message`") || !strings.Contains(doc, "A 422 returns `check_id` and `check_text`") {
 			t.Fatal("docs drifted on the 409 and 422 body shapes")
 		}
-		if !strings.Contains(doc, "Digest totals, site totals, and Live now exclude") || !strings.Contains(doc, "Leave a failed restore removed") {
+		if !strings.Contains(doc, "Digest totals, site totals, and Live now exclude") || !strings.Contains(doc, "Leave a failed restore removed") || !strings.Contains(doc, "counts as live only when `plugin_state` is `placed`") {
 			t.Fatal("docs drifted on leave-it-removed")
 		}
 	}

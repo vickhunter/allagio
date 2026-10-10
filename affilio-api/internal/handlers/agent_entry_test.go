@@ -767,7 +767,7 @@ VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, 
 		t.Fatalf("account digest: %d %s", digestRec.Code, digestRec.Body.String())
 	}
 	totals := digest["totals"].(map[string]any)
-	if totals["went_live"] != float64(2) || totals["clicks"] != float64(2) {
+	if totals["went_live"] != float64(1) || totals["clicks"] != float64(2) {
 		t.Fatalf("totals: %s", digestRec.Body.String())
 	}
 	if sourceClicks(t, totals["clicks_by_source"], "direct") != 1 || sourceClicks(t, totals["clicks_by_source"], "news.example") != 1 {
@@ -795,7 +795,7 @@ VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, 
 		switch project["kind"] {
 		case "site":
 			sawSite = true
-			if project["clicks"] != float64(2) || project["went_live"] != float64(1) || project["earnings"] != 1.5 {
+			if project["clicks"] != float64(2) || project["went_live"] != float64(0) || project["earnings"] != 1.5 {
 				t.Fatalf("site project: %v", project)
 			}
 		case "offer":
