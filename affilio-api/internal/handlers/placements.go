@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/entry"
 	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -27,6 +28,16 @@ type PlacementsHandler struct {
 	DB                        *database.DB
 	RequireVerifiedConnection bool
 	Now                       func() time.Time
+	PluginOfflineAfter        time.Duration
+	StatusLimiter             *IPRateLimiter
+}
+
+// PlacementPollInterval is the shortest period the placement status read may
+// enforce. A client polling every 4 seconds must still be allowed through.
+const PlacementPollInterval = 4 * time.Second
+
+func NewPlacementPollLimiter() *IPRateLimiter {
+	return NewIPRateLimiter(1, PlacementPollInterval)
 }
 
 type opportunity struct {
@@ -190,12 +201,51 @@ func (h *PlacementsHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
 		return
 	}
-	p, err := h.DB.GetPlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"))
-	if err != nil {
+	writePlacementStatus(c, h.DB, h.StatusLimiter, h.now(), h.pluginWindow(), siteIDFrom(c), "")
+}
+
+func (h *PlacementsHandler) pluginWindow() time.Duration {
+	if h.PluginOfflineAfter > 0 {
+		return h.PluginOfflineAfter
+	}
+	return 10 * time.Minute
+}
+
+func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimiter, now time.Time, window time.Duration, siteID, userID string) {
+	id := c.Param("id")
+	if limiter != nil && !limiter.Allow(placementPollKey(c, id, userID)) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
+		return
+	}
+	if siteID == "" {
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"placement": p})
+	status, wait, waitAt, err := db.ReadPlacementStatus(c.Request.Context(), siteID, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement status unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":           id,
+		"status":       status,
+		"plugin_state": entry.PluginState(wait, waitAt, now, window),
+	})
+}
+
+func placementPollKey(c *gin.Context, placementID, userID string) string {
+	identity := c.GetString("api_key_hash")
+	if identity == "" {
+		identity = userID
+	}
+	if identity == "" {
+		identity = siteIDFrom(c)
+	}
+	return placementID + "\x00" + identity
 }
 
 func (h *PlacementsHandler) now() time.Time {

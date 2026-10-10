@@ -325,17 +325,33 @@ func (d *DB) TouchPlacementContact(ctx context.Context, siteID string, at time.T
 }
 
 func (d *DB) AckPluginPlacement(ctx context.Context, id, siteID, action string, at time.Time) (bool, error) {
-	from, to := "remove", "removed"
-	if action == "restored" {
-		from, to = "restore", ""
+	var query string
+	switch action {
+	case "restored":
+		query = `UPDATE placement_proposals
+SET plugin_wait='placed', plugin_wait_at=$3, plugin_contact_at=$3
+WHERE id=$1 AND site_id=$2 AND plugin_wait IN ('', 'restore')`
+	case "removed":
+		query = `UPDATE placement_proposals
+SET plugin_wait='removed', plugin_wait_at=$3, plugin_contact_at=$3
+WHERE id=$1 AND site_id=$2 AND plugin_wait='remove'`
+	default:
+		return false, nil
 	}
-	tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
-SET plugin_wait=$4, plugin_wait_at=CASE WHEN $4='' THEN NULL ELSE plugin_wait_at END, plugin_contact_at=$5
-WHERE id=$1 AND site_id=$2 AND plugin_wait=$3`, id, siteID, from, to, at)
+	tag, err := d.Pool.Exec(ctx, query, id, siteID, at)
 	if err != nil {
 		return false, err
 	}
 	return tag.RowsAffected() == 1, nil
+}
+
+// PlacementStatusSQL is the placement poll. It reads one row by primary key
+// and does not join another table.
+const PlacementStatusSQL = `SELECT status, plugin_wait, plugin_wait_at FROM placement_proposals WHERE id=$1 AND site_id=$2`
+
+func (d *DB) ReadPlacementStatus(ctx context.Context, siteID, id string) (status, wait string, waitAt *time.Time, err error) {
+	err = d.Pool.QueryRow(ctx, PlacementStatusSQL, id, siteID).Scan(&status, &wait, &waitAt)
+	return status, wait, waitAt, err
 }
 
 func (d *DB) PlacementPlugin(ctx context.Context, id string) (wait string, waitAt, contact *time.Time, err error) {

@@ -1,5 +1,7 @@
 package handlers
 
+import "affilio-api/internal/entry"
+
 const llmsText = `# Offer Rails
 
 > Agents list a product or place an offer. Humans sign in once. Hard checks always apply.
@@ -18,6 +20,10 @@ Offer Rails is a publisher and maker workflow. Tools return offers, matches, and
 
 ` + "`POST /v1/device/code`" + ` then open verification_uri. Poll ` + "`POST /v1/device/token`" + ` until it returns a project key.
 `
+
+func llmsBody() string {
+	return llmsText + "\n" + entry.HardCheckDoc()
+}
 
 const deviceLoginDoc = `# Device login
 
@@ -256,16 +262,18 @@ Undo is that revoke. It takes effect in the same request in the API and in MCP. 
 POST /v1/placements/:id/restore
 ` + "```" + `
 
-Restore applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. If Pause or the kill switch was turned on for that site, offer, or account at any point after the undo, including when it is still on, restore returns 409 with ` + "`reason: paused`" + `. The server re-runs every hard check first. It also evaluates the current 30-day placement cap and the current minimum relevance against the score stored when the placement was approved. A failing check returns 422 with that check id (` + "`placement_cap`" + ` or ` + "`below_min_relevance`" + ` among the hard-check ids) and leaves the placement revoked. On success the placement returns to the status it had before the undo, ` + "`approved_by`" + ` stays the original value, ` + "`restored_by`" + ` records the user, and a ` + "`placement_restore`" + ` event stores the actor.
+Restore applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. If Pause or the kill switch was turned on for that site, offer, or account at any point after the undo, including when it is still on, restore returns 409 with ` + "`reason: paused`" + `. The server re-runs every hard check first. It also evaluates the current 30-day placement cap and the current minimum relevance against the score stored when the placement was approved. A failing check returns 422 with ` + "`check_id`" + ` and ` + "`check_text`" + ` from the hard-check list below and leaves the placement revoked. On success the placement returns to the status it had before the undo, ` + "`approved_by`" + ` stays the original value, ` + "`restored_by`" + ` records the user, and a ` + "`placement_restore`" + ` event stores the actor.
 
-Every placement in ` + "`GET /v1/digest`" + ` and ` + "`GET /v1/account/digest`" + ` includes ` + "`plugin_state`" + `. After an undo it is ` + "`pending`" + ` until the site key acknowledges the removal. It becomes ` + "`removed`" + ` after that acknowledgement and stays ` + "`removed`" + ` even if the plugin later goes silent. It is ` + "`offline`" + ` when the plugin has made no contact, by receipt, by ` + "`GET /v1/placements`" + `, or by acknowledgement, within ` + "`PLUGIN_OFFLINE_AFTER`" + ` (default 10 minutes). A fresh undo stays ` + "`pending`" + ` for that same window even with no contact. After a restore the state is ` + "`pending`" + ` again until the plugin acknowledges the re-insert. Once that acknowledgement lands and the plugin is still inside the contact window, the state is ` + "`current`" + `.
+There is no push channel. Clients poll ` + "`GET /v1/placements/:id`" + `. That read is one row from ` + "`placement_proposals`" + ` and allows at least one request every 4 seconds per placement per session. The body includes ` + "`status`" + ` and ` + "`plugin_state`" + `.
+
+Every placement in ` + "`GET /v1/digest`" + `, ` + "`GET /v1/account/digest`" + `, and the status read includes ` + "`plugin_state`" + `. It is never null. The values are ` + "`pending`" + `, ` + "`placed`" + `, ` + "`removed`" + `, and ` + "`offline`" + `. A brand-new placement is ` + "`pending`" + ` until the site key's first acknowledgement, then ` + "`placed`" + `. After a restore it is ` + "`pending`" + ` until ` + "`POST /v1/placements/:id/plugin-ack`" + ` with ` + "`action: restored`" + `, which sets ` + "`placed`" + `. After a revoke it is ` + "`pending`" + `, then ` + "`removed`" + ` on ` + "`action: removed`" + `, or ` + "`offline`" + ` after ` + "`PLUGIN_OFFLINE_AFTER`" + ` (default 10 minutes) with no acknowledgement.
 
 ` + "```" + `
 POST /v1/placements/:id/plugin-ack
 {"action":"removed"}
 ` + "```" + `
 
-` + "`action`" + ` is ` + "`removed`" + ` or ` + "`restored`" + `. The site key is required. The WordPress plugin calls ` + "`removed`" + ` after it deletes the block, and ` + "`restored`" + ` after it puts the block back. Neither call creates a post revision.
+` + "`action`" + ` is ` + "`removed`" + ` or ` + "`restored`" + `. The site key is required. The WordPress plugin calls ` + "`restored`" + ` the first time the block is in the post and again after it puts the block back. It calls ` + "`removed`" + ` after it deletes the block. Neither call creates a post revision. A restore acknowledgement is only valid while the placement is brand new or waiting on a re-insert. A removal acknowledgement is only valid while a revoke is waiting, including after the window has already marked it ` + "`offline`" + `.
 
 A revoked placement's ` + "`/v1/go/...`" + ` link stops immediately. It returns 410 with ` + "`reason: revoked`" + `, no offer redirect, and no click. A successful restore makes that link redirect again. A placement that was removed without a revoke still redirects to the landing page and still records no click.
 `
@@ -314,7 +322,7 @@ Send the account key as ` + "`X-API-Key`" + ` for the publisher site, or ` + "`X
 
 ## Hard checks
 
-` + "`GET /v1/policy/hard-checks`" + ` returns the fixed list the dashboard shows. The codes match the decision failures.
+` + "`GET /v1/policy/hard-checks`" + ` returns ` + "`check_id`" + ` and ` + "`check_text`" + ` from the same list a 422 uses. There is no push channel; clients poll placement status.
 `
 
 func agentDoc(name string) (string, bool) {
@@ -326,7 +334,7 @@ func agentDoc(name string) (string, bool) {
 	case "listing-card.md":
 		return listingCardDoc, true
 	case "modes.md":
-		return modesDoc, true
+		return modesDoc + "\n" + entry.HardCheckDoc(), true
 	case "account.md":
 		return accountDoc, true
 	default:

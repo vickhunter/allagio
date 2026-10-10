@@ -2,38 +2,26 @@ package entry
 
 import "time"
 
-// PluginState is what the digest reports for one placement.
-// pending means the plugin still has to remove or re-insert the block.
-// removed means the plugin confirmed the block is gone.
-// offline means the plugin has been silent longer than the contact window.
-// current means the plugin has checked in and nothing is waiting.
-func PluginState(wait string, waitAt, contact *time.Time, now time.Time, window time.Duration) string {
-	fresh := freshStamp(contact, now, window)
-	waitLive := (wait == "remove" || wait == "restore") && freshStamp(waitAt, now, window)
+// PluginStates are the only values plugin_state may take. The field is never
+// null and never omitted on a placement.
+var PluginStates = []string{"pending", "placed", "removed", "offline"}
+
+// PluginState reports the plugin's view of one placement.
+// A brand-new placement and a restore stay pending until the site key
+// acknowledges them, which stores placed. A revoke stays pending until the
+// site key acknowledges the removal, or until the window passes with no ack.
+func PluginState(wait string, waitAt *time.Time, now time.Time, window time.Duration) string {
 	switch wait {
-	case "remove", "restore":
-		if waitLive || fresh {
-			return "pending"
-		}
-		return "offline"
+	case "placed":
+		return "placed"
 	case "removed":
 		return "removed"
-	default:
-		if fresh {
-			return "current"
+	case "remove":
+		if waitAt != nil && !waitAt.UTC().After(now.UTC()) && now.UTC().Sub(waitAt.UTC()) > window {
+			return "offline"
 		}
-		return "offline"
+		return "pending"
+	default:
+		return "pending"
 	}
-}
-
-func freshStamp(at *time.Time, now time.Time, window time.Duration) bool {
-	if at == nil || window < 0 {
-		return false
-	}
-	stamp := at.UTC()
-	current := now.UTC()
-	if stamp.After(current) {
-		return false
-	}
-	return current.Sub(stamp) <= window
 }

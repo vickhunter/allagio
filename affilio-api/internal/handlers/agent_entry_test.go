@@ -359,23 +359,23 @@ func TestPolicyEngineHTTP(t *testing.T) {
 	}
 
 	rec, denied := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 10, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "relevance_below_25") {
+	if rec.Code != http.StatusUnprocessableEntity || denied["check_id"] != "relevance_min" || denied["check_text"] == "" {
 		t.Fatalf("hard relevance: %d %s", rec.Code, rec.Body.String())
 	}
 	_ = denied
 	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": false}, map[string]string{"X-API-Key": "policy-site-key"})
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "disclosure_and_rel_sponsored") {
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "rel_sponsored") {
 		t.Fatalf("disclosure: %d %s", rec.Code, rec.Body.String())
 	}
 	api.Claims = rejectingClaims{}
 	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true, "offer_data": "A short honest note."}, map[string]string{"X-API-Key": "policy-site-key"})
 	api.Claims = entry.StubClaimChecker{}
-	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "claim_check") {
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "claims_from_offer") {
 		t.Fatalf("claim hook: %d %s", rec.Code, rec.Body.String())
 	}
 	longID := insertPlacement(t, db, siteID, offerID, "https://policy.example/long", strings.Repeat("a", 141))
 	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+longID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
-	if !strings.Contains(rec.Body.String(), "copy_over_140") {
+	if !strings.Contains(rec.Body.String(), "copy_length") {
 		t.Fatalf("cap: %s", rec.Body.String())
 	}
 	rec, decision := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true, "offer_data": "mode=yolo"}, map[string]string{"X-API-Key": "policy-site-key"})
@@ -389,7 +389,7 @@ func TestPolicyEngineHTTP(t *testing.T) {
 	}
 	second := insertPlacement(t, db, siteID, offerID, "https://policy.example/post", "Another note.")
 	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
-	if !strings.Contains(rec.Body.String(), "one_box_per_post") {
+	if !strings.Contains(rec.Body.String(), "one_per_post") {
 		t.Fatalf("one box: %s", rec.Body.String())
 	}
 
@@ -726,7 +726,7 @@ VALUES($1,'or_offe',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPI
 	}
 	placementID := insertPlacement(t, db, siteID, offerID, "https://keys.example/post", "A short note.")
 	denied, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": false}, map[string]string{"X-API-Key": accountKey})
-	if denied.Code != http.StatusUnprocessableEntity || !strings.Contains(denied.Body.String(), "disclosure_and_rel_sponsored") {
+	if denied.Code != http.StatusUnprocessableEntity || !strings.Contains(denied.Body.String(), "rel_sponsored") {
 		t.Fatalf("hard check: %d %s", denied.Code, denied.Body.String())
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW() WHERE id=$1`, placementID); err != nil {
@@ -813,7 +813,7 @@ VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, 
 		t.Fatalf("session digest: %d", sessionDigest.Code)
 	}
 	checks, _ := postJSON(t, r, http.MethodGet, "/v1/policy/hard-checks", nil, nil)
-	if checks.Code != http.StatusOK || len(checks.Body.String()) == 0 || !strings.Contains(checks.Body.String(), "relevance_below_25") {
+	if checks.Code != http.StatusOK || len(checks.Body.String()) == 0 || !strings.Contains(checks.Body.String(), "relevance_min") {
 		t.Fatalf("hard checks: %d %s", checks.Code, checks.Body.String())
 	}
 	projectsRec, projects := postJSON(t, r, http.MethodGet, "/v1/account/projects", nil, map[string]string{"X-API-Key": accountKey})
@@ -1283,14 +1283,7 @@ func TestPlacementRestore(t *testing.T) {
 	}
 	current = current.Add(time.Second)
 	pausedRec, pausedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+paused+"/restore", nil, siteKey)
-	failures, _ := pausedBody["failures"].([]any)
-	found := false
-	for _, failure := range failures {
-		if failure == "offer_not_live" {
-			found = true
-		}
-	}
-	if pausedRec.Code != http.StatusUnprocessableEntity || pausedBody["decision"] != "denied" || !found {
+	if pausedRec.Code != http.StatusUnprocessableEntity || pausedBody["check_id"] != "offer_live" || pausedBody["check_text"] == "" || pausedBody["decision"] != nil {
 		t.Fatalf("paused offer: %d %s", pausedRec.Code, pausedRec.Body.String())
 	}
 	if status, _, restoredBy := placementStatus(paused); status != "revoked" || restoredBy != "" {

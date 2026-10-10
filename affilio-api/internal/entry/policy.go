@@ -150,7 +150,7 @@ func EvaluatePlacement(mode string, rules AutoRules, in PlacementFacts, claims C
 
 func EvaluatePublisher(mode string, rules AutoRules, in PublisherFacts) Decision {
 	if !in.OfferLive {
-		return Decision{Failures: []string{"offer_not_live"}}
+		return Decision{Failures: []string{"offer_live"}}
 	}
 	switch mode {
 	case ModeManual:
@@ -177,55 +177,97 @@ func EvaluatePublisher(mode string, rules AutoRules, in PublisherFacts) Decision
 	}
 }
 
-// HardChecks are the failure codes that run in every mode. The dashboard
-// shows the matching labels. D-028 replaces the claim-check stub.
-func HardChecks() []string {
-	return []string{
-		"disclosure_and_rel_sponsored",
-		"claim_check",
-		"copy_over_140",
-		"one_box_per_post",
-		"relevance_below_25",
-		"offer_not_live",
-		"revoke_unavailable",
-	}
+// HardCheck is one public failure. HardCheckCatalog is the only list of
+// check ids and the text a 422 returns with them.
+type HardCheck struct {
+	ID   string
+	Text string
 }
 
-// HardCheckLabels are the plain words the dashboard shows for HardChecks.
-func HardCheckLabels() []string {
-	return []string{
-		"Disclosure label and rel=sponsored",
-		"Claim check",
-		"140-character cap",
-		"One box per post",
-		"Relevance at least 25",
-		"Live offer",
-		"Working revoke",
+var HardCheckCatalog = []HardCheck{
+	{ID: "disclosure", Text: "Add a disclosure."},
+	{ID: "rel_sponsored", Text: "Add rel=sponsored."},
+	{ID: "claims_from_offer", Text: "Use only claims from the offer."},
+	{ID: "copy_length", Text: "Keep the copy to 140 characters."},
+	{ID: "one_per_post", Text: "Keep one box on this post."},
+	{ID: "relevance_min", Text: "Relevance is below the minimum."},
+	{ID: "offer_live", Text: "The offer is not live."},
+	{ID: "revoke_path", Text: "The revoke path is not available."},
+	{ID: "cap", Text: "The placement cap is full."},
+}
+
+// HardChecks are the ids from HardCheckCatalog, in that order.
+func HardChecks() []string {
+	out := make([]string, len(HardCheckCatalog))
+	for i, check := range HardCheckCatalog {
+		out[i] = check.ID
 	}
+	return out
+}
+
+// HardCheckLabels are the texts from HardCheckCatalog, in that order.
+func HardCheckLabels() []string {
+	out := make([]string, len(HardCheckCatalog))
+	for i, check := range HardCheckCatalog {
+		out[i] = check.Text
+	}
+	return out
+}
+
+// FirstCheck returns the earliest catalog entry among the failure ids.
+func FirstCheck(failures []string) (HardCheck, bool) {
+	present := map[string]bool{}
+	for _, id := range failures {
+		present[id] = true
+	}
+	for _, check := range HardCheckCatalog {
+		if present[check.ID] {
+			return check, true
+		}
+	}
+	return HardCheck{}, false
+}
+
+// HardCheckDoc is the hard-check section for /llms.txt and the mode docs.
+func HardCheckDoc() string {
+	var b strings.Builder
+	b.WriteString("## Hard checks\n\n")
+	b.WriteString("A 422 from restore, or from any hard-check failure, returns `check_id` and `check_text`:\n\n")
+	for _, check := range HardCheckCatalog {
+		b.WriteString("- `")
+		b.WriteString(check.ID)
+		b.WriteString("`: ")
+		b.WriteString(check.Text)
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 func placementHardFailures(in PlacementFacts, claims ClaimChecker) []string {
 	var failures []string
-	if strings.TrimSpace(in.Disclosure) == "" || !in.RelSponsored {
-		failures = append(failures, "disclosure_and_rel_sponsored")
+	if strings.TrimSpace(in.Disclosure) == "" {
+		failures = append(failures, "disclosure")
+	}
+	if !in.RelSponsored {
+		failures = append(failures, "rel_sponsored")
 	}
 	if err := claims.CheckClaims(in.Copy, in.OfferData); err != nil {
-		failures = append(failures, "claim_check")
+		failures = append(failures, "claims_from_offer")
 	}
 	if len([]rune(in.Copy)) > 140 {
-		failures = append(failures, "copy_over_140")
+		failures = append(failures, "copy_length")
 	}
 	if in.ExistingBoxes > 0 {
-		failures = append(failures, "one_box_per_post")
+		failures = append(failures, "one_per_post")
 	}
 	if in.Relevance < 25 {
-		failures = append(failures, "relevance_below_25")
+		failures = append(failures, "relevance_min")
 	}
 	if !in.OfferLive {
-		failures = append(failures, "offer_not_live")
+		failures = append(failures, "offer_live")
 	}
 	if !in.RevokeWorks {
-		failures = append(failures, "revoke_unavailable")
+		failures = append(failures, "revoke_path")
 	}
 	return failures
 }

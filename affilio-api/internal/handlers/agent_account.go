@@ -15,15 +15,9 @@ import (
 const earningsNote = "Earnings are recorded test-mode commission only. The number is null when that scope has no test-mode rows, and 0 when those rows add up to zero. Publisher amounts are ledger rows joined to test conversions. Maker amounts are test conversion commissions. Live and legacy rows are omitted. Click source is the referrer host; a click with no host counts as direct."
 
 func (h *AgentEntry) HardChecks(c *gin.Context) {
-	checks := entry.HardChecks()
-	labels := entry.HardCheckLabels()
-	out := make([]gin.H, 0, len(checks))
-	for i := range checks {
-		label := checks[i]
-		if i < len(labels) {
-			label = labels[i]
-		}
-		out = append(out, gin.H{"code": checks[i], "label": label})
+	out := make([]gin.H, 0, len(entry.HardCheckCatalog))
+	for _, check := range entry.HardCheckCatalog {
+		out = append(out, gin.H{"check_id": check.ID, "check_text": check.Text})
 	}
 	c.JSON(http.StatusOK, gin.H{"checks": out})
 }

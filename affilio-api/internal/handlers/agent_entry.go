@@ -33,6 +33,7 @@ type AgentEntry struct {
 	DeviceLimiter      *IPRateLimiter
 	Now                func() time.Time
 	PluginOfflineAfter time.Duration
+	StatusLimiter      *IPRateLimiter
 }
 
 type entryActor struct {
@@ -62,6 +63,7 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.POST("/v1/placements/:id/revoke", h.RevokePlacement)
 	r.POST("/v1/placements/:id/restore", h.RestorePlacement)
 	r.POST("/v1/placements/:id/plugin-ack", h.PluginAck)
+	r.GET("/v1/placements/:id", h.PlacementStatus)
 	r.POST("/v1/offers/:id/accept", h.AcceptPublisher)
 	r.POST("/v1/listing-cards", h.CreateListing)
 	r.GET("/v1/listing-cards/:id", h.GetListing)
@@ -684,7 +686,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		Position: req.Position, MakerID: makerID, Category: category, CopyEdited: req.CopyEdited, PlacementsIn30Days: used,
 	}, h.claims())
 	if len(decision.Failures) > 0 && !decision.NeedsOwner {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"decision": "denied", "failures": decision.Failures})
+		writeCheckDenied(c, decision.Failures)
 		return
 	}
 	if !decision.Allowed {
@@ -738,7 +740,7 @@ func (h *AgentEntry) AcceptPublisher(c *gin.Context) {
 	}
 	decision := entry.EvaluatePublisher(policy.Mode, rulesOf(policy), entry.PublisherFacts{OfferLive: live, SiteQuality: req.SiteQuality, Niche: req.Niche})
 	if len(decision.Failures) > 0 && !decision.NeedsOwner {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"decision": "denied", "failures": decision.Failures})
+		writeCheckDenied(c, decision.Failures)
 		return
 	}
 	if !decision.Allowed {
@@ -1035,7 +1037,7 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 		}
 	}
 	if len(failures) > 0 {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"decision": "denied", "failures": failures})
+		writeCheckDenied(c, failures)
 		return
 	}
 	status, approvedBy, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now)
@@ -1081,14 +1083,14 @@ func (h *AgentEntry) restoreLimitFailures(c *gin.Context, row database.Placement
 	}
 	var failures []string
 	if used >= placementCap {
-		failures = append(failures, "placement_cap")
+		failures = append(failures, "cap")
 	}
 	minRel := policy.MinRelevance
 	if minRel == 0 {
 		minRel = 40
 	}
 	if row.Relevance >= 0 && row.Relevance < minRel {
-		failures = append(failures, "below_min_relevance")
+		failures = append(failures, "relevance_min")
 	}
 	return failures, nil
 }
@@ -1152,12 +1154,37 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"plugin_state": state})
 }
 
+func (h *AgentEntry) PlacementStatus(c *gin.Context) {
+	if !uuidPattern.MatchString(c.Param("id")) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
+		return
+	}
+	actor, ok := h.actorFrom(c)
+	if !ok {
+		return
+	}
+	if actor.SiteID == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "site key required"})
+		return
+	}
+	writePlacementStatus(c, h.DB, h.StatusLimiter, h.now(), h.pluginWindow(), actor.SiteID, actor.UserID)
+}
+
 func (h *AgentEntry) pluginState(c *gin.Context, id string) (string, error) {
-	wait, waitAt, contact, err := h.DB.PlacementPlugin(c.Request.Context(), id)
+	wait, waitAt, _, err := h.DB.PlacementPlugin(c.Request.Context(), id)
 	if err != nil {
 		return "", err
 	}
-	return entry.PluginState(wait, waitAt, contact, h.now(), h.pluginWindow()), nil
+	return entry.PluginState(wait, waitAt, h.now(), h.pluginWindow()), nil
+}
+
+func writeCheckDenied(c *gin.Context, failures []string) {
+	check, ok := entry.FirstCheck(failures)
+	if !ok {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "check failed"})
+		return
+	}
+	c.JSON(http.StatusUnprocessableEntity, gin.H{"check_id": check.ID, "check_text": check.Text})
 }
 
 func (h *AgentEntry) pluginWindow() time.Duration {
@@ -1241,7 +1268,7 @@ func (h *AgentEntry) FromSource(c *gin.Context) {
 }
 
 func (h *AgentEntry) LLMs(c *gin.Context) {
-	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(llmsText))
+	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(llmsBody()))
 }
 
 func (h *AgentEntry) Doc(c *gin.Context) {
@@ -1483,7 +1510,7 @@ func approvalJSON(decision entry.Decision, version int) gin.H {
 func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 	body := gin.H{"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token}
 	if item.Kind == "placement" {
-		body["plugin_state"] = entry.PluginState(item.PluginWait, item.PluginWaitAt, item.PluginContactAt, h.now(), h.pluginWindow())
+		body["plugin_state"] = entry.PluginState(item.PluginWait, item.PluginWaitAt, h.now(), h.pluginWindow())
 	}
 	return body
 }

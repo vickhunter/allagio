@@ -29,13 +29,13 @@ func TestHardChecksAlwaysRun(t *testing.T) {
 		mutate  func(*PlacementFacts)
 		failure string
 	}{
-		{"missing disclosure", func(in *PlacementFacts) { in.Disclosure = " " }, "disclosure_and_rel_sponsored"},
-		{"missing rel", func(in *PlacementFacts) { in.RelSponsored = false }, "disclosure_and_rel_sponsored"},
-		{"over 140", func(in *PlacementFacts) { in.Copy = strings.Repeat("a", 141) }, "copy_over_140"},
-		{"second box", func(in *PlacementFacts) { in.ExistingBoxes = 1 }, "one_box_per_post"},
-		{"relevance 24", func(in *PlacementFacts) { in.Relevance = 24 }, "relevance_below_25"},
-		{"paused offer", func(in *PlacementFacts) { in.OfferLive = false }, "offer_not_live"},
-		{"revoke broken", func(in *PlacementFacts) { in.RevokeWorks = false }, "revoke_unavailable"},
+		{"missing disclosure", func(in *PlacementFacts) { in.Disclosure = " " }, "disclosure"},
+		{"missing rel", func(in *PlacementFacts) { in.RelSponsored = false }, "rel_sponsored"},
+		{"over 140", func(in *PlacementFacts) { in.Copy = strings.Repeat("a", 141) }, "copy_length"},
+		{"second box", func(in *PlacementFacts) { in.ExistingBoxes = 1 }, "one_per_post"},
+		{"relevance 24", func(in *PlacementFacts) { in.Relevance = 24 }, "relevance_min"},
+		{"paused offer", func(in *PlacementFacts) { in.OfferLive = false }, "offer_live"},
+		{"revoke broken", func(in *PlacementFacts) { in.RevokeWorks = false }, "revoke_path"},
 	}
 	for _, mode := range []string{ModeManual, ModeAuto, ModeYolo} {
 		for _, tc := range cases {
@@ -55,7 +55,7 @@ func (rejectClaims) CheckClaims(string, string) error { return errors.New("numbe
 
 func TestClaimCheckHookBlocks(t *testing.T) {
 	got := EvaluatePlacement(ModeYolo, AutoRules{}, passingFacts(), rejectClaims{})
-	if got.Allowed || !hasFailure(got, "claim_check") {
+	if got.Allowed || !hasFailure(got, "claims_from_offer") {
 		t.Fatalf("%+v", got)
 	}
 	ok := EvaluatePlacement(ModeYolo, AutoRules{}, passingFacts(), StubClaimChecker{})
@@ -133,7 +133,7 @@ func TestPublisherMirror(t *testing.T) {
 	if low.Allowed || !low.NeedsOwner {
 		t.Fatalf("quality: %+v", low)
 	}
-	if got := EvaluatePublisher(ModeYolo, rules, PublisherFacts{OfferLive: false, SiteQuality: 100, Niche: "devtools"}); got.Allowed || !hasFailure(got, "offer_not_live") {
+	if got := EvaluatePublisher(ModeYolo, rules, PublisherFacts{OfferLive: false, SiteQuality: 100, Niche: "devtools"}); got.Allowed || !hasFailure(got, "offer_live") {
 		t.Fatalf("dead offer: %+v", got)
 	}
 }
@@ -160,6 +160,31 @@ func TestAgentCannotLoosenRules(t *testing.T) {
 	}
 	if !(AutoRules{MinRelevance: 40, MaxPlacementsPer30Days: 3, DenyMakers: []string{"b"}}).LooserThan(prev) {
 		t.Fatal("dropping the allow list should be looser")
+	}
+}
+
+func TestHardCheckCatalogIsTheOnlyList(t *testing.T) {
+	want := []string{"disclosure", "rel_sponsored", "claims_from_offer", "copy_length", "one_per_post", "relevance_min", "offer_live", "revoke_path", "cap"}
+	if len(HardCheckCatalog) != len(want) {
+		t.Fatalf("catalog: %+v", HardCheckCatalog)
+	}
+	for i, id := range want {
+		if HardCheckCatalog[i].ID != id || HardCheckCatalog[i].Text == "" {
+			t.Fatalf("catalog[%d]: %+v", i, HardCheckCatalog[i])
+		}
+		if HardChecks()[i] != id || HardCheckLabels()[i] != HardCheckCatalog[i].Text {
+			t.Fatal("derived lists drifted from the catalog")
+		}
+	}
+	first, ok := FirstCheck([]string{"cap", "disclosure", "nope"})
+	if !ok || first.ID != "disclosure" || first.Text != HardCheckCatalog[0].Text {
+		t.Fatalf("first check: %+v %v", first, ok)
+	}
+	doc := HardCheckDoc()
+	for _, check := range HardCheckCatalog {
+		if !strings.Contains(doc, "`"+check.ID+"`") || !strings.Contains(doc, check.Text) {
+			t.Fatalf("doc missing %s", check.ID)
+		}
 	}
 }
 

@@ -220,6 +220,7 @@ func main() {
 		AccountLimiter:     handlers.NewIPRateLimiter(8, time.Minute),
 		DeviceLimiter:      handlers.NewIPRateLimiter(30, time.Minute),
 		PluginOfflineAfter: cfg.PluginOfflineAfter,
+		StatusLimiter:      handlers.NewPlacementPollLimiter(),
 	}
 	if hosted != nil {
 		agentEntry.Owner = hosted.RequireOwnerSession
@@ -275,7 +276,6 @@ func main() {
 		secured.POST("/revenue/opportunities", placements.Find)
 		secured.POST("/placements", placements.Prepare)
 		secured.GET("/placements", placements.List)
-		secured.GET("/placements/:id", placements.Get)
 		secured.POST("/placements/:id/commit", placements.Commit)
 		secured.POST("/placements/:id/receipt", placements.RecordReceipt)
 		secured.POST("/placements/:id/removed", placements.MarkRemoved)

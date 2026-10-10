@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"affilio-api/internal/database"
+	"affilio-api/internal/entry"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -55,15 +58,9 @@ func TestRestorePauseAndLimits(t *testing.T) {
 		}
 		return status
 	}
-	hasFailure := func(body map[string]any, id string) bool {
+	hasCheck := func(body map[string]any, id string) bool {
 		t.Helper()
-		failures, _ := body["failures"].([]any)
-		for _, failure := range failures {
-			if failure == id {
-				return true
-			}
-		}
-		return false
+		return body["check_id"] == id && body["check_text"] != "" && body["failures"] == nil
 	}
 
 	pausedSite := approve("https://limits.example/site", 80)
@@ -115,7 +112,7 @@ func TestRestorePauseAndLimits(t *testing.T) {
 		t.Fatalf("raise min relevance: %d %s", raised.Code, raised.Body.String())
 	}
 	denied, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+low+"/restore", nil, siteKey)
-	if denied.Code != http.StatusUnprocessableEntity || body["decision"] != "denied" || !hasFailure(body, "below_min_relevance") || hasFailure(body, "placement_cap") {
+	if denied.Code != http.StatusUnprocessableEntity || !hasCheck(body, "relevance_min") || body["check_id"] == "cap" {
 		t.Fatalf("raised min relevance: %d %s", denied.Code, denied.Body.String())
 	}
 	if statusOf(low) != "revoked" {
@@ -130,7 +127,7 @@ func TestRestorePauseAndLimits(t *testing.T) {
 		t.Fatalf("lower cap: %d %s", lowered.Code, lowered.Body.String())
 	}
 	denied, body = postJSON(t, r, http.MethodPost, "/v1/placements/"+capped+"/restore", nil, siteKey)
-	if denied.Code != http.StatusUnprocessableEntity || !hasFailure(body, "placement_cap") || hasFailure(body, "below_min_relevance") {
+	if denied.Code != http.StatusUnprocessableEntity || !hasCheck(body, "cap") || body["check_id"] == "relevance_min" {
 		t.Fatalf("lowered cap: %d %s", denied.Code, denied.Body.String())
 	}
 	if statusOf(capped) != "revoked" {
@@ -223,22 +220,62 @@ func TestPluginPlacementState(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	assertPlacementStates := func(raw string) {
+		t.Helper()
+		var payload struct {
+			Items []struct {
+				Kind        string  `json:"kind"`
+				PluginState *string `json:"plugin_state"`
+			} `json:"items"`
+			Projects []struct {
+				Items []struct {
+					Kind        string  `json:"kind"`
+					PluginState *string `json:"plugin_state"`
+				} `json:"items"`
+			} `json:"projects"`
+		}
+		if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+			t.Fatal(err)
+		}
+		check := func(kind string, state *string) {
+			t.Helper()
+			if kind == "offer" {
+				if state != nil {
+					t.Fatalf("offer plugin_state is not null: %s", raw)
+				}
+				return
+			}
+			if kind != "placement" {
+				return
+			}
+			if state == nil || (*state != "pending" && *state != "placed" && *state != "removed" && *state != "offline") {
+				t.Fatalf("plugin_state is null or unknown: %s", raw)
+			}
+		}
+		for _, item := range payload.Items {
+			check(item.Kind, item.PluginState)
+		}
+		for _, project := range payload.Projects {
+			for _, item := range project.Items {
+				check(item.Kind, item.PluginState)
+			}
+		}
+	}
 	digestState := func() string {
 		t.Helper()
 		rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("digest: %d %s", rec.Code, rec.Body.String())
 		}
-		for _, raw := range body["items"].([]any) {
-			item := raw.(map[string]any)
-			if item["kind"] == "offer" && item["plugin_state"] != nil {
-				t.Fatalf("offer has plugin_state: %s", rec.Body.String())
-			}
-		}
+		assertPlacementStates(rec.Body.String())
 		return pluginStateOf(t, body, placementID)
 	}
-	if digestState() != "offline" {
-		t.Fatal("a placement with no contact should be offline")
+	if digestState() != "pending" {
+		t.Fatal("a brand-new placement should be pending")
+	}
+	firstAck, firstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
+	if firstAck.Code != http.StatusOK || firstBody["plugin_state"] != "placed" || digestState() != "placed" {
+		t.Fatalf("first ack: %d %s", firstAck.Code, firstAck.Body.String())
 	}
 
 	undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/revoke", map[string]any{"reason": "undo"}, siteKey)
@@ -252,30 +289,25 @@ func TestPluginPlacementState(t *testing.T) {
 	if account.Code != http.StatusOK || pluginStateOf(t, accountBody, placementID) != "pending" {
 		t.Fatalf("dashboard pending: %d %s", account.Code, account.Body.String())
 	}
+	assertPlacementStates(account.Body.String())
 
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait_at=NOW()-INTERVAL '11 minutes', plugin_contact_at=NULL WHERE id=$1`, placementID); err != nil {
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait_at=NOW()-INTERVAL '11 minutes' WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
 	}
 	if digestState() != "offline" {
-		t.Fatal("a stale unacked undo should be offline")
+		t.Fatal("a revoke with no ack after 10 minutes should be offline")
 	}
-	polled, _ := postJSON(t, r, http.MethodGet, "/v1/placements", nil, siteKey)
-	if polled.Code != http.StatusOK {
+	polled, polledBody := postJSON(t, r, http.MethodGet, "/v1/placements/"+placementID, nil, siteKey)
+	if polled.Code != http.StatusOK || polledBody["plugin_state"] != "offline" {
 		t.Fatalf("poll: %d %s", polled.Code, polled.Body.String())
 	}
-	if digestState() != "pending" {
-		t.Fatal("a poll should bring a stale undo back to pending")
+	if digestState() != "offline" {
+		t.Fatal("a poll must not clear an offline revoke")
 	}
 
 	acked, ackBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "removed"}, siteKey)
 	if acked.Code != http.StatusOK || ackBody["plugin_state"] != "removed" || digestState() != "removed" {
 		t.Fatalf("ack removed: %d %s", acked.Code, acked.Body.String())
-	}
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_contact_at=NOW()-INTERVAL '11 minutes' WHERE id=$1`, placementID); err != nil {
-		t.Fatal(err)
-	}
-	if digestState() != "removed" {
-		t.Fatal("an acknowledged removal stays removed when the plugin goes silent")
 	}
 
 	second := insertPlacement(t, db, siteID, offerID, "https://plugin.example/again", "Honest note about the product.")
@@ -294,28 +326,18 @@ func TestPluginPlacementState(t *testing.T) {
 	if rec.Code != http.StatusOK || pluginStateOf(t, body, second) != "pending" {
 		t.Fatalf("restore pending: %d %s", rec.Code, rec.Body.String())
 	}
+	assertPlacementStates(rec.Body.String())
 	acked, ackBody = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "restored"}, siteKey)
-	if acked.Code != http.StatusOK || ackBody["plugin_state"] != "current" {
+	if acked.Code != http.StatusOK || ackBody["plugin_state"] != "placed" {
 		t.Fatalf("ack restored: %d %s", acked.Code, acked.Body.String())
 	}
 	rec, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
-	if pluginStateOf(t, body, second) != "current" {
-		t.Fatalf("digest current: %s", rec.Body.String())
+	if pluginStateOf(t, body, second) != "placed" || pluginStateOf(t, body, placementID) != "removed" {
+		t.Fatalf("digest after restore ack: %s", rec.Body.String())
 	}
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_contact_at=NOW()-INTERVAL '11 minutes' WHERE id=$1`, second); err != nil {
-		t.Fatal(err)
-	}
-	rec, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
-	if pluginStateOf(t, body, second) != "offline" {
-		t.Fatalf("silent after restore: %s", rec.Body.String())
-	}
-	polled, _ = postJSON(t, r, http.MethodGet, "/v1/placements", nil, siteKey)
-	if polled.Code != http.StatusOK {
-		t.Fatalf("second poll: %d", polled.Code)
-	}
-	rec, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
-	if pluginStateOf(t, body, second) != "current" || pluginStateOf(t, body, placementID) != "removed" {
-		t.Fatalf("poll after silence: %s", rec.Body.String())
+	statusRec, statusBody := postJSON(t, r, http.MethodGet, "/v1/placements/"+second, nil, siteKey)
+	if statusRec.Code != http.StatusOK || statusBody["plugin_state"] != "placed" || statusBody["status"] == "" {
+		t.Fatalf("status read: %d %s", statusRec.Code, statusRec.Body.String())
 	}
 
 	maker, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/plugin-ack", map[string]any{"action": "removed"}, map[string]string{"X-Maker-Key": "plugin-maker-key"})
@@ -378,6 +400,183 @@ func bodyReason(t *testing.T, rec *httptest.ResponseRecorder) string {
 	}
 	reason, _ := body["reason"].(string)
 	return reason
+}
+
+func TestPlacementStatusPollAllowsFourSeconds(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	now := time.Date(2026, 10, 10, 5, 0, 0, 0, time.UTC)
+	limiter := NewPlacementPollLimiter()
+	limiter.nowFn = func() time.Time { return now }
+	api.StatusLimiter = limiter
+	if PlacementPollInterval < 4*time.Second || limiter.limit < 1 {
+		t.Fatal("placement status limit is stricter than one request per 4 seconds")
+	}
+	query := strings.ToLower(database.PlacementStatusSQL)
+	if strings.Contains(query, " join ") || strings.Count(query, " from ") != 1 || !strings.Contains(query, "from placement_proposals") {
+		t.Fatal(database.PlacementStatusSQL)
+	}
+
+	owner, cookie := testOwnerSession(t, h, "poll-owner", "poll-owner@example.com")
+	siteID := createTestSite(t, db, "poll-site-key", "poll.example", "Poll")
+	_, offerID := seedListedOffer(t, db, "poll-maker-key", "poll-maker@example.com", "Poll Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	siteKey := map[string]string{"X-API-Key": "poll-site-key"}
+	first := insertPlacement(t, db, siteID, offerID, "https://poll.example/one", "Honest note about the product.")
+	second := insertPlacement(t, db, siteID, offerID, "https://poll.example/two", "Honest note about the product.")
+
+	got, body := postJSON(t, r, http.MethodGet, "/v1/placements/"+first, nil, siteKey)
+	if got.Code != http.StatusOK || body["plugin_state"] != "pending" || body["status"] == "" {
+		t.Fatalf("first poll: %d %s", got.Code, got.Body.String())
+	}
+	again, _ := postJSON(t, r, http.MethodGet, "/v1/placements/"+first, nil, siteKey)
+	if again.Code != http.StatusTooManyRequests {
+		t.Fatalf("burst: %d %s", again.Code, again.Body.String())
+	}
+	otherPlacement, _ := postJSON(t, r, http.MethodGet, "/v1/placements/"+second, nil, siteKey)
+	if otherPlacement.Code != http.StatusOK {
+		t.Fatalf("other placement: %d %s", otherPlacement.Code, otherPlacement.Body.String())
+	}
+	session, sessionBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/placements/"+first, nil)
+	if session.Code != http.StatusOK || sessionBody["plugin_state"] != "pending" {
+		t.Fatalf("other session: %d %s", session.Code, session.Body.String())
+	}
+	now = now.Add(4 * time.Second)
+	after, _ := postJSON(t, r, http.MethodGet, "/v1/placements/"+first, nil, siteKey)
+	if after.Code != http.StatusOK {
+		t.Fatalf("poll after 4s: %d %s", after.Code, after.Body.String())
+	}
+}
+
+func TestEveryHardCheckReturns422(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	current := time.Date(2026, 10, 10, 6, 0, 0, 0, time.UTC)
+	api.Now = func() time.Time { return current }
+	owner, cookie := testOwnerSession(t, h, "checks-owner", "checks-owner@example.com")
+	siteID := createTestSite(t, db, "checks-site-key", "checks.example", "Checks")
+	_, offerID := seedListedOffer(t, db, "checks-maker-key", "checks-maker@example.com", "Checks Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/sites/"+siteID+"/mode", map[string]any{"mode": "yolo"})
+	if saved.Code != http.StatusOK {
+		t.Fatalf("yolo: %d %s", saved.Code, saved.Body.String())
+	}
+	siteKey := map[string]string{"X-API-Key": "checks-site-key"}
+	textOf := func(id string) string {
+		t.Helper()
+		for _, check := range entry.HardCheckCatalog {
+			if check.ID == id {
+				return check.Text
+			}
+		}
+		t.Fatalf("catalog missing %s", id)
+		return ""
+	}
+	expect := func(rec *httptest.ResponseRecorder, body map[string]any, id string) {
+		t.Helper()
+		if rec.Code != http.StatusUnprocessableEntity || body["check_id"] != id || body["check_text"] != textOf(id) || body["failures"] != nil || body["decision"] != nil {
+			t.Fatalf("%s: %d %s", id, rec.Code, rec.Body.String())
+		}
+	}
+	decide := func(id string, payload map[string]any) (*httptest.ResponseRecorder, map[string]any) {
+		t.Helper()
+		return postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/decide", payload, siteKey)
+	}
+	okPayload := map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}
+
+	disclosureID := insertPlacement(t, db, siteID, offerID, "https://checks.example/disclosure", "Honest note about the product.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='' WHERE id=$1`, disclosureID); err != nil {
+		t.Fatal(err)
+	}
+	disclosureRec, disclosureBody := decide(disclosureID, okPayload)
+	expect(disclosureRec, disclosureBody, "disclosure")
+
+	relID := insertPlacement(t, db, siteID, offerID, "https://checks.example/rel", "Honest note about the product.")
+	relRec, relBody := decide(relID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": false})
+	expect(relRec, relBody, "rel_sponsored")
+
+	api.Claims = rejectingClaims{}
+	claimsID := insertPlacement(t, db, siteID, offerID, "https://checks.example/claims", "Honest note about the product.")
+	claimsRec, claimsBody := decide(claimsID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true, "offer_data": "A short honest note."})
+	api.Claims = entry.StubClaimChecker{}
+	expect(claimsRec, claimsBody, "claims_from_offer")
+
+	copyID := insertPlacement(t, db, siteID, offerID, "https://checks.example/copy", strings.Repeat("a", 141))
+	copyRec, copyBody := decide(copyID, okPayload)
+	expect(copyRec, copyBody, "copy_length")
+
+	relevanceID := insertPlacement(t, db, siteID, offerID, "https://checks.example/relevance", "Honest note about the product.")
+	relevanceRec, relevanceBody := decide(relevanceID, map[string]any{"relevance": 10, "position": "end", "rel_sponsored": true})
+	expect(relevanceRec, relevanceBody, "relevance_min")
+
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='paused' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	offerIDPlacement := insertPlacement(t, db, siteID, offerID, "https://checks.example/offer", "Honest note about the product.")
+	offerRec, offerBody := decide(offerIDPlacement, okPayload)
+	expect(offerRec, offerBody, "offer_live")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='listed' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+
+	revokeID := insertPlacement(t, db, siteID, offerID, "https://checks.example/revoke", "Honest note about the product.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='revoked' WHERE id=$1`, revokeID); err != nil {
+		t.Fatal(err)
+	}
+	revokeRec, revokeBody := decide(revokeID, okPayload)
+	expect(revokeRec, revokeBody, "revoke_path")
+
+	first := insertPlacement(t, db, siteID, offerID, "https://checks.example/one", "Honest note about the product.")
+	approved, _ := decide(first, okPayload)
+	if approved.Code != http.StatusOK {
+		t.Fatalf("first box: %d %s", approved.Code, approved.Body.String())
+	}
+	second := insertPlacement(t, db, siteID, offerID, "https://checks.example/one", "Another honest note.")
+	oneRec, oneBody := decide(second, okPayload)
+	expect(oneRec, oneBody, "one_per_post")
+
+	capped := insertPlacement(t, db, siteID, offerID, "https://checks.example/cap", "Honest note about the product.")
+	approved, _ = decide(capped, map[string]any{"relevance": 90, "position": "end", "rel_sponsored": true})
+	if approved.Code != http.StatusOK {
+		t.Fatalf("cap approve: %d %s", approved.Code, approved.Body.String())
+	}
+	undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+capped+"/revoke", map[string]any{"reason": "undo"}, siteKey)
+	if undone.Code != http.StatusOK {
+		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
+	}
+	lowered, _ := postJSON(t, r, http.MethodPut, "/v1/sites/"+siteID+"/mode", map[string]any{"mode": "yolo", "max_placements_per_30_days": 0}, siteKey)
+	if lowered.Code != http.StatusOK {
+		t.Fatalf("cap: %d %s", lowered.Code, lowered.Body.String())
+	}
+	current = current.Add(time.Second)
+	restored, restoreBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+capped+"/restore", nil, siteKey)
+	expect(restored, restoreBody, "cap")
+}
+
+func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
+	llms := llmsBody()
+	modes, ok := agentDoc("modes.md")
+	if !ok {
+		t.Fatal("modes doc missing")
+	}
+	for _, check := range entry.HardCheckCatalog {
+		needle := "`" + check.ID + "`"
+		if !strings.Contains(llms, needle) || !strings.Contains(llms, check.Text) {
+			t.Fatalf("llms.txt drifted on %s", check.ID)
+		}
+		if !strings.Contains(modes, needle) || !strings.Contains(modes, check.Text) {
+			t.Fatalf("modes.md drifted on %s", check.ID)
+		}
+	}
+	if strings.Contains(llms, "disclosure_and_rel_sponsored") || strings.Contains(modes, "`current`") {
+		t.Fatal("docs still describe a retired check or plugin state")
+	}
 }
 
 func containsAll(value string, parts ...string) bool {

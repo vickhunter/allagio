@@ -59,7 +59,7 @@ var RevenueTools = []Tool{
 	},
 	{
 		Name:        "restore_placement",
-		Description: "Restore one placement within 6 seconds of its undo, as the same key identity. The server re-runs every hard check in this request, plus the current cap and minimum relevance. A pause or kill switch after the undo refuses the restore. There is no delay.",
+		Description: "Restore one placement within 6 seconds of its undo, as the same key identity. The server re-runs every hard check in this request, plus the current cap and minimum relevance. A failing check returns 422 with check_id and check_text. A pause or kill switch after the undo refuses the restore. There is no delay and no push channel; poll the placement status.",
 		InputSchema: schema([]string{"placement_id"}, map[string]interface{}{"placement_id": str("Placement ID that was just undone")}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			id, err := pathArg(args, "placement_id")
