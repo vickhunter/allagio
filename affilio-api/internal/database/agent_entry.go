@@ -65,6 +65,8 @@ type ApprovalPolicy struct {
 	CopyEditsAllowed       bool
 	MinSiteQuality         int
 	AllowedNiches          []string
+	KillSwitch             bool
+	ModeBeforeKill         string
 }
 
 type ListingCardRow struct {
@@ -393,18 +395,21 @@ func (d *DB) OwnerIDByMaker(ctx context.Context, makerID string) (string, error)
 
 func scanPolicy(row interface{ Scan(...any) error }) (ApprovalPolicy, error) {
 	var p ApprovalPolicy
-	var site, offer *string
-	err := row.Scan(&p.Scope, &site, &offer, &p.Mode, &p.Version, &p.AllowMakers, &p.DenyMakers, &p.AllowCategories, &p.DenyCategories, &p.MinRelevance, &p.AllowedPositions, &p.MaxPlacementsPer30Days, &p.CopyEditsAllowed, &p.MinSiteQuality, &p.AllowedNiches)
+	var site, offer, before *string
+	err := row.Scan(&p.Scope, &site, &offer, &p.Mode, &p.Version, &p.AllowMakers, &p.DenyMakers, &p.AllowCategories, &p.DenyCategories, &p.MinRelevance, &p.AllowedPositions, &p.MaxPlacementsPer30Days, &p.CopyEditsAllowed, &p.MinSiteQuality, &p.AllowedNiches, &p.KillSwitch, &before)
 	if site != nil {
 		p.SiteID = *site
 	}
 	if offer != nil {
 		p.OfferID = *offer
 	}
+	if before != nil {
+		p.ModeBeforeKill = *before
+	}
 	return p, err
 }
 
-const policySelect = `scope, site_id::text, offer_id::text, mode, version, allow_makers, deny_makers, allow_categories, deny_categories, min_relevance, allowed_positions, max_placements_per_30d, copy_edits_allowed, min_site_quality, allowed_niches`
+const policySelect = `scope, site_id::text, offer_id::text, mode, version, allow_makers, deny_makers, allow_categories, deny_categories, min_relevance, allowed_positions, max_placements_per_30d, copy_edits_allowed, min_site_quality, allowed_niches, kill_switch, mode_before_kill`
 
 func (d *DB) GetSitePolicy(ctx context.Context, siteID string) (ApprovalPolicy, error) {
 	return scanPolicy(d.Pool.QueryRow(ctx, `SELECT `+policySelect+` FROM approval_policies WHERE site_id=$1`, siteID))
@@ -426,8 +431,11 @@ VALUES('site',$1,$2,1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 ON CONFLICT(site_id) DO UPDATE SET mode=EXCLUDED.mode, version=approval_policies.version+1,
 allow_makers=EXCLUDED.allow_makers, deny_makers=EXCLUDED.deny_makers, allow_categories=EXCLUDED.allow_categories, deny_categories=EXCLUDED.deny_categories,
 min_relevance=EXCLUDED.min_relevance, allowed_positions=EXCLUDED.allowed_positions, max_placements_per_30d=EXCLUDED.max_placements_per_30d,
-copy_edits_allowed=EXCLUDED.copy_edits_allowed, min_site_quality=EXCLUDED.min_site_quality, allowed_niches=EXCLUDED.allowed_niches, updated_at=NOW()
-RETURNING version`, siteID, p.Mode, textList(p.AllowMakers), textList(p.DenyMakers), textList(p.AllowCategories), textList(p.DenyCategories), p.MinRelevance, textList(p.AllowedPositions), p.MaxPlacementsPer30Days, p.CopyEditsAllowed, p.MinSiteQuality, textList(p.AllowedNiches)).Scan(&version)
+copy_edits_allowed=EXCLUDED.copy_edits_allowed, min_site_quality=EXCLUDED.min_site_quality, allowed_niches=EXCLUDED.allowed_niches,
+kill_switch=CASE WHEN $13='owner_ui' THEN false ELSE approval_policies.kill_switch END,
+mode_before_kill=CASE WHEN $13='owner_ui' THEN NULL ELSE approval_policies.mode_before_kill END,
+updated_at=NOW()
+RETURNING version`, siteID, p.Mode, textList(p.AllowMakers), textList(p.DenyMakers), textList(p.AllowCategories), textList(p.DenyCategories), p.MinRelevance, textList(p.AllowedPositions), p.MaxPlacementsPer30Days, p.CopyEditsAllowed, p.MinSiteQuality, textList(p.AllowedNiches), actor).Scan(&version)
 	if err != nil {
 		return 0, err
 	}
@@ -451,8 +459,11 @@ VALUES('offer',$1,$2,1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 ON CONFLICT(offer_id) DO UPDATE SET mode=EXCLUDED.mode, version=approval_policies.version+1,
 allow_makers=EXCLUDED.allow_makers, deny_makers=EXCLUDED.deny_makers, allow_categories=EXCLUDED.allow_categories, deny_categories=EXCLUDED.deny_categories,
 min_relevance=EXCLUDED.min_relevance, allowed_positions=EXCLUDED.allowed_positions, max_placements_per_30d=EXCLUDED.max_placements_per_30d,
-copy_edits_allowed=EXCLUDED.copy_edits_allowed, min_site_quality=EXCLUDED.min_site_quality, allowed_niches=EXCLUDED.allowed_niches, updated_at=NOW()
-RETURNING version`, offerID, p.Mode, textList(p.AllowMakers), textList(p.DenyMakers), textList(p.AllowCategories), textList(p.DenyCategories), p.MinRelevance, textList(p.AllowedPositions), p.MaxPlacementsPer30Days, p.CopyEditsAllowed, p.MinSiteQuality, textList(p.AllowedNiches)).Scan(&version)
+copy_edits_allowed=EXCLUDED.copy_edits_allowed, min_site_quality=EXCLUDED.min_site_quality, allowed_niches=EXCLUDED.allowed_niches,
+kill_switch=CASE WHEN $13='owner_ui' THEN false ELSE approval_policies.kill_switch END,
+mode_before_kill=CASE WHEN $13='owner_ui' THEN NULL ELSE approval_policies.mode_before_kill END,
+updated_at=NOW()
+RETURNING version`, offerID, p.Mode, textList(p.AllowMakers), textList(p.DenyMakers), textList(p.AllowCategories), textList(p.DenyCategories), p.MinRelevance, textList(p.AllowedPositions), p.MaxPlacementsPer30Days, p.CopyEditsAllowed, p.MinSiteQuality, textList(p.AllowedNiches), actor).Scan(&version)
 	if err != nil {
 		return 0, err
 	}
@@ -476,19 +487,70 @@ WHERE site_id=$1 AND status='approved' AND approved_by_kind IN ('policy:auto','p
 		return 0, err
 	}
 	var version int
-	err = tx.QueryRow(ctx, `INSERT INTO approval_policies(scope,site_id,mode) VALUES('site',$1,'manual')
-ON CONFLICT(site_id) DO UPDATE SET mode='manual', version=approval_policies.version+1, updated_at=NOW()
-RETURNING version`, siteID).Scan(&version)
-	if err != nil {
+	err = tx.QueryRow(ctx, `INSERT INTO approval_policies(scope,site_id,mode,kill_switch,mode_before_kill)
+VALUES('site',$1,'manual',true,NULLIF($2,''))
+ON CONFLICT(site_id) DO UPDATE SET
+mode_before_kill=CASE WHEN approval_policies.kill_switch THEN approval_policies.mode_before_kill ELSE NULLIF($2,'') END,
+kill_switch=true, mode='manual', version=approval_policies.version+1, updated_at=NOW()
+RETURNING version`, siteID, fromMode).Scan(&version)
+	if err != nil || version < 1 {
+		if err == nil {
+			err = errors.New("kill switch was not saved")
+		}
 		return 0, err
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO mode_changes(site_id,actor,user_id,from_mode,to_mode) VALUES($1,$2,NULLIF($3,'')::uuid,NULLIF($4,''),'manual')`, siteID, actor, userID, fromMode); err != nil {
-		return 0, err
+	if fromMode != "manual" {
+		if _, err = tx.Exec(ctx, `INSERT INTO mode_changes(site_id,actor,user_id,from_mode,to_mode) VALUES($1,$2,NULLIF($3,'')::uuid,NULLIF($4,''),'manual')`, siteID, actor, userID, fromMode); err != nil {
+			return 0, err
+		}
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return 0, err
 	}
 	return int(tag.RowsAffected()), nil
+}
+
+// ReleaseSiteKillSwitch clears the kill switch for a signed-in human, restores
+// the mode it replaced, and unpauses the approvals it held.
+func (d *DB) ReleaseSiteKillSwitch(ctx context.Context, siteID, actor, userID string) (string, int, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return "", 0, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE placement_proposals SET auto_paused=false
+WHERE site_id=$1 AND status='approved' AND approved_by_kind IN ('policy:auto','policy:yolo') AND auto_paused=true`, siteID)
+	if err != nil {
+		return "", 0, err
+	}
+	var mode, before string
+	var on bool
+	err = tx.QueryRow(ctx, `SELECT mode, kill_switch, COALESCE(mode_before_kill,'') FROM approval_policies WHERE site_id=$1 FOR UPDATE`, siteID).Scan(&mode, &on, &before)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if err = tx.Commit(ctx); err != nil {
+			return "", 0, err
+		}
+		return "manual", int(tag.RowsAffected()), nil
+	}
+	if err != nil {
+		return "", 0, err
+	}
+	restored := mode
+	if on && before != "" {
+		restored = before
+	}
+	if _, err = tx.Exec(ctx, `UPDATE approval_policies SET mode=$2, kill_switch=false, mode_before_kill=NULL, version=version+1, updated_at=NOW() WHERE site_id=$1`, siteID, restored); err != nil {
+		return "", 0, err
+	}
+	if restored != mode {
+		if _, err = tx.Exec(ctx, `INSERT INTO mode_changes(site_id,actor,user_id,from_mode,to_mode) VALUES($1,$2,NULLIF($3,'')::uuid,$4,$5)`, siteID, actor, userID, mode, restored); err != nil {
+			return "", 0, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return "", 0, err
+	}
+	return restored, int(tag.RowsAffected()), nil
 }
 
 func (d *DB) MakerOfferIDs(ctx context.Context, makerID string) ([]string, error) {

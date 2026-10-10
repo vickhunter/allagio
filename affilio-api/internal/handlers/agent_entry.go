@@ -329,6 +329,10 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 }
 
 func (h *AgentEntry) PutSetup(c *gin.Context) {
+	if credentialPresented(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "setup is saved from a signed-in dashboard session"})
+		return
+	}
 	owner, ok := h.sessionOwner(c)
 	if !ok {
 		return
@@ -525,7 +529,7 @@ func (h *AgentEntry) putMode(c *gin.Context, scope string) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if actor.Kind == "agent_tool" && (!entry.AgentMaySetMode(prev.Mode, next.Mode) || rulesOf(next).LooserThan(rulesOf(prev))) {
+	if (actor.Kind == "agent_tool" || credentialPresented(c)) && (!entry.AgentMaySetMode(prev.Mode, next.Mode) || rulesOf(next).LooserThan(rulesOf(prev))) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "agent tools can only tighten a mode"})
 		return
 	}
@@ -552,12 +556,43 @@ func (h *AgentEntry) KillSwitch(c *gin.Context) {
 	if !ok || !h.siteAllowed(c, actor, c.Param("id")) {
 		return
 	}
+	body, err := readJSONBody(c, 1024)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return
+	}
+	enabled := true
+	if len(bytes.TrimSpace(body)) > 0 {
+		var req struct {
+			Enabled *bool `json:"enabled"`
+		}
+		if decodeStrict(body, &req) != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+			return
+		}
+		if req.Enabled != nil {
+			enabled = *req.Enabled
+		}
+	}
 	prev, _, err := h.sitePolicy(c, c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "kill switch failed"})
 		return
 	}
-	if actor.Kind == "agent_tool" && !entry.AgentMaySetMode(prev.Mode, entry.ModeManual) {
+	if !enabled {
+		if credentialPresented(c) || actor.Kind != "owner_ui" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "turning the kill switch off requires a signed-in dashboard session"})
+			return
+		}
+		mode, unpaused, err := h.DB.ReleaseSiteKillSwitch(c.Request.Context(), c.Param("id"), actor.Kind, actor.UserID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "kill switch failed"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"mode": mode, "kill_switch": false, "paused": 0, "unpaused": unpaused})
+		return
+	}
+	if (actor.Kind == "agent_tool" || credentialPresented(c)) && !entry.AgentMaySetMode(prev.Mode, entry.ModeManual) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "agent tools can only tighten a mode"})
 		return
 	}
@@ -566,7 +601,7 @@ func (h *AgentEntry) KillSwitch(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "kill switch failed"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"mode": "manual", "paused": paused})
+	c.JSON(http.StatusOK, gin.H{"mode": "manual", "kill_switch": true, "paused": paused})
 }
 
 func (h *AgentEntry) DecidePlacement(c *gin.Context) {
@@ -1097,6 +1132,7 @@ func policyJSON(p database.ApprovalPolicy, source string) gin.H {
 		"min_relevance": p.MinRelevance, "allowed_positions": listOrEmpty(p.AllowedPositions),
 		"max_placements_per_30_days": p.MaxPlacementsPer30Days, "copy_edits_allowed": p.CopyEditsAllowed,
 		"min_site_quality": p.MinSiteQuality, "allowed_niches": listOrEmpty(p.AllowedNiches),
+		"kill_switch": p.KillSwitch,
 	}
 }
 

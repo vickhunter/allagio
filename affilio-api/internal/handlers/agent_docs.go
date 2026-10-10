@@ -133,7 +133,7 @@ PUT /v1/setup/settings
 
 Publisher body fields are ` + "`sites_channels`" + `, ` + "`never_topics`" + `, and ` + "`box_position`" + ` (` + "`after_intro`" + `, ` + "`matched_section`" + `, ` + "`end`" + `, ` + "`main_post`" + `, ` + "`first_reply`" + `, ` + "`early_mention`" + `, ` + "`description`" + `, ` + "`pinned_comment`" + `).
 
-The row stores ` + "`mode_shown`" + `, the chosen ` + "`mode`" + `, the owner id, and the time. Saving also sets that mode on the owner's site, or on the maker's offers.
+The row stores ` + "`mode_shown`" + `, the chosen ` + "`mode`" + `, the owner id, and the time. Saving also sets that mode on the owner's site, or on the maker's offers. The mode chosen here, right after the device-code browser sign-in, is the human choosing. A preselected ` + "`yolo`" + ` for a CLI install is saved. An API key cannot call this save.
 `
 
 const listingCardDoc = `# Listing card
@@ -198,7 +198,7 @@ PUT /v1/offers/:id/mode
 
 ` + "`min_relevance`" + ` defaults to 40 and cannot be below 25. The placement cap defaults to 3 per 30 days. Maker auto rules are ` + "`min_site_quality`" + ` and ` + "`allowed_niches`" + `.
 
-An owner session may loosen or tighten. An agent key may only tighten (` + "`yolo`" + ` to ` + "`auto`" + ` to ` + "`manual`" + `) and may not widen the rules. Offer copy, page content, and feedback are rejected and do not change the policy. Every mode change stores ` + "`owner_ui`" + ` or ` + "`agent_tool`" + `, the user id, and the time.
+An owner session may loosen or tighten. A project key or an account key may only make the rules stricter: a tighter mode (` + "`yolo`" + ` to ` + "`auto`" + ` to ` + "`manual`" + `), a lower cap, a higher minimum relevance, or pausing. Loosening the mode (` + "`manual`" + ` to ` + "`auto`" + `, ` + "`auto`" + ` to ` + "`yolo`" + `, or ` + "`manual`" + ` to ` + "`yolo`" + `), raising a cap, and lowering minimum relevance are session-only and return 403 when any API key is present. Offer copy, page content, and feedback are rejected and do not change the policy. Every mode change stores ` + "`owner_ui`" + ` or ` + "`agent_tool`" + `, the user id, and the time.
 
 ## Hard checks
 
@@ -227,9 +227,17 @@ Manual, or anything outside an auto policy, returns ` + "`decision: needs_owner`
 
 ` + "```" + `
 POST /v1/sites/:id/kill-switch
+{"enabled": true}
 ` + "```" + `
 
-The site returns to manual. Approved placements that are not published yet are paused, and commit refuses them.
+` + "`enabled: true`" + `, or a body that omits it, turns the switch on. The site returns to manual. Approved placements that are not published yet are paused, and commit refuses them. A project key or an account key may turn the switch on.
+
+` + "```" + `
+POST /v1/sites/:id/kill-switch
+{"enabled": false}
+` + "```" + `
+
+Turning the switch off is session-only. Any API key receives 403. The signed-in human restores the mode from before the switch and unpauses those approvals.
 
 ## Digest
 
@@ -247,11 +255,11 @@ Undo revokes the placement or pauses the offer and stores ` + "`placement_undo`"
 
 const accountDoc = `# Account keys and digest
 
-Two kinds of key exist. A project key comes from device-code approval and works for one site or one offer. An account key works for every site and offer on the account. Neither key can skip the hard checks or loosen a mode.
+Two kinds of key exist. A project key comes from device-code approval and works for one site or one offer. An account key works for every site and offer on the account. Neither key can skip the hard checks, loosen a mode, raise a cap, lower minimum relevance, or turn a kill switch off. Those four actions are session-only.
 
 ## Account keys
 
-Create, list, and revoke require the owner session. ` + "`X-API-Key`" + `, ` + "`X-Maker-Key`" + `, and ` + "`Authorization`" + ` are refused with 403.
+Create, list, and revoke require the owner session. Creating an account-wide key is session-only: ` + "`X-API-Key`" + `, ` + "`X-Maker-Key`" + `, and ` + "`Authorization`" + ` are refused with 403, including a project key and an account key.
 
 ` + "```" + `
 POST /v1/account-keys

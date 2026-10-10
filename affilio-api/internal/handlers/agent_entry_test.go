@@ -610,6 +610,7 @@ func TestDocumentedScreenActionsHaveEndpoints(t *testing.T) {
 		t.Fatal("no documented screen actions")
 	}
 	seen := map[string]bool{}
+	sessionOnly := map[string]bool{}
 	for _, action := range entry.ScreenActions {
 		if action.Screen == "" || action.Action == "" || action.Method == "" || action.Path == "" {
 			t.Fatalf("incomplete screen action: %+v", action)
@@ -621,6 +622,23 @@ func TestDocumentedScreenActionsHaveEndpoints(t *testing.T) {
 		if !mounted[action.Method+" "+action.Path] {
 			t.Errorf("%s: %q has no endpoint %s %s", action.Screen, action.Action, action.Method, action.Path)
 		}
+		if action.SessionOnly {
+			sessionOnly[action.Action] = true
+		}
+	}
+	for _, action := range []string{
+		"Loosen the approval mode (manual to auto, auto to yolo, or manual to yolo)",
+		"Raise a cap or lower minimum relevance",
+		"Turn the kill switch off",
+		"Create an account-wide key",
+	} {
+		if !sessionOnly[action] {
+			t.Errorf("%q is not marked session-only", action)
+		}
+		delete(sessionOnly, action)
+	}
+	if len(sessionOnly) != 0 {
+		t.Errorf("unexpected session-only rows: %v", sessionOnly)
 	}
 	for _, screen := range []string{"setup", "dashboard", "digest"} {
 		if !seen[screen] {
@@ -802,6 +820,182 @@ VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, 
 	after, _ := postJSON(t, r, http.MethodGet, "/v1/account/digest", nil, map[string]string{"X-API-Key": accountKey})
 	if after.Code != http.StatusForbidden {
 		t.Fatalf("revoked key: %d", after.Code)
+	}
+}
+
+func TestSessionOnlyActions(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "session-only-owner", "session-only@example.com")
+	siteID := createTestSite(t, db, "session-site-key", "session.example", "Session Blog")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+
+	_, codeBody := postJSON(t, r, http.MethodPost, "/v1/device/code", map[string]any{}, nil)
+	userCode := codeBody["user_code"].(string)
+	approved, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/device/approve", map[string]any{
+		"user_code": userCode, "decision": "approve", "scope": "site", "project_id": siteID,
+	})
+	if approved.Code != http.StatusOK {
+		t.Fatalf("device approve: %d %s", approved.Code, approved.Body.String())
+	}
+	saved, setup := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/setup/settings", map[string]any{
+		"role": "publisher", "install_path": "cli", "mode_shown": "yolo", "mode": "yolo",
+		"sites_channels": []string{"session.example"}, "box_position": "end",
+	})
+	if saved.Code != http.StatusOK || setup["mode"] != "yolo" || setup["saved_by"] != owner.ID {
+		t.Fatalf("cli setup: %d %s", saved.Code, saved.Body.String())
+	}
+	got, mode := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/sites/"+siteID+"/mode", nil)
+	if got.Code != http.StatusOK || mode["mode"] != "yolo" {
+		t.Fatalf("preselected yolo: %d %s", got.Code, got.Body.String())
+	}
+
+	projectKey := "or_session_project_key"
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO project_keys(key_hash,key_prefix,owner_id,scope,site_id,expires_at)
+VALUES($1,'or_sess',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(projectKey), owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	created, accountBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/account-keys", nil)
+	if created.Code != http.StatusCreated || accountBody["key"] == "" {
+		t.Fatalf("session account key: %d %s", created.Code, created.Body.String())
+	}
+	accountKey := accountBody["key"].(string)
+	keys := []string{projectKey, accountKey}
+
+	refuse := func(method, path, label string, payload any) {
+		t.Helper()
+		for _, key := range keys {
+			for _, withSession := range []bool{false, true} {
+				var rec *httptest.ResponseRecorder
+				if withSession {
+					raw, err := json.Marshal(payload)
+					if err != nil {
+						t.Fatal(err)
+					}
+					req := httptest.NewRequest(method, path, strings.NewReader(string(raw)))
+					req.Header.Set("Content-Type", "application/json")
+					req.Header.Set("Origin", h.BaseURL)
+					req.Header.Set("X-CSRF-Token", owner.CSRF)
+					req.Header.Set("X-API-Key", key)
+					req.AddCookie(cookie)
+					rec = httptest.NewRecorder()
+					r.ServeHTTP(rec, req)
+				} else {
+					rec, _ = postJSON(t, r, method, path, payload, map[string]string{"X-API-Key": key})
+				}
+				if rec.Code != http.StatusForbidden {
+					t.Fatalf("%s with key session=%v: %d %s", label, withSession, rec.Code, rec.Body.String())
+				}
+			}
+		}
+	}
+	sessionPut := func(payload map[string]any) map[string]any {
+		t.Helper()
+		rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/sites/"+siteID+"/mode", payload)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("session save %v: %d %s", payload, rec.Code, rec.Body.String())
+		}
+		return body
+	}
+	keyPut := func(key string, payload map[string]any) map[string]any {
+		t.Helper()
+		rec, body := postJSON(t, r, http.MethodPut, "/v1/sites/"+siteID+"/mode", payload, map[string]string{"X-API-Key": key})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("key save %v: %d %s", payload, rec.Code, rec.Body.String())
+		}
+		return body
+	}
+
+	for _, key := range keys {
+		rec, _ := postJSON(t, r, http.MethodPut, "/v1/setup/settings", map[string]any{
+			"role": "publisher", "install_path": "cli", "mode_shown": "yolo", "mode": "manual",
+		}, map[string]string{"X-API-Key": key})
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("key saved setup: %d %s", rec.Code, rec.Body.String())
+		}
+	}
+	refuse(http.MethodPost, "/v1/account-keys", "create account key", map[string]any{})
+
+	sessionPut(map[string]any{"mode": "manual"})
+	refuse(http.MethodPut, "/v1/sites/"+siteID+"/mode", "manual to auto", map[string]any{"mode": "auto"})
+	if sessionPut(map[string]any{"mode": "auto"})["mode"] != "auto" {
+		t.Fatal("session did not set auto")
+	}
+	refuse(http.MethodPut, "/v1/sites/"+siteID+"/mode", "auto to yolo", map[string]any{"mode": "yolo"})
+	sessionPut(map[string]any{"mode": "manual"})
+	refuse(http.MethodPut, "/v1/sites/"+siteID+"/mode", "manual to yolo", map[string]any{"mode": "yolo"})
+	if sessionPut(map[string]any{"mode": "yolo"})["mode"] != "yolo" {
+		t.Fatal("session did not set yolo")
+	}
+
+	refuse(http.MethodPut, "/v1/sites/"+siteID+"/mode", "raise cap", map[string]any{"mode": "yolo", "max_placements_per_30_days": 10})
+	refuse(http.MethodPut, "/v1/sites/"+siteID+"/mode", "lower min relevance", map[string]any{"mode": "yolo", "min_relevance": 30})
+	raised := sessionPut(map[string]any{"mode": "yolo", "max_placements_per_30_days": 10})
+	if raised["max_placements_per_30_days"] != float64(10) {
+		t.Fatalf("session cap: %v", raised["max_placements_per_30_days"])
+	}
+	lowered := sessionPut(map[string]any{"mode": "yolo", "min_relevance": 30})
+	if lowered["min_relevance"] != float64(30) {
+		t.Fatalf("session min relevance: %v", lowered["min_relevance"])
+	}
+
+	if keyPut(projectKey, map[string]any{"mode": "yolo", "max_placements_per_30_days": 4})["max_placements_per_30_days"] != float64(4) {
+		t.Fatal("project key did not lower the cap")
+	}
+	if keyPut(accountKey, map[string]any{"mode": "yolo", "max_placements_per_30_days": 2})["max_placements_per_30_days"] != float64(2) {
+		t.Fatal("account key did not lower the cap")
+	}
+	if keyPut(projectKey, map[string]any{"mode": "yolo", "min_relevance": 45})["min_relevance"] != float64(45) {
+		t.Fatal("project key did not raise minimum relevance")
+	}
+	if keyPut(accountKey, map[string]any{"mode": "yolo", "min_relevance": 60})["min_relevance"] != float64(60) {
+		t.Fatal("account key did not raise minimum relevance")
+	}
+	if keyPut(projectKey, map[string]any{"mode": "auto"})["mode"] != "auto" {
+		t.Fatal("project key did not tighten to auto")
+	}
+	if keyPut(accountKey, map[string]any{"mode": "manual"})["mode"] != "manual" {
+		t.Fatal("account key did not tighten to manual")
+	}
+	if sessionPut(map[string]any{"mode": "yolo"})["mode"] != "yolo" {
+		t.Fatal("session did not restore yolo before the kill switch")
+	}
+
+	_, offerID := seedListedOffer(t, db, "session-maker-key", "session-maker@example.com", "Session Product")
+	placementID := insertPlacement(t, db, siteID, offerID, "https://session.example/post", "A short honest note.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW(), approved_by_kind='policy:yolo', matched_rule='hard_checks', policy_version=1 WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
+	killed, killBody := postJSON(t, r, http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", map[string]any{"enabled": true}, map[string]string{"X-API-Key": projectKey})
+	if killed.Code != http.StatusOK || killBody["mode"] != "manual" || killBody["kill_switch"] != true || killBody["paused"].(float64) < 1 {
+		t.Fatalf("project key kill on: %d %s", killed.Code, killed.Body.String())
+	}
+	killed, killBody = postJSON(t, r, http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", map[string]any{"enabled": true}, map[string]string{"X-API-Key": accountKey})
+	if killed.Code != http.StatusOK || killBody["mode"] != "manual" || killBody["kill_switch"] != true {
+		t.Fatalf("account key kill on: %d %s", killed.Code, killed.Body.String())
+	}
+	var paused bool
+	if err := db.Pool.QueryRow(context.Background(), `SELECT auto_paused FROM placement_proposals WHERE id=$1`, placementID).Scan(&paused); err != nil || !paused {
+		t.Fatalf("placement was not paused: %v %v", paused, err)
+	}
+	refuse(http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", "kill switch off", map[string]any{"enabled": false})
+	var stillOn bool
+	var storedMode string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT mode, kill_switch FROM approval_policies WHERE site_id=$1`, siteID).Scan(&storedMode, &stillOn); err != nil || storedMode != "manual" || !stillOn {
+		t.Fatalf("kill switch changed by a key: %s %v %v", storedMode, stillOn, err)
+	}
+	released, off := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/sites/"+siteID+"/kill-switch", map[string]any{"enabled": false})
+	if released.Code != http.StatusOK || off["mode"] != "yolo" || off["kill_switch"] != false || off["unpaused"].(float64) < 1 {
+		t.Fatalf("session kill off: %d %s", released.Code, released.Body.String())
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT mode, kill_switch FROM approval_policies WHERE site_id=$1`, siteID).Scan(&storedMode, &stillOn); err != nil || storedMode != "yolo" || stillOn {
+		t.Fatalf("restored policy: %s %v %v", storedMode, stillOn, err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT auto_paused FROM placement_proposals WHERE id=$1`, placementID).Scan(&paused); err != nil || paused {
+		t.Fatalf("placement stayed paused: %v %v", paused, err)
 	}
 }
 

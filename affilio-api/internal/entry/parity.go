@@ -4,10 +4,11 @@ package entry
 // the digest. Part B wraps each row's endpoint. A handler test fails when a
 // row's method and path are not mounted.
 type ScreenAction struct {
-	Screen string
-	Action string
-	Method string
-	Path   string
+	Screen      string
+	Action      string
+	Method      string
+	Path        string
+	SessionOnly bool // true when a project key or an account key must receive 403
 }
 
 // ScreenActions is the parity contract for the setup page, the dashboard, and
@@ -26,12 +27,15 @@ var ScreenActions = []ScreenAction{
 	{Screen: "dashboard", Action: "Number: minimum relevance", Method: "GET", Path: "/v1/sites/:id/mode"},
 	{Screen: "dashboard", Action: "Number: maximum new placements per 30 days", Method: "GET", Path: "/v1/sites/:id/mode"},
 	{Screen: "dashboard", Action: "Save a site mode and policy", Method: "PUT", Path: "/v1/sites/:id/mode"},
+	{Screen: "dashboard", Action: "Loosen the approval mode (manual to auto, auto to yolo, or manual to yolo)", Method: "PUT", Path: "/v1/sites/:id/mode", SessionOnly: true},
+	{Screen: "dashboard", Action: "Raise a cap or lower minimum relevance", Method: "PUT", Path: "/v1/sites/:id/mode", SessionOnly: true},
 	{Screen: "dashboard", Action: "Read an offer policy", Method: "GET", Path: "/v1/offers/:id/mode"},
 	{Screen: "dashboard", Action: "Number: minimum site quality", Method: "GET", Path: "/v1/offers/:id/mode"},
 	{Screen: "dashboard", Action: "Save an offer mode and policy", Method: "PUT", Path: "/v1/offers/:id/mode"},
-	{Screen: "dashboard", Action: "Kill switch", Method: "POST", Path: "/v1/sites/:id/kill-switch"},
+	{Screen: "dashboard", Action: "Turn the kill switch on", Method: "POST", Path: "/v1/sites/:id/kill-switch"},
+	{Screen: "dashboard", Action: "Turn the kill switch off", Method: "POST", Path: "/v1/sites/:id/kill-switch", SessionOnly: true},
 	{Screen: "dashboard", Action: "Show the hard checks", Method: "GET", Path: "/v1/policy/hard-checks"},
-	{Screen: "dashboard", Action: "Create an account-wide key", Method: "POST", Path: "/v1/account-keys"},
+	{Screen: "dashboard", Action: "Create an account-wide key", Method: "POST", Path: "/v1/account-keys", SessionOnly: true},
 	{Screen: "dashboard", Action: "List account keys", Method: "GET", Path: "/v1/account-keys"},
 	{Screen: "dashboard", Action: "Revoke an account key", Method: "POST", Path: "/v1/account-keys/:id/revoke"},
 	{Screen: "dashboard", Action: "Record dashboard opened", Method: "POST", Path: "/v1/events"},
