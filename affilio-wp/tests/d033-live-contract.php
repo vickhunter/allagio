@@ -208,7 +208,8 @@ foreach ($GLOBALS['live_calls'] as $call) {
 }
 check($receipt_call !== null && isset($receipt_call['args']['headers']['X-API-Key']) && $receipt_call['args']['headers']['X-API-Key'] === $fixture['site_key'], 'receipt did not use the site key');
 check(!isset($receipt_call['args']['headers']['X-Plugin-Key']), 'receipt sent X-Plugin-Key');
-check(strpos($receipt_call['args']['body'], '/go/' . $receipt_id) !== false, 'receipt body omitted /go/');
+$receipt_sent = json_decode($receipt_call['args']['body'], true);
+check(is_array($receipt_sent) && strpos($receipt_sent['published_text'], '/go/' . $receipt_id) !== false, 'receipt body omitted /go/');
 
 $refused = d033_live_http(rtrim($fixture['base'], '/') . '/placements/' . $refused_id . '/plugin-ack', array(
     'method' => 'POST',
@@ -218,7 +219,8 @@ $refused = d033_live_http(rtrim($fixture['base'], '/') . '/placements/' . $refus
     ),
     'body' => json_encode(array('action' => 'placed', 'rel_sponsored' => true)),
 ));
-check($refused['code'] === 403, 'project X-API-Key on plugin-ack returned ' . $refused['code'] . ' ' . $refused['body']);
+$refused_code = isset($refused['response']['code']) ? (int) $refused['response']['code'] : 0;
+check($refused_code === 403, 'project X-API-Key on plugin-ack returned ' . $refused_code . ' ' . $refused['body']);
 $refused_body = json_decode($refused['body'], true);
 check(is_array($refused_body) && isset($refused_body['error']) && $refused_body['error'] === 'plugin key required', 'project key error ' . $refused['body']);
 
