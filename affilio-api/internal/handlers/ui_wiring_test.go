@@ -16,14 +16,22 @@ import (
 func TestRestoreOrRedoWithoutUndoReturnsNotUndone(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	_, _, r := newEntryTest(t, db)
+	h, _, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "undo-miss-owner", "undo-miss-owner@example.com")
 	siteID := createTestSite(t, db, "undo-miss-site", "undo-miss.example", "Undo")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
 	_, offerID := seedListedOffer(t, db, "undo-miss-maker", "undo-miss-maker@example.com", "Undo Product")
 	placementID := insertPlacement(t, db, siteID, offerID, "https://undo-miss.example/post", "Honest note about the product.")
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', approved_at=NOW(), approved_by_kind='policy:yolo' WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
 	}
-	rec, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/restore", nil, map[string]string{"X-API-Key": "undo-miss-site"})
+	keyed, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/restore", nil, map[string]string{"X-API-Key": "undo-miss-site"})
+	if keyed.Code != http.StatusForbidden {
+		t.Fatalf("site key restore: %d %s", keyed.Code, keyed.Body.String())
+	}
+	rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/restore", nil)
 	if rec.Code != http.StatusConflict || body["reason"] != "not_undone" || body["message"] != "The placement was not undone." || body["error"] != nil {
 		t.Fatalf("restore without undo: %d %s", rec.Code, rec.Body.String())
 	}

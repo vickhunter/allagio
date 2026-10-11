@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"affilio-api/internal/entry"
@@ -253,10 +254,11 @@ FROM placement_proposals WHERE id=$1`, id).Scan(&row.Status, &row.StatusBefore, 
 }
 
 // RestoreUndonePlacement puts the placement back only when the same identity
-// is still inside the undo window. Pause and the placement cap are checked
-// in this transaction, after the row is locked. approved_by_kind is left as
-// it was. block is paused, cap, or window_expired when the update does not run.
-func (d *DB) RestoreUndonePlacement(ctx context.Context, id, userID, keyHash, actor string, now time.Time, cap int) (status, approvedBy, block string, ok bool, err error) {
+// is still inside the undo window. Pause, the placement cap, and the offer
+// claim check run in this transaction, after the row is locked.
+// approved_by_kind is left as it was. block is paused, cap, claims_from_offer,
+// or window_expired when the update does not run.
+func (d *DB) RestoreUndonePlacement(ctx context.Context, id, userID, keyHash, actor string, now time.Time, cap int, claims entry.ClaimChecker) (status, approvedBy, block string, ok bool, err error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return "", "", "", false, err
@@ -311,6 +313,18 @@ AND status<>'revoked' AND id<>$3`, siteID, now.Add(-30*24*time.Hour), id).Scan(&
 	}
 	if used >= cap {
 		return "", "", "cap", false, nil
+	}
+	var copyText, product, category, website string
+	err = tx.QueryRow(ctx, `SELECT pp.copy, COALESCE(p.name,''), COALESCE(p.primary_category,''), COALESCE(p.website_url,'')
+FROM placement_proposals pp
+JOIN offers o ON o.id = pp.offer_id
+JOIN products p ON p.id = o.product_id
+WHERE pp.id=$1`, id).Scan(&copyText, &product, &category, &website)
+	if err != nil {
+		return "", "", "", false, err
+	}
+	if entry.ClaimsFail(claims, copyText, strings.TrimSpace(product+"\n"+category+"\n"+website)) {
+		return "", "", "claims_from_offer", false, nil
 	}
 	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL,
 plugin_wait='restore', plugin_wait_at=$3, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
@@ -427,24 +441,50 @@ WHERE id=$1 AND site_id=$2 AND plugin_wait IN ('', 'restore', 'remove')`, id, si
 }
 
 // RetryPluginPlacement re-queues only the action stored when the failure
-// arrived. removed stays a removal. restored stays a re-insert. Status and
-// restore_unconfirmed are left alone, so a revoked or failed-restore go link
-// stays stopped.
-func (d *DB) RetryPluginPlacement(ctx context.Context, id, siteID, action string, at time.Time) (bool, error) {
+// arrived. removed stays a removal. restored stays a re-insert and re-checks
+// the offer's claims in this same transaction, before the row is updated.
+// Status and restore_unconfirmed are left alone, so a revoked or failed-restore
+// go link stays stopped. block is claims_from_offer when that check refuses.
+func (d *DB) RetryPluginPlacement(ctx context.Context, id, siteID, action string, at time.Time, claims entry.ClaimChecker) (ok bool, block string, err error) {
 	wait := "restore"
 	if action == "removed" {
 		wait = "remove"
 	} else if action != "restored" {
-		return false, nil
+		return false, "", nil
 	}
-	tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return false, "", err
+	}
+	defer tx.Rollback(ctx)
+	var copyText, product, category, website string
+	err = tx.QueryRow(ctx, `SELECT pp.copy, COALESCE(p.name,''), COALESCE(p.primary_category,''), COALESCE(p.website_url,'')
+FROM placement_proposals pp
+JOIN offers o ON o.id = pp.offer_id
+JOIN products p ON p.id = o.product_id
+WHERE pp.id=$1 AND pp.site_id=$2 AND pp.plugin_failed_reason <> '' AND pp.failed_action=$3
+AND pp.plugin_wait IN ('', 'restore', 'remove')
+FOR UPDATE OF pp`, id, siteID, action).Scan(&copyText, &product, &category, &website)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, "", nil
+	}
+	if err != nil {
+		return false, "", err
+	}
+	if action == "restored" && entry.ClaimsFail(claims, copyText, strings.TrimSpace(product+"\n"+category+"\n"+website)) {
+		return false, "claims_from_offer", nil
+	}
+	tag, err := tx.Exec(ctx, `UPDATE placement_proposals
 SET plugin_failed_reason='', failed_action='', plugin_wait=$4, plugin_wait_at=$3, plugin_contact_at=$3
 WHERE id=$1 AND site_id=$2 AND plugin_failed_reason <> '' AND failed_action=$5
 AND plugin_wait IN ('', 'restore', 'remove')`, id, siteID, at, wait, action)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
-	return tag.RowsAffected() == 1, nil
+	if tag.RowsAffected() != 1 {
+		return false, "", nil
+	}
+	return true, "", tx.Commit(ctx)
 }
 
 // PlacementStatusSQL is the placement poll. It reads one row by primary key

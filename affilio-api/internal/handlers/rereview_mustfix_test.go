@@ -112,7 +112,7 @@ func TestCapExcludesThePlacementItself(t *testing.T) {
 	if undone.Code != http.StatusOK {
 		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
 	}
-	restored, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+only+"/restore", nil, siteKey)
+	restored, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+only+"/restore", nil)
 	if restored.Code != http.StatusOK {
 		t.Fatalf("self was counted against the cap: %d %s", restored.Code, restored.Body.String())
 	}
@@ -126,7 +126,7 @@ func TestCapExcludesThePlacementItself(t *testing.T) {
 	if undone.Code != http.StatusOK {
 		t.Fatalf("second undo: %d %s", undone.Code, undone.Body.String())
 	}
-	blocked, blockedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+self+"/restore", nil, siteKey)
+	blocked, blockedBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+self+"/restore", nil)
 	if blocked.Code != http.StatusUnprocessableEntity || blockedBody["check_id"] != "cap" {
 		t.Fatalf("other placement should fill the cap: %d %s", blocked.Code, blocked.Body.String())
 	}
@@ -221,12 +221,11 @@ func TestRelSponsoredComesFromPluginReread(t *testing.T) {
 	if saved.Code != http.StatusOK {
 		t.Fatalf("mode: %d %s", saved.Code, saved.Body.String())
 	}
-	siteKey := map[string]string{"X-API-Key": "rel-site-key"}
 	placementID := insertPlacement(t, db, siteID, offerID, "https://rel.example/post", "Rel Product note.")
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='(link sponsorizzato)' WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
 	}
-	decided, decidedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 10, "position": "end", "rel_sponsored": false}, siteKey)
+	decided, decidedBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 10, "position": "end", "rel_sponsored": false})
 	if decided.Code != http.StatusOK || decidedBody["approved_by"] != "policy:yolo" {
 		t.Fatalf("decide used disclosure words: %d %s", decided.Code, decided.Body.String())
 	}

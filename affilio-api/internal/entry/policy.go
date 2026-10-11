@@ -34,6 +34,23 @@ type LiveClaimChecker struct{}
 func (LiveClaimChecker) CheckClaims(string, string) error { return nil }
 func (LiveClaimChecker) Real() bool                       { return true }
 
+// UncheckedClaims skips claims_from_offer. Restore and retry call ClaimsFail
+// in the same database transaction as the other re-checks.
+type UncheckedClaims struct{}
+
+func (UncheckedClaims) CheckClaims(string, string) error { return nil }
+func (UncheckedClaims) Real() bool                       { return true }
+
+// ClaimsFail is true when restore or retry must refuse the placement.
+// Any check error counts, including the production stub. Decide still
+// ignores ErrClaimCheckUnavailable so yolo stays on manual approval.
+func ClaimsFail(claims ClaimChecker, copyText, offerData string) bool {
+	if claims == nil {
+		claims = StubClaimChecker{}
+	}
+	return claims.CheckClaims(copyText, offerData) != nil
+}
+
 // AutoRules is the owner policy for auto mode. Maker fields (site quality and
 // niches) apply when an offer accepts a publisher.
 type AutoRules struct {

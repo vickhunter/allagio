@@ -57,6 +57,10 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.GET("/v1/sites/:id/mode", h.GetSiteMode)
 	r.PUT("/v1/sites/:id/mode", h.PutSiteMode)
 	r.POST("/v1/sites/:id/kill-switch", h.KillSwitch)
+	r.POST("/v1/sites/:id/plugin-key", h.IssuePluginKey)
+	r.GET("/v1/sites/:id/plugin-key", h.ListPluginKeys)
+	r.POST("/v1/sites/:id/plugin-key/rotate", h.RotatePluginKey)
+	r.POST("/v1/sites/:id/plugin-key/revoke", h.RevokePluginKey)
 	r.POST("/v1/account/pause", h.AccountPause)
 	r.POST("/v1/account/resume", h.AccountResume)
 	r.GET("/v1/offers/:id/mode", h.GetOfferMode)
@@ -1119,13 +1123,13 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 	if source == "policy" {
 		rules.UseStoredCap = true
 	}
-	status, approvedBy, block, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now, entry.CapLimit(rules))
+	status, approvedBy, block, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now, entry.CapLimit(rules), h.claims())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
 		return
 	}
-	if block == "cap" {
-		writeCheckDenied(c, []string{"cap"})
+	if block == "cap" || block == "claims_from_offer" {
+		writeCheckDenied(c, []string{block})
 		return
 	}
 	if block == "paused" {
@@ -1179,10 +1183,7 @@ func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementU
 		ExistingBoxes: boxes, Relevance: services.ScorePlacement(row.Copy, offer.ProductName, offer.Category, offer.Website),
 		OfferLive: offer.Live, RevokeWorks: revokePathAvailable(row),
 		PlacementsIn30Days: used,
-	}, h.claims())
-	if decision.NeedsOwner && decision.Reason == entry.ClaimCheckReason {
-		return nil, nil
-	}
+	}, entry.UncheckedClaims{})
 	return decision.Failures, nil
 }
 
@@ -1322,9 +1323,13 @@ func (h *AgentEntry) RetryPlugin(c *gin.Context) {
 			return
 		}
 	}
-	retried, err := h.DB.RetryPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, action, h.now())
+	retried, block, err := h.DB.RetryPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, action, h.now(), h.claims())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+		return
+	}
+	if block == "claims_from_offer" {
+		writeCheckDenied(c, []string{block})
 		return
 	}
 	if !retried {
@@ -1921,7 +1926,7 @@ func (h *AgentEntry) writePolicy(c *gin.Context, policy database.ApprovalPolicy,
 }
 
 func sessionOnlyDecision(c *gin.Context) bool {
-	if c.GetBool("agent_access") || c.GetString("key_kind") == "project" || c.GetString("key_kind") == "account" {
+	if credentialPresented(c) || c.GetBool("agent_access") || c.GetString("key_kind") == "project" || c.GetString("key_kind") == "account" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "decide and restore require a signed-in dashboard session"})
 		return true
 	}

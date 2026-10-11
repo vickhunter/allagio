@@ -164,7 +164,17 @@ func (h *SitesHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register site"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"api_key": apiKey, "site_id": siteID})
+	body := gin.H{"api_key": apiKey, "site_id": siteID}
+	pluginKey, issued, err := mintPluginKey(c.Request.Context(), h.DB, siteID)
+	if err != nil {
+		log.Printf("sites.register plugin key failed domain=%s err=%v", req.Domain, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register site"})
+		return
+	}
+	if issued {
+		body["plugin_key"] = pluginKey
+	}
+	c.JSON(http.StatusOK, body)
 }
 
 func (h *SitesHandler) Delete(c *gin.Context) {
