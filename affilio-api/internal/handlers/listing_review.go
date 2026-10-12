@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"affilio-api/internal/config"
 	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
 	"affilio-api/internal/services"
@@ -21,6 +22,7 @@ const (
 	reviewReasonCaps      = "caps"
 
 	reviewClaimsMessage    = "Use only claims from the offer."
+	reviewClaimsNotLive    = "The claims check is not live yet."
 	reviewHeadMessage      = "The offer page did not answer."
 	reviewRelevanceMessage = "Relevance is below the minimum."
 	reviewCapsMessage      = "The placement cap is full."
@@ -48,9 +50,29 @@ func failedListingCheck(offer database.Offer, product database.Product, listed i
 	return "", "", false
 }
 
-func listingReview(offer database.Offer, product database.Product, listed int) (string, string) {
-	if offer.Status == "listed" {
+// claimsHeld is true for stub, and for real until the page checker is
+// installed. Empty and off-local run the four checks in failedListingCheck.
+// real does not auto-list: that branch stays the not-live hold so a local
+// CLAIMS_CHECK=real cannot list an offer the page checker has not seen.
+func claimsHeld(mode string) bool {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case config.ClaimsStub, config.ClaimsReal:
+		return true
+	default:
+		return false
+	}
+}
+
+// listingReview is recomputed on read. It is not stored. Under stub, and under
+// real until the page checker is installed, every submitted offer reports
+// claims and the not-live message. That includes an offer that failed a
+// different check the last time this process ran off-local.
+func listingReview(mode string, offer database.Offer, product database.Product, listed int) (string, string) {
+	if offer.Status != "submitted" {
 		return "", ""
+	}
+	if claimsHeld(mode) {
+		return reviewReasonClaims, reviewClaimsNotLive
 	}
 	reason, message, failed := failedListingCheck(offer, product, listed)
 	if !failed {
@@ -151,7 +173,7 @@ func nullReview(reason, message string) (any, any) {
 	return reason, message
 }
 
-func reviewForMakerProduct(ctx context.Context, db *database.DB, makerID, productID string) (string, string) {
+func reviewForMakerProduct(ctx context.Context, db *database.DB, claimsCheck, makerID, productID string) (string, string) {
 	if makerID == "" || productID == "" {
 		return "", ""
 	}
@@ -168,13 +190,16 @@ func reviewForMakerProduct(ctx context.Context, db *database.DB, makerID, produc
 		if offers[i].ProductID != productID || offers[i].Status != "submitted" {
 			continue
 		}
+		if claimsHeld(claimsCheck) {
+			return reviewReasonClaims, reviewClaimsNotLive
+		}
 		if product == nil {
 			product, err = db.GetProduct(ctx, makerID, productID)
 			if err != nil {
 				return "", ""
 			}
 		}
-		return listingReview(offers[i], *product, listed)
+		return listingReview(claimsCheck, offers[i], *product, listed)
 	}
 	return "", ""
 }

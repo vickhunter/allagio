@@ -36,6 +36,9 @@ type AgentEntry struct {
 	Now                func() time.Time
 	PluginOfflineAfter time.Duration
 	StatusLimiter      *IPRateLimiter
+	// ClaimsCheck is the resolved CLAIMS_CHECK mode. Listing-card reads use it
+	// so a hosted stub reports the not-live claims message.
+	ClaimsCheck string
 }
 
 type entryActor struct {
@@ -895,7 +898,7 @@ func (h *AgentEntry) GetListing(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing card not found"})
 		return
 	}
-	reason, message := reviewForMakerProduct(c.Request.Context(), h.DB, actor.MakerID, row.ProductID)
+	reason, message := reviewForMakerProduct(c.Request.Context(), h.DB, h.ClaimsCheck, actor.MakerID, row.ProductID)
 	reviewReason, reviewMessage := nullReview(reason, message)
 	c.JSON(http.StatusOK, gin.H{"id": row.ID, "card": json.RawMessage(row.Card), "signals": json.RawMessage(row.Signals), "score": row.Score, "payments_check": row.PaymentsCheck, "offer_link_health": row.OfferLinkHealth, "review_reason": reviewReason, "message": reviewMessage})
 }

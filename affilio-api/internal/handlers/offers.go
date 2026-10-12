@@ -14,6 +14,9 @@ import (
 
 type OffersHandler struct {
 	DB *database.DB
+	// ClaimsCheck is stub, real, or off-local. Empty matches off-local so a
+	// test router keeps today's four checks.
+	ClaimsCheck string
 }
 
 type offerPayload struct {
@@ -219,6 +222,19 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 		h.listOffer(c, offer, product)
 		return
 	}
+	if claimsHeld(h.ClaimsCheck) {
+		if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"id":            offer.ID,
+			"status":        "submitted",
+			"review_reason": reviewReasonClaims,
+			"message":       reviewClaimsNotLive,
+		})
+		return
+	}
 	listed, err := h.DB.CountListedOffers(c.Request.Context(), makerID(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
@@ -370,6 +386,9 @@ func (h *OffersHandler) presentWith(c *gin.Context, offer *database.Offer, liste
 	reason, message := "", ""
 	var product *database.Product
 	if offer.Status == "submitted" {
+		if claimsHeld(h.ClaimsCheck) {
+			reason, message = reviewReasonClaims, reviewClaimsNotLive
+		}
 		product = products[offer.ProductID]
 		if product == nil {
 			loaded, err := h.DB.GetProduct(c.Request.Context(), makerID(c), offer.ProductID)
@@ -378,8 +397,8 @@ func (h *OffersHandler) presentWith(c *gin.Context, offer *database.Offer, liste
 				products[offer.ProductID] = loaded
 			}
 		}
-		if product != nil {
-			reason, message = listingReview(*offer, *product, listed)
+		if product != nil && !claimsHeld(h.ClaimsCheck) {
+			reason, message = listingReview(h.ClaimsCheck, *offer, *product, listed)
 		}
 	}
 	item := offerJSON(offer, reason, message)

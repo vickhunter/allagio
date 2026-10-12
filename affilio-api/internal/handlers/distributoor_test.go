@@ -18,14 +18,22 @@ import (
 )
 
 func newMakerRouter(db *database.DB) *gin.Engine {
-	return newMakerRouterWithReadinessClient(db, &http.Client{Timeout: 5 * time.Second})
+	return newMakerRouterWithClaims(db, "")
+}
+
+func newMakerRouterWithClaims(db *database.DB, claims string) *gin.Engine {
+	return newMakerRouterFull(db, &http.Client{Timeout: 5 * time.Second}, claims)
 }
 
 func newMakerRouterWithReadinessClient(db *database.DB, client *http.Client) *gin.Engine {
+	return newMakerRouterFull(db, client, "")
+}
+
+func newMakerRouterFull(db *database.DB, client *http.Client, claims string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	products := &ProductsHandler{DB: db}
-	offers := &OffersHandler{DB: db}
+	offers := &OffersHandler{DB: db, ClaimsCheck: claims}
 	assessments := &AssessmentsHandler{
 		DB:     db,
 		Engine: &services.ReadinessEngine{AllowPrivateHosts: true, Client: client},

@@ -20,7 +20,7 @@ are required.
 | `list_listings` | — | `{listings: Listing[]}` — `GET /v1/listings`; `review_reason` and `message` are null when listed |
 | `get_offer` | offer_id* | Offer |
 | `update_offer` | offer_id* + fields, or status transition | Offer |
-| `submit_offer` | offer_id* | Untrusted makers list when claims, the cached HEAD check, minimum relevance, and the cap pass. A failed check stays in review: `{id, status: "submitted", review_reason, message}`. A readiness failure is `{error, reason, message}`. Trusted makers list directly. |
+| `submit_offer` | offer_id* | On a hosted server (`GIN_MODE=release`) the claims check defaults to `stub`, so an untrusted offer stays in review with `review_reason` `claims` until the page checker is installed. Local `off-local` lists when claims, the cached HEAD check, minimum relevance, and the cap pass. A failed check stays in review: `{id, status: "submitted", review_reason, message}`. A readiness failure is `{error, reason, message}`. Trusted makers list directly. |
 | `get_earnings` | — | `{offers: [{offer_id, product_name, status, clicks, sales, refunds, revenue, commission, currency}], totals[]}` |
 
 Errors are returned as MCP tool results with `isError: true` and the reason as
