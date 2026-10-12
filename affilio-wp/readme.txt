@@ -1,11 +1,16 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.19
+Stable tag: 0.1.20
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.20 =
+* An upgrade no longer fatals the front page. Go-link detection reads the request path before WordPress has built the query, and the version upgrade runs on init.
+* Box sync is scheduled on activation and upgrade, and cleared on deactivation. A failed plugin acknowledgement is retried with backoff.
+* Choosing "leave removed" settles as removed and sends the acknowledgement. `/go/<id>` without a trailing slash is not canonically cached. Publish matches the article URL or post id the API returns.
 
 = 0.1.19 =
 * An inserted box links to this site's `/go/<placement id>` with `rel="sponsored nofollow"` and the label "(link sponsorizzato)".

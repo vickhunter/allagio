@@ -11,6 +11,7 @@ $posts = array();
 function add_action($name, $callback) { $GLOBALS['actions'][$name][] = $callback; }
 function apply_filters($name, $value) { return $value; }
 function register_activation_hook($path, $callback) { $GLOBALS['actions']['activation'][] = $callback; }
+function register_deactivation_hook($path, $callback) { $GLOBALS['actions']['deactivation'][] = $callback; }
 function plugin_dir_path($path) { return dirname($path) . '/'; }
 function plugin_dir_url($path) { return 'https://blog.example/wp-content/plugins/affilio/'; }
 function get_option($key, $default = false) { return $GLOBALS['options'][$key] ?? $default; }

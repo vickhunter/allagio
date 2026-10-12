@@ -296,8 +296,7 @@ class Affilio_Distribution {
         if (is_wp_error($data)) {
             return $data;
         }
-        $placement = $data['placement'];
-        if ($placement['surface_url'] !== get_permalink($post)) {
+        if (!self::placement_matches_article(is_array($data) ? $data : array(), $post)) {
             return new WP_Error('affilio_surface', 'This placement belongs to another article.', array('status' => 409));
         }
         $data = $this->request('POST', '/placements/' . $id . '/commit', array());
@@ -982,6 +981,7 @@ class Affilio_Distribution {
     }
 
     public function sync_known_boxes() {
+        $this->drain_ack_queue();
         if (!function_exists('get_option')) {
             return;
         }
@@ -1000,38 +1000,85 @@ class Affilio_Distribution {
             if (!empty($data['fallback_url']) && class_exists('Affilio_Go')) {
                 Affilio_Go::remember_fallback($id, $data['fallback_url']);
             }
-            $wait = isset($data['plugin_wait']) ? (string) $data['plugin_wait'] : '';
-            $status = isset($data['status']) ? (string) $data['status'] : '';
             $phase = isset($row['phase']) ? (string) $row['phase'] : '';
-            if ($wait === 'remove' || ($status === 'revoked' && $phase === 'placed')) {
+            if (self::server_wants_removed($data)) {
                 $this->revoke_box((int) $row['post_id'], $id);
                 continue;
             }
-            if ($wait === 'restore' || ($status === 'committed' && $phase === 'removed')) {
+            if (self::server_wants_restored($data, $phase)) {
                 $this->restore_box((int) $row['post_id'], $id, $row);
             }
         }
     }
 
+    public static function server_wants_removed($data) {
+        $state = isset($data['plugin_state']) ? (string) $data['plugin_state'] : '';
+        if ($state === 'removed') {
+            return false;
+        }
+        $wait = isset($data['plugin_wait']) ? (string) $data['plugin_wait'] : '';
+        if ($wait === 'remove') {
+            return true;
+        }
+        $status = isset($data['status']) ? (string) $data['status'] : '';
+        // GET /placements/:id does not return plugin_wait. A revoke, including
+        // "leave removed", is status=revoked and plugin_state pending, then offline.
+        return $status === 'revoked';
+    }
+
+    public static function server_wants_restored($data, $phase) {
+        $wait = isset($data['plugin_wait']) ? (string) $data['plugin_wait'] : '';
+        if ($wait === 'restore') {
+            return true;
+        }
+        $status = isset($data['status']) ? (string) $data['status'] : '';
+        $state = isset($data['plugin_state']) ? (string) $data['plugin_state'] : '';
+        return $status === 'committed' && $phase === 'removed' && $state !== 'placed' && $state !== 'removed';
+    }
+
     public function maybe_upgrade() {
-        if (!function_exists('get_option') || !defined('AFFILIO_VERSION')) {
+        static $running = false;
+        if ($running || !function_exists('get_option') || !defined('AFFILIO_VERSION')) {
             return;
         }
         $seen = (string) get_option('affilio_seen_version', '');
-        if ($seen === AFFILIO_VERSION) {
+        $flush_pending = (string) get_option('affilio_go_flush_pending', '');
+        if ($seen === AFFILIO_VERSION && $flush_pending === '') {
             return;
         }
-        if (class_exists('Affilio_Go')) {
-            Affilio_Go::register_rewrites();
-            if (function_exists('flush_rewrite_rules')) {
-                flush_rewrite_rules(false);
+        if (class_exists('Affilio_Go') && !Affilio_Go::rewrite_api_ready()) {
+            return;
+        }
+        $running = true;
+        $flushed = !class_exists('Affilio_Go');
+        try {
+            if (class_exists('Affilio_Go')) {
+                Affilio_Go::register_rewrites();
+                if (function_exists('flush_rewrite_rules')) {
+                    flush_rewrite_rules(false);
+                    $flushed = true;
+                }
             }
-        }
-        if (($seen !== '' || $this->plugin_already_installed()) && class_exists('Affilio_Plugin_Ack')) {
-            $this->ack_existing_boxes();
-        }
-        if (function_exists('update_option')) {
-            update_option('affilio_seen_version', AFFILIO_VERSION, false);
+            if ($seen !== AFFILIO_VERSION && ($seen !== '' || $this->plugin_already_installed()) && class_exists('Affilio_Plugin_Ack')) {
+                $this->ack_existing_boxes();
+            }
+            if (function_exists('affilio_schedule_box_sync')) {
+                affilio_schedule_box_sync();
+            }
+        } catch (Throwable $error) {
+            error_log('affilio upgrade failed: ' . $error->getMessage());
+        } finally {
+            if (function_exists('update_option')) {
+                update_option('affilio_seen_version', AFFILIO_VERSION, false);
+                if ($flushed || $flush_pending === 'once') {
+                    if (function_exists('delete_option')) {
+                        delete_option('affilio_go_flush_pending');
+                    }
+                } else {
+                    update_option('affilio_go_flush_pending', 'once', false);
+                }
+            }
+            $running = false;
         }
     }
 
@@ -1103,7 +1150,7 @@ class Affilio_Distribution {
             $content = ($fresh && isset($fresh->post_content)) ? (string) $fresh->post_content : '';
             if (self::box_in_content($content, $placement_id) === $expect_present) {
                 $rel = self::rel_sponsored_from_content($content, $placement_id);
-                (new Affilio_Plugin_Ack())->send($placement_id, $action, $rel, '');
+                $this->deliver_ack($placement_id, $action, $rel, '');
                 $this->remember_phase($placement_id, $post_id, $action);
                 return true;
             }
@@ -1111,10 +1158,195 @@ class Affilio_Distribution {
                 $write();
             }
         }
-        (new Affilio_Plugin_Ack())->send($placement_id, AFFILIO_PLUGIN_ACK_FAILED, false, 're-read failed');
+        $this->deliver_ack($placement_id, AFFILIO_PLUGIN_ACK_FAILED, false, 're-read failed');
         error_log('affilio plugin ack failed placement_id=' . $placement_id . ' post_id=' . (int) $post_id . ' action=' . $action);
         $this->remember_ack_notice($post_id, $placement_id, $action);
         return false;
+    }
+
+    public static function placement_matches_article($data, $post) {
+        $sources = array();
+        if (is_array($data) && isset($data['placement']) && is_array($data['placement'])) {
+            $sources[] = $data['placement'];
+        }
+        if (is_array($data)) {
+            $sources[] = $data;
+        }
+        $article_urls = array();
+        $post_ids = array();
+        $fallback_urls = array();
+        foreach ($sources as $source) {
+            if (!empty($source['article_url']) && is_string($source['article_url'])) {
+                $article_urls[] = $source['article_url'];
+            }
+            foreach (array('post_id', 'wp_post_id') as $key) {
+                if (isset($source[$key]) && $source[$key] !== '' && $source[$key] !== null && (int) $source[$key] > 0) {
+                    $post_ids[] = (int) $source[$key];
+                }
+            }
+            foreach (array('surface_url', 'post_url') as $key) {
+                if (!empty($source[$key]) && is_string($source[$key])) {
+                    $fallback_urls[] = $source[$key];
+                }
+            }
+        }
+        $permalink = function_exists('get_permalink') ? (string) get_permalink($post) : '';
+        $post_id = (is_object($post) && isset($post->ID)) ? (int) $post->ID : 0;
+        if ($article_urls || $post_ids) {
+            foreach ($article_urls as $url) {
+                if (self::same_article_url($url, $permalink)) {
+                    return true;
+                }
+            }
+            foreach ($post_ids as $id) {
+                if ($id === $post_id) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if ($fallback_urls) {
+            foreach ($fallback_urls as $url) {
+                if (self::same_article_url($url, $permalink)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private static function same_article_url($left, $right) {
+        $normalize = function ($url) {
+            return rtrim(strtolower(trim((string) $url)), '/');
+        };
+        $left = $normalize($left);
+        $right = $normalize($right);
+        return $left !== '' && $left === $right;
+    }
+
+    public static function ack_backoff($attempts) {
+        $steps = array(60, 300, 900, 3600);
+        $index = max(0, (int) $attempts - 1);
+        if ($index >= count($steps)) {
+            return 3600;
+        }
+        return $steps[$index];
+    }
+
+    public static function ack_queue_option() {
+        return 'affilio_ack_retry_queue';
+    }
+
+    private function deliver_ack($placement_id, $action, $rel, $reason) {
+        if (!class_exists('Affilio_Plugin_Ack')) {
+            return false;
+        }
+        $response = (new Affilio_Plugin_Ack())->send($placement_id, $action, $rel, $reason);
+        if (self::ack_succeeded($response)) {
+            $this->forget_ack($placement_id, $action);
+            return true;
+        }
+        if (self::ack_retryable($response)) {
+            $this->enqueue_ack($placement_id, $action, $rel, $reason);
+        }
+        return false;
+    }
+
+    public function drain_ack_queue() {
+        if (!function_exists('get_option') || !function_exists('update_option') || !class_exists('Affilio_Plugin_Ack')) {
+            return;
+        }
+        $queue = get_option(self::ack_queue_option(), array());
+        if (!is_array($queue) || !$queue) {
+            return;
+        }
+        $now = time();
+        foreach ($queue as $key => $item) {
+            if (!is_array($item) || empty($item['placement_id']) || empty($item['action'])) {
+                unset($queue[$key]);
+                continue;
+            }
+            if (isset($item['next_at']) && (int) $item['next_at'] > $now) {
+                continue;
+            }
+            $response = (new Affilio_Plugin_Ack())->send(
+                $item['placement_id'],
+                $item['action'],
+                !empty($item['rel_sponsored']),
+                isset($item['reason']) ? (string) $item['reason'] : ''
+            );
+            if (self::ack_succeeded($response) || !self::ack_retryable($response)) {
+                unset($queue[$key]);
+                continue;
+            }
+            $attempts = (isset($item['attempts']) ? (int) $item['attempts'] : 1) + 1;
+            $queue[$key]['attempts'] = $attempts;
+            $queue[$key]['next_at'] = $now + self::ack_backoff($attempts);
+        }
+        update_option(self::ack_queue_option(), $queue, false);
+    }
+
+    private function enqueue_ack($placement_id, $action, $rel, $reason) {
+        if (!function_exists('get_option') || !function_exists('update_option')) {
+            return;
+        }
+        $queue = get_option(self::ack_queue_option(), array());
+        if (!is_array($queue)) {
+            $queue = array();
+        }
+        $key = (string) $placement_id . '|' . (string) $action;
+        if (isset($queue[$key]) && is_array($queue[$key]) && isset($queue[$key]['next_at']) && (int) $queue[$key]['next_at'] > time()) {
+            return;
+        }
+        $attempts = (isset($queue[$key]['attempts']) ? (int) $queue[$key]['attempts'] : 0) + 1;
+        $queue[$key] = array(
+            'placement_id' => (string) $placement_id,
+            'action' => (string) $action,
+            'rel_sponsored' => (bool) $rel,
+            'reason' => (string) $reason,
+            'attempts' => $attempts,
+            'next_at' => time() + self::ack_backoff($attempts),
+        );
+        update_option(self::ack_queue_option(), $queue, false);
+    }
+
+    private function forget_ack($placement_id, $action) {
+        if (!function_exists('get_option') || !function_exists('update_option')) {
+            return;
+        }
+        $queue = get_option(self::ack_queue_option(), array());
+        if (!is_array($queue)) {
+            return;
+        }
+        unset($queue[(string) $placement_id . '|' . (string) $action]);
+        update_option(self::ack_queue_option(), $queue, false);
+    }
+
+    private static function ack_status_code($response) {
+        if (is_wp_error($response) || !is_array($response)) {
+            return 0;
+        }
+        if (isset($response['response']['code'])) {
+            return (int) $response['response']['code'];
+        }
+        if (isset($response['code'])) {
+            return (int) $response['code'];
+        }
+        return 0;
+    }
+
+    private static function ack_succeeded($response) {
+        $code = self::ack_status_code($response);
+        return $code >= 200 && $code < 300;
+    }
+
+    private static function ack_retryable($response) {
+        if (is_wp_error($response)) {
+            return true;
+        }
+        $code = self::ack_status_code($response);
+        return $code === 0 || $code >= 500;
     }
 
     private function remember_box($id, $post_id, $copy, $disclosure, $fallback, $phase) {

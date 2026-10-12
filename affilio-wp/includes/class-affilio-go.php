@@ -18,7 +18,26 @@ if (class_exists('Affilio_Go')) {
 }
 
 class Affilio_Go {
+    public static function rewrite_api_ready() {
+        global $wp_rewrite;
+        if (is_object($wp_rewrite)) {
+            return true;
+        }
+        // Real WordPress defines did_action before $wp_rewrite exists. Calling
+        // add_rewrite_rule in that window fatals. Test stubs have no did_action.
+        if (function_exists('did_action')) {
+            return false;
+        }
+        if (!empty($GLOBALS['affilio_rewrite_requires_wp_rewrite'])) {
+            return false;
+        }
+        return function_exists('add_rewrite_rule');
+    }
+
     public static function register_rewrites() {
+        if (!self::rewrite_api_ready()) {
+            return;
+        }
         if (function_exists('add_rewrite_rule')) {
             add_rewrite_rule('^go/([a-f0-9-]{36})/?$', 'index.php?affilio_go=$matches[1]', 'top');
         }
@@ -53,6 +72,12 @@ class Affilio_Go {
         }
     }
 
+    public static function mark_go_request_uncacheable() {
+        if (self::is_go_request()) {
+            self::mark_uncacheable();
+        }
+    }
+
     public static function exclude_cache($exclude) {
         if (self::is_go_request()) {
             return true;
@@ -72,16 +97,14 @@ class Affilio_Go {
         return self::current_id() !== '';
     }
 
-    public static function current_id() {
-        $candidates = array();
+    public static function path_is_go() {
+        return self::id_from_request() !== '';
+    }
+
+    public static function id_from_request() {
         if (isset($_GET['affilio_go'])) {
             $raw = (string) $_GET['affilio_go'];
-            $candidates[] = function_exists('wp_unslash') ? (string) wp_unslash($raw) : $raw;
-        }
-        if (function_exists('get_query_var')) {
-            $candidates[] = (string) get_query_var('affilio_go');
-        }
-        foreach ($candidates as $candidate) {
+            $candidate = function_exists('wp_unslash') ? (string) wp_unslash($raw) : $raw;
             if (preg_match('/^[a-f0-9-]{36}$/i', $candidate)) {
                 return $candidate;
             }
@@ -91,6 +114,28 @@ class Affilio_Go {
             return $match[1];
         }
         return '';
+    }
+
+    public static function current_id() {
+        $from_request = self::id_from_request();
+        if ($from_request !== '') {
+            return $from_request;
+        }
+        global $wp_query;
+        if (is_object($wp_query) && function_exists('get_query_var')) {
+            $candidate = (string) get_query_var('affilio_go');
+            if (preg_match('/^[a-f0-9-]{36}$/i', $candidate)) {
+                return $candidate;
+            }
+        }
+        return '';
+    }
+
+    public static function bypass_canonical($redirect_url, $requested_url = '') {
+        if (self::path_is_go()) {
+            return false;
+        }
+        return $redirect_url;
     }
 
     public static function rewrite_legacy_links($content) {
@@ -278,10 +323,11 @@ class Affilio_Go {
         if (!is_wp_error($response) && $code === 302 && $location !== '') {
             return $location;
         }
-        if (function_exists('update_option')) {
+        $transport_failed = is_wp_error($response);
+        if (($transport_failed || $code >= 500) && function_exists('update_option')) {
             update_option(AFFILIO_GO_CIRCUIT_OPTION, time() + (int) AFFILIO_GO_CIRCUIT_SECONDS, false);
         }
-        $reason = is_wp_error($response) ? 'upstream_failed' : 'upstream_status_' . $code;
+        $reason = $transport_failed ? 'upstream_failed' : 'upstream_status_' . $code;
         $this->log_fallback($placement_id, $reason);
         return $fallback;
     }

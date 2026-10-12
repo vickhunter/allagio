@@ -129,12 +129,21 @@ if (!function_exists('is_wp_error')) {
         throw new RuntimeException('redirect ' . (int) $status . ' ' . $location);
     }
     function add_rewrite_rule($pattern, $query, $priority = 'bottom') {
+        global $wp_rewrite;
+        if (!empty($GLOBALS['affilio_rewrite_requires_wp_rewrite']) && !is_object($wp_rewrite)) {
+            throw new Error('add_rewrite_rule called before WP_Rewrite exists');
+        }
         $GLOBALS['rewrites'][] = array($pattern, $query, $priority);
     }
     function add_rewrite_tag($tag, $regex) {
         $GLOBALS['rewrite_tags'][$tag] = $regex;
     }
-    function flush_rewrite_rules($hard = true) { $GLOBALS['flushes']++; }
+    function flush_rewrite_rules($hard = true) {
+        $GLOBALS['flushes']++;
+        if (isset($GLOBALS['flush_rewrite_rules_hook']) && is_callable($GLOBALS['flush_rewrite_rules_hook'])) {
+            call_user_func($GLOBALS['flush_rewrite_rules_hook']);
+        }
+    }
     function wp_verify_nonce($nonce, $action) { return $nonce === 'nonce-for-' . $action; }
     function wp_nonce_field($action, $name, $referer = true, $echo = true) {
         return '<input type="hidden" name="' . $name . '" value="nonce-for-' . $action . '">';
@@ -142,8 +151,10 @@ if (!function_exists('is_wp_error')) {
     function add_query_arg($args, $url) { return $url . '?' . http_build_query($args); }
     function add_action($name, $callback, $priority = 10, $accepted_args = 1) {
         $GLOBALS['actions'][$name][] = $callback;
+        $GLOBALS['action_meta'][$name][] = array('priority' => $priority, 'accepted_args' => $accepted_args);
     }
     function register_activation_hook($path, $callback) { $GLOBALS['actions']['activation'][] = $callback; }
+    function register_deactivation_hook($path, $callback) { $GLOBALS['actions']['deactivation'][] = $callback; }
 }
 
 if (!class_exists('Affilio_API')) {

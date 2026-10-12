@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Affilio
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.19
+ * Version: 0.1.20
  * Author: Affilio
  */
 
@@ -15,7 +15,7 @@ if (defined('AFFILIO_LOADED')) {
 }
 define('AFFILIO_LOADED', true);
 
-define('AFFILIO_VERSION', '0.1.19');
+define('AFFILIO_VERSION', '0.1.20');
 
 if (!defined('AFFILIO_PLUGIN_ACK_HEADER')) {
     define('AFFILIO_PLUGIN_ACK_HEADER', 'X-Plugin-Key');
@@ -103,9 +103,12 @@ function affilio_init() {
     add_filter('the_content', array('Affilio_Go', 'rewrite_legacy_links'));
     add_filter('robots_txt', array('Affilio_Go', 'robots_txt'), 10, 2);
     add_filter('wpfc_exclude_current_page', array('Affilio_Go', 'exclude_cache'));
-    add_action('template_redirect', array(new Affilio_Go(), 'handle'));
+    add_action('parse_request', array('Affilio_Go', 'mark_go_request_uncacheable'));
+    // Priority 0 runs before redirect_canonical (template_redirect priority 10).
+    add_action('template_redirect', array(new Affilio_Go(), 'handle'), 0);
+    add_filter('redirect_canonical', array('Affilio_Go', 'bypass_canonical'), 0, 2);
     add_action('affilio_sync_plugin_boxes', array($distribution, 'sync_known_boxes'));
-    $distribution->maybe_upgrade();
+    add_action('init', array($distribution, 'maybe_upgrade'), 20);
     if (defined('WP_CLI') && WP_CLI) {
         require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-cli.php';
         WP_CLI::add_command('affilio revert', new Affilio_Revert_Command($distribution));
@@ -164,18 +167,61 @@ function affilio_activate() {
     if (class_exists('Affilio_Go')) {
         Affilio_Go::register_rewrites();
     }
-    if (function_exists('flush_rewrite_rules')) {
+    if (function_exists('flush_rewrite_rules') && (!class_exists('Affilio_Go') || Affilio_Go::rewrite_api_ready())) {
         flush_rewrite_rules();
+    }
+    affilio_schedule_box_sync();
+}
+}
+
+if (!function_exists('affilio_cron_schedules')) {
+function affilio_cron_schedules($schedules) {
+    if (!is_array($schedules)) {
+        $schedules = array();
+    }
+    $schedules['affilio_five_minutes'] = array(
+        'interval' => 300,
+        'display' => 'Every five minutes',
+    );
+    return $schedules;
+}
+}
+
+if (function_exists('add_filter')) {
+    add_filter('cron_schedules', 'affilio_cron_schedules');
+}
+
+if (!function_exists('affilio_schedule_box_sync')) {
+function affilio_schedule_box_sync() {
+    if (!function_exists('wp_next_scheduled') || !function_exists('wp_schedule_event')) {
+        return;
+    }
+    if (wp_next_scheduled('affilio_sync_plugin_boxes')) {
+        return;
+    }
+    wp_schedule_event(time() + 60, 'affilio_five_minutes', 'affilio_sync_plugin_boxes');
+}
+}
+
+if (!function_exists('affilio_deactivate')) {
+function affilio_deactivate() {
+    if (function_exists('wp_clear_scheduled_hook')) {
+        wp_clear_scheduled_hook('affilio_sync_plugin_boxes');
     }
 }
 }
 
 register_activation_hook(__FILE__, 'affilio_activate');
+register_deactivation_hook(__FILE__, 'affilio_deactivate');
 
 add_action('admin_init', 'affilio_maybe_setup_redirect');
 
-add_action('plugins_loaded', function () {
-    if (class_exists('Affilio_Go') && Affilio_Go::is_go_request()) {
+add_action('plugins_loaded', 'affilio_mark_go_uncacheable', 0);
+
+if (!function_exists('affilio_mark_go_uncacheable')) {
+function affilio_mark_go_uncacheable() {
+    if (class_exists('Affilio_Go') && Affilio_Go::path_is_go()) {
         Affilio_Go::mark_uncacheable();
     }
-}, 0);
+}
+}
