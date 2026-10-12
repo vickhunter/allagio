@@ -237,7 +237,7 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "submit_offer",
-		Description: "Submit a draft offer. Requires the product's readiness to be 'ready'. A connected payment provider is not required. An untrusted maker lists when the claims check, the cached HEAD check, minimum relevance, and the cap all pass. A failed check leaves the offer in review with review_reason and message. Trusted makers list directly. A readiness failure returns reason and message.",
+		Description: "Submit a draft offer. Requires the product's readiness to be 'ready'. A connected payment provider is not required. On a hosted server the claims check defaults to stub, so an untrusted offer stays in review with review_reason claims until the page checker is installed. Local off-local lists when the claims check, the cached HEAD check, minimum relevance, and the cap all pass. Trusted makers list directly. A readiness failure returns reason and message.",
 		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
 			"offer_id": str("Offer id"),
 		}),

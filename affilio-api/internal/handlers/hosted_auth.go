@@ -33,6 +33,7 @@ type HostedHandler struct {
 	OperatorID      string
 	Assessments     *AssessmentsHandler
 	DemoCheckoutURL string
+	ClaimsCheck     string
 }
 
 func ValidatePublicURL(raw string) error {

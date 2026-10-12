@@ -50,7 +50,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		c.JSON(200, gin.H{"name": o.Name, "email": o.Email, "owner_id": o.ID, "maker": o.MakerID != "", "publisher": o.SiteID != "", "operator": h.OperatorID != "" && o.ID == h.OperatorID, "mcp_url": h.resource(), "install_command": h.installCommand()})
 	})
 	products := &ProductsHandler{DB: h.DB}
-	offers := &OffersHandler{DB: h.DB}
+	offers := &OffersHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}
 	placements := &PlacementsHandler{DB: h.DB, RequireVerifiedConnection: true}
 	payouts := &PayoutsHandler{DB: h.DB}
 	maker := api.Group("", h.requireMaker)
