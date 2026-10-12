@@ -240,7 +240,7 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 		return
 	}
-	if reason, message, failed := failedListingCheck(*offer, *product, listed); failed {
+	if reason, message, failed := failedListingCheck(c.Request.Context(), h.DB, h.ClaimsCheck, *offer, *product, listed); failed {
 		if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 			return
@@ -398,7 +398,7 @@ func (h *OffersHandler) presentWith(c *gin.Context, offer *database.Offer, liste
 			}
 		}
 		if product != nil && !claimsHeld(h.ClaimsCheck) {
-			reason, message = listingReview(h.ClaimsCheck, *offer, *product, listed)
+			reason, message = listingReview(c.Request.Context(), h.DB, h.ClaimsCheck, *offer, *product, listed)
 		}
 	}
 	item := offerJSON(offer, reason, message)

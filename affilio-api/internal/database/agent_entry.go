@@ -825,6 +825,38 @@ FROM listing_cards WHERE id=$1 AND maker_id=$2`, id, makerID).Scan(&row.ID, &row
 	return row, err
 }
 
+// LatestListingCardJSON is the newest card stored for a product.
+// A product with no card returns nil, nil.
+func (d *DB) LatestListingCardJSON(ctx context.Context, makerID, productID string) ([]byte, error) {
+	var raw []byte
+	err := d.Pool.QueryRow(ctx, `SELECT card FROM listing_cards
+WHERE maker_id=$1::uuid AND product_id=$2::uuid
+ORDER BY created_at DESC, id DESC
+LIMIT 1`, makerID, productID).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return raw, err
+}
+
+// OfferClaimSource is the offer text the page checker compares.
+type OfferClaimSource struct {
+	MakerID         string
+	ProductID       string
+	LandingURL      string
+	Terms           string
+	CommissionType  string
+	CommissionValue float64
+}
+
+func (d *DB) OfferClaimSource(ctx context.Context, offerID string) (OfferClaimSource, error) {
+	var src OfferClaimSource
+	err := d.Pool.QueryRow(ctx, `SELECT p.maker_id::text, p.id::text, COALESCE(o.landing_url,''), COALESCE(o.terms,''), COALESCE(o.commission_type,''), o.commission_value
+FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan(
+		&src.MakerID, &src.ProductID, &src.LandingURL, &src.Terms, &src.CommissionType, &src.CommissionValue)
+	return src, err
+}
+
 func (d *DB) MakerOwnsProduct(ctx context.Context, makerID, productID string) (bool, error) {
 	var ok bool
 	err := d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM products WHERE id=$1 AND maker_id=$2)`, productID, makerID).Scan(&ok)
