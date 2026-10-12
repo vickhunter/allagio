@@ -108,6 +108,7 @@ type DigestItem struct {
 	Clicks             int
 	ApprovedBy         string
 	PolicyVersion      int
+	UndoneBy           string
 }
 
 // DigestPause is the account, site, and offer pause state for one digest.
@@ -911,7 +912,7 @@ func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Tim
 plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
 COALESCE(post_title,''), COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
 (SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
-COALESCE(approved_by_kind,''), COALESCE(policy_version,0)
+COALESCE(approved_by_kind,''), COALESCE(policy_version,0), COALESCE(undone_by_user::text,'')
 FROM placement_proposals
 WHERE `+digestPlacementWhere+`
 ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
@@ -923,7 +924,7 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = "placement"
-		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion); err != nil {
+		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion, &item.UndoneBy); err != nil {
 			return nil, err
 		}
 		out = append(out, item)

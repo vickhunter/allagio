@@ -343,7 +343,7 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 		}
 		path := c.Query("install_path")
 		if !entry.ValidInstallPath(path) {
-			path = ""
+			path = entry.DefaultInstallPath(source)
 		}
 		mode := entry.DefaultMode(source)
 		h.finishSetup(c, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn, source, h.claims()), actor.SiteID)
@@ -401,7 +401,19 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		NeverTopics   []string         `json:"never_topics"`
 		BoxPosition   string           `json:"box_position"`
 	}
-	if decodeStrict(body, &req) != nil || (req.Role != "maker" && req.Role != "publisher") || !entry.ValidInstallPath(req.InstallPath) || !entry.ValidMode(req.Mode) || !entry.ValidMode(req.ModeShown) {
+	if decodeStrict(body, &req) != nil || (req.Role != "maker" && req.Role != "publisher") || !entry.ValidMode(req.Mode) || !entry.ValidMode(req.ModeShown) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role, install_path, mode, and mode_shown required"})
+		return
+	}
+	if strings.TrimSpace(req.InstallPath) == "" {
+		source, sourceErr := h.DB.OwnerSource(c.Request.Context(), owner.ID)
+		if sourceErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
+			return
+		}
+		req.InstallPath = entry.DefaultInstallPath(source)
+	}
+	if !entry.ValidInstallPath(req.InstallPath) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "role, install_path, mode, and mode_shown required"})
 		return
 	}
@@ -1915,7 +1927,7 @@ func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 		"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token,
 		"plugin_state": pluginState, "live_now": item.CountsAsLive,
 		"post_title": item.PostTitle, "position": item.Position, "link_text": item.LinkText, "label": item.Label,
-		"clicks": item.Clicks, "approved_by": item.ApprovedBy,
+		"clicks": item.Clicks, "approved_by": item.ApprovedBy, "undone_by": item.UndoneBy,
 		"policy_rule_id": ruleID, "policy_rule_text": ruleText, "rules_version": item.PolicyVersion,
 	}
 	if item.Kind == "placement" {
