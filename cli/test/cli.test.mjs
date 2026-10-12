@@ -243,6 +243,9 @@ test('the readme paste block is the six CLI lines', () => {
     'npx offer-rails undo',
     'npx offer-rails kill',
   ]);
-  assert.match(readme, /"offer-rails"/);
-  assert.match(readme, /offer-rails", "mcp"/);
+  assert.match(readme, /\.cursor\/mcp\.json/);
+  assert.match(readme, /claude mcp add offer-rails -- npx offer-rails mcp/);
+  assert.match(readme, /"command": "npx"/);
+  assert.match(readme, /"-y", "offer-rails", "mcp"/);
+  assert.match(readme, /"offer-rails", "mcp"/);
 });

@@ -29,7 +29,7 @@ npx offer-rails kill
 
 ## Cursor
 
-Add this to `~/.cursor/mcp.json` (or the project `.cursor/mcp.json`):
+Copy this into `.cursor/mcp.json`:
 
 ```json
 {
@@ -44,14 +44,18 @@ Add this to `~/.cursor/mcp.json` (or the project `.cursor/mcp.json`):
 
 ## Claude Code
 
-Add this to `~/.claude.json` or the project `.mcp.json`:
+```bash
+claude mcp add offer-rails -- npx offer-rails mcp
+```
+
+JSON form, for `.mcp.json` or `~/.claude.json`:
 
 ```json
 {
   "mcpServers": {
     "offer-rails": {
       "command": "npx",
-      "args": ["-y", "offer-rails", "mcp"]
+      "args": ["offer-rails", "mcp"]
     }
   }
 }

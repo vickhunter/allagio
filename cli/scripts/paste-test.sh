@@ -290,4 +290,13 @@ if [[ "$fail" -ne 0 ]]; then
   tail -n 80 "$WORKDIR/api.log" >&2
   exit 1
 fi
+
+echo "=== mcp stdio ==="
+if ! OFFER_RAILS_MCP_SPAWN=1 node --test "$CLI/test/mcp-stdio.test.mjs" >"$WORKDIR/mcp.out" 2>"$WORKDIR/mcp.err"; then
+  echo "mcp stdio failed" >&2
+  cat "$WORKDIR/mcp.out" "$WORKDIR/mcp.err" >&2
+  exit 1
+fi
+cat "$WORKDIR/mcp.out"
+echo "mcp stdio passed"
 echo "paste test passed"
