@@ -315,6 +315,10 @@ func main() {
 
 		maker.GET("/earnings", payouts.MakerEarnings)
 	}
+	listings := v1.Group("/listings")
+	listings.Use(middleware.MakerKeyAuth(db, oauthResources...))
+	listings.Use(middleware.LimitOfferScope())
+	listings.GET("", offers.Listings)
 
 	admin := v1.Group("/program-discovery")
 	admin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))

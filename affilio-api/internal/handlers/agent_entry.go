@@ -878,7 +878,7 @@ func (h *AgentEntry) CreateListing(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "listing card was not stored"})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"id": id, "score": upload.Score, "payments_check": upload.PaymentsCheck, "offer_link_health": upload.OfferLinkHealth})
+	c.JSON(http.StatusCreated, gin.H{"id": id, "score": upload.Score, "payments_check": upload.PaymentsCheck, "offer_link_health": upload.OfferLinkHealth, "review_reason": nil, "message": nil})
 }
 
 func (h *AgentEntry) GetListing(c *gin.Context) {
@@ -895,7 +895,9 @@ func (h *AgentEntry) GetListing(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing card not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": row.ID, "card": json.RawMessage(row.Card), "signals": json.RawMessage(row.Signals), "score": row.Score, "payments_check": row.PaymentsCheck, "offer_link_health": row.OfferLinkHealth})
+	reason, message := reviewForMakerProduct(c.Request.Context(), h.DB, actor.MakerID, row.ProductID)
+	reviewReason, reviewMessage := nullReview(reason, message)
+	c.JSON(http.StatusOK, gin.H{"id": row.ID, "card": json.RawMessage(row.Card), "signals": json.RawMessage(row.Signals), "score": row.Score, "payments_check": row.PaymentsCheck, "offer_link_health": row.OfferLinkHealth, "review_reason": reviewReason, "message": reviewMessage})
 }
 
 func (h *AgentEntry) RecordEvent(c *gin.Context) {

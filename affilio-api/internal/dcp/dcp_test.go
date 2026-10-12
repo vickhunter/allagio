@@ -91,6 +91,13 @@ func TestCallToolRoutesPathParams(t *testing.T) {
 	if _, err := CallTool(client, "does_not_exist", nil); err == nil {
 		t.Fatalf("expected error for unknown tool")
 	}
+
+	if _, err := CallTool(client, "list_listings", nil); err != nil {
+		t.Fatalf("list_listings: %v", err)
+	}
+	if lastReq.Method != http.MethodGet || lastReq.URL.Path != "/v1/listings" {
+		t.Fatalf("list_listings called %s %s", lastReq.Method, lastReq.URL.Path)
+	}
 }
 
 func TestPublisherToolsUseSiteKey(t *testing.T) {

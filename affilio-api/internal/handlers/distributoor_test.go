@@ -46,6 +46,9 @@ func newMakerRouterWithReadinessClient(db *database.DB, client *http.Client) *gi
 		maker.POST("/offers/:id/submit", offers.Submit)
 		maker.GET("/offers/:id/matches", offers.Matches)
 	}
+	listings := r.Group("/v1/listings")
+	listings.Use(middleware.MakerKeyAuth(db))
+	listings.GET("", offers.Listings)
 	review := &OfferReviewHandler{DB: db}
 	admin := r.Group("/v1/offer-review")
 	admin.Use(middleware.AdminKeyAuth("admin-secret", services.NewAuditLogger(db)))

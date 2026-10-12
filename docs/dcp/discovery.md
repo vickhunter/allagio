@@ -20,7 +20,7 @@ and qualify distribution networks the way MCP clients find servers.
   "verbs": {
     "maker": ["register_maker", "register_product", "list_products", "get_product",
               "update_product", "run_assessment", "list_assessments", "create_offer",
-              "list_offers", "get_offer", "update_offer", "submit_offer", "get_earnings"],
+              "list_offers", "list_listings", "get_offer", "update_offer", "submit_offer", "get_earnings"],
     "publisher": ["list_marketplace_offers", "join_offer", "get_balance", "get_payout_history"]
   },
   "payout_methods": ["manual"]

@@ -184,10 +184,18 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "list_offers",
-		Description: "List the maker's offers with their statuses.",
+		Description: "List the maker's offers with their statuses. Each offer includes review_reason (claims, head, relevance, or caps) and message while it is in review. Both are null when the offer is listed.",
 		InputSchema: schema(nil, map[string]interface{}{}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			return c.Do(http.MethodGet, "/v1/maker/offers", nil)
+		},
+	},
+	{
+		Name:        "list_listings",
+		Description: "List this maker's listing cards. review_reason is claims, head, relevance, or caps while the offer is in review, with a human message. Both are null when the offer is listed.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.Do(http.MethodGet, "/v1/listings", nil)
 		},
 	},
 	{
@@ -229,7 +237,7 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "submit_offer",
-		Description: "Submit a draft offer for listing review. Requires the product's readiness to be 'ready'. A connected payment provider is not required. After human approval the offer is listed in the publisher catalog. Trusted makers list directly.",
+		Description: "Submit a draft offer. Requires the product's readiness to be 'ready'. A connected payment provider is not required. An untrusted maker lists when the claims check, the cached HEAD check, minimum relevance, and the cap all pass. A failed check leaves the offer in review with review_reason and message. Trusted makers list directly. A readiness failure returns reason and message.",
 		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
 			"offer_id": str("Offer id"),
 		}),

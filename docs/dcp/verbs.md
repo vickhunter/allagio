@@ -16,15 +16,18 @@ are required.
 | `run_assessment` | product_id*, ref_param | `{assessment_id, readiness_status, readiness_score, checks[], ai_summary}` |
 | `list_assessments` | product_id* | `{assessments: Assessment[]}` |
 | `create_offer` | product_id*, commission_type*, commission_value*, commission_currency, cookie_duration_days, refund_window_days, landing_url, ref_param, terms | Offer |
-| `list_offers` | — | `{offers: Offer[]}` |
+| `list_offers` | — | `{offers: Offer[]}` — each offer includes `review_reason` and `message`, null when listed |
+| `list_listings` | — | `{listings: Listing[]}` — `GET /v1/listings`; `review_reason` and `message` are null when listed |
 | `get_offer` | offer_id* | Offer |
 | `update_offer` | offer_id* + fields, or status transition | Offer |
-| `submit_offer` | offer_id* | `{id, status: "submitted"}` — requires product `ready` |
+| `submit_offer` | offer_id* | Untrusted makers list when claims, the cached HEAD check, minimum relevance, and the cap pass. A failed check stays in review: `{id, status: "submitted", review_reason, message}`. A readiness failure is `{error, reason, message}`. Trusted makers list directly. |
 | `get_earnings` | — | `{offers: [{offer_id, product_name, status, clicks, sales, refunds, revenue, commission, currency}], totals[]}` |
 
 Errors are returned as MCP tool results with `isError: true` and the reason as
 text (e.g. the readiness gate: *"product has not passed readiness
-assessment"*), so agents can react without protocol-level failures.
+assessment"*), so agents can react without protocol-level failures. That
+readiness error also includes `reason` (`claims`, `head`, or `relevance`) and
+`message`.
 
 ## Publisher verbs (MCP tools + HTTP)
 
