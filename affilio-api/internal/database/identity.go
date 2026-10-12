@@ -71,10 +71,18 @@ RETURNING id`, o.Issuer, o.Subject, o.Email, o.Name, source).Scan(&o.ID)
 }
 
 func (d *DB) OwnerSession(ctx context.Context, hash string) (*Owner, error) {
+	o, _, err := d.OwnerSessionExpiry(ctx, hash)
+	return o, err
+}
+
+// OwnerSessionExpiry returns the signed-in owner and the session expiry.
+// Sessions last eight hours from the sign-in that created them.
+func (d *DB) OwnerSessionExpiry(ctx context.Context, hash string) (*Owner, time.Time, error) {
 	var o Owner
-	err := d.Pool.QueryRow(ctx, `SELECT o.id,o.issuer,o.subject,o.email,o.name,COALESCE(o.site_id::text,''),COALESCE(o.maker_id::text,''),s.csrf
-FROM owner_sessions s JOIN owners o ON o.id=s.owner_id WHERE s.token_hash=$1 AND s.expires_at>NOW()`, hash).Scan(&o.ID, &o.Issuer, &o.Subject, &o.Email, &o.Name, &o.SiteID, &o.MakerID, &o.CSRF)
-	return &o, err
+	var expires time.Time
+	err := d.Pool.QueryRow(ctx, `SELECT o.id,o.issuer,o.subject,o.email,o.name,COALESCE(o.site_id::text,''),COALESCE(o.maker_id::text,''),s.csrf,s.expires_at
+FROM owner_sessions s JOIN owners o ON o.id=s.owner_id WHERE s.token_hash=$1 AND s.expires_at>NOW()`, hash).Scan(&o.ID, &o.Issuer, &o.Subject, &o.Email, &o.Name, &o.SiteID, &o.MakerID, &o.CSRF, &expires)
+	return &o, expires, err
 }
 
 func (d *DB) EndOwnerSession(ctx context.Context, hash string) error {

@@ -52,7 +52,7 @@ func (h *MarketplaceHandler) ListOffers(c *gin.Context) {
 	for _, idx := range order {
 		offer := offers[idx]
 		item := gin.H{
-			"relevance": scores[idx],
+			"relevance":            scores[idx],
 			"offer_id":             offer.OfferID,
 			"product_name":         offer.ProductName,
 			"product_tagline":      offer.ProductTagline,
@@ -66,6 +66,8 @@ func (h *MarketplaceHandler) ListOffers(c *gin.Context) {
 			"terms":                offer.Terms,
 			"program_id":           offer.ProgramID,
 			"joined":               offer.TrackingCode != nil && offer.CampaignStatus != nil && *offer.CampaignStatus == "active",
+			"review_reason":        nil,
+			"message":              nil,
 		}
 		if offer.TrackingCode != nil {
 			item["tracking_code"] = *offer.TrackingCode

@@ -343,7 +343,7 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 		}
 		path := c.Query("install_path")
 		if !entry.ValidInstallPath(path) {
-			path = ""
+			path = entry.DefaultInstallPath(source)
 		}
 		mode := entry.DefaultMode(source)
 		h.finishSetup(c, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn, source, h.claims()), actor.SiteID)
@@ -401,7 +401,19 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		NeverTopics   []string         `json:"never_topics"`
 		BoxPosition   string           `json:"box_position"`
 	}
-	if decodeStrict(body, &req) != nil || (req.Role != "maker" && req.Role != "publisher") || !entry.ValidInstallPath(req.InstallPath) || !entry.ValidMode(req.Mode) || !entry.ValidMode(req.ModeShown) {
+	if decodeStrict(body, &req) != nil || (req.Role != "maker" && req.Role != "publisher") || !entry.ValidMode(req.Mode) || !entry.ValidMode(req.ModeShown) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role, install_path, mode, and mode_shown required"})
+		return
+	}
+	if strings.TrimSpace(req.InstallPath) == "" {
+		source, sourceErr := h.DB.OwnerSource(c.Request.Context(), owner.ID)
+		if sourceErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
+			return
+		}
+		req.InstallPath = entry.DefaultInstallPath(source)
+	}
+	if !entry.ValidInstallPath(req.InstallPath) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "role, install_path, mode, and mode_shown required"})
 		return
 	}
@@ -754,7 +766,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		return
 	}
 	if !decision.Allowed {
-		body := gin.H{"decision": "needs_owner", "failures": decision.Failures}
+		body := gin.H{"decision": "needs_owner", "failures": decision.Failures, "surface_url": placement.SurfaceURL}
 		if decision.Reason != "" {
 			body["reason"] = decision.Reason
 			body["message"] = decision.Message
@@ -771,7 +783,9 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		writeNamedConflict(c, "not_approvable")
 		return
 	}
-	c.JSON(http.StatusOK, approvalJSON(decision, policy.Version))
+	approved := approvalJSON(decision, policy.Version)
+	approved["surface_url"] = placement.SurfaceURL
+	c.JSON(http.StatusOK, approved)
 }
 
 func (h *AgentEntry) AcceptPublisher(c *gin.Context) {
@@ -864,7 +878,7 @@ func (h *AgentEntry) CreateListing(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "listing card was not stored"})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"id": id, "score": upload.Score, "payments_check": upload.PaymentsCheck, "offer_link_health": upload.OfferLinkHealth})
+	c.JSON(http.StatusCreated, gin.H{"id": id, "score": upload.Score, "payments_check": upload.PaymentsCheck, "offer_link_health": upload.OfferLinkHealth, "review_reason": nil, "message": nil})
 }
 
 func (h *AgentEntry) GetListing(c *gin.Context) {
@@ -881,7 +895,9 @@ func (h *AgentEntry) GetListing(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing card not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": row.ID, "card": json.RawMessage(row.Card), "signals": json.RawMessage(row.Signals), "score": row.Score, "payments_check": row.PaymentsCheck, "offer_link_health": row.OfferLinkHealth})
+	reason, message := reviewForMakerProduct(c.Request.Context(), h.DB, actor.MakerID, row.ProductID)
+	reviewReason, reviewMessage := nullReview(reason, message)
+	c.JSON(http.StatusOK, gin.H{"id": row.ID, "card": json.RawMessage(row.Card), "signals": json.RawMessage(row.Signals), "score": row.Score, "payments_check": row.PaymentsCheck, "offer_link_health": row.OfferLinkHealth, "review_reason": reviewReason, "message": reviewMessage})
 }
 
 func (h *AgentEntry) RecordEvent(c *gin.Context) {
@@ -1379,6 +1395,15 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		}
 		if (wait == "" || wait == "restore") && !req.RelSponsored {
 			writeCheckDenied(c, []string{"rel_sponsored"})
+			return
+		}
+		boxes, boxErr := h.DB.CountPlacementBoxes(c.Request.Context(), siteID, placement.SurfaceURL, placement.ID)
+		if boxErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
+			return
+		}
+		if boxes > 0 {
+			writeCheckDenied(c, []string{"one_per_post"})
 			return
 		}
 	}
@@ -2031,7 +2056,7 @@ func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 		"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token,
 		"plugin_state": pluginState, "live_now": item.CountsAsLive,
 		"post_title": item.PostTitle, "position": item.Position, "link_text": item.LinkText, "label": item.Label,
-		"clicks": item.Clicks, "approved_by": item.ApprovedBy,
+		"clicks": item.Clicks, "approved_by": item.ApprovedBy, "undone_by": item.UndoneBy,
 		"policy_rule_id": ruleID, "policy_rule_text": ruleText, "rules_version": item.PolicyVersion,
 	}
 	if item.Kind == "placement" {

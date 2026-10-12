@@ -27,6 +27,25 @@ func ValidInstallPath(path string) bool {
 	}
 }
 
+// DefaultInstallPath is the install path used when setup is read or saved
+// without one. It follows owners.source. mcp has no path of its own and uses
+// connector. chatgpt and claude use their directory installs. Anything else,
+// including direct, uses cli. The path does not select the mode.
+func DefaultInstallPath(source string) string {
+	switch source {
+	case "cli", "cursor", "connector", "grok":
+		return source
+	case "mcp":
+		return "connector"
+	case "chatgpt":
+		return "chatgpt_dir"
+	case "claude":
+		return "claude_dir"
+	default:
+		return "cli"
+	}
+}
+
 func ValidMode(mode string) bool {
 	switch mode {
 	case ModeManual, ModeAuto, ModeYolo:
