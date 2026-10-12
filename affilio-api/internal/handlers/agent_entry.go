@@ -754,7 +754,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		return
 	}
 	if !decision.Allowed {
-		body := gin.H{"decision": "needs_owner", "failures": decision.Failures}
+		body := gin.H{"decision": "needs_owner", "failures": decision.Failures, "surface_url": placement.SurfaceURL}
 		if decision.Reason != "" {
 			body["reason"] = decision.Reason
 			body["message"] = decision.Message
@@ -771,7 +771,9 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		writeNamedConflict(c, "not_approvable")
 		return
 	}
-	c.JSON(http.StatusOK, approvalJSON(decision, policy.Version))
+	approved := approvalJSON(decision, policy.Version)
+	approved["surface_url"] = placement.SurfaceURL
+	c.JSON(http.StatusOK, approved)
 }
 
 func (h *AgentEntry) AcceptPublisher(c *gin.Context) {
@@ -1252,6 +1254,15 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		}
 		if (wait == "" || wait == "restore") && !req.RelSponsored {
 			writeCheckDenied(c, []string{"rel_sponsored"})
+			return
+		}
+		boxes, boxErr := h.DB.CountPlacementBoxes(c.Request.Context(), siteID, placement.SurfaceURL, placement.ID)
+		if boxErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
+			return
+		}
+		if boxes > 0 {
+			writeCheckDenied(c, []string{"one_per_post"})
 			return
 		}
 	}

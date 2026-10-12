@@ -729,11 +729,21 @@ FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan
 	return status == "listed", makerID, category, err
 }
 
-func (d *DB) CountPlacementBoxes(ctx context.Context, siteID, surfaceURL, exceptID string) (int, error) {
+const placementBoxCountSQL = `SELECT COUNT(*) FROM placement_proposals
+WHERE site_id=$1 AND surface_url=$2 AND id<>$3 AND status<>'revoked' AND removed_at IS NULL`
+
+type rowQuery interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func countPlacementBoxes(ctx context.Context, q rowQuery, siteID, surfaceURL, exceptID string) (int, error) {
 	var n int
-	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals
-WHERE site_id=$1 AND surface_url=$2 AND id<>$3 AND status<>'revoked' AND removed_at IS NULL`, siteID, surfaceURL, exceptID).Scan(&n)
+	err := q.QueryRow(ctx, placementBoxCountSQL, siteID, surfaceURL, exceptID).Scan(&n)
 	return n, err
+}
+
+func (d *DB) CountPlacementBoxes(ctx context.Context, siteID, surfaceURL, exceptID string) (int, error) {
+	return countPlacementBoxes(ctx, d.Pool, siteID, surfaceURL, exceptID)
 }
 
 func (d *DB) CountPolicyPlacements(ctx context.Context, siteID string, since time.Time, includeID string) (int, error) {

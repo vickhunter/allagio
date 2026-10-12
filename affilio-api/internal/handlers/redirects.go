@@ -188,10 +188,8 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req g
 		c.Redirect(http.StatusFound, plain)
 		return
 	}
-	if !landingReachable(plain) {
-		c.Redirect(http.StatusFound, h.postOrHome(link))
-		return
-	}
+	// A live placement always records one click and 302s to the offer URL
+	// with the ref. A down landing probe does not send the reader to the article.
 	limitKey := reader.hash
 	if limitKey == "" {
 		limitKey = "unknown"

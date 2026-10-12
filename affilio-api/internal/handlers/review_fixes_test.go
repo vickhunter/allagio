@@ -345,9 +345,13 @@ func TestReviewCampaignPathAndHeadProbe(t *testing.T) {
 		t.Fatal(err)
 	}
 	failed := hit("/v1/go/" + second)
-	requirePlainRedirect(t, failed, "https://go-review.example/other")
-	if n := clickCount(t, db); n != 1 {
-		t.Fatalf("unreachable landing recorded %d", n)
+	loc := failed.Header().Get("Location")
+	if failed.Code != http.StatusFound || !strings.HasPrefix(loc, "https://example.com?") || !strings.Contains(loc, "via=") || loc == "https://go-review.example/other" {
+		t.Fatalf("live go link with a down probe: %d %s", failed.Code, loc)
+	}
+	requireGoLinkHeaders(t, failed)
+	if n := clickCount(t, db); n != 2 {
+		t.Fatalf("live go link clicks %d", n)
 	}
 }
 

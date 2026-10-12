@@ -14,6 +14,9 @@ import (
 
 var ErrPlacementAuthority = errors.New("placement is not authorized, has expired, or terms changed")
 
+// ErrOnePerPost is the second box on an article that already has one.
+var ErrOnePerPost = errors.New("one box per post")
+
 type Placement struct {
 	ID            string          `json:"id"`
 	SiteID        string          `json:"site_id"`
@@ -366,6 +369,13 @@ func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Pla
 	if !eligible {
 		return nil, ErrPlacementAuthority
 	}
+	boxes, err := countPlacementBoxes(ctx, tx, siteID, p.SurfaceURL, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	if boxes > 0 {
+		return nil, ErrOnePerPost
+	}
 	var campaignID, trackingCode, status string
 	err = tx.QueryRow(ctx, `INSERT INTO campaigns(offer_id,site_id,tracking_code,requires_placement) VALUES($1,$2,$3,true)
  ON CONFLICT(offer_id,site_id) DO UPDATE SET requires_placement=true
@@ -489,11 +499,11 @@ AND plugin_wait IN ('', 'restore', 'remove')`, id, siteID, at, wait, action)
 
 // PlacementStatusSQL is the placement poll. It reads one row by primary key
 // and does not join another table.
-const PlacementStatusSQL = `SELECT status, plugin_wait, plugin_wait_at, plugin_failed_reason, failed_action, COALESCE(matched_rule,'') FROM placement_proposals WHERE id=$1 AND site_id=$2`
+const PlacementStatusSQL = `SELECT status, plugin_wait, plugin_wait_at, plugin_failed_reason, failed_action, COALESCE(matched_rule,''), surface_url FROM placement_proposals WHERE id=$1 AND site_id=$2`
 
-func (d *DB) ReadPlacementStatus(ctx context.Context, siteID, id string) (status, wait, failedReason, failedAction, matchedRule string, waitAt *time.Time, err error) {
-	err = d.Pool.QueryRow(ctx, PlacementStatusSQL, id, siteID).Scan(&status, &wait, &waitAt, &failedReason, &failedAction, &matchedRule)
-	return status, wait, failedReason, failedAction, matchedRule, waitAt, err
+func (d *DB) ReadPlacementStatus(ctx context.Context, siteID, id string) (status, wait, failedReason, failedAction, matchedRule, surfaceURL string, waitAt *time.Time, err error) {
+	err = d.Pool.QueryRow(ctx, PlacementStatusSQL, id, siteID).Scan(&status, &wait, &waitAt, &failedReason, &failedAction, &matchedRule, &surfaceURL)
+	return status, wait, failedReason, failedAction, matchedRule, surfaceURL, waitAt, err
 }
 
 // PlacementFallbackURL is the offer's plain landing URL for one placement.
