@@ -58,7 +58,12 @@ func TestClaimsCheckOffLocalListsWhenChecksPass(t *testing.T) {
 		t.Fatalf("off-local submit: %d %v", rec.Code, body)
 	}
 	requireReview(t, body, nil, nil)
-	assertReviewOnReads(t, r, makerKey, offerID, nil, nil)
+	_, got := doJSON(t, r, http.MethodGet, "/v1/maker/offers/"+offerID, makerKey, nil)
+	requireReview(t, got, nil, nil)
+	_, offers := doJSON(t, r, http.MethodGet, "/v1/maker/offers", makerKey, nil)
+	requireReview(t, itemByID(t, offers, "offers", offerID), nil, nil)
+	_, listings := doJSON(t, r, http.MethodGet, "/v1/listings", makerKey, nil)
+	requireReview(t, itemByID(t, listings, "listings", offerID), nil, nil)
 	if queueLen(t, r) != 0 {
 		t.Fatal("off-local must list when the four checks pass")
 	}
