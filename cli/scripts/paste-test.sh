@@ -17,10 +17,13 @@ export PGPASSWORD
 BASE="http://127.0.0.1:${API_PORT}"
 API_PID=""
 VERD_PID=""
+HEAD_PID=""
+HEAD_PORT="$(node -e 'const s=require("net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')"
 
 cleanup() {
   if [[ -n "$API_PID" ]]; then kill "$API_PID" >/dev/null 2>&1 || true; fi
   if [[ -n "$VERD_PID" ]]; then kill "$VERD_PID" >/dev/null 2>&1 || true; fi
+  if [[ -n "$HEAD_PID" ]]; then kill "$HEAD_PID" >/dev/null 2>&1 || true; fi
 }
 trap cleanup EXIT
 
@@ -69,6 +72,23 @@ for _ in $(seq 1 60); do
   sleep 0.5
 done
 curl -sf "$BASE/v1/health" >/dev/null
+
+HEAD_PORT="$HEAD_PORT" python3 -c '
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import os
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ok")
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+    def log_message(self, fmt, *args):
+        return
+HTTPServer(("127.0.0.1", int(os.environ["HEAD_PORT"])), Handler).serve_forever()
+' >/dev/null 2>&1 &
+HEAD_PID=$!
 
 SEED="$(node <<'NODE'
 const crypto = require('crypto');
@@ -120,7 +140,7 @@ fi
 
 echo "seeded offer: $OFFER_ID"
 
-LANDING="http://127.0.0.1:${API_PORT}/health"
+LANDING="http://127.0.0.1:${HEAD_PORT}/"
 
 seed_untrusted() {
   local label="$1" product_name="$2" terms="$3"
