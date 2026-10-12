@@ -54,6 +54,7 @@ API_KEY_SECRET="$(openssl rand -hex 24)"
 DATABASE_URL="postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/affilio_paste" \
   AUTO_MIGRATE=true \
   OFFER_RAILS_CI_SESSION=1 \
+  CLAIMS_CHECK=stub \
   HOST=127.0.0.1 \
   PORT="$API_PORT" \
   API_KEY_SECRET="$API_KEY_SECRET" \
@@ -430,16 +431,17 @@ grep -q '^mode_preselected: yolo$' "$WORKDIR/list.out" || fail=1
 grep -q 'in review' "$WORKDIR/list.out" && fail=1
 grep -q '^mode: manual$' "$WORKDIR/digest.out" || fail=1
 grep -q '^mode_preselected: yolo$' "$WORKDIR/digest.out" || fail=1
-grep -q 'status: listed' "$WORKDIR/live-list.out" || fail=1
-grep -q 'live: true' "$WORKDIR/live-list.out" || fail=1
+grep -q 'status: in review' "$WORKDIR/live-list.out" || fail=1
+grep -q '^check: claims$' "$WORKDIR/live-list.out" || fail=1
+grep -q '^message: The claims check is not live yet.$' "$WORKDIR/live-list.out" || fail=1
+grep -q '^next: Submit again after this check passes.$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^mode: manual$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^mode_preselected: yolo$' "$WORKDIR/live-list.out" || fail=1
-grep -q 'in review' "$WORKDIR/live-list.out" && fail=1
-grep -q '^check:' "$WORKDIR/live-list.out" && fail=1
-[[ "$LIVE_STATUS" == "listed" ]] || fail=1
+grep -q 'status: listed' "$WORKDIR/live-list.out" && fail=1
+[[ "$LIVE_STATUS" == "submitted" ]] || fail=1
 grep -q 'status: in review' "$WORKDIR/relevance-list.out" || fail=1
-grep -q '^check: relevance$' "$WORKDIR/relevance-list.out" || fail=1
-grep -q '^message: Relevance is below the minimum.$' "$WORKDIR/relevance-list.out" || fail=1
+grep -q '^check: claims$' "$WORKDIR/relevance-list.out" || fail=1
+grep -q '^message: The claims check is not live yet.$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^next: Submit again after this check passes.$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^mode: manual$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^mode_preselected: yolo$' "$WORKDIR/relevance-list.out" || fail=1
@@ -465,10 +467,10 @@ echo "-- undo --"
 cat "$WORKDIR/undo.out"
 echo "-- kill --"
 cat "$WORKDIR/kill.out"
-echo "-- untrusted maker going live --"
+echo "-- untrusted maker, checks passing --"
 echo "server status: ${LIVE_STATUS}"
 cat "$WORKDIR/live-list.out"
-echo "-- untrusted relevance check --"
+echo "-- untrusted maker, stub holds before relevance --"
 echo "server status: ${RELEVANCE_STATUS}"
 cat "$WORKDIR/relevance-list.out"
 if [[ "$fail" -ne 0 ]]; then

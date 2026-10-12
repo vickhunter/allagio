@@ -281,6 +281,32 @@ test('list prints in review when a check fails and does not set a mode', async (
   assert.equal(calls.some((call) => call.method === 'PUT' || call.url.includes('/mode')), false);
 });
 
+test('list prints the claims stub hold from review_reason and message', async () => {
+  const offer = '66666666-6666-4666-8666-666666666666';
+  const { io, stdout } = projectIO(offer, [
+    { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
+    {
+      method: 'POST',
+      path: `/v1/maker/offers/${offer}/submit`,
+      body: {
+        id: offer,
+        status: 'submitted',
+        review_reason: 'claims',
+        message: 'The claims check is not live yet.',
+      },
+    },
+    { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
+  ]);
+  const result = await run(['list'], io);
+  assert.equal(result.exitCode, 0);
+  const text = stdout();
+  assert.match(text, /status: in review/);
+  assert.match(text, /^check: claims$/m);
+  assert.match(text, /^message: The claims check is not live yet\.$/m);
+  assert.match(text, /^next: Submit again after this check passes\.$/m);
+  assert.equal(text.includes('status: listed'), false);
+});
+
 test('list prints the readiness message next step from reason and message', async () => {
   const offer = '55555555-5555-4555-8555-555555555555';
   const message = 'This product has not passed readiness assessment. Fix the failed checks, then submit again.';
