@@ -132,13 +132,12 @@ function textField(value) {
 
 function reviewFailure(body) {
   if (!body || typeof body !== 'object' || body.status === 'listed') return null;
-  const reason = textField(body.reason) || textField(body.error);
-  if (!reason) return null;
-  const explicit = textField(body.check) || textField(body.failed_check);
-  const sentences = reason.split(/(?<=\.)\s+/).map((part) => part.trim()).filter(Boolean);
-  const check = explicit || sentences[0].replace(/\.$/, '');
-  const next = sentences.length > 1 ? sentences.slice(1).join(' ') : '';
-  return { check, reason, next };
+  const check = textField(body.review_reason) || textField(body.reason);
+  if (!check) return null;
+  const message = textField(body.message) || textField(body.error);
+  const sentences = message.split(/(?<=\.)\s+/).map((part) => part.trim()).filter(Boolean);
+  const next = sentences.length > 1 ? sentences.slice(1).join(' ') : 'Submit again after this check passes.';
+  return { check, message, next };
 }
 
 function printServerMode(io, payload) {
@@ -190,8 +189,8 @@ export async function listCommand(io) {
     io.stdout('status: in review\n');
     io.stdout('live: false\n');
     io.stdout(`check: ${review.check}\n`);
-    io.stdout(`reason: ${review.reason}\n`);
-    if (review.next) io.stdout(`next: ${review.next}\n`);
+    if (review.message) io.stdout(`message: ${review.message}\n`);
+    io.stdout(`next: ${review.next}\n`);
   } else {
     io.stdout(`status: ${status}\n`);
     io.stdout(`live: ${status === 'listed'}\n`);

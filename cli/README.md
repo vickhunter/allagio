@@ -8,7 +8,7 @@ Local CLI and stdio MCP server for Offer Rails. The package name and the MCP ser
 
 `scan` reads the project on this machine. It does not read `.env` files, key or certificate files, or paths ignored by git. The API receives the listing card, the pass/fail signals, and the score. The CLI prints that JSON and asks before the first upload. Say yes once. Page text and source stay local.
 
-`list`, `status`, `digest`, `undo`, and `kill` use that project key. `list` submits a draft offer and prints the status the server returns. It prints `listed` when the server lists the offer. It prints `in review` only when a check fails, then names that check from the server's reason and prints the next step. The CLI does not set an approval mode. `list` and `digest` print `mode` and `mode_preselected` from the server. For a new site, `mode` is manual and `mode_preselected` is yolo. `kill` turns the kill switch on.
+`list`, `status`, `digest`, `undo`, and `kill` use that project key. `list` submits a draft offer and prints the status the server returns. It prints `listed` when the server lists the offer. It prints `in review` only when a check fails, then prints `check:` with the server's `review_reason`, the message, and the next step. The CLI does not set an approval mode. `list` and `digest` print `mode` and `mode_preselected` from the server. For a new site, `mode` is manual and `mode_preselected` is yolo. `kill` turns the kill switch on.
 
 These actions are not available here: loosen the approval mode, raise a cap or lower minimum relevance, turn the kill switch off, create an account-wide key, generate or rotate or revoke a plugin key, and restore a placement. The command prints a sign-in link to `/owner`.
 

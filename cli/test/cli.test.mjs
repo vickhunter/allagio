@@ -254,30 +254,64 @@ function projectIO(offer, routes) {
 
 test('list prints in review when a check fails and does not set a mode', async () => {
   const offer = '11111111-1111-4111-8111-111111111111';
-  const reason = 'This product has not passed readiness assessment. Fix the failed checks, then submit again.';
   const { io, stdout, calls } = projectIO(offer, [
     { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
-    { method: 'POST', path: `/v1/maker/offers/${offer}/submit`, status: 409, body: { error: reason, readiness_status: 'failed' } },
+    {
+      method: 'POST',
+      path: `/v1/maker/offers/${offer}/submit`,
+      body: {
+        id: offer,
+        status: 'submitted',
+        review_reason: 'relevance',
+        message: 'Relevance is below the minimum.',
+      },
+    },
     { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
   ]);
   const result = await run(['list'], io);
   assert.equal(result.exitCode, 0);
   const text = stdout();
   assert.match(text, /status: in review/);
-  assert.match(text, /check: This product has not passed readiness assessment/);
-  assert.match(text, /reason: This product has not passed readiness assessment\. Fix the failed checks, then submit again\./);
-  assert.match(text, /next: Fix the failed checks, then submit again\./);
+  assert.match(text, /^check: relevance$/m);
+  assert.match(text, /^message: Relevance is below the minimum\.$/m);
+  assert.match(text, /^next: Submit again after this check passes\.$/m);
   assert.match(text, /^mode: manual$/m);
   assert.match(text, /^mode_preselected: yolo$/m);
   assert.equal(text.includes('status: listed'), false);
   assert.equal(calls.some((call) => call.method === 'PUT' || call.url.includes('/mode')), false);
 });
 
+test('list prints the readiness message next step from reason and message', async () => {
+  const offer = '55555555-5555-4555-8555-555555555555';
+  const message = 'This product has not passed readiness assessment. Fix the failed checks, then submit again.';
+  const { io, stdout } = projectIO(offer, [
+    { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
+    {
+      method: 'POST',
+      path: `/v1/maker/offers/${offer}/submit`,
+      status: 409,
+      body: { error: message, reason: 'head', message, readiness_status: 'failed' },
+    },
+    { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
+  ]);
+  const result = await run(['list'], io);
+  assert.equal(result.exitCode, 0);
+  const text = stdout();
+  assert.match(text, /status: in review/);
+  assert.match(text, /^check: head$/m);
+  assert.match(text, /^message: This product has not passed readiness assessment\. Fix the failed checks, then submit again\.$/m);
+  assert.match(text, /^next: Fix the failed checks, then submit again\.$/m);
+});
+
 test('list prints listed and the mode the server returns', async () => {
   const offer = '22222222-2222-4222-8222-222222222222';
   const { io, stdout, calls } = projectIO(offer, [
     { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
-    { method: 'POST', path: `/v1/maker/offers/${offer}/submit`, body: { id: offer, status: 'listed' } },
+    {
+      method: 'POST',
+      path: `/v1/maker/offers/${offer}/submit`,
+      body: { id: offer, status: 'listed', review_reason: null, message: null },
+    },
     { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
   ]);
   const result = await run(['list'], io);
@@ -344,6 +378,7 @@ test('the readme paste block is the six CLI lines', () => {
   assert.match(readme, /"-y", "offer-rails", "mcp"/);
   assert.match(readme, /"offer-rails", "mcp"/);
   assert.match(readme, /in review/);
+  assert.match(readme, /review_reason/);
   assert.match(readme, /does not set an approval mode/);
   assert.match(readme, /mode_preselected` is yolo/);
   assert.equal(readme.toLowerCase().includes('fully automatic'), false);
