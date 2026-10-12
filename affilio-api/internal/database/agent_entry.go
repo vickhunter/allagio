@@ -953,6 +953,12 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 	return out, rows.Err()
 }
 
+func (d *DB) PeekUndo(ctx context.Context, hash, ownerID string, now time.Time) (kind, placementID, offerID string, err error) {
+	err = d.Pool.QueryRow(ctx, `SELECT kind, COALESCE(placement_id::text,''), COALESCE(offer_id::text,'')
+FROM undo_tokens WHERE token_hash=$1 AND owner_id=$2 AND used_at IS NULL AND expires_at>$3`, hash, ownerID, now).Scan(&kind, &placementID, &offerID)
+	return kind, placementID, offerID, err
+}
+
 func (d *DB) StoreUndoToken(ctx context.Context, hash, ownerID, kind, placementID, offerID string, expires time.Time) error {
 	_, err := d.Pool.Exec(ctx, `INSERT INTO undo_tokens(token_hash,owner_id,kind,placement_id,offer_id,expires_at)
 VALUES($1,$2,$3,NULLIF($4,'')::uuid,NULLIF($5,'')::uuid,$6)`, hash, ownerID, kind, placementID, offerID, expires)

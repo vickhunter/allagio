@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -19,6 +20,25 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// localSession wires cookie sessions without OIDC so a localhost test can
+// approve a device code. It refuses release mode and any non-loopback host.
+func localSession(cfg config.Config) bool {
+	if os.Getenv("OFFER_RAILS_CI_SESSION") != "1" {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(cfg.GinMode), "release") {
+		log.Fatal("OFFER_RAILS_CI_SESSION cannot be used when GIN_MODE=release")
+	}
+	host := strings.TrimSpace(cfg.Host)
+	switch host {
+	case "", "127.0.0.1", "localhost", "::1":
+		return true
+	default:
+		log.Fatal("OFFER_RAILS_CI_SESSION only listens on localhost")
+	}
+	return false
+}
 
 func main() {
 	cfg := config.Load()
@@ -231,6 +251,14 @@ func main() {
 	}
 	if hosted != nil {
 		agentEntry.Owner = hosted.RequireOwnerSession
+	} else if localSession(cfg) {
+		if cfg.Host == "" {
+			cfg.Host = "127.0.0.1"
+		}
+		base := "http://" + net.JoinHostPort(cfg.Host, cfg.Port)
+		agentEntry.BaseURL = base
+		agentEntry.Owner = (&handlers.HostedHandler{DB: db, BaseURL: base}).RequireOwnerSession
+		log.Printf("local session auth enabled for %s", base)
 	}
 	agentEntry.Mount(r)
 	signals := v1.Group("/agent-signals")

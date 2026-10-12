@@ -1359,3 +1359,71 @@ func TestPlacementRestore(t *testing.T) {
 		t.Fatalf("unknown placement: %d %s", missing.Code, missing.Body.String())
 	}
 }
+
+func TestProjectKeyDigestAndUndo(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, _ := testOwnerSession(t, h, "digest-key-owner", "digest-key-owner@example.com")
+	siteID := createTestSite(t, db, "digest-key-site", "digest-key.example", "Digest Key")
+	makerID, offerID := seedListedOffer(t, db, "digest-key-maker", "digest-key-maker@example.com", "Paste Forge")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3, source='cli' WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	var otherOffer string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO offers(product_id,status,commission_type,commission_value,landing_url)
+SELECT product_id,'listed','percentage',30,'https://example.com' FROM offers WHERE id=$1 RETURNING id`, offerID).Scan(&otherOffer); err != nil {
+		t.Fatal(err)
+	}
+	siteKey := "or_digest_site_key"
+	offerKey := "or_digest_offer_key"
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO project_keys(key_hash,key_prefix,owner_id,scope,site_id,expires_at)
+VALUES($1,'or_digs',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(siteKey), owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO project_keys(key_hash,key_prefix,owner_id,scope,offer_id,maker_id,expires_at)
+VALUES($1,'or_digo',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(offerKey), owner.ID, offerID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	accountBlocked, _ := postJSON(t, r, http.MethodGet, "/v1/account/digest", nil, map[string]string{"X-Maker-Key": offerKey})
+	if accountBlocked.Code != http.StatusForbidden {
+		t.Fatalf("offer project key account digest: %d %s", accountBlocked.Code, accountBlocked.Body.String())
+	}
+	siteDigest, siteBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-API-Key": siteKey})
+	if siteDigest.Code != http.StatusOK || siteBody["session"].(map[string]any)["signed_in"] != false {
+		t.Fatalf("site project digest: %d %s", siteDigest.Code, siteDigest.Body.String())
+	}
+	rec, body := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-Maker-Key": offerKey})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("offer project digest: %d %s", rec.Code, rec.Body.String())
+	}
+	items := body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["summary"] != "Paste Forge" || items[0].(map[string]any)["id"] != offerID || items[0].(map[string]any)["live_now"] != true {
+		t.Fatalf("scoped digest: %s", rec.Body.String())
+	}
+	outside := "outside-undo-token"
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO undo_tokens(token_hash,owner_id,kind,offer_id,expires_at)
+VALUES($1,$2,'offer',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(outside), owner.ID, otherOffer); err != nil {
+		t.Fatal(err)
+	}
+	denied, _ := postJSON(t, r, http.MethodPost, "/v1/digest/undo", map[string]any{"undo_token": outside}, map[string]string{"X-Maker-Key": offerKey})
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("outside undo: %d %s", denied.Code, denied.Body.String())
+	}
+	var unused bool
+	if err := db.Pool.QueryRow(context.Background(), `SELECT used_at IS NULL FROM undo_tokens WHERE token_hash=$1`, services.HashAPIKey(outside)).Scan(&unused); err != nil || !unused {
+		t.Fatalf("outside token consumed: %v %v", unused, err)
+	}
+	token := items[0].(map[string]any)["undo_token"].(string)
+	undone, undoneBody := postJSON(t, r, http.MethodPost, "/v1/digest/undo", map[string]any{"undo_token": token}, map[string]string{"X-Maker-Key": offerKey})
+	if undone.Code != http.StatusOK || undoneBody["status"] != "undone" || undoneBody["kind"] != "offer" || undoneBody["offer_id"] != offerID {
+		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
+	}
+	var status string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status FROM offers WHERE id=$1`, offerID).Scan(&status); err != nil || status != "paused" {
+		t.Fatalf("offer status %s %v", status, err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status FROM offers WHERE id=$1`, otherOffer).Scan(&status); err != nil || status != "listed" {
+		t.Fatalf("other offer status %s %v", status, err)
+	}
+}

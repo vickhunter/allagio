@@ -909,8 +909,48 @@ func (h *AgentEntry) RecordEvent(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"kind": req.Kind, "user_id": owner.ID, "recorded_at": at.Format(time.RFC3339)})
 }
 
+func (h *AgentEntry) digestCaller(c *gin.Context) (owner *database.Owner, actor entryActor, offerFilter string, keyed bool, ok bool) {
+	if !credentialPresented(c) {
+		session, good := h.sessionOwner(c)
+		return session, entryActor{}, "", false, good
+	}
+	var good bool
+	actor, good = h.actorFrom(c)
+	if !good {
+		return nil, entryActor{}, "", true, false
+	}
+	if actor.UserID == "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account scope required"})
+		return nil, actor, "", true, false
+	}
+	owner = &database.Owner{ID: actor.UserID}
+	if actor.OfferID != "" {
+		owner.MakerID = actor.MakerID
+		return owner, actor, actor.OfferID, true, true
+	}
+	if c.GetString("key_kind") == "project" && actor.SiteID != "" {
+		owner.SiteID = actor.SiteID
+		return owner, actor, "", true, true
+	}
+	siteID, makerID, err := h.DB.LoadOwnerScope(c.Request.Context(), actor.UserID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "account scope required"})
+		return nil, actor, "", true, false
+	}
+	if actor.MakerID != "" && actor.SiteID == "" && c.GetString("key_kind") != "account" {
+		owner.MakerID = actor.MakerID
+		return owner, actor, "", true, true
+	}
+	owner.SiteID = siteID
+	owner.MakerID = makerID
+	if actor.SiteID != "" {
+		owner.SiteID = actor.SiteID
+	}
+	return owner, actor, "", true, true
+}
+
 func (h *AgentEntry) Digest(c *gin.Context) {
-	owner, ok := h.sessionOwner(c)
+	owner, _, offerFilter, keyed, ok := h.digestCaller(c)
 	if !ok {
 		return
 	}
@@ -946,6 +986,9 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 			return
 		}
 		for _, item := range offers {
+			if offerFilter != "" && item.ID != offerFilter {
+				continue
+			}
 			token, err := h.issueUndo(c, owner.ID, item)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
@@ -967,7 +1010,7 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 		}
 		wentLive = n
 	}
-	body := gin.H{"since": sinceOut, "items": items, "went_live": wentLive, "session": gin.H{"signed_in": true}}
+	body := gin.H{"since": sinceOut, "items": items, "went_live": wentLive, "session": gin.H{"signed_in": !keyed}}
 	if err = h.attachDigestMeta(c, owner, body); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 		return
@@ -991,7 +1034,7 @@ func (h *AgentEntry) issueUndo(c *gin.Context, ownerID string, item database.Dig
 }
 
 func (h *AgentEntry) Undo(c *gin.Context) {
-	owner, ok := h.sessionOwner(c)
+	owner, actor, _, keyed, ok := h.digestCaller(c)
 	if !ok {
 		return
 	}
@@ -1007,7 +1050,22 @@ func (h *AgentEntry) Undo(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "undo_token required"})
 		return
 	}
-	kind, placementID, offerID, err := h.DB.ConsumeUndo(c.Request.Context(), services.HashAPIKey(req.UndoToken), owner.ID, time.Now().UTC())
+	now := time.Now().UTC()
+	kind, placementID, offerID, err := h.DB.PeekUndo(c.Request.Context(), services.HashAPIKey(req.UndoToken), owner.ID, now)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "undo token not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "undo failed"})
+		return
+	}
+	if keyed {
+		if !h.undoInScope(c, actor, kind, placementID, offerID) {
+			return
+		}
+	}
+	kind, placementID, offerID, err = h.DB.ConsumeUndo(c.Request.Context(), services.HashAPIKey(req.UndoToken), owner.ID, now)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "undo token not found"})
 		return
@@ -1017,6 +1075,75 @@ func (h *AgentEntry) Undo(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "undone", "kind": kind, "placement_id": placementID, "offer_id": offerID, "user_id": owner.ID})
+}
+
+func (h *AgentEntry) undoInScope(c *gin.Context, actor entryActor, kind, placementID, offerID string) bool {
+	if c.GetString("key_kind") == "account" {
+		return true
+	}
+	refuse := func() bool {
+		c.JSON(http.StatusForbidden, gin.H{"error": "undo is outside this project key"})
+		return false
+	}
+	if actor.OfferID != "" {
+		if kind == "offer" && offerID == actor.OfferID {
+			return true
+		}
+		if kind == "placement" && h.placementField(c, placementID, func(p *database.Placement) bool { return p.OfferID == actor.OfferID }) {
+			return true
+		}
+		if !c.Writer.Written() {
+			return refuse()
+		}
+		return false
+	}
+	if c.GetString("key_kind") == "project" && actor.SiteID != "" {
+		if kind == "placement" && h.placementField(c, placementID, func(p *database.Placement) bool { return p.SiteID == actor.SiteID }) {
+			return true
+		}
+		if !c.Writer.Written() {
+			return refuse()
+		}
+		return false
+	}
+	if actor.MakerID != "" && actor.SiteID == "" {
+		target := offerID
+		if kind == "placement" {
+			placement, err := h.DB.GetPlacementByID(c.Request.Context(), placementID)
+			if err != nil {
+				return refuse()
+			}
+			target = placement.OfferID
+		}
+		if target != "" && h.makerOwnsOffer(c, actor.MakerID, target) {
+			return true
+		}
+		return refuse()
+	}
+	if actor.SiteID != "" && kind == "placement" && h.placementField(c, placementID, func(p *database.Placement) bool { return p.SiteID == actor.SiteID }) {
+		return true
+	}
+	if !c.Writer.Written() {
+		return refuse()
+	}
+	return false
+}
+
+func (h *AgentEntry) placementField(c *gin.Context, placementID string, match func(*database.Placement) bool) bool {
+	placement, err := h.DB.GetPlacementByID(c.Request.Context(), placementID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "undo is outside this project key"})
+			return false
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "undo failed"})
+		return false
+	}
+	if !match(placement) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "undo is outside this project key"})
+		return false
+	}
+	return true
 }
 
 func (h *AgentEntry) RevokePlacement(c *gin.Context) {
