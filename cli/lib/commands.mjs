@@ -126,6 +126,30 @@ export async function scanCommand(target, io, options = {}) {
   return { exitCode: 0, payload, sent: true, id: res.json.id };
 }
 
+const REVIEW_NEXT = 'Waiting for the operator to list this offer.';
+
+function offerState(status) {
+  if (status === 'submitted') return { status: 'in review', live: false, next: REVIEW_NEXT };
+  return { status: status || '', live: status === 'listed', next: '' };
+}
+
+function printOfferState(io, status) {
+  const state = offerState(status);
+  io.stdout(`status: ${state.status}\n`);
+  io.stdout(`live: ${state.live}\n`);
+  if (state.next) io.stdout(`next: ${state.next}\n`);
+  return state;
+}
+
+async function serverMode(io, headers) {
+  const setup = await apiRequest(io, '/v1/setup/settings', { headers });
+  if (setup.status !== 200 || !setup.json || typeof setup.json.mode !== 'string') {
+    io.stderr(`mode was not loaded (${setup.status})\n`);
+    return '';
+  }
+  return setup.json.mode;
+}
+
 export async function listCommand(io) {
   const config = loadConfig(io);
   const headers = authHeaders(config);
@@ -150,14 +174,13 @@ export async function listCommand(io) {
     }
     status = submitted.json.status;
   }
-  const setup = await apiRequest(io, '/v1/setup/settings', { headers });
-  const mode = setup.json && setup.json.mode_preselected ? setup.json.mode_preselected : '';
+  const mode = await serverMode(io, headers);
   io.stdout(`listing_card: ${config.listing_card_id || 'none'}\n`);
   io.stdout(`offer: ${offerID}\n`);
-  io.stdout(`status: ${status}\n`);
-  io.stdout(`live: ${status === 'listed'}\n`);
-  io.stdout(`mode_preselected: ${mode}\n`);
-  return { exitCode: status === 'listed' ? 0 : 1 };
+  const state = printOfferState(io, status);
+  io.stdout(`mode: ${mode}\n`);
+  if (!mode) return { exitCode: 1 };
+  return { exitCode: state.status === 'listed' || state.status === 'in review' ? 0 : 1 };
 }
 
 export async function statusCommand(io) {
@@ -171,10 +194,7 @@ export async function statusCommand(io) {
   const offerID = offerFromScope(config.scope);
   if (offerID) {
     const current = await apiRequest(io, `/v1/maker/offers/${offerID}`, { headers });
-    if (current.status === 200) {
-      io.stdout(`status: ${current.json.status}\n`);
-      io.stdout(`live: ${current.json.status === 'listed'}\n`);
-    }
+    if (current.status === 200) printOfferState(io, current.json.status);
   }
   if (config.listing_card_id) {
     const card = await apiRequest(io, `/v1/listing-cards/${config.listing_card_id}`, { headers });
@@ -192,6 +212,8 @@ export async function digestCommand(io) {
     return { exitCode: 1 };
   }
   const items = Array.isArray(res.json.items) ? res.json.items : [];
+  const mode = typeof res.json.effective_mode === 'string' ? res.json.effective_mode : (typeof res.json.mode === 'string' ? res.json.mode : '');
+  if (mode) io.stdout(`mode: ${mode}\n`);
   if (items[0] && items[0].undo_token) {
     saveConfig(io, { ...loadConfig(io), undo_token: items[0].undo_token });
   }

@@ -120,6 +120,54 @@ fi
 
 echo "seeded offer: $OFFER_ID"
 
+UNTRUSTED_SEED="$(node <<'NODE'
+const crypto = require('crypto');
+const token = crypto.randomBytes(32).toString('hex');
+const hash = crypto.createHash('sha256').update(token).digest('hex');
+const csrf = crypto.randomBytes(16).toString('hex');
+const makerKey = crypto.randomBytes(16).toString('hex');
+const subject = crypto.randomBytes(8).toString('hex');
+const email = `review-${subject}@example.com`;
+process.stdout.write(JSON.stringify({ token, hash, csrf, makerKey, subject, email }));
+NODE
+)"
+UNTRUSTED_TOKEN="$(node -e 'console.log(JSON.parse(process.argv[1]).token)' "$UNTRUSTED_SEED")"
+UNTRUSTED_HASH="$(node -e 'console.log(JSON.parse(process.argv[1]).hash)' "$UNTRUSTED_SEED")"
+UNTRUSTED_CSRF="$(node -e 'console.log(JSON.parse(process.argv[1]).csrf)' "$UNTRUSTED_SEED")"
+UNTRUSTED_MAKER_KEY="$(node -e 'console.log(JSON.parse(process.argv[1]).makerKey)' "$UNTRUSTED_SEED")"
+UNTRUSTED_SUBJECT="$(node -e 'console.log(JSON.parse(process.argv[1]).subject)' "$UNTRUSTED_SEED")"
+UNTRUSTED_EMAIL="$(node -e 'console.log(JSON.parse(process.argv[1]).email)' "$UNTRUSTED_SEED")"
+UNTRUSTED_OFFER="$(psql_base -d affilio_paste -At <<SQL
+WITH maker AS (
+  INSERT INTO makers (api_key, email, name, trusted)
+  VALUES ('${UNTRUSTED_MAKER_KEY}', '${UNTRUSTED_EMAIL}', 'Paste Review', false)
+  RETURNING id
+), product AS (
+  INSERT INTO products (maker_id, name, website_url, product_type, primary_category, readiness_status)
+  SELECT id, 'Paste Review', 'https://pastereview.example', 'saas', 'devtools', 'ready' FROM maker
+  RETURNING id, maker_id
+), offer AS (
+  INSERT INTO offers (product_id, status, commission_type, commission_value, landing_url)
+  SELECT id, 'draft', 'percentage', 20, 'https://pastereview.example' FROM product
+  RETURNING id
+), owner AS (
+  INSERT INTO owners (issuer, subject, email, name, source, maker_id, agent_only, human_login)
+  SELECT 'https://offer-rails.paste', '${UNTRUSTED_SUBJECT}', '${UNTRUSTED_EMAIL}', 'Review Owner', 'cli', maker_id, false, false FROM product
+  RETURNING id
+), session AS (
+  INSERT INTO owner_sessions (token_hash, owner_id, csrf, expires_at)
+  SELECT '${UNTRUSTED_HASH}', id, '${UNTRUSTED_CSRF}', NOW() + INTERVAL '2 hours' FROM owner
+  RETURNING owner_id
+)
+SELECT offer.id FROM offer, session;
+SQL
+)"
+if [[ -z "$UNTRUSTED_OFFER" ]]; then
+  echo "seed did not create an untrusted offer" >&2
+  exit 1
+fi
+echo "seeded untrusted offer: $UNTRUSTED_OFFER"
+
 (
   cd "$CLI"
   OFFER_RAILS_INTEGRATION=1 OFFER_RAILS_API_URL="$BASE" node --test test/integration.test.mjs
@@ -256,12 +304,77 @@ bash -c "${LINES[3]}" >"$WORKDIR/digest.out" 2>"$WORKDIR/digest.err" || true
 bash -c "${LINES[4]}" >"$WORKDIR/undo.out" 2>"$WORKDIR/undo.err" || true
 bash -c "${LINES[5]}" >"$WORKDIR/kill.out" 2>"$WORKDIR/kill.err" || true
 
+UNTRUSTED="$WORKDIR/untrusted"
+mkdir -p "$UNTRUSTED"
+(
+  cd "$UNTRUSTED"
+  bash -c "${LINES[0]}" >"$WORKDIR/untrusted-login.out" 2>"$WORKDIR/untrusted-login.err"
+) &
+UNTRUSTED_PID=$!
+UNTRUSTED_CODE=""
+for _ in $(seq 1 40); do
+  if grep -q '^user_code:' "$WORKDIR/untrusted-login.out" 2>/dev/null; then
+    UNTRUSTED_CODE="$(awk '/^user_code:/{print $2}' "$WORKDIR/untrusted-login.out")"
+    break
+  fi
+  if ! kill -0 "$UNTRUSTED_PID" >/dev/null 2>&1; then
+    echo "untrusted login exited before a user code" >&2
+    cat "$WORKDIR/untrusted-login.out" "$WORKDIR/untrusted-login.err" >&2
+    exit 1
+  fi
+  sleep 0.25
+done
+if [[ -z "$UNTRUSTED_CODE" ]]; then
+  echo "no untrusted user code" >&2
+  cat "$WORKDIR/untrusted-login.out" "$WORKDIR/untrusted-login.err" >&2
+  exit 1
+fi
+UNTRUSTED_APPROVE="$(curl -sS -w '\n%{http_code}' \
+  -H "Origin: ${BASE}" \
+  -H 'Content-Type: application/json' \
+  -H "X-CSRF-Token: ${UNTRUSTED_CSRF}" \
+  -H "Cookie: dtr_owner=${UNTRUSTED_TOKEN}" \
+  -d "{\"user_code\":\"${UNTRUSTED_CODE}\",\"decision\":\"approve\",\"scope\":\"offer\",\"project_id\":\"${UNTRUSTED_OFFER}\"}" \
+  "${BASE}/v1/device/approve")"
+UNTRUSTED_APPROVE_CODE="$(printf '%s\n' "$UNTRUSTED_APPROVE" | tail -n 1)"
+if [[ "$UNTRUSTED_APPROVE_CODE" != "200" ]]; then
+  echo "untrusted device approve failed: $UNTRUSTED_APPROVE" >&2
+  exit 1
+fi
+for _ in $(seq 1 40); do
+  if ! kill -0 "$UNTRUSTED_PID" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 0.5
+done
+if kill -0 "$UNTRUSTED_PID" >/dev/null 2>&1; then
+  echo "untrusted login did not finish" >&2
+  kill "$UNTRUSTED_PID" || true
+  exit 1
+fi
+wait "$UNTRUSTED_PID" || true
+(
+  cd "$UNTRUSTED"
+  bash -c "${LINES[2]}" >"$WORKDIR/untrusted-list.out" 2>"$WORKDIR/untrusted-list.err"
+) || true
+UNTRUSTED_STATUS="$(psql_base -d affilio_paste -At -c "SELECT status FROM offers WHERE id='${UNTRUSTED_OFFER}'")"
+
 fail=0
 grep -q 'A person approved the device code.' "$WORKDIR/login.out" || fail=1
 grep -q '^listing_card:' "$WORKDIR/scan.out" || fail=1
 grep -q 'status: listed' "$WORKDIR/list.out" || fail=1
 grep -q 'live: true' "$WORKDIR/list.out" || fail=1
-grep -q 'mode_preselected: yolo' "$WORKDIR/list.out" || fail=1
+grep -q '^mode: manual$' "$WORKDIR/list.out" || fail=1
+grep -q 'yolo' "$WORKDIR/list.out" && fail=1
+grep -q 'mode_preselected' "$WORKDIR/list.out" && fail=1
+grep -q '^mode: manual$' "$WORKDIR/digest.out" || fail=1
+grep -q 'yolo' "$WORKDIR/digest.out" && fail=1
+grep -q 'status: in review' "$WORKDIR/untrusted-list.out" || fail=1
+grep -q 'next: Waiting for the operator to list this offer.' "$WORKDIR/untrusted-list.out" || fail=1
+grep -q '^mode: manual$' "$WORKDIR/untrusted-list.out" || fail=1
+grep -q 'status: listed' "$WORKDIR/untrusted-list.out" && fail=1
+grep -q 'yolo' "$WORKDIR/untrusted-list.out" && fail=1
+[[ "$UNTRUSTED_STATUS" == "submitted" ]] || fail=1
 grep -q 'summary: Paste Forge' "$WORKDIR/digest.out" || fail=1
 grep -q 'live_now: true' "$WORKDIR/digest.out" || fail=1
 grep -q '^undo_token:' "$WORKDIR/digest.out" || fail=1
@@ -282,17 +395,20 @@ echo "-- undo --"
 cat "$WORKDIR/undo.out"
 echo "-- kill --"
 cat "$WORKDIR/kill.out"
+echo "-- untrusted list --"
+echo "server status: ${UNTRUSTED_STATUS}"
+cat "$WORKDIR/untrusted-list.out"
 if [[ "$fail" -ne 0 ]]; then
   echo "paste test failed" >&2
   echo "-- stderr --" >&2
-  cat "$WORKDIR/login.err" "$WORKDIR/scan.err" "$WORKDIR/list.err" "$WORKDIR/digest.err" "$WORKDIR/undo.err" "$WORKDIR/kill.err" >&2
+  cat "$WORKDIR/login.err" "$WORKDIR/scan.err" "$WORKDIR/list.err" "$WORKDIR/digest.err" "$WORKDIR/undo.err" "$WORKDIR/kill.err" "$WORKDIR/untrusted-login.err" "$WORKDIR/untrusted-list.err" >&2
   echo "-- api log --" >&2
   tail -n 80 "$WORKDIR/api.log" >&2
   exit 1
 fi
 
 echo "=== mcp stdio ==="
-if ! OFFER_RAILS_MCP_SPAWN=1 node --test "$CLI/test/mcp-stdio.test.mjs" >"$WORKDIR/mcp.out" 2>"$WORKDIR/mcp.err"; then
+if ! OFFER_RAILS_MCP_SPAWN=1 OFFER_RAILS_PASTE_DB=affilio_paste node --test "$CLI/test/mcp-stdio.test.mjs" >"$WORKDIR/mcp.out" 2>"$WORKDIR/mcp.err"; then
   echo "mcp stdio failed" >&2
   cat "$WORKDIR/mcp.out" "$WORKDIR/mcp.err" >&2
   exit 1

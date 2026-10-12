@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { apiBase } from '../lib/api.mjs';
-import { configPath } from '../lib/config.mjs';
+import { configPath, saveConfig } from '../lib/config.mjs';
 import { handleMcpMessage, toolDefs } from '../lib/mcp.mjs';
 import { run } from '../lib/main.mjs';
 
@@ -231,6 +231,86 @@ test('mcp session-only tools return a sign-in link and scan does not upload with
   assert.equal(calls.length, 0);
 });
 
+function projectIO(offer, routes) {
+  const { io, stdout, calls } = tempIO({
+    env: { OFFER_RAILS_API_URL: 'http://127.0.0.1:9' },
+    fetch: async (url, opts = {}) => {
+      const method = opts.method || 'GET';
+      const pathname = new URL(url).pathname;
+      calls.push({ url, method, body: opts.body });
+      const hit = routes.find((route) => route.method === method && route.path === pathname);
+      if (!hit) throw new Error(`${method} ${pathname}`);
+      return jsonResponse(hit.status || 200, hit.body);
+    },
+  });
+  saveConfig(io, {
+    access_token: 'or_test',
+    key_header: 'X-Maker-Key',
+    scope: `offer:${offer}`,
+    listing_card_id: 'card-1',
+  });
+  return { io, stdout, calls };
+}
+
+test('list prints in review for an untrusted maker and does not set a mode', async () => {
+  const offer = '11111111-1111-4111-8111-111111111111';
+  const { io, stdout, calls } = projectIO(offer, [
+    { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
+    { method: 'POST', path: `/v1/maker/offers/${offer}/submit`, body: { id: offer, status: 'submitted' } },
+    { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
+  ]);
+  const result = await run(['list'], io);
+  assert.equal(result.exitCode, 0);
+  const text = stdout();
+  assert.match(text, /status: in review/);
+  assert.match(text, /next: Waiting for the operator to list this offer\./);
+  assert.match(text, /^mode: manual$/m);
+  assert.equal(text.includes('status: listed'), false);
+  assert.equal(text.includes('yolo'), false);
+  assert.equal(text.includes('mode_preselected'), false);
+  assert.equal(calls.some((call) => call.method === 'PUT' || call.url.includes('/mode')), false);
+});
+
+test('list prints listed and the mode the server returns', async () => {
+  const offer = '22222222-2222-4222-8222-222222222222';
+  const { io, stdout, calls } = projectIO(offer, [
+    { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
+    { method: 'POST', path: `/v1/maker/offers/${offer}/submit`, body: { id: offer, status: 'listed' } },
+    { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
+  ]);
+  const result = await run(['list'], io);
+  assert.equal(result.exitCode, 0);
+  const text = stdout();
+  assert.match(text, /status: listed/);
+  assert.match(text, /^mode: manual$/m);
+  assert.equal(text.includes('yolo'), false);
+  assert.equal(text.includes('mode_preselected'), false);
+  assert.equal(text.includes('in review'), false);
+  assert.equal(calls.some((call) => call.method === 'PUT'), false);
+});
+
+test('digest prints the mode the server returns', async () => {
+  const offer = '33333333-3333-4333-8333-333333333333';
+  const { io, stdout } = projectIO(offer, [
+    {
+      method: 'GET',
+      path: '/v1/digest',
+      body: {
+        effective_mode: 'manual',
+        mode_preselected: 'yolo',
+        items: [{ summary: 'Paste Forge', live_now: true, undo_token: 'tok' }],
+      },
+    },
+  ]);
+  const result = await run(['digest'], io);
+  assert.equal(result.exitCode, 0);
+  const text = stdout();
+  assert.match(text, /^mode: manual$/m);
+  assert.match(text, /summary: Paste Forge/);
+  assert.equal(text.includes('yolo'), false);
+  assert.equal(text.includes('mode_preselected'), false);
+});
+
 test('the readme paste block is the six CLI lines', () => {
   const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const block = readme.split('<!-- paste:begin -->')[1].split('<!-- paste:end -->')[0];
@@ -248,4 +328,7 @@ test('the readme paste block is the six CLI lines', () => {
   assert.match(readme, /"command": "npx"/);
   assert.match(readme, /"-y", "offer-rails", "mcp"/);
   assert.match(readme, /"offer-rails", "mcp"/);
+  assert.match(readme, /in review/);
+  assert.match(readme, /does not set an approval mode/);
+  assert.match(readme, /A new site is manual/);
 });
