@@ -144,7 +144,7 @@ WITH maker AS (
   RETURNING id
 ), product AS (
   INSERT INTO products (maker_id, name, website_url, product_type, primary_category, readiness_status)
-  SELECT id, 'Paste Review', 'https://pastereview.example', 'saas', 'devtools', 'ready' FROM maker
+  SELECT id, 'Paste Review', 'https://pastereview.example', 'saas', 'devtools', 'failed' FROM maker
   RETURNING id, maker_id
 ), offer AS (
   INSERT INTO offers (product_id, status, commission_type, commission_value, landing_url)
@@ -167,6 +167,7 @@ if [[ -z "$UNTRUSTED_OFFER" ]]; then
   exit 1
 fi
 echo "seeded untrusted offer: $UNTRUSTED_OFFER"
+echo "pending: untrusted maker going live waits on the PR #21 submit change. This server still does not list an untrusted maker when checks pass."
 
 (
   cd "$CLI"
@@ -365,16 +366,18 @@ grep -q '^listing_card:' "$WORKDIR/scan.out" || fail=1
 grep -q 'status: listed' "$WORKDIR/list.out" || fail=1
 grep -q 'live: true' "$WORKDIR/list.out" || fail=1
 grep -q '^mode: manual$' "$WORKDIR/list.out" || fail=1
-grep -q 'yolo' "$WORKDIR/list.out" && fail=1
-grep -q 'mode_preselected' "$WORKDIR/list.out" && fail=1
+grep -q '^mode_preselected: yolo$' "$WORKDIR/list.out" || fail=1
+grep -q 'in review' "$WORKDIR/list.out" && fail=1
 grep -q '^mode: manual$' "$WORKDIR/digest.out" || fail=1
-grep -q 'yolo' "$WORKDIR/digest.out" && fail=1
+grep -q '^mode_preselected: yolo$' "$WORKDIR/digest.out" || fail=1
 grep -q 'status: in review' "$WORKDIR/untrusted-list.out" || fail=1
-grep -q 'next: Waiting for the operator to list this offer.' "$WORKDIR/untrusted-list.out" || fail=1
+grep -q 'check: This product has not passed readiness assessment' "$WORKDIR/untrusted-list.out" || fail=1
+grep -q 'reason: This product has not passed readiness assessment. Fix the failed checks, then submit again.' "$WORKDIR/untrusted-list.out" || fail=1
+grep -q 'next: Fix the failed checks, then submit again.' "$WORKDIR/untrusted-list.out" || fail=1
 grep -q '^mode: manual$' "$WORKDIR/untrusted-list.out" || fail=1
+grep -q '^mode_preselected: yolo$' "$WORKDIR/untrusted-list.out" || fail=1
 grep -q 'status: listed' "$WORKDIR/untrusted-list.out" && fail=1
-grep -q 'yolo' "$WORKDIR/untrusted-list.out" && fail=1
-[[ "$UNTRUSTED_STATUS" == "submitted" ]] || fail=1
+[[ "$UNTRUSTED_STATUS" == "draft" ]] || fail=1
 grep -q 'summary: Paste Forge' "$WORKDIR/digest.out" || fail=1
 grep -q 'live_now: true' "$WORKDIR/digest.out" || fail=1
 grep -q '^undo_token:' "$WORKDIR/digest.out" || fail=1
@@ -395,9 +398,11 @@ echo "-- undo --"
 cat "$WORKDIR/undo.out"
 echo "-- kill --"
 cat "$WORKDIR/kill.out"
-echo "-- untrusted list --"
+echo "-- untrusted failed check --"
 echo "server status: ${UNTRUSTED_STATUS}"
 cat "$WORKDIR/untrusted-list.out"
+echo "-- untrusted maker going live --"
+echo "pending: waits on the PR #21 submit change"
 if [[ "$fail" -ne 0 ]]; then
   echo "paste test failed" >&2
   echo "-- stderr --" >&2

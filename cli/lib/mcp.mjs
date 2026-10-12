@@ -28,7 +28,7 @@ export function toolDefs() {
       url: str('One https URL, or http on localhost. Links inside the page are not fetched.'),
       confirm: bool('Upload the listing card after printing it.'),
     }),
-    tool('list', 'Submit the scoped draft offer. A trusted maker is listed. An untrusted maker is in review. Prints the mode the server returns and does not set one.', {}),
+    tool('list', 'Submit the scoped draft offer and print the status the server returns. Prints listed when the server lists it. Prints in review, the failed check, and the next step when a check fails. Prints mode and mode_preselected from the server and does not set a mode.', {}),
     tool('status', 'Show the stored project key scope and the offer or listing state.', {}),
     tool('digest', 'Show what went live for this project key, with an undo token.', {}),
     tool('undo', 'Undo the latest digest item for this project key.', {}),

@@ -126,28 +126,36 @@ export async function scanCommand(target, io, options = {}) {
   return { exitCode: 0, payload, sent: true, id: res.json.id };
 }
 
-const REVIEW_NEXT = 'Waiting for the operator to list this offer.';
-
-function offerState(status) {
-  if (status === 'submitted') return { status: 'in review', live: false, next: REVIEW_NEXT };
-  return { status: status || '', live: status === 'listed', next: '' };
+function textField(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
 }
 
-function printOfferState(io, status) {
-  const state = offerState(status);
-  io.stdout(`status: ${state.status}\n`);
-  io.stdout(`live: ${state.live}\n`);
-  if (state.next) io.stdout(`next: ${state.next}\n`);
-  return state;
+function reviewFailure(body) {
+  if (!body || typeof body !== 'object' || body.status === 'listed') return null;
+  const reason = textField(body.reason) || textField(body.error);
+  if (!reason) return null;
+  const explicit = textField(body.check) || textField(body.failed_check);
+  const sentences = reason.split(/(?<=\.)\s+/).map((part) => part.trim()).filter(Boolean);
+  const check = explicit || sentences[0].replace(/\.$/, '');
+  const next = sentences.length > 1 ? sentences.slice(1).join(' ') : '';
+  return { check, reason, next };
+}
+
+function printServerMode(io, payload) {
+  const mode = textField(payload && payload.effective_mode) || textField(payload && payload.mode);
+  const preselected = textField(payload && payload.mode_preselected);
+  if (mode) io.stdout(`mode: ${mode}\n`);
+  if (preselected) io.stdout(`mode_preselected: ${preselected}\n`);
+  return mode;
 }
 
 async function serverMode(io, headers) {
   const setup = await apiRequest(io, '/v1/setup/settings', { headers });
-  if (setup.status !== 200 || !setup.json || typeof setup.json.mode !== 'string') {
+  if (setup.status !== 200 || !setup.json) {
     io.stderr(`mode was not loaded (${setup.status})\n`);
     return '';
   }
-  return setup.json.mode;
+  return printServerMode(io, setup.json);
 }
 
 export async function listCommand(io) {
@@ -165,22 +173,32 @@ export async function listCommand(io) {
     return { exitCode: 1 };
   }
   let status = current.json.status;
+  let review = null;
   if (status === 'draft') {
     const submitted = await apiRequest(io, `/v1/maker/offers/${offerID}/submit`, { method: 'POST', headers });
-    if (submitted.status !== 200) {
+    review = reviewFailure(submitted.json);
+    if (!review && submitted.status !== 200) {
       io.stderr(`offer was not submitted (${submitted.status})\n`);
       io.stdout(`${JSON.stringify(submitted.json)}\n`);
       return { exitCode: 1 };
     }
-    status = submitted.json.status;
+    if (!review) status = submitted.json.status;
   }
-  const mode = await serverMode(io, headers);
   io.stdout(`listing_card: ${config.listing_card_id || 'none'}\n`);
   io.stdout(`offer: ${offerID}\n`);
-  const state = printOfferState(io, status);
-  io.stdout(`mode: ${mode}\n`);
+  if (review) {
+    io.stdout('status: in review\n');
+    io.stdout('live: false\n');
+    io.stdout(`check: ${review.check}\n`);
+    io.stdout(`reason: ${review.reason}\n`);
+    if (review.next) io.stdout(`next: ${review.next}\n`);
+  } else {
+    io.stdout(`status: ${status}\n`);
+    io.stdout(`live: ${status === 'listed'}\n`);
+  }
+  const mode = await serverMode(io, headers);
   if (!mode) return { exitCode: 1 };
-  return { exitCode: state.status === 'listed' || state.status === 'in review' ? 0 : 1 };
+  return { exitCode: status === 'listed' || review ? 0 : 1 };
 }
 
 export async function statusCommand(io) {
@@ -194,7 +212,10 @@ export async function statusCommand(io) {
   const offerID = offerFromScope(config.scope);
   if (offerID) {
     const current = await apiRequest(io, `/v1/maker/offers/${offerID}`, { headers });
-    if (current.status === 200) printOfferState(io, current.json.status);
+    if (current.status === 200) {
+      io.stdout(`status: ${current.json.status}\n`);
+      io.stdout(`live: ${current.json.status === 'listed'}\n`);
+    }
   }
   if (config.listing_card_id) {
     const card = await apiRequest(io, `/v1/listing-cards/${config.listing_card_id}`, { headers });
@@ -212,8 +233,15 @@ export async function digestCommand(io) {
     return { exitCode: 1 };
   }
   const items = Array.isArray(res.json.items) ? res.json.items : [];
-  const mode = typeof res.json.effective_mode === 'string' ? res.json.effective_mode : (typeof res.json.mode === 'string' ? res.json.mode : '');
-  if (mode) io.stdout(`mode: ${mode}\n`);
+  const setup = await apiRequest(io, '/v1/setup/settings', { headers: authHeaders(config) });
+  const modePayload = {
+    ...(setup.status === 200 && setup.json ? setup.json : {}),
+    effective_mode: textField(res.json.effective_mode) || textField(setup.json && setup.json.mode),
+  };
+  if (!printServerMode(io, modePayload)) {
+    io.stderr('mode was not loaded\n');
+    return { exitCode: 1 };
+  }
   if (items[0] && items[0].undo_token) {
     saveConfig(io, { ...loadConfig(io), undo_token: items[0].undo_token });
   }

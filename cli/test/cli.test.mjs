@@ -252,22 +252,24 @@ function projectIO(offer, routes) {
   return { io, stdout, calls };
 }
 
-test('list prints in review for an untrusted maker and does not set a mode', async () => {
+test('list prints in review when a check fails and does not set a mode', async () => {
   const offer = '11111111-1111-4111-8111-111111111111';
+  const reason = 'This product has not passed readiness assessment. Fix the failed checks, then submit again.';
   const { io, stdout, calls } = projectIO(offer, [
     { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
-    { method: 'POST', path: `/v1/maker/offers/${offer}/submit`, body: { id: offer, status: 'submitted' } },
+    { method: 'POST', path: `/v1/maker/offers/${offer}/submit`, status: 409, body: { error: reason, readiness_status: 'failed' } },
     { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
   ]);
   const result = await run(['list'], io);
   assert.equal(result.exitCode, 0);
   const text = stdout();
   assert.match(text, /status: in review/);
-  assert.match(text, /next: Waiting for the operator to list this offer\./);
+  assert.match(text, /check: This product has not passed readiness assessment/);
+  assert.match(text, /reason: This product has not passed readiness assessment\. Fix the failed checks, then submit again\./);
+  assert.match(text, /next: Fix the failed checks, then submit again\./);
   assert.match(text, /^mode: manual$/m);
+  assert.match(text, /^mode_preselected: yolo$/m);
   assert.equal(text.includes('status: listed'), false);
-  assert.equal(text.includes('yolo'), false);
-  assert.equal(text.includes('mode_preselected'), false);
   assert.equal(calls.some((call) => call.method === 'PUT' || call.url.includes('/mode')), false);
 });
 
@@ -283,13 +285,27 @@ test('list prints listed and the mode the server returns', async () => {
   const text = stdout();
   assert.match(text, /status: listed/);
   assert.match(text, /^mode: manual$/m);
-  assert.equal(text.includes('yolo'), false);
-  assert.equal(text.includes('mode_preselected'), false);
+  assert.match(text, /^mode_preselected: yolo$/m);
   assert.equal(text.includes('in review'), false);
   assert.equal(calls.some((call) => call.method === 'PUT'), false);
 });
 
-test('digest prints the mode the server returns', async () => {
+test('list does not call a bare submitted offer in review', async () => {
+  const offer = '44444444-4444-4444-8444-444444444444';
+  const { io, stdout } = projectIO(offer, [
+    { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
+    { method: 'POST', path: `/v1/maker/offers/${offer}/submit`, body: { id: offer, status: 'submitted' } },
+    { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
+  ]);
+  const result = await run(['list'], io);
+  assert.equal(result.exitCode, 1);
+  const text = stdout();
+  assert.match(text, /status: submitted/);
+  assert.equal(text.includes('in review'), false);
+  assert.match(text, /^mode_preselected: yolo$/m);
+});
+
+test('digest prints the mode and mode_preselected the server returns', async () => {
   const offer = '33333333-3333-4333-8333-333333333333';
   const { io, stdout } = projectIO(offer, [
     {
@@ -297,18 +313,17 @@ test('digest prints the mode the server returns', async () => {
       path: '/v1/digest',
       body: {
         effective_mode: 'manual',
-        mode_preselected: 'yolo',
         items: [{ summary: 'Paste Forge', live_now: true, undo_token: 'tok' }],
       },
     },
+    { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
   ]);
   const result = await run(['digest'], io);
   assert.equal(result.exitCode, 0);
   const text = stdout();
   assert.match(text, /^mode: manual$/m);
+  assert.match(text, /^mode_preselected: yolo$/m);
   assert.match(text, /summary: Paste Forge/);
-  assert.equal(text.includes('yolo'), false);
-  assert.equal(text.includes('mode_preselected'), false);
 });
 
 test('the readme paste block is the six CLI lines', () => {
@@ -330,5 +345,6 @@ test('the readme paste block is the six CLI lines', () => {
   assert.match(readme, /"offer-rails", "mcp"/);
   assert.match(readme, /in review/);
   assert.match(readme, /does not set an approval mode/);
-  assert.match(readme, /A new site is manual/);
+  assert.match(readme, /mode_preselected` is yolo/);
+  assert.equal(readme.toLowerCase().includes('fully automatic'), false);
 });
