@@ -127,7 +127,11 @@ FROM products WHERE id=$1`, offer.ProductID).Scan(&product.MakerID, &product.Nam
 		return "", "", false, nil
 	}
 	if (entry.StubClaimChecker{}).CheckClaims(offer.Terms, offerFacts(*offer, product)) != nil {
-		return reviewReasonClaims, reviewClaimsMessage, true, nil
+		message := reviewClaimsMessage
+		if claimsHeld(h.ClaimsCheck) {
+			message = reviewClaimsNotLive
+		}
+		return reviewReasonClaims, message, true, nil
 	}
 	return "", "", false, nil
 }

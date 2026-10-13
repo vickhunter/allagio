@@ -464,13 +464,29 @@ func (d *DB) PlacementAllowsClick(ctx context.Context, placementID, campaignID s
 	return valid, err
 }
 
+// ReopenRefusedReceipt returns a committed placement to pending when the
+// publisher's receipt does not match. The tracked link stays on the receipt.
+// A later matching receipt can commit it again. A receipt that already
+// reported publication is left committed.
+func (d *DB) ReopenRefusedReceipt(ctx context.Context, siteID, id string) error {
+	_, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
+SET status='pending',
+    receipt = COALESCE(receipt, '{}'::jsonb) || jsonb_build_object('publication_status', 'refused')
+WHERE id=$1 AND site_id=$2 AND status='committed'
+  AND COALESCE(receipt->>'publication_status', '') <> 'publisher_reported'`, id, siteID)
+	return err
+}
+
 func (d *DB) RecordPlacementReceipt(ctx context.Context, siteID, id, surfaceURL, contentHash, evidence, postTitle string, at time.Time) (bool, error) {
-	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET receipt=receipt || jsonb_build_object(
+	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='committed', receipt=receipt || jsonb_build_object(
  'publication_status','publisher_reported','surface_url',$3::text,'content_sha256',$4::text,'evidence',$5::text,
  'post_title', COALESCE(NULLIF($7, ''), NULLIF(post_title, ''), receipt->>'post_title', '')),
  plugin_contact_at=$6
- WHERE id=$1 AND site_id=$2 AND surface_url=$3 AND status='committed'
- AND receipt->>'publication_status'='awaiting_evidence'`, id, siteID, surfaceURL, contentHash, evidence, at, postTitle)
+ WHERE id=$1 AND site_id=$2 AND surface_url=$3
+ AND (
+   (status='committed' AND receipt->>'publication_status'='awaiting_evidence')
+   OR (status='pending' AND receipt->>'publication_status'='refused')
+ )`, id, siteID, surfaceURL, contentHash, evidence, at, postTitle)
 	if err != nil {
 		return false, err
 	}

@@ -466,6 +466,10 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 	wantLink := "/v1/go/" + p.ID
 	publishedLink := strings.Contains(req.PublishedText, "/go/"+p.ID)
 	if json.Unmarshal(p.Receipt, &receipt) != nil || receipt.TrackedLink != wantLink || !strings.Contains(req.PublishedText, p.Copy) || !publishedDisclosureOK(req.PublishedText, p.Disclosure) || !publishedLink {
+		if err = h.DB.ReopenRefusedReceipt(c.Request.Context(), siteIDFrom(c), p.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "receipt recording failed"})
+			return
+		}
 		writeNamedConflict(c, "receipt_mismatch")
 		return
 	}

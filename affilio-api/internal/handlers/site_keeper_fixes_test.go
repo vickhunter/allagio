@@ -578,8 +578,9 @@ func requireDigestTitleAndSurface(t *testing.T, items []map[string]any) {
 	for _, item := range items {
 		title, _ := item["post_title"].(string)
 		surface, _ := item["surface_url"].(string)
-		if title == "" || surface == "" {
-			t.Fatalf("item missing post_title or surface_url: %v", item)
+		position, _ := item["position"].(string)
+		if title == "" || surface == "" || position == "" {
+			t.Fatalf("item missing post_title, surface_url, or position: %v", item)
 		}
 	}
 }
@@ -648,11 +649,11 @@ func TestDigestTitleAndSurfaceFromRealPlacement(t *testing.T) {
 		items := itemsFromDigest(t, body)
 		requireDigestTitleAndSurface(t, items)
 		item := findDigestItem(items, created.ID)
-		if item == nil || item["post_title"] != "Guide to shipping" || item["surface_url"] != surface {
+		if item == nil || item["post_title"] != "Guide to shipping" || item["surface_url"] != surface || item["position"] != "end" {
 			t.Fatalf("%s placement: %v", path, item)
 		}
 		offer := findDigestItem(items, offerID)
-		if offer == nil || offer["post_title"] != "Guide to shipping" || offer["surface_url"] != surface {
+		if offer == nil || offer["post_title"] != "Guide to shipping" || offer["surface_url"] != surface || offer["position"] != "end" {
 			t.Fatalf("%s offer: %v", path, offer)
 		}
 	}
@@ -696,7 +697,7 @@ SELECT product_id,'submitted',commission_type,commission_value,landing_url FROM 
 		items := itemsFromDigest(t, body)
 		requireDigestTitleAndSurface(t, items)
 		held := findDigestItem(items, heldID)
-		if held == nil || held["status"] != "submitted" || held["post_title"] != "Held Product" || held["surface_url"] != "https://example.com" {
+		if held == nil || held["status"] != "submitted" || held["post_title"] != "Held Product" || held["surface_url"] != "https://example.com" || held["position"] != "end" {
 			t.Fatalf("%s held: %v", path, held)
 		}
 		listed := findDigestItem(items, listedID)
@@ -716,4 +717,128 @@ SELECT product_id,'submitted',commission_type,commission_value,landing_url FROM 
 	open()
 	assertHeld("/v1/account/digest", true)
 	assertHeld("/v1/digest", false)
+}
+
+func TestRefusedReceiptReopensPrepare(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	makerID := insertPublisherMaker(t, db)
+	_, offerID := insertPublisherOffer(t, db, makerID, "none", "percentage", "USD", "InboxPilot", []string{"email", "inbox", "productivity"})
+	siteKey := "site-key-refused-receipt"
+	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Tutorials")
+	linkPublisherOwner(t, db, siteID)
+	r := publisherLegRouter(db, true)
+	surface := "https://publisher.example.com/tutorial"
+	copy := "Consider InboxPilot for an email inbox productivity workflow."
+	prepare := func() (int, map[string]interface{}) {
+		t.Helper()
+		rec, body := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+			"offer_id": offerID, "surface_url": surface, "context": "InboxPilot email inbox productivity tutorial for developers", "copy": copy,
+		})
+		return rec.Code, body
+	}
+	code, prepared := prepare()
+	if code != http.StatusCreated {
+		t.Fatalf("prepare: %d %v", code, prepared)
+	}
+	placementID := prepared["placement"].(map[string]interface{})["id"].(string)
+	approved, _ := adminJSON(t, r, http.MethodPost, "/v1/offer-review/placements/"+placementID+"/approve", map[string]interface{}{
+		"site_id": siteID, "owner_email": "publisher@example.com", "evidence": "Publisher approved this exact providerless placement.",
+	})
+	if approved.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", approved.Code, approved.Body.String())
+	}
+	committed, committedBody := doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/commit", siteKey, nil)
+	if committed.Code != http.StatusOK {
+		t.Fatalf("commit: %d %v", committed.Code, committedBody)
+	}
+	refused, refusedBody := doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/receipt", siteKey, map[string]interface{}{
+		"surface_url": surface, "published_text": "This post does not contain the approved box.", "evidence": "The publisher refused this receipt.",
+	})
+	if refused.Code != http.StatusConflict || refusedBody["reason"] != "receipt_mismatch" {
+		t.Fatalf("refuse: %d %v", refused.Code, refusedBody)
+	}
+	var status, publication string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status, COALESCE(receipt->>'publication_status','') FROM placement_proposals WHERE id=$1`, placementID).Scan(&status, &publication); err != nil || status != "pending" || publication != "refused" {
+		t.Fatalf("after refuse status=%s publication=%s err=%v", status, publication, err)
+	}
+	again, againBody := prepare()
+	if again != http.StatusCreated {
+		t.Fatalf("prepare after refuse: %d %v", again, againBody)
+	}
+	nextID, _ := againBody["placement"].(map[string]interface{})["id"].(string)
+	if nextID == "" || nextID == placementID || againBody["reason"] == "one_per_post" {
+		t.Fatalf("expected a new box, got %v", againBody)
+	}
+}
+
+func assertYoloHeld(t *testing.T, rec *httptest.ResponseRecorder, body map[string]any) {
+	t.Helper()
+	if rec.Code != http.StatusOK || body["mode"] != "manual" || body["mode_preselected"] != "yolo" || body["approval_reason"] != entry.YoloAfterFirstReason || body["approval_message"] != entry.YoloAfterFirstMessage {
+		t.Fatalf("yolo hold: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestOwnerSetupSavesYoloUntilFirstPlacement(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	api.Claims = entry.StubClaimChecker{}
+	owner, cookie := testOwnerSession(t, h, "yolo-setup-route", "yolo-setup-route@example.com")
+	siteID := createTestSite(t, db, "yolo-setup-route-key", "yolo-setup-route.example", "Yolo Setup")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, source='direct' WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	saved, savedBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/setup/settings", map[string]any{
+		"role": "publisher", "install_path": "cli", "mode": "yolo", "mode_shown": "yolo",
+	})
+	assertYoloHeld(t, saved, savedBody)
+	got, gotBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher", nil)
+	assertYoloHeld(t, got, gotBody)
+}
+
+func TestSiteModeSavesYoloUntilFirstPlacement(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	api.Claims = entry.StubClaimChecker{}
+	owner, cookie := testOwnerSession(t, h, "yolo-site-route", "yolo-site-route@example.com")
+	siteID := createTestSite(t, db, "yolo-site-route-key", "yolo-site-route.example", "Yolo Site")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, source='direct' WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	saved, savedBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/sites/"+siteID+"/mode", map[string]any{"mode": "yolo"})
+	assertYoloHeld(t, saved, savedBody)
+	got, gotBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/sites/"+siteID+"/mode", nil)
+	assertYoloHeld(t, got, gotBody)
+	var stored string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT mode FROM approval_policies WHERE site_id=$1`, siteID).Scan(&stored); err != nil || stored != "yolo" {
+		t.Fatalf("stored mode %s %v", stored, err)
+	}
+}
+
+func TestAdminApproveMatchesOfferClaimsText(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	ginSetTest(t)
+	_, makerKey := createTestMaker(t, db)
+	makers := newMakerRouterWithClaims(db, config.ClaimsStub)
+	productID, heldID := createDraftOffer(t, makers, makerKey, "InboxPilot", "https://inboxpilot.example.com", "Readers save 90% of their time.", 20)
+	markProductReady(t, db, productID)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE products SET name='InboxPilot', primary_category='productivity', keywords=$2 WHERE id=$1`, productID, []string{"email", "inbox", "productivity"}); err != nil {
+		t.Fatal(err)
+	}
+	submitted, submittedBody := doJSON(t, makers, http.MethodPost, "/v1/maker/offers/"+heldID+"/submit", makerKey, nil)
+	if submitted.Code != http.StatusOK || submittedBody["status"] != "submitted" {
+		t.Fatalf("submit: %d %v", submitted.Code, submittedBody)
+	}
+	row, rowBody := doJSON(t, makers, http.MethodGet, "/v1/maker/offers/"+heldID, makerKey, nil)
+	if row.Code != http.StatusOK || rowBody["message"] != reviewClaimsNotLive || rowBody["review_reason"] != reviewReasonClaims {
+		t.Fatalf("offer row: %d %v", row.Code, rowBody)
+	}
+	blocked, blockedBody := adminJSON(t, makers, http.MethodPost, "/v1/offer-review/"+heldID+"/approve", nil)
+	if blocked.Code != http.StatusConflict || blockedBody["message"] != rowBody["message"] || blockedBody["review_reason"] != rowBody["review_reason"] || blockedBody["status"] != "submitted" {
+		t.Fatalf("approve: %d %v row %v", blocked.Code, blockedBody, rowBody["message"])
+	}
 }

@@ -745,6 +745,7 @@ func normalizedSurfaceSQL(expr string) string {
 
 var placementBoxCountSQL = `SELECT COUNT(*) FROM placement_proposals
 WHERE site_id=$1 AND id<>$3::uuid AND status<>'revoked' AND removed_at IS NULL
+AND NOT (status='pending' AND COALESCE(receipt->>'publication_status','')='refused')
 AND (
   ($4::bigint > 0 AND wp_post_id = $4::bigint)
   OR (
@@ -988,7 +989,18 @@ const digestPostTitleSQL = `COALESCE(NULLIF(receipt->>'post_title', ''), NULLIF(
       = regexp_replace(lower(split_part(split_part(placement_proposals.surface_url, '#', 1), '?', 1)), '/+$', '')
   ORDER BY a.updated_at DESC
   LIMIT 1
-), NULLIF(copy, ''))`
+), NULLIF(copy, ''), 'Untitled')`
+
+// digestPositionSQL uses the stored position, then the publisher's saved box
+// position, then end, so a digest item never has an empty position.
+const digestPositionSQL = `COALESCE(NULLIF(position, ''), (
+  SELECT os.box_position FROM owner_setup os
+  JOIN owners o ON o.id = os.owner_id
+  WHERE o.site_id = placement_proposals.site_id
+    AND os.role = 'publisher'
+    AND COALESCE(os.box_position, '') <> ''
+  LIMIT 1
+), 'end')`
 
 // digestSurfaceSQL prefers the plugin receipt, then the stored placement URL.
 const digestSurfaceSQL = `COALESCE(NULLIF(receipt->>'surface_url', ''), surface_url)`
@@ -1000,7 +1012,7 @@ func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Tim
 	}
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
 plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
-`+digestPostTitleSQL+`, `+digestSurfaceSQL+`, COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
+`+digestPostTitleSQL+`, `+digestSurfaceSQL+`, `+digestPositionSQL+`, COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
 (SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
 COALESCE(approved_by_kind,''), COALESCE(policy_version,0), COALESCE(undone_by_user::text,'')
 FROM placement_proposals
@@ -1030,12 +1042,13 @@ const digestOfferColumns = `o.id::text, p.name,
 (o.updated_at AT TIME ZONE current_setting('TimeZone')),
 (SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
 o.status,
-COALESCE(NULLIF(place.receipt->>'post_title', ''), NULLIF(place.post_title, ''), NULLIF(p.name, '')),
-COALESCE(NULLIF(place.receipt->>'surface_url', ''), NULLIF(place.surface_url, ''), NULLIF(o.landing_url, ''), NULLIF(p.website_url, ''))`
+COALESCE(NULLIF(place.receipt->>'post_title', ''), NULLIF(place.post_title, ''), NULLIF(p.name, ''), 'Untitled'),
+COALESCE(NULLIF(place.receipt->>'surface_url', ''), NULLIF(place.surface_url, ''), NULLIF(o.landing_url, ''), NULLIF(p.website_url, '')),
+COALESCE(NULLIF(place.position, ''), 'end')`
 
 const digestOfferFrom = `FROM offers o JOIN products p ON p.id=o.product_id
 LEFT JOIN LATERAL (
-  SELECT receipt, post_title, surface_url
+  SELECT receipt, post_title, surface_url, position
   FROM placement_proposals
   WHERE offer_id = o.id
   ORDER BY COALESCE(approved_at, created_at) DESC
@@ -1073,7 +1086,7 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = kind
-		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.Status, &item.PostTitle, &item.SurfaceURL); err != nil {
+		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.Status, &item.PostTitle, &item.SurfaceURL, &item.Position); err != nil {
 			return nil, err
 		}
 		item.Label = item.Summary
