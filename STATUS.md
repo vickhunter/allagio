@@ -1,3 +1,7 @@
+## October 13 — release zip rejects a missing reference
+
+The WordPress release ZIP fails when a file inside it points at a path that is not in the archive. The check covers a JavaScript `import` and `import()`, a `wp_enqueue_script` or `wp_enqueue_style` source, and a PHP `require` or `include`. A packaged script that imports `landing-scene.bundle.js` fails when that file is absent. Hosted landing files stay out of the WordPress ZIP, so the committed bundle is not required there.
+
 ## October 13 — committed landing scene, deterministic wake wait
 
 `landing-scene.bundle.js` and `landing-scene.bundle.js.LEGAL.txt` are committed. `landing.js` imports the bundle, and the hosted image copies those committed files instead of rebuilding them. Regenerate both with `npm run build` in `affilio-wp/admin/build` when `landing-scene.js` changes. The WordPress plugin ZIP still omits hosted landing files. The slow health-check offer-rail test advances the page clock one 4-second poll at a time and waits for each `/health` response, so it does not race a 25-second visibility timeout.

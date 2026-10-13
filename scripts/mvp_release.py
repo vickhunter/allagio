@@ -55,6 +55,21 @@ PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
 ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
 DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
 QUOTED_BUILD = re.compile(r"""(['"])([A-Za-z0-9_.-]+\.(?:js|css))\1""")
+JS_DYNAMIC_IMPORT = re.compile(r"""(?<![.\w$])import\s*\(\s*(['"`])([^'"`]+)\1""")
+JS_FROM = re.compile(r"""\bfrom\s+(['"`])([^'"`]+)\1""")
+JS_SIDE_IMPORT = re.compile(r"""(?<![.\w$])import\s+(['"`])([^'"`]+)\1""")
+PHP_LOAD_CONCAT = re.compile(
+    r"""(?<![.\w])(?:require_once|include_once|require|include)\b\s*(?:\(\s*)?"""
+    r"""(?P<base>AFFILIO_PLUGIN_DIR|__DIR__|dirname\s*\(\s*__DIR__\s*(?:,\s*(?P<dir_levels>\d+)\s*)?\)|dirname\s*\(\s*__FILE__\s*(?:,\s*(?P<file_levels>\d+)\s*)?\))\s*\.\s*"""
+    r"""(['"])(?P<path>[^'"]+)\4"""
+)
+PHP_LOAD_LITERAL = re.compile(
+    r"""(?<![.\w])(?:require_once|include_once|require|include)\b\s*(?:\(\s*)?(['"])(?P<path>[^'"]+\.(?:php|inc|js|css))\1"""
+)
+PHP_ENQUEUE = re.compile(
+    r"""wp_enqueue_(?:script|style)\s*\(\s*(?:(['"])[^'"]+\1|\$[A-Za-z_][A-Za-z0-9_]*)\s*,\s*"""
+    r"""(?:AFFILIO_PLUGIN_URL\s*\.\s*|plugins_url\s*\(\s*)?(['"])([^'"]+)\2"""
+)
 SKILLS = {f"package/skills/distributoor-{name}/SKILL.md" for name in ("onboard", "instrument", "launch")}
 MAX_DOWNLOAD = 20 * 1024 * 1024
 
@@ -194,16 +209,128 @@ def archive_names(names):
         require(not any(part in {".git", ".local", "node_modules", ".env"} or part.startswith(".env.") for part in parts), "Archive contains private or development files.")
 
 
-def referenced_plugin_files(text):
+def strip_code_comments(text):
+    kept = []
+    index = 0
+    length = len(text)
+    while index < length:
+        character = text[index]
+        if character in "'\"`":
+            kept.append(character)
+            index += 1
+            while index < length:
+                kept.append(text[index])
+                if text[index] == "\\":
+                    index += 1
+                    if index < length:
+                        kept.append(text[index])
+                        index += 1
+                    continue
+                if text[index] == character:
+                    index += 1
+                    break
+                index += 1
+            continue
+        if text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            kept.append(" ")
+            index = length if end < 0 else end + 2
+            continue
+        if text.startswith("//", index):
+            end = text.find("\n", index)
+            index = length if end < 0 else end
+            continue
+        kept.append(character)
+        index += 1
+    return "".join(kept)
+
+
+def _packaged_reference(base_parts, spec):
+    spec = spec.strip().split("?", 1)[0].split("#", 1)[0].strip()
+    if not spec or spec.startswith("//") or re.match(r"^[a-z][a-z0-9+.-]*:", spec, re.I):
+        return ""
+    if base_parts is None:
+        return None
+    collapsed = []
+    for part in list(base_parts) + [part for part in PurePosixPath(spec).parts if part != "/"]:
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not collapsed:
+                return None
+            collapsed.pop()
+            continue
+        collapsed.append(part)
+    if not collapsed or collapsed[0] != "affilio-wp":
+        return None
+    relative = "/".join(collapsed[1:])
+    if not relative or "." not in PurePosixPath(relative).name:
+        return ""
+    return relative
+
+
+def _remember_reference(needed, outside, relative, label):
+    if relative is None:
+        outside.append(label.strip() or "..")
+    elif relative:
+        needed.add(relative)
+
+
+def _js_references(source_name, text, needed, outside):
+    base = list(PurePosixPath(source_name).parent.parts)
+    specs = []
+    for pattern in (JS_DYNAMIC_IMPORT, JS_FROM, JS_SIDE_IMPORT):
+        specs.extend(match.group(2) for match in pattern.finditer(text))
+    for spec in specs:
+        cleaned = spec.strip()
+        if not cleaned.startswith(("./", "../")):
+            continue
+        _remember_reference(needed, outside, _packaged_reference(base, cleaned), cleaned)
+
+
+def _php_load_base(source_name, match):
+    kind = match.group("base")
+    if kind == "AFFILIO_PLUGIN_DIR":
+        return ["affilio-wp"]
+    parent = list(PurePosixPath(source_name).parent.parts)
+    if kind == "__DIR__":
+        return parent
+    if match.group("file_levels") is not None or "FILE" in kind:
+        levels = int(match.group("file_levels") or 1) - 1
+    else:
+        levels = int(match.group("dir_levels") or 1)
+    base = parent[:]
+    for _ in range(max(levels, 0)):
+        if not base:
+            return None
+        base.pop()
+    return base
+
+
+def referenced_plugin_files(source_name, text):
     needed = set()
-    for match in ASSET_CONCAT.finditer(text):
-        relative = match.group(2).lstrip("/")
-        if "." in PurePosixPath(relative).name:
-            needed.add(relative)
-    if DYNAMIC_BUILD.search(text):
-        for match in QUOTED_BUILD.finditer(text):
+    outside = []
+    suffix = PurePosixPath(source_name).suffix.lower()
+    source = strip_code_comments(text)
+    if suffix in {".js", ".mjs"}:
+        _js_references(source_name, source, needed, outside)
+        return needed, outside
+    if suffix != ".php":
+        return needed, outside
+    for match in ASSET_CONCAT.finditer(source):
+        _remember_reference(needed, outside, _packaged_reference(["affilio-wp"], match.group(2)), match.group(2))
+    if DYNAMIC_BUILD.search(source):
+        for match in QUOTED_BUILD.finditer(source):
             needed.add("admin/build/" + match.group(2))
-    return needed
+    for match in PHP_LOAD_CONCAT.finditer(source):
+        _remember_reference(needed, outside, _packaged_reference(_php_load_base(source_name, match), match.group("path")), match.group("path"))
+    for match in PHP_LOAD_LITERAL.finditer(source):
+        path = match.group("path")
+        base = list(PurePosixPath(source_name).parent.parts) if path.startswith(("./", "../")) else ["affilio-wp"]
+        _remember_reference(needed, outside, _packaged_reference(base, path), path)
+    for match in PHP_ENQUEUE.finditer(source):
+        _remember_reference(needed, outside, _packaged_reference(["affilio-wp"], match.group(3)), match.group(3))
+    return needed, outside
 
 
 def unguarded_init(text):
@@ -257,8 +384,13 @@ def validate_plugin(data, origin=None):
         require(f"Version: {PLUGIN_VERSION}" in plugin, f"WordPress plugin header is not {PLUGIN_VERSION}")
         require(f"define('AFFILIO_VERSION', '{PLUGIN_VERSION}')" in plugin, f"AFFILIO_VERSION is not {PLUGIN_VERSION}")
         require(f"Stable tag: {PLUGIN_VERSION}".encode() in files.get(PLUGIN_ROOT + "readme.txt", b""), f"readme stable tag is not {PLUGIN_VERSION}")
-        for text in php.values():
-            for relative in referenced_plugin_files(text):
+        for name, payload in files.items():
+            if PurePosixPath(name).suffix.lower() not in {".php", ".js", ".mjs"}:
+                continue
+            needed, outside = referenced_plugin_files(name, payload.decode("utf8", "replace"))
+            if outside:
+                raise ReleaseError("WordPress ZIP references a path outside the plugin: " + outside[0])
+            for relative in sorted(needed):
                 require(PLUGIN_ROOT + relative in files, "WordPress ZIP is missing " + relative)
 
 
