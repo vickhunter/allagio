@@ -231,11 +231,11 @@ WHERE c.site_id = ANY($1::uuid[])
 }
 
 func (d *DB) digestOffer(ctx context.Context, offerID string) ([]DigestItem, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, (o.updated_at AT TIME ZONE current_setting('TimeZone')),
-(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
-o.status
-FROM offers o JOIN products p ON p.id=o.product_id
-WHERE o.id=$1 AND o.status='listed'`, offerID)
+	// listed and submitted match GET /v1/digest. A submitted offer stays here
+	// until it leaves that state, including after another digest open.
+	rows, err := d.Pool.Query(ctx, `SELECT `+digestOfferColumns+`
+`+digestOfferFrom+`
+WHERE o.id=$1 AND o.status IN ('listed','submitted')`, offerID)
 	if err != nil {
 		return nil, err
 	}

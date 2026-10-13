@@ -1,3 +1,7 @@
+## October 13 — digest titles, held offers, and maker email link
+
+Every item in `GET /v1/digest` and `GET /v1/account/digest` includes a non-empty `post_title` and a `surface_url`. A placement uses the plugin receipt when that JSON has them, then the stored placement, then the article title when the URLs match. An offer uses the same fields from its placement. A held offer with no placement uses the product name and the landing URL. `submitted` offers, the held and in-review set, stay in both digests until they leave that state, including after another `digest_opened`. Listed offers stay inside the digest window. A verified OIDC sign-in links an existing maker with that email when no other owner already holds the maker. It does not link a publisher site, and it does not take a maker another owner already has. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 13 — digest window follows the instant, not the process clock
 
 `offers.updated_at` is a timestamp without time zone. The digest now binds the previous open as `timestamptz` and compares it to that column in the database session's wall clock, the same clock `NOW()` used when the row was written. The returned `went_live_at` is that instant. `TestDigestItemsIncludeUIFields` uses fixed June instants so a `Europe/Rome` process clock cannot hide or invent the window. Signing in through OIDC still does not link a maker by email. Identity is the verified issuer and subject. An existing maker is linked only when the owner posts that maker's API key.

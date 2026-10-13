@@ -449,6 +449,7 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		SurfaceURL    string `json:"surface_url"`
 		PublishedText string `json:"published_text"`
 		Evidence      string `json:"evidence"`
+		PostTitle     string `json:"post_title"`
 	}
 	if !uuidPattern.MatchString(c.Param("id")) || bindBoundedJSON(c, &req) != nil || len(req.PublishedText) > 16000 || len(req.Evidence) < 10 || len(req.Evidence) > 2000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "surface_url, published_text and evidence required"})
@@ -469,7 +470,7 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		return
 	}
 	hash := sha256.Sum256([]byte(req.PublishedText))
-	updated, err := h.DB.RecordPlacementReceipt(c.Request.Context(), siteIDFrom(c), p.ID, req.SurfaceURL, hex.EncodeToString(hash[:]), req.Evidence, h.now())
+	updated, err := h.DB.RecordPlacementReceipt(c.Request.Context(), siteIDFrom(c), p.ID, req.SurfaceURL, hex.EncodeToString(hash[:]), req.Evidence, strings.TrimSpace(req.PostTitle), h.now())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "receipt recording failed"})
 		return

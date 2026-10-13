@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
@@ -547,4 +548,172 @@ func TestOneBoxPrepareIsAtomic(t *testing.T) {
 	if created != 1 || conflict != 1 || n != 1 {
 		t.Fatalf("concurrent prepare created=%d conflict=%d rows=%d codes=%v reasons=%v", created, conflict, n, codes, reasons)
 	}
+}
+
+func itemsFromDigest(t *testing.T, body map[string]any) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	if raw, ok := body["items"].([]any); ok {
+		for _, item := range raw {
+			out = append(out, item.(map[string]any))
+		}
+		return out
+	}
+	projects, _ := body["projects"].([]any)
+	for _, raw := range projects {
+		project := raw.(map[string]any)
+		items, _ := project["items"].([]any)
+		for _, item := range items {
+			out = append(out, item.(map[string]any))
+		}
+	}
+	return out
+}
+
+func requireDigestTitleAndSurface(t *testing.T, items []map[string]any) {
+	t.Helper()
+	if len(items) == 0 {
+		t.Fatal("digest has no items")
+	}
+	for _, item := range items {
+		title, _ := item["post_title"].(string)
+		surface, _ := item["surface_url"].(string)
+		if title == "" || surface == "" {
+			t.Fatalf("item missing post_title or surface_url: %v", item)
+		}
+	}
+}
+
+func findDigestItem(items []map[string]any, id string) map[string]any {
+	for _, item := range items {
+		if item["id"] == id {
+			return item
+		}
+	}
+	return nil
+}
+
+func TestDigestTitleAndSurfaceFromRealPlacement(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "place-title-owner", "place-title@example.com")
+	siteID := createTestSite(t, db, "place-title-site", "digest-place.example", "Digest Place")
+	makerID, offerID := seedListedOffer(t, db, "place-title-maker", "place-title-maker@example.com", "Place Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	const surface = "https://digest-place.example/guide"
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO articles(site_id, wp_post_id, title, url) VALUES($1, 41, 'Guide to shipping', $2)`, siteID, surface+"/"); err != nil {
+		t.Fatal(err)
+	}
+	created, err := db.CreatePlacement(context.Background(), database.Placement{
+		SiteID: siteID, OfferID: offerID, SurfaceURL: surface,
+		Context:    "A section about shipping the box to readers today.",
+		Copy:       "Honest note about the product.",
+		Disclosure: "Affiliate disclosure: I may earn a commission if you buy through this link.",
+		Reason:     "The product fits this guide.",
+		ExpiresAt:  time.Now().Add(48 * time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var storedTitle string
+	if err = db.Pool.QueryRow(context.Background(), `SELECT post_title FROM placement_proposals WHERE id=$1`, created.ID).Scan(&storedTitle); err != nil || storedTitle != "Guide to shipping" {
+		t.Fatalf("placement stored %q (%v); the test did not set the title", storedTitle, err)
+	}
+	if _, err = db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW(), approved_by_kind='owner' WHERE id=$1`, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.CommitPlacement(context.Background(), siteID, created.ID, "place-title-go", entry.StubClaimChecker{}); err != nil {
+		t.Fatal(err)
+	}
+	var receiptTitle, receiptSurface string
+	if err = db.Pool.QueryRow(context.Background(), `SELECT receipt->>'post_title', receipt->>'surface_url' FROM placement_proposals WHERE id=$1`, created.ID).Scan(&receiptTitle, &receiptSurface); err != nil || receiptTitle != "Guide to shipping" || receiptSurface != surface {
+		t.Fatalf("receipt title %q surface %q (%v)", receiptTitle, receiptSurface, err)
+	}
+	if _, err = db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET post_title='' WHERE id=$1`, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Pool.Exec(context.Background(), `DELETE FROM articles WHERE site_id=$1`, siteID); err != nil {
+		t.Fatal(err)
+	}
+
+	check := func(path string) {
+		t.Helper()
+		rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, path, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		items := itemsFromDigest(t, body)
+		requireDigestTitleAndSurface(t, items)
+		item := findDigestItem(items, created.ID)
+		if item == nil || item["post_title"] != "Guide to shipping" || item["surface_url"] != surface {
+			t.Fatalf("%s placement: %v", path, item)
+		}
+		offer := findDigestItem(items, offerID)
+		if offer == nil || offer["post_title"] != "Guide to shipping" || offer["surface_url"] != surface {
+			t.Fatalf("%s offer: %v", path, offer)
+		}
+	}
+	check("/v1/digest")
+	check("/v1/account/digest")
+}
+
+func TestAccountDigestKeepsHeldOfferAcrossOpens(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	api.ClaimsCheck = config.ClaimsStub
+	owner, cookie := testOwnerSession(t, h, "held-digest-owner", "held-digest@example.com")
+	makerID, listedID := seedListedOffer(t, db, "held-digest-maker", "held-digest-maker@example.com", "Held Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET maker_id=$2 WHERE id=$1`, owner.ID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	var heldID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO offers(product_id,status,commission_type,commission_value,landing_url)
+SELECT product_id,'submitted',commission_type,commission_value,landing_url FROM offers WHERE id=$1 RETURNING id`, listedID).Scan(&heldID); err != nil {
+		t.Fatal(err)
+	}
+	past := "2026-06-01 08:00:00+00"
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET updated_at = ($2::timestamptz AT TIME ZONE current_setting('TimeZone')) WHERE id=$1 OR id=$3`, listedID, past, heldID); err != nil {
+		t.Fatal(err)
+	}
+
+	open := func() {
+		t.Helper()
+		rec, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/events", map[string]any{"kind": "digest_opened"})
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("open: %d %s", rec.Code, rec.Body.String())
+		}
+	}
+	assertHeld := func(path string, wantListed bool) {
+		t.Helper()
+		rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, path, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		items := itemsFromDigest(t, body)
+		requireDigestTitleAndSurface(t, items)
+		held := findDigestItem(items, heldID)
+		if held == nil || held["status"] != "submitted" || held["post_title"] != "Held Product" || held["surface_url"] != "https://example.com" {
+			t.Fatalf("%s held: %v", path, held)
+		}
+		listed := findDigestItem(items, listedID)
+		if wantListed && listed == nil {
+			t.Fatalf("%s missing listed offer", path)
+		}
+		if !wantListed && listed != nil {
+			t.Fatalf("%s still lists the resolved window: %v", path, listed)
+		}
+	}
+
+	assertHeld("/v1/account/digest", true)
+	assertHeld("/v1/digest", true)
+	open()
+	assertHeld("/v1/account/digest", true)
+	assertHeld("/v1/digest", false)
+	open()
+	assertHeld("/v1/account/digest", true)
+	assertHeld("/v1/digest", false)
 }

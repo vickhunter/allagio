@@ -103,6 +103,7 @@ type DigestItem struct {
 	FailedAction       string
 	MatchedRule        string
 	PostTitle          string
+	SurfaceURL         string
 	Position           string
 	LinkText           string
 	Label              string
@@ -976,14 +977,9 @@ func (d *DB) CountDigestPlacements(ctx context.Context, siteID string, since tim
 	return n, err
 }
 
-func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Time) ([]DigestItem, error) {
-	limit := DigestPageSize
-	if limit < 1 {
-		limit = 50
-	}
-	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
-plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
-COALESCE(NULLIF(post_title, ''), (
+// digestPostTitleSQL prefers the plugin receipt, then the stored placement
+// title, then the article title when the URLs match.
+const digestPostTitleSQL = `COALESCE(NULLIF(receipt->>'post_title', ''), NULLIF(post_title, ''), (
   SELECT a.title FROM articles a
   WHERE a.site_id = placement_proposals.site_id
     AND COALESCE(a.title, '') <> ''
@@ -991,7 +987,19 @@ COALESCE(NULLIF(post_title, ''), (
       = regexp_replace(lower(split_part(split_part(placement_proposals.surface_url, '#', 1), '?', 1)), '/+$', '')
   ORDER BY a.updated_at DESC
   LIMIT 1
-), ''), COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
+), '')`
+
+// digestSurfaceSQL prefers the plugin receipt, then the stored placement URL.
+const digestSurfaceSQL = `COALESCE(NULLIF(receipt->>'surface_url', ''), surface_url)`
+
+func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Time) ([]DigestItem, error) {
+	limit := DigestPageSize
+	if limit < 1 {
+		limit = 50
+	}
+	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
+plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
+`+digestPostTitleSQL+`, `+digestSurfaceSQL+`, COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
 (SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
 COALESCE(approved_by_kind,''), COALESCE(policy_version,0), COALESCE(undone_by_user::text,'')
 FROM placement_proposals
@@ -1005,13 +1013,33 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = "placement"
-		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion, &item.UndoneBy); err != nil {
+		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.SurfaceURL, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion, &item.UndoneBy); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
 	}
 	return out, rows.Err()
 }
+
+// digestOfferColumns is the shared offer row for both digest endpoints.
+// Title and URL come from the offer's placement receipt, then that placement,
+// then the product name and landing URL so a held offer with no placement
+// still has both fields.
+const digestOfferColumns = `o.id::text, p.name,
+(o.updated_at AT TIME ZONE current_setting('TimeZone')),
+(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
+o.status,
+COALESCE(NULLIF(place.receipt->>'post_title', ''), NULLIF(place.post_title, ''), NULLIF(p.name, '')),
+COALESCE(NULLIF(place.receipt->>'surface_url', ''), NULLIF(place.surface_url, ''), NULLIF(o.landing_url, ''), NULLIF(p.website_url, ''))`
+
+const digestOfferFrom = `FROM offers o JOIN products p ON p.id=o.product_id
+LEFT JOIN LATERAL (
+  SELECT receipt, post_title, surface_url
+  FROM placement_proposals
+  WHERE offer_id = o.id
+  ORDER BY COALESCE(approved_at, created_at) DESC
+  LIMIT 1
+) place ON true`
 
 func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) ([]DigestItem, error) {
 	limit := DigestPageSize
@@ -1022,13 +1050,15 @@ func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) 
 	// at write. Bind the floor as timestamptz, then convert that instant into
 	// the same wall clock, so a process location such as Europe/Rome does not
 	// move the cutoff. Return the column as that same instant.
-	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name,
-(o.updated_at AT TIME ZONE current_setting('TimeZone')),
-(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
-o.status
-FROM offers o JOIN products p ON p.id=o.product_id
+	// Submitted offers stay in the digest until they leave that state. Listed
+	// offers stay inside the window. The floor is still an absolute instant.
+	rows, err := d.Pool.Query(ctx, `SELECT `+digestOfferColumns+`
+`+digestOfferFrom+`
 WHERE p.maker_id=$1 AND o.status IN ('listed','submitted')
-AND o.updated_at > ($2::timestamptz AT TIME ZONE current_setting('TimeZone'))
+AND (
+  o.status = 'submitted'
+  OR o.updated_at > ($2::timestamptz AT TIME ZONE current_setting('TimeZone'))
+)
 ORDER BY o.updated_at DESC LIMIT $3`, makerID, since.UTC(), limit)
 	if err != nil {
 		return nil, err
@@ -1042,7 +1072,7 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = kind
-		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.Status); err != nil {
+		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.Status, &item.PostTitle, &item.SurfaceURL); err != nil {
 			return nil, err
 		}
 		item.Label = item.Summary

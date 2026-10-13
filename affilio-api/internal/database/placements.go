@@ -440,9 +440,14 @@ FROM offers o JOIN products pr ON pr.id=o.product_id WHERE o.id=$1`, p.OfferID).
 	if status != "active" {
 		return nil, ErrPlacementAuthority
 	}
+	var postTitle string
+	if err = tx.QueryRow(ctx, `SELECT COALESCE(post_title,'') FROM placement_proposals WHERE id=$1`, p.ID).Scan(&postTitle); err != nil {
+		return nil, err
+	}
 	receipt, err := json.Marshal(map[string]interface{}{"placement_id": p.ID, "campaign_id": campaignID,
 		"tracked_link": "/v1/go/" + p.ID, "publication_status": "awaiting_evidence",
-		"approved_text": p.Copy + "\n\n" + p.Disclosure, "terms": p.Terms})
+		"approved_text": p.Copy + "\n\n" + p.Disclosure, "terms": p.Terms,
+		"post_title": postTitle, "surface_url": p.SurfaceURL})
 	if err != nil {
 		return nil, err
 	}
@@ -459,12 +464,13 @@ func (d *DB) PlacementAllowsClick(ctx context.Context, placementID, campaignID s
 	return valid, err
 }
 
-func (d *DB) RecordPlacementReceipt(ctx context.Context, siteID, id, surfaceURL, contentHash, evidence string, at time.Time) (bool, error) {
+func (d *DB) RecordPlacementReceipt(ctx context.Context, siteID, id, surfaceURL, contentHash, evidence, postTitle string, at time.Time) (bool, error) {
 	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET receipt=receipt || jsonb_build_object(
- 'publication_status','publisher_reported','surface_url',$3::text,'content_sha256',$4::text,'evidence',$5::text),
+ 'publication_status','publisher_reported','surface_url',$3::text,'content_sha256',$4::text,'evidence',$5::text,
+ 'post_title', COALESCE(NULLIF($7, ''), NULLIF(post_title, ''), receipt->>'post_title', '')),
  plugin_contact_at=$6
  WHERE id=$1 AND site_id=$2 AND surface_url=$3 AND status='committed'
- AND receipt->>'publication_status'='awaiting_evidence'`, id, siteID, surfaceURL, contentHash, evidence, at)
+ AND receipt->>'publication_status'='awaiting_evidence'`, id, siteID, surfaceURL, contentHash, evidence, at, postTitle)
 	if err != nil {
 		return false, err
 	}

@@ -240,9 +240,59 @@ func TestHostedMakerSetupCreatesOnlyNewOwnedAccount(t *testing.T) {
 	if dashboard.Code != 200 {
 		t.Fatal("existing-account recovery form missing")
 	}
-	var ownerID *string
-	if err = db.Pool.QueryRow(context.Background(), `SELECT id::text FROM owners WHERE maker_id=$1`, foreign).Scan(&ownerID); err == nil {
-		t.Fatal("matching email claimed another maker")
+	session, err := h.DB.OwnerSession(context.Background(), services.HashAPIKey(foreignCookie.Value))
+	if err != nil || session.MakerID != foreign {
+		t.Fatalf("verified email did not link the maker: %v", err)
+	}
+	if err = db.Pool.QueryRow(context.Background(), `SELECT count(*) FROM makers WHERE lower(email)=lower($1)`, "existing-setup@example.com").Scan(&count); err != nil || count != 1 {
+		t.Fatal("email link duplicated the maker")
+	}
+}
+
+func TestOIDCSignInLinksMakerByEmail(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, r, _ := hostedTestServer(t, db)
+	makerID, err := db.CreateMaker(context.Background(), "oidc-maker-key", "Publisher@Example.com", "OIDC Maker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	login := h.Login.(*fakeOwnerLogin)
+	login.owner.Email = "publisher@example.com"
+	start := httptest.NewRecorder()
+	r.ServeHTTP(start, httptest.NewRequest("GET", "/auth/login", nil))
+	if start.Code != 302 {
+		t.Fatal(start.Code)
+	}
+	loginURL, _ := url.Parse(start.Header().Get("Location"))
+	cookies := start.Result().Cookies()
+	callback := httptest.NewRequest("GET", "/auth/callback?code=valid-code&state="+url.QueryEscape(loginURL.Query().Get("state")), nil)
+	callback.AddCookie(cookies[0])
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, callback)
+	if rec.Code != 302 {
+		t.Fatalf("callback: %d %s", rec.Code, rec.Body.String())
+	}
+	var ownerCookie *http.Cookie
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == h.cookieName() {
+			ownerCookie = cookie
+		}
+	}
+	if ownerCookie == nil {
+		t.Fatal("missing session cookie")
+	}
+	o, err := h.DB.OwnerSession(context.Background(), services.HashAPIKey(ownerCookie.Value))
+	if err != nil || o.MakerID != makerID {
+		t.Fatalf("sign-in linked %q, want %s (%v)", o.MakerID, makerID, err)
+	}
+	other, _ := testOwnerSession(t, h, "someone-else", "other@example.com")
+	if other.MakerID != "" {
+		t.Fatal("unrelated email linked a maker")
+	}
+	second, _ := testOwnerSession(t, h, "another-subject", "publisher@example.com")
+	if second.MakerID != "" {
+		t.Fatal("email match transferred ownership")
 	}
 }
 
