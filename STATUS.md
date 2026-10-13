@@ -1,3 +1,7 @@
+## October 13 — unknown /go id is 404
+
+`/go/<id>` answers 404 when the API returns 404 and this site has no remembered fallback URL for that id. It does not redirect to the home page. A remembered fallback is still used for that 404, and a transport failure or HTTP 5xx with no usable fallback still sends the reader home. The circuit still opens only for transport failures and HTTP 5xx. The release ZIP rejects `e2e/`, `tests/`, `phpunit.xml.dist`, and test-result paths. `landing-scene.bundle.js` and `landing-scene.bundle.js.LEGAL.txt` stay untracked build outputs and are not in the WordPress ZIP.
+
 ## October 13 — digest keeps the listed offer
 
 `GET /v1/digest` includes a maker's listed and submitted offers updated after the last `digest_opened`. `offers.updated_at` is a timestamp without a time zone, so the floor is compared as an absolute UTC instant. A just-listed offer stays in the items when the process `TZ` is `Europe/Rome` and when PostgreSQL's `TimeZone` is not UTC. Each offer item includes `status`, `review_reason`, and `message`. A listed offer has null review fields and `live_now` true. A submitted offer under the claims stub has `review_reason` `claims` and message "The claims check is not live yet." Offer items do not include `plugin_failed_reason`.

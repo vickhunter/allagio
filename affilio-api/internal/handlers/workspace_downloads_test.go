@@ -24,6 +24,24 @@ func repoRoot(t *testing.T) string {
 	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
 }
 
+func releaseExcluded(rel string) bool {
+	base := filepath.Base(rel)
+	switch base {
+	case "phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache":
+		return true
+	}
+	if strings.HasPrefix(base, ".phpunit.") {
+		return true
+	}
+	for _, part := range strings.Split(rel, "/") {
+		switch part {
+		case "node_modules", "e2e", "tests", "test-results", "playwright-report":
+			return true
+		}
+	}
+	return false
+}
+
 func hostedBuildFile(name string) bool {
 	switch name {
 	case "home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md":
@@ -46,14 +64,13 @@ func releasePluginZip(t *testing.T, mutateMain func([]byte) []byte) []byte {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if info.IsDir() {
-			base := filepath.Base(path)
-			if base == "node_modules" || base == "e2e" || base == "tests" {
+		if releaseExcluded(rel) {
+			if info.IsDir() {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if strings.Contains(rel, "/node_modules/") || strings.HasPrefix(rel, "affilio-wp/e2e/") || strings.HasPrefix(rel, "affilio-wp/tests/") {
+		if info.IsDir() {
 			return nil
 		}
 		if strings.HasPrefix(rel, "affilio-wp/admin/build/") && hostedBuildFile(filepath.Base(path)) {

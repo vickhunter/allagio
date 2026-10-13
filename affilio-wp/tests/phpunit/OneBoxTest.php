@@ -42,4 +42,13 @@ class OneBoxTest extends TestCase {
         affilio_review_go_fallback_is_never_empty();
         $this->assertTrue(true);
     }
+
+    /**
+     * @runInSeparateProcess
+     */
+    public function test_unknown_go_id_is_404() {
+        require_once dirname(__DIR__) . '/d033-one-box.php';
+        affilio_review_unknown_go_id_is_404();
+        $this->assertTrue(true);
+    }
 }

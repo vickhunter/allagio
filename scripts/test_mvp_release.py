@@ -155,6 +155,15 @@ class ReleaseTests(unittest.TestCase):
             release.validate_plugin(archive(plugin=guarded.replace("0.1.21", "0.1.9")))
         with self.assertRaisesRegex(release.ReleaseError, "hosted UI"):
             release.validate_plugin(archive(extra=("affilio-wp/admin/build/landing-scene.bundle.js", "unexpected")))
+        for extra in (
+            "affilio-wp/e2e/offer-rail.spec.js",
+            "affilio-wp/phpunit.xml.dist",
+            "affilio-wp/tests/d033-one-box.php",
+            "affilio-wp/e2e/test-results/x",
+            "affilio-wp/tests/phpunit/.phpunit.result.cache",
+        ):
+            with self.subTest(extra=extra), self.assertRaisesRegex(release.ReleaseError, "tests or test results"):
+                release.validate_plugin(archive(extra=(extra, "unexpected")))
         with self.assertRaisesRegex(release.ReleaseError, "class-affilio-missing.php"):
             release.validate_plugin(archive(plugin=guarded + "require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-missing.php';\n"))
         with self.assertRaisesRegex(release.ReleaseError, "marketplace.js"):

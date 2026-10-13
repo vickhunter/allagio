@@ -128,6 +128,9 @@ if (!function_exists('is_wp_error')) {
     function wp_redirect($location, $status = 302) {
         throw new RuntimeException('redirect ' . (int) $status . ' ' . $location);
     }
+    function status_header($code) {
+        throw new RuntimeException('status ' . (int) $code);
+    }
     function add_rewrite_rule($pattern, $query, $priority = 'bottom') {
         global $wp_rewrite;
         if (!empty($GLOBALS['affilio_rewrite_requires_wp_rewrite']) && !is_object($wp_rewrite)) {

@@ -50,6 +50,8 @@ WP_FILES = {
 }
 PLUGIN_ROOT = "affilio-wp/"
 PLUGIN_VERSION = "0.1.21"
+PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
+PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
 ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
 DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
 QUOTED_BUILD = re.compile(r"""(['"])([A-Za-z0-9_.-]+\.(?:js|css))\1""")
@@ -217,6 +219,14 @@ def unguarded_init(text):
         start = index + len(marker)
 
 
+def packaged_out(name):
+    path = PurePosixPath(name)
+    if any(part in PACKAGED_OUT for part in path.parts):
+        return True
+    file = path.name
+    return file in PACKAGED_FILES or file.startswith(".phpunit.")
+
+
 def validate_plugin(data, origin=None):
     del origin  # The plugin no longer bakes a deployment origin into its source.
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
@@ -232,6 +242,8 @@ def validate_plugin(data, origin=None):
         require(PLUGIN_ROOT + "admin/build/analytics.js" in files, "WordPress ZIP is missing admin/build/analytics.js")
         missing = sorted(WP_FILES - set(files))
         require(not missing, "WordPress ZIP is missing " + ", ".join(missing))
+        for name in names:
+            require(not packaged_out(name), "WordPress ZIP includes tests or test results: " + name)
         for name, payload in files.items():
             require(name.startswith(PLUGIN_ROOT), "WordPress ZIP top folder must be affilio-wp/")
             require(b"railway.app" not in payload, "WordPress ZIP must not contain railway.app")

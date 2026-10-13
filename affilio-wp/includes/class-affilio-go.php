@@ -186,11 +186,15 @@ class Affilio_Go {
         update_option(AFFILIO_GO_FALLBACKS_OPTION, $all, false);
     }
 
-    public static function fallback_for($id) {
+    public static function cached_fallback($id) {
         $all = function_exists('get_option') ? get_option(AFFILIO_GO_FALLBACKS_OPTION, array()) : array();
         if (is_array($all) && isset($all[$id]) && is_string($all[$id]) && $all[$id] !== '') {
             return $all[$id];
         }
+        return '';
+    }
+
+    public static function home_fallback() {
         if (function_exists('home_url')) {
             $home = home_url('/');
             if (is_string($home) && $home !== '') {
@@ -198,6 +202,14 @@ class Affilio_Go {
             }
         }
         return '/';
+    }
+
+    public static function fallback_for($id) {
+        $cached = self::cached_fallback($id);
+        if ($cached !== '') {
+            return $cached;
+        }
+        return self::home_fallback();
     }
 
     public static function truncate_ip($ip) {
@@ -314,7 +326,8 @@ class Affilio_Go {
     }
 
     public function resolve($placement_id) {
-        $fallback = self::fallback_for($placement_id);
+        $cached = self::cached_fallback($placement_id);
+        $fallback = $cached !== '' ? $cached : self::home_fallback();
         $until = function_exists('get_option') ? (int) get_option(AFFILIO_GO_CIRCUIT_OPTION, 0) : 0;
         if ($until > time()) {
             $this->log_fallback($placement_id, 'circuit_open');
@@ -330,6 +343,12 @@ class Affilio_Go {
         if (($transport_failed || $code >= 500) && function_exists('update_option')) {
             update_option(AFFILIO_GO_CIRCUIT_OPTION, time() + (int) AFFILIO_GO_CIRCUIT_SECONDS, false);
         }
+        // An id the API does not know has no destination. Sending the reader
+        // home would look like a successful click. A remembered fallback still wins.
+        if (!$transport_failed && $code === 404 && $cached === '') {
+            $this->log_fallback($placement_id, 'upstream_status_404');
+            return '';
+        }
         $reason = $transport_failed ? 'upstream_failed' : 'upstream_status_' . $code;
         $this->log_fallback($placement_id, $reason);
         return $fallback;
@@ -343,6 +362,10 @@ class Affilio_Go {
         self::mark_uncacheable();
         self::send_headers();
         $location = $this->resolve($id);
+        if ($location === '') {
+            self::send_not_found();
+            exit;
+        }
         if (function_exists('wp_redirect')) {
             wp_redirect($location, 302);
             exit;
@@ -351,6 +374,19 @@ class Affilio_Go {
             header('Location: ' . $location, true, 302);
         }
         exit;
+    }
+
+    public static function send_not_found() {
+        if (function_exists('status_header')) {
+            status_header(404);
+            return;
+        }
+        if (!headers_sent()) {
+            header('HTTP/1.1 404 Not Found', true, 404);
+        }
+        if (function_exists('http_response_code')) {
+            http_response_code(404);
+        }
     }
 
     private function call_upstream($placement_id) {

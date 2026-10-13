@@ -211,12 +211,38 @@ function affilio_review_go_fallback_is_never_empty() {
     check($location !== '', 'go fallback was empty');
 }
 
+function affilio_review_unknown_go_id_is_404() {
+    d033_log_file();
+    $id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+    affilio_one_box_reset('<p>Go.</p>');
+    unset($GLOBALS['options'][AFFILIO_GO_FALLBACKS_OPTION]);
+    delete_option(AFFILIO_GO_CIRCUIT_OPTION);
+    unset($_GET['affilio_go']);
+    $_SERVER['REQUEST_URI'] = '/go/' . $id;
+    unset($GLOBALS['http_response']);
+    $GLOBALS['http_handler'] = function ($url, $args) {
+        return array('response' => array('code' => 404), 'headers' => array(), 'body' => '');
+    };
+    $go = new Affilio_Go();
+    check($go->resolve($id) === '', 'unknown go id resolved to a URL');
+    check((int) get_option(AFFILIO_GO_CIRCUIT_OPTION, 0) === 0, 'an unknown go id opened the circuit');
+    try {
+        $go->handle();
+        check(false, 'unknown go id redirected');
+    } catch (RuntimeException $response) {
+        check($response->getMessage() === 'status 404', 'unknown go id was ' . $response->getMessage());
+        check(strpos($response->getMessage(), 'redirect 302') === false, 'unknown go id sent a 302');
+        check(strpos($response->getMessage(), 'https://blog.example/') === false, 'unknown go id redirected home');
+    }
+}
+
 if (!function_exists('affilio_review_run_all')) {
     function affilio_review_run_all() {
         affilio_review_commit_one_per_post_does_not_insert();
         affilio_review_ack_one_per_post_removes_the_new_box();
         affilio_review_upgrade_one_per_post_keeps_the_existing_box();
         affilio_review_go_fallback_is_never_empty();
+        affilio_review_unknown_go_id_is_404();
         echo "One box per post and go-link fallback passed.\n";
     }
 }
