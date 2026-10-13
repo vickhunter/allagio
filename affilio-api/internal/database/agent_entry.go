@@ -972,10 +972,10 @@ func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) 
 	if limit < 1 {
 		limit = 50
 	}
-	// offers.updated_at is TIMESTAMP WITHOUT TIME ZONE, stored as the session
-	// wall clock. Compare it to an absolute timestamptz. A bare time.Time is
-	// sent as a timestamp, so Postgres treats the UTC wall clock as local and
-	// drops a just-listed offer whenever TimeZone is not UTC.
+	// offers.updated_at is TIMESTAMP WITHOUT TIME ZONE. A bare time.Time is
+	// encoded from the process-local wall clock (TZ=Europe/Rome shifts it by
+	// the offset) and Postgres then reads that clock in the session TimeZone.
+	// Either mismatch drops a just-listed offer. Send an absolute UTC instant.
 	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, o.updated_at,
 (SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
 o.status

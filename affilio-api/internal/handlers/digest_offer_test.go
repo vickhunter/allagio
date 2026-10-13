@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -77,7 +78,7 @@ func TestDigestListsOfferWhenSessionTimeZoneIsNotUTC(t *testing.T) {
 		t.Fatal(err)
 	}
 	q := u.Query()
-	q.Set("TimeZone", "America/New_York")
+	q.Set("TimeZone", "Europe/Rome")
 	u.RawQuery = q.Encode()
 	db, err := database.Connect(context.Background(), u.String())
 	if err != nil {
@@ -117,4 +118,35 @@ func TestDigestListsOfferWhenSessionTimeZoneIsNotUTC(t *testing.T) {
 		}
 	}
 	t.Fatalf("listed offer missing in %s: %s", zone, rec.Body.String())
+}
+
+// TestDigestItemsIncludeUIFieldsUnderEuropeRome re-runs the digest UI test in
+// a process whose TZ is Europe/Rome. pgx scans the digest floor with
+// time.Local, so a UTC database still drops the listed offer when that floor
+// is sent as a timestamp.
+func TestDigestItemsIncludeUIFieldsUnderEuropeRome(t *testing.T) {
+	if strings.TrimSpace(os.Getenv("AFFILIO_TEST_DATABASE_URL")) == "" {
+		t.Skip("AFFILIO_TEST_DATABASE_URL not set; skipping DB integration tests")
+	}
+	if os.Getenv("AFFILIO_TZ_CHILD") == "1" {
+		TestDigestItemsIncludeUIFields(t)
+		return
+	}
+	env := make([]string, 0, len(os.Environ())+2)
+	for _, item := range os.Environ() {
+		if strings.HasPrefix(item, "TZ=") || strings.HasPrefix(item, "AFFILIO_TZ_CHILD=") {
+			continue
+		}
+		env = append(env, item)
+	}
+	env = append(env, "TZ=Europe/Rome", "AFFILIO_TZ_CHILD=1")
+	cmd := exec.Command(os.Args[0], "-test.run", "^TestDigestItemsIncludeUIFieldsUnderEuropeRome$", "-test.count=1", "-test.v")
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Europe/Rome: %v\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "--- PASS: TestDigestItemsIncludeUIFieldsUnderEuropeRome") {
+		t.Fatalf("Europe/Rome child did not pass the digest test:\n%s", out)
+	}
 }
