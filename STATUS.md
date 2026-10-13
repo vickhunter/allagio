@@ -1,3 +1,7 @@
+## October 13 — digest window follows the instant, not the process clock
+
+`offers.updated_at` is a timestamp without time zone. The digest now binds the previous open as `timestamptz` and compares it to that column in the database session's wall clock, the same clock `NOW()` used when the row was written. The returned `went_live_at` is that instant. `TestDigestItemsIncludeUIFields` uses fixed June instants so a `Europe/Rome` process clock cannot hide or invent the window. Signing in through OIDC still does not link a maker by email. Identity is the verified issuer and subject. An existing maker is linked only when the owner posts that maker's API key.
+
 ## October 13 — review: claims on publish, and one box under a lock
 
 Publishing a submitted offer runs the claims check again. Under `CLAIMS_CHECK=stub`, an untrusted maker's offer stays `submitted`. If its terms say "90%" and the offer facts do not, approve leaves it submitted and does not list it. A placement copy that says "90%" is still refused on prepare and again on commit. Prepare and commit take a per-site lock before counting boxes, so two prepares of the same post cannot both insert. Undo then redo checks the copy against the offer name, category, site, terms, and commission, the same text commit uses. A showing box stays `plugin_wait` `placed`, and `/go` keeps counting.

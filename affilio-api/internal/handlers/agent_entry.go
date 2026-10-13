@@ -983,7 +983,7 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 	}
 	floor := time.Unix(0, 0).UTC()
 	if since != nil {
-		floor = *since
+		floor = since.UTC()
 	}
 	items := []gin.H{}
 	if owner.SiteID != "" {
@@ -1833,7 +1833,7 @@ func (h *AgentEntry) attachDigestMeta(c *gin.Context, owner *database.Owner, bod
 	}
 	floor := time.Unix(0, 0).UTC()
 	if since != nil {
-		floor = *since
+		floor = since.UTC()
 	}
 	wentSince, err := h.DB.CountWentLiveSince(c.Request.Context(), owner.SiteID, floor)
 	if err != nil {

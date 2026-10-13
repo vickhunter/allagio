@@ -231,7 +231,7 @@ WHERE c.site_id = ANY($1::uuid[])
 }
 
 func (d *DB) digestOffer(ctx context.Context, offerID string) ([]DigestItem, error) {
-	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, o.updated_at,
+	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, (o.updated_at AT TIME ZONE current_setting('TimeZone')),
 (SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
 o.status
 FROM offers o JOIN products p ON p.id=o.product_id

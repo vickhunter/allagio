@@ -1018,12 +1018,18 @@ func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) 
 	if limit < 1 {
 		limit = 50
 	}
-	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, o.updated_at,
+	// offers.updated_at is timestamp without time zone: the session wall clock
+	// at write. Bind the floor as timestamptz, then convert that instant into
+	// the same wall clock, so a process location such as Europe/Rome does not
+	// move the cutoff. Return the column as that same instant.
+	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name,
+(o.updated_at AT TIME ZONE current_setting('TimeZone')),
 (SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
 o.status
 FROM offers o JOIN products p ON p.id=o.product_id
-WHERE p.maker_id=$1 AND o.status IN ('listed','submitted') AND o.updated_at > $2
-ORDER BY o.updated_at DESC LIMIT $3`, makerID, since, limit)
+WHERE p.maker_id=$1 AND o.status IN ('listed','submitted')
+AND o.updated_at > ($2::timestamptz AT TIME ZONE current_setting('TimeZone'))
+ORDER BY o.updated_at DESC LIMIT $3`, makerID, since.UTC(), limit)
 	if err != nil {
 		return nil, err
 	}
