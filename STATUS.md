@@ -1,6 +1,6 @@
 ## October 13 — offer rail phone targets, webhook copy, offer id, demo sign-in
 
-Demo nav links are 45px wide inside a 180px “Demo” navigation, so a phone can tap Pricing, Docs, Privacy, and Terms. A Stripe connection with a signing secret that does not start with `whsec_` stays on the form and shows “Use the signing secret from your Stripe webhook endpoint. It starts with whsec_.” The raw JSON error is not the page. A new referral offer shows its id, the tracked link, and Copy link. `/demo/start` keeps `ref` and `via` on Sign in and Register. The auth end-to-end server is `TestServeDemoAuthForE2E`.
+Demo nav links are 45px wide inside a 180px “Demo” navigation, so a phone can tap Pricing, Docs, Privacy, and Terms. A Stripe connection with a signing secret that does not start with `whsec_` stays on the form and shows “Use the signing secret from your Stripe webhook endpoint. It starts with whsec_.” The raw JSON error is not the page. A new referral offer shows its id, the tracked link, and Copy link. `/demo/start` keeps `ref` and `via` on Sign in and Register. Sign-in copies those same parameters onto the return path, so the callback lands on `/owner?ref=…&via=…`. The auth end-to-end server is `TestServeDemoAuthForE2E`.
 
 ## October 13 — plugin 0.1.21 receipt errors and plugin key
 

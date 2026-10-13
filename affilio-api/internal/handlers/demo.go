@@ -3,6 +3,7 @@ package handlers
 import (
 	"html"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -35,6 +36,28 @@ func demoAttribution(c *gin.Context) string {
 		}
 	}
 	return strings.Join(values, "&")
+}
+
+func mergeDemoReferral(returnTo, ref, via string) string {
+	u, err := url.Parse(returnTo)
+	if err != nil || u == nil {
+		return returnTo
+	}
+	q := u.Query()
+	changed := false
+	if demoAttributionParam.MatchString(ref) {
+		q.Set("ref", ref)
+		changed = true
+	}
+	if demoAttributionParam.MatchString(via) {
+		q.Set("via", via)
+		changed = true
+	}
+	if !changed {
+		return returnTo
+	}
+	u.RawQuery = q.Encode()
+	return u.RequestURI()
 }
 
 func demoHref(path, query string) string {

@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -98,6 +99,46 @@ func TestServeDemoForE2E(t *testing.T) {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
 	_ = srv.Close()
+}
+
+func TestMergeDemoReferralKeepsRefAndVia(t *testing.T) {
+	if got := mergeDemoReferral("/owner", "camp", "post2615"); got != "/owner?ref=camp&via=post2615" {
+		t.Fatalf("referral params: %s", got)
+	}
+	if got := mergeDemoReferral("/owner", "bad value", "x"); got != "/owner?via=x" {
+		t.Fatalf("invalid ref should be dropped: %s", got)
+	}
+	if got := mergeDemoReferral("/owner", "", ""); got != "/owner" {
+		t.Fatalf("empty params changed the return path: %s", got)
+	}
+}
+
+func TestLoginKeepsDemoReferralOnOwner(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	_, r, _ := hostedTestServer(t, db)
+	start := httptest.NewRecorder()
+	r.ServeHTTP(start, httptest.NewRequest("GET", "/auth/login?ref=camp&via=post2615", nil))
+	if start.Code != http.StatusFound {
+		t.Fatalf("login start: %d", start.Code)
+	}
+	loginURL, err := url.Parse(start.Header().Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	callback := httptest.NewRequest("GET", "/auth/callback?code=valid-code&state="+url.QueryEscape(loginURL.Query().Get("state")), nil)
+	for _, cookie := range start.Result().Cookies() {
+		callback.AddCookie(cookie)
+	}
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, callback)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("callback: %d %s", rec.Code, rec.Body.String())
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.HasPrefix(loc, "/owner?") || !strings.Contains(loc, "ref=camp") || !strings.Contains(loc, "via=post2615") {
+		t.Fatalf("owner redirect dropped referral params: %s", loc)
+	}
 }
 
 func TestServeDemoAuthForE2E(t *testing.T) {
