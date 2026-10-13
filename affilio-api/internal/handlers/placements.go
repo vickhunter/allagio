@@ -566,12 +566,13 @@ func localPublisherHost(host string) bool {
 	return strings.HasSuffix(host, ".localhost")
 }
 
-func surfaceHostPort(u *url.URL) string {
-	host := strings.ToLower(u.Hostname())
-	if port := u.Port(); port != "" {
-		return host + ":" + port
+func registeredHostPort(domain string) (host, port string) {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	name, p, ok := splitOptionalPort(domain)
+	if !ok {
+		return strings.Trim(domain, "[]"), ""
 	}
-	return host
+	return strings.Trim(name, "[]"), p
 }
 
 func surfaceURLProblem(raw, siteDomain string) string {
@@ -581,7 +582,8 @@ func surfaceURLProblem(raw, siteDomain string) string {
 		return registered
 	}
 	u, err := url.Parse(raw)
-	if err != nil || u.Hostname() == "" || u.User != nil || surfaceHostPort(u) != strings.ToLower(strings.TrimSpace(siteDomain)) {
+	host, port := registeredHostPort(siteDomain)
+	if err != nil || u.Hostname() == "" || u.User != nil || !strings.EqualFold(u.Hostname(), host) || (port != "" && u.Port() != port) {
 		return registered
 	}
 	if u.Scheme == "https" {

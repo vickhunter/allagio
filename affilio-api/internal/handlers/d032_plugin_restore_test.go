@@ -943,6 +943,10 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	if undone.Code != http.StatusOK {
 		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
 	}
+	removed, removedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "removed"}, pluginKey)
+	if removed.Code != http.StatusOK || removedBody["plugin_state"] != "removed" {
+		t.Fatalf("ack removed before redo: %d %s", removed.Code, removed.Body.String())
+	}
 	current = current.Add(time.Second)
 	restored, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+id+"/restore", nil)
 	if restored.Code != http.StatusOK {
@@ -1062,6 +1066,16 @@ VALUES($1,$2,$3,'stripe',$4,'sale',10,'USD',1.50,NOW(),'test') RETURNING id`, of
 		undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/revoke", map[string]any{"reason": "undo"}, siteKey)
 		if undone.Code != http.StatusOK {
 			t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
+		}
+		var before string
+		if err := db.Pool.QueryRow(context.Background(), `SELECT plugin_wait_before FROM placement_proposals WHERE id=$1`, id).Scan(&before); err != nil {
+			t.Fatal(err)
+		}
+		if before == "placed" {
+			removed, removedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "removed"}, pluginKey)
+			if removed.Code != http.StatusOK || removedBody["plugin_state"] != "removed" {
+				t.Fatalf("ack removed before redo: %d %s", removed.Code, removed.Body.String())
+			}
 		}
 		current = current.Add(time.Second)
 		restored, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+id+"/restore", nil)
