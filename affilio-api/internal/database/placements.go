@@ -17,6 +17,9 @@ var ErrPlacementAuthority = errors.New("placement is not authorized, has expired
 // ErrOnePerPost is the second box on an article that already has one.
 var ErrOnePerPost = errors.New("one box per post")
 
+// ErrClaimsFromOffer is copy that states a number the offer does not contain.
+var ErrClaimsFromOffer = errors.New("claims_from_offer")
+
 type Placement struct {
 	ID            string          `json:"id"`
 	SiteID        string          `json:"site_id"`
@@ -35,6 +38,8 @@ type Placement struct {
 	PolicyVersion int             `json:"policy_version,omitempty"`
 	MatchedRule   string          `json:"matched_rule,omitempty"`
 	AutoPaused    bool            `json:"auto_paused,omitempty"`
+	WPPostID      int64           `json:"-"`
+	PostTitle     string          `json:"-"`
 }
 
 const placementColumns = `id,site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,status,expires_at,receipt,removed_at,COALESCE(approved_by_kind,''),COALESCE(policy_version,0),COALESCE(matched_rule,''),auto_paused`
@@ -88,7 +93,7 @@ ORDER BY pp.created_at DESC LIMIT 50`, makerID)
 }
 
 func (d *DB) MarkPlacementRemoved(ctx context.Context, siteID, id string) (already bool, at time.Time, found bool, err error) {
-	err = d.Pool.QueryRow(ctx, `UPDATE placement_proposals SET removed_at=NOW(), plugin_wait='remove', plugin_wait_at=NOW()
+	err = d.Pool.QueryRow(ctx, `UPDATE placement_proposals SET removed_at=NOW(), plugin_wait_before=plugin_wait, plugin_wait='remove', plugin_wait_at=NOW()
 WHERE id=$1 AND site_id=$2 AND removed_at IS NULL RETURNING removed_at`, id, siteID).Scan(&at)
 	if err == nil {
 		return false, at, true, nil
@@ -147,9 +152,15 @@ func (d *DB) PlacementRestoreUnconfirmed(ctx context.Context, placementID, campa
 }
 
 func (d *DB) CreatePlacement(ctx context.Context, p Placement) (*Placement, error) {
-	return scanPlacement(d.Pool.QueryRow(ctx, `INSERT INTO placement_proposals(site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,expires_at,post_url)
- SELECT $1,o.id,$3,$4,$5,$6,$7,`+placementTermsSQL+`,$8,$3 `+placementEligibleSQL+` AND o.id=$2
- RETURNING `+placementColumns, p.SiteID, p.OfferID, p.SurfaceURL, p.Context, p.Copy, p.Disclosure, p.Reason, p.ExpiresAt))
+	return scanPlacement(d.Pool.QueryRow(ctx, `INSERT INTO placement_proposals(site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,expires_at,post_url,wp_post_id,post_title)
+ SELECT $1,o.id,$3,$4,$5,$6,$7,`+placementTermsSQL+`,$8,$3,$9,COALESCE(NULLIF($10,''), (
+  SELECT a.title FROM articles a
+  WHERE a.site_id=$1::uuid AND COALESCE(a.title,'') <> ''
+    AND regexp_replace(lower(split_part(split_part(COALESCE(a.url,''), '#', 1), '?', 1)), '/+$', '')
+      = regexp_replace(lower(split_part(split_part($3, '#', 1), '?', 1)), '/+$', '')
+  ORDER BY a.updated_at DESC LIMIT 1
+), '') `+placementEligibleSQL+` AND o.id=$2
+ RETURNING `+placementColumns, p.SiteID, p.OfferID, p.SurfaceURL, p.Context, p.Copy, p.Disclosure, p.Reason, p.ExpiresAt, p.WPPostID, p.PostTitle))
 }
 
 func (d *DB) GetPlacement(ctx context.Context, siteID, id string) (*Placement, error) {
@@ -187,7 +198,7 @@ policy_version=COALESCE((SELECT version FROM approval_policies WHERE site_id=pp.
 }
 
 func (d *DB) RevokePlacement(ctx context.Context, siteID, id string) (bool, error) {
-	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='revoked', revoked_by_side='publisher', plugin_wait='remove', plugin_wait_at=NOW() WHERE id=$1 AND site_id=$2 AND status<>'revoked'`, id, siteID)
+	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='revoked', revoked_by_side='publisher', plugin_wait_before=plugin_wait, plugin_wait='remove', plugin_wait_at=NOW() WHERE id=$1 AND site_id=$2 AND status<>'revoked'`, id, siteID)
 	if err != nil {
 		return false, err
 	}
@@ -212,6 +223,7 @@ status_before_undo=CASE WHEN $3='undo' THEN status ELSE status_before_undo END,
 undone_at=CASE WHEN $3='undo' THEN $4 ELSE undone_at END,
 undone_by_user=CASE WHEN $3='undo' THEN NULLIF($5,'')::uuid ELSE undone_by_user END,
 undone_by_key_hash=CASE WHEN $3='undo' THEN NULLIF($6,'') ELSE undone_by_key_hash END,
+plugin_wait_before=plugin_wait,
 plugin_wait='remove',
 plugin_wait_at=$4,
 plugin_failed_reason=CASE WHEN $3='undo' THEN '' ELSE plugin_failed_reason END,
@@ -330,7 +342,9 @@ WHERE pp.id=$1`, id).Scan(&copyText, &product, &category, &website)
 		return "", "", "claims_from_offer", false, nil
 	}
 	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL,
-plugin_wait='restore', plugin_wait_at=$3, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
+plugin_wait=CASE WHEN plugin_wait='remove' AND plugin_wait_before='placed' THEN plugin_wait_before ELSE 'restore' END,
+plugin_wait_at=CASE WHEN plugin_wait='remove' AND plugin_wait_before='placed' THEN plugin_wait_at ELSE $3 END,
+plugin_failed_reason='', failed_action='', restore_unconfirmed=false
 WHERE id=$1
 RETURNING status, COALESCE(approved_by_kind,'')`, id, userID, now).Scan(&status, &approvedBy)
 	if err != nil {
@@ -342,7 +356,7 @@ RETURNING status, COALESCE(approved_by_kind,'')`, id, userID, now).Scan(&status,
 	return status, approvedBy, "", true, tx.Commit(ctx)
 }
 
-func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Placement, error) {
+func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string, claims entry.ClaimChecker) (*Placement, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -369,7 +383,20 @@ func (d *DB) CommitPlacement(ctx context.Context, siteID, id, code string) (*Pla
 	if !eligible {
 		return nil, ErrPlacementAuthority
 	}
-	boxes, err := countPlacementBoxes(ctx, tx, siteID, p.SurfaceURL, p.ID)
+	var product, category, website, terms, commission string
+	err = tx.QueryRow(ctx, `SELECT COALESCE(pr.name,''), COALESCE(pr.primary_category,''), COALESCE(pr.website_url,''), COALESCE(o.terms,''), COALESCE(o.commission_value::text,'')
+FROM offers o JOIN products pr ON pr.id=o.product_id WHERE o.id=$1`, p.OfferID).Scan(&product, &category, &website, &terms, &commission)
+	if err != nil {
+		return nil, err
+	}
+	if entry.ClaimsFail(claims, p.Copy, strings.TrimSpace(strings.Join([]string{product, category, website, terms, commission}, "\n"))) {
+		return nil, ErrClaimsFromOffer
+	}
+	var postID int64
+	if err = tx.QueryRow(ctx, `SELECT wp_post_id FROM placement_proposals WHERE id=$1`, p.ID).Scan(&postID); err != nil {
+		return nil, err
+	}
+	boxes, err := countPlacementBoxes(ctx, tx, siteID, p.SurfaceURL, p.ID, postID)
 	if err != nil {
 		return nil, err
 	}

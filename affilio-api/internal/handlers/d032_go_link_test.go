@@ -284,12 +284,24 @@ WHERE id=$1`, id); err != nil {
 		t.Fatalf("forwarded bot: %s hits %d", bot.Header().Get("Location"), clicks())
 	}
 
-	unknown := goHit("unknown id", "/v1/go/00000000-0000-4000-8000-000000000099", "192.0.2.50:1000", "Mozilla/5.0 reader", "", nil)
-	if unknown.Header().Get("Location") != "https://offerrails.example/" {
-		t.Fatalf("unknown id: %d %s", unknown.Code, unknown.Header().Get("Location"))
+	unknownID := func(label, path string, headers map[string]string) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Host = "127.0.0.1:8443"
+		req.RemoteAddr = "192.0.2.50:1000"
+		req.Header.Set("User-Agent", "Mozilla/5.0 reader")
+		for key, value := range headers {
+			req.Header.Set(key, value)
+		}
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound || rec.Header().Get("Location") != "" || !strings.Contains(rec.Body.String(), "This link is not on Offer Rails.") || !strings.Contains(rec.Header().Get("Content-Type"), "text/html") {
+			t.Fatalf("%s: %d location %q type %q body %s", label, rec.Code, rec.Header().Get("Location"), rec.Header().Get("Content-Type"), rec.Body.String())
+		}
+		if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
+			t.Fatalf("%s dropped go-link headers", label)
+		}
 	}
-	knownSite := goHit("unknown id with site key", "/v1/go/00000000-0000-4000-8000-000000000098?via=plugin", "192.0.2.51:1000", "PublisherServer/1.0", "", siteKey)
-	if knownSite.Header().Get("Location") != siteHomeURL {
-		t.Fatalf("unknown id with site key: %s", knownSite.Header().Get("Location"))
-	}
+	unknownID("unknown id", "/v1/go/00000000-0000-4000-8000-000000000099", nil)
+	unknownID("unknown id with site key", "/v1/go/00000000-0000-4000-8000-000000000098?via=plugin", siteKey)
 }

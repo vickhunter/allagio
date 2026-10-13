@@ -151,7 +151,7 @@ func main() {
 	}
 
 	marketplace := &handlers.MarketplaceHandler{DB: db}
-	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != ""}
+	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != "", Claims: entry.StubClaimChecker{}}
 	payouts := &handlers.PayoutsHandler{DB: db}
 	redirects := &handlers.RedirectsHandler{
 		DB:           db,

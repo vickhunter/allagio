@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -109,6 +110,9 @@ type DigestItem struct {
 	ApprovedBy         string
 	PolicyVersion      int
 	UndoneBy           string
+	Status             string
+	ReviewReason       string
+	ReviewMessage      string
 }
 
 // DigestPause is the account, site, and offer pause state for one digest.
@@ -730,21 +734,56 @@ FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan
 	return status == "listed", makerID, category, err
 }
 
-const placementBoxCountSQL = `SELECT COUNT(*) FROM placement_proposals
-WHERE site_id=$1 AND surface_url=$2 AND id<>$3 AND status<>'revoked' AND removed_at IS NULL`
+// normalizedSurfaceSQL folds host case, drops a query and a fragment, and
+// drops trailing slashes so the same post is one box.
+func normalizedSurfaceSQL(expr string) string {
+	return `regexp_replace(lower(split_part(split_part(` + expr + `, '#', 1), '?', 1)), '/+$', '')`
+}
+
+var placementBoxCountSQL = `SELECT COUNT(*) FROM placement_proposals
+WHERE site_id=$1 AND id<>$3::uuid AND status<>'revoked' AND removed_at IS NULL
+AND (
+  ($4::bigint > 0 AND wp_post_id = $4::bigint)
+  OR (
+    wp_post_id > 0 AND EXISTS (
+      SELECT 1 FROM placement_proposals self
+      WHERE self.id = $3::uuid AND self.wp_post_id > 0 AND self.wp_post_id = placement_proposals.wp_post_id
+    )
+  )
+  OR ` + normalizedSurfaceSQL("surface_url") + ` = ` + normalizedSurfaceSQL("$2") + `
+)`
 
 type rowQuery interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-func countPlacementBoxes(ctx context.Context, q rowQuery, siteID, surfaceURL, exceptID string) (int, error) {
+func countPlacementBoxes(ctx context.Context, q rowQuery, siteID, surfaceURL, exceptID string, postID int64) (int, error) {
 	var n int
-	err := q.QueryRow(ctx, placementBoxCountSQL, siteID, surfaceURL, exceptID).Scan(&n)
+	err := q.QueryRow(ctx, placementBoxCountSQL, siteID, surfaceURL, exceptID, postID).Scan(&n)
 	return n, err
 }
 
-func (d *DB) CountPlacementBoxes(ctx context.Context, siteID, surfaceURL, exceptID string) (int, error) {
-	return countPlacementBoxes(ctx, d.Pool, siteID, surfaceURL, exceptID)
+func (d *DB) CountPlacementBoxes(ctx context.Context, siteID, surfaceURL, exceptID string, postID int64) (int, error) {
+	return countPlacementBoxes(ctx, d.Pool, siteID, surfaceURL, exceptID, postID)
+}
+
+// SiteHasApprovedPlacement is true after the first approved or committed box.
+func (d *DB) SiteHasApprovedPlacement(ctx context.Context, siteID string) (bool, error) {
+	if siteID == "" {
+		return false, nil
+	}
+	var n int
+	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals
+WHERE site_id=$1 AND status IN ('approved','committed')`, siteID).Scan(&n)
+	return n > 0, err
+}
+
+// OfferClaimText is the offer text a placement copy is checked against.
+func (d *DB) OfferClaimText(ctx context.Context, offerID string) (string, error) {
+	var product, category, website, terms, commission string
+	err := d.Pool.QueryRow(ctx, `SELECT COALESCE(p.name,''), COALESCE(p.primary_category,''), COALESCE(p.website_url,''), COALESCE(o.terms,''), COALESCE(o.commission_value::text,'')
+FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan(&product, &category, &website, &terms, &commission)
+	return strings.TrimSpace(strings.Join([]string{product, category, website, terms, commission}, "\n")), err
 }
 
 func (d *DB) CountPolicyPlacements(ctx context.Context, siteID string, since time.Time, includeID string) (int, error) {
@@ -942,7 +981,15 @@ func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Tim
 	}
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
 plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
-COALESCE(post_title,''), COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
+COALESCE(NULLIF(post_title, ''), (
+  SELECT a.title FROM articles a
+  WHERE a.site_id = placement_proposals.site_id
+    AND COALESCE(a.title, '') <> ''
+    AND regexp_replace(lower(split_part(split_part(COALESCE(a.url, ''), '#', 1), '?', 1)), '/+$', '')
+      = regexp_replace(lower(split_part(split_part(placement_proposals.surface_url, '#', 1), '?', 1)), '/+$', '')
+  ORDER BY a.updated_at DESC
+  LIMIT 1
+), ''), COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
 (SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
 COALESCE(approved_by_kind,''), COALESCE(policy_version,0), COALESCE(undone_by_user::text,'')
 FROM placement_proposals
@@ -970,9 +1017,10 @@ func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) 
 		limit = 50
 	}
 	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, o.updated_at,
-(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id)
+(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
+o.status
 FROM offers o JOIN products p ON p.id=o.product_id
-WHERE p.maker_id=$1 AND o.status='listed' AND o.updated_at > $2
+WHERE p.maker_id=$1 AND o.status IN ('listed','submitted') AND o.updated_at > $2
 ORDER BY o.updated_at DESC LIMIT $3`, makerID, since, limit)
 	if err != nil {
 		return nil, err
@@ -986,11 +1034,11 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = kind
-		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks); err != nil {
+		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.Status); err != nil {
 			return nil, err
 		}
 		item.Label = item.Summary
-		item.CountsAsLive = true // a listed offer, not a placement
+		item.CountsAsLive = item.Status == "listed"
 		out = append(out, item)
 	}
 	return out, rows.Err()
@@ -1021,6 +1069,7 @@ status_before_undo=status,
 undone_at=$2,
 undone_by_user=$3::uuid,
 undone_by_key_hash='',
+plugin_wait_before=plugin_wait,
 plugin_wait='remove',
 plugin_wait_at=$2,
 plugin_failed_reason='',

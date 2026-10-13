@@ -207,10 +207,12 @@ func TestRevokedGoLink(t *testing.T) {
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
-	again := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
-	requirePlainRedirect(t, again, "https://example.com")
-	if placementClickCount(t, db, placementID) != 1 {
-		t.Fatal("a restored placement credited a click before the plugin acknowledged placed")
+	again := hitGo(t, r, http.MethodGet, path, "RedoReader/1")
+	if again.Code != http.StatusFound || !strings.Contains(again.Header().Get("Location"), "via=") {
+		t.Fatalf("undo and redo before the plugin ack: %d %s", again.Code, again.Header().Get("Location"))
+	}
+	if placementClickCount(t, db, placementID) != 2 {
+		t.Fatal("undo and redo before the plugin sync stopped the go link")
 	}
 
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET post_url='https://golink.example/post' WHERE id=$1`, placementID); err != nil {
@@ -221,7 +223,7 @@ func TestRevokedGoLink(t *testing.T) {
 	}
 	paused := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
 	requirePlainRedirect(t, paused, "https://golink.example/post")
-	if placementClickCount(t, db, placementID) != 1 {
+	if placementClickCount(t, db, placementID) != 2 {
 		t.Fatal("an offer that is not live credited a click")
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET post_url='' WHERE id=$1`, placementID); err != nil {
@@ -1540,7 +1542,7 @@ func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 		if !strings.Contains(doc, "A 409 returns `reason` and `message`") || !strings.Contains(doc, "A 422 returns `check_id` and `check_text`") {
 			t.Fatal("docs drifted on the 409 and 422 body shapes")
 		}
-		if !strings.Contains(doc, "Digest totals, site totals, and Live now exclude") || !strings.Contains(doc, "Leave a failed restore removed") || !strings.Contains(doc, "counts as live only when `plugin_state` is `placed`") || !strings.Contains(doc, "`GET /v1/go/<placement_id>` always returns 302") || !strings.Contains(doc, "`GET /v1/go/<code>`") || !strings.Contains(doc, "never returns a 4xx") || !strings.Contains(doc, "`fallback_url`") || !strings.Contains(doc, "`X-OR-Client-Hash`") || !strings.Contains(doc, "/24") || !strings.Contains(doc, "00:00 UTC") {
+		if !strings.Contains(doc, "Digest totals, site totals, and Live now exclude") || !strings.Contains(doc, "Leave a failed restore removed") || !strings.Contains(doc, "counts as live only when `plugin_state` is `placed`") || !strings.Contains(doc, "An unknown placement id returns a 404 page") || !strings.Contains(doc, "`GET /v1/go/<code>`") || !strings.Contains(doc, "never returns a 4xx") || !strings.Contains(doc, "`fallback_url`") || !strings.Contains(doc, "`X-OR-Client-Hash`") || !strings.Contains(doc, "/24") || !strings.Contains(doc, "00:00 UTC") {
 			t.Fatal("docs drifted on leave-it-removed")
 		}
 	}

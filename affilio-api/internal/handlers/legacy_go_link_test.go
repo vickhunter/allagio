@@ -213,7 +213,7 @@ WHERE id=$1`, id); err != nil {
 			name: "unknown code", setup: makeLive,
 			bareWant: railsHome, queryWant: railsHome,
 			barePath:  "/v1/go/missing-legacy",
-			queryPath: "/v1/go/missing-legacy?placement=00000000-0000-4000-8000-000000000099",
+			queryPath: "/v1/go/missing-legacy",
 		},
 		{name: "rate-limited", setup: func() {
 			makeLive()

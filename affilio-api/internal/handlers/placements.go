@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"net"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -30,6 +31,9 @@ type PlacementsHandler struct {
 	Now                       func() time.Time
 	PluginOfflineAfter        time.Duration
 	StatusLimiter             *IPRateLimiter
+	// Claims is the production checker. Nil uses the stub, which refuses a
+	// number the offer does not contain and is not a live claim check.
+	Claims entry.ClaimChecker
 }
 
 // PlacementPollInterval is the shortest period the placement status read may
@@ -149,12 +153,22 @@ func (h *PlacementsHandler) requireLinkedPublisher(c *gin.Context) bool {
 	return true
 }
 
+func (h *PlacementsHandler) claims() entry.ClaimChecker {
+	if h.Claims == nil {
+		return entry.StubClaimChecker{}
+	}
+	return h.Claims
+}
+
 func (h *PlacementsHandler) Prepare(c *gin.Context) {
 	var req struct {
 		OfferID    string `json:"offer_id"`
 		SurfaceURL string `json:"surface_url"`
 		Context    string `json:"context"`
 		Copy       string `json:"copy"`
+		PostID     int64  `json:"post_id"`
+		WPPostID   int64  `json:"wp_post_id"`
+		PostTitle  string `json:"post_title"`
 	}
 	if bindBoundedJSON(c, &req) != nil || !uuidPattern.MatchString(req.OfferID) || len(req.Context) < 10 || len(req.Context) > 12000 || len(strings.TrimSpace(req.Copy)) < 10 || len(req.Copy) > 4000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "offer_id, surface_url, context and copy required"})
@@ -188,7 +202,20 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		writeNamedConflict(c, "offer_ineligible")
 		return
 	}
-	boxes, err := h.DB.CountPlacementBoxes(c.Request.Context(), site.ID, req.SurfaceURL, "00000000-0000-0000-0000-000000000000")
+	offerText, err := h.DB.OfferClaimText(c.Request.Context(), req.OfferID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
+		return
+	}
+	if entry.ClaimsFail(h.claims(), strings.TrimSpace(req.Copy), offerText) {
+		writeCheckDenied(c, []string{"claims_from_offer"})
+		return
+	}
+	postID := req.PostID
+	if req.WPPostID > 0 {
+		postID = req.WPPostID
+	}
+	boxes, err := h.DB.CountPlacementBoxes(c.Request.Context(), site.ID, req.SurfaceURL, "00000000-0000-0000-0000-000000000000", postID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
 		return
@@ -198,7 +225,8 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		return
 	}
 	p, err := h.DB.CreatePlacement(c.Request.Context(), database.Placement{SiteID: site.ID, OfferID: req.OfferID, SurfaceURL: req.SurfaceURL,
-		Context: req.Context, Copy: strings.TrimSpace(req.Copy), Disclosure: "Affiliate disclosure: I may earn a commission if you buy through this link.", Reason: reason, ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour)})
+		Context: req.Context, Copy: strings.TrimSpace(req.Copy), Disclosure: "Affiliate disclosure: I may earn a commission if you buy through this link.", Reason: reason, ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour),
+		WPPostID: postID, PostTitle: strings.TrimSpace(req.PostTitle)})
 	if err != nil {
 		writeNamedConflict(c, "offer_unavailable")
 		return
@@ -325,9 +353,13 @@ func (h *PlacementsHandler) Commit(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "link generation failed"})
 		return
 	}
-	p, err := h.DB.CommitPlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"), code)
+	p, err := h.DB.CommitPlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"), code, h.claims())
 	if errors.Is(err, database.ErrPlacementAuthority) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, database.ErrClaimsFromOffer) {
+		writeCheckDenied(c, []string{"claims_from_offer"})
 		return
 	}
 	if errors.Is(err, database.ErrOnePerPost) {
@@ -517,13 +549,29 @@ func (h *PlacementsHandler) RevokeAgentAccess(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "revoked"})
 }
 
+func hostWithoutPort(host string) string {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if name, _, err := net.SplitHostPort(host); err == nil {
+		host = name
+	}
+	return strings.Trim(strings.TrimSuffix(host, "."), "[]")
+}
+
 func localPublisherHost(host string) bool {
-	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	host = hostWithoutPort(host)
 	switch host {
 	case "127.0.0.1", "::1", "localhost":
 		return true
 	}
 	return strings.HasSuffix(host, ".localhost")
+}
+
+func surfaceHostPort(u *url.URL) string {
+	host := strings.ToLower(u.Hostname())
+	if port := u.Port(); port != "" {
+		return host + ":" + port
+	}
+	return host
 }
 
 func surfaceURLProblem(raw, siteDomain string) string {
@@ -533,7 +581,7 @@ func surfaceURLProblem(raw, siteDomain string) string {
 		return registered
 	}
 	u, err := url.Parse(raw)
-	if err != nil || u.Hostname() == "" || u.User != nil || u.Hostname() != siteDomain {
+	if err != nil || u.Hostname() == "" || u.User != nil || surfaceHostPort(u) != strings.ToLower(strings.TrimSpace(siteDomain)) {
 		return registered
 	}
 	if u.Scheme == "https" {

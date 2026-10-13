@@ -16,8 +16,8 @@ import (
 type RedirectsHandler struct {
 	DB          *database.DB
 	RateLimiter *IPRateLimiter
-	// HomeURL is the Offer Rails home page. Unknown placement ids land here
-	// when the site is not known.
+	// HomeURL is the Offer Rails home page. Unknown campaign codes land here.
+	// An unknown placement id is a 404 page instead of a redirect.
 	HomeURL string
 	// IPSaltSecret is mixed into the daily server salt for direct go links.
 	IPSaltSecret string
@@ -161,8 +161,10 @@ func appendRefParam(landingURL, refParam, clickID string) string {
 	return parsed.String()
 }
 
-// goPlacement is GET /v1/go/<placement_id>. It always answers 302. A ref is
-// attached and a hit is recorded only when placement_counts_as_live is true.
+// goPlacement is GET /v1/go/<placement_id>. A known placement answers 302. A
+// ref is attached and a hit is recorded only when placement_counts_as_live
+// is true. An unknown id is an HTML 404 with no Location, so the request
+// port stays on the page the reader opened.
 func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req goRequest) {
 	link, err := h.DB.LookupPlacementRedirect(c.Request.Context(), placementID)
 	if err != nil {
@@ -170,15 +172,11 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req g
 		c.Redirect(http.StatusFound, h.offerRailsHome())
 		return
 	}
-	reader, siteID, domain := h.placementReader(c, link, req)
 	if !link.Found {
-		if siteID != "" {
-			c.Redirect(http.StatusFound, siteHome(domain))
-			return
-		}
-		c.Redirect(http.StatusFound, h.offerRailsHome())
+		writeUnknownGoLink(c)
 		return
 	}
+	reader, _, _ := h.placementReader(c, link, req)
 	if !link.OfferListed || !httpsDestination(link.LandingURL) {
 		c.Redirect(http.StatusFound, h.postOrHome(link))
 		return
@@ -275,6 +273,10 @@ func (h *RedirectsHandler) postOrHome(link database.PlacementRedirect) string {
 		return home
 	}
 	return h.offerRailsHome()
+}
+
+func writeUnknownGoLink(c *gin.Context) {
+	c.Data(http.StatusNotFound, "text/html; charset=utf-8", []byte("<!DOCTYPE html><html><head><title>Not found</title></head><body><p>This link is not on Offer Rails.</p></body></html>\n"))
 }
 
 func (h *RedirectsHandler) offerRailsHome() string {

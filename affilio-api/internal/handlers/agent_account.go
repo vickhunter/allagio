@@ -141,6 +141,10 @@ func (h *AgentEntry) AccountDigest(c *gin.Context) {
 		}
 		mode, _, _ = h.presentMode(mode)
 		project.Mode = mode
+		if err = h.annotateOfferReviews(c, project.Items); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+			return
+		}
 		items := make([]gin.H, 0, len(project.Items))
 		for _, item := range project.Items {
 			token, err := h.issueUndo(c, owner.ID, item)

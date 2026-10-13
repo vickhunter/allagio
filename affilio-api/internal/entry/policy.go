@@ -16,6 +16,13 @@ const ClaimCheckReason = "claim_check_unavailable"
 // ClaimCheckMessage is the sentence returned with ClaimCheckReason.
 const ClaimCheckMessage = "Automatic approval is off until claim checks are live."
 
+// YoloAfterFirstReason is why a saved yolo site still answers manual
+// until its first approved placement.
+const YoloAfterFirstReason = "yolo_after_first_placement"
+
+// YoloAfterFirstMessage tells the UI that yolo is picked and waiting.
+const YoloAfterFirstMessage = "YOLO is picked and turns on after the first approved placement."
+
 // ClaimChecker is the D-028 claim-check hook. Real reports whether this
 // checker is the live one. The stub is not, so yolo and auto cannot go live.
 type ClaimChecker interface {
