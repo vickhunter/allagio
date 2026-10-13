@@ -978,7 +978,8 @@ func (d *DB) CountDigestPlacements(ctx context.Context, siteID string, since tim
 }
 
 // digestPostTitleSQL prefers the plugin receipt, then the stored placement
-// title, then the article title when the URLs match.
+// title, then the article title when the URLs match, then the stored copy so
+// the digest title is never empty.
 const digestPostTitleSQL = `COALESCE(NULLIF(receipt->>'post_title', ''), NULLIF(post_title, ''), (
   SELECT a.title FROM articles a
   WHERE a.site_id = placement_proposals.site_id
@@ -987,7 +988,7 @@ const digestPostTitleSQL = `COALESCE(NULLIF(receipt->>'post_title', ''), NULLIF(
       = regexp_replace(lower(split_part(split_part(placement_proposals.surface_url, '#', 1), '?', 1)), '/+$', '')
   ORDER BY a.updated_at DESC
   LIMIT 1
-), '')`
+), NULLIF(copy, ''))`
 
 // digestSurfaceSQL prefers the plugin receipt, then the stored placement URL.
 const digestSurfaceSQL = `COALESCE(NULLIF(receipt->>'surface_url', ''), surface_url)`
