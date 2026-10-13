@@ -158,7 +158,7 @@ publishing channels and ranking changes should follow evidence from that loop.
 
 The landing page uses original illustration work inspired by Blume's visual clarity and ThreeUI's interactive presentation. It bundles Three.js locally, retains the SVG on mobile/reduced-motion/data-saving browsers and preserves the primary actions without JavaScript or WebGL. The owner workspace shares copyable installer commands with clipboard fallback. No ThreeUI assets or app framework are shipped.
 
-The Docker build and CI compile the optional scene automatically. For local development:
+`landing.js` imports `./landing-scene.bundle.js`. That bundle and `landing-scene.bundle.js.LEGAL.txt` are committed, and the hosted image copies those files into `/app/assets`. The image does not rebuild them, so a checkout and the release contain the same scene. When `landing-scene.js` changes, regenerate both files and commit them:
 
 ```sh
 cd affilio-wp/admin/build
@@ -166,4 +166,4 @@ npm ci --ignore-scripts
 npm run build
 ```
 
-`landing-scene.bundle.js` and its generated legal notice are build outputs. The full Three.js MIT notice lives in `THIRD_PARTY_NOTICES.md` and ships in the hosted image. The WordPress ZIP does not include hosted landing assets.
+CI runs that build and fails if the committed bundle or legal notice differs. The full Three.js MIT notice also lives in `THIRD_PARTY_NOTICES.md`. The WordPress plugin ZIP still omits hosted landing files, including this bundle.

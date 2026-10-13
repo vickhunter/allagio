@@ -1,6 +1,10 @@
+## October 13 — committed landing scene, deterministic wake wait
+
+`landing-scene.bundle.js` and `landing-scene.bundle.js.LEGAL.txt` are committed. `landing.js` imports the bundle, and the hosted image copies those committed files instead of rebuilding them. Regenerate both with `npm run build` in `affilio-wp/admin/build` when `landing-scene.js` changes. The WordPress plugin ZIP still omits hosted landing files. The slow health-check offer-rail test advances the page clock one 4-second poll at a time and waits for each `/health` response, so it does not race a 25-second visibility timeout.
+
 ## October 13 — unknown /go id is 404
 
-`/go/<id>` answers 404 when the API returns 404 and this site has no remembered fallback URL for that id. It does not redirect to the home page. A remembered fallback is still used for that 404, and a transport failure or HTTP 5xx with no usable fallback still sends the reader home. The circuit still opens only for transport failures and HTTP 5xx. The release ZIP rejects `e2e/`, `tests/`, `phpunit.xml.dist`, and test-result paths. `landing-scene.bundle.js` and `landing-scene.bundle.js.LEGAL.txt` stay untracked build outputs and are not in the WordPress ZIP.
+`/go/<id>` answers 404 when the API returns 404 and this site has no remembered fallback URL for that id. It does not redirect to the home page. A remembered fallback is still used for that 404, and a transport failure or HTTP 5xx with no usable fallback still sends the reader home. The circuit still opens only for transport failures and HTTP 5xx. The release ZIP rejects `e2e/`, `tests/`, `phpunit.xml.dist`, and test-result paths.
 
 ## October 13 — digest keeps the listed offer
 

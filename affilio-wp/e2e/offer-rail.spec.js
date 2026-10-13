@@ -784,11 +784,12 @@ test('a slow health check wakes the workspace and keeps typed input', async ({ b
   state.healthFails = 3;
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, recordVideo: { dir: '/tmp/d020-video', size: { width: 1440, height: 900 } } });
   const page = await context.newPage();
+  await page.clock.install();
   await page.goto(base + '/owner');
   await expect(page.getByRole('heading', { name: 'Waking the server, about 30 seconds' })).toBeVisible();
   await expect(page.locator('#workspace-feedback')).toHaveText('');
   await shotD020(page, 'after-waking-1440');
-  await expect(page.getByRole('link', { name: 'Open products ↗', exact: true })).toBeVisible({ timeout: 25000 });
+  await finishWake(page, page.getByRole('link', { name: 'Open products ↗', exact: true }));
   await shotD020(page, 'after-recovered-1440');
   const video = page.video();
   await context.close();
@@ -801,17 +802,19 @@ test('a slow health check wakes the workspace and keeps typed input', async ({ b
   state.healthFails = 3;
   const narrow = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
   const phone = await narrow.newPage();
+  await phone.clock.install();
   await phone.goto(base + '/owner');
   await expect(phone.getByRole('heading', { name: 'Waking the server, about 30 seconds' })).toBeVisible();
   await expect(phone.locator('.wake-bar')).toHaveCSS('transition-duration', '0s');
   await shotD020(phone, 'after-waking-390');
-  await expect(phone.getByRole('link', { name: 'Open products ↗', exact: true })).toBeVisible({ timeout: 25000 });
+  await finishWake(phone, phone.getByRole('link', { name: 'Open products ↗', exact: true }));
   await shotD020(phone, 'after-recovered-390');
   await narrow.close();
 
   reset();
   const kept = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const formPage = await kept.newPage();
+  await formPage.clock.install();
   await formPage.goto(base + '/owner/products');
   await formPage.getByLabel('Product name', { exact: true }).fill('Kept Name');
   await formPage.getByLabel('Website', { exact: true }).fill('https://rail-tool.example');
@@ -823,9 +826,25 @@ test('a slow health check wakes the workspace and keeps typed input', async ({ b
   await formPage.getByRole('button', { name: 'Register product', exact: true }).click();
   await expect(formPage.getByRole('heading', { name: 'Waking the server, about 30 seconds' })).toBeVisible();
   await expect(formPage.getByLabel('Product name', { exact: true })).toHaveValue('Kept Name');
-  await expect(formPage.getByRole('heading', { name: 'Kept Name', exact: true })).toBeVisible({ timeout: 25000 });
+  await finishWake(formPage, formPage.getByRole('heading', { name: 'Kept Name', exact: true }));
   await kept.close();
 });
+
+// Workspace wake polls /health every 4s. A 25s visibility timeout raced that loop
+// and flaked near 28s under TZ=Europe/Rome. Step the page clock one poll at a time
+// and wait for the real /health response before the next step.
+async function finishWake(page, ready) {
+  for (let step = 0; step < 20; step += 1) {
+    if (await ready.isVisible()) return;
+    const health = page.waitForResponse(response => {
+      try { return new URL(response.url()).pathname === '/health'; }
+      catch { return false; }
+    }, { timeout: 5000 });
+    await page.clock.runFor(4000);
+    await health.catch(() => {});
+  }
+  await expect(ready).toBeVisible({ timeout: 5000 });
+}
 
 test('a server that stays down offers try again', async ({ browser }) => {
   test.setTimeout(180000);

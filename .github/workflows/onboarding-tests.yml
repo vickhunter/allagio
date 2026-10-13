@@ -31,7 +31,7 @@ jobs:
           php /tmp/phpunit.phar --do-not-cache-result -c affilio-wp/phpunit.xml.dist
       - name: Build landing illustration
         working-directory: affilio-wp/admin/build
-        run: npm ci --ignore-scripts && npm run build
+        run: npm ci --ignore-scripts && npm run build && git diff --exit-code -- landing-scene.bundle.js landing-scene.bundle.js.LEGAL.txt
       - name: Gutenberg block round-trip
         working-directory: affilio-wp/tests/block-roundtrip
         run: npm ci --ignore-scripts && node roundtrip.mjs
