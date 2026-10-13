@@ -175,7 +175,7 @@ X-Maker-Key: <maker or offer key>
 
 Unknown JSON fields are rejected. ` + "`payments_check`" + ` is ` + "`pass`" + `, ` + "`fail`" + `, or ` + "`unknown`" + `. ` + "`offer_link_health`" + ` is ` + "`ok`" + `, ` + "`broken`" + `, or ` + "`unknown`" + `. Both are stored with the card.
 
-` + "`GET /v1/listing-cards/:id`" + ` returns the stored card for the same maker. That response and ` + "`GET /v1/listings`" + ` include ` + "`review_reason`" + ` and ` + "`message`" + `. ` + "`review_reason`" + ` is ` + "`claims`" + `, ` + "`head`" + `, ` + "`relevance`" + `, or ` + "`caps`" + ` while the offer is in review. Both are null when the offer is listed. On a hosted server the claims check defaults to stub, so an untrusted offer stays in review with ` + "`review_reason`" + ` ` + "`claims`" + ` until the page checker is installed.
+` + "`GET /v1/listing-cards/:id`" + ` returns the stored card for the same maker. That response and ` + "`GET /v1/listings`" + ` include ` + "`review_reason`" + ` and ` + "`message`" + `. ` + "`review_reason`" + ` is ` + "`claims`" + `, ` + "`head`" + `, ` + "`relevance`" + `, or ` + "`caps`" + ` while the offer is in review. Both are null when the offer is listed. On a hosted server the claims check defaults to stub and stays there: hosted refuses real. Local real compares the listing card with the merchant page.
 `
 
 const modesDoc = `# Approval modes

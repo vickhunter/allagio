@@ -69,25 +69,6 @@ func TestClaimsCheckOffLocalListsWhenChecksPass(t *testing.T) {
 	}
 }
 
-func TestClaimsCheckRealDoesNotListYet(t *testing.T) {
-	db, cleanup := setupTestDB(t)
-	defer cleanup()
-	_, makerKey := createTestMaker(t, db)
-	r := newMakerRouterWithClaims(db, config.ClaimsReal)
-	productID, offerID := createDraftOffer(t, r, makerKey, "Northwind Ledger", "https://northwind.example.com", passingTerms("Northwind Ledger", 20), 20)
-	markProductReady(t, db, productID)
-
-	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
-	if rec.Code != http.StatusOK || body["status"] != "submitted" {
-		t.Fatalf("real submit: %d %v", rec.Code, body)
-	}
-	requireReview(t, body, reviewReasonClaims, reviewClaimsNotLive)
-	assertReviewOnReads(t, r, makerKey, offerID, reviewReasonClaims, reviewClaimsNotLive)
-	if queueLen(t, r) != 1 {
-		t.Fatal("real must not auto-list until the page checker is installed")
-	}
-}
-
 func trustMaker(t *testing.T, r interface {
 	ServeHTTP(http.ResponseWriter, *http.Request)
 }, makerID string) {

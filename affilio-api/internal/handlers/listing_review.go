@@ -31,11 +31,22 @@ const (
 
 // failedListingCheck is the server gate for an untrusted maker. The order is
 // claims, the cached HEAD check, minimum relevance, then the cap. A trusted
-// maker does not use this gate.
-func failedListingCheck(offer database.Offer, product database.Product, listed int) (string, string, bool) {
-	claims := entry.StubClaimChecker{}
-	if claims.CheckClaims(offer.Terms, offerFacts(offer, product)) != nil {
-		return reviewReasonClaims, reviewClaimsMessage, true
+// maker does not use this gate. real replaces the numeric stub with the page
+// checker. stub and off-local keep the numeric stub.
+func failedListingCheck(ctx context.Context, db *database.DB, mode string, offer database.Offer, product database.Product, listed int) (string, string, bool) {
+	if claimsReal(mode) {
+		reason, message := compareOfferClaims(ctx, db, product.MakerID, product.ID, offer)
+		if reason == entry.PageReasonUnreachable {
+			return reviewReasonHead, reviewHeadMessage, true
+		}
+		if reason != "" {
+			return reviewReasonClaims, message, true
+		}
+	} else {
+		claims := entry.StubClaimChecker{}
+		if claims.CheckClaims(offer.Terms, offerFacts(offer, product)) != nil {
+			return reviewReasonClaims, reviewClaimsMessage, true
+		}
 	}
 	if !landingReachable(offer.LandingURL) {
 		return reviewReasonHead, reviewHeadMessage, true
@@ -50,31 +61,28 @@ func failedListingCheck(offer database.Offer, product database.Product, listed i
 	return "", "", false
 }
 
-// claimsHeld is true for stub, and for real until the page checker is
-// installed. Empty and off-local run the four checks in failedListingCheck.
-// real does not auto-list: that branch stays the not-live hold so a local
-// CLAIMS_CHECK=real cannot list an offer the page checker has not seen.
+// claimsHeld is true only for stub. Empty and off-local run the four checks.
+// real runs the page checker instead of the not-live hold.
 func claimsHeld(mode string) bool {
-	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case config.ClaimsStub, config.ClaimsReal:
-		return true
-	default:
-		return false
-	}
+	return strings.EqualFold(strings.TrimSpace(mode), config.ClaimsStub)
 }
 
-// listingReview is recomputed on read. It is not stored. Under stub, and under
-// real until the page checker is installed, every submitted offer reports
-// claims and the not-live message. That includes an offer that failed a
-// different check the last time this process ran off-local.
-func listingReview(mode string, offer database.Offer, product database.Product, listed int) (string, string) {
+func claimsReal(mode string) bool {
+	return strings.EqualFold(strings.TrimSpace(mode), config.ClaimsReal)
+}
+
+// listingReview is recomputed on read. It is not stored. Under stub, every
+// submitted offer reports claims and the not-live message. That includes an
+// offer that failed a different check the last time this process ran off-local.
+// real reports the page checker's reason.
+func listingReview(ctx context.Context, db *database.DB, mode string, offer database.Offer, product database.Product, listed int) (string, string) {
 	if offer.Status != "submitted" {
 		return "", ""
 	}
 	if claimsHeld(mode) {
 		return reviewReasonClaims, reviewClaimsNotLive
 	}
-	reason, message, failed := failedListingCheck(offer, product, listed)
+	reason, message, failed := failedListingCheck(ctx, db, mode, offer, product, listed)
 	if !failed {
 		return "", ""
 	}
@@ -199,7 +207,7 @@ func reviewForMakerProduct(ctx context.Context, db *database.DB, claimsCheck, ma
 				return "", ""
 			}
 		}
-		return listingReview(claimsCheck, offers[i], *product, listed)
+		return listingReview(ctx, db, claimsCheck, offers[i], *product, listed)
 	}
 	return "", ""
 }

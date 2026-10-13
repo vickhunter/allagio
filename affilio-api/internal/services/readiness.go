@@ -207,6 +207,13 @@ func publicProbeAddresses(ctx context.Context, host string) ([]net.IPAddr, error
 	return addresses, nil
 }
 
+// FetchPublicPage GETs a public page with the readiness timeout and the
+// 512 KiB body cap. ok is true only for an HTTP 2xx response.
+func (e *ReadinessEngine) FetchPublicPage(ctx context.Context, rawURL string) (body string, status int, ok bool) {
+	page := e.fetchPage(ctx, rawURL)
+	return page.Body, page.Status, page.OK
+}
+
 func (e *ReadinessEngine) fetchPage(ctx context.Context, rawURL string) fetchedPage {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {

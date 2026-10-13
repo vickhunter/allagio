@@ -98,6 +98,39 @@ func (h *AgentEntry) claims() entry.ClaimChecker {
 	return h.Claims
 }
 
+// placementClaims runs the page checker at restore and retry when this
+// process is on CLAIMS_CHECK=real and the decide checker is still the stub.
+// The page is fetched before the transaction. The recorded result is what
+// ClaimsFail reads inside it, so a miss leaves the row unchanged. yolo and
+// auto stay on the stub.
+func (h *AgentEntry) placementClaims(c *gin.Context, offerID string) (entry.ClaimChecker, error) {
+	if !claimsReal(h.ClaimsCheck) || !productionStub(h.Claims) {
+		return h.claims(), nil
+	}
+	src, err := h.DB.OfferClaimSource(c.Request.Context(), offerID)
+	if err != nil {
+		return nil, err
+	}
+	reason, _ := compareOfferClaims(c.Request.Context(), h.DB, src.MakerID, src.ProductID, database.Offer{
+		LandingURL:      src.LandingURL,
+		Terms:           src.Terms,
+		CommissionType:  src.CommissionType,
+		CommissionValue: src.CommissionValue,
+	})
+	if reason == "" {
+		return entry.RecordedClaimCheck{}, nil
+	}
+	return entry.RecordedClaimCheck{Err: entry.ClaimMismatch{Reason: reason}}, nil
+}
+
+func productionStub(claims entry.ClaimChecker) bool {
+	if claims == nil {
+		return true
+	}
+	_, ok := claims.(entry.StubClaimChecker)
+	return ok
+}
+
 func (h *AgentEntry) verificationURI() string {
 	if h.BaseURL != "" {
 		return strings.TrimRight(h.BaseURL, "/") + "/device"
@@ -1269,7 +1302,12 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 	if source == "policy" {
 		rules.UseStoredCap = true
 	}
-	status, approvedBy, block, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now, entry.CapLimit(rules), h.claims())
+	claims, claimErr := h.placementClaims(c, row.OfferID)
+	if claimErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+		return
+	}
+	status, approvedBy, block, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now, entry.CapLimit(rules), claims)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
 		return
@@ -1478,7 +1516,16 @@ func (h *AgentEntry) RetryPlugin(c *gin.Context) {
 			return
 		}
 	}
-	retried, block, err := h.DB.RetryPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, action, h.now(), h.claims())
+	claims := h.claims()
+	if action == "restored" {
+		var claimErr error
+		claims, claimErr = h.placementClaims(c, placement.OfferID)
+		if claimErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+			return
+		}
+	}
+	retried, block, err := h.DB.RetryPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, action, h.now(), claims)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
 		return
