@@ -1,3 +1,7 @@
+## October 13 — digest keeps the listed offer
+
+`GET /v1/digest` includes a maker's listed and submitted offers updated after the last `digest_opened`. `offers.updated_at` is a timestamp without a time zone, so the floor is compared as an absolute instant. A just-listed offer stays in the items when PostgreSQL's `TimeZone` is not UTC. Each offer item includes `status`, `review_reason`, and `message`. A listed offer has null review fields and `live_now` true. A submitted offer under the claims stub has `review_reason` `claims` and message "The claims check is not live yet." Offer items do not include `plugin_failed_reason`.
+
 ## October 13 — offer rail phone targets, webhook copy, offer id, demo sign-in
 
 Demo nav links are 45px wide inside a 180px “Demo” navigation, so a phone can tap Pricing, Docs, Privacy, and Terms. A Stripe connection with a signing secret that does not start with `whsec_` stays on the form and shows “Use the signing secret from your Stripe webhook endpoint. It starts with whsec_.” The raw JSON error is not the page. A new referral offer shows its id, the tracked link, and Copy link. `/demo/start` keeps `ref` and `via` on Sign in and Register. Sign-in copies those same parameters onto the return path, so the callback lands on `/owner?ref=…&via=…`. The auth end-to-end server is `TestServeDemoAuthForE2E`.

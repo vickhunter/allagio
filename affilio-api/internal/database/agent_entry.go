@@ -109,6 +109,9 @@ type DigestItem struct {
 	ApprovedBy         string
 	PolicyVersion      int
 	UndoneBy           string
+	Status             string
+	ReviewReason       string
+	ReviewMessage      string
 }
 
 // DigestPause is the account, site, and offer pause state for one digest.
@@ -969,11 +972,17 @@ func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) 
 	if limit < 1 {
 		limit = 50
 	}
+	// offers.updated_at is TIMESTAMP WITHOUT TIME ZONE, stored as the session
+	// wall clock. Compare it to an absolute timestamptz. A bare time.Time is
+	// sent as a timestamp, so Postgres treats the UTC wall clock as local and
+	// drops a just-listed offer whenever TimeZone is not UTC.
 	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, o.updated_at,
-(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id)
+(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
+o.status
 FROM offers o JOIN products p ON p.id=o.product_id
-WHERE p.maker_id=$1 AND o.status='listed' AND o.updated_at > $2
-ORDER BY o.updated_at DESC LIMIT $3`, makerID, since, limit)
+WHERE p.maker_id=$1 AND o.status IN ('listed','submitted')
+AND o.updated_at > $2::timestamptz
+ORDER BY o.updated_at DESC LIMIT $3`, makerID, since.UTC().Format(time.RFC3339), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -986,11 +995,11 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = kind
-		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks); err != nil {
+		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.Status); err != nil {
 			return nil, err
 		}
 		item.Label = item.Summary
-		item.CountsAsLive = true // a listed offer, not a placement
+		item.CountsAsLive = item.Status == "listed"
 		out = append(out, item)
 	}
 	return out, rows.Err()

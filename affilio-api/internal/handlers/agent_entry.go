@@ -997,6 +997,10 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 			return
 		}
+		if err = h.annotateOfferReviews(c, offers); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+			return
+		}
 		for _, item := range offers {
 			token, err := h.issueUndo(c, owner.ID, item)
 			if err != nil {
@@ -1986,7 +1990,65 @@ func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 		body["plugin_failed_reason"] = item.PluginFailedReason
 		body["failed_action"] = item.FailedAction
 	}
+	if item.Kind == "offer" {
+		status := item.Status
+		if status == "" {
+			status = "listed"
+		}
+		body["status"] = status
+		if item.ReviewReason == "" {
+			body["review_reason"] = nil
+			body["message"] = nil
+		} else {
+			body["review_reason"] = item.ReviewReason
+			body["message"] = item.ReviewMessage
+		}
+	}
 	return body
+}
+
+func (h *AgentEntry) annotateOfferReviews(c *gin.Context, items []database.DigestItem) error {
+	listedByMaker := map[string]int{}
+	for i := range items {
+		if items[i].Kind != "offer" {
+			continue
+		}
+		if items[i].Status == "" {
+			items[i].Status = "listed"
+		}
+		if items[i].Status != "submitted" {
+			items[i].ReviewReason = ""
+			items[i].ReviewMessage = ""
+			continue
+		}
+		if claimsHeld(h.ClaimsCheck) {
+			items[i].ReviewReason = reviewReasonClaims
+			items[i].ReviewMessage = reviewClaimsNotLive
+			continue
+		}
+		offer, err := h.DB.GetOfferByID(c.Request.Context(), items[i].ID)
+		if err != nil {
+			return err
+		}
+		var makerID string
+		if err = h.DB.Pool.QueryRow(c.Request.Context(), `SELECT p.maker_id::text FROM products p WHERE p.id=$1`, offer.ProductID).Scan(&makerID); err != nil {
+			return err
+		}
+		product, err := h.DB.GetProduct(c.Request.Context(), makerID, offer.ProductID)
+		if err != nil {
+			return err
+		}
+		listed, ok := listedByMaker[makerID]
+		if !ok {
+			listed, err = h.DB.CountListedOffers(c.Request.Context(), makerID)
+			if err != nil {
+				return err
+			}
+			listedByMaker[makerID] = listed
+		}
+		items[i].ReviewReason, items[i].ReviewMessage = listingReview(c.Request.Context(), h.DB, h.ClaimsCheck, *offer, *product, listed)
+	}
+	return nil
 }
 
 func (h *AgentEntry) writePolicy(c *gin.Context, policy database.ApprovalPolicy, source string) {
