@@ -1,7 +1,9 @@
 package entry
 
 import (
+	"bytes"
 	"errors"
+	"log"
 	"strings"
 	"testing"
 )
@@ -206,6 +208,7 @@ func TestRestoreRefusalsAreTheOnlyList(t *testing.T) {
 		"window_expired", "paused", "not_failed", "device_used", "account_exists",
 		"not_approvable", "not_undone", "nothing_to_ack", "offer_ineligible", "offer_unavailable",
 		"placement_unavailable", "receipt_mismatch", "receipt_recorded", "publisher_missing", "restore_refused",
+		"one_per_post",
 	}
 	if len(RestoreRefusals) != len(want) {
 		t.Fatalf("refusals: %+v", RestoreRefusals)
@@ -222,6 +225,28 @@ func TestRestoreRefusalsAreTheOnlyList(t *testing.T) {
 		if !strings.Contains(doc, "`"+reason+"`") || !strings.Contains(doc, RestoreRefusals[i].Text) {
 			t.Fatalf("doc missing %s", reason)
 		}
+	}
+}
+
+func TestStubClaimCheckerPassesConsistentClaims(t *testing.T) {
+	stub := StubClaimChecker{}
+	if stub.Real() {
+		t.Fatal("production checker must stay off automatic approval")
+	}
+	offer := "Claims Product\ndevtools\nhttps://example.com"
+	if err := stub.CheckClaims("Claims Product is a solid fit.", offer); err != nil {
+		t.Fatal(err)
+	}
+	var logs bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(prev) })
+	err := stub.CheckClaims("Claims Product is a solid fit. 99%", offer)
+	if err == nil || !strings.Contains(err.Error(), ClaimReasonNumberNotInOffer) {
+		t.Fatalf("inconsistent claim: %v", err)
+	}
+	if !strings.Contains(logs.String(), "reason="+ClaimReasonNumberNotInOffer) {
+		t.Fatalf("log: %s", logs.String())
 	}
 }
 

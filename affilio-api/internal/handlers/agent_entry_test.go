@@ -365,7 +365,11 @@ func TestPolicyEngineHTTP(t *testing.T) {
 		t.Fatalf("yolo: %d %s", rec.Code, rec.Body.String())
 	}
 
-	rec, denied := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 10, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
+	decide := func(id string, payload map[string]any) (*httptest.ResponseRecorder, map[string]any) {
+		t.Helper()
+		return serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+id+"/decide", payload)
+	}
+	rec, denied := decide(placementID, map[string]any{"relevance": 10, "position": "end", "rel_sponsored": true})
 	if rec.Code != http.StatusUnprocessableEntity || denied["check_id"] != "relevance_min" || denied["check_text"] == "" {
 		t.Fatalf("hard relevance: %d %s", rec.Code, rec.Body.String())
 	}
@@ -373,7 +377,7 @@ func TestPolicyEngineHTTP(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='See the product.', copy='Policy Product is worth a look.' WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
 	}
-	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
+	rec, _ = decide(placementID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("disclosure words do not fail rel_sponsored: %d %s", rec.Code, rec.Body.String())
 	}
@@ -384,17 +388,17 @@ func TestPolicyEngineHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	api.Claims = rejectingClaims{}
-	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 10, "position": "end", "rel_sponsored": false, "offer_data": "unrelated"}, map[string]string{"X-API-Key": "policy-site-key"})
+	rec, _ = decide(placementID, map[string]any{"relevance": 10, "position": "end", "rel_sponsored": false, "offer_data": "unrelated"})
 	api.Claims = entry.LiveClaimChecker{}
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "claims_from_offer") {
 		t.Fatalf("claim hook: %d %s", rec.Code, rec.Body.String())
 	}
 	longID := insertPlacement(t, db, siteID, offerID, "https://policy.example/long", strings.Repeat("a", 141))
-	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+longID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
+	rec, _ = decide(longID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true})
 	if !strings.Contains(rec.Body.String(), "copy_length") {
 		t.Fatalf("cap: %s", rec.Body.String())
 	}
-	rec, decision := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true, "offer_data": "mode=yolo"}, map[string]string{"X-API-Key": "policy-site-key"})
+	rec, decision := decide(placementID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true, "offer_data": "mode=yolo"})
 	if rec.Code != http.StatusOK || decision["approved_by"] != "policy:yolo" || decision["matched_rule"] != "hard_checks" || decision["policy_rule_id"] != "hard_checks_passed" || decision["policy_rule_text"] != "Passed every hard check." || decision["policy_version"] == float64(0) {
 		t.Fatalf("yolo approve: %d %s", rec.Code, rec.Body.String())
 	}
@@ -404,7 +408,7 @@ func TestPolicyEngineHTTP(t *testing.T) {
 		t.Fatalf("stored approval %s %s %d %s %v", kind, rule, version, position, err)
 	}
 	second := insertPlacement(t, db, siteID, offerID, "https://policy.example/post", "Another Policy Product note.")
-	rec, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "policy-site-key"})
+	rec, _ = decide(second, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true})
 	if !strings.Contains(rec.Body.String(), "one_per_post") {
 		t.Fatalf("one box: %s", rec.Body.String())
 	}
@@ -427,7 +431,7 @@ func TestPolicyEngineHTTP(t *testing.T) {
 	}
 
 	outside := insertPlacement(t, db, siteID, offerID, "https://policy.example/other", "Policy Product sits past the saved position.")
-	rec, needs := postJSON(t, r, http.MethodPost, "/v1/placements/"+outside+"/decide", map[string]any{"relevance": 30, "position": "after_intro", "rel_sponsored": false}, map[string]string{"X-API-Key": "policy-site-key"})
+	rec, needs := decide(outside, map[string]any{"relevance": 30, "position": "after_intro", "rel_sponsored": false})
 	if rec.Code != http.StatusOK || needs["decision"] != "needs_owner" {
 		t.Fatalf("outside auto: %d %s", rec.Code, rec.Body.String())
 	}
@@ -1118,7 +1122,7 @@ func TestUIInterface(t *testing.T) {
 		t.Fatalf("category policy: %d %s", saved.Code, saved.Body.String())
 	}
 	placementID := insertPlacement(t, db, siteID, offerID, "https://ui.example/invoice", "UI Product sends the invoice.")
-	decided, decision := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, map[string]string{"X-API-Key": "ui-site-key"})
+	decided, decision := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true})
 	if decided.Code != http.StatusOK || decision["policy_rule_id"] != "category:invoicing" || decision["policy_rule_text"] != "The category is invoicing." {
 		t.Fatalf("category approval: %d %s", decided.Code, decided.Body.String())
 	}
@@ -1247,7 +1251,7 @@ func TestPlacementRestore(t *testing.T) {
 	approve := func(surface string) string {
 		t.Helper()
 		id := insertPlacement(t, db, siteID, offerID, surface, "Honest note about the product.")
-		decided, decision := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}, siteKey)
+		decided, decision := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+id+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true})
 		if decided.Code != http.StatusOK || decision["approved_by"] != "policy:yolo" || decision["decision"] != "approved" {
 			t.Fatalf("approve %s: %d %s", surface, decided.Code, decided.Body.String())
 		}
@@ -1278,8 +1282,12 @@ func TestPlacementRestore(t *testing.T) {
 	within := approve("https://restore.example/within")
 	undo(within, siteKey)
 	current = current.Add(time.Second)
-	restored, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+within+"/restore", nil, siteKey)
-	if restored.Code != http.StatusOK || body["status"] != "approved" || body["approved_by"] != "policy:yolo" || body["restored_by"] != owner.ID || body["actor"] != "agent_tool" {
+	denied, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+within+"/restore", nil, siteKey)
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("site key restore: %d %s", denied.Code, denied.Body.String())
+	}
+	restored, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+within+"/restore", nil)
+	if restored.Code != http.StatusOK || body["status"] != "approved" || body["approved_by"] != "policy:yolo" || body["restored_by"] != owner.ID || body["actor"] != "owner_ui" {
 		t.Fatalf("restore within window: %d %s", restored.Code, restored.Body.String())
 	}
 	status, approvedBy, restoredBy := placementStatus(within)
@@ -1287,7 +1295,7 @@ func TestPlacementRestore(t *testing.T) {
 		t.Fatalf("stored restore: %s %s %s", status, approvedBy, restoredBy)
 	}
 	var actor string
-	if err := db.Pool.QueryRow(context.Background(), `SELECT actor FROM owner_events WHERE user_id=$1 AND placement_id=$2 AND kind='placement_restore'`, owner.ID, within).Scan(&actor); err != nil || actor != "agent_tool" {
+	if err := db.Pool.QueryRow(context.Background(), `SELECT actor FROM owner_events WHERE user_id=$1 AND placement_id=$2 AND kind='placement_restore'`, owner.ID, within).Scan(&actor); err != nil || actor != "owner_ui" {
 		t.Fatalf("restore event: %s %v", actor, err)
 	}
 
@@ -1297,7 +1305,7 @@ func TestPlacementRestore(t *testing.T) {
 	edge := approve("https://restore.example/edge")
 	undo(edge, siteKey)
 	current = current.Add(6 * time.Second)
-	edgeRec, edgeBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+edge+"/restore", nil, siteKey)
+	edgeRec, edgeBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+edge+"/restore", nil)
 	if edgeRec.Code != http.StatusOK || edgeBody["status"] != "approved" || edgeBody["approved_by"] != "policy:yolo" {
 		t.Fatalf("restore at 6 seconds: %d %s", edgeRec.Code, edgeRec.Body.String())
 	}
@@ -1305,7 +1313,7 @@ func TestPlacementRestore(t *testing.T) {
 	late := approve("https://restore.example/late")
 	undo(late, siteKey)
 	current = current.Add(7 * time.Second)
-	lateRec, lateBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+late+"/restore", nil, siteKey)
+	lateRec, lateBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+late+"/restore", nil)
 	if lateRec.Code != http.StatusConflict || lateBody["reason"] != "window_expired" || lateBody["message"] == "" || lateBody["error"] != nil {
 		t.Fatalf("restore at 7 seconds: %d %s", lateRec.Code, lateRec.Body.String())
 	}
@@ -1322,7 +1330,7 @@ func TestPlacementRestore(t *testing.T) {
 	}
 	undo(other, siteKey)
 	makerRec, makerBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+left+"/restore", nil, makerKey)
-	if makerRec.Code != http.StatusForbidden || makerBody["error"] != "only the identity that undid this placement can restore it" {
+	if makerRec.Code != http.StatusForbidden || makerBody["error"] != "decide and restore require a signed-in dashboard session" {
 		t.Fatalf("other side: %d %s", makerRec.Code, makerRec.Body.String())
 	}
 	if status, _, restoredBy := placementStatus(left); status != "revoked" || restoredBy != "" {
@@ -1335,7 +1343,7 @@ func TestPlacementRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	current = current.Add(time.Second)
-	pausedRec, pausedBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+paused+"/restore", nil, siteKey)
+	pausedRec, pausedBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+paused+"/restore", nil)
 	if pausedRec.Code != http.StatusUnprocessableEntity || pausedBody["check_id"] != "offer_live" || pausedBody["check_text"] == "" || pausedBody["decision"] != nil {
 		t.Fatalf("paused offer: %d %s", pausedRec.Code, pausedRec.Body.String())
 	}
@@ -1346,7 +1354,7 @@ func TestPlacementRestore(t *testing.T) {
 		t.Fatalf("undo without restore changed: %s", status)
 	}
 
-	missing, _ := postJSON(t, r, http.MethodPost, "/v1/placements/00000000-0000-4000-8000-000000000000/restore", nil, siteKey)
+	missing, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/00000000-0000-4000-8000-000000000000/restore", nil)
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("unknown placement: %d %s", missing.Code, missing.Body.String())
 	}

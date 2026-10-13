@@ -53,7 +53,7 @@ func TestReviewYoloEnforcesCapMinAndIgnoresCaller(t *testing.T) {
 		t.Fatalf("mode: %d %s", saved.Code, saved.Body.String())
 	}
 	low := insertPlacement(t, db, siteID, offerID, "https://review-policy.example/low", "Honest note about the product.")
-	rec, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+low+"/decide", map[string]any{"relevance": 100, "position": "end", "rel_sponsored": true, "offer_data": "caller offer"}, siteKey)
+	rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+low+"/decide", map[string]any{"relevance": 100, "position": "end", "rel_sponsored": true, "offer_data": "caller offer"})
 	if rec.Code != http.StatusUnprocessableEntity || body["check_id"] != "relevance_min" {
 		t.Fatalf("yolo min relevance: %d %s", rec.Code, rec.Body.String())
 	}
@@ -63,7 +63,7 @@ func TestReviewYoloEnforcesCapMinAndIgnoresCaller(t *testing.T) {
 		t.Fatalf("cap mode: %d %s", cappedMode.Code, cappedMode.Body.String())
 	}
 	capped := insertPlacement(t, db, siteID, offerID, "https://review-policy.example/cap", "Review Product is worth a look.")
-	rec, body = postJSON(t, r, http.MethodPost, "/v1/placements/"+capped+"/decide", map[string]any{"relevance": 100, "position": "end", "rel_sponsored": true}, siteKey)
+	rec, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+capped+"/decide", map[string]any{"relevance": 100, "position": "end", "rel_sponsored": true})
 	if rec.Code != http.StatusUnprocessableEntity || body["check_id"] != "cap" {
 		t.Fatalf("yolo cap: %d %s", rec.Code, rec.Body.String())
 	}
@@ -76,7 +76,7 @@ func TestReviewYoloEnforcesCapMinAndIgnoresCaller(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET disclosure='See the product.' WHERE id=$1`, ignored); err != nil {
 		t.Fatal(err)
 	}
-	rec, body = postJSON(t, r, http.MethodPost, "/v1/placements/"+ignored+"/decide", map[string]any{"relevance": 1, "position": "end", "rel_sponsored": false, "offer_data": "not the offer"}, siteKey)
+	rec, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+ignored+"/decide", map[string]any{"relevance": 1, "position": "end", "rel_sponsored": false, "offer_data": "not the offer"})
 	if rec.Code != http.StatusOK || body["approved_by"] != "policy:yolo" {
 		t.Fatalf("disclosure words do not decide rel_sponsored: %d %s", rec.Code, rec.Body.String())
 	}
@@ -95,7 +95,7 @@ func TestReviewYoloEnforcesCapMinAndIgnoresCaller(t *testing.T) {
 		t.Fatalf("stored mode %s %v", stored, err)
 	}
 	auto := insertPlacement(t, db, siteID, offerID, "https://review-policy.example/auto", "Another Review Product note.")
-	rec, body = postJSON(t, r, http.MethodPost, "/v1/placements/"+auto+"/decide", map[string]any{"relevance": 90, "position": "end", "rel_sponsored": true}, siteKey)
+	rec, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+auto+"/decide", map[string]any{"relevance": 90, "position": "end", "rel_sponsored": true})
 	if rec.Code != http.StatusOK || body["decision"] != "needs_owner" || body["reason"] != entry.ClaimCheckReason || body["message"] != entry.ClaimCheckMessage {
 		t.Fatalf("stub decide: %d %s", rec.Code, rec.Body.String())
 	}
@@ -109,7 +109,7 @@ func TestReviewYoloEnforcesCapMinAndIgnoresCaller(t *testing.T) {
 	if undo.Code != http.StatusOK {
 		t.Fatalf("undo: %d %s", undo.Code, undo.Body.String())
 	}
-	restored, restoredBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+ignored+"/restore", nil, siteKey)
+	restored, restoredBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+ignored+"/restore", nil)
 	if restored.Code != http.StatusOK || restoredBody["status"] == "" {
 		t.Fatalf("restore ignores disclosure words: %d %s", restored.Code, restored.Body.String())
 	}
@@ -345,9 +345,13 @@ func TestReviewCampaignPathAndHeadProbe(t *testing.T) {
 		t.Fatal(err)
 	}
 	failed := hit("/v1/go/" + second)
-	requirePlainRedirect(t, failed, "https://go-review.example/other")
-	if n := clickCount(t, db); n != 1 {
-		t.Fatalf("unreachable landing recorded %d", n)
+	loc := failed.Header().Get("Location")
+	if failed.Code != http.StatusFound || !strings.HasPrefix(loc, "https://example.com?") || !strings.Contains(loc, "via=") || loc == "https://go-review.example/other" {
+		t.Fatalf("live go link with a down probe: %d %s", failed.Code, loc)
+	}
+	requireGoLinkHeaders(t, failed)
+	if n := clickCount(t, db); n != 2 {
+		t.Fatalf("live go link clicks %d", n)
 	}
 }
 

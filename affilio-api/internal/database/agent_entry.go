@@ -108,6 +108,7 @@ type DigestItem struct {
 	Clicks             int
 	ApprovedBy         string
 	PolicyVersion      int
+	UndoneBy           string
 }
 
 // DigestPause is the account, site, and offer pause state for one digest.
@@ -729,11 +730,21 @@ FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan
 	return status == "listed", makerID, category, err
 }
 
-func (d *DB) CountPlacementBoxes(ctx context.Context, siteID, surfaceURL, exceptID string) (int, error) {
+const placementBoxCountSQL = `SELECT COUNT(*) FROM placement_proposals
+WHERE site_id=$1 AND surface_url=$2 AND id<>$3 AND status<>'revoked' AND removed_at IS NULL`
+
+type rowQuery interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func countPlacementBoxes(ctx context.Context, q rowQuery, siteID, surfaceURL, exceptID string) (int, error) {
 	var n int
-	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals
-WHERE site_id=$1 AND surface_url=$2 AND id<>$3 AND status<>'revoked' AND removed_at IS NULL`, siteID, surfaceURL, exceptID).Scan(&n)
+	err := q.QueryRow(ctx, placementBoxCountSQL, siteID, surfaceURL, exceptID).Scan(&n)
 	return n, err
+}
+
+func (d *DB) CountPlacementBoxes(ctx context.Context, siteID, surfaceURL, exceptID string) (int, error) {
+	return countPlacementBoxes(ctx, d.Pool, siteID, surfaceURL, exceptID)
 }
 
 func (d *DB) CountPolicyPlacements(ctx context.Context, siteID string, since time.Time, includeID string) (int, error) {
@@ -812,6 +823,38 @@ FROM listing_cards WHERE id=$1 AND maker_id=$2`, id, makerID).Scan(&row.ID, &row
 		row.ProductID = *product
 	}
 	return row, err
+}
+
+// LatestListingCardJSON is the newest card stored for a product.
+// A product with no card returns nil, nil.
+func (d *DB) LatestListingCardJSON(ctx context.Context, makerID, productID string) ([]byte, error) {
+	var raw []byte
+	err := d.Pool.QueryRow(ctx, `SELECT card FROM listing_cards
+WHERE maker_id=$1::uuid AND product_id=$2::uuid
+ORDER BY created_at DESC, id DESC
+LIMIT 1`, makerID, productID).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return raw, err
+}
+
+// OfferClaimSource is the offer text the page checker compares.
+type OfferClaimSource struct {
+	MakerID         string
+	ProductID       string
+	LandingURL      string
+	Terms           string
+	CommissionType  string
+	CommissionValue float64
+}
+
+func (d *DB) OfferClaimSource(ctx context.Context, offerID string) (OfferClaimSource, error) {
+	var src OfferClaimSource
+	err := d.Pool.QueryRow(ctx, `SELECT p.maker_id::text, p.id::text, COALESCE(o.landing_url,''), COALESCE(o.terms,''), COALESCE(o.commission_type,''), o.commission_value
+FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan(
+		&src.MakerID, &src.ProductID, &src.LandingURL, &src.Terms, &src.CommissionType, &src.CommissionValue)
+	return src, err
 }
 
 func (d *DB) MakerOwnsProduct(ctx context.Context, makerID, productID string) (bool, error) {
@@ -901,7 +944,7 @@ func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Tim
 plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
 COALESCE(post_title,''), COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
 (SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
-COALESCE(approved_by_kind,''), COALESCE(policy_version,0)
+COALESCE(approved_by_kind,''), COALESCE(policy_version,0), COALESCE(undone_by_user::text,'')
 FROM placement_proposals
 WHERE `+digestPlacementWhere+`
 ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
@@ -913,7 +956,7 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = "placement"
-		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion); err != nil {
+		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion, &item.UndoneBy); err != nil {
 			return nil, err
 		}
 		out = append(out, item)

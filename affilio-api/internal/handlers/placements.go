@@ -188,6 +188,15 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		writeNamedConflict(c, "offer_ineligible")
 		return
 	}
+	boxes, err := h.DB.CountPlacementBoxes(c.Request.Context(), site.ID, req.SurfaceURL, "00000000-0000-0000-0000-000000000000")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
+		return
+	}
+	if boxes > 0 {
+		writeNamedConflict(c, "one_per_post")
+		return
+	}
 	p, err := h.DB.CreatePlacement(c.Request.Context(), database.Placement{SiteID: site.ID, OfferID: req.OfferID, SurfaceURL: req.SurfaceURL,
 		Context: req.Context, Copy: strings.TrimSpace(req.Copy), Disclosure: "Affiliate disclosure: I may earn a commission if you buy through this link.", Reason: reason, ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour)})
 	if err != nil {
@@ -222,7 +231,7 @@ func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimite
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
 	}
-	status, wait, failedReason, failedAction, matchedRule, waitAt, err := db.ReadPlacementStatus(c.Request.Context(), siteID, id)
+	status, wait, failedReason, failedAction, matchedRule, surfaceURL, waitAt, err := db.ReadPlacementStatus(c.Request.Context(), siteID, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
@@ -246,6 +255,8 @@ func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimite
 		"fallback_url":         fallback,
 		"policy_rule_id":       ruleID,
 		"policy_rule_text":     ruleText,
+		"surface_url":          surfaceURL,
+		"placement":            gin.H{"surface_url": surfaceURL},
 	})
 }
 
@@ -317,6 +328,10 @@ func (h *PlacementsHandler) Commit(c *gin.Context) {
 	p, err := h.DB.CommitPlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"), code)
 	if errors.Is(err, database.ErrPlacementAuthority) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, database.ErrOnePerPost) {
+		writeNamedConflict(c, "one_per_post")
 		return
 	}
 	if errors.Is(err, pgx.ErrNoRows) {

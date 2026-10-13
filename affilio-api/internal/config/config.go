@@ -38,7 +38,21 @@ type Config struct {
 	StripeWebhookSecret       string
 	LemonSqueezyWebhookSecret string
 	PolarWebhookSecret        string
+
+	// ClaimsCheck is the resolved CLAIMS_CHECK mode: stub, real, or off-local.
+	ClaimsCheck    string
+	claimsCheckErr error
 }
+
+const (
+	// ClaimsStub holds every untrusted offer in review. It is the hosted default.
+	ClaimsStub = "stub"
+	// ClaimsReal runs the page checker on local and dev. A hosted server refuses
+	// it and stays on stub.
+	ClaimsReal = "real"
+	// ClaimsOffLocal keeps today's four listing checks. Local and dev only.
+	ClaimsOffLocal = "off-local"
+)
 
 func Load() Config {
 	graceHours, _ := strconv.Atoi(getEnvValue("KEY_ROTATION_GRACE_HOURS", "24"))
@@ -51,6 +65,7 @@ func Load() Config {
 			offlineAfter = parsed
 		}
 	}
+	claims, claimsErr := ResolveClaimsCheck(os.Getenv("GIN_MODE"), os.Getenv("CLAIMS_CHECK"))
 	return Config{
 		Port:                   getEnvValue("PORT", "8080"),
 		Host:                   os.Getenv("HOST"),
@@ -80,7 +95,52 @@ func Load() Config {
 		StripeWebhookSecret:       os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		LemonSqueezyWebhookSecret: os.Getenv("LEMONSQUEEZY_WEBHOOK_SECRET"),
 		PolarWebhookSecret:        os.Getenv("POLAR_WEBHOOK_SECRET"),
+		ClaimsCheck:               claims,
+		claimsCheckErr:            claimsErr,
 	}
+}
+
+// Hosted reports whether this process is the hosted server. The signal is
+// GIN_MODE=release, the same check ValidateRuntime uses. Empty, debug, and
+// test are local or dev.
+func Hosted(ginMode string) bool {
+	return strings.EqualFold(strings.TrimSpace(ginMode), "release")
+}
+
+// ResolveClaimsCheck applies CLAIMS_CHECK. An empty value is stub on a hosted
+// server and off-local everywhere else. off-local and real are refused when
+// GIN_MODE=release. Local real compares the listing card with the merchant page.
+// The hosted default stays stub.
+func ResolveClaimsCheck(ginMode, raw string) (string, error) {
+	mode := strings.ToLower(strings.TrimSpace(raw))
+	hosted := Hosted(ginMode)
+	switch mode {
+	case "":
+		if hosted {
+			return ClaimsStub, nil
+		}
+		return ClaimsOffLocal, nil
+	case ClaimsStub:
+		return ClaimsStub, nil
+	case ClaimsOffLocal:
+		if hosted {
+			return "", errors.New("CLAIMS_CHECK=off-local is only for local and dev. A hosted server (GIN_MODE=release) stays on stub")
+		}
+		return ClaimsOffLocal, nil
+	case ClaimsReal:
+		if hosted {
+			return "", errors.New("CLAIMS_CHECK=real is not allowed while GIN_MODE=release. The hosted default stays stub")
+		}
+		return ClaimsReal, nil
+	default:
+		return "", errors.New("CLAIMS_CHECK must be stub, real, or off-local")
+	}
+}
+
+// ValidateClaims refuses to boot when CLAIMS_CHECK is unknown or when a hosted
+// server asks for real or off-local.
+func (c Config) ValidateClaims() error {
+	return c.claimsCheckErr
 }
 
 // SecretRefused reports an API key secret the server must not boot with.
@@ -104,7 +164,7 @@ func (c Config) ValidateSecrets() error {
 // ValidateRuntime refuses to boot a release process that still has the
 // development API key secret or a wildcard CORS allowlist.
 func (c Config) ValidateRuntime() error {
-	if !strings.EqualFold(strings.TrimSpace(c.GinMode), "release") {
+	if !Hosted(c.GinMode) {
 		return nil
 	}
 	secret := strings.TrimSpace(c.APIKeySecret)

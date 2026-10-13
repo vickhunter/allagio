@@ -2,6 +2,8 @@ package entry
 
 import (
 	"errors"
+	"log"
+	"regexp"
 	"strings"
 )
 
@@ -21,18 +23,63 @@ type ClaimChecker interface {
 	Real() bool
 }
 
-// StubClaimChecker refuses every claim check and is not a live checker.
-// Production wires this stub. Yolo and auto cannot approve while it is in use.
+// ClaimReasonNumberNotInOffer is logged when copy states a number the offer does not.
+const ClaimReasonNumberNotInOffer = "number_not_in_offer"
+
+// ClaimMismatch is a failed claim check. Reason is the logged reason code.
+type ClaimMismatch struct{ Reason string }
+
+func (e ClaimMismatch) Error() string { return "claims_from_offer: " + e.Reason }
+
+var claimToken = regexp.MustCompile(`\d+(?:[.,]\d+)?%?`)
+
+// StubClaimChecker is the production checker. It is not live, so yolo and auto
+// stay on manual approval. Consistent copy passes. A number the offer does not
+// contain fails, and that failure logs a reason code.
 type StubClaimChecker struct{}
 
-func (StubClaimChecker) CheckClaims(string, string) error { return ErrClaimCheckUnavailable }
-func (StubClaimChecker) Real() bool                       { return false }
+func (StubClaimChecker) CheckClaims(copyText, offerData string) error {
+	offer := strings.ToLower(offerData)
+	for _, token := range claimToken.FindAllString(copyText, -1) {
+		token = strings.ToLower(token)
+		if strings.Contains(offer, token) {
+			continue
+		}
+		bare := strings.TrimSuffix(token, "%")
+		if bare != "" && strings.Contains(offer, bare) {
+			continue
+		}
+		log.Printf("claim check failed reason=%s", ClaimReasonNumberNotInOffer)
+		return ClaimMismatch{Reason: ClaimReasonNumberNotInOffer}
+	}
+	return nil
+}
+
+func (StubClaimChecker) Real() bool { return false }
 
 // LiveClaimChecker accepts every claim and allows automatic go-live.
 type LiveClaimChecker struct{}
 
 func (LiveClaimChecker) CheckClaims(string, string) error { return nil }
 func (LiveClaimChecker) Real() bool                       { return true }
+
+// UncheckedClaims skips claims_from_offer. Restore and retry call ClaimsFail
+// in the same database transaction as the other re-checks.
+type UncheckedClaims struct{}
+
+func (UncheckedClaims) CheckClaims(string, string) error { return nil }
+func (UncheckedClaims) Real() bool                       { return true }
+
+// ClaimsFail is true when restore or retry must refuse the placement.
+// A consistent offer returns nil from the production checker and passes.
+// A mismatch is a real failure. Decide still ignores ErrClaimCheckUnavailable
+// so yolo stays on manual approval while the checker is not live.
+func ClaimsFail(claims ClaimChecker, copyText, offerData string) bool {
+	if claims == nil {
+		claims = StubClaimChecker{}
+	}
+	return claims.CheckClaims(copyText, offerData) != nil
+}
 
 // AutoRules is the owner policy for auto mode. Maker fields (site quality and
 // niches) apply when an offer accepts a publisher.
@@ -318,6 +365,7 @@ var RestoreRefusals = []RestoreRefusal{
 	{Reason: "receipt_recorded", Text: "The receipt was already recorded or the placement is unavailable."},
 	{Reason: "publisher_missing", Text: "The publisher was not found."},
 	{Reason: "restore_refused", Text: "The restore was refused."},
+	{Reason: "one_per_post", Text: "Keep one box on this post."},
 }
 
 // RestoreRefusalByReason returns the catalog entry for one reason.

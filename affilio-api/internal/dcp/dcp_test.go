@@ -91,6 +91,13 @@ func TestCallToolRoutesPathParams(t *testing.T) {
 	if _, err := CallTool(client, "does_not_exist", nil); err == nil {
 		t.Fatalf("expected error for unknown tool")
 	}
+
+	if _, err := CallTool(client, "list_listings", nil); err != nil {
+		t.Fatalf("list_listings: %v", err)
+	}
+	if lastReq.Method != http.MethodGet || lastReq.URL.Path != "/v1/listings" {
+		t.Fatalf("list_listings called %s %s", lastReq.Method, lastReq.URL.Path)
+	}
 }
 
 func TestPublisherToolsUseSiteKey(t *testing.T) {
@@ -142,17 +149,20 @@ func TestUndoAndRestoreToolsCallImmediately(t *testing.T) {
 	}
 
 	started = time.Now()
-	if _, err := CallTool(client, "restore_placement", map[string]interface{}{"placement_id": id}); err != nil {
+	restored, err := CallTool(client, "restore_placement", map[string]interface{}{"placement_id": id})
+	if err != nil {
 		t.Fatal(err)
 	}
 	if time.Since(started) > time.Second {
-		t.Fatal("restore_placement waited before calling the API")
+		t.Fatal("restore_placement waited")
 	}
-	if lastReq.Method != http.MethodPost || lastReq.URL.Path != "/v1/placements/"+id+"/restore" {
-		t.Fatalf("restore call: %s %s", lastReq.Method, lastReq.URL.Path)
+	if lastReq.URL.Path != "/v1/placements/"+id+"/revoke" {
+		t.Fatalf("restore_placement called the API: %s", lastReq.URL.Path)
 	}
-	if lastReq.ContentLength != 0 {
-		t.Fatalf("restore body: %s", string(*lastBody))
+	link, _ := restored["sign_in_url"].(string)
+	message, _ := restored["message"].(string)
+	if link != server.URL+"/owner" || !strings.Contains(strings.ToLower(message), "sign in again") {
+		t.Fatalf("sign in again link: %#v", restored)
 	}
 
 	maker := NewClient(server.URL, "maker-key-1")

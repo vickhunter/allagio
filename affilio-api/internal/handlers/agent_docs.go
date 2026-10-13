@@ -113,7 +113,7 @@ One saved answer set per owner and role. The setup screen shows at most four que
 GET /v1/setup/settings?role=publisher&install_path=cli
 ` + "```" + `
 
-Auth is the owner session or the site key. A project key is limited to the agent route allow-list and cannot read setup. When nothing is saved, ` + "`mode`" + ` and ` + "`mode_shown`" + ` are the default for ` + "`owners.source`" + `. Every response includes ` + "`mode_preselected`" + `, which the server derives from ` + "`owners.source`" + `. A query ` + "`install_path`" + ` does not select the mode. ` + "`human_login`" + ` and ` + "`session.signed_in`" + ` are included too. While claim checks are not live, a preselected or saved yolo or auto is answered as manual, and the response includes ` + "`approval_reason`" + ` and ` + "`approval_message`" + `. ` + "`mode_preselected`" + ` stays the source default.
+Auth is the owner session or the site key. A project key is limited to the agent route allow-list and cannot read setup. When nothing is saved, ` + "`mode`" + ` and ` + "`mode_shown`" + ` are the default for ` + "`owners.source`" + `. Every response includes ` + "`mode_preselected`" + `, which the server derives from ` + "`owners.source`" + `. A query ` + "`install_path`" + ` does not select the mode. When nothing is saved and the query omits ` + "`install_path`" + `, or the value is not an install path, the read uses the default for ` + "`owners.source`" + `: cli, cursor, connector, and grok use that same path, mcp uses connector, chatgpt uses chatgpt_dir, claude uses claude_dir, and every other source uses cli. Saving with an empty ` + "`install_path`" + ` stores that same default. An install path that is not one of those values is still rejected. ` + "`human_login`" + ` and ` + "`session.signed_in`" + ` are included too. While claim checks are not live, a preselected or saved yolo or auto is answered as manual, and the response includes ` + "`approval_reason`" + ` and ` + "`approval_message`" + `. ` + "`mode_preselected`" + ` stays the source default.
 
 | owners.source | default mode |
 | --- | --- |
@@ -175,7 +175,7 @@ X-Maker-Key: <maker or offer key>
 
 Unknown JSON fields are rejected. ` + "`payments_check`" + ` is ` + "`pass`" + `, ` + "`fail`" + `, or ` + "`unknown`" + `. ` + "`offer_link_health`" + ` is ` + "`ok`" + `, ` + "`broken`" + `, or ` + "`unknown`" + `. Both are stored with the card.
 
-` + "`GET /v1/listing-cards/:id`" + ` returns the stored card for the same maker.
+` + "`GET /v1/listing-cards/:id`" + ` returns the stored card for the same maker. That response and ` + "`GET /v1/listings`" + ` include ` + "`review_reason`" + ` and ` + "`message`" + `. ` + "`review_reason`" + ` is ` + "`claims`" + `, ` + "`head`" + `, ` + "`relevance`" + `, or ` + "`caps`" + ` while the offer is in review. Both are null when the offer is listed. On a hosted server the claims check defaults to stub and stays there: hosted refuses real. Local real compares the listing card with the merchant page.
 `
 
 const modesDoc = `# Approval modes
@@ -255,7 +255,7 @@ Resume is session-only. Any API key receives 403. The signed-in human restores t
 
 ` + "`POST /v1/events`" + ` with ` + "`kind`" + ` ` + "`digest_opened`" + ` or ` + "`dashboard_opened`" + ` stores the user id and the time.
 
-` + "`GET /v1/digest`" + ` lists placements and offers that went live since the last ` + "`digest_opened`" + `. The payload includes ` + "`session.signed_in`" + `, ` + "`paused`" + ` (` + "`account`" + `, ` + "`site`" + `, ` + "`offer`" + `), ` + "`went_live_since_last`" + `, ` + "`change_url`" + `, ` + "`site_url`" + `, and ` + "`available_modes`" + `. While claim checks are not live it also includes ` + "`effective_mode`" + ` ` + "`manual`" + `, ` + "`approval_reason`" + `, and ` + "`approval_message`" + `. Each item includes ` + "`plugin_state`" + `, ` + "`live_now`" + ` (from ` + "`placement_counts_as_live`" + ` for a placement), ` + "`post_title`" + `, ` + "`position`" + `, ` + "`link_text`" + `, ` + "`label`" + `, ` + "`clicks`" + `, ` + "`approved_by`" + `, ` + "`policy_rule_id`" + `, ` + "`policy_rule_text`" + `, and ` + "`rules_version`" + `. Undoing a listing uses the offer undo token. There is no redo for a listing in v1.
+` + "`GET /v1/digest`" + ` lists placements and offers that went live since the last ` + "`digest_opened`" + `. The payload includes ` + "`session.signed_in`" + `, ` + "`paused`" + ` (` + "`account`" + `, ` + "`site`" + `, ` + "`offer`" + `), ` + "`went_live_since_last`" + `, ` + "`change_url`" + `, ` + "`site_url`" + `, and ` + "`available_modes`" + `. While claim checks are not live it also includes ` + "`effective_mode`" + ` ` + "`manual`" + `, ` + "`approval_reason`" + `, and ` + "`approval_message`" + `. Each item includes ` + "`plugin_state`" + `, ` + "`live_now`" + ` (from ` + "`placement_counts_as_live`" + ` for a placement), ` + "`post_title`" + `, ` + "`position`" + `, ` + "`link_text`" + `, ` + "`label`" + `, ` + "`clicks`" + `, ` + "`approved_by`" + `, ` + "`undone_by`" + ` (the owner id when a placement was undone, otherwise empty), ` + "`policy_rule_id`" + `, ` + "`policy_rule_text`" + `, and ` + "`rules_version`" + `. Undoing a listing uses the offer undo token. There is no redo for a listing in v1.
 
 ` + "```" + `
 POST /v1/placements/:id/revoke

@@ -42,7 +42,7 @@ func TestRestorePauseAndLimits(t *testing.T) {
 	approve := func(surface string, relevance int) string {
 		t.Helper()
 		id := insertPlacement(t, db, siteID, offerID, surface, "Honest note about the product.")
-		decided, decision := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/decide", map[string]any{"relevance": relevance, "position": "end", "rel_sponsored": true}, siteKey)
+		decided, decision := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+id+"/decide", map[string]any{"relevance": relevance, "position": "end", "rel_sponsored": true})
 		if decided.Code != http.StatusOK || decision["approved_by"] != "policy:yolo" {
 			t.Fatalf("approve %s: %d %s", surface, decided.Code, decided.Body.String())
 		}
@@ -74,7 +74,7 @@ func TestRestorePauseAndLimits(t *testing.T) {
 	if paused.Code != http.StatusOK {
 		t.Fatalf("pause site: %d %s", paused.Code, paused.Body.String())
 	}
-	refused, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+pausedSite+"/restore", nil, siteKey)
+	refused, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+pausedSite+"/restore", nil)
 	if refused.Code != http.StatusConflict || body["reason"] != "paused" || body["message"] == "" {
 		t.Fatalf("pause then restore: %d %s", refused.Code, refused.Body.String())
 	}
@@ -97,7 +97,7 @@ func TestRestorePauseAndLimits(t *testing.T) {
 	if resumed.Code != http.StatusOK {
 		t.Fatalf("resume offer: %d %s", resumed.Code, resumed.Body.String())
 	}
-	refused, body = postJSON(t, r, http.MethodPost, "/v1/placements/"+pausedOffer+"/restore", nil, siteKey)
+	refused, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+pausedOffer+"/restore", nil)
 	if refused.Code != http.StatusConflict || body["reason"] != "paused" || body["message"] == "" || body["error"] != nil {
 		t.Fatalf("pause history then restore: %d %s", refused.Code, refused.Body.String())
 	}
@@ -116,7 +116,7 @@ func TestRestorePauseAndLimits(t *testing.T) {
 	if raised.Code != http.StatusOK {
 		t.Fatalf("raise min relevance: %d %s", raised.Code, raised.Body.String())
 	}
-	denied, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+low+"/restore", nil, siteKey)
+	denied, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+low+"/restore", nil)
 	if denied.Code != http.StatusUnprocessableEntity || !hasCheck(body, "relevance_min") || body["check_id"] == "cap" {
 		t.Fatalf("raised min relevance: %d %s", denied.Code, denied.Body.String())
 	}
@@ -135,7 +135,7 @@ func TestRestorePauseAndLimits(t *testing.T) {
 	if lowered.Code != http.StatusOK {
 		t.Fatalf("lower cap: %d %s", lowered.Code, lowered.Body.String())
 	}
-	denied, body = postJSON(t, r, http.MethodPost, "/v1/placements/"+capped+"/restore", nil, siteKey)
+	denied, body = serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+capped+"/restore", nil)
 	if denied.Code != http.StatusUnprocessableEntity || !hasCheck(body, "cap") || body["check_id"] == "relevance_min" {
 		t.Fatalf("lowered cap: %d %s", denied.Code, denied.Body.String())
 	}
@@ -151,7 +151,7 @@ func TestRevokedGoLink(t *testing.T) {
 	r.GET("/v1/go/:code", (&RedirectsHandler{DB: db}).Go)
 	r.HEAD("/v1/go/:code", (&RedirectsHandler{DB: db}).Go)
 
-	owner, _ := testOwnerSession(t, h, "golink-owner", "golink-owner@example.com")
+	owner, cookie := testOwnerSession(t, h, "golink-owner", "golink-owner@example.com")
 	siteID := createTestSite(t, db, "golink-site-key", "golink.example", "Go Link")
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
 		t.Fatal(err)
@@ -203,7 +203,7 @@ func TestRevokedGoLink(t *testing.T) {
 		t.Fatal("revoked link credited a click")
 	}
 
-	restored, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/restore", nil, siteKey)
+	restored, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/restore", nil)
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
@@ -348,7 +348,7 @@ func TestPluginPlacementState(t *testing.T) {
 	if undone.Code != http.StatusOK {
 		t.Fatalf("second undo: %d %s", undone.Code, undone.Body.String())
 	}
-	restored, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/restore", nil, siteKey)
+	restored, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+second+"/restore", nil)
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
@@ -528,7 +528,7 @@ func TestEveryHardCheckReturns422(t *testing.T) {
 	}
 	decide := func(id string, payload map[string]any) (*httptest.ResponseRecorder, map[string]any) {
 		t.Helper()
-		return postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/decide", payload, siteKey)
+		return serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+id+"/decide", payload)
 	}
 	okPayload := map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true}
 
@@ -608,7 +608,7 @@ func TestEveryHardCheckReturns422(t *testing.T) {
 		t.Fatalf("cap: %d %s", lowered.Code, lowered.Body.String())
 	}
 	current = current.Add(time.Second)
-	restored, restoreBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+capped+"/restore", nil, siteKey)
+	restored, restoreBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+capped+"/restore", nil)
 	expect(restored, restoreBody, "cap")
 }
 
@@ -790,7 +790,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 		t.Fatalf("second undo: %d %s", undone.Code, undone.Body.String())
 	}
 	current = current.Add(time.Second)
-	restored, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/restore", nil, siteKey)
+	restored, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+second+"/restore", nil)
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
@@ -942,7 +942,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
 	}
 	current = current.Add(time.Second)
-	restored, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/restore", nil, siteKey)
+	restored, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+id+"/restore", nil)
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
@@ -1062,7 +1062,7 @@ VALUES($1,$2,$3,'stripe',$4,'sale',10,'USD',1.50,NOW(),'test') RETURNING id`, of
 			t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
 		}
 		current = current.Add(time.Second)
-		restored, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/restore", nil, siteKey)
+		restored, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+id+"/restore", nil)
 		if restored.Code != http.StatusOK {
 			t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 		}
@@ -1184,7 +1184,7 @@ VALUES($1,'stripe','leave-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id
 	if earlyRetry.Code != http.StatusConflict || earlyBody["reason"] != "not_failed" || view(fourth)["plugin_state"] != "pending" {
 		t.Fatalf("retry while pending: %d %s", earlyRetry.Code, earlyRetry.Body.String())
 	}
-	restored, restoredBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+fourth+"/restore", nil, siteKey)
+	restored, restoredBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+fourth+"/restore", nil)
 	if restored.Code != http.StatusOK || restoredBody["plugin_state"] == "placed" || view(fourth)["plugin_state"] != "pending" {
 		t.Fatalf("restore queued placed: %d %s %v", restored.Code, restored.Body.String(), view(fourth))
 	}

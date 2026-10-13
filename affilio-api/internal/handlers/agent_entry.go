@@ -36,6 +36,9 @@ type AgentEntry struct {
 	Now                func() time.Time
 	PluginOfflineAfter time.Duration
 	StatusLimiter      *IPRateLimiter
+	// ClaimsCheck is the resolved CLAIMS_CHECK mode. Listing-card reads use it
+	// so a hosted stub reports the not-live claims message.
+	ClaimsCheck string
 }
 
 type entryActor struct {
@@ -57,6 +60,10 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.GET("/v1/sites/:id/mode", h.GetSiteMode)
 	r.PUT("/v1/sites/:id/mode", h.PutSiteMode)
 	r.POST("/v1/sites/:id/kill-switch", h.KillSwitch)
+	r.POST("/v1/sites/:id/plugin-key", h.IssuePluginKey)
+	r.GET("/v1/sites/:id/plugin-key", h.ListPluginKeys)
+	r.POST("/v1/sites/:id/plugin-key/rotate", h.RotatePluginKey)
+	r.POST("/v1/sites/:id/plugin-key/revoke", h.RevokePluginKey)
 	r.POST("/v1/account/pause", h.AccountPause)
 	r.POST("/v1/account/resume", h.AccountResume)
 	r.GET("/v1/offers/:id/mode", h.GetOfferMode)
@@ -89,6 +96,39 @@ func (h *AgentEntry) claims() entry.ClaimChecker {
 		return entry.StubClaimChecker{}
 	}
 	return h.Claims
+}
+
+// placementClaims runs the page checker at restore and retry when this
+// process is on CLAIMS_CHECK=real and the decide checker is still the stub.
+// The page is fetched before the transaction. The recorded result is what
+// ClaimsFail reads inside it, so a miss leaves the row unchanged. yolo and
+// auto stay on the stub.
+func (h *AgentEntry) placementClaims(c *gin.Context, offerID string) (entry.ClaimChecker, error) {
+	if !claimsReal(h.ClaimsCheck) || !productionStub(h.Claims) {
+		return h.claims(), nil
+	}
+	src, err := h.DB.OfferClaimSource(c.Request.Context(), offerID)
+	if err != nil {
+		return nil, err
+	}
+	reason, _ := compareOfferClaims(c.Request.Context(), h.DB, src.MakerID, src.ProductID, database.Offer{
+		LandingURL:      src.LandingURL,
+		Terms:           src.Terms,
+		CommissionType:  src.CommissionType,
+		CommissionValue: src.CommissionValue,
+	})
+	if reason == "" {
+		return entry.RecordedClaimCheck{}, nil
+	}
+	return entry.RecordedClaimCheck{Err: entry.ClaimMismatch{Reason: reason}}, nil
+}
+
+func productionStub(claims entry.ClaimChecker) bool {
+	if claims == nil {
+		return true
+	}
+	_, ok := claims.(entry.StubClaimChecker)
+	return ok
 }
 
 func (h *AgentEntry) verificationURI() string {
@@ -339,7 +379,7 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 		}
 		path := c.Query("install_path")
 		if !entry.ValidInstallPath(path) {
-			path = ""
+			path = entry.DefaultInstallPath(source)
 		}
 		mode := entry.DefaultMode(source)
 		h.finishSetup(c, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn, source, h.claims()), actor.SiteID)
@@ -397,7 +437,19 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		NeverTopics   []string         `json:"never_topics"`
 		BoxPosition   string           `json:"box_position"`
 	}
-	if decodeStrict(body, &req) != nil || (req.Role != "maker" && req.Role != "publisher") || !entry.ValidInstallPath(req.InstallPath) || !entry.ValidMode(req.Mode) || !entry.ValidMode(req.ModeShown) {
+	if decodeStrict(body, &req) != nil || (req.Role != "maker" && req.Role != "publisher") || !entry.ValidMode(req.Mode) || !entry.ValidMode(req.ModeShown) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role, install_path, mode, and mode_shown required"})
+		return
+	}
+	if strings.TrimSpace(req.InstallPath) == "" {
+		source, sourceErr := h.DB.OwnerSource(c.Request.Context(), owner.ID)
+		if sourceErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
+			return
+		}
+		req.InstallPath = entry.DefaultInstallPath(source)
+	}
+	if !entry.ValidInstallPath(req.InstallPath) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "role, install_path, mode, and mode_shown required"})
 		return
 	}
@@ -750,7 +802,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		return
 	}
 	if !decision.Allowed {
-		body := gin.H{"decision": "needs_owner", "failures": decision.Failures}
+		body := gin.H{"decision": "needs_owner", "failures": decision.Failures, "surface_url": placement.SurfaceURL}
 		if decision.Reason != "" {
 			body["reason"] = decision.Reason
 			body["message"] = decision.Message
@@ -767,7 +819,9 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		writeNamedConflict(c, "not_approvable")
 		return
 	}
-	c.JSON(http.StatusOK, approvalJSON(decision, policy.Version))
+	approved := approvalJSON(decision, policy.Version)
+	approved["surface_url"] = placement.SurfaceURL
+	c.JSON(http.StatusOK, approved)
 }
 
 func (h *AgentEntry) AcceptPublisher(c *gin.Context) {
@@ -860,7 +914,7 @@ func (h *AgentEntry) CreateListing(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "listing card was not stored"})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"id": id, "score": upload.Score, "payments_check": upload.PaymentsCheck, "offer_link_health": upload.OfferLinkHealth})
+	c.JSON(http.StatusCreated, gin.H{"id": id, "score": upload.Score, "payments_check": upload.PaymentsCheck, "offer_link_health": upload.OfferLinkHealth, "review_reason": nil, "message": nil})
 }
 
 func (h *AgentEntry) GetListing(c *gin.Context) {
@@ -877,7 +931,9 @@ func (h *AgentEntry) GetListing(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "listing card not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": row.ID, "card": json.RawMessage(row.Card), "signals": json.RawMessage(row.Signals), "score": row.Score, "payments_check": row.PaymentsCheck, "offer_link_health": row.OfferLinkHealth})
+	reason, message := reviewForMakerProduct(c.Request.Context(), h.DB, h.ClaimsCheck, actor.MakerID, row.ProductID)
+	reviewReason, reviewMessage := nullReview(reason, message)
+	c.JSON(http.StatusOK, gin.H{"id": row.ID, "card": json.RawMessage(row.Card), "signals": json.RawMessage(row.Signals), "score": row.Score, "payments_check": row.PaymentsCheck, "offer_link_health": row.OfferLinkHealth, "review_reason": reviewReason, "message": reviewMessage})
 }
 
 func (h *AgentEntry) RecordEvent(c *gin.Context) {
@@ -1119,13 +1175,18 @@ func (h *AgentEntry) RestorePlacement(c *gin.Context) {
 	if source == "policy" {
 		rules.UseStoredCap = true
 	}
-	status, approvedBy, block, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now, entry.CapLimit(rules))
+	claims, claimErr := h.placementClaims(c, row.OfferID)
+	if claimErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
+		return
+	}
+	status, approvedBy, block, restored, err := h.DB.RestoreUndonePlacement(c.Request.Context(), c.Param("id"), userID, actorKeyHash(c), actor.Kind, now, entry.CapLimit(rules), claims)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "restore failed"})
 		return
 	}
-	if block == "cap" {
-		writeCheckDenied(c, []string{"cap"})
+	if block == "cap" || block == "claims_from_offer" {
+		writeCheckDenied(c, []string{block})
 		return
 	}
 	if block == "paused" {
@@ -1179,10 +1240,7 @@ func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementU
 		ExistingBoxes: boxes, Relevance: services.ScorePlacement(row.Copy, offer.ProductName, offer.Category, offer.Website),
 		OfferLive: offer.Live, RevokeWorks: revokePathAvailable(row),
 		PlacementsIn30Days: used,
-	}, h.claims())
-	if decision.NeedsOwner && decision.Reason == entry.ClaimCheckReason {
-		return nil, nil
-	}
+	}, entry.UncheckedClaims{})
 	return decision.Failures, nil
 }
 
@@ -1251,6 +1309,15 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		}
 		if (wait == "" || wait == "restore") && !req.RelSponsored {
 			writeCheckDenied(c, []string{"rel_sponsored"})
+			return
+		}
+		boxes, boxErr := h.DB.CountPlacementBoxes(c.Request.Context(), siteID, placement.SurfaceURL, placement.ID)
+		if boxErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
+			return
+		}
+		if boxes > 0 {
+			writeCheckDenied(c, []string{"one_per_post"})
 			return
 		}
 	}
@@ -1322,9 +1389,22 @@ func (h *AgentEntry) RetryPlugin(c *gin.Context) {
 			return
 		}
 	}
-	retried, err := h.DB.RetryPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, action, h.now())
+	claims := h.claims()
+	if action == "restored" {
+		var claimErr error
+		claims, claimErr = h.placementClaims(c, placement.OfferID)
+		if claimErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+			return
+		}
+	}
+	retried, block, err := h.DB.RetryPluginPlacement(c.Request.Context(), placement.ID, actor.SiteID, action, h.now(), claims)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "retry failed"})
+		return
+	}
+	if block == "claims_from_offer" {
+		writeCheckDenied(c, []string{block})
 		return
 	}
 	if !retried {
@@ -1899,7 +1979,7 @@ func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 		"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token,
 		"plugin_state": pluginState, "live_now": item.CountsAsLive,
 		"post_title": item.PostTitle, "position": item.Position, "link_text": item.LinkText, "label": item.Label,
-		"clicks": item.Clicks, "approved_by": item.ApprovedBy,
+		"clicks": item.Clicks, "approved_by": item.ApprovedBy, "undone_by": item.UndoneBy,
 		"policy_rule_id": ruleID, "policy_rule_text": ruleText, "rules_version": item.PolicyVersion,
 	}
 	if item.Kind == "placement" {
@@ -1921,7 +2001,7 @@ func (h *AgentEntry) writePolicy(c *gin.Context, policy database.ApprovalPolicy,
 }
 
 func sessionOnlyDecision(c *gin.Context) bool {
-	if c.GetBool("agent_access") || c.GetString("key_kind") == "project" || c.GetString("key_kind") == "account" {
+	if credentialPresented(c) || c.GetBool("agent_access") || c.GetString("key_kind") == "project" || c.GetString("key_kind") == "account" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "decide and restore require a signed-in dashboard session"})
 		return true
 	}

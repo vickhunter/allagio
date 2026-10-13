@@ -43,6 +43,8 @@ func main() {
 		err = cmdAssess(os.Args[2:])
 	case "offer":
 		err = cmdOffer(os.Args[2:])
+	case "listings":
+		err = cmdListings()
 	case "snippet":
 		err = cmdSnippet()
 	case "status":
@@ -63,6 +65,7 @@ func usage() {
   init     register maker + product (writes .distributoor.json)
   assess   run the readiness assessment and print the checklist
   offer    create | submit an offer
+  listings list offers with review_reason (null when listed)
   snippet  print the attribution snippet + provider checkout wiring
   status   offers, earnings, and readiness at a glance`)
 }
@@ -238,11 +241,36 @@ func cmdOffer(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("offer %s is %v — awaiting listing review\n", cfg.OfferID, result["status"])
+		if result["status"] == "listed" {
+			fmt.Printf("offer %s is listed\n", cfg.OfferID)
+			return nil
+		}
+		fmt.Printf("offer %s is in review (%v): %v\n", cfg.OfferID, result["review_reason"], result["message"])
 		return nil
 	default:
 		return fmt.Errorf("usage: distributoor offer create|submit")
 	}
+}
+
+func cmdListings() error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	result, err := clientFor(cfg).Do(http.MethodGet, "/v1/listings", nil)
+	if err != nil {
+		return err
+	}
+	items, _ := result["listings"].([]interface{})
+	if len(items) == 0 {
+		fmt.Println("no listings yet — run 'distributoor offer create'")
+		return nil
+	}
+	for _, item := range items {
+		listing, _ := item.(map[string]interface{})
+		fmt.Printf("listing %v [%v] review_reason=%v message=%v\n", listing["id"], listing["status"], listing["review_reason"], listing["message"])
+	}
+	return nil
 }
 
 func cmdSnippet() error {

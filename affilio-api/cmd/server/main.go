@@ -28,6 +28,9 @@ func main() {
 	if err := cfg.ValidateRuntime(); err != nil {
 		log.Fatalf("refusing to start: %v", err)
 	}
+	if err := cfg.ValidateClaims(); err != nil {
+		log.Fatalf("refusing to start: %v", err)
+	}
 	ctx := context.Background()
 
 	db, err := database.Connect(ctx, cfg.DatabaseURL)
@@ -135,7 +138,7 @@ func main() {
 		RegisterLimiter: handlers.NewIPRateLimiter(8, time.Minute),
 	}
 	products := &handlers.ProductsHandler{DB: db}
-	offers := &handlers.OffersHandler{DB: db}
+	offers := &handlers.OffersHandler{DB: db, ClaimsCheck: cfg.ClaimsCheck}
 	offerReview := &handlers.OfferReviewHandler{DB: db}
 	assessments := &handlers.AssessmentsHandler{
 		DB: db,
@@ -177,7 +180,7 @@ func main() {
 		if loginErr != nil {
 			log.Fatalf("owner sign-in configuration failed: %v", loginErr)
 		}
-		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments}
+		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments, ClaimsCheck: cfg.ClaimsCheck}
 		if err = hosted.LoadWorkspace(); err != nil {
 			log.Fatalf("workspace assets failed: %v", err)
 		}
@@ -228,6 +231,7 @@ func main() {
 		DeviceLimiter:      handlers.NewIPRateLimiter(30, time.Minute),
 		PluginOfflineAfter: cfg.PluginOfflineAfter,
 		StatusLimiter:      handlers.NewPlacementPollLimiter(),
+		ClaimsCheck:        cfg.ClaimsCheck,
 	}
 	if hosted != nil {
 		agentEntry.Owner = hosted.RequireOwnerSession
@@ -315,6 +319,10 @@ func main() {
 
 		maker.GET("/earnings", payouts.MakerEarnings)
 	}
+	listings := v1.Group("/listings")
+	listings.Use(middleware.MakerKeyAuth(db, oauthResources...))
+	listings.Use(middleware.LimitOfferScope())
+	listings.GET("", offers.Listings)
 
 	admin := v1.Group("/program-discovery")
 	admin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
