@@ -707,6 +707,8 @@ type OfferCopy struct {
 	Category    string
 	ProductName string
 	Website     string
+	Terms       string
+	Commission  string
 }
 
 func (d *DB) OwnerSource(ctx context.Context, ownerID string) (string, error) {
@@ -721,8 +723,8 @@ func (d *DB) OwnerSource(ctx context.Context, ownerID string) (string, error) {
 func (d *DB) OfferCopy(ctx context.Context, offerID string) (OfferCopy, error) {
 	var row OfferCopy
 	var status string
-	err := d.Pool.QueryRow(ctx, `SELECT o.status, p.maker_id::text, COALESCE(p.primary_category,''), COALESCE(p.name,''), COALESCE(p.website_url,'')
-FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan(&status, &row.MakerID, &row.Category, &row.ProductName, &row.Website)
+	err := d.Pool.QueryRow(ctx, `SELECT o.status, p.maker_id::text, COALESCE(p.primary_category,''), COALESCE(p.name,''), COALESCE(p.website_url,''), COALESCE(o.terms,''), COALESCE(o.commission_value::text,'')
+FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan(&status, &row.MakerID, &row.Category, &row.ProductName, &row.Website, &row.Terms, &row.Commission)
 	row.Live = status == "listed"
 	return row, err
 }

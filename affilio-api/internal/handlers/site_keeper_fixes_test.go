@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"affilio-api/internal/config"
@@ -180,7 +181,8 @@ func TestClaimsCheckedOnPrepareAndCommit(t *testing.T) {
 func TestUndoRedoBeforePluginAckKeepsGoClicks(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	h, _, r := newEntryTest(t, db)
+	h, api, r := newEntryTest(t, db)
+	api.Claims = entry.StubClaimChecker{}
 	r.GET("/v1/go/:code", (&RedirectsHandler{DB: db, HomeURL: "https://offerrails.example/"}).Go)
 	owner, cookie := testOwnerSession(t, h, "redo-click-owner", "redo-click@example.com")
 	siteID := createTestSite(t, db, "redo-click-key", "redo-click.example", "Redo")
@@ -188,7 +190,7 @@ func TestUndoRedoBeforePluginAckKeepsGoClicks(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, offerID := seedListedOffer(t, db, "redo-click-maker", "redo-click-maker@example.com", "Redo Product")
-	id := insertPlacement(t, db, siteID, offerID, "https://redo-click.example/post", "Honest note about the product.")
+	id := insertPlacement(t, db, siteID, offerID, "https://redo-click.example/post", "Honest note about the product. The offer pays 30%.")
 	markPlacementLive(t, db, siteID, offerID, id, "redo-click-go", "https://redo-click.example/post")
 	siteKey := map[string]string{"X-API-Key": "redo-click-key"}
 	path := "/v1/go/" + id
@@ -213,8 +215,12 @@ func TestUndoRedoBeforePluginAckKeepsGoClicks(t *testing.T) {
 		t.Fatal(err)
 	}
 	polled, pollBody := postJSON(t, r, http.MethodGet, "/v1/placements/"+id, nil, siteKey)
-	if polled.Code != http.StatusOK || pollBody["plugin_state"] != "placed" {
-		t.Fatalf("redo before ack: %d %s", polled.Code, polled.Body.String())
+	var pluginWait string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT plugin_wait FROM placement_proposals WHERE id=$1`, id).Scan(&pluginWait); err != nil {
+		t.Fatal(err)
+	}
+	if polled.Code != http.StatusOK || pollBody["plugin_state"] != "placed" || pluginWait != "placed" {
+		t.Fatalf("redo before ack: %d wait %s %s", polled.Code, pluginWait, polled.Body.String())
 	}
 	again := hitGo(t, r, http.MethodGet, path, "RedoReader/2")
 	if again.Code != http.StatusFound || !strings.Contains(again.Header().Get("Location"), "via=") || placementClickCount(t, db, id) != 2 {
@@ -401,5 +407,144 @@ SELECT product_id,'submitted',commission_type,commission_value,landing_url FROM 
 	}
 	if !seen[listedID] || !seen[submittedID] {
 		t.Fatalf("offers missing: %v", seen)
+	}
+}
+
+func TestStubUntrustedNinetyPercentNeverGoesLive(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	ginSetTest(t)
+	_, makerKey := createTestMaker(t, db)
+	makers := newMakerRouterWithClaims(db, config.ClaimsStub)
+	productID, heldID := createDraftOffer(t, makers, makerKey, "InboxPilot", "https://inboxpilot.example.com", "Readers save 90% of their time.", 20)
+	markProductReady(t, db, productID)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE products SET name='InboxPilot', primary_category='productivity', keywords=$2 WHERE id=$1`, productID, []string{"email", "inbox", "productivity"}); err != nil {
+		t.Fatal(err)
+	}
+	submitted, submittedBody := doJSON(t, makers, http.MethodPost, "/v1/maker/offers/"+heldID+"/submit", makerKey, nil)
+	if submitted.Code != http.StatusOK || submittedBody["status"] != "submitted" || submittedBody["review_reason"] != "claims" {
+		t.Fatalf("stub submit: %d %v", submitted.Code, submittedBody)
+	}
+	blocked, blockedBody := adminJSON(t, makers, http.MethodPost, "/v1/offer-review/"+heldID+"/approve", nil)
+	if blocked.Code != http.StatusConflict || blockedBody["review_reason"] != "claims" || blockedBody["status"] != "submitted" {
+		t.Fatalf("publish 90%%: %d %v", blocked.Code, blockedBody)
+	}
+	var status string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status FROM offers WHERE id=$1`, heldID).Scan(&status); err != nil || status != "submitted" {
+		t.Fatalf("90%% offer listed: %s %v", status, err)
+	}
+
+	honestProduct, honestID := createDraftOffer(t, makers, makerKey, "InboxPilot Notes", "https://inboxpilot.example.com", "InboxPilot pays 20 percent to publishers.", 20)
+	markProductReady(t, db, honestProduct)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE products SET name='InboxPilot', primary_category='productivity', keywords=$2 WHERE id=$1`, honestProduct, []string{"email", "inbox", "productivity"}); err != nil {
+		t.Fatal(err)
+	}
+	held, heldBody := doJSON(t, makers, http.MethodPost, "/v1/maker/offers/"+honestID+"/submit", makerKey, nil)
+	if held.Code != http.StatusOK || heldBody["status"] != "submitted" {
+		t.Fatalf("honest stub submit: %d %v", held.Code, heldBody)
+	}
+	published, publishedBody := adminJSON(t, makers, http.MethodPost, "/v1/offer-review/"+honestID+"/approve", nil)
+	if published.Code != http.StatusOK || publishedBody["status"] != "listed" {
+		t.Fatalf("honest publish: %d %v", published.Code, publishedBody)
+	}
+
+	siteKey := "site-key-stub-90"
+	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Tutorials")
+	linkTestOwner(t, db, siteID, "stub-90-owner", "stub-90@example.com")
+	publishers := publisherLegRouter(db, false)
+	contextText := "InboxPilot email inbox productivity tutorial for developers"
+	article := "https://publisher.example.com/stub-claims"
+	unlisted, unlistedBody := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+		"offer_id": heldID, "surface_url": article, "context": contextText, "copy": "InboxPilot improves this workflow by 90%.",
+	})
+	if unlisted.Code != http.StatusConflict || unlistedBody["reason"] != "offer_ineligible" {
+		t.Fatalf("unlisted 90%% offer: %d %v", unlisted.Code, unlistedBody)
+	}
+	copyBlocked, copyBody := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+		"offer_id": honestID, "surface_url": article, "context": contextText, "copy": "InboxPilot improves this workflow by 90%.",
+	})
+	if copyBlocked.Code != http.StatusUnprocessableEntity || copyBody["check_id"] != "claims_from_offer" {
+		t.Fatalf("prepare listed 90%%: %d %v", copyBlocked.Code, copyBody)
+	}
+	var n int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM placement_proposals WHERE site_id=$1`, siteID).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("90%% copy was stored: %d %v", n, err)
+	}
+	placed, prepared := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+		"offer_id": honestID, "surface_url": article, "context": contextText, "copy": "Consider InboxPilot for an email inbox productivity workflow.",
+	})
+	if placed.Code != http.StatusCreated {
+		t.Fatalf("honest place: %d %s", placed.Code, placed.Body.String())
+	}
+	id := prepared["placement"].(map[string]interface{})["id"].(string)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET copy='InboxPilot improves this workflow by 90%.' WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	approved, _ := adminJSON(t, publishers, http.MethodPost, "/v1/offer-review/placements/"+id+"/approve", map[string]interface{}{
+		"site_id": siteID, "owner_email": "publisher@example.com", "evidence": "Publisher approved this exact providerless placement.",
+	})
+	if approved.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", approved.Code, approved.Body.String())
+	}
+	commit, commitBody := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements/"+id+"/commit", siteKey, nil)
+	if commit.Code != http.StatusUnprocessableEntity || commitBody["check_id"] != "claims_from_offer" {
+		t.Fatalf("commit 90%%: %d %v", commit.Code, commitBody)
+	}
+	var placementStatus string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status FROM placement_proposals WHERE id=$1`, id).Scan(&placementStatus); err != nil || placementStatus != "approved" {
+		t.Fatalf("commit wrote the 90%% copy live: %s %v", placementStatus, err)
+	}
+}
+
+func TestOneBoxPrepareIsAtomic(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	ginSetTest(t)
+	makerID := insertPublisherMaker(t, db)
+	_, offerID := insertPublisherOffer(t, db, makerID, "none", "percentage", "USD", "InboxPilot", []string{"email", "inbox", "productivity"})
+	siteKey := "site-key-box-race"
+	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Tutorials")
+	linkTestOwner(t, db, siteID, "box-race-owner", "box-race@example.com")
+	r := publisherLegRouter(db, false)
+	contextText := "InboxPilot email inbox productivity tutorial for developers"
+	article := "https://publisher.example.com/race"
+	var wg sync.WaitGroup
+	codes := make([]int, 2)
+	reasons := make([]string, 2)
+	start := make(chan struct{})
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			rec, body := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+				"offer_id": offerID, "surface_url": article, "context": contextText,
+				"copy": "Consider InboxPilot for an email inbox productivity workflow.",
+			})
+			codes[i] = rec.Code
+			if reason, _ := body["reason"].(string); reason != "" {
+				reasons[i] = reason
+			}
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	created, conflict := 0, 0
+	for i := 0; i < 2; i++ {
+		switch codes[i] {
+		case http.StatusCreated:
+			created++
+		case http.StatusConflict:
+			if reasons[i] == "one_per_post" {
+				conflict++
+			}
+		}
+	}
+	var n int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM placement_proposals WHERE site_id=$1`, siteID).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if created != 1 || conflict != 1 || n != 1 {
+		t.Fatalf("concurrent prepare created=%d conflict=%d rows=%d codes=%v reasons=%v", created, conflict, n, codes, reasons)
 	}
 }

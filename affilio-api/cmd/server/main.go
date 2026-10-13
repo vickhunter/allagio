@@ -139,7 +139,7 @@ func main() {
 	}
 	products := &handlers.ProductsHandler{DB: db}
 	offers := &handlers.OffersHandler{DB: db, ClaimsCheck: cfg.ClaimsCheck}
-	offerReview := &handlers.OfferReviewHandler{DB: db}
+	offerReview := &handlers.OfferReviewHandler{DB: db, ClaimsCheck: cfg.ClaimsCheck}
 	assessments := &handlers.AssessmentsHandler{
 		DB: db,
 		Engine: &services.ReadinessEngine{

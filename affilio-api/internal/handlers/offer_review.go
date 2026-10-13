@@ -8,12 +8,19 @@ import (
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/entry"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
 
 type OfferReviewHandler struct {
 	DB *database.DB
+	// ClaimsCheck is the resolved CLAIMS_CHECK mode. Publish runs the same
+	// claims check as submit: the page checker when real, otherwise the
+	// numeric stub. A "90%" claim that the offer facts do not contain stays
+	// submitted.
+	ClaimsCheck string
 }
 
 type offerReviewPayload struct {
@@ -62,6 +69,20 @@ func (h *OfferReviewHandler) Approve(c *gin.Context) {
 	if err != nil {
 		return
 	}
+	reason, message, blocked, err := h.claimsOnPublish(c, offer)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to promote offer"})
+		return
+	}
+	if blocked {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":         "offer claims are not ready to publish",
+			"status":        "submitted",
+			"review_reason": reason,
+			"message":       message,
+		})
+		return
+	}
 	slug := offerSlug(item.ProductName, offer.ID)
 	programID, err := h.DB.PromoteOffer(c.Request.Context(), offer.ID, slug)
 	if err != nil {
@@ -83,6 +104,32 @@ func (h *OfferReviewHandler) Reject(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "draft", "offer_id": offer.ID, "note": payload.Note})
+}
+
+// claimsOnPublish is the second claims check. Submit already held an untrusted
+// offer. Publish runs again so a "90%" claim cannot be listed.
+func (h *OfferReviewHandler) claimsOnPublish(c *gin.Context, offer *database.Offer) (string, string, bool, error) {
+	var product database.Product
+	err := h.DB.Pool.QueryRow(c.Request.Context(), `SELECT maker_id::text, name, COALESCE(tagline,''), COALESCE(website_url,''), COALESCE(primary_category,''), COALESCE(keywords,'{}'), COALESCE(tags,'{}')
+FROM products WHERE id=$1`, offer.ProductID).Scan(&product.MakerID, &product.Name, &product.Tagline, &product.WebsiteURL, &product.PrimaryCategory, &product.Keywords, &product.Tags)
+	if err != nil {
+		return "", "", false, err
+	}
+	product.ID = offer.ProductID
+	if claimsReal(h.ClaimsCheck) {
+		reason, message := compareOfferClaims(c.Request.Context(), h.DB, product.MakerID, product.ID, *offer)
+		if reason == entry.PageReasonUnreachable {
+			return reviewReasonHead, reviewHeadMessage, true, nil
+		}
+		if reason != "" {
+			return reviewReasonClaims, message, true, nil
+		}
+		return "", "", false, nil
+	}
+	if (entry.StubClaimChecker{}).CheckClaims(offer.Terms, offerFacts(*offer, product)) != nil {
+		return reviewReasonClaims, reviewClaimsMessage, true, nil
+	}
+	return "", "", false, nil
 }
 
 func (h *OfferReviewHandler) loadSubmittedOffer(c *gin.Context) (*database.Offer, *database.OfferReviewItem, error) {

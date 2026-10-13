@@ -152,7 +152,24 @@ func (d *DB) PlacementRestoreUnconfirmed(ctx context.Context, placementID, campa
 }
 
 func (d *DB) CreatePlacement(ctx context.Context, p Placement) (*Placement, error) {
-	return scanPlacement(d.Pool.QueryRow(ctx, `INSERT INTO placement_proposals(site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,expires_at,post_url,wp_post_id,post_title)
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	// One box per post. The lock is per site so a second prepare waits, then
+	// sees the row the first prepare inserted.
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))`, p.SiteID); err != nil {
+		return nil, err
+	}
+	boxes, err := countPlacementBoxes(ctx, tx, p.SiteID, p.SurfaceURL, "00000000-0000-0000-0000-000000000000", p.WPPostID)
+	if err != nil {
+		return nil, err
+	}
+	if boxes > 0 {
+		return nil, ErrOnePerPost
+	}
+	created, err := scanPlacement(tx.QueryRow(ctx, `INSERT INTO placement_proposals(site_id,offer_id,surface_url,context,copy,disclosure,reason,terms_snapshot,expires_at,post_url,wp_post_id,post_title)
  SELECT $1,o.id,$3,$4,$5,$6,$7,`+placementTermsSQL+`,$8,$3,$9,COALESCE(NULLIF($10,''), (
   SELECT a.title FROM articles a
   WHERE a.site_id=$1::uuid AND COALESCE(a.title,'') <> ''
@@ -161,6 +178,13 @@ func (d *DB) CreatePlacement(ctx context.Context, p Placement) (*Placement, erro
   ORDER BY a.updated_at DESC LIMIT 1
 ), '') `+placementEligibleSQL+` AND o.id=$2
  RETURNING `+placementColumns, p.SiteID, p.OfferID, p.SurfaceURL, p.Context, p.Copy, p.Disclosure, p.Reason, p.ExpiresAt, p.WPPostID, p.PostTitle))
+	if err != nil {
+		return nil, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 func (d *DB) GetPlacement(ctx context.Context, siteID, id string) (*Placement, error) {
@@ -329,16 +353,16 @@ AND status<>'revoked' AND id<>$3`, siteID, now.Add(-30*24*time.Hour), id).Scan(&
 	if used >= cap {
 		return "", "", "cap", false, nil
 	}
-	var copyText, product, category, website string
-	err = tx.QueryRow(ctx, `SELECT pp.copy, COALESCE(p.name,''), COALESCE(p.primary_category,''), COALESCE(p.website_url,'')
+	var copyText, product, category, website, terms, commission string
+	err = tx.QueryRow(ctx, `SELECT pp.copy, COALESCE(p.name,''), COALESCE(p.primary_category,''), COALESCE(p.website_url,''), COALESCE(o.terms,''), COALESCE(o.commission_value::text,'')
 FROM placement_proposals pp
 JOIN offers o ON o.id = pp.offer_id
 JOIN products p ON p.id = o.product_id
-WHERE pp.id=$1`, id).Scan(&copyText, &product, &category, &website)
+WHERE pp.id=$1`, id).Scan(&copyText, &product, &category, &website, &terms, &commission)
 	if err != nil {
 		return "", "", "", false, err
 	}
-	if entry.ClaimsFail(claims, copyText, strings.TrimSpace(product+"\n"+category+"\n"+website)) {
+	if entry.ClaimsFail(claims, copyText, strings.TrimSpace(strings.Join([]string{product, category, website, terms, commission}, "\n"))) {
 		return "", "", "claims_from_offer", false, nil
 	}
 	err = tx.QueryRow(ctx, `UPDATE placement_proposals SET status=status_before_undo, restored_by=$2, undone_at=NULL,
@@ -391,6 +415,9 @@ FROM offers o JOIN products pr ON pr.id=o.product_id WHERE o.id=$1`, p.OfferID).
 	}
 	if entry.ClaimsFail(claims, p.Copy, strings.TrimSpace(strings.Join([]string{product, category, website, terms, commission}, "\n"))) {
 		return nil, ErrClaimsFromOffer
+	}
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))`, siteID); err != nil {
+		return nil, err
 	}
 	var postID int64
 	if err = tx.QueryRow(ctx, `SELECT wp_post_id FROM placement_proposals WHERE id=$1`, p.ID).Scan(&postID); err != nil {
@@ -494,21 +521,21 @@ func (d *DB) RetryPluginPlacement(ctx context.Context, id, siteID, action string
 		return false, "", err
 	}
 	defer tx.Rollback(ctx)
-	var copyText, product, category, website string
-	err = tx.QueryRow(ctx, `SELECT pp.copy, COALESCE(p.name,''), COALESCE(p.primary_category,''), COALESCE(p.website_url,'')
+	var copyText, product, category, website, terms, commission string
+	err = tx.QueryRow(ctx, `SELECT pp.copy, COALESCE(p.name,''), COALESCE(p.primary_category,''), COALESCE(p.website_url,''), COALESCE(o.terms,''), COALESCE(o.commission_value::text,'')
 FROM placement_proposals pp
 JOIN offers o ON o.id = pp.offer_id
 JOIN products p ON p.id = o.product_id
 WHERE pp.id=$1 AND pp.site_id=$2 AND pp.plugin_failed_reason <> '' AND pp.failed_action=$3
 AND pp.plugin_wait IN ('', 'restore', 'remove')
-FOR UPDATE OF pp`, id, siteID, action).Scan(&copyText, &product, &category, &website)
+FOR UPDATE OF pp`, id, siteID, action).Scan(&copyText, &product, &category, &website, &terms, &commission)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, "", nil
 	}
 	if err != nil {
 		return false, "", err
 	}
-	if action == "restored" && entry.ClaimsFail(claims, copyText, strings.TrimSpace(product+"\n"+category+"\n"+website)) {
+	if action == "restored" && entry.ClaimsFail(claims, copyText, strings.TrimSpace(strings.Join([]string{product, category, website, terms, commission}, "\n"))) {
 		return false, "claims_from_offer", nil
 	}
 	tag, err := tx.Exec(ctx, `UPDATE placement_proposals

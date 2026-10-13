@@ -1259,7 +1259,7 @@ func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementU
 }
 
 func serverOfferData(offer database.OfferCopy) string {
-	return strings.TrimSpace(offer.ProductName + "\n" + offer.Category + "\n" + offer.Website)
+	return strings.TrimSpace(strings.Join([]string{offer.ProductName, offer.Category, offer.Website, offer.Terms, offer.Commission}, "\n"))
 }
 
 func (h *AgentEntry) PluginAck(c *gin.Context) {

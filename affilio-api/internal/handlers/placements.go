@@ -227,6 +227,10 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 	p, err := h.DB.CreatePlacement(c.Request.Context(), database.Placement{SiteID: site.ID, OfferID: req.OfferID, SurfaceURL: req.SurfaceURL,
 		Context: req.Context, Copy: strings.TrimSpace(req.Copy), Disclosure: "Affiliate disclosure: I may earn a commission if you buy through this link.", Reason: reason, ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour),
 		WPPostID: postID, PostTitle: strings.TrimSpace(req.PostTitle)})
+	if errors.Is(err, database.ErrOnePerPost) {
+		writeNamedConflict(c, "one_per_post")
+		return
+	}
 	if err != nil {
 		writeNamedConflict(c, "offer_unavailable")
 		return
