@@ -100,6 +100,50 @@ func TestServeDemoForE2E(t *testing.T) {
 	_ = srv.Close()
 }
 
+func TestServeDemoAuthForE2E(t *testing.T) {
+	if os.Getenv("AUTH_E2E") != "1" {
+		t.Skip()
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := ginEngine()
+	h := &HostedHandler{BaseURL: "http://" + ln.Addr().String()}
+	public := r.Group("")
+	h.mountDemo(public)
+	public.GET("/auth/login", func(c *gin.Context) {
+		next := "/auth/callback"
+		if q := c.Request.URL.RawQuery; q != "" {
+			next += "?" + q
+		}
+		c.Redirect(http.StatusFound, next)
+	})
+	public.GET("/auth/callback", func(c *gin.Context) {
+		next := "/owner"
+		if q := demoAttribution(c); q != "" {
+			next += "?" + q
+		}
+		c.Redirect(http.StatusFound, next)
+	})
+	public.GET("/owner", func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Owner</title></head><body><h1>Your distribution workspace</h1></body></html>`))
+	})
+	srv := &http.Server{Handler: r}
+	go func() { _ = srv.Serve(ln) }()
+	if file := os.Getenv("AUTH_E2E_ADDR_FILE"); file != "" {
+		if err = os.WriteFile(file, []byte(ln.Addr().String()), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fmt.Fprintf(os.Stdout, "AUTH_READY %s\n", ln.Addr().String())
+	_ = os.Stdout.Sync()
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	<-sig
+	_ = srv.Close()
+}
+
 func TestDemoPagesAreReadableAndKeepReferralParams(t *testing.T) {
 	r := ginEngine()
 	h := &HostedHandler{BaseURL: "http://127.0.0.1"}
@@ -184,6 +228,24 @@ func TestDemoPagesAreReadableAndKeepReferralParams(t *testing.T) {
 	start.Body.Close()
 	if !strings.Contains(string(startBody), `href="/auth/login"`) || !strings.Contains(string(startBody), "Sign in") || !strings.Contains(string(startBody), "Register") {
 		t.Fatalf("start page must link onward to sign-in and register: %s", startBody)
+	}
+	home, err := http.Get(server.URL + "/demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	homeBody, _ := io.ReadAll(home.Body)
+	home.Body.Close()
+	if !strings.Contains(string(homeBody), `aria-label="Demo"`) || !strings.Contains(string(homeBody), `class="demo-nav"`) {
+		t.Fatal("demo home must name its navigation Demo")
+	}
+	signed, err := http.Get(server.URL + "/demo/start?ref=camp&via=post2615")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signedBody, _ := io.ReadAll(signed.Body)
+	signed.Body.Close()
+	if !strings.Contains(string(signedBody), `href="/auth/login?ref=camp&amp;via=post2615"`) {
+		t.Fatalf("sign-in dropped referral params: %s", signedBody)
 	}
 
 	for _, probe := range []struct{ page, key string }{{"/demo", "ref"}, {"/demo", "via"}, {"/demo/pricing", "ref"}} {

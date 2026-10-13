@@ -130,6 +130,18 @@ func TestStripeConnectionPageIsTestModeOnly(t *testing.T) {
 	if verify.calls != before {
 		t.Fatal("live keys were sent to Stripe")
 	}
+	badSecret := url.Values{"csrf": {o.CSRF}, "stripe_key": {"rk_test_verify_once"}, "price_id": {"price_pilot"}, "endpoint_id": {"we_pilot"}, "signing_secret": {"not-a-webhook-secret"}}
+	refused := ownerForm(t, h, r, cookie, "/owner/products/"+productID+"/connection", badSecret)
+	refusedBody := refused.Body.String()
+	if refused.Code != http.StatusBadRequest || strings.HasPrefix(strings.TrimSpace(refusedBody), "{") || !strings.Contains(refused.Header().Get("Content-Type"), "text/html") {
+		t.Fatalf("bad webhook secret must stay on the form: %d %s", refused.Code, refusedBody)
+	}
+	if !strings.Contains(refusedBody, `id="stripe-live-key"`) || !strings.Contains(refusedBody, webhookSecretRefusal) || strings.Contains(refusedBody, "valid webhook signing secret required") || !strings.Contains(refusedBody, "Verify and connect Stripe") {
+		t.Fatalf("bad webhook secret needs the inline sentence: %s", refusedBody)
+	}
+	if verify.calls != before {
+		t.Fatal("bad webhook secret was sent to Stripe")
+	}
 }
 
 func TestLiveKeyRefusalStaysOnTheFormAndOutOfLogs(t *testing.T) {

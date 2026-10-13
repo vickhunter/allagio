@@ -201,7 +201,9 @@ async function handle(req, res) {
   }
   const connection = pathname.match(/^\/owner\/products\/([^/]+)\/connection$/);
   if (connection && req.method === 'POST') {
-    return send(res, 400, { error: 'valid webhook signing secret required' });
+    const webhook = 'https://api.example.test/v1/webhooks/stripe/' + connection[1] + '/checkout.session.completed.checkout.session.async_payment_succeeded.charge.refunded';
+    const body = `<p>This page is for Stripe test mode only. Live keys (sk_live_ and rk_live_) are rejected.</p><p>Create an endpoint in Stripe for <code class="webhook-url">${webhook}</code> with checkout.session.completed events.</p><form method="post" action="/owner/products/${connection[1]}/connection"><label>Restricted API key <input type="password" name="stripe_key" autocomplete="off" required></label><label>One-time price ID <input name="price_id" required></label><label>Webhook endpoint ID <input name="endpoint_id" required></label><label>Webhook signing secret <input type="password" name="signing_secret" autocomplete="off" required></label><button>Verify and connect Stripe</button><p class="field-error" id="stripe-live-key" role="alert" tabindex="-1">Use the signing secret from your Stripe webhook endpoint. It starts with whsec_.</p></form>`;
+    return send(res, 400, shell('Connect your checkout', body, true), 'text/html; charset=utf-8');
   }
   if (connection && req.method === 'GET') {
     if (state.stripeForm) {
