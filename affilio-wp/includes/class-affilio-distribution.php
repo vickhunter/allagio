@@ -109,8 +109,16 @@ class Affilio_Distribution {
             'published text must include approved copy, disclosure and exact tracked link' => 'Il testo pubblicato deve includere la copia approvata, la disclosure e il link tracciato esatto.',
             'receipt already recorded or placement unavailable' => 'La ricevuta risulta già registrata, oppure il placement non è disponibile.',
             'receipt recording failed' => 'La registrazione della pubblicazione non è riuscita.',
+            'The distribution service could not complete this request.' => 'Il servizio ha rifiutato la pubblicazione.',
         );
-        $detail = isset($translated[$api]) ? $translated[$api] : 'Il servizio ha rifiutato la pubblicazione.';
+        $api = trim((string) $api);
+        if (isset($translated[$api])) {
+            $detail = $translated[$api];
+        } elseif ($api !== '') {
+            $detail = $api;
+        } else {
+            $detail = 'Il servizio ha rifiutato la pubblicazione.';
+        }
         return $detail . ' L\'inserimento è stato annullato.';
     }
 
@@ -156,17 +164,30 @@ class Affilio_Distribution {
         return json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
+    private static function distribution_error_message($data) {
+        if (is_array($data)) {
+            if (isset($data['message']) && is_string($data['message']) && trim($data['message']) !== '') {
+                return trim($data['message']);
+            }
+            if (isset($data['error']) && is_string($data['error']) && trim($data['error']) !== '') {
+                return trim($data['error']);
+            }
+        }
+        return 'The distribution service could not complete this request.';
+    }
+
     private function request($method, $path, $body = null) {
         $response = $this->api->request($method, $path, $body);
         if (is_wp_error($response)) {
             return new WP_Error('affilio_distribution', 'Il servizio non è raggiungibile. Riprova tra qualche istante.', array('status' => 503));
         }
         if ($response['code'] < 200 || $response['code'] >= 300) {
-            $message = isset($response['data']['error']) ? $response['data']['error'] : 'The distribution service could not complete this request.';
+            $payload = isset($response['data']) && is_array($response['data']) ? $response['data'] : array();
+            $message = self::distribution_error_message($payload);
             $status = $response['code'] >= 400 && $response['code'] < 500 ? (int) $response['code'] : 502;
             $error_data = array('status' => $status);
-            if (isset($response['data']['reason']) && is_string($response['data']['reason'])) {
-                $error_data['reason'] = $response['data']['reason'];
+            if (isset($payload['reason']) && is_string($payload['reason'])) {
+                $error_data['reason'] = $payload['reason'];
             }
             return new WP_Error('affilio_distribution', $message, $error_data);
         }
@@ -343,13 +364,21 @@ class Affilio_Distribution {
                     $this->report_live_without_receipt($post->ID, $id, $reason);
                 }
                 $status = 502;
-                if (is_array($receipt->data) && isset($receipt->data['status'])) {
-                    $code = (int) $receipt->data['status'];
+                $error_data = $receipt->get_error_data();
+                if (!is_array($error_data)) {
+                    $error_data = array();
+                }
+                if (isset($error_data['status'])) {
+                    $code = (int) $error_data['status'];
                     if ($code < 200 || $code >= 300) {
                         $status = $code;
                     }
                 }
-                return new WP_Error('affilio_receipt', self::receipt_refusal_message($receipt->get_error_message()), array('status' => $status));
+                $returned = array('status' => $status);
+                if (isset($error_data['reason']) && is_string($error_data['reason']) && $error_data['reason'] !== '') {
+                    $returned['reason'] = $error_data['reason'];
+                }
+                return new WP_Error('affilio_receipt', self::receipt_refusal_message($receipt->get_error_message()), $returned);
             }
         }
         $fallback = isset($placement['fallback_url']) ? (string) $placement['fallback_url'] : '';

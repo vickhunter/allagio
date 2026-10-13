@@ -1,11 +1,14 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.20
+Stable tag: 0.1.21
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.21 =
+* A refused receipt returns the server status and the server reason. Connect stores plugin_key when the register response includes it.
 
 = 0.1.20 =
 * An upgrade no longer fatals the front page. Go-link detection reads the request path before WordPress has built the query, and the version upgrade runs on init.

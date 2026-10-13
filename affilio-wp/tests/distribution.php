@@ -6,6 +6,7 @@ class WP_Error {
     public $data;
     public function __construct($code, $message, $data = array()) { $this->code = $code; $this->message = $message; $this->data = $data; }
     public function get_error_message() { return $this->message; }
+    public function get_error_data($code = '') { return $this->data; }
 }
 function is_wp_error($value) { return $value instanceof WP_Error; }
 function rest_ensure_response($value) { return $value; }

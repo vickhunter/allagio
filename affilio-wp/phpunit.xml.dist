@@ -6,6 +6,7 @@
     <testsuites>
         <testsuite name="walk">
             <file>tests/phpunit/WalkBlockersTest.php</file>
+            <file>tests/phpunit/N2ErrorsTest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>

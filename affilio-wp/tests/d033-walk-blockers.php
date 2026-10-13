@@ -482,7 +482,7 @@ function affilio_walk_upgrade_then_front_page() {
     } catch (Throwable $error) {
         check(false, 'upgrade on init fataled: ' . $error->getMessage());
     }
-    check(get_option('affilio_seen_version') === '0.1.20', 'the upgrade did not save affilio_seen_version');
+    check(get_option('affilio_seen_version') === AFFILIO_VERSION, 'the upgrade did not save affilio_seen_version');
     check($GLOBALS['flushes'] >= 1, 'the upgrade did not flush rewrite rules');
     $acks = d033_ack_bodies();
     check(count($acks) === 1 && $acks[0]['body']['action'] === 'placed', 'the upgrade did not acknowledge the existing box');

@@ -173,6 +173,7 @@ if (!class_exists('WP_Error')) {
             $this->data = $data;
         }
         public function get_error_message() { return $this->message; }
+        public function get_error_data($code = '') { return $this->data; }
     }
 }
 

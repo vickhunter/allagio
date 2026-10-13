@@ -73,7 +73,7 @@ class SetupTestAPI {
                 $this->lose_response = false;
                 return new WP_Error('network', 'Response lost after registration');
             }
-            return array('code' => 200, 'data' => array('site_id' => 'same-site', 'api_key' => 'server-issued-api-key'));
+            return array('code' => 200, 'data' => array('site_id' => 'same-site', 'api_key' => 'server-issued-api-key', 'plugin_key' => 'server-issued-plugin-key'));
         }
         if ($path === '/scan/full' || $path === '/scan/single') {
             $this->scans[] = $body;
@@ -100,7 +100,9 @@ $state = $setup->connect();
 check($state['phase'] === 'scanning' && $state['connection']['connected'], 'Retry did not connect');
 check($api->registrations[0] === $api->registrations[1], 'Retry changed the registration payload');
 check(get_option('affilio_api_key') === 'server-issued-api-key', 'Server API key was not stored');
+check(get_option('affilio_plugin_key') === 'server-issued-plugin-key', 'register did not store plugin_key');
 check(strpos(json_encode($state), 'server-issued-api-key') === false, 'Setup leaked a credential to the browser');
+check(strpos(json_encode($state), 'server-issued-plugin-key') === false, 'Setup leaked the plugin key to the browser');
 $setup->connect();
 check(count($api->registrations) === 2, 'Connected setup registered again');
 

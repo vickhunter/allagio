@@ -85,6 +85,7 @@ class Affilio_Onboarding {
                 }
                 update_option('affilio_api_key', (string) $response['data']['api_key'], false);
                 update_option('affilio_site_id', $response['data']['site_id'], false);
+                $this->store_issued_plugin_key($response['data']);
             }
             $this->api->invalidate_status_cache();
             $connection = $this->api->get_connection_status(true);
@@ -105,6 +106,18 @@ class Affilio_Onboarding {
         } finally {
             delete_option('affilio_setup_lock');
         }
+    }
+
+    private function store_issued_plugin_key($data) {
+        if (!is_array($data) || !isset($data['plugin_key']) || !is_string($data['plugin_key'])) {
+            return;
+        }
+        $plugin_key = trim($data['plugin_key']);
+        if ($plugin_key === '') {
+            return;
+        }
+        $option = defined('AFFILIO_PLUGIN_ACK_OPTION') ? AFFILIO_PLUGIN_ACK_OPTION : 'affilio_plugin_key';
+        update_option($option, $plugin_key, false);
     }
 
     private function schedule_scan() {
