@@ -9,6 +9,7 @@ AI affiliate copilot for WordPress. Connect from Settings, then review recommend
 
 = 0.1.21 =
 * A refused receipt returns the server status and the server reason. Connect stores plugin_key when the register response includes it.
+* A second box on the same post is refused with "Keep one box on this post." A box added in that request is removed. An upgrade does not delete a box that was already in the post.
 
 = 0.1.20 =
 * An upgrade no longer fatals the front page. Go-link detection reads the request path before WordPress has built the query, and the version upgrade runs on init.

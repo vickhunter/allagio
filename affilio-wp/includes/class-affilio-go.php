@@ -188,11 +188,14 @@ class Affilio_Go {
 
     public static function fallback_for($id) {
         $all = function_exists('get_option') ? get_option(AFFILIO_GO_FALLBACKS_OPTION, array()) : array();
-        if (is_array($all) && isset($all[$id]) && $all[$id] !== '') {
-            return (string) $all[$id];
+        if (is_array($all) && isset($all[$id]) && is_string($all[$id]) && $all[$id] !== '') {
+            return $all[$id];
         }
         if (function_exists('home_url')) {
-            return home_url('/');
+            $home = home_url('/');
+            if (is_string($home) && $home !== '') {
+                return $home;
+            }
         }
         return '/';
     }
@@ -318,9 +321,9 @@ class Affilio_Go {
             return $fallback;
         }
         $response = $this->call_upstream($placement_id);
-        $location = self::location_header($response);
+        $location = trim(self::location_header($response));
         $code = self::response_code($response);
-        if (!is_wp_error($response) && $code === 302 && $location !== '') {
+        if (!is_wp_error($response) && $code === 302 && $location !== '' && strpos($location, "\n") === false && strpos($location, "\r") === false) {
             return $location;
         }
         $transport_failed = is_wp_error($response);

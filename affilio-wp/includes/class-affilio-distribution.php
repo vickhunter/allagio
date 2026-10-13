@@ -8,6 +8,7 @@ class Affilio_Distribution {
     private $api;
     private $publisher_checked = false;
     private $publisher_error = null;
+    private $last_ack_refusal = null;
 
     public function __construct($api) {
         $this->api = $api;
@@ -324,7 +325,7 @@ class Affilio_Distribution {
         if (is_wp_error($data)) {
             return $data;
         }
-        $placement = $data['placement'];
+        $placement = (is_array($data) && isset($data['placement']) && is_array($data['placement'])) ? $data['placement'] : array();
         $link = isset($placement['receipt']['tracked_link']) ? $placement['receipt']['tracked_link'] : '';
         if (!self::tracked_link_ok($link, $id)) {
             return new WP_Error('affilio_link', 'Invalid tracked link.', array('status' => 502));
@@ -345,10 +346,11 @@ class Affilio_Distribution {
         if (!$reported) {
             $full = html_entity_decode($current->post_content, ENT_QUOTES, 'UTF-8');
             $published = self::published_slice($full, $id);
-            if (strpos($current->post_content, esc_html($placement['disclosure'])) !== false && strpos($published, $placement['disclosure']) === false) {
-                $published .= "\n" . $placement['disclosure'];
+            $disclosure = (isset($placement['disclosure']) && is_string($placement['disclosure'])) ? $placement['disclosure'] : '';
+            if ($disclosure !== '' && strpos((string) $current->post_content, esc_html($disclosure)) !== false && strpos($published, $disclosure) === false) {
+                $published .= "\n" . $disclosure;
             }
-            if (!self::has_receipt_disclosure($published, $placement['disclosure']) && self::has_receipt_disclosure($full, $placement['disclosure'])) {
+            if (!self::has_receipt_disclosure($published, $disclosure) && self::has_receipt_disclosure($full, $disclosure)) {
                 $excerpt = self::disclosure_excerpt($full);
                 if ($excerpt !== '') {
                     $published = $excerpt . "\n" . $published;
@@ -381,17 +383,28 @@ class Affilio_Distribution {
                 return new WP_Error('affilio_receipt', self::receipt_refusal_message($receipt->get_error_message()), $returned);
             }
         }
-        $fallback = isset($placement['fallback_url']) ? (string) $placement['fallback_url'] : '';
-        $this->remember_box($id, $post->ID, isset($placement['copy']) ? (string) $placement['copy'] : '', isset($placement['disclosure']) ? (string) $placement['disclosure'] : '', $fallback, 'pending');
+        $fallback = (isset($placement['fallback_url']) && is_string($placement['fallback_url'])) ? $placement['fallback_url'] : '';
+        $copy_text = (isset($placement['copy']) && is_string($placement['copy'])) ? $placement['copy'] : '';
+        $disclosure_text = (isset($placement['disclosure']) && is_string($placement['disclosure'])) ? $placement['disclosure'] : '';
+        $this->remember_box($id, $post->ID, $copy_text, $disclosure_text, $fallback, 'pending');
         if (class_exists('Affilio_Plugin_Ack') && defined('AFFILIO_PLUGIN_ACK_PLACED')) {
-            $copy = isset($placement['copy']) ? (string) $placement['copy'] : '';
-            $disclosure = isset($placement['disclosure']) ? (string) $placement['disclosure'] : '';
-            $this->confirm_box($post->ID, $id, true, AFFILIO_PLUGIN_ACK_PLACED, function ($current) use ($copy, $disclosure, $id) {
+            $copy = $copy_text;
+            $disclosure = $disclosure_text;
+            $confirmed = $this->confirm_box($post->ID, $id, true, AFFILIO_PLUGIN_ACK_PLACED, function ($current) use ($copy, $disclosure, $id) {
                 if (self::box_in_content($current, $id)) {
                     return $current;
                 }
                 return $this->append_box($current, array('copy' => $copy, 'disclosure' => $disclosure), $id);
             });
+            if ($confirmed === false && is_array($this->last_ack_refusal)) {
+                // Publish inserts before the acknowledgement. A one-box refusal
+                // has to remove that insert even though confirm_box did not write it.
+                $this->rollback_inserted_placement($post->ID, $id);
+                return new WP_Error('affilio_distribution', $this->last_ack_refusal['message'], array(
+                    'status' => (int) $this->last_ack_refusal['status'],
+                    'reason' => $this->last_ack_refusal['reason'],
+                ));
+            }
         }
         return rest_ensure_response(array('published' => true, 'url' => get_permalink($post)));
     }
@@ -803,6 +816,7 @@ class Affilio_Distribution {
 
     private static function locate_blocks($content) {
         $blocks = array();
+        $content = (string) $content;
         $pattern = '/<!--\s+wp:([a-z0-9\/-]+)(\s+(\{.*?\}))?\s*-->/s';
         $offset = 0;
         $length = strlen($content);
@@ -1158,7 +1172,9 @@ class Affilio_Distribution {
         if (!class_exists('Affilio_Plugin_Ack')) {
             return false;
         }
-        $write = function () use ($post_id, $placement_id, $expect_present, $mutate) {
+        $this->last_ack_refusal = null;
+        $changed = false;
+        $write = function () use ($post_id, $placement_id, $expect_present, $mutate, &$changed) {
             $post = get_post($post_id);
             if (!$post || !isset($post->post_content)) {
                 return;
@@ -1172,6 +1188,7 @@ class Affilio_Distribution {
                 return;
             }
             $this->save_content($post_id, $next);
+            $changed = true;
         };
         $write();
         for ($try = 0; $try < 2; $try++) {
@@ -1179,7 +1196,32 @@ class Affilio_Distribution {
             $content = ($fresh && isset($fresh->post_content)) ? (string) $fresh->post_content : '';
             if (self::box_in_content($content, $placement_id) === $expect_present) {
                 $rel = self::rel_sponsored_from_content($content, $placement_id);
-                $this->deliver_ack($placement_id, $action, $rel, '');
+                $acked = $this->deliver_ack($placement_id, $action, $rel, '');
+                if ($acked === true) {
+                    $this->remember_phase($placement_id, $post_id, $action);
+                    return true;
+                }
+                if (self::ack_is_one_per_post($acked)) {
+                    $text = self::ack_refusal_text($acked);
+                    if ($text === '') {
+                        $text = 'Keep one box on this post.';
+                    }
+                    if ($changed && $expect_present) {
+                        $this->rollback_inserted_placement($post_id, $placement_id);
+                    }
+                    $this->remember_box($placement_id, $post_id, '', '', '', 'refused');
+                    $this->remember_ack_notice($post_id, $placement_id, $action, $text);
+                    $status = self::ack_status_code($acked);
+                    if ($status < 400 || $status >= 500) {
+                        $status = 422;
+                    }
+                    $this->last_ack_refusal = array(
+                        'status' => $status,
+                        'reason' => 'one_per_post',
+                        'message' => $text,
+                    );
+                    return false;
+                }
                 $this->remember_phase($placement_id, $post_id, $action);
                 return true;
             }
@@ -1272,14 +1314,18 @@ class Affilio_Distribution {
             return false;
         }
         $response = (new Affilio_Plugin_Ack())->send($placement_id, $action, $rel, $reason);
-        if (self::ack_succeeded($response)) {
+        if (self::ack_is_one_per_post($response)) {
+            return $response;
+        }
+        if (self::ack_succeeded($response) || self::ack_settled($response)) {
             $this->forget_ack($placement_id, $action);
             return true;
         }
         if (self::ack_retryable($response)) {
             $this->enqueue_ack($placement_id, $action, $rel, $reason);
+            return true;
         }
-        return false;
+        return $response;
     }
 
     public function drain_ack_queue() {
@@ -1365,6 +1411,38 @@ class Affilio_Distribution {
         return 0;
     }
 
+    private static function ack_body($response) {
+        if (is_wp_error($response) || !is_array($response) || !isset($response['body']) || !is_string($response['body'])) {
+            return array();
+        }
+        $decoded = json_decode($response['body'], true);
+        return is_array($decoded) ? $decoded : array();
+    }
+
+    private static function ack_field($response, $key) {
+        $body = self::ack_body($response);
+        if (isset($body[$key]) && is_string($body[$key])) {
+            return trim($body[$key]);
+        }
+        return '';
+    }
+
+    private static function ack_is_one_per_post($response) {
+        return self::ack_field($response, 'check_id') === 'one_per_post' || self::ack_field($response, 'reason') === 'one_per_post';
+    }
+
+    private static function ack_refusal_text($response) {
+        $text = self::ack_field($response, 'check_text');
+        if ($text === '') {
+            $text = self::ack_field($response, 'message');
+        }
+        return $text;
+    }
+
+    private static function ack_settled($response) {
+        return self::ack_status_code($response) === 409 && self::ack_field($response, 'reason') === 'nothing_to_ack';
+    }
+
     private static function ack_succeeded($response) {
         $code = self::ack_status_code($response);
         return $code >= 200 && $code < 300;
@@ -1408,7 +1486,7 @@ class Affilio_Distribution {
         $this->remember_box($id, $post_id, '', '', '', $phase);
     }
 
-    private function remember_ack_notice($post_id, $placement_id, $action) {
+    private function remember_ack_notice($post_id, $placement_id, $action, $message = '') {
         if (!function_exists('get_option') || !function_exists('update_option')) {
             return;
         }
@@ -1416,11 +1494,14 @@ class Affilio_Distribution {
         if (!is_array($notices)) {
             $notices = array();
         }
+        if (!is_string($message) || $message === '') {
+            $message = 'Affilio could not confirm the box change.';
+        }
         $notices[] = array(
             'placement_id' => (string) $placement_id,
             'post_id' => (int) $post_id,
             'action' => (string) $action,
-            'message' => 'Affilio could not confirm the box change.',
+            'message' => $message,
         );
         update_option('affilio_plugin_ack_notices', $notices);
     }
