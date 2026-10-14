@@ -1042,12 +1042,20 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 		floor = since.UTC()
 	}
 	items := []gin.H{}
+	placementTotal := 0
+	returnedPlacements := 0
 	if owner.SiteID != "" {
+		placementTotal, err = h.DB.CountDigestPlacements(c.Request.Context(), owner.SiteID, floor)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+			return
+		}
 		placements, err := h.DB.DigestPlacements(c.Request.Context(), owner.SiteID, floor)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 			return
 		}
+		returnedPlacements = len(placements)
 		for _, item := range placements {
 			token, err := h.issueUndo(c, owner.ID, item)
 			if err != nil {
@@ -1057,7 +1065,14 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 			items = append(items, h.digestJSON(item, token))
 		}
 	}
+	offerTotal := 0
+	returnedOffers := 0
 	if owner.MakerID != "" {
+		offerTotal, err = h.DB.CountDigestOffers(c.Request.Context(), owner.MakerID, floor)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+			return
+		}
 		offers, err := h.DB.DigestOffers(c.Request.Context(), owner.MakerID, floor)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
@@ -1077,6 +1092,7 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 				return
 			}
 			items = append(items, h.digestJSON(item, token))
+			returnedOffers++
 		}
 	}
 	var sinceOut any
@@ -1092,7 +1108,19 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 		}
 		wentLive = n
 	}
-	body := gin.H{"since": sinceOut, "items": items, "went_live": wentLive, "session": gin.H{"signed_in": !keyed}}
+	total := placementTotal + offerTotal
+	if offerFilter != "" && offerTotal > 0 {
+		total = placementTotal + returnedOffers
+		offerTotal = returnedOffers
+	}
+	truncated := placementTotal > returnedPlacements || offerTotal > returnedOffers
+	body := gin.H{
+		"since": sinceOut, "items": items, "went_live": wentLive, "session": gin.H{"signed_in": !keyed},
+		"truncated": truncated, "total": total,
+	}
+	if claimsHeld(h.ClaimsCheck) {
+		body["claims_check"] = "not_checked"
+	}
 	if err = h.attachDigestMeta(c, owner, body); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 		return
@@ -2207,6 +2235,7 @@ func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 			body["review_reason"] = item.ReviewReason
 			body["message"] = item.ReviewMessage
 		}
+		attachClaimsCheck(body, h.ClaimsCheck, status, item.ReviewReason)
 	}
 	return body
 }
@@ -2296,6 +2325,11 @@ func (h *AgentEntry) MakerDigest(c *gin.Context) {
 	} else if scoped != "" {
 		offerID = scoped
 	}
+	total, err := h.DB.CountMakerDigestOffers(c.Request.Context(), makerID, offerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
+	}
 	offers, err := h.DB.MakerDigestOffers(c.Request.Context(), makerID, offerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
@@ -2325,7 +2359,14 @@ func (h *AgentEntry) MakerDigest(c *gin.Context) {
 		}
 		items = append(items, h.digestJSON(item, token))
 	}
-	c.JSON(http.StatusOK, gin.H{"items": items, "session": gin.H{"signed_in": false}})
+	body := gin.H{
+		"items": items, "session": gin.H{"signed_in": false},
+		"truncated": total > len(items), "total": total,
+	}
+	if claimsHeld(h.ClaimsCheck) {
+		body["claims_check"] = "not_checked"
+	}
+	c.JSON(http.StatusOK, body)
 }
 
 func filledDigestPosition(position string) string {

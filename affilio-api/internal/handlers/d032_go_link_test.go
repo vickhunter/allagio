@@ -280,8 +280,12 @@ WHERE id=$1`, id); err != nil {
 		"X-OR-Referer":     "https://reader.example/article",
 	}
 	bot := goHit("forwarded bot", "/v1/go/"+id+"?via=plugin", "192.0.2.40:1000", "Mozilla/5.0 reader", "https://go.example/the-post", botHeaders)
-	if bot.Header().Get("Location") != plain || clicks() != beforeBot {
+	if bot.Header().Get("Location") != plain || clicks() != beforeBot+1 {
 		t.Fatalf("forwarded bot: %s hits %d", bot.Header().Get("Location"), clicks())
+	}
+	var botClass string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT click_class FROM clicks WHERE placement_id=$1 AND user_agent='Twitterbot/1.0'`, id).Scan(&botClass); err != nil || botClass != "unknown" {
+		t.Fatalf("forwarded bot class %s %v", botClass, err)
 	}
 
 	unknownID := func(label, path string, headers map[string]string) {

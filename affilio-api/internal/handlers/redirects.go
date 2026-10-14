@@ -182,23 +182,23 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req g
 		return
 	}
 	plain := link.LandingURL
-	if !link.CountsAsLive || c.Request.Method == http.MethodHead || isPreviewBot(reader.userAgent) {
+	if !link.CountsAsLive {
 		c.Redirect(http.StatusFound, plain)
 		return
 	}
-	// A live placement always records one click and 302s to the offer URL
-	// with the ref. A down landing probe does not send the reader to the article.
-	limitKey := reader.hash
-	if limitKey == "" {
-		limitKey = "unknown"
-	}
-	if h.RateLimiter != nil && !h.RateLimiter.Allow(limitKey) {
+	class := ClassifyClick(c.Request.Method, reader.userAgent, c.Request.Header)
+	// The cap is the placement, shared by every reader class.
+	if h.RateLimiter != nil && !h.RateLimiter.Allow("placement:"+placementID) {
 		c.Redirect(http.StatusFound, plain)
 		return
 	}
-	clickID, err := h.recordPlacementHit(c, link, placementID, reader)
+	clickID, err := h.recordPlacementHit(c, link, placementID, reader, class)
 	if err != nil {
 		logGo("redirects.go placement click failed id=%s err=%v", placementID, err)
+		c.Redirect(http.StatusFound, plain)
+		return
+	}
+	if !AttributableClick(class) {
 		c.Redirect(http.StatusFound, plain)
 		return
 	}
@@ -254,15 +254,15 @@ func (h *RedirectsHandler) placementReader(c *gin.Context, link database.Placeme
 	return reader, siteID, domain
 }
 
-func (h *RedirectsHandler) recordPlacementHit(c *gin.Context, link database.PlacementRedirect, placementID string, reader goReader) (string, error) {
+func (h *RedirectsHandler) recordPlacementHit(c *gin.Context, link database.PlacementRedirect, placementID string, reader goReader, class string) (string, error) {
 	if link.CampaignID == "" {
 		return "", errors.New("live placement has no campaign")
 	}
-	existing, err := h.DB.RecentPlacementClick(c.Request.Context(), link.SiteID, placementID, reader.hash, reader.userAgent, placementClickDedupSeconds)
+	existing, err := h.DB.RecentPlacementClick(c.Request.Context(), link.SiteID, placementID, reader.hash, reader.userAgent, class, placementClickDedupSeconds)
 	if err != nil || existing != "" {
 		return existing, err
 	}
-	return h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, reader.hash, reader.userAgent, reader.referer, placementID)
+	return h.DB.InsertPlacementClick(c.Request.Context(), link.CampaignID, link.SiteID, link.ProgramID, reader.hash, reader.userAgent, reader.referer, placementID, class)
 }
 
 func (h *RedirectsHandler) postOrHome(link database.PlacementRedirect) string {

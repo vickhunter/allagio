@@ -2,7 +2,7 @@
 No injection: every screen shows what the server sends. Flow:
  1 site owner registers a site (plugin_key), connects it; trusted maker offer lists; one live placement on that site (prepare ->
    owner approve -> commit -> plugin-ack placed) so the site digest has an item -> post_title checked.
- 2 untrusted maker (email != site owner) offer -> submitted / claims / "The claims check is not live yet."; the maker owner signs in
+ 2 untrusted maker (email != site owner) offer -> submitted / claims / "Claims are not checked yet."; the maker owner signs in
    with the maker's email; if that does not link the maker (known server bug) the owner binds it through the dashboard form
    POST /owner/accounts (role=maker + maker key). The real /v1/account/digest then drives the in-review screen at 390 + 1440.
  3 trusted maker owner likewise -> listed, no review box.
@@ -51,8 +51,8 @@ def maker_owner(mail, mh):
 def untrusted(n):
     mail = 'maker%d-%s@uismoke-maker.test' % (n, tag); mh, mid = maker(mail)
     oid, r = offer(mh, mid, False, 'Northwind Builder %d %s' % (n, tag), 'Commission paid directly by merchant.'); j = r.json()
-    rec('untrusted maker #%d (%s != owner) -> submitted, claims, "The claims check is not live yet."' % (n, mail.split('@')[1]),
-        r.status_code == 200 and j.get('status') == 'submitted' and j.get('review_reason') == 'claims' and j.get('message') == 'The claims check is not live yet.', {k: j.get(k) for k in ('status', 'review_reason', 'message')})
+    rec('untrusted maker #%d (%s != owner) -> submitted, claims, "Claims are not checked yet."' % (n, mail.split('@')[1]),
+        r.status_code == 200 and j.get('status') == 'submitted' and j.get('review_reason') == 'claims' and j.get('message') == 'Claims are not checked yet.', {k: j.get(k) for k in ('status', 'review_reason', 'message')})
     s, how = maker_owner(mail, mh); FACTS['untrusted_link'] = how
     return s, oid
 su, uoid = untrusted(1)
@@ -63,7 +63,7 @@ rec('GET /v1/account/digest lists the held offer in its section (link: %s)' % FA
 dd = su.get(V + '/digest', headers={'Origin': B}).json()
 ditems = [i for i in dd.get('items', []) if i.get('kind') == 'offer']
 rec('GET /v1/digest offer items carry status, review_reason, message', ditems and all(all(k in i for k in ('status', 'review_reason', 'message')) for i in ditems)
-    and any(i.get('id') == uoid and i['status'] == 'submitted' and i['review_reason'] == 'claims' and i['message'] == 'The claims check is not live yet.' for i in ditems), [(i.get('status'), i.get('review_reason'), i.get('message')) for i in ditems])
+    and any(i.get('id') == uoid and i['status'] == 'submitted' and i['review_reason'] == 'claims' and i['message'] == 'Claims are not checked yet.' for i in ditems), [(i.get('status'), i.get('review_reason'), i.get('message')) for i in ditems])
 USESS = {390: su, 1440: untrusted(2)[0]}  # /v1/digest items are "since the last open": one fresh maker owner per width
 st, how_t = maker_owner(tmail, tmh); FACTS['trusted_link'] = how_t
 # 4
@@ -105,7 +105,7 @@ try:
             except Exception: pass
             ok = pg.locator(sel).count() >= 1; t = ' '.join(pg.locator(sel).first.inner_text().split()) if ok else ''
             rec('%d in-review screen from the real digest: claims in plain words + server message + next step, no time' % w,
-                ok and 'checking the offer\u2019s claims against the merchant page' in t and '\u201cThe claims check is not live yet.\u201d' in t and 'Next step:' in t and not any(x in t.lower() for x in BAD), t[:200])
+                ok and 'Claims are not checked yet.' in t and '\u201cClaims are not checked yet.\u201d' in t and 'Next step:' in t and not any(x in t.lower() for x in BAD), t[:200])
             if ok: pg.locator(sel).first.scroll_into_view_if_needed()
             pg.wait_for_timeout(1500); pg.screenshot(path='%s/live-in-review-claims-%d.png' % (PROOF, w)); c.close()
             c = ctx_for(b, st, w); pg = c.new_page(); pg.goto(BASE + 'digest.html?api=real&api_base=/backend', wait_until='domcontentloaded')

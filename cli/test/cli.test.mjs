@@ -314,7 +314,8 @@ test('list prints the claims stub hold from review_reason and message', async ()
         id: offer,
         status: 'submitted',
         review_reason: 'claims',
-        message: 'The claims check is not live yet.',
+        claims_check: 'not_checked',
+        message: 'Claims are not checked yet.',
       },
     },
     { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
@@ -324,7 +325,9 @@ test('list prints the claims stub hold from review_reason and message', async ()
   const text = stdout();
   assert.match(text, /status: in review/);
   assert.match(text, /^check: claims$/m);
-  assert.match(text, /^message: The claims check is not live yet\.$/m);
+  assert.match(text, /^message: Claims are not checked yet\.$/m);
+  assert.match(text, /^claims: not checked yet$/m);
+  assert.equal(/\bchecked\b/.test(text.replace(/not checked yet/g, '')), false);
   assert.match(text, /^next: Submit again after this check passes\.$/m);
   assert.equal(text.includes('status: listed'), false);
 });
@@ -406,6 +409,32 @@ test('digest prints the mode and mode_preselected the server returns', async () 
   assert.match(text, /^mode: manual$/m);
   assert.match(text, /^mode_preselected: yolo$/m);
   assert.match(text, /summary: Paste Forge/);
+});
+
+test('digest says when the list was cut and when claims are not checked yet', async () => {
+  const offer = '33333333-3333-4333-8333-333333333334';
+  const { io, stdout } = projectIO(offer, [
+    {
+      method: 'GET',
+      path: '/v1/maker/digest',
+      body: {
+        effective_mode: 'manual',
+        truncated: true,
+        total: 51,
+        claims_check: 'not_checked',
+        items: [{ summary: 'Paste Forge', live_now: true, undo_token: 'tok', claims_check: 'not_checked' }],
+      },
+    },
+    { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
+  ]);
+  const result = await run(['digest'], io);
+  assert.equal(result.exitCode, 0);
+  const text = stdout();
+  assert.match(text, /^truncated: true$/m);
+  assert.match(text, /^total: 51$/m);
+  assert.match(text, /Showing 1 of 51\. The list was cut\./);
+  assert.match(text, /^claims: not checked yet$/m);
+  assert.equal(/\bchecked\b/.test(text.replace(/not checked yet/g, '')), false);
 });
 
 test('the readme paste block is the six CLI lines', () => {

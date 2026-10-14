@@ -58,7 +58,7 @@ func APIKeyAuth(db *database.DB, audit *services.AuditLogger, resources ...strin
 			}
 			projectSiteID, projectErr := db.ProjectSiteKey(c.Request.Context(), keyHash)
 			if projectErr == nil {
-				if !agentRouteAllowed(c) {
+				if !projectRouteAllowed(c) {
 					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "project key is not authorized for this action"})
 					return
 				}
@@ -149,6 +149,16 @@ func safePrefix(key string) string {
 		return "***"
 	}
 	return key[:8] + "..."
+}
+
+// projectRouteAllowed is the agent allow list plus the site digest read.
+// A site project key may read only the digest digestCaller already scopes
+// to that site. Agent keys stay on agentRouteAllowed and do not gain it.
+func projectRouteAllowed(c *gin.Context) bool {
+	if c.FullPath() == "/v1/digest" && c.Request.Method == http.MethodGet {
+		return true
+	}
+	return agentRouteAllowed(c)
 }
 
 func agentRouteAllowed(c *gin.Context) bool {

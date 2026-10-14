@@ -433,7 +433,7 @@ grep -q '^mode: manual$' "$WORKDIR/digest.out" || fail=1
 grep -q '^mode_preselected: yolo$' "$WORKDIR/digest.out" || fail=1
 grep -q 'status: in review' "$WORKDIR/live-list.out" || fail=1
 grep -q '^check: claims$' "$WORKDIR/live-list.out" || fail=1
-grep -q '^message: The claims check is not live yet.$' "$WORKDIR/live-list.out" || fail=1
+grep -q '^message: Claims are not checked yet.$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^next: Submit again after this check passes.$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^mode: manual$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^mode_preselected: yolo$' "$WORKDIR/live-list.out" || fail=1
@@ -441,7 +441,7 @@ grep -q 'status: listed' "$WORKDIR/live-list.out" && fail=1
 [[ "$LIVE_STATUS" == "submitted" ]] || fail=1
 grep -q 'status: in review' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^check: claims$' "$WORKDIR/relevance-list.out" || fail=1
-grep -q '^message: The claims check is not live yet.$' "$WORKDIR/relevance-list.out" || fail=1
+grep -q '^message: Claims are not checked yet.$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^next: Submit again after this check passes.$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^mode: manual$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^mode_preselected: yolo$' "$WORKDIR/relevance-list.out" || fail=1

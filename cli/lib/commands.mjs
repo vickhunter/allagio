@@ -148,6 +148,27 @@ function printServerMode(io, payload) {
   return mode;
 }
 
+function printClaimsState(io, payload) {
+  if (payload && payload.claims_check === 'not_checked') io.stdout('claims: not checked yet\n');
+}
+
+function printDigestLimit(io, payload, items) {
+  const body = payload && typeof payload === 'object' ? payload : {};
+  if (body.truncated === true) {
+    const total = typeof body.total === 'number' ? body.total : null;
+    io.stdout('truncated: true\n');
+    if (total !== null) {
+      io.stdout(`total: ${total}\n`);
+      io.stdout(`Showing ${items.length} of ${total}. The list was cut.\n`);
+    } else {
+      io.stdout('The list was cut.\n');
+    }
+  }
+  if (body.claims_check === 'not_checked' || items.some((item) => item && item.claims_check === 'not_checked')) {
+    io.stdout('claims: not checked yet\n');
+  }
+}
+
 async function serverMode(io, headers) {
   const setup = await apiRequest(io, '/v1/setup/settings', { headers });
   if (setup.status !== 200 || !setup.json) {
@@ -176,6 +197,7 @@ export async function listCommand(io) {
   if (status === 'draft') {
     const submitted = await apiRequest(io, `/v1/maker/offers/${offerID}/submit`, { method: 'POST', headers });
     review = reviewFailure(submitted.json);
+    printClaimsState(io, submitted.json);
     if (!review && submitted.status !== 200) {
       io.stderr(`offer was not submitted (${submitted.status})\n`);
       io.stdout(`${JSON.stringify(submitted.json)}\n`);
@@ -214,6 +236,7 @@ export async function statusCommand(io) {
     if (current.status === 200) {
       io.stdout(`status: ${current.json.status}\n`);
       io.stdout(`live: ${current.json.status === 'listed'}\n`);
+      printClaimsState(io, current.json);
     }
   }
   if (config.listing_card_id) {
@@ -245,6 +268,7 @@ export async function digestCommand(io) {
   if (items[0] && items[0].undo_token) {
     saveConfig(io, { ...loadConfig(io), undo_token: items[0].undo_token });
   }
+  printDigestLimit(io, res.json, items);
   if (items.length === 0) {
     io.stdout('items: 0\n');
     return { exitCode: 0 };

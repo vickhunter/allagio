@@ -30,7 +30,7 @@ export function toolDefs() {
     }),
     tool('list', 'Submit the scoped draft offer and print the status the server returns. Prints listed when the server lists it. Prints in review, check with the server review_reason, the message, and the next step when a check fails. Prints mode and mode_preselected from the server and does not set a mode.', {}),
     tool('status', 'Show the stored project key scope and the offer or listing state.', {}),
-    tool('digest', 'Show what went live for this project key, with an undo token.', {}),
+    tool('digest', 'Show what went live for this project key, with an undo token. When the list is cut, the output says truncated and the total. When claims are not checked yet, the output says so.', {}),
     tool('undo', 'Undo the latest digest item for this project key.', {}),
     tool('kill', 'Turn the kill switch on for this project.', {}),
     ...SESSION_ONLY.map((item) => tool(item.tool, `Session-only. ${item.label}. Returns a sign-in link and does not call the API.`, {

@@ -1,0 +1,8 @@
+.affilio-product-link,
+p[class*="affilio-placement-"] a[rel~="sponsored"] {
+  display: inline-block;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 12px;
+  line-height: 24px;
+}

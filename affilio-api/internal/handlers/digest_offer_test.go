@@ -54,17 +54,20 @@ SELECT product_id,'submitted',commission_type,commission_value,landing_url FROM 
 		seen[id] = true
 		switch id {
 		case listedID:
-			if item["status"] != "listed" || item["review_reason"] != nil || item["message"] != nil || item["live_now"] != true {
+			if item["status"] != "listed" || item["review_reason"] != nil || item["message"] != nil || item["live_now"] != true || item["claims_check"] != "not_checked" {
 				t.Fatalf("listed offer: %v", item)
 			}
 		case submittedID:
-			if item["status"] != "submitted" || item["review_reason"] != "claims" || item["message"] != "The claims check is not live yet." || item["live_now"] != false {
+			if item["status"] != "submitted" || item["review_reason"] != "claims" || item["message"] != "Claims are not checked yet." || item["live_now"] != false || item["claims_check"] != "not_checked" {
 				t.Fatalf("submitted offer: %v", item)
 			}
 		}
 	}
 	if !seen[listedID] || !seen[submittedID] {
 		t.Fatalf("offers missing: %v", seen)
+	}
+	if body["claims_check"] != "not_checked" {
+		t.Fatalf("stub digest claims_check: %s", rec.Body.String())
 	}
 }
 

@@ -1391,10 +1391,28 @@ VALUES($1,'or_digo',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPI
 	if accountBlocked.Code != http.StatusForbidden {
 		t.Fatalf("offer project key account digest: %d %s", accountBlocked.Code, accountBlocked.Body.String())
 	}
+	otherSite := createTestSite(t, db, "digest-other-site-key", "digest-other.example", "Other")
+	ownID := insertPlacement(t, db, siteID, offerID, "https://digest-key.example/post", "Paste Forge is worth a look.")
+	markPlacementLive(t, db, siteID, offerID, ownID, "digest-own", "https://digest-key.example/post")
+	otherID := insertPlacement(t, db, otherSite, offerID, "https://digest-other.example/post", "Other site box.")
+	markPlacementLive(t, db, otherSite, offerID, otherID, "digest-other", "https://digest-other.example/post")
 	siteDigest, siteBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-API-Key": siteKey})
-	errText, _ := siteBody["error"].(string)
-	if siteDigest.Code != http.StatusForbidden || !strings.Contains(errText, "project key") {
+	if siteDigest.Code != http.StatusOK {
 		t.Fatalf("site project digest: %d %s", siteDigest.Code, siteDigest.Body.String())
+	}
+	siteItems, _ := siteBody["items"].([]any)
+	if len(siteItems) != 1 || siteItems[0].(map[string]any)["id"] != ownID || siteItems[0].(map[string]any)["kind"] != "placement" || siteBody["truncated"] != false {
+		t.Fatalf("site project digest scope: %s", siteDigest.Body.String())
+	}
+	agentKey := "or_digest_agent_key"
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO publisher_agent_keys(key_hash,site_id,expires_at)
+VALUES($1,$2,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(agentKey), siteID); err != nil {
+		t.Fatal(err)
+	}
+	agentDigest, agentBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-API-Key": agentKey})
+	agentErr, _ := agentBody["error"].(string)
+	if agentDigest.Code != http.StatusForbidden || !strings.Contains(agentErr, "agent key") {
+		t.Fatalf("agent digest: %d %s", agentDigest.Code, agentDigest.Body.String())
 	}
 	ownerDenied, ownerDeniedBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-Maker-Key": offerKey})
 	if ownerDenied.Code != http.StatusForbidden || ownerDeniedBody["reason"] != "forbidden_key_type" {

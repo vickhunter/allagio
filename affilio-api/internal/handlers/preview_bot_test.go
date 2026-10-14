@@ -64,8 +64,16 @@ func TestPreviewBotsAndHeadRedirectWithoutClicks(t *testing.T) {
 	if strings.Contains(head.Header().Get("Location"), "via=") {
 		t.Fatalf("HEAD must not carry attribution, got %q", head.Header().Get("Location"))
 	}
-	if n := clickCount(t, db); n != 1 {
-		t.Fatalf("previews and HEAD must not insert clicks, got %d", n)
+	want := 1 + len(previews) + 1
+	if n := clickCount(t, db); n != want {
+		t.Fatalf("previews and HEAD are stored as unknown clicks, got %d want %d", n, want)
+	}
+	var paid, unknown int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FILTER (WHERE click_class='browser'), COUNT(*) FILTER (WHERE click_class='unknown') FROM clicks`).Scan(&paid, &unknown); err != nil {
+		t.Fatal(err)
+	}
+	if paid != 1 || unknown != len(previews)+1 {
+		t.Fatalf("paid %d unknown %d", paid, unknown)
 	}
 }
 

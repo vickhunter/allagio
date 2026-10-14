@@ -982,6 +982,27 @@ func (d *DB) CountDigestPlacements(ctx context.Context, siteID string, since tim
 	return n, err
 }
 
+func (d *DB) CountDigestOffers(ctx context.Context, makerID string, since time.Time) (int, error) {
+	var n int
+	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*)
+FROM offers o JOIN products p ON p.id=o.product_id
+WHERE p.maker_id=$1 AND o.status IN ('listed','submitted')
+AND (
+  o.status = 'submitted'
+  OR o.updated_at > ($2::timestamptz AT TIME ZONE current_setting('TimeZone'))
+)`, makerID, since.UTC()).Scan(&n)
+	return n, err
+}
+
+func (d *DB) CountMakerDigestOffers(ctx context.Context, makerID, offerID string) (int, error) {
+	var n int
+	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*)
+FROM offers o JOIN products p ON p.id=o.product_id
+WHERE p.maker_id=$1 AND o.status IN ('listed','submitted')
+AND ($2 = '' OR o.id::text = $2)`, makerID, offerID).Scan(&n)
+	return n, err
+}
+
 // digestPostTitleSQL is the WordPress article title. The plugin sends it on
 // prepare or receipt. The box copy is not a title. A prepare that omits the
 // title and matches no article returns an empty string. The UI uses the URL path.

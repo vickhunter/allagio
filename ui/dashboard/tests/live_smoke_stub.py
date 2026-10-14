@@ -1,6 +1,6 @@
 """Live smoke (v9), CLAIMS_CHECK=stub server: python3 tests/live_smoke_stub.py <sha> <port> <oidc_port> <proof_subdir>
 Follows d024-local/checks-<sha>-claims.py (read, not edited): register site (plugin_key), owner via fake OIDC, untrusted maker
-(email != owner) -> submitted/claims/'The claims check is not live yet.'; trusted maker (admin trust) -> listed. Product readiness is set
+(email != owner) -> submitted/claims/'Claims are not checked yet.'; trusted maker (admin trust) -> listed. Product readiness is set
 'ready' in the local test DB the same way the d024 check does, so only the claims check can hold the offer.
 UI: the owner digest at these SHAs does not carry review_reason (maker routes only), so the page gets the server's real /v1/account/digest
 plus one offer section whose item is the untrusted maker's real GET /v1/maker/offers/:id (status, review_reason, message verbatim).
@@ -39,8 +39,8 @@ def maker(email, pname, trusted):
     return r, g, o, p
 mail_u = 'maker-%s@uismoke-maker.test' % tag
 r, g, o, p = maker(mail_u, 'Northwind Ledger', False); ju = r.json(); gu = g.json()
-rec('untrusted maker (%s != owner) -> submitted, review_reason claims, "The claims check is not live yet."' % mail_u.split('@')[1],
-    r.status_code == 200 and ju.get('status') == 'submitted' and ju.get('review_reason') == 'claims' and ju.get('message') == 'The claims check is not live yet.' and gu.get('status') == 'submitted',
+rec('untrusted maker (%s != owner) -> submitted, review_reason claims, "Claims are not checked yet."' % mail_u.split('@')[1],
+    r.status_code == 200 and ju.get('status') == 'submitted' and ju.get('review_reason') == 'claims' and ju.get('message') == 'Claims are not checked yet.' and gu.get('status') == 'submitted',
     '%d %s' % (r.status_code, {k: ju.get(k) for k in ('status', 'review_reason', 'message')}))
 r3, g3, o3, p3 = maker('trusted-%s@uismoke-maker.test' % tag, 'Southwind Ledger', True); j3 = r3.json()
 rec('trusted maker still lists directly', r3.status_code == 200 and j3.get('status') == 'listed' and not j3.get('review_reason'), '%d %s' % (r3.status_code, {k: j3.get(k) for k in ('status', 'review_reason')}))
@@ -76,7 +76,7 @@ try:
             ok = pg.locator(sel).count() == 1
             t = ' '.join(pg.locator(sel).inner_text().split()) if ok else ''
             rec('%d in-review screen: claims in plain words + server message + next step, no time' % w,
-                ok and 'checking the offer\u2019s claims against the merchant page' in t and '\u201cThe claims check is not live yet.\u201d' in t and 'Next step:' in t
+                ok and 'Claims are not checked yet.' in t and '\u201cClaims are not checked yet.\u201d' in t and 'Next step:' in t
                 and not any(x in t.lower() for x in ('minute', 'hour', 'today', 'tomorrow', 'soon', 'within')), t[:220])
             if ok: pg.locator(sel).scroll_into_view_if_needed()
             pg.screenshot(path='%s/live-in-review-claims-%d.png' % (PROOF, w))

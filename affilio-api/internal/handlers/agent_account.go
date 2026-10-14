@@ -157,6 +157,7 @@ func (h *AgentEntry) AccountDigest(c *gin.Context) {
 		projects = append(projects, gin.H{
 			"kind": project.Kind, "id": project.ID, "name": project.Name, "mode": project.Mode,
 			"went_live": project.WentLive, "clicks": project.Clicks, "total_items": project.TotalItems,
+			"truncated": project.TotalItems > len(items),
 			"earnings": earningsList(project.Earnings), "clicks_by_source": sourceJSON(project.ClicksBySource),
 			"items": items,
 		})

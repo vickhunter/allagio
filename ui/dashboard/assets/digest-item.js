@@ -60,9 +60,9 @@
   OR.whoText = whoText;
   // 2d3aed7 review_reason -> which check is holding the listing, in plain words, and the next step. No times are promised.
   var REVIEW = {
-    claims: { check: 'We\u2019re checking the offer\u2019s claims against the merchant page.',
+    claims: { check: 'Claims are not checked yet.',
       next: 'Nothing to do for now. If the copy uses a number the offer doesn\u2019t show, change the copy to match the offer and submit again.' },
-    head: { check: 'The offer page didn\u2019t answer when we checked it.', next: 'Make sure the offer link opens in a browser, then submit again.' },
+    head: { check: 'The offer page did not answer.', next: 'Make sure the offer link opens in a browser, then submit again.' },
     relevance: { check: 'The offer scored below the minimum relevance.', next: 'Make the offer\u2019s description say plainly what the product does, then submit again.' },
     caps: { check: 'You already have as many offers listed as the cap allows.', next: 'End or pause a listed offer to make room, then submit again.' }
   };

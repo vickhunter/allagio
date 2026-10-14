@@ -90,9 +90,10 @@ func (h *TrackingHandler) TrackClick(c *gin.Context) {
 		}
 	}
 
+	clickClass := ClassifyClick(c.Request.Method, userAgent, c.Request.Header)
 	_, err := h.DB.Pool.Exec(c.Request.Context(), `
-INSERT INTO clicks (site_id, article_id, recommendation_id, program_id, user_agent, referrer, ip_hash)
-VALUES ($1,$2,$3,$4,$5,$6,$7)`, siteID, nullIfEmpty(req.ArticleID), nullIfEmpty(req.RecommendationID), nullIfEmpty(req.ProgramID), userAgent, ref, ipHash)
+INSERT INTO clicks (site_id, article_id, recommendation_id, program_id, user_agent, referrer, ip_hash, click_class)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, siteID, nullIfEmpty(req.ArticleID), nullIfEmpty(req.RecommendationID), nullIfEmpty(req.ProgramID), userAgent, ref, ipHash, clickClass)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record"})
 		return

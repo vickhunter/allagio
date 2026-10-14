@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Affilio
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.24
+ * Version: 0.1.25
  * Author: Affilio
  */
 
@@ -15,7 +15,7 @@ if (defined('AFFILIO_LOADED')) {
 }
 define('AFFILIO_LOADED', true);
 
-define('AFFILIO_VERSION', '0.1.24');
+define('AFFILIO_VERSION', '0.1.25');
 
 if (!defined('AFFILIO_PLUGIN_ACK_HEADER')) {
     define('AFFILIO_PLUGIN_ACK_HEADER', 'X-Plugin-Key');
@@ -109,6 +109,7 @@ function affilio_init() {
     add_filter('redirect_canonical', array('Affilio_Go', 'bypass_canonical'), 0, 2);
     add_action('affilio_sync_plugin_boxes', array($distribution, 'sync_known_boxes'));
     add_action('init', array($distribution, 'maybe_upgrade'), 20);
+    add_action('wp_enqueue_scripts', 'affilio_enqueue_placement_styles');
     if (defined('WP_CLI') && WP_CLI) {
         require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-cli.php';
         WP_CLI::add_command('affilio revert', new Affilio_Revert_Command($distribution));
@@ -117,6 +118,12 @@ function affilio_init() {
 }
 
 add_action('plugins_loaded', 'affilio_init');
+
+if (!function_exists('affilio_enqueue_placement_styles')) {
+function affilio_enqueue_placement_styles() {
+    wp_enqueue_style('affilio-placement', AFFILIO_PLUGIN_URL . 'public/css/placement.css', array(), AFFILIO_VERSION);
+}
+}
 
 if (!function_exists('affilio_request_is_admin_post')) {
 function affilio_request_is_admin_post() {
