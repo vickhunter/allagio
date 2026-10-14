@@ -174,14 +174,16 @@ class Affilio_Admin {
         $job = get_option('affilio_scan_all_job', array());
         if (isset($_GET['affilio_scan_continue']) && is_array($job) && $job) {
             $so_far = isset($job['scanned']) ? (int) $job['scanned'] : 0;
-            echo '<form id="affilio-scan-continue" method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
-            wp_nonce_field('affilio_scan_all');
-            echo '<input type="hidden" name="action" value="affilio_scan_all">';
-            echo '<input type="hidden" name="affilio_scan_continue" value="1">';
+            $token = isset($job['continue_token']) ? (string) $job['continue_token'] : '';
             echo '<p>' . esc_html($this->t('Scanning… ' . $so_far . ' posts analyzed so far.', 'Scansione in corso… ' . $so_far . ' articoli analizzati finora.')) . '</p>';
-            submit_button($this->t('Continue scan', 'Continua la scansione'));
-            echo '</form>';
-            echo '<script>document.getElementById("affilio-scan-continue").submit();</script>';
+            if ($token !== '') {
+                echo '<form id="affilio-scan-continue" method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+                echo '<input type="hidden" name="action" value="affilio_scan_all">';
+                echo '<input type="hidden" name="affilio_scan_continue" value="1">';
+                echo '<input type="hidden" name="affilio_scan_token" value="' . esc_attr($token) . '">';
+                submit_button($this->t('Continue scan', 'Continua la scansione'));
+                echo '</form>';
+            }
         }
         echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         wp_nonce_field('affilio_scan_all');
@@ -358,7 +360,10 @@ class Affilio_Admin {
         if (!current_user_can('manage_options')) {
             wp_die(esc_html($this->t('Unauthorized', 'Non autorizzato')), '', array('response' => 403));
         }
-        check_admin_referer('affilio_scan_all');
+        $continuing = isset($_POST['affilio_scan_continue']) && (string) $_POST['affilio_scan_continue'] === '1';
+        if (!$continuing) {
+            check_admin_referer('affilio_scan_all');
+        }
         delete_option('affilio_setup_redirect');
         $status = $this->api->get_connection_status();
         if (!$status['connected']) {
@@ -371,13 +376,22 @@ class Affilio_Admin {
     }
 
     public function advance_scan_all() {
-        $continue = isset($_REQUEST['affilio_scan_continue']) && (string) $_REQUEST['affilio_scan_continue'] === '1';
+        $stored = get_option('affilio_scan_all_job', array());
+        if (!is_array($stored)) {
+            $stored = array();
+        }
+        $continuing = isset($_POST['affilio_scan_continue']) && (string) $_POST['affilio_scan_continue'] === '1';
         $job = array();
-        if ($continue) {
-            $stored = get_option('affilio_scan_all_job', array());
-            if (is_array($stored)) {
-                $job = $stored;
+        if ($continuing) {
+            $token = isset($_POST['affilio_scan_token']) ? (string) $_POST['affilio_scan_token'] : '';
+            $saved = isset($stored['continue_token']) ? (string) $stored['continue_token'] : '';
+            if ($saved === '' || $token === '' || !hash_equals($saved, $token)) {
+                return array(
+                    'redirect' => admin_url('admin.php?page=affilio'),
+                    'done' => false,
+                );
             }
+            $job = $stored;
         }
         $offset = isset($job['offset']) ? (int) $job['offset'] : 0;
         $batch = $this->scanner->scan_published_batch($offset);
@@ -394,6 +408,7 @@ class Affilio_Admin {
                 'offset' => isset($batch['next_offset']) ? (int) $batch['next_offset'] : $offset + 10,
                 'scanned' => $scanned,
                 'skipped' => $skipped,
+                'continue_token' => bin2hex(random_bytes(16)),
             ), false);
             return array(
                 'redirect' => admin_url('admin.php?page=affilio&affilio_scan_continue=1'),

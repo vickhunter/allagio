@@ -173,9 +173,44 @@ class Affilio_Go {
         return $path;
     }
 
+    public static function redirect_url_allowed($url) {
+        $url = trim((string) $url);
+        if ($url === '' || strpos($url, "\n") !== false || strpos($url, "\r") !== false) {
+            return false;
+        }
+        if (self::same_redirect_target($url, self::home_fallback())) {
+            return true;
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return false;
+        }
+        return strtolower((string) $parts['scheme']) === 'https';
+    }
+
+    private static function same_redirect_target($url, $home) {
+        $normalize = function ($value) {
+            return rtrim(strtolower(trim((string) $value)), '/');
+        };
+        $url = $normalize($url);
+        $home = $normalize($home);
+        return $url !== '' && $url === $home;
+    }
+
+    private static function safe_redirect_location($url) {
+        if (self::redirect_url_allowed($url)) {
+            return $url;
+        }
+        $home = self::home_fallback();
+        if (self::redirect_url_allowed($home)) {
+            return $home;
+        }
+        return '';
+    }
+
     public static function remember_fallback($id, $url) {
         $url = trim((string) $url);
-        if ($url === '' || !preg_match('/^[a-f0-9-]{36}$/i', (string) $id) || !function_exists('get_option') || !function_exists('update_option')) {
+        if ($url === '' || !self::redirect_url_allowed($url) || !preg_match('/^[a-f0-9-]{36}$/i', (string) $id) || !function_exists('get_option') || !function_exists('update_option')) {
             return;
         }
         $all = get_option(AFFILIO_GO_FALLBACKS_OPTION, array());
@@ -331,12 +366,12 @@ class Affilio_Go {
         $until = function_exists('get_option') ? (int) get_option(AFFILIO_GO_CIRCUIT_OPTION, 0) : 0;
         if ($until > time()) {
             $this->log_fallback($placement_id, 'circuit_open');
-            return $fallback;
+            return self::safe_redirect_location($fallback);
         }
         $response = $this->call_upstream($placement_id);
         $location = trim(self::location_header($response));
         $code = self::response_code($response);
-        if (!is_wp_error($response) && $code === 302 && $location !== '' && strpos($location, "\n") === false && strpos($location, "\r") === false) {
+        if (!is_wp_error($response) && $code === 302 && self::redirect_url_allowed($location)) {
             return $location;
         }
         $transport_failed = is_wp_error($response);
@@ -351,7 +386,7 @@ class Affilio_Go {
         }
         $reason = $transport_failed ? 'upstream_failed' : 'upstream_status_' . $code;
         $this->log_fallback($placement_id, $reason);
-        return $fallback;
+        return self::safe_redirect_location($fallback);
     }
 
     public function handle() {
@@ -363,6 +398,13 @@ class Affilio_Go {
         self::send_headers();
         $location = $this->resolve($id);
         if ($location === '') {
+            self::send_not_found();
+            exit;
+        }
+        if (!self::redirect_url_allowed($location)) {
+            $location = self::home_fallback();
+        }
+        if (!self::redirect_url_allowed($location)) {
             self::send_not_found();
             exit;
         }

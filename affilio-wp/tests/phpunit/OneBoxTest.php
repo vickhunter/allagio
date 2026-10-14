@@ -55,6 +55,15 @@ class OneBoxTest extends TestCase {
     /**
      * @runInSeparateProcess
      */
+    public function test_go_rejects_unsafe_urls() {
+        require_once dirname(__DIR__) . '/d033-one-box.php';
+        affilio_review_go_rejects_unsafe_urls();
+        $this->assertTrue(true);
+    }
+
+    /**
+     * @runInSeparateProcess
+     */
     public function test_prepare_and_receipt_send_decoded_title() {
         require_once dirname(__DIR__) . '/d033-one-box.php';
         affilio_review_prepare_and_receipt_send_decoded_title();

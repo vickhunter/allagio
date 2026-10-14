@@ -53,4 +53,14 @@ class WalkBlockersTest extends TestCase {
         affilio_walk_upgrade_then_front_page();
         $this->assertTrue(true);
     }
+
+    public function test_sync_cron_returns_on_load() {
+        affilio_walk_sync_cron_returns_on_load();
+        $this->assertTrue(true);
+    }
+
+    public function test_scheduled_sync_removes_revoked_box() {
+        affilio_walk_scheduled_sync_removes_revoked_box();
+        $this->assertTrue(true);
+    }
 }

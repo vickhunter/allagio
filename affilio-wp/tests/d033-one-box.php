@@ -3,7 +3,7 @@
 require __DIR__ . '/d033-harness.php';
 
 if (!defined('AFFILIO_VERSION')) {
-    define('AFFILIO_VERSION', '0.1.22');
+    define('AFFILIO_VERSION', '0.1.23');
 }
 require __DIR__ . '/../includes/class-affilio-plugin-ack.php';
 require __DIR__ . '/../includes/class-affilio-go.php';
@@ -346,6 +346,61 @@ function affilio_review_local_refuse_then_prepare_keeps_one_box() {
     check(strpos($post->post_content, $first) === false, 'the refused box came back');
 }
 
+function affilio_review_go_rejects_unsafe_urls() {
+    d033_log_file();
+    $id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    affilio_one_box_reset('<p>Go.</p>');
+    unset($GLOBALS['http_handler']);
+    delete_option(AFFILIO_GO_CIRCUIT_OPTION);
+    $GLOBALS['options'][AFFILIO_GO_FALLBACKS_OPTION] = array($id => 'https://shop.example/plain');
+    $go = new Affilio_Go();
+    foreach (array('http://shop.example/landed', 'javascript:alert(1)') as $unsafe) {
+        $GLOBALS['http_response'] = array(
+            'response' => array('code' => 302),
+            'headers' => array('Location' => $unsafe),
+            'body' => '',
+        );
+        $location = $go->resolve($id);
+        check($location !== $unsafe, 'unsafe Location was used: ' . $unsafe);
+        check(stripos((string) $location, 'javascript:') === false, 'javascript Location was used');
+        check(strpos((string) $location, 'http://') !== 0, 'http Location was used: ' . $location);
+        check($location === 'https://shop.example/plain', 'unsafe Location did not fall back safely: ' . $location);
+    }
+    unset($GLOBALS['http_response']);
+    $GLOBALS['options'][AFFILIO_GO_FALLBACKS_OPTION] = array();
+    $GLOBALS['http_handler'] = function () {
+        return array(
+            'response' => array('code' => 302),
+            'headers' => array('Location' => 'javascript:alert(1)'),
+            'body' => '',
+        );
+    };
+    check($go->resolve($id) === 'https://blog.example/', 'an unsafe Location with no fallback was not sent home');
+    $_SERVER['REQUEST_URI'] = '/go/' . $id;
+    $GLOBALS['options'][AFFILIO_GO_FALLBACKS_OPTION] = array($id => 'https://shop.example/plain');
+    try {
+        $go->handle();
+        check(false, 'unsafe Location did not redirect');
+    } catch (RuntimeException $redirect) {
+        check(strpos($redirect->getMessage(), 'javascript:') === false, 'handle redirected to javascript: ' . $redirect->getMessage());
+        check(strpos($redirect->getMessage(), 'http://') === false, 'handle redirected to http: ' . $redirect->getMessage());
+        check(strpos($redirect->getMessage(), 'https://shop.example/plain') !== false, 'handle did not fall back safely: ' . $redirect->getMessage());
+    }
+    unset($GLOBALS['http_handler']);
+
+    Affilio_Go::remember_fallback($id, 'http://shop.example/nope');
+    Affilio_Go::remember_fallback($id, 'javascript:alert(1)');
+    $stored = get_option(AFFILIO_GO_FALLBACKS_OPTION, array());
+    check(isset($stored[$id]) && $stored[$id] === 'https://shop.example/plain', 'an unsafe fallback replaced the saved URL');
+    Affilio_Go::remember_fallback($id, 'https://shop.example/kept');
+    $stored = get_option(AFFILIO_GO_FALLBACKS_OPTION, array());
+    check(isset($stored[$id]) && $stored[$id] === 'https://shop.example/kept', 'an https fallback was not stored');
+    check(Affilio_Go::redirect_url_allowed(Affilio_Go::home_fallback()) === true, 'the site home URL was rejected');
+    check(Affilio_Go::redirect_url_allowed('https://merchant.example/product') === true, 'an https Location was rejected');
+    check(Affilio_Go::redirect_url_allowed('http://merchant.example/product') === false, 'an http Location was accepted');
+    check(Affilio_Go::redirect_url_allowed('javascript:alert(1)') === false, 'a javascript Location was accepted');
+}
+
 function affilio_review_unknown_go_id_is_404() {
     d033_log_file();
     $id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -380,6 +435,7 @@ if (!function_exists('affilio_review_run_all')) {
         affilio_review_prepare_and_receipt_send_decoded_title();
         affilio_review_local_refuse_then_prepare_keeps_one_box();
         affilio_review_unknown_go_id_is_404();
+        affilio_review_go_rejects_unsafe_urls();
         echo "One box per post and go-link fallback passed.\n";
     }
 }

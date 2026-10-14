@@ -163,6 +163,12 @@ if (!function_exists('is_wp_error')) {
 if (!class_exists('Affilio_API')) {
     class Affilio_API {
         public static function resolve_base_url() { return 'https://api.example.test/v1'; }
+        public function request($method, $path, $body = null) {
+            if (isset($GLOBALS['affilio_api_request']) && is_callable($GLOBALS['affilio_api_request'])) {
+                return call_user_func($GLOBALS['affilio_api_request'], $method, $path, $body);
+            }
+            return array('code' => 200, 'data' => array());
+        }
     }
 }
 

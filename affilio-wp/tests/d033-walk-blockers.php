@@ -39,6 +39,10 @@ function affilio_walk_install_stubs() {
             return isset($GLOBALS['cron'][$hook]) ? $GLOBALS['cron'][$hook]['time'] : false;
         }
         function wp_schedule_event($timestamp, $schedule, $hook) {
+            if (!isset($GLOBALS['cron_schedule_calls'][$hook])) {
+                $GLOBALS['cron_schedule_calls'][$hook] = 0;
+            }
+            $GLOBALS['cron_schedule_calls'][$hook]++;
             $GLOBALS['cron'][$hook] = array('time' => $timestamp, 'schedule' => $schedule);
             return true;
         }
@@ -510,6 +514,86 @@ if (!class_exists('Affilio_Walk_Query')) {
     }
 }
 
+function affilio_walk_sync_cron_returns_on_load() {
+    affilio_walk_boot();
+    $saved_rewrite = isset($GLOBALS['wp_rewrite']) ? $GLOBALS['wp_rewrite'] : null;
+    $GLOBALS['wp_rewrite'] = null;
+    update_option('affilio_seen_version', AFFILIO_VERSION);
+    delete_option('affilio_go_flush_pending');
+    $GLOBALS['cron'] = array();
+    $GLOBALS['cron_schedule_calls'] = array();
+    check(wp_next_scheduled('affilio_sync_plugin_boxes') === false, 'box sync was already scheduled');
+    affilio_walk_do_action('init');
+    check(isset($GLOBALS['cron']['affilio_sync_plugin_boxes']), 'load did not schedule box sync');
+    check($GLOBALS['cron']['affilio_sync_plugin_boxes']['schedule'] === 'affilio_five_minutes', 'load scheduled the wrong recurrence');
+    $calls = isset($GLOBALS['cron_schedule_calls']['affilio_sync_plugin_boxes']) ? (int) $GLOBALS['cron_schedule_calls']['affilio_sync_plugin_boxes'] : 0;
+    check($calls === 1, 'load scheduled box sync ' . $calls . ' times');
+    $stamp = $GLOBALS['cron']['affilio_sync_plugin_boxes']['time'];
+    affilio_walk_do_action('init');
+    check((int) $GLOBALS['cron_schedule_calls']['affilio_sync_plugin_boxes'] === 1, 'a second load scheduled another box sync');
+    check($GLOBALS['cron']['affilio_sync_plugin_boxes']['time'] === $stamp, 'a second load replaced the scheduled event');
+    check(count($GLOBALS['cron']) === 1, 'load created more than one cron event');
+
+    wp_clear_scheduled_hook('affilio_sync_plugin_boxes');
+    check(!isset($GLOBALS['cron']['affilio_sync_plugin_boxes']), 'unschedule did not remove the event');
+    affilio_walk_do_action('init');
+    check(isset($GLOBALS['cron']['affilio_sync_plugin_boxes']), 'load did not restore a deleted event');
+    check($GLOBALS['cron']['affilio_sync_plugin_boxes']['schedule'] === 'affilio_five_minutes', 'the restored event used the wrong recurrence');
+    check((int) $GLOBALS['cron_schedule_calls']['affilio_sync_plugin_boxes'] === 2, 'restoring the event scheduled it more than once');
+    check(count($GLOBALS['cron']) === 1, 'restoring the event created a duplicate');
+    affilio_walk_do_action('init');
+    check((int) $GLOBALS['cron_schedule_calls']['affilio_sync_plugin_boxes'] === 2, 'a later load duplicated the restored event');
+    $GLOBALS['wp_rewrite'] = $saved_rewrite;
+}
+
+function affilio_walk_scheduled_sync_removes_revoked_box() {
+    affilio_walk_boot();
+    if (empty($GLOBALS['actions']['affilio_sync_plugin_boxes'])) {
+        affilio_init();
+    }
+    $sync = null;
+    foreach ($GLOBALS['actions']['affilio_sync_plugin_boxes'] as $callback) {
+        if (is_array($callback) && $callback[1] === 'sync_known_boxes') {
+            $sync = $callback;
+            break;
+        }
+    }
+    check($sync !== null, 'affilio_sync_plugin_boxes is not bound to sync_known_boxes');
+    $GLOBALS['actions']['affilio_sync_plugin_boxes'] = array($sync);
+    $id = '12121212-1212-1212-1212-121212121212';
+    $post = (object) array(
+        'ID' => 4242,
+        'post_type' => 'post',
+        'post_status' => 'publish',
+        'post_title' => 'Revoked on the server',
+        'post_content' => affilio_walk_box($id),
+    );
+    $GLOBALS['posts'] = array($post);
+    $GLOBALS['post'] = $post;
+    $GLOBALS['options']['affilio_plugin_key'] = 'plugin-only-key';
+    update_option('affilio_box_index', array(
+        $id => array('post_id' => 4242, 'phase' => 'placed', 'copy' => 'Tool', 'disclosure' => '(link sponsorizzato)'),
+    ));
+    update_option(Affilio_Distribution::ack_queue_option(), array());
+    $GLOBALS['http'] = array();
+    unset($GLOBALS['http_handler']);
+    $GLOBALS['affilio_api_request'] = function ($method, $path) use ($id) {
+        if ($method === 'GET' && strpos((string) $path, '/placements/' . $id) !== false) {
+            return array('code' => 200, 'data' => array(
+                'id' => $id,
+                'status' => 'revoked',
+                'plugin_state' => 'pending',
+            ));
+        }
+        return array('code' => 200, 'data' => array());
+    };
+    affilio_walk_do_action('affilio_sync_plugin_boxes');
+    unset($GLOBALS['affilio_api_request']);
+    check(strpos($post->post_content, 'affilio-placement-' . $id) === false, 'scheduled sync left a revoked box on the post');
+    $acks = d033_ack_bodies();
+    check(count($acks) === 1 && $acks[0]['body']['action'] === 'removed', 'scheduled sync did not acknowledge the removal');
+}
+
 function affilio_walk_run_all() {
     affilio_walk_b1_front_page_does_not_call_get_query_var();
     affilio_walk_b2_upgrade_saves_marker_after_partial_failure();
@@ -520,6 +604,8 @@ function affilio_walk_run_all() {
     affilio_walk_b7_publish_matches_article_url_or_post_id();
     affilio_walk_circuit_opens_only_for_5xx_and_timeouts();
     affilio_walk_upgrade_then_front_page();
+    affilio_walk_sync_cron_returns_on_load();
+    affilio_walk_scheduled_sync_removes_revoked_box();
     echo "D-033 walk blockers passed.\n";
 }
 

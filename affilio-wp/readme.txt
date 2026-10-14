@@ -1,11 +1,16 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.22
+Stable tag: 0.1.23
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.23 =
+* If the five-minute box sync is not scheduled, the next load schedules it again. A second load does not add another event. A placement revoked on the server is removed from the post when that sync runs.
+* A go-link redirect accepts an https address, or this site's own home URL. An http or javascript address is not used, including as a remembered fallback.
+* Opening the scan page with ?affilio_scan_continue=1 does not submit the next batch and does not mint a nonce. The next batch runs only from the POST that created the job.
 
 = 0.1.22 =
 * Prepare and the publication receipt send the article's decoded WordPress title and post id.

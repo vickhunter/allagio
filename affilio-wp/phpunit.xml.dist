@@ -8,6 +8,7 @@
             <file>tests/phpunit/WalkBlockersTest.php</file>
             <file>tests/phpunit/N2ErrorsTest.php</file>
             <file>tests/phpunit/OneBoxTest.php</file>
+            <file>tests/phpunit/ScanContinueTest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>

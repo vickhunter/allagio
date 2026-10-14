@@ -1,3 +1,9 @@
+## October 14 — plugin 0.1.23 restores a missing box sync
+
+`affilio_sync_plugin_boxes` is scheduled again on `init` when `wp_next_scheduled` says it is gone. The same five-minute interval is used. A load that finds the event already scheduled does nothing, so the event is not duplicated. Deactivation still clears it. The next time that sync runs, a placement the server reports as revoked is removed from the post.
+
+A `/go/<id>` redirect uses a Location from the API only when it is https, or when it is this site's own home URL. `remember_fallback` stores a fallback URL only when it passes that same check. Anything else sends the reader to a safe fallback, or home. The dashboard URL `?affilio_scan_continue=1` does not auto-submit and does not mint a scan nonce. The next batch runs only when the POST presents the continuation token stored with the job. The stale `builds/offer-rails/d033/affilio-0.1.19.zip` is removed.
+
 ## October 14 — API origin, stable plugin zip name
 
 A saved API URL that is only an origin, or an origin with a trailing slash, is stored and called as that origin plus `/v1`. `POST /placements/{id}/refuse` with a bare-origin setting goes to `/v1/placements/{id}/refuse`. `scripts/package-wp-zip` writes `affilio-<header version>.zip` (a requested `affilio-0.1.19.zip` becomes `affilio-0.1.22.zip`). Zip entry names are sorted and every timestamp is 1980-01-01, so two builds of the same checkout have the same sha256. The release-gate test skips, instead of exiting 128, when the directory is not a git checkout.
