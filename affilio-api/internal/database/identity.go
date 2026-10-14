@@ -63,6 +63,23 @@ RETURNING id`, o.Issuer, o.Subject, o.Email, o.Name, source).Scan(&o.ID)
 	if err != nil {
 		return err
 	}
+	email := strings.ToLower(strings.TrimSpace(o.Email))
+	if email != "" {
+		// A verified sign-in links an existing maker with this email when no
+		// other owner already holds it. It does not take a publisher site.
+		_, err = tx.Exec(ctx, `UPDATE owners o SET maker_id = picked.id
+FROM (
+  SELECT m.id FROM makers m
+  WHERE lower(m.email) = lower($2)
+    AND NOT EXISTS (SELECT 1 FROM owners other WHERE other.maker_id = m.id)
+  ORDER BY m.created_at ASC
+  LIMIT 1
+) picked
+WHERE o.id = $1 AND o.maker_id IS NULL`, o.ID, email)
+		if err != nil {
+			return err
+		}
+	}
 	_, err = tx.Exec(ctx, `INSERT INTO owner_sessions VALUES($1,$2,$3,NOW()+INTERVAL '8 hours')`, tokenHash, o.ID, csrf)
 	if err != nil {
 		return err
@@ -71,10 +88,18 @@ RETURNING id`, o.Issuer, o.Subject, o.Email, o.Name, source).Scan(&o.ID)
 }
 
 func (d *DB) OwnerSession(ctx context.Context, hash string) (*Owner, error) {
+	o, _, err := d.OwnerSessionExpiry(ctx, hash)
+	return o, err
+}
+
+// OwnerSessionExpiry returns the signed-in owner and the session expiry.
+// Sessions last eight hours from the sign-in that created them.
+func (d *DB) OwnerSessionExpiry(ctx context.Context, hash string) (*Owner, time.Time, error) {
 	var o Owner
-	err := d.Pool.QueryRow(ctx, `SELECT o.id,o.issuer,o.subject,o.email,o.name,COALESCE(o.site_id::text,''),COALESCE(o.maker_id::text,''),s.csrf
-FROM owner_sessions s JOIN owners o ON o.id=s.owner_id WHERE s.token_hash=$1 AND s.expires_at>NOW()`, hash).Scan(&o.ID, &o.Issuer, &o.Subject, &o.Email, &o.Name, &o.SiteID, &o.MakerID, &o.CSRF)
-	return &o, err
+	var expires time.Time
+	err := d.Pool.QueryRow(ctx, `SELECT o.id,o.issuer,o.subject,o.email,o.name,COALESCE(o.site_id::text,''),COALESCE(o.maker_id::text,''),s.csrf,s.expires_at
+FROM owner_sessions s JOIN owners o ON o.id=s.owner_id WHERE s.token_hash=$1 AND s.expires_at>NOW()`, hash).Scan(&o.ID, &o.Issuer, &o.Subject, &o.Email, &o.Name, &o.SiteID, &o.MakerID, &o.CSRF, &expires)
+	return &o, expires, err
 }
 
 func (d *DB) EndOwnerSession(ctx context.Context, hash string) error {
@@ -285,6 +310,8 @@ func (d *DB) RevokeOwnerGrant(ctx context.Context, ownerID, grantID string) (boo
 
 func (d *DB) ApproveOwnerPlacement(ctx context.Context, o *Owner, id string) (bool, error) {
 	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals pp SET status='approved',approved_at=NOW(),approved_by=$3,
+approved_by_kind='owner', matched_rule='owner',
+policy_version=COALESCE((SELECT version FROM approval_policies WHERE site_id=pp.site_id),0),
 approval_evidence=jsonb_build_object('method','owner_session','owner_id',$3::text,'issuer',$4::text,'subject',$5::text)::text
 FROM offers f JOIN products p ON p.id=f.product_id JOIN makers m ON m.id=p.maker_id
 WHERE pp.id=$1 AND pp.site_id=$2 AND pp.offer_id=f.id AND pp.status='pending' AND pp.expires_at>NOW()

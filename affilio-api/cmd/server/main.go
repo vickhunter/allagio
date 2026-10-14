@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -12,6 +11,7 @@ import (
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
 	"affilio-api/internal/dcp"
+	"affilio-api/internal/entry"
 	"affilio-api/internal/handlers"
 	"affilio-api/internal/middleware"
 	"affilio-api/internal/migrations"
@@ -22,7 +22,13 @@ import (
 
 func main() {
 	cfg := config.Load()
+	if err := cfg.ValidateSecrets(); err != nil {
+		log.Fatalf("refusing to start: %v", err)
+	}
 	if err := cfg.ValidateRuntime(); err != nil {
+		log.Fatalf("refusing to start: %v", err)
+	}
+	if err := cfg.ValidateClaims(); err != nil {
 		log.Fatalf("refusing to start: %v", err)
 	}
 	ctx := context.Background()
@@ -42,9 +48,10 @@ func main() {
 	defer audit.Close()
 
 	r := gin.New()
-	r.Use(gin.LoggerWithFormatter(func(p gin.LogFormatterParams) string {
-		return fmt.Sprintf("%s %d %s %s %s\n", p.TimeStamp.Format(time.RFC3339), p.StatusCode, p.Method, p.Request.URL.Path, p.Latency)
-	}), gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ any) { log.Print("request panic recovered"); c.AbortWithStatus(500) }))
+	r.Use(gin.LoggerWithFormatter(middleware.AccessLogFormatter), gin.CustomRecoveryWithWriter(io.Discard, func(c *gin.Context, _ any) {
+		log.Print(middleware.ScrubLoggedIPs("request panic recovered"))
+		c.AbortWithStatus(500)
+	}))
 	if err := middleware.ConfigureTrustedProxies(r, cfg.TrustedProxies); err != nil {
 		log.Fatalf("failed to set trusted proxies: %v", err)
 	}
@@ -131,8 +138,8 @@ func main() {
 		RegisterLimiter: handlers.NewIPRateLimiter(8, time.Minute),
 	}
 	products := &handlers.ProductsHandler{DB: db}
-	offers := &handlers.OffersHandler{DB: db}
-	offerReview := &handlers.OfferReviewHandler{DB: db}
+	offers := &handlers.OffersHandler{DB: db, ClaimsCheck: cfg.ClaimsCheck}
+	offerReview := &handlers.OfferReviewHandler{DB: db, ClaimsCheck: cfg.ClaimsCheck}
 	assessments := &handlers.AssessmentsHandler{
 		DB: db,
 		Engine: &services.ReadinessEngine{
@@ -144,11 +151,13 @@ func main() {
 	}
 
 	marketplace := &handlers.MarketplaceHandler{DB: db}
-	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != ""}
+	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != "", Claims: entry.StubClaimChecker{}}
 	payouts := &handlers.PayoutsHandler{DB: db}
 	redirects := &handlers.RedirectsHandler{
-		DB:          db,
-		RateLimiter: handlers.NewIPRateLimiter(120, time.Minute),
+		DB:           db,
+		RateLimiter:  handlers.NewIPRateLimiter(120, time.Minute),
+		HomeURL:      "https://offerrails.com/",
+		IPSaltSecret: cfg.APIKeySecret,
 	}
 	var connectionCipher *services.ConnectionCipher
 	if cfg.ConnectionEncryptionKey != "" {
@@ -165,12 +174,13 @@ func main() {
 			log.Fatal(err)
 		}
 		cfg.PublicBaseURL = strings.TrimRight(cfg.PublicBaseURL, "/")
+		redirects.HomeURL = cfg.PublicBaseURL + "/"
 		assessments.Engine.PublicBaseURL = cfg.PublicBaseURL
 		login, loginErr := services.NewOIDCLogin(ctx, cfg.OIDCIssuer, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.PublicBaseURL+"/auth/callback")
 		if loginErr != nil {
 			log.Fatalf("owner sign-in configuration failed: %v", loginErr)
 		}
-		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments}
+		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments, ClaimsCheck: cfg.ClaimsCheck}
 		if err = hosted.LoadWorkspace(); err != nil {
 			log.Fatalf("workspace assets failed: %v", err)
 		}
@@ -206,11 +216,30 @@ func main() {
 	workerCtx, cancelWorker := context.WithCancel(ctx)
 	defer cancelWorker()
 	go webhooks.RunWorker(workerCtx)
+	go handlers.PurgeClickSignals(workerCtx, db)
 	mcp := &handlers.MCPHandler{
 		LoopbackURL: "http://127.0.0.1:" + cfg.Port,
 		RateLimiter: handlers.NewIPRateLimiter(240, time.Minute),
 	}
 	v1.POST("/mcp", mcp.Receive)
+
+	agentEntry := &handlers.AgentEntry{
+		DB:                 db,
+		BaseURL:            strings.TrimRight(cfg.PublicBaseURL, "/"),
+		Claims:             entry.StubClaimChecker{},
+		AccountLimiter:     handlers.NewIPRateLimiter(8, time.Minute),
+		DeviceLimiter:      handlers.NewIPRateLimiter(30, time.Minute),
+		PluginOfflineAfter: cfg.PluginOfflineAfter,
+		StatusLimiter:      handlers.NewPlacementPollLimiter(),
+		ClaimsCheck:        cfg.ClaimsCheck,
+	}
+	if hosted != nil {
+		agentEntry.Owner = hosted.RequireOwnerSession
+	}
+	agentEntry.Mount(r)
+	signals := v1.Group("/agent-signals")
+	signals.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
+	signals.GET("", agentEntry.AgentSignals)
 
 	secured := v1.Group("/")
 	secured.Use(middleware.APIKeyAuth(db, audit, oauthResources...))
@@ -258,11 +287,11 @@ func main() {
 		secured.POST("/revenue/opportunities", placements.Find)
 		secured.POST("/placements", placements.Prepare)
 		secured.GET("/placements", placements.List)
-		secured.GET("/placements/:id", placements.Get)
 		secured.POST("/placements/:id/commit", placements.Commit)
 		secured.POST("/placements/:id/receipt", placements.RecordReceipt)
+		secured.POST("/placements/:id/refuse", placements.Refuse)
 		secured.POST("/placements/:id/removed", placements.MarkRemoved)
-		secured.POST("/placements/:id/revoke", placements.Revoke)
+		// Revoke lives on AgentEntry so a site owner or the offer's maker can call it.
 		secured.GET("/marketplace/offers", marketplace.ListOffers)
 		secured.POST("/marketplace/offers/:id/join", marketplace.JoinOffer)
 
@@ -273,6 +302,7 @@ func main() {
 
 	maker := v1.Group("/maker")
 	maker.Use(middleware.MakerKeyAuth(db, oauthResources...))
+	maker.Use(middleware.LimitOfferScope())
 	{
 		maker.POST("/products", products.Create)
 		maker.GET("/products", products.List)
@@ -290,6 +320,10 @@ func main() {
 
 		maker.GET("/earnings", payouts.MakerEarnings)
 	}
+	listings := v1.Group("/listings")
+	listings.Use(middleware.MakerKeyAuth(db, oauthResources...))
+	listings.Use(middleware.LimitOfferScope())
+	listings.GET("", offers.Listings)
 
 	admin := v1.Group("/program-discovery")
 	admin.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))

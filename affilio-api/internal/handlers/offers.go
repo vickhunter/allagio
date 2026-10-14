@@ -14,6 +14,9 @@ import (
 
 type OffersHandler struct {
 	DB *database.DB
+	// ClaimsCheck is stub, real, or off-local. Empty matches off-local so a
+	// test router keeps today's four checks.
+	ClaimsCheck string
 }
 
 type offerPayload struct {
@@ -92,20 +95,27 @@ func (h *OffersHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load offer"})
 		return
 	}
-	c.JSON(http.StatusOK, offerJSON(created))
+	c.JSON(http.StatusOK, h.present(c, created))
 }
 
 func (h *OffersHandler) List(c *gin.Context) {
-	offers, err := h.DB.ListOffers(c.Request.Context(), makerID(c))
+	out, err := h.reviewed(c, false)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load offers"})
 		return
 	}
-	out := make([]gin.H, 0, len(offers))
-	for i := range offers {
-		out = append(out, offerJSON(&offers[i]))
-	}
 	c.JSON(http.StatusOK, gin.H{"offers": out})
+}
+
+// Listings is GET /v1/listings. Each item is the offer plus its card.
+// review_reason and message are null when the offer is listed.
+func (h *OffersHandler) Listings(c *gin.Context) {
+	out, err := h.reviewed(c, true)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load listings"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"listings": out})
 }
 
 func (h *OffersHandler) Get(c *gin.Context) {
@@ -118,7 +128,7 @@ func (h *OffersHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load offer"})
 		return
 	}
-	c.JSON(http.StatusOK, offerJSON(offer))
+	c.JSON(http.StatusOK, h.present(c, offer))
 }
 
 func (h *OffersHandler) Patch(c *gin.Context) {
@@ -170,7 +180,7 @@ WHERE id=$1`, offer.ID, offer.CommissionType, offer.CommissionValue, offer.Commi
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load offer"})
 		return
 	}
-	c.JSON(http.StatusOK, offerJSON(updated))
+	c.JSON(http.StatusOK, h.present(c, updated))
 }
 
 func (h *OffersHandler) Submit(c *gin.Context) {
@@ -193,8 +203,11 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 		return
 	}
 	if product.ReadinessStatus != "ready" {
+		reason, message := h.readinessReason(c.Request.Context(), product)
 		c.JSON(http.StatusConflict, gin.H{
-			"error":            "This product has not passed readiness assessment. Fix the failed checks, then submit again.",
+			"error":            readinessFailMessage,
+			"reason":           reason,
+			"message":          message,
 			"readiness_status": product.ReadinessStatus,
 		})
 		return
@@ -206,19 +219,45 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 		return
 	}
 	if trusted {
-		programID, err := h.DB.PromoteOffer(c.Request.Context(), offer.ID, offerSlug(product.Name, offer.ID))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list offer"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"id": offer.ID, "status": "listed", "program_id": programID})
+		h.listOffer(c, offer, product)
 		return
 	}
-	if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
+	if claimsHeld(h.ClaimsCheck) {
+		if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"id":            offer.ID,
+			"status":        "submitted",
+			"review_reason": reviewReasonClaims,
+			"message":       reviewClaimsNotLive,
+		})
+		return
+	}
+	listed, err := h.DB.CountListedOffers(c.Request.Context(), makerID(c))
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": offer.ID, "status": "submitted"})
+	if reason, message, failed := failedListingCheck(c.Request.Context(), h.DB, h.ClaimsCheck, *offer, *product, listed); failed {
+		if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"id": offer.ID, "status": "submitted", "review_reason": reason, "message": message})
+		return
+	}
+	h.listOffer(c, offer, product)
+}
+
+func (h *OffersHandler) listOffer(c *gin.Context, offer *database.Offer, product *database.Product) {
+	programID, err := h.DB.PromoteOffer(c.Request.Context(), offer.ID, offerSlug(product.Name, offer.ID))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list offer"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": offer.ID, "status": "listed", "program_id": programID, "review_reason": nil, "message": nil})
 }
 
 // Matches ranks the network's publishers by topical fit with the offer's
@@ -335,7 +374,85 @@ func applyOfferPayload(o *database.Offer, req *offerPayload) error {
 	return nil
 }
 
-func offerJSON(o *database.Offer) gin.H {
+func (h *OffersHandler) present(c *gin.Context, offer *database.Offer) gin.H {
+	listed, err := h.DB.CountListedOffers(c.Request.Context(), makerID(c))
+	if err != nil {
+		listed = 0
+	}
+	return h.presentWith(c, offer, listed, map[string]*database.Product{})
+}
+
+func (h *OffersHandler) presentWith(c *gin.Context, offer *database.Offer, listed int, products map[string]*database.Product) gin.H {
+	reason, message := "", ""
+	var product *database.Product
+	if offer.Status == "submitted" {
+		if claimsHeld(h.ClaimsCheck) {
+			reason, message = reviewReasonClaims, reviewClaimsNotLive
+		}
+		product = products[offer.ProductID]
+		if product == nil {
+			loaded, err := h.DB.GetProduct(c.Request.Context(), makerID(c), offer.ProductID)
+			if err == nil {
+				product = loaded
+				products[offer.ProductID] = loaded
+			}
+		}
+		if product != nil && !claimsHeld(h.ClaimsCheck) {
+			reason, message = listingReview(c.Request.Context(), h.DB, h.ClaimsCheck, *offer, *product, listed)
+		}
+	}
+	item := offerJSON(offer, reason, message)
+	if product == nil {
+		if cached := products[offer.ProductID]; cached != nil {
+			product = cached
+		}
+	}
+	if product != nil {
+		item["card"] = gin.H{
+			"name":     product.Name,
+			"summary":  product.Tagline,
+			"category": product.PrimaryCategory,
+		}
+	}
+	return item
+}
+
+func (h *OffersHandler) reviewed(c *gin.Context, withCard bool) ([]gin.H, error) {
+	offers, err := h.DB.ListOffers(c.Request.Context(), makerID(c))
+	if err != nil {
+		return nil, err
+	}
+	listed, err := h.DB.CountListedOffers(c.Request.Context(), makerID(c))
+	if err != nil {
+		return nil, err
+	}
+	products := map[string]*database.Product{}
+	out := make([]gin.H, 0, len(offers))
+	for i := range offers {
+		if scoped := c.GetString("offer_scope_id"); scoped != "" && offers[i].ID != scoped {
+			continue
+		}
+		if withCard {
+			if _, ok := products[offers[i].ProductID]; !ok {
+				if loaded, err := h.DB.GetProduct(c.Request.Context(), makerID(c), offers[i].ProductID); err == nil {
+					products[offers[i].ProductID] = loaded
+				}
+			}
+		}
+		item := h.presentWith(c, &offers[i], listed, products)
+		if !withCard {
+			delete(item, "card")
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func offerJSON(o *database.Offer, reason, message string) gin.H {
+	reviewReason, reviewMessage := nullReview(reason, message)
+	if o.Status == "listed" {
+		reviewReason, reviewMessage = nil, nil
+	}
 	return gin.H{
 		"id":                   o.ID,
 		"product_id":           o.ProductID,
@@ -352,5 +469,7 @@ func offerJSON(o *database.Offer) gin.H {
 		"program_id":           o.ProgramID,
 		"created_at":           o.CreatedAt,
 		"updated_at":           o.UpdatedAt,
+		"review_reason":        reviewReason,
+		"message":              reviewMessage,
 	}
 }

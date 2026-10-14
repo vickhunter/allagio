@@ -26,6 +26,8 @@ func TestNormalizeAttributionSource(t *testing.T) {
 		"x":         "x",
 		"community": "community",
 		"DIRECT":    "direct",
+		"CLI":       "cli",
+		"mcp":       "mcp",
 	}
 	for in, want := range cases {
 		if got := database.NormalizeAttributionSource(in); got != want {

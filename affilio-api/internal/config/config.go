@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 )
 
@@ -31,18 +32,40 @@ type Config struct {
 	APIKeySecret           string
 	AdminAPIKey            string
 	KeyRotationGracePeriod time.Duration
+	PluginOfflineAfter     time.Duration
 
 	ConnectionEncryptionKey   string
 	StripeWebhookSecret       string
 	LemonSqueezyWebhookSecret string
 	PolarWebhookSecret        string
+
+	// ClaimsCheck is the resolved CLAIMS_CHECK mode: stub, real, or off-local.
+	ClaimsCheck    string
+	claimsCheckErr error
 }
+
+const (
+	// ClaimsStub holds every untrusted offer in review. It is the hosted default.
+	ClaimsStub = "stub"
+	// ClaimsReal runs the page checker on local and dev. A hosted server refuses
+	// it and stays on stub.
+	ClaimsReal = "real"
+	// ClaimsOffLocal keeps today's four listing checks. Local and dev only.
+	ClaimsOffLocal = "off-local"
+)
 
 func Load() Config {
 	graceHours, _ := strconv.Atoi(getEnvValue("KEY_ROTATION_GRACE_HOURS", "24"))
 	if graceHours <= 0 {
 		graceHours = 24
 	}
+	offlineAfter := 10 * time.Minute
+	if raw := strings.TrimSpace(os.Getenv("PLUGIN_OFFLINE_AFTER")); raw != "" {
+		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
+			offlineAfter = parsed
+		}
+	}
+	claims, claimsErr := ResolveClaimsCheck(os.Getenv("GIN_MODE"), os.Getenv("CLAIMS_CHECK"))
 	return Config{
 		Port:                   getEnvValue("PORT", "8080"),
 		Host:                   os.Getenv("HOST"),
@@ -63,21 +86,85 @@ func Load() Config {
 		AllowedOrigins:         getEnvValue("ALLOWED_ORIGINS", "*"),
 		TrustedProxies:         os.Getenv("TRUSTED_PROXIES"),
 		GinMode:                os.Getenv("GIN_MODE"),
-		APIKeySecret:           getEnvValue("API_KEY_SECRET", "dev-secret"),
+		APIKeySecret:           os.Getenv("API_KEY_SECRET"),
 		AdminAPIKey:            getEnvValue("ADMIN_API_KEY", ""),
 		KeyRotationGracePeriod: time.Duration(graceHours) * time.Hour,
+		PluginOfflineAfter:     offlineAfter,
 
 		ConnectionEncryptionKey:   os.Getenv("CONNECTION_ENCRYPTION_KEY"),
 		StripeWebhookSecret:       os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		LemonSqueezyWebhookSecret: os.Getenv("LEMONSQUEEZY_WEBHOOK_SECRET"),
 		PolarWebhookSecret:        os.Getenv("POLAR_WEBHOOK_SECRET"),
+		ClaimsCheck:               claims,
+		claimsCheckErr:            claimsErr,
 	}
+}
+
+// Hosted reports whether this process is the hosted server. The signal is
+// GIN_MODE=release, the same check ValidateRuntime uses. Empty, debug, and
+// test are local or dev.
+func Hosted(ginMode string) bool {
+	return strings.EqualFold(strings.TrimSpace(ginMode), "release")
+}
+
+// ResolveClaimsCheck applies CLAIMS_CHECK. An empty value is stub on a hosted
+// server and off-local everywhere else. off-local and real are refused when
+// GIN_MODE=release. Local real compares the listing card with the merchant page.
+// The hosted default stays stub.
+func ResolveClaimsCheck(ginMode, raw string) (string, error) {
+	mode := strings.ToLower(strings.TrimSpace(raw))
+	hosted := Hosted(ginMode)
+	switch mode {
+	case "":
+		if hosted {
+			return ClaimsStub, nil
+		}
+		return ClaimsOffLocal, nil
+	case ClaimsStub:
+		return ClaimsStub, nil
+	case ClaimsOffLocal:
+		if hosted {
+			return "", errors.New("CLAIMS_CHECK=off-local is only for local and dev. A hosted server (GIN_MODE=release) stays on stub")
+		}
+		return ClaimsOffLocal, nil
+	case ClaimsReal:
+		if hosted {
+			return "", errors.New("CLAIMS_CHECK=real is not allowed while GIN_MODE=release. The hosted default stays stub")
+		}
+		return ClaimsReal, nil
+	default:
+		return "", errors.New("CLAIMS_CHECK must be stub, real, or off-local")
+	}
+}
+
+// ValidateClaims refuses to boot when CLAIMS_CHECK is unknown or when a hosted
+// server asks for real or off-local.
+func (c Config) ValidateClaims() error {
+	return c.claimsCheckErr
+}
+
+// SecretRefused reports an API key secret the server must not boot with.
+func SecretRefused(secret string) error {
+	secret = strings.TrimSpace(secret)
+	if secret == "" || secret == "dev-secret" {
+		return errors.New("API_KEY_SECRET must be set to a non-default value")
+	}
+	return nil
+}
+
+// ValidateSecrets refuses to boot outside tests when the API key secret is
+// missing or still the development value.
+func (c Config) ValidateSecrets() error {
+	if testing.Testing() {
+		return nil
+	}
+	return SecretRefused(c.APIKeySecret)
 }
 
 // ValidateRuntime refuses to boot a release process that still has the
 // development API key secret or a wildcard CORS allowlist.
 func (c Config) ValidateRuntime() error {
-	if !strings.EqualFold(strings.TrimSpace(c.GinMode), "release") {
+	if !Hosted(c.GinMode) {
 		return nil
 	}
 	secret := strings.TrimSpace(c.APIKeySecret)

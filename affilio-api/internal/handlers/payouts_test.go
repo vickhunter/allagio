@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"affilio-api/internal/database"
@@ -85,8 +84,8 @@ func TestPayoutLifecycle(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
 	rrec := httptest.NewRecorder()
 	r.ServeHTTP(rrec, req)
-	location := rrec.Header().Get("Location")
-	clickID := location[strings.Index(location, "via=")+4:]
+	requirePlainRedirect(t, rrec, "https://inboxpilot.example.com")
+	clickID := insertCampaignClick(t, db, code)
 	wrec, wbody := sendStripeEvent(t, db, r, stripeSalePayload("evt_payout_sale", "pi_payout", clickID, 20000))
 	if wrec.Code != http.StatusOK || wbody["status"] != "recorded" {
 		t.Fatalf("sale: expected recorded, got %d %v", wrec.Code, wbody)

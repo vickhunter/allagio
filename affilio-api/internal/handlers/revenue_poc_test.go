@@ -56,12 +56,10 @@ func testPaidCampaign(t *testing.T) (*database.DB, *gin.Engine, string, string, 
 	createTestSite(t, db, siteKey, "publisher.example.com", "Developer tutorials")
 	_, joined := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
 	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/go/"+joined["tracking_code"].(string), nil))
-	u, err := url.Parse(rec.Header().Get("Location"))
-	if err != nil || rec.Code != http.StatusFound {
-		t.Fatalf("click failed: %d %v", rec.Code, err)
-	}
-	return db, r, siteKey, offerID, u.Query().Get("via")
+	code := joined["tracking_code"].(string)
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil))
+	requirePlainRedirect(t, rec, "https://inboxpilot.example.com")
+	return db, r, siteKey, offerID, insertCampaignClick(t, db, code)
 }
 
 func TestStripePaymentGatesAndBusinessDedupe(t *testing.T) {
@@ -475,6 +473,9 @@ func TestTwoIndependentStdioAgentsRevenueLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	publisher.call(t, "record_placement_receipt", map[string]interface{}{"placement_id": id, "surface_url": p["surface_url"], "published_text": text, "evidence": "Local artifact only, no public publication: " + artifact})
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='placed', plugin_wait_at=NOW() WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tracked, nil))
 	u, err := url.Parse(rec.Header().Get("Location"))

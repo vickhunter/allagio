@@ -1,8 +1,10 @@
 package dcp
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 var PreviewTools = []Tool{{
@@ -44,6 +46,49 @@ var RevenueTools = []Tool{
 	placementTool("commit_placement", "Idempotently commit an owner-approved, unexpired placement. Returns an attribution link and approved text. Does not publish; confirm=true cannot replace owner approval.", http.MethodPost, "/commit", nil),
 	placementTool("record_placement_receipt", "Record publisher-reported publication evidence after publishing through the owner's existing tool. Requires exact approved copy, disclosure and tracked link. This is not independent publication verification.", http.MethodPost, "/receipt", map[string]interface{}{
 		"surface_url": str("Approved article URL"), "published_text": str("Published text including exact copy, disclosure and tracked link"), "evidence": str("Evidence reference or local artifact description")}),
+	{
+		Name:        "undo_placement",
+		Description: "Undo a placement immediately. Revokes it in this request with reason undo. There is no delay.",
+		InputSchema: schema([]string{"placement_id"}, map[string]interface{}{"placement_id": str("Placement ID")}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			id, err := pathArg(args, "placement_id")
+			if err != nil {
+				return nil, err
+			}
+			return callPlacementIdentity(c, http.MethodPost, "/v1/placements/"+url.PathEscape(id)+"/revoke", map[string]interface{}{"reason": "undo"})
+		},
+	},
+	{
+		Name:        "restore_placement",
+		Description: "Does not restore the placement. Decide and restore require a signed-in dashboard session. Returns a sign in again link to the owner dashboard.",
+		InputSchema: schema([]string{"placement_id"}, map[string]interface{}{"placement_id": str("Placement ID that was just undone")}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			if _, err := pathArg(args, "placement_id"); err != nil {
+				return nil, err
+			}
+			link := "/owner"
+			if c.BaseURL != "" {
+				link = strings.TrimRight(c.BaseURL, "/") + "/owner"
+			}
+			return map[string]interface{}{
+				"message":     "Sign in again to restore this placement: " + link,
+				"sign_in_url": link,
+			}, nil
+		},
+	},
+}
+
+// callPlacementIdentity calls the placement route with the key that is present.
+// A site key or bearer wins. A maker key is used when that is the only credential.
+// The call returns as soon as the API responds.
+func callPlacementIdentity(c *Client, method, path string, payload interface{}) (map[string]interface{}, error) {
+	if c.SiteKey != "" || c.Bearer != "" {
+		return c.DoSite(method, path, payload)
+	}
+	if c.MakerKey != "" {
+		return c.Do(method, path, payload)
+	}
+	return nil, fmt.Errorf("publisher verbs need a site key: set DISTRIBUTOOR_SITE_KEY (the Affilio site api key)")
 }
 
 func placementTool(name, description, method, suffix string, props map[string]interface{}) Tool {

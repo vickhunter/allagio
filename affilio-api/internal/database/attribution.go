@@ -87,16 +87,117 @@ type CampaignLink struct {
 	RefParam          string
 	ProgramID         *string
 	RequiresPlacement bool
+	SiteDomain        string
+}
+
+// PlacementRedirectSQL is the placement go-link lookup. CountsAsLive is the
+// shared placement_counts_as_live predicate. A hit is recorded only when it
+// is true.
+const PlacementRedirectSQL = `SELECT pp.site_id::text, s.domain, pp.post_url,
+       (o.status = 'listed'), o.landing_url, COALESCE(NULLIF(o.ref_param,''),'via'),
+       pp.campaign_id::text, o.program_id,
+       EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)
+FROM placement_proposals pp
+JOIN sites s ON s.id = pp.site_id
+JOIN offers o ON o.id = pp.offer_id
+WHERE pp.id = $1`
+
+// PlacementRedirect is everything GET /v1/go/<placement_id> needs to choose
+// a 302 target. Found is false when the id is unknown.
+type PlacementRedirect struct {
+	Found        bool
+	SiteID       string
+	SiteDomain   string
+	PostURL      string
+	OfferListed  bool
+	LandingURL   string
+	RefParam     string
+	CampaignID   string
+	ProgramID    *string
+	CountsAsLive bool
+}
+
+func (d *DB) LookupPlacementRedirect(ctx context.Context, placementID string) (PlacementRedirect, error) {
+	var out PlacementRedirect
+	var campaignID *string
+	err := d.Pool.QueryRow(ctx, PlacementRedirectSQL, placementID).Scan(
+		&out.SiteID, &out.SiteDomain, &out.PostURL, &out.OfferListed, &out.LandingURL, &out.RefParam,
+		&campaignID, &out.ProgramID, &out.CountsAsLive)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PlacementRedirect{}, nil
+	}
+	if err != nil {
+		return PlacementRedirect{}, err
+	}
+	out.Found = true
+	if campaignID != nil {
+		out.CampaignID = *campaignID
+	}
+	return out, nil
+}
+
+// RecentPlacementClick returns a hit from the same reader hash and user agent
+// on this site and placement inside the dedup window. An empty hash is not a
+// reader, so it never matches. An empty id means there is no recent hit.
+func (d *DB) RecentPlacementClick(ctx context.Context, siteID, placementID, ipHash, userAgent string, withinSeconds int) (string, error) {
+	if ipHash == "" {
+		return "", nil
+	}
+	var id string
+	err := d.Pool.QueryRow(ctx, `SELECT id::text FROM clicks
+WHERE site_id=$1 AND placement_id=$2 AND ip_hash=$3 AND COALESCE(user_agent,'')=$4
+AND clicked_at >= NOW() - ($5 * INTERVAL '1 second')
+ORDER BY clicked_at DESC LIMIT 1`, siteID, placementID, ipHash, userAgent, withinSeconds).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
+}
+
+// SiteForGoKey resolves a publisher key to the site it may speak for.
+// ok is false when the key is missing or does not identify a site.
+func (d *DB) SiteForGoKey(ctx context.Context, keyHash, keyPrefix string) (siteID, domain string, ok bool, err error) {
+	site, err := d.GetSiteByAnyKeyHash(ctx, keyHash, keyPrefix)
+	if err == nil {
+		return site.ID, site.Domain, true, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, err
+	}
+	siteID, err = d.ProjectSiteKey(ctx, keyHash)
+	if err == nil {
+		site, err = d.GetSiteByID(ctx, siteID)
+		if err != nil {
+			return "", "", false, err
+		}
+		return site.ID, site.Domain, true, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, err
+	}
+	account, err := d.ActiveAccountKey(ctx, keyHash)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && account.SiteID == "") {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, err
+	}
+	site, err = d.GetSiteByID(ctx, account.SiteID)
+	if err != nil {
+		return "", "", false, err
+	}
+	return site.ID, site.Domain, true, nil
 }
 
 func (d *DB) GetCampaignByTrackingCode(ctx context.Context, code string) (*CampaignLink, error) {
 	row := d.Pool.QueryRow(ctx, `
-SELECT c.id, c.site_id, c.offer_id, c.status, o.status, o.landing_url, o.ref_param, o.program_id,c.requires_placement
+SELECT c.id, c.site_id, c.offer_id, c.status, o.status, o.landing_url, o.ref_param, o.program_id, c.requires_placement, s.domain
 FROM campaigns c
 JOIN offers o ON o.id = c.offer_id
+JOIN sites s ON s.id = c.site_id
 WHERE c.tracking_code=$1`, code)
 	var link CampaignLink
-	if err := row.Scan(&link.CampaignID, &link.SiteID, &link.OfferID, &link.CampaignStatus, &link.OfferStatus, &link.LandingURL, &link.RefParam, &link.ProgramID, &link.RequiresPlacement); err != nil {
+	if err := row.Scan(&link.CampaignID, &link.SiteID, &link.OfferID, &link.CampaignStatus, &link.OfferStatus, &link.LandingURL, &link.RefParam, &link.ProgramID, &link.RequiresPlacement, &link.SiteDomain); err != nil {
 		return nil, err
 	}
 	return &link, nil
@@ -104,6 +205,27 @@ WHERE c.tracking_code=$1`, code)
 
 func (d *DB) InsertCampaignClick(ctx context.Context, campaignID, siteID string, programID *string, ipHash, userAgent, referrer string) (string, error) {
 	return d.InsertPlacementClick(ctx, campaignID, siteID, programID, ipHash, userAgent, referrer, "")
+}
+
+// LivePlacementForCampaign returns the placement id only when exactly one
+// placement on this campaign is in placement_counts_as_live. Zero or two or
+// more return an empty id so the bare code redirects with no hit.
+func (d *DB) LivePlacementForCampaign(ctx context.Context, campaignID string) (string, error) {
+	var id string
+	err := d.Pool.QueryRow(ctx, `SELECT COALESCE(CASE WHEN COUNT(*) = 1 THEN MIN(pp.id::text) ELSE '' END, '')
+FROM placement_proposals pp
+WHERE pp.campaign_id=$1
+  AND EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)`, campaignID).Scan(&id)
+	return id, err
+}
+
+// PurgeClickSignals clears reader signals older than the cutoff.
+func (d *DB) PurgeClickSignals(ctx context.Context, cutoff time.Time) error {
+	_, err := d.Pool.Exec(ctx, `UPDATE clicks
+SET ip_hash=NULL, user_agent=NULL, referrer=NULL
+WHERE clicked_at < $1
+  AND (ip_hash IS NOT NULL OR user_agent IS NOT NULL OR referrer IS NOT NULL)`, cutoff)
+	return err
 }
 
 func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string, programID *string, ipHash, userAgent, referrer, placementID string) (string, error) {
@@ -115,12 +237,11 @@ func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string
 	var snapshot []byte
 	if placementID != "" {
 		var status string
-		var expires time.Time
-		err = tx.QueryRow(ctx, `SELECT status,expires_at,terms_snapshot FROM placement_proposals WHERE id=$1 AND campaign_id=$2 FOR SHARE`, placementID, campaignID).Scan(&status, &expires, &snapshot)
+		err = tx.QueryRow(ctx, `SELECT status,terms_snapshot FROM placement_proposals WHERE id=$1 AND campaign_id=$2 FOR SHARE`, placementID, campaignID).Scan(&status, &snapshot)
 		if err != nil {
 			return "", err
 		}
-		if status != "committed" || !time.Now().Before(expires) {
+		if status != "committed" {
 			return "", ErrPlacementAuthority
 		}
 	}

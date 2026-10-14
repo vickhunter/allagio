@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"net"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/entry"
 	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -26,6 +28,21 @@ import (
 type PlacementsHandler struct {
 	DB                        *database.DB
 	RequireVerifiedConnection bool
+	Now                       func() time.Time
+	PluginOfflineAfter        time.Duration
+	StatusLimiter             *IPRateLimiter
+	// Claims is the production checker. Nil uses the stub, which refuses a
+	// number the offer does not contain and is not a live claim check.
+	Claims entry.ClaimChecker
+}
+
+// PlacementPollInterval is the shortest period the placement status read may
+// enforce. One call every 2 seconds per placement leaves headroom for a
+// client that polls every 4 seconds.
+const PlacementPollInterval = 2 * time.Second
+
+func NewPlacementPollLimiter() *IPRateLimiter {
+	return NewIPRateLimiter(1, PlacementPollInterval)
 }
 
 type opportunity struct {
@@ -136,12 +153,22 @@ func (h *PlacementsHandler) requireLinkedPublisher(c *gin.Context) bool {
 	return true
 }
 
+func (h *PlacementsHandler) claims() entry.ClaimChecker {
+	if h.Claims == nil {
+		return entry.StubClaimChecker{}
+	}
+	return h.Claims
+}
+
 func (h *PlacementsHandler) Prepare(c *gin.Context) {
 	var req struct {
 		OfferID    string `json:"offer_id"`
 		SurfaceURL string `json:"surface_url"`
 		Context    string `json:"context"`
 		Copy       string `json:"copy"`
+		PostID     int64  `json:"post_id"`
+		WPPostID   int64  `json:"wp_post_id"`
+		PostTitle  string `json:"post_title"`
 	}
 	if bindBoundedJSON(c, &req) != nil || !uuidPattern.MatchString(req.OfferID) || len(req.Context) < 10 || len(req.Context) > 12000 || len(strings.TrimSpace(req.Copy)) < 10 || len(req.Copy) > 4000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "offer_id, surface_url, context and copy required"})
@@ -172,13 +199,40 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		}
 	}
 	if reason == "" {
-		c.JSON(http.StatusConflict, gin.H{"error": "offer is not eligible or relevant to this content"})
+		writeNamedConflict(c, "offer_ineligible")
+		return
+	}
+	offerText, err := h.DB.OfferClaimText(c.Request.Context(), req.OfferID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
+		return
+	}
+	if claimErr := h.claims().CheckClaims(strings.TrimSpace(req.Copy), offerText); claimErr != nil {
+		writeClaimsDenied(c, claimErr)
+		return
+	}
+	postID := req.PostID
+	if req.WPPostID > 0 {
+		postID = req.WPPostID
+	}
+	boxes, err := h.DB.CountPlacementBoxes(c.Request.Context(), site.ID, req.SurfaceURL, "00000000-0000-0000-0000-000000000000", postID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
+		return
+	}
+	if boxes > 0 {
+		writeNamedConflict(c, "one_per_post")
 		return
 	}
 	p, err := h.DB.CreatePlacement(c.Request.Context(), database.Placement{SiteID: site.ID, OfferID: req.OfferID, SurfaceURL: req.SurfaceURL,
-		Context: req.Context, Copy: strings.TrimSpace(req.Copy), Disclosure: "Affiliate disclosure: I may earn a commission if you buy through this link.", Reason: reason, ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour)})
+		Context: req.Context, Copy: strings.TrimSpace(req.Copy), Disclosure: "Affiliate disclosure: I may earn a commission if you buy through this link.", Reason: reason, ExpiresAt: time.Now().UTC().Add(7 * 24 * time.Hour),
+		WPPostID: postID, PostTitle: strings.TrimSpace(req.PostTitle)})
+	if errors.Is(err, database.ErrOnePerPost) {
+		writeNamedConflict(c, "one_per_post")
+		return
+	}
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "offer unavailable"})
+		writeNamedConflict(c, "offer_unavailable")
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"placement": p, "next_action": "Owner reviews exact copy, disclosure, surface and terms; pilot operator records their approval."})
@@ -189,21 +243,105 @@ func (h *PlacementsHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid placement id"})
 		return
 	}
-	p, err := h.DB.GetPlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"))
-	if err != nil {
+	writePlacementStatus(c, h.DB, h.StatusLimiter, h.now(), h.pluginWindow(), siteIDFrom(c), "")
+}
+
+func (h *PlacementsHandler) pluginWindow() time.Duration {
+	if h.PluginOfflineAfter > 0 {
+		return h.PluginOfflineAfter
+	}
+	return 10 * time.Minute
+}
+
+func writePlacementStatus(c *gin.Context, db *database.DB, limiter *IPRateLimiter, now time.Time, window time.Duration, siteID, userID string) {
+	id := c.Param("id")
+	if limiter != nil && !limiter.Allow(placementPollKey(c, id, userID)) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
+		return
+	}
+	if siteID == "" {
 		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"placement": p})
+	status, wait, failedReason, failedAction, matchedRule, surfaceURL, waitAt, err := db.ReadPlacementStatus(c.Request.Context(), siteID, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement status unavailable"})
+		return
+	}
+	fallback, err := db.PlacementFallbackURL(c.Request.Context(), siteID, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement status unavailable"})
+		return
+	}
+	ruleID, ruleText := entry.PresentRule(matchedRule)
+	c.JSON(http.StatusOK, gin.H{
+		"id":                   id,
+		"status":               status,
+		"plugin_state":         entry.PluginState(wait, waitAt, failedReason != "", now, window),
+		"plugin_failed_reason": failedReason,
+		"failed_action":        failedAction,
+		"fallback_url":         fallback,
+		"policy_rule_id":       ruleID,
+		"policy_rule_text":     ruleText,
+		"surface_url":          surfaceURL,
+		"placement":            gin.H{"surface_url": surfaceURL},
+	})
+}
+
+func placementPollKey(c *gin.Context, placementID, userID string) string {
+	identity := c.GetString("api_key_hash")
+	if identity == "" {
+		identity = userID
+	}
+	if identity == "" {
+		identity = siteIDFrom(c)
+	}
+	return placementID + "\x00" + identity
+}
+
+func (h *PlacementsHandler) now() time.Time {
+	if h.Now != nil {
+		return h.Now().UTC()
+	}
+	return time.Now().UTC()
 }
 
 func (h *PlacementsHandler) List(c *gin.Context) {
-	p, err := h.DB.ListPlacements(c.Request.Context(), siteIDFrom(c))
+	siteID := siteIDFrom(c)
+	if siteID != "" {
+		if err := h.DB.TouchPlacementContact(c.Request.Context(), siteID, h.now()); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "task inbox unavailable"})
+			return
+		}
+	}
+	p, err := h.DB.ListPlacements(c.Request.Context(), siteID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "task inbox unavailable"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"placements": p})
+	fallbacks, err := h.DB.PlacementFallbackURLs(c.Request.Context(), siteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "task inbox unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"placements": withFallbackURLs(p, fallbacks)})
+}
+
+type placementPayload struct {
+	database.Placement
+	FallbackURL string `json:"fallback_url"`
+}
+
+func withFallbackURLs(items []database.Placement, fallbacks map[string]string) []placementPayload {
+	out := make([]placementPayload, 0, len(items))
+	for _, item := range items {
+		out = append(out, placementPayload{Placement: item, FallbackURL: fallbacks[item.ID]})
+	}
+	return out
 }
 
 func (h *PlacementsHandler) Commit(c *gin.Context) {
@@ -219,9 +357,17 @@ func (h *PlacementsHandler) Commit(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "link generation failed"})
 		return
 	}
-	p, err := h.DB.CommitPlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"), code)
+	p, err := h.DB.CommitPlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"), code, h.claims())
 	if errors.Is(err, database.ErrPlacementAuthority) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, database.ErrClaimsFromOffer) {
+		writeClaimsDenied(c, err)
+		return
+	}
+	if errors.Is(err, database.ErrOnePerPost) {
+		writeNamedConflict(c, "one_per_post")
 		return
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -232,7 +378,12 @@ func (h *PlacementsHandler) Commit(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "commit failed"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"placement": p, "next_action": "Use the publisher's existing publishing tool for approved copy, tracked link and disclosure, then record the receipt."})
+	fallback, err := h.DB.PlacementFallbackURL(c.Request.Context(), siteIDFrom(c), p.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "commit failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"placement": placementPayload{Placement: *p, FallbackURL: fallback}, "next_action": "Use the publisher's existing publishing tool for approved copy, tracked link and disclosure, then record the receipt."})
 }
 
 func (h *PlacementsHandler) Approve(c *gin.Context) {
@@ -257,7 +408,7 @@ func (h *PlacementsHandler) Approve(c *gin.Context) {
 		return
 	}
 	if !updated {
-		c.JSON(http.StatusConflict, gin.H{"error": "placement unavailable, expired or self referral"})
+		writeNamedConflict(c, "placement_unavailable")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "approved", "placement_id": c.Param("id")})
@@ -298,6 +449,9 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		SurfaceURL    string `json:"surface_url"`
 		PublishedText string `json:"published_text"`
 		Evidence      string `json:"evidence"`
+		PostTitle     string `json:"post_title"`
+		PostID        int64  `json:"post_id"`
+		WPPostID      int64  `json:"wp_post_id"`
 	}
 	if !uuidPattern.MatchString(c.Param("id")) || bindBoundedJSON(c, &req) != nil || len(req.PublishedText) > 16000 || len(req.Evidence) < 10 || len(req.Evidence) > 2000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "surface_url, published_text and evidence required"})
@@ -311,21 +465,65 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 	var receipt struct {
 		TrackedLink string `json:"tracked_link"`
 	}
-	if json.Unmarshal(p.Receipt, &receipt) != nil || receipt.TrackedLink == "" || !strings.Contains(req.PublishedText, p.Copy) || !publishedDisclosureOK(req.PublishedText, p.Disclosure) || !strings.Contains(req.PublishedText, receipt.TrackedLink) {
-		c.JSON(http.StatusConflict, gin.H{"error": "published text must include approved copy, disclosure and exact tracked link"})
+	wantLink := "/v1/go/" + p.ID
+	publishedLink := strings.Contains(req.PublishedText, "/go/"+p.ID)
+	if json.Unmarshal(p.Receipt, &receipt) != nil || receipt.TrackedLink != wantLink || !strings.Contains(req.PublishedText, p.Copy) || !publishedDisclosureOK(req.PublishedText, p.Disclosure) || !publishedLink {
+		if err = h.DB.ReopenRefusedReceipt(c.Request.Context(), siteIDFrom(c), p.ID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "receipt recording failed"})
+			return
+		}
+		writeNamedConflict(c, "receipt_mismatch")
 		return
 	}
 	hash := sha256.Sum256([]byte(req.PublishedText))
-	updated, err := h.DB.RecordPlacementReceipt(c.Request.Context(), siteIDFrom(c), p.ID, req.SurfaceURL, hex.EncodeToString(hash[:]), req.Evidence)
+	postID := req.PostID
+	if req.WPPostID > 0 {
+		postID = req.WPPostID
+	}
+	updated, err := h.DB.RecordPlacementReceipt(c.Request.Context(), siteIDFrom(c), p.ID, req.SurfaceURL, hex.EncodeToString(hash[:]), req.Evidence, strings.TrimSpace(req.PostTitle), postID, h.now())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "receipt recording failed"})
 		return
 	}
 	if !updated {
-		c.JSON(http.StatusConflict, gin.H{"error": "receipt already recorded or placement unavailable"})
+		writeNamedConflict(c, "receipt_recorded")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "publisher_reported", "content_sha256": hex.EncodeToString(hash[:])})
+}
+
+func (h *PlacementsHandler) Refuse(c *gin.Context) {
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if !uuidPattern.MatchString(c.Param("id")) || bindBoundedJSON(c, &req) != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "placement id and reason required"})
+		return
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" || len(reason) > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "reason required"})
+		return
+	}
+	outcome, err := h.DB.RefusePlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"), reason)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement refusal failed"})
+		return
+	}
+	switch outcome {
+	case "missing":
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+	case "recorded":
+		writeNamedConflict(c, "receipt_recorded")
+	case "unavailable":
+		writeNamedConflict(c, "placement_unavailable")
+	case "already refused":
+		c.JSON(http.StatusOK, gin.H{"status": "already refused", "publication_status": "refused", "placement_id": c.Param("id")})
+	case "refused":
+		c.JSON(http.StatusOK, gin.H{"status": "pending", "publication_status": "refused", "placement_id": c.Param("id")})
+	default:
+		writeNamedConflict(c, "placement_unavailable")
+	}
 }
 
 func (h *PlacementsHandler) MarkRemoved(c *gin.Context) {
@@ -377,7 +575,7 @@ func (h *PlacementsHandler) CreateAgentAccess(c *gin.Context) {
 	key = "agent_" + key
 	id, err := h.DB.CreateAgentAccess(c.Request.Context(), c.Param("site_id"), services.HashAPIKey(key))
 	if err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "publisher not found"})
+		writeNamedConflict(c, "publisher_missing")
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"id": id, "api_key": key, "expires_in_days": 7, "scope": "opportunities, placements and revenue reads; no owner approvals, payout confirmation or legacy joins"})
@@ -400,13 +598,30 @@ func (h *PlacementsHandler) RevokeAgentAccess(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "revoked"})
 }
 
+func hostWithoutPort(host string) string {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if name, _, err := net.SplitHostPort(host); err == nil {
+		host = name
+	}
+	return strings.Trim(strings.TrimSuffix(host, "."), "[]")
+}
+
 func localPublisherHost(host string) bool {
-	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	host = hostWithoutPort(host)
 	switch host {
 	case "127.0.0.1", "::1", "localhost":
 		return true
 	}
 	return strings.HasSuffix(host, ".localhost")
+}
+
+func registeredHostPort(domain string) (host, port string) {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	name, p, ok := splitOptionalPort(domain)
+	if !ok {
+		return strings.Trim(domain, "[]"), ""
+	}
+	return strings.Trim(name, "[]"), p
 }
 
 func surfaceURLProblem(raw, siteDomain string) string {
@@ -416,7 +631,8 @@ func surfaceURLProblem(raw, siteDomain string) string {
 		return registered
 	}
 	u, err := url.Parse(raw)
-	if err != nil || u.Hostname() == "" || u.User != nil || u.Hostname() != siteDomain {
+	host, port := registeredHostPort(siteDomain)
+	if err != nil || u.Hostname() == "" || u.User != nil || !strings.EqualFold(u.Hostname(), host) || (port != "" && u.Port() != port) {
 		return registered
 	}
 	if u.Scheme == "https" {

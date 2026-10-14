@@ -49,7 +49,7 @@ func (h *HostedHandler) MCPTransport() http.Handler {
 		bearer := strings.Fields(r.Header.Get("Authorization"))[1]
 		for _, tool := range hostedTools(g) {
 			readOnly := strings.HasPrefix(tool.Name, "get_") || strings.HasPrefix(tool.Name, "list_") || tool.Name == "find_opportunities" || tool.Name == "preview_revenue"
-			destructive := strings.HasPrefix(tool.Name, "update_")
+			destructive := strings.HasPrefix(tool.Name, "update_") || tool.Name == "undo_placement" || tool.Name == "restore_placement"
 			openWorld := tool.Name == "run_assessment"
 			s.AddTool(&mcp.Tool{Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: readOnly || tool.Name == "commit_placement", DestructiveHint: &destructive, OpenWorldHint: &openWorld}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				args := map[string]any{}

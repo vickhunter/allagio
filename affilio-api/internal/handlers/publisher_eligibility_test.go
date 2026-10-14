@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 
 	"affilio-api/internal/database"
@@ -112,7 +113,7 @@ func TestPrepareAndCommitProviderlessOffer(t *testing.T) {
 	}
 	receipt := committed["placement"].(map[string]interface{})["receipt"].(map[string]interface{})
 	link, _ := receipt["tracked_link"].(string)
-	if len(link) < len("/v1/go/") || link[:len("/v1/go/")] != "/v1/go/" {
+	if link != "/v1/go/"+placementID || strings.Contains(link, "?placement=") {
 		t.Fatalf("tracked link = %q", link)
 	}
 }
@@ -126,6 +127,7 @@ func publisherLegRouter(db *database.DB, verified bool) *gin.Engine {
 	site.POST("/placements", h.Prepare)
 	site.POST("/placements/:id/commit", h.Commit)
 	site.POST("/placements/:id/receipt", h.RecordReceipt)
+	site.POST("/placements/:id/refuse", h.Refuse)
 	admin := r.Group("/v1/offer-review")
 	admin.Use(middleware.AdminKeyAuth("admin-secret", nil))
 	admin.POST("/placements/:id/approve", h.Approve)

@@ -37,3 +37,20 @@ func TestProductionRefusesDefaultSecretAndWildcardOrigins(t *testing.T) {
 		}
 	}
 }
+
+func TestSecretRefusedAndLoadHasNoDevDefault(t *testing.T) {
+	if err := SecretRefused(""); err == nil || SecretRefused("dev-secret") == nil || SecretRefused("  dev-secret  ") == nil {
+		t.Fatal("empty and dev-secret must be refused")
+	}
+	if err := SecretRefused("real-secret"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("API_KEY_SECRET", "")
+	cfg := Load()
+	if cfg.APIKeySecret != "" {
+		t.Fatalf("API_KEY_SECRET defaulted to %q", cfg.APIKeySecret)
+	}
+	if err := cfg.ValidateSecrets(); err != nil {
+		t.Fatal(err)
+	}
+}
