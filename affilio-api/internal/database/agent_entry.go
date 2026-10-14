@@ -979,7 +979,8 @@ func (d *DB) CountDigestPlacements(ctx context.Context, siteID string, since tim
 }
 
 // digestPostTitleSQL is the WordPress article title. The plugin sends it on
-// prepare or receipt. The box copy is not a title.
+// prepare or receipt. The box copy is not a title. A prepare that omits the
+// title and matches no article returns an empty string. The UI uses the URL path.
 const digestPostTitleSQL = `COALESCE(NULLIF(receipt->>'post_title', ''), NULLIF(post_title, ''), (
   SELECT a.title FROM articles a
   WHERE a.site_id = placement_proposals.site_id
@@ -988,7 +989,7 @@ const digestPostTitleSQL = `COALESCE(NULLIF(receipt->>'post_title', ''), NULLIF(
       = regexp_replace(lower(split_part(split_part(placement_proposals.surface_url, '#', 1), '?', 1)), '/+$', '')
   ORDER BY a.updated_at DESC
   LIMIT 1
-), 'Untitled')`
+), '')`
 
 // digestPositionSQL uses the stored position, then the publisher's saved box
 // position, then end, so a digest item never has an empty position.
@@ -1034,20 +1035,24 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 }
 
 // digestOfferColumns is the shared offer row for both digest endpoints.
-// Title and URL come from the offer's placement receipt, then that placement,
-// then the product name and landing URL so a held offer with no placement
-// still has both fields. The placement copy is not the title.
+// Title and URL come from the offer's placement receipt, then that placement.
+// A placement prepared without a title returns an empty string so the UI can
+// use the URL path. A held offer with no placement uses the product name.
+// The placement copy is not the title.
 const digestOfferColumns = `o.id::text, p.name,
 (o.updated_at AT TIME ZONE current_setting('TimeZone')),
 (SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
 o.status,
-COALESCE(NULLIF(place.receipt->>'post_title', ''), NULLIF(place.post_title, ''), NULLIF(p.name, ''), 'Untitled'),
+CASE WHEN place.id IS NOT NULL
+  THEN COALESCE(NULLIF(place.receipt->>'post_title', ''), NULLIF(place.post_title, ''), '')
+  ELSE COALESCE(NULLIF(p.name, ''), '')
+END,
 COALESCE(NULLIF(place.receipt->>'surface_url', ''), NULLIF(place.surface_url, ''), NULLIF(o.landing_url, ''), NULLIF(p.website_url, '')),
 COALESCE(NULLIF(place.position, ''), 'end')`
 
 const digestOfferFrom = `FROM offers o JOIN products p ON p.id=o.product_id
 LEFT JOIN LATERAL (
-  SELECT receipt, post_title, surface_url, position
+  SELECT id, receipt, post_title, surface_url, position
   FROM placement_proposals
   WHERE offer_id = o.id
   ORDER BY COALESCE(approved_at, created_at) DESC

@@ -918,6 +918,77 @@ func TestDigestPostTitleIsArticleNotCopy(t *testing.T) {
 	check("/v1/account/digest")
 }
 
+func TestPrepareWithoutTitleReturnsEmptyPostTitle(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "empty-title-owner", "empty-title@example.com")
+	makerID := insertPublisherMaker(t, db)
+	_, offerID := insertPublisherOffer(t, db, makerID, "none", "percentage", "USD", "InboxPilot", []string{"email", "inbox", "productivity"})
+	siteKey := "site-key-empty-title"
+	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Tutorials")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	publishers := publisherLegRouter(db, true)
+	const (
+		surface = "https://publisher.example.com/cli-prepare-no-title"
+		copy    = "Consider InboxPilot for an email inbox productivity workflow."
+	)
+	prepared, preparedBody := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements", siteKey, map[string]any{
+		"offer_id": offerID, "surface_url": surface, "context": "InboxPilot email inbox productivity tutorial for developers",
+		"copy": copy,
+	})
+	if prepared.Code != http.StatusCreated {
+		t.Fatalf("prepare: %d %s", prepared.Code, prepared.Body.String())
+	}
+	placementID := preparedBody["placement"].(map[string]any)["id"].(string)
+	var storedTitle string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT post_title FROM placement_proposals WHERE id=$1`, placementID).Scan(&storedTitle); err != nil || storedTitle != "" {
+		t.Fatalf("stored title %q (%v)", storedTitle, err)
+	}
+	approved, _ := adminJSON(t, publishers, http.MethodPost, "/v1/offer-review/placements/"+placementID+"/approve", map[string]any{
+		"site_id": siteID, "owner_email": "publisher@example.com", "evidence": "Publisher approved this exact providerless placement.",
+	})
+	if approved.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", approved.Code, approved.Body.String())
+	}
+	committed, _ := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements/"+placementID+"/commit", siteKey, nil)
+	if committed.Code != http.StatusOK {
+		t.Fatalf("commit: %d %s", committed.Code, committed.Body.String())
+	}
+	var receiptTitle string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COALESCE(receipt->>'post_title','') FROM placement_proposals WHERE id=$1`, placementID).Scan(&receiptTitle); err != nil || receiptTitle != "" {
+		t.Fatalf("receipt title %q (%v)", receiptTitle, err)
+	}
+	checkOwner := func(path string) {
+		t.Helper()
+		rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, path, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		items := itemsFromDigest(t, body)
+		item := findDigestItem(items, placementID)
+		if item == nil || item["post_title"] != "" || item["message"] != copy || item["surface_url"] != surface {
+			t.Fatalf("%s placement: %v", path, item)
+		}
+		offer := findDigestItem(items, offerID)
+		if offer == nil || offer["post_title"] != "" || offer["surface_url"] != surface {
+			t.Fatalf("%s offer: %v", path, offer)
+		}
+	}
+	checkOwner("/v1/digest")
+	checkOwner("/v1/account/digest")
+	maker, makerBody := postJSON(t, r, http.MethodGet, "/v1/maker/digest", nil, map[string]string{"X-Maker-Key": "maker-elig-key"})
+	if maker.Code != http.StatusOK {
+		t.Fatalf("maker digest: %d %s", maker.Code, maker.Body.String())
+	}
+	offer := findDigestItem(itemsFromDigest(t, makerBody), offerID)
+	if offer == nil || offer["post_title"] != "" || offer["surface_url"] != surface {
+		t.Fatalf("maker offer: %v", offer)
+	}
+}
+
 func TestMakerDigestReadsOwnOffersOnly(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

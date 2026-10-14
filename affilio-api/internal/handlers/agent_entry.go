@@ -2103,10 +2103,7 @@ func writePluginAckForbidden(c *gin.Context, reason, message, compat string) {
 }
 
 func filledDigestTitle(item database.DigestItem) string {
-	if title := strings.TrimSpace(item.PostTitle); title != "" {
-		return title
-	}
-	return "Untitled"
+	return strings.TrimSpace(item.PostTitle)
 }
 
 func (h *AgentEntry) MakerDigest(c *gin.Context) {

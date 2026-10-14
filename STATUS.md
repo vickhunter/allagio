@@ -1,3 +1,7 @@
+## October 14 — a missing prepare title stays empty
+
+A placement prepared without `post_title`, and with no matching article, stores `post_title` as an empty string. `GET /v1/digest`, `GET /v1/account/digest`, and `GET /v1/maker/digest` return that empty string. They do not substitute "Untitled". The UI uses the URL path. A matching article title is still stored and returned. A held offer with no placement still uses the product name. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 14 — article titles, maker digest, plugin refuse
 
 Digest `post_title` is the WordPress article title. The plugin sends `post_title` and `post_id` on prepare and on the receipt. Both are stored on `placement_proposals` (`post_title`, `wp_post_id`) and copied into the receipt. The box copy is `message` on a placement item, not the title. `GET /v1/maker/digest` with `X-Maker-Key` returns that maker's held, in-review, and live offers and does not need a browser session. Another maker's offer is 403. `GET /v1/digest` with a maker key returns 403 `forbidden_key_type` instead of a login return-path error. `POST /v1/placements/:id/refuse` with the site key and `{"reason":"..."}` sets the placement back to `pending` with `publication_status` `refused`, the same open state as a refused receipt, and a second call returns the same 200. The next prepare on that post returns a box. A receipt that already reported publication stays `committed`. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
