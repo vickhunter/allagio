@@ -50,19 +50,30 @@ func TestDigestItemsIncludeUIFields(t *testing.T) {
 	older := insertPlacement(t, db, siteID, offerID, "https://digest-ui.example/old", "Digest Product older.")
 	newer := insertPlacement(t, db, siteID, offerID, "https://digest-ui.example/new", "Digest Product newer.")
 	markPlacementLive(t, db, siteID, offerID, older, "digest-ui-go", "https://digest-ui.example/old")
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', plugin_wait='placed', plugin_wait_at=NOW(), campaign_id=(SELECT campaign_id FROM placement_proposals WHERE id=$2), expires_at=NOW()+INTERVAL '2 days', restore_unconfirmed=false, matched_rule='hard_checks' WHERE id=$1`, newer, older); err != nil {
+	// Fixed instants. June is UTC+2 in Rome. The offer sits one hour after the
+	// digest open, inside the gap a discarded local offset would shift past.
+	// Store updated_at the same way NOW() writes a timestamp column.
+	const (
+		openedAt = "2026-06-15 12:00:00+00"
+		olderAt  = "2026-06-15 10:00:00+00"
+		liveAt   = "2026-06-15 13:00:00+00"
+	)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', plugin_wait='placed', plugin_wait_at=$3::timestamptz, approved_at=$3::timestamptz, campaign_id=(SELECT campaign_id FROM placement_proposals WHERE id=$2), expires_at=$3::timestamptz + INTERVAL '2 days', restore_unconfirmed=false, matched_rule='hard_checks' WHERE id=$1`, newer, older, liveAt); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET
 post_title='The post', position='end', link_text='Buy the tool', label='Recommended',
-approved_by_kind='policy:yolo', policy_version=4, plugin_wait_at=NOW()-INTERVAL '2 hours'
-WHERE id=$1`, older); err != nil {
+approved_by_kind='policy:yolo', policy_version=4, plugin_wait_at=$2::timestamptz, approved_at=$2::timestamptz
+WHERE id=$1`, older, olderAt); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET updated_at = ($2::timestamptz AT TIME ZONE current_setting('TimeZone')) WHERE id=$1`, offerID, liveAt); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO clicks(site_id, placement_id) VALUES ($1,$2),($1,$2)`, siteID, older); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO owner_events(kind, user_id, created_at) VALUES('digest_opened',$1,NOW()-INTERVAL '1 hour')`, owner.ID); err != nil {
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO owner_events(kind, user_id, created_at) VALUES('digest_opened',$1,$2::timestamptz)`, owner.ID, openedAt); err != nil {
 		t.Fatal(err)
 	}
 

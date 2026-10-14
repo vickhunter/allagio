@@ -824,7 +824,9 @@ VALUES($1,'stripe','evt-live','sale',40,'USD',9.00,NOW(),'live') RETURNING id`, 
 			}
 		case "offer":
 			sawOffer = true
-			if project["clicks"] != float64(1) || moneyAmount(t, project["earnings"], "USD") != 2.0 {
+			// The campaign click is also this site's click, so the site
+			// project keeps that id and the offer count stays 0.
+			if project["clicks"] != float64(0) || moneyAmount(t, project["earnings"], "USD") != 2.0 {
 				t.Fatalf("offer project: %v", project)
 			}
 		}

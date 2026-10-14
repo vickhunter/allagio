@@ -16,6 +16,13 @@ const ClaimCheckReason = "claim_check_unavailable"
 // ClaimCheckMessage is the sentence returned with ClaimCheckReason.
 const ClaimCheckMessage = "Automatic approval is off until claim checks are live."
 
+// YoloAfterFirstReason is why a saved yolo site still answers manual
+// until its first approved placement.
+const YoloAfterFirstReason = "yolo_after_first_placement"
+
+// YoloAfterFirstMessage tells the UI that yolo is picked and waiting.
+const YoloAfterFirstMessage = "YOLO is picked and turns on after the first approved placement."
+
 // ClaimChecker is the D-028 claim-check hook. Real reports whether this
 // checker is the live one. The stub is not, so yolo and auto cannot go live.
 type ClaimChecker interface {
@@ -27,9 +34,21 @@ type ClaimChecker interface {
 const ClaimReasonNumberNotInOffer = "number_not_in_offer"
 
 // ClaimMismatch is a failed claim check. Reason is the logged reason code.
-type ClaimMismatch struct{ Reason string }
+// Claim is the unsupported token from the copy, such as "90%".
+type ClaimMismatch struct {
+	Reason string
+	Claim  string
+}
 
 func (e ClaimMismatch) Error() string { return "claims_from_offer: " + e.Reason }
+
+// PublicMessage names the unsupported claim for a 422 body.
+func (e ClaimMismatch) PublicMessage() string {
+	if strings.TrimSpace(e.Claim) == "" {
+		return "The copy states a claim the offer does not support."
+	}
+	return "The copy says \"" + e.Claim + "\", which the offer does not support."
+}
 
 var claimToken = regexp.MustCompile(`\d+(?:[.,]\d+)?%?`)
 
@@ -50,7 +69,7 @@ func (StubClaimChecker) CheckClaims(copyText, offerData string) error {
 			continue
 		}
 		log.Printf("claim check failed reason=%s", ClaimReasonNumberNotInOffer)
-		return ClaimMismatch{Reason: ClaimReasonNumberNotInOffer}
+		return ClaimMismatch{Reason: ClaimReasonNumberNotInOffer, Claim: token}
 	}
 	return nil
 }

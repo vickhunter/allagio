@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -102,6 +103,7 @@ type DigestItem struct {
 	FailedAction       string
 	MatchedRule        string
 	PostTitle          string
+	SurfaceURL         string
 	Position           string
 	LinkText           string
 	Label              string
@@ -706,6 +708,8 @@ type OfferCopy struct {
 	Category    string
 	ProductName string
 	Website     string
+	Terms       string
+	Commission  string
 }
 
 func (d *DB) OwnerSource(ctx context.Context, ownerID string) (string, error) {
@@ -720,8 +724,8 @@ func (d *DB) OwnerSource(ctx context.Context, ownerID string) (string, error) {
 func (d *DB) OfferCopy(ctx context.Context, offerID string) (OfferCopy, error) {
 	var row OfferCopy
 	var status string
-	err := d.Pool.QueryRow(ctx, `SELECT o.status, p.maker_id::text, COALESCE(p.primary_category,''), COALESCE(p.name,''), COALESCE(p.website_url,'')
-FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan(&status, &row.MakerID, &row.Category, &row.ProductName, &row.Website)
+	err := d.Pool.QueryRow(ctx, `SELECT o.status, p.maker_id::text, COALESCE(p.primary_category,''), COALESCE(p.name,''), COALESCE(p.website_url,''), COALESCE(o.terms,''), COALESCE(o.commission_value::text,'')
+FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan(&status, &row.MakerID, &row.Category, &row.ProductName, &row.Website, &row.Terms, &row.Commission)
 	row.Live = status == "listed"
 	return row, err
 }
@@ -733,21 +737,61 @@ FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan
 	return status == "listed", makerID, category, err
 }
 
-const placementBoxCountSQL = `SELECT COUNT(*) FROM placement_proposals
-WHERE site_id=$1 AND surface_url=$2 AND id<>$3 AND status<>'revoked' AND removed_at IS NULL`
+// normalizedSurfaceSQL folds host case, drops a query and a fragment, and
+// drops trailing slashes so the same post is one box.
+func normalizedSurfaceSQL(expr string) string {
+	return `regexp_replace(lower(split_part(split_part(` + expr + `, '#', 1), '?', 1)), '/+$', '')`
+}
+
+// An approved placement that expired without being committed is not the box.
+// A pending row and a committed row still are, including a committed row
+// whose prepare window has passed.
+var placementBoxCountSQL = `SELECT COUNT(*) FROM placement_proposals
+WHERE site_id=$1 AND id<>$3::uuid AND status<>'revoked' AND removed_at IS NULL
+AND NOT (status='pending' AND COALESCE(receipt->>'publication_status','')='refused')
+AND NOT (status='approved' AND expires_at <= NOW())
+AND (
+  ($4::bigint > 0 AND wp_post_id = $4::bigint)
+  OR (
+    wp_post_id > 0 AND EXISTS (
+      SELECT 1 FROM placement_proposals self
+      WHERE self.id = $3::uuid AND self.wp_post_id > 0 AND self.wp_post_id = placement_proposals.wp_post_id
+    )
+  )
+  OR ` + normalizedSurfaceSQL("surface_url") + ` = ` + normalizedSurfaceSQL("$2") + `
+)`
 
 type rowQuery interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-func countPlacementBoxes(ctx context.Context, q rowQuery, siteID, surfaceURL, exceptID string) (int, error) {
+func countPlacementBoxes(ctx context.Context, q rowQuery, siteID, surfaceURL, exceptID string, postID int64) (int, error) {
 	var n int
-	err := q.QueryRow(ctx, placementBoxCountSQL, siteID, surfaceURL, exceptID).Scan(&n)
+	err := q.QueryRow(ctx, placementBoxCountSQL, siteID, surfaceURL, exceptID, postID).Scan(&n)
 	return n, err
 }
 
-func (d *DB) CountPlacementBoxes(ctx context.Context, siteID, surfaceURL, exceptID string) (int, error) {
-	return countPlacementBoxes(ctx, d.Pool, siteID, surfaceURL, exceptID)
+func (d *DB) CountPlacementBoxes(ctx context.Context, siteID, surfaceURL, exceptID string, postID int64) (int, error) {
+	return countPlacementBoxes(ctx, d.Pool, siteID, surfaceURL, exceptID, postID)
+}
+
+// SiteHasApprovedPlacement is true after the first approved or committed box.
+func (d *DB) SiteHasApprovedPlacement(ctx context.Context, siteID string) (bool, error) {
+	if siteID == "" {
+		return false, nil
+	}
+	var n int
+	err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM placement_proposals
+WHERE site_id=$1 AND status IN ('approved','committed')`, siteID).Scan(&n)
+	return n > 0, err
+}
+
+// OfferClaimText is the offer text a placement copy is checked against.
+func (d *DB) OfferClaimText(ctx context.Context, offerID string) (string, error) {
+	var product, category, website, terms, commission string
+	err := d.Pool.QueryRow(ctx, `SELECT COALESCE(p.name,''), COALESCE(p.primary_category,''), COALESCE(p.website_url,''), COALESCE(o.terms,''), COALESCE(o.commission_value::text,'')
+FROM offers o JOIN products p ON p.id=o.product_id WHERE o.id=$1`, offerID).Scan(&product, &category, &website, &terms, &commission)
+	return strings.TrimSpace(strings.Join([]string{product, category, website, terms, commission}, "\n")), err
 }
 
 func (d *DB) CountPolicyPlacements(ctx context.Context, siteID string, since time.Time, includeID string) (int, error) {
@@ -938,6 +982,33 @@ func (d *DB) CountDigestPlacements(ctx context.Context, siteID string, since tim
 	return n, err
 }
 
+// digestPostTitleSQL is the WordPress article title. The plugin sends it on
+// prepare or receipt. The box copy is not a title. A prepare that omits the
+// title and matches no article returns an empty string. The UI uses the URL path.
+const digestPostTitleSQL = `COALESCE(NULLIF(receipt->>'post_title', ''), NULLIF(post_title, ''), (
+  SELECT a.title FROM articles a
+  WHERE a.site_id = placement_proposals.site_id
+    AND COALESCE(a.title, '') <> ''
+    AND regexp_replace(lower(split_part(split_part(COALESCE(a.url, ''), '#', 1), '?', 1)), '/+$', '')
+      = regexp_replace(lower(split_part(split_part(placement_proposals.surface_url, '#', 1), '?', 1)), '/+$', '')
+  ORDER BY a.updated_at DESC
+  LIMIT 1
+), '')`
+
+// digestPositionSQL uses the stored position, then the publisher's saved box
+// position, then end, so a digest item never has an empty position.
+const digestPositionSQL = `COALESCE(NULLIF(position, ''), (
+  SELECT os.box_position FROM owner_setup os
+  JOIN owners o ON o.id = os.owner_id
+  WHERE o.site_id = placement_proposals.site_id
+    AND os.role = 'publisher'
+    AND COALESCE(os.box_position, '') <> ''
+  LIMIT 1
+), 'end')`
+
+// digestSurfaceSQL prefers the plugin receipt, then the stored placement URL.
+const digestSurfaceSQL = `COALESCE(NULLIF(receipt->>'surface_url', ''), surface_url)`
+
 func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Time) ([]DigestItem, error) {
 	limit := DigestPageSize
 	if limit < 1 {
@@ -945,7 +1016,7 @@ func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Tim
 	}
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
 plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
-COALESCE(post_title,''), COALESCE(position,''), COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
+`+digestPostTitleSQL+`, `+digestSurfaceSQL+`, `+digestPositionSQL+`, COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
 (SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
 COALESCE(approved_by_kind,''), COALESCE(policy_version,0), COALESCE(undone_by_user::text,'')
 FROM placement_proposals
@@ -959,7 +1030,7 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = "placement"
-		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion, &item.UndoneBy); err != nil {
+		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.SurfaceURL, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion, &item.UndoneBy); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -967,22 +1038,50 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 	return out, rows.Err()
 }
 
+// digestOfferColumns is the shared offer row for both digest endpoints.
+// Title and URL come from the offer's placement receipt, then that placement.
+// A placement prepared without a title returns an empty string so the UI can
+// use the URL path. A held offer with no placement uses the product name.
+// The placement copy is not the title.
+const digestOfferColumns = `o.id::text, p.name,
+(o.updated_at AT TIME ZONE current_setting('TimeZone')),
+(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
+o.status,
+CASE WHEN place.id IS NOT NULL
+  THEN COALESCE(NULLIF(place.receipt->>'post_title', ''), NULLIF(place.post_title, ''), '')
+  ELSE COALESCE(NULLIF(p.name, ''), '')
+END,
+COALESCE(NULLIF(place.receipt->>'surface_url', ''), NULLIF(place.surface_url, ''), NULLIF(o.landing_url, ''), NULLIF(p.website_url, '')),
+COALESCE(NULLIF(place.position, ''), 'end')`
+
+const digestOfferFrom = `FROM offers o JOIN products p ON p.id=o.product_id
+LEFT JOIN LATERAL (
+  SELECT id, receipt, post_title, surface_url, position
+  FROM placement_proposals
+  WHERE offer_id = o.id
+  ORDER BY COALESCE(approved_at, created_at) DESC
+  LIMIT 1
+) place ON true`
+
 func (d *DB) DigestOffers(ctx context.Context, makerID string, since time.Time) ([]DigestItem, error) {
 	limit := DigestPageSize
 	if limit < 1 {
 		limit = 50
 	}
-	// offers.updated_at is TIMESTAMP WITHOUT TIME ZONE. A bare time.Time is
-	// encoded from the process-local wall clock (TZ=Europe/Rome shifts it by
-	// the offset) and Postgres then reads that clock in the session TimeZone.
-	// Either mismatch drops a just-listed offer. Send an absolute UTC instant.
-	rows, err := d.Pool.Query(ctx, `SELECT o.id::text, p.name, o.updated_at,
-(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
-o.status
-FROM offers o JOIN products p ON p.id=o.product_id
+	// offers.updated_at is timestamp without time zone: the session wall clock
+	// at write. Bind the floor as timestamptz, then convert that instant into
+	// the same wall clock, so a process location such as Europe/Rome does not
+	// move the cutoff. Return the column as that same instant.
+	// Submitted offers stay in the digest until they leave that state. Listed
+	// offers stay inside the window. The floor is still an absolute instant.
+	rows, err := d.Pool.Query(ctx, `SELECT `+digestOfferColumns+`
+`+digestOfferFrom+`
 WHERE p.maker_id=$1 AND o.status IN ('listed','submitted')
-AND o.updated_at > $2::timestamptz
-ORDER BY o.updated_at DESC LIMIT $3`, makerID, since.UTC().Format(time.RFC3339), limit)
+AND (
+  o.status = 'submitted'
+  OR o.updated_at > ($2::timestamptz AT TIME ZONE current_setting('TimeZone'))
+)
+ORDER BY o.updated_at DESC LIMIT $3`, makerID, since.UTC(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -995,7 +1094,7 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = kind
-		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.Status); err != nil {
+		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.Status, &item.PostTitle, &item.SurfaceURL, &item.Position); err != nil {
 			return nil, err
 		}
 		item.Label = item.Summary
@@ -1003,6 +1102,26 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 		out = append(out, item)
 	}
 	return out, rows.Err()
+}
+
+// MakerDigestOffers lists this maker's held, in-review, and live offers.
+// Submitted stays until it leaves that state. Listed stays with no digest window.
+// offerID limits the read to one offer when the key is scoped to it.
+func (d *DB) MakerDigestOffers(ctx context.Context, makerID, offerID string) ([]DigestItem, error) {
+	limit := DigestPageSize
+	if limit < 1 {
+		limit = 50
+	}
+	rows, err := d.Pool.Query(ctx, `SELECT `+digestOfferColumns+`
+`+digestOfferFrom+`
+WHERE p.maker_id=$1 AND o.status IN ('listed','submitted')
+AND ($2 = '' OR o.id::text = $2)
+ORDER BY o.updated_at DESC LIMIT $3`, makerID, offerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanDigest(rows, "offer")
 }
 
 func (d *DB) StoreUndoToken(ctx context.Context, hash, ownerID, kind, placementID, offerID string, expires time.Time) error {
@@ -1030,6 +1149,7 @@ status_before_undo=status,
 undone_at=$2,
 undone_by_user=$3::uuid,
 undone_by_key_hash='',
+plugin_wait_before=plugin_wait,
 plugin_wait='remove',
 plugin_wait_at=$2,
 plugin_failed_reason='',

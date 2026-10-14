@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -257,14 +258,17 @@ func domainFromSiteURL(raw string) (string, bool) {
 		return "", false
 	}
 	scheme := strings.ToLower(parsed.Scheme)
-	if (scheme != "http" && scheme != "https") || parsed.Hostname() == "" {
+	host := normalizeDomain(parsed.Hostname())
+	if (scheme != "http" && scheme != "https") || host == "" || !validHost(host) {
 		return "", false
 	}
-	domain := normalizeDomain(parsed.Hostname())
-	if domain == "" || !validDomain(domain) {
-		return "", false
+	if port := parsed.Port(); port != "" {
+		if !numericPort(port) {
+			return "", false
+		}
+		return host + ":" + port, true
 	}
-	return domain, true
+	return host, true
 }
 
 func normalizeDomain(domain string) string {
@@ -280,16 +284,53 @@ func normalizeDomain(domain string) string {
 	return strings.Trim(raw, ".")
 }
 
-func validDomain(domain string) bool {
-	domain = normalizeDomain(domain)
-	if domain == "localhost" {
+func numericPort(port string) bool {
+	if port == "" || len(port) > 5 {
+		return false
+	}
+	n := 0
+	for _, r := range port {
+		if r < '0' || r > '9' {
+			return false
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n >= 1 && n <= 65535
+}
+
+func splitOptionalPort(hostport string) (host, port string, ok bool) {
+	if !strings.Contains(hostport, ":") {
+		return hostport, "", true
+	}
+	name, p, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return "", "", false
+	}
+	return name, p, true
+}
+
+func validHost(host string) bool {
+	host = normalizeDomain(host)
+	if host == "localhost" {
 		return true
 	}
-	if len(domain) < 3 || len(domain) > 253 {
+	if len(host) < 3 || len(host) > 253 {
 		return false
 	}
-	if strings.Contains(domain, "..") {
+	if strings.Contains(host, "..") {
 		return false
 	}
-	return domainPattern.MatchString(domain)
+	return domainPattern.MatchString(host)
+}
+
+func validDomain(domain string) bool {
+	domain = strings.TrimSpace(strings.ToLower(domain))
+	if strings.Contains(domain, "://") {
+		domain = normalizeDomain(domain)
+	}
+	host, port, ok := splitOptionalPort(domain)
+	if !ok || (port != "" && !numericPort(port)) {
+		return false
+	}
+	return validHost(host)
 }

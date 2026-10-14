@@ -139,7 +139,7 @@ func main() {
 	}
 	products := &handlers.ProductsHandler{DB: db}
 	offers := &handlers.OffersHandler{DB: db, ClaimsCheck: cfg.ClaimsCheck}
-	offerReview := &handlers.OfferReviewHandler{DB: db}
+	offerReview := &handlers.OfferReviewHandler{DB: db, ClaimsCheck: cfg.ClaimsCheck}
 	assessments := &handlers.AssessmentsHandler{
 		DB: db,
 		Engine: &services.ReadinessEngine{
@@ -151,7 +151,7 @@ func main() {
 	}
 
 	marketplace := &handlers.MarketplaceHandler{DB: db}
-	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != ""}
+	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != "", Claims: entry.StubClaimChecker{}}
 	payouts := &handlers.PayoutsHandler{DB: db}
 	redirects := &handlers.RedirectsHandler{
 		DB:           db,
@@ -289,6 +289,7 @@ func main() {
 		secured.GET("/placements", placements.List)
 		secured.POST("/placements/:id/commit", placements.Commit)
 		secured.POST("/placements/:id/receipt", placements.RecordReceipt)
+		secured.POST("/placements/:id/refuse", placements.Refuse)
 		secured.POST("/placements/:id/removed", placements.MarkRemoved)
 		// Revoke lives on AgentEntry so a site owner or the offer's maker can call it.
 		secured.GET("/marketplace/offers", marketplace.ListOffers)
