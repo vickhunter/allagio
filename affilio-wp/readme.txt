@@ -1,11 +1,39 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.18
+Stable tag: 0.1.24
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.24 =
+* The five-minute box sync also checks published posts and pages whose content contains an Affilio box, even when that box is missing from the local index. A draft is not scanned. A placement revoked on the server is removed and acknowledged.
+
+= 0.1.23 =
+* If the five-minute box sync is not scheduled, the next load schedules it again. A second load does not add another event. A placement revoked on the server is removed from the post when that sync runs.
+* A go-link redirect accepts an https address, or this site's own home URL. An http or javascript address is not used, including as a remembered fallback.
+* Opening the scan page with ?affilio_scan_continue=1 does not submit the next batch and does not mint a nonce. The next batch runs only from the POST that created the job.
+
+= 0.1.22 =
+* Prepare and the publication receipt send the article's decoded WordPress title and post id.
+* When a new box is removed because the receipt never reached the server, the plugin asks the server to put that placement back to pending. A failed call is retried on the next prepare, before another placement is created.
+* An API URL that is only the site origin is saved and called as that origin plus /v1. A trailing slash is removed.
+
+= 0.1.21 =
+* A refused receipt returns the server status and the server reason. Connect stores plugin_key when the register response includes it.
+* A second box on the same post is refused with "Keep one box on this post." A box added in that request is removed. An upgrade does not delete a box that was already in the post.
+
+= 0.1.20 =
+* An upgrade no longer fatals the front page. Go-link detection reads the request path before WordPress has built the query, and the version upgrade runs on init.
+* Box sync is scheduled on activation and upgrade, and cleared on deactivation. A failed plugin acknowledgement is retried with backoff.
+* Choosing "leave removed" settles as removed and sends the acknowledgement. `/go/<id>` without a trailing slash is not canonically cached. Publish matches the article URL or post id the API returns.
+
+= 0.1.19 =
+* An inserted box links to this site's `/go/<placement id>` with `rel="sponsored nofollow"` and the label "(link sponsorizzato)".
+* Revoke, restore, and upgrade send a plugin acknowledgement only after the saved post is re-read. A second failed re-read sends `failed` and shows an admin notice.
+* `/go/<placement id>` proxies the API with the site key and falls back when the API is down. Legacy `/v1/go/` links are rewritten only while the post is rendered.
+* Settings stores a plugin key for box acknowledgements. The field renders empty, and an empty save keeps the saved key.
 
 = 0.1.18 =
 * Inserting or removing an Affilio block does not create a WordPress post revision. The revision skip runs last, so another plugin cannot turn revisions back on for that write.

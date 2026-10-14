@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         bootstrap="tests/phpunit/bootstrap.php"
+         colors="true"
+         cacheDirectory="/tmp/affilio-phpunit-cache">
+    <testsuites>
+        <testsuite name="walk">
+            <file>tests/phpunit/WalkBlockersTest.php</file>
+            <file>tests/phpunit/N2ErrorsTest.php</file>
+            <file>tests/phpunit/OneBoxTest.php</file>
+            <file>tests/phpunit/ScanContinueTest.php</file>
+        </testsuite>
+    </testsuites>
+</phpunit>

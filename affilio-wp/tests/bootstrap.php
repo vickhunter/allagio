@@ -35,7 +35,7 @@ if (!function_exists('check')) {
 }
 
 if (!function_exists('add_action')) {
-    function add_action($name, $callback) { $GLOBALS['actions'][$name][] = $callback; }
+    function add_action($name, $callback, $priority = 10, $accepted_args = 1) { $GLOBALS['actions'][$name][] = $callback; }
     function apply_filters($name, $value) {
         $args = func_get_args();
         if ($name === 'pre_http_request') {
@@ -52,6 +52,7 @@ if (!function_exists('add_action')) {
         return $value;
     }
     function register_activation_hook($path, $callback) { $GLOBALS['actions']['activation'][] = $callback; }
+    function register_deactivation_hook($path, $callback) { $GLOBALS['actions']['deactivation'][] = $callback; }
     function register_rest_route($namespace, $path, $args) { $GLOBALS['routes'][] = array($namespace, $path, $args); }
     function plugin_dir_path($path) { return dirname($path) . '/'; }
     function plugin_dir_url($path) { return 'https://blog.example/wp-content/plugins/affilio-wp/'; }
@@ -172,6 +173,7 @@ if (!class_exists('WP_Error')) {
             $this->data = $data;
         }
         public function get_error_message() { return $this->message; }
+        public function get_error_data($code = '') { return $this->data; }
     }
 }
 

@@ -6,6 +6,7 @@ require __DIR__ . '/bootstrap.php';
 
 $site_key = 'abcdSECRETKEY1234wxyz';
 $admin_key = 'admnSECRETADMIN9999qrst';
+$plugin_key = 'plugPLUGINKEY1234mnop';
 $failures = array();
 
 function fail_security($message) {
@@ -48,7 +49,10 @@ function run_scan($administrator, $nonce) {
 require {$bootstrap};
 require {$plugin};
 class Affilio_ScanSpy {
-    public function scan_all_posts() { fwrite(STDERR, "SCANNED\n"); }
+    public function scan_published_batch(\$offset = 0) {
+        fwrite(STDERR, "SCANNED\n");
+        return array('scanned' => 0, 'skipped' => array(), 'fetched' => 0, 'done' => true, 'next_offset' => 0);
+    }
 }
 class Affilio_QuietAPI {
     public function get_connection_status(\$force = false) {
@@ -80,6 +84,7 @@ PHP;
 
 $GLOBALS['options']['affilio_api_key'] = $site_key;
 $GLOBALS['options']['affilio_admin_api_key'] = $admin_key;
+$GLOBALS['options']['affilio_plugin_key'] = $plugin_key;
 $GLOBALS['administrator'] = true;
 $_SERVER['REQUEST_METHOD'] = 'GET';
 
@@ -116,6 +121,7 @@ $page->render_settings();
 $settings = ob_get_clean();
 assert_key_hidden($settings, $site_key, 'settings page');
 assert_key_hidden($settings, $admin_key, 'advanced settings');
+assert_key_hidden($settings, $plugin_key, 'plugin key field');
 if (strpos($settings, 'placeholder="Key saved (' . substr($site_key, 0, 4) . '…)"') === false) {
     fail_security('settings API key field is missing the saved-key placeholder');
 }
@@ -127,6 +133,15 @@ if (strpos($settings, 'placeholder="Key saved (' . substr($admin_key, 0, 4) . '�
 }
 if (strpos($settings, 'name="affilio_admin_api_key" value=""') === false) {
     fail_security('advanced admin key field did not render empty');
+}
+if (strpos($settings, 'placeholder="Key saved (' . substr($plugin_key, 0, 4) . '…)"') === false) {
+    fail_security('plugin key field is missing the saved-key placeholder');
+}
+if (strpos($settings, 'name="affilio_plugin_key" value=""') === false) {
+    fail_security('plugin key field did not render empty');
+}
+if (strpos($settings, 'X-Plugin-Key') === false) {
+    fail_security('plugin key field did not say it is sent as X-Plugin-Key');
 }
 if (strpos($settings, 'class="affilio-key-hint"') === false || strpos($settings, 'Key saved (' . substr($site_key, 0, 4) . '…)') === false) {
     fail_security('status box did not show the first 4 characters and an ellipsis');
@@ -143,6 +158,7 @@ $_SERVER['REQUEST_METHOD'] = 'POST';
 $_POST = array(
     'affilio_api_key' => '',
     'affilio_admin_api_key' => '   ',
+    'affilio_plugin_key' => '',
     '_wpnonce' => wp_create_nonce('affilio_settings'),
 );
 $_REQUEST = $_POST;
@@ -155,10 +171,15 @@ if (get_option('affilio_api_key', '') !== $site_key) {
 if (get_option('affilio_admin_api_key', '') !== $admin_key) {
     fail_security('an empty admin key field replaced the stored key');
 }
+if (get_option('affilio_plugin_key', '') !== $plugin_key) {
+    fail_security('an empty plugin key field replaced the stored key');
+}
 
 $replacement = 'zzzzNEWSECRETKEY5678abcd';
+$plugin_replacement = 'plugNEWPLUGINKEY5678qrst';
 $_POST['affilio_api_key'] = $replacement;
 $_POST['affilio_admin_api_key'] = 'admnNEWADMINKEY5678wxyz';
+$_POST['affilio_plugin_key'] = $plugin_replacement;
 $_REQUEST = $_POST;
 ob_start();
 $page->render_settings();
@@ -166,14 +187,20 @@ $replaced = ob_get_clean();
 if (get_option('affilio_api_key', '') !== $replacement) {
     fail_security('a new API key did not replace the stored key');
 }
+if (get_option('affilio_plugin_key', '') !== $plugin_replacement) {
+    fail_security('a new plugin key did not replace the stored key');
+}
 assert_key_hidden($replaced, $replacement, 'settings page after replace');
+assert_key_hidden($replaced, $plugin_replacement, 'plugin key after replace');
 $GLOBALS['options']['affilio_api_key'] = $site_key;
 $GLOBALS['options']['affilio_admin_api_key'] = $admin_key;
+$GLOBALS['options']['affilio_plugin_key'] = $plugin_key;
 
 $dashboard = new Affilio_Admin($quiet, new Affilio_ScanSpy(), null);
 ob_start();
 $dashboard->render_dashboard();
 $form = ob_get_clean();
+assert_key_hidden($form, $plugin_key, 'dashboard');
 $scan_nonce = null;
 if (!preg_match('/name="_wpnonce" value="([^"]+)"/', $form, $nonce_match)) {
     fail_security('Scan All Posts form did not include a nonce');
@@ -229,6 +256,59 @@ foreach ($GLOBALS['probe_urls'] as $url) {
 }
 if (!$saw_new_host) {
     fail_security('changing the API URL kept the cached connection host');
+}
+
+$GLOBALS['options']['affilio_api_url_override'] = 'https://kept.example/v1';
+$_SERVER['REQUEST_METHOD'] = 'POST';
+$_POST = array(
+    'affilio_api_key' => '',
+    'affilio_admin_api_key' => '',
+    'affilio_api_url_override' => 'http://evil.example/v1',
+    '_wpnonce' => wp_create_nonce('affilio_settings'),
+);
+$_REQUEST = $_POST;
+ob_start();
+$page->render_settings();
+$rejected_url = ob_get_clean();
+if (get_option('affilio_api_url_override', '') !== 'https://kept.example/v1') {
+    fail_security('an http API URL override replaced the stored https URL');
+}
+if (strpos($rejected_url, 'deve usare https, salvo localhost.') === false) {
+    fail_security('API URL override did not explain the https rule in Italian');
+}
+foreach (array('http://localhost/v1', 'http://127.0.0.1:8080/v1', 'https://ok.example/v1') as $allowed_url) {
+    $_POST['affilio_api_url_override'] = $allowed_url;
+    $_REQUEST = $_POST;
+    ob_start();
+    $page->render_settings();
+    ob_end_clean();
+    if (get_option('affilio_api_url_override', '') !== $allowed_url) {
+        fail_security('allowed API URL was rejected: ' . $allowed_url);
+    }
+}
+$_POST['affilio_api_url_override'] = 'http://localhost.evil.com/v1';
+$_REQUEST = $_POST;
+ob_start();
+$page->render_settings();
+ob_end_clean();
+if (get_option('affilio_api_url_override', '') !== 'https://ok.example/v1') {
+    fail_security('a lookalike localhost host replaced the stored API URL');
+}
+$_POST['affilio_api_url_override'] = 'https://bare.example/';
+$_REQUEST = $_POST;
+ob_start();
+$page->render_settings();
+ob_end_clean();
+if (get_option('affilio_api_url_override', '') !== 'https://bare.example/v1') {
+    fail_security('a bare API origin was stored without /v1: ' . get_option('affilio_api_url_override', ''));
+}
+$_POST['affilio_api_url_override'] = '';
+$_REQUEST = $_POST;
+ob_start();
+$page->render_settings();
+ob_end_clean();
+if (get_option('affilio_api_url_override', '') !== '') {
+    fail_security('an empty API URL override did not clear the stored URL');
 }
 
 if ($failures) {

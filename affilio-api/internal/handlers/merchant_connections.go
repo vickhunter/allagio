@@ -24,6 +24,12 @@ func (h *MerchantConnectionsHandler) viewer() *HostedHandler {
 	return &HostedHandler{Page: h.Page, BaseURL: h.BaseURL, OperatorID: h.OperatorID}
 }
 
+const webhookSecretRefusal = "Use the signing secret from your Stripe webhook endpoint. It starts with whsec_."
+
+func validWebhookSecret(secret string) bool {
+	return strings.HasPrefix(secret, "whsec_") && len(secret) >= 16 && len(secret) <= 512
+}
+
 func liveKeyRejected(key string) bool {
 	key = strings.ToLower(strings.TrimSpace(key))
 	return strings.HasPrefix(key, "sk_live_") || strings.HasPrefix(key, "rk_live_") || strings.HasPrefix(key, "pk_live_")
@@ -88,8 +94,9 @@ func (h *MerchantConnectionsHandler) Connect(c *gin.Context) {
 		return
 	}
 	secret := c.PostForm("signing_secret")
-	if !strings.HasPrefix(secret, "whsec_") || len(secret) < 16 || len(secret) > 512 {
-		c.JSON(400, gin.H{"error": "valid webhook signing secret required"})
+	if !validWebhookSecret(secret) {
+		c.Status(http.StatusBadRequest)
+		h.viewer().render(c, "Connect your checkout", "", h.connectionBody(p.Name, productID, o.CSRF, webhookSecretRefusal))
 		return
 	}
 	check, err := h.Verifier.Verify(c.Request.Context(), key, c.PostForm("price_id"), c.PostForm("endpoint_id"), h.BaseURL+"/v1/webhooks/stripe/"+productID)

@@ -6,6 +6,7 @@ class WP_Error {
     public $data;
     public function __construct($code, $message, $data = array()) { $this->code = $code; $this->message = $message; $this->data = $data; }
     public function get_error_message() { return $this->message; }
+    public function get_error_data($code = '') { return $this->data; }
 }
 function is_wp_error($value) { return $value instanceof WP_Error; }
 function rest_ensure_response($value) { return $value; }
@@ -41,7 +42,9 @@ function affilio_receipt_code($published, $copy, $disclosure, $tracked) {
     $has_disclosure = strpos((string) $published, (string) $disclosure) !== false
         || preg_match('/link.{0,60}affiliat|affiliat.{0,60}link/iu', $plain)
         || strpos($plain, 'commissione') !== false;
-    if (strpos((string) $published, (string) $copy) !== false && $has_disclosure && strpos((string) $published, (string) $tracked) !== false) {
+    $has_link = strpos((string) $published, (string) $tracked) !== false
+        || strpos((string) $published, '/go/' . $GLOBALS['placement_id']) !== false;
+    if (strpos((string) $published, (string) $copy) !== false && $has_disclosure && $has_link) {
         return 200;
     }
     return 409;
@@ -142,7 +145,7 @@ $GLOBALS['post']->post_content = $server_original;
 $result = $distribution->publish($request);
 check(is_wp_error($result), 'a 500 receipt was treated as published');
 check($GLOBALS['post']->post_content === $server_original, 'a non-2xx receipt left the insert in the post');
-check(strpos($GLOBALS['post']->post_content, '/v1/go/') === false, 'a non-2xx receipt left the tracked link in the post');
+check(strpos($GLOBALS['post']->post_content, '/go/' . $placement_id) === false, 'a non-2xx receipt left the tracked link in the post');
 check(strpos($result->get_error_message(), 'annullato') !== false, 'a non-2xx receipt did not tell the admin in Italian: ' . $result->get_error_message());
 
 $GLOBALS['force_receipt'] = 0;
@@ -152,7 +155,7 @@ $GLOBALS['post']->post_content = $policy;
 $result = $distribution->publish($request);
 check(!is_wp_error($result) && !empty($result['published']), 'a disclosure-policy sentence blocked publication: ' . (is_wp_error($result) ? $result->get_error_message() : ''));
 check(strpos($GLOBALS['post']->post_content, 'affilio-disclosure-') !== false, 'a disclosure-policy sentence was treated as the disclosure');
-check(strpos($GLOBALS['post']->post_content, '/v1/go/') !== false, 'the tracked link was not inserted once a real disclosure was added');
+check(strpos($GLOBALS['post']->post_content, '/go/' . $placement_id) !== false, 'the tracked link was not inserted once a real disclosure was added');
 
 $GLOBALS['receipt_recorded'] = false;
 $boundary = '<p>' . str_repeat('a', 80) . 'è' . str_repeat('b', 79) . 'link affiliati nel testo.</p>';

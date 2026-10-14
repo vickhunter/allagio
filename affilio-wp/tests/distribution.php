@@ -6,6 +6,7 @@ class WP_Error {
     public $data;
     public function __construct($code, $message, $data = array()) { $this->code = $code; $this->message = $message; $this->data = $data; }
     public function get_error_message() { return $this->message; }
+    public function get_error_data($code = '') { return $this->data; }
 }
 function is_wp_error($value) { return $value instanceof WP_Error; }
 function rest_ensure_response($value) { return $value; }
@@ -78,7 +79,7 @@ check(!is_wp_error($result) && $result['published'] && $GLOBALS['updates'] === 3
 check(substr_count($GLOBALS['post']->post_content, '<!-- wp:paragraph {"className":"affilio-placement-') === 1, 'Duplicate placement marker.');
 check(substr_count($GLOBALS['post']->post_content, 'Affiliate disclosure:') === 1, 'Duplicate disclosure.');
 check(strpos($GLOBALS['post']->post_content, $existing) === 0, 'Existing article content was modified.');
-check(strlen($api->receipt['published_text']) < 16000 && strpos($api->receipt['published_text'], 'R&D') !== false && strpos($api->receipt['published_text'], '/v1/go/test?placement=') !== false, 'Published evidence did not preserve exact approved text/link.');
+check(strlen($api->receipt['published_text']) < 16000 && strpos($api->receipt['published_text'], 'R&D') !== false && strpos($api->receipt['published_text'], '/go/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa') !== false, 'Published evidence did not preserve exact approved text/link.');
 $GLOBALS['allowed'] = false;
 check(!$distribution->allowed() && is_wp_error($distribution->publish($request)), 'Unauthorized user published.');
 $GLOBALS['allowed'] = true;

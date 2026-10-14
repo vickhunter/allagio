@@ -189,6 +189,7 @@ func (h *HostedHandler) LoginStart(c *gin.Context) {
 		return
 	}
 	returnTo = mergeAttributionSource(returnTo, c.Query("source"))
+	returnTo = mergeDemoReferral(returnTo, c.Query("ref"), c.Query("via"))
 	if len(returnTo) > 8192 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return

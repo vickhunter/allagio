@@ -1,8 +1,10 @@
 import base64
 from email.message import Message
+import hashlib
 import io
 import json
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import sys
@@ -57,6 +59,31 @@ def public_responses():
     for name in release.ASSETS:
         result["/assets/" + name] = response()
     return result
+
+
+def plugin_archive(plugin=None, extra=None, drop=None, bodies=None):
+    version = release.PLUGIN_VERSION
+    if plugin is None:
+        plugin = (
+            "<?php\n/* Plugin Name: Affilio\n * Version: %s\n */\n"
+            "define('AFFILIO_VERSION', '%s');\n"
+            "if (!function_exists('affilio_init')) {\nfunction affilio_init() {}\n}\n"
+        ) % (version, version)
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as zipped:
+        for name in release.WP_FILES:
+            if drop and name == drop:
+                continue
+            if name.endswith("/affilio.php"):
+                body = plugin
+            elif name.endswith("/readme.txt"):
+                body = "=== Affilio ===\nStable tag: %s\n" % version
+            else:
+                body = (bodies or {}).get(name, "runtime")
+            zipped.writestr(name, body)
+        if extra:
+            zipped.writestr(extra[0], extra[1])
+    return output.getvalue()
 
 
 class ReleaseTests(unittest.TestCase):
@@ -123,24 +150,10 @@ class ReleaseTests(unittest.TestCase):
             release.archive_names(["package/package.json", "package/package.json"])
 
     def test_plugin_origin_and_hosted_asset_exclusion(self):
-        guarded = "<?php\n/* Plugin Name: Affilio\n * Version: 0.1.18\n */\ndefine('AFFILIO_VERSION', '0.1.18');\nif (!function_exists('affilio_init')) {\nfunction affilio_init() {}\n}\n"
+        guarded = "<?php\n/* Plugin Name: Affilio\n * Version: 0.1.24\n */\ndefine('AFFILIO_VERSION', '0.1.24');\nif (!function_exists('affilio_init')) {\nfunction affilio_init() {}\n}\n"
 
         def archive(plugin=guarded, extra=None, drop=None):
-            output = io.BytesIO()
-            with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as z:
-                for name in release.WP_FILES:
-                    if drop and name == drop:
-                        continue
-                    if name.endswith("/affilio.php"):
-                        body = plugin
-                    elif name.endswith("/readme.txt"):
-                        body = "=== Affilio ===\nStable tag: 0.1.18\n"
-                    else:
-                        body = "runtime"
-                    z.writestr(name, body)
-                if extra:
-                    z.writestr(extra[0], extra[1])
-            return output.getvalue()
+            return plugin_archive(plugin, extra, drop)
 
         release.validate_plugin(archive(), release.ORIGIN)
         with self.assertRaisesRegex(release.ReleaseError, "railway.app"):
@@ -151,14 +164,101 @@ class ReleaseTests(unittest.TestCase):
             release.validate_plugin(archive(drop="affilio-wp/admin/build/analytics.js"))
         with self.assertRaisesRegex(release.ReleaseError, "unguarded function affilio_init"):
             release.validate_plugin(archive(plugin="<?php\n/* Plugin Name: Affilio */\nfunction affilio_init() {}\n"))
-        with self.assertRaisesRegex(release.ReleaseError, "0.1.18"):
-            release.validate_plugin(archive(plugin=guarded.replace("0.1.18", "0.1.9")))
+        with self.assertRaisesRegex(release.ReleaseError, "0.1.24"):
+            release.validate_plugin(archive(plugin=guarded.replace("0.1.24", "0.1.9")))
         with self.assertRaisesRegex(release.ReleaseError, "hosted UI"):
             release.validate_plugin(archive(extra=("affilio-wp/admin/build/landing-scene.bundle.js", "unexpected")))
+        for extra in (
+            "affilio-wp/e2e/offer-rail.spec.js",
+            "affilio-wp/phpunit.xml.dist",
+            "affilio-wp/tests/d033-one-box.php",
+            "affilio-wp/e2e/test-results/x",
+            "affilio-wp/tests/phpunit/.phpunit.result.cache",
+        ):
+            with self.subTest(extra=extra), self.assertRaisesRegex(release.ReleaseError, "tests or test results"):
+                release.validate_plugin(archive(extra=(extra, "unexpected")))
         with self.assertRaisesRegex(release.ReleaseError, "class-affilio-missing.php"):
             release.validate_plugin(archive(plugin=guarded + "require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-missing.php';\n"))
         with self.assertRaisesRegex(release.ReleaseError, "marketplace.js"):
             release.validate_plugin(archive(plugin=guarded + "wp_enqueue_script($handle, AFFILIO_PLUGIN_URL . 'admin/build/' . $script);\n$script = 'marketplace.js';\n", drop="affilio-wp/admin/build/marketplace.js"))
+
+    def test_missing_landing_scene_bundle_fails_the_zip(self):
+        script = "affilio-wp/admin/build/dashboard.js"
+        php = "affilio-wp/includes/class-affilio-scanner.php"
+        for body in (
+            "import './landing-scene.bundle.js';\n",
+            "import scene from './landing-scene.bundle.js';\n",
+            "const { mountScene } = await import('./landing-scene.bundle.js');\n",
+            'await import("./landing-scene.bundle.js");\n',
+        ):
+            with self.subTest(body=body), self.assertRaisesRegex(release.ReleaseError, "landing-scene.bundle.js"):
+                release.validate_plugin(plugin_archive(bodies={script: body}))
+        release.validate_plugin(plugin_archive(bodies={script: "// import('./landing-scene.bundle.js');\nimport * as THREE from 'three';\nimport './analytics.js';\n"}))
+        header = (
+            "<?php\n/* Plugin Name: Affilio\n * Version: %s\n */\n"
+            "define('AFFILIO_VERSION', '%s');\n"
+            "if (!function_exists('affilio_init')) {\nfunction affilio_init() {}\n}\n"
+        ) % (release.PLUGIN_VERSION, release.PLUGIN_VERSION)
+        with self.assertRaisesRegex(release.ReleaseError, "missing-script.js"):
+            release.validate_plugin(plugin_archive(plugin=header + "wp_enqueue_script('affilio-missing', 'admin/build/missing-script.js');\n"))
+        with self.assertRaisesRegex(release.ReleaseError, "missing-style.css"):
+            release.validate_plugin(plugin_archive(plugin=header + "wp_enqueue_style('affilio-missing', 'admin/css/missing-style.css');\n"))
+        with self.assertRaisesRegex(release.ReleaseError, "missing-include.php"):
+            release.validate_plugin(plugin_archive(bodies={php: "<?php\nrequire_once __DIR__ . '/missing-include.php';\n"}))
+        with self.assertRaisesRegex(release.ReleaseError, "missing-required.php"):
+            release.validate_plugin(plugin_archive(bodies={php: "<?php\ninclude 'includes/missing-required.php';\n"}))
+        with self.assertRaisesRegex(release.ReleaseError, "outside the plugin"):
+            release.validate_plugin(plugin_archive(bodies={php: "<?php\nrequire __DIR__ . '/../../outside.php';\n"}))
+
+    def test_package_wp_zip_passes_the_release_gate(self):
+        probe = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=release.ROOT,
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode != 0 or probe.stdout.strip() != "true":
+            self.skipTest("not a git checkout, so package-wp-zip cannot list tracked files")
+        hosted = {
+            "landing.js", "landing-scene.js", "landing.css",
+            "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt",
+            "workspace.js", "workspace.css", "workspace.html",
+            "home.html", "agent-poc.html", "setup-controls.js",
+            "THIRD_PARTY_NOTICES.md", "package.json", "package-lock.json",
+        }
+        admin = release.ROOT / "affilio-wp/includes/class-affilio-admin.php"
+        needed, outside = release.referenced_plugin_files(str(admin.relative_to(release.ROOT)), admin.read_text())
+        self.assertEqual(outside, [])
+        self.assertNotIn("setup-controls.js", admin.read_text())
+        for relative in needed:
+            self.assertFalse(release.hosted_build_file(Path(relative).name), relative)
+        header = (release.ROOT / "affilio-wp/affilio.php").read_text()
+        found = re.search(r"(?m)^[ \t]*\*[ \t]*Version:[ \t]*([0-9]+\.[0-9]+\.[0-9]+)[ \t]*$", header)
+        self.assertIsNotNone(found)
+        version = found.group(1)
+        script = release.ROOT / "scripts" / "package-wp-zip"
+        archives = []
+        for _ in range(2):
+            with tempfile.TemporaryDirectory() as directory:
+                stale = Path(directory) / "affilio-0.1.19.zip"
+                result = subprocess.run([str(script), str(stale)], cwd=release.ROOT, capture_output=True, text=True, timeout=60)
+                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+                self.assertIn("passed the release gate with 24 files: affilio-%s.zip" % version, result.stdout)
+                written = Path(directory) / ("affilio-%s.zip" % version)
+                self.assertTrue(written.is_file(), result.stdout)
+                self.assertFalse(stale.exists())
+                archives.append(written.read_bytes())
+        self.assertEqual(hashlib.sha256(archives[0]).hexdigest(), hashlib.sha256(archives[1]).hexdigest())
+        release.validate_plugin(archives[0])
+        with zipfile.ZipFile(io.BytesIO(archives[0])) as archive:
+            names = [name for name in archive.namelist() if not name.endswith("/")]
+            self.assertEqual(names, sorted(names))
+            for info in archive.infolist():
+                self.assertEqual(info.date_time, (1980, 1, 1, 0, 0, 0))
+        self.assertEqual(len(names), 24)
+        self.assertTrue(hosted.isdisjoint(Path(name).name for name in names))
+        for relative in needed:
+            self.assertIn(release.PLUGIN_ROOT + relative, names)
 
     def test_plugin_zip_rejects_stored_entries(self):
         output = io.BytesIO()

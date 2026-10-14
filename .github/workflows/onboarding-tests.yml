@@ -25,9 +25,13 @@ jobs:
         run: find affilio-wp -name '*.php' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 php -l
       - name: Test WordPress plugin
         run: find affilio-wp/tests -name '*.php' ! -name 'bootstrap.php' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 php
+      - name: PHPUnit walk blockers
+        run: |
+          curl -fsSL -o /tmp/phpunit.phar https://phar.phpunit.de/phpunit-10.5.45.phar
+          php /tmp/phpunit.phar --do-not-cache-result -c affilio-wp/phpunit.xml.dist
       - name: Build landing illustration
         working-directory: affilio-wp/admin/build
-        run: npm ci --ignore-scripts && npm run build
+        run: npm ci --ignore-scripts && npm run build && git diff --exit-code -- landing-scene.bundle.js landing-scene.bundle.js.LEGAL.txt
       - name: Gutenberg block round-trip
         working-directory: affilio-wp/tests/block-roundtrip
         run: npm ci --ignore-scripts && node roundtrip.mjs

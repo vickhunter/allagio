@@ -66,7 +66,7 @@ func TestSitesRegisterAcceptsPluginContract(t *testing.T) {
 	if domain != "blog.example" || name != "" {
 		t.Fatalf("stored domain %q name %q", domain, name)
 	}
-	if strings.Contains(row, "0.1.18") {
+	if strings.Contains(row, "0.1.24") {
 		t.Fatalf("plugin_version was stored without a column: %s", row)
 	}
 
@@ -159,7 +159,7 @@ func TestSitesRegisterStoresPluginVersionOnlyWhenColumnExists(t *testing.T) {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT COALESCE(plugin_version,'') FROM sites WHERE id=$1`, created["site_id"]).Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if version != "0.1.18" {
+	if version != "0.1.24" {
 		t.Fatalf("plugin_version column was not stored: %q", version)
 	}
 }

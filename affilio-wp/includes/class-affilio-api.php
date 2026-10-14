@@ -104,13 +104,25 @@ class Affilio_API {
         return substr($key, 0, 4) . '…';
     }
 
+    public static function normalize_base_url($url) {
+        $url = trim((string) $url);
+        if ($url === '') {
+            return '';
+        }
+        $url = rtrim($url, '/');
+        if (!preg_match('#/v1$#', $url)) {
+            $url .= '/v1';
+        }
+        return $url;
+    }
+
     public static function resolve_base_url() {
         $url = defined('AFFILIO_API_URL') ? trim((string) AFFILIO_API_URL) : '';
         $override = trim((string) get_option('affilio_api_url_override', ''));
         if ($override !== '') {
             $url = $override;
         }
-        return rtrim((string) apply_filters('affilio_api_base_url', $url), '/');
+        return self::normalize_base_url(apply_filters('affilio_api_base_url', $url));
     }
 
     private function connection_cache_key() {
@@ -197,8 +209,13 @@ class Affilio_API {
 
         $health = $this->service_health();
         if (is_wp_error($health)) {
-            $status['state'] = 'starting';
-            $status['label'] = $this->t('Starting', 'In avvio');
+            if ($this->error_code($health) === 'affilio_bad_url') {
+                $status['state'] = 'wrong_api_url';
+                $status['label'] = $this->t('Invalid API URL', 'URL API non valido');
+            } else {
+                $status['state'] = 'starting';
+                $status['label'] = $this->t('Starting', 'In avvio');
+            }
             $status['message'] = $health->get_error_message();
             return $this->store_status($cache_key, $status, 15);
         }
@@ -245,6 +262,9 @@ class Affilio_API {
         $health = null;
         foreach ($timeouts as $index => $timeout) {
             $health = wp_remote_get($url, array('timeout' => $timeout));
+            if ($this->health_is_client_error($health) || (is_wp_error($health) && !$this->transport_is_cold_start($health))) {
+                return new WP_Error('affilio_bad_url', $this->refused_url_message(), array('status' => 502));
+            }
             if (!$this->health_needs_retry($health) || $index > 0) {
                 break;
             }
@@ -256,15 +276,90 @@ class Affilio_API {
                 array('status' => 503)
             );
         }
+        $code = (int) wp_remote_retrieve_response_code($health);
+        if ($code >= 200 && $code < 300) {
+            $this->remember_known_base_url();
+        }
         return $health;
     }
 
     private function health_needs_retry($health) {
         if (is_wp_error($health)) {
-            return true;
+            return $this->transport_is_cold_start($health);
         }
         $code = (int) wp_remote_retrieve_response_code($health);
         return $code === 0 || $code === 502 || $code === 503 || $code === 504;
+    }
+
+    private function health_is_client_error($health) {
+        if (is_wp_error($health)) {
+            return false;
+        }
+        $code = (int) wp_remote_retrieve_response_code($health);
+        return $code >= 400 && $code < 500;
+    }
+
+    private function transport_is_cold_start($error) {
+        $message = '';
+        if (is_object($error) && method_exists($error, 'get_error_message')) {
+            $message = strtolower((string) $error->get_error_message());
+        }
+        $curl = 0;
+        if (preg_match('/curl error (\d+)/', $message, $match)) {
+            $curl = (int) $match[1];
+        }
+        $dns = $curl === 6 || strpos($message, 'could not resolve') !== false || strpos($message, 'getaddrinfo') !== false || strpos($message, 'name or service not known') !== false;
+        $tls_codes = array(35, 51, 53, 54, 58, 59, 60, 66, 77, 80, 82, 83, 90, 91);
+        $tls = in_array($curl, $tls_codes, true) || strpos($message, 'ssl') !== false || strpos($message, 'certificate') !== false || strpos($message, 'tls') !== false;
+        if ($dns || $tls) {
+            return false;
+        }
+        $refused = $curl === 7 || strpos($message, 'connection refused') !== false;
+        if ($refused) {
+            return $this->base_url_is_known();
+        }
+        return $curl === 28 || $curl === 52 || strpos($message, 'timed out') !== false || strpos($message, 'timeout') !== false;
+    }
+
+    private function refused_url_message() {
+        return $this->t(
+            'The API URL is wrong or was refused. Check the address in Settings › Affilio.',
+            'L\'URL API è sbagliato o è stato rifiutato. Controlla l\'indirizzo in Impostazioni › Affilio.'
+        );
+    }
+
+    private function remember_known_base_url() {
+        $url = (string) $this->base_url;
+        if ($url === '') {
+            return;
+        }
+        $known = get_option('affilio_known_api_urls', array());
+        if (!is_array($known)) {
+            $known = array();
+        }
+        if (in_array($url, $known, true)) {
+            return;
+        }
+        $known[] = $url;
+        if (count($known) > 8) {
+            $known = array_slice($known, -8);
+        }
+        update_option('affilio_known_api_urls', $known, false);
+    }
+
+    private function base_url_is_known() {
+        $known = get_option('affilio_known_api_urls', array());
+        return is_array($known) && in_array((string) $this->base_url, $known, true);
+    }
+
+    private function error_code($error) {
+        if (is_object($error) && method_exists($error, 'get_error_code')) {
+            return (string) $error->get_error_code();
+        }
+        if (is_object($error) && isset($error->code)) {
+            return (string) $error->code;
+        }
+        return '';
     }
 
     private function encode_scan_body($path, $body) {

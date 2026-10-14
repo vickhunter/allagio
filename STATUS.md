@@ -1,3 +1,7 @@
+## October 14 — D-033 plugin 0.1.24 syncs boxes missing from the index
+
+`sync_known_boxes` still reads `affilio_box_index`, and it also selects published posts and pages whose content contains `affilio-placement-`. The query is a paged `LIKE` match, 20 rows at a time, and drafts are left out. Ids come from `placement_ids_in_content` and are merged with the index so each placement is checked once. A revoked placement still follows `GET /placements/:id`, `revoke_box`, and the plugin-ack path. The five-minute `affilio_sync_plugin_boxes` schedule is unchanged.
+
 ## October 14 — refuse reports the current row, project clicks add up
 
 `RefusePlacement` reads how many rows the update changed. When that is zero, it reads the row again. A missing id is 404. A row that is already refused returns 200 and says already refused. Any other state is returned as itself: a receipt that landed as `publisher_reported` stays committed and is `recorded` (409 `receipt_recorded`), and the response does not claim the placement was refused. Account digest counts each click id on the first project that has it, the same id set as the account total, so the per-project click counts add up to `totals.clicks`. A click on both the site and the offer in that account is counted once. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
