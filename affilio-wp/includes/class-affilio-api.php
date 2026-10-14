@@ -104,13 +104,25 @@ class Affilio_API {
         return substr($key, 0, 4) . '…';
     }
 
+    public static function normalize_base_url($url) {
+        $url = trim((string) $url);
+        if ($url === '') {
+            return '';
+        }
+        $url = rtrim($url, '/');
+        if (!preg_match('#/v1$#', $url)) {
+            $url .= '/v1';
+        }
+        return $url;
+    }
+
     public static function resolve_base_url() {
         $url = defined('AFFILIO_API_URL') ? trim((string) AFFILIO_API_URL) : '';
         $override = trim((string) get_option('affilio_api_url_override', ''));
         if ($override !== '') {
             $url = $override;
         }
-        return rtrim((string) apply_filters('affilio_api_base_url', $url), '/');
+        return self::normalize_base_url(apply_filters('affilio_api_base_url', $url));
     }
 
     private function connection_cache_key() {

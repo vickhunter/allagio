@@ -294,6 +294,14 @@ ob_end_clean();
 if (get_option('affilio_api_url_override', '') !== 'https://ok.example/v1') {
     fail_security('a lookalike localhost host replaced the stored API URL');
 }
+$_POST['affilio_api_url_override'] = 'https://bare.example/';
+$_REQUEST = $_POST;
+ob_start();
+$page->render_settings();
+ob_end_clean();
+if (get_option('affilio_api_url_override', '') !== 'https://bare.example/v1') {
+    fail_security('a bare API origin was stored without /v1: ' . get_option('affilio_api_url_override', ''));
+}
 $_POST['affilio_api_url_override'] = '';
 $_REQUEST = $_POST;
 ob_start();

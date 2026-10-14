@@ -269,7 +269,7 @@ class Affilio_Admin {
                 if (!$this->api_url_override_allowed($override)) {
                     $url_error = "L'URL dell'API deve usare https, salvo localhost.";
                 } else {
-                    update_option('affilio_api_url_override', esc_url_raw($override));
+                    update_option('affilio_api_url_override', Affilio_API::normalize_base_url(esc_url_raw($override)));
                 }
                 $this->keep_or_replace_secret('affilio_admin_api_key', 'affilio_admin_api_key');
             }

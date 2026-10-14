@@ -1,8 +1,10 @@
 import base64
 from email.message import Message
+import hashlib
 import io
 import json
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import sys
@@ -209,6 +211,14 @@ class ReleaseTests(unittest.TestCase):
             release.validate_plugin(plugin_archive(bodies={php: "<?php\nrequire __DIR__ . '/../../outside.php';\n"}))
 
     def test_package_wp_zip_passes_the_release_gate(self):
+        probe = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=release.ROOT,
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode != 0 or probe.stdout.strip() != "true":
+            self.skipTest("not a git checkout, so package-wp-zip cannot list tracked files")
         hosted = {
             "landing.js", "landing-scene.js", "landing.css",
             "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt",
@@ -222,19 +232,33 @@ class ReleaseTests(unittest.TestCase):
         self.assertNotIn("setup-controls.js", admin.read_text())
         for relative in needed:
             self.assertFalse(release.hosted_build_file(Path(relative).name), relative)
-        with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory) / "affilio.zip"
-            script = release.ROOT / "scripts" / "package-wp-zip"
-            result = subprocess.run([str(script), str(target)], cwd=release.ROOT, capture_output=True, text=True, timeout=60)
-            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-            self.assertIn("passed the release gate with 24 files", result.stdout)
-            release.validate_plugin(target.read_bytes())
-            with zipfile.ZipFile(target) as archive:
-                names = [name for name in archive.namelist() if not name.endswith("/")]
-            self.assertEqual(len(names), 24)
-            self.assertTrue(hosted.isdisjoint(Path(name).name for name in names))
-            for relative in needed:
-                self.assertIn(release.PLUGIN_ROOT + relative, names)
+        header = (release.ROOT / "affilio-wp/affilio.php").read_text()
+        found = re.search(r"(?m)^[ \t]*\*[ \t]*Version:[ \t]*([0-9]+\.[0-9]+\.[0-9]+)[ \t]*$", header)
+        self.assertIsNotNone(found)
+        version = found.group(1)
+        script = release.ROOT / "scripts" / "package-wp-zip"
+        archives = []
+        for _ in range(2):
+            with tempfile.TemporaryDirectory() as directory:
+                stale = Path(directory) / "affilio-0.1.19.zip"
+                result = subprocess.run([str(script), str(stale)], cwd=release.ROOT, capture_output=True, text=True, timeout=60)
+                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+                self.assertIn("passed the release gate with 24 files: affilio-%s.zip" % version, result.stdout)
+                written = Path(directory) / ("affilio-%s.zip" % version)
+                self.assertTrue(written.is_file(), result.stdout)
+                self.assertFalse(stale.exists())
+                archives.append(written.read_bytes())
+        self.assertEqual(hashlib.sha256(archives[0]).hexdigest(), hashlib.sha256(archives[1]).hexdigest())
+        release.validate_plugin(archives[0])
+        with zipfile.ZipFile(io.BytesIO(archives[0])) as archive:
+            names = [name for name in archive.namelist() if not name.endswith("/")]
+            self.assertEqual(names, sorted(names))
+            for info in archive.infolist():
+                self.assertEqual(info.date_time, (1980, 1, 1, 0, 0, 0))
+        self.assertEqual(len(names), 24)
+        self.assertTrue(hosted.isdisjoint(Path(name).name for name in names))
+        for relative in needed:
+            self.assertIn(release.PLUGIN_ROOT + relative, names)
 
     def test_plugin_zip_rejects_stored_entries(self):
         output = io.BytesIO()

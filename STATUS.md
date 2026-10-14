@@ -1,3 +1,7 @@
+## October 14 — API origin, stable plugin zip name
+
+A saved API URL that is only an origin, or an origin with a trailing slash, is stored and called as that origin plus `/v1`. `POST /placements/{id}/refuse` with a bare-origin setting goes to `/v1/placements/{id}/refuse`. `scripts/package-wp-zip` writes `affilio-<header version>.zip` (a requested `affilio-0.1.19.zip` becomes `affilio-0.1.22.zip`). Zip entry names are sorted and every timestamp is 1980-01-01, so two builds of the same checkout have the same sha256. The release-gate test skips, instead of exiting 128, when the directory is not a git checkout.
+
 ## October 14 — plugin 0.1.22 article title and local refuse
 
 Prepare (`POST /placements`) and the publication receipt send `post_title` and `post_id`. `post_title` is `get_the_title` for that post, with HTML entities decoded. When a receipt never reaches the server and the box this request inserted is removed, the plugin calls `POST /placements/{id}/refuse` with `{reason: local_rollback}` on the site key. That asks the server to put the placement back to pending. A transport failure or HTTP 5xx is stored in `affilio_refuse_queue` and retried at the start of the next prepare, before another placement is created. A successful refuse is not sent again.
