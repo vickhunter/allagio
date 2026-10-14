@@ -1,0 +1,36 @@
+{
+ "available_modes": [
+  "manual",
+  "auto",
+  "yolo"
+ ],
+ "avoid_topics": [],
+ "box_position": "end",
+ "change_url": "https://offerrails.example/owner",
+ "commission": null,
+ "human_login": true,
+ "install_path": "claude_dir",
+ "listing_price": null,
+ "listing_url": "",
+ "mode": "manual",
+ "mode_preselected": "manual",
+ "mode_shown": "manual",
+ "never_topics": [
+  "gambling",
+  "crypto"
+ ],
+ "project_name": "",
+ "promote": "",
+ "role": "publisher",
+ "saved": true,
+ "saved_at": "2026-10-10T06:58:00Z",
+ "saved_by": "0e0e0001-0000-4000-8000-00000000c001",
+ "session": {
+  "signed_in": true
+ },
+ "site_url": "https://victormotricala.it",
+ "sites_channels": [
+  "victormotricala.it",
+  "newsletter.victormotricala.it"
+ ]
+}

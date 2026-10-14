@@ -1,0 +1,230 @@
+{
+ "available_modes": [
+  "manual",
+  "auto",
+  "yolo"
+ ],
+ "change_url": "https://offerrails.example/owner",
+ "earnings_note": "Earnings are a list of currency and amount for recorded test-mode commission. The list is null when that scope has no test-mode rows, and includes a zero amount when those rows add up to zero. Publisher amounts are ledger rows joined to test conversions. Maker commission stays on the offer and is not added to publisher income. Live and legacy rows are omitted. Earnings from a click on a placement whose restore failed are omitted until that restore is confirmed placed. A placement counts as live only when plugin_state is placed and its go link is redirecting. Digest totals, site totals, and Live now exclude a failed restore. Click source is the referrer host; a click with no host counts as direct.",
+ "paused": {
+  "account": false,
+  "offer": false,
+  "site": false
+ },
+ "projects": [
+  {
+   "clicks": 37,
+   "clicks_by_source": [
+    {
+     "clicks": 29,
+     "source": "google.com"
+    },
+    {
+     "clicks": 8,
+     "source": "direct"
+    }
+   ],
+   "earnings": [
+    {
+     "amount": 9.5,
+     "currency": "EUR"
+    },
+    {
+     "amount": 3.0,
+     "currency": "USD"
+    }
+   ],
+   "id": "5a1e0001-0000-4000-8000-00000000a001",
+   "items": [
+    {
+     "approved_by": "policy:auto",
+     "clicks": 23,
+     "failed_action": "",
+     "id": "9c000003-0000-4000-8000-000000000003",
+     "kind": "placement",
+     "label": "(link sponsorizzato)",
+     "link_text": "Prova Fattura Lampo",
+     "live_now": true,
+     "plugin_failed_reason": "",
+     "plugin_state": "placed",
+     "policy_rule_id": "category:invoicing",
+     "policy_rule_text": "The category is invoicing.",
+     "position": "matched_section",
+     "post_title": "Come fatturare da freelance nel 2026",
+     "rules_version": 3,
+     "summary": "Fattura Lampo crea e invia fatture elettroniche dal telefono, da €9 al mese.",
+     "undo_token": "ut_9c000003",
+     "undone_by": "",
+     "went_live_at": "2026-10-08T09:12:00Z"
+    },
+    {
+     "approved_by": "owner",
+     "clicks": 14,
+     "failed_action": "",
+     "id": "9c000004-0000-4000-8000-000000000004",
+     "kind": "placement",
+     "label": "Pubblicità",
+     "link_text": "Vedi SnapVault",
+     "live_now": true,
+     "plugin_failed_reason": "",
+     "plugin_state": "placed",
+     "policy_rule_id": "",
+     "policy_rule_text": "",
+     "position": "end",
+     "post_title": "Backup WordPress: la guida completa",
+     "rules_version": 3,
+     "summary": "SnapVault salva il tuo sito ogni notte e lo ripristina in un clic.",
+     "undo_token": "ut_9c000004",
+     "undone_by": "",
+     "went_live_at": "2026-10-07T16:40:00Z"
+    },
+    {
+     "approved_by": "policy:yolo",
+     "clicks": 0,
+     "failed_action": "",
+     "id": "9c000005-0000-4000-8000-000000000005",
+     "kind": "placement",
+     "label": "(link sponsorizzato)",
+     "link_text": "Scopri Ledgerly",
+     "live_now": false,
+     "plugin_failed_reason": "",
+     "plugin_state": "pending",
+     "policy_rule_id": "hard_checks_passed",
+     "policy_rule_text": "Passed every hard check.",
+     "position": "after_intro",
+     "post_title": "Prima nota senza fatica",
+     "rules_version": 2,
+     "summary": "Ledgerly tiene la prima nota per te, collegata alla tua banca.",
+     "undo_token": "ut_9c000005",
+     "undone_by": "",
+     "went_live_at": "2026-10-06T08:00:00Z"
+    },
+    {
+     "approved_by": "owner",
+     "clicks": 2,
+     "failed_action": "removed",
+     "id": "9c000006-0000-4000-8000-000000000006",
+     "kind": "placement",
+     "label": "(link sponsorizzato)",
+     "link_text": "Prova Rail Tool",
+     "live_now": false,
+     "plugin_failed_reason": "The block was edited in WordPress after it was inserted, so the plugin left the post alone.",
+     "plugin_state": "failed",
+     "policy_rule_id": "",
+     "policy_rule_text": "",
+     "position": "end",
+     "post_title": "Referral per SaaS piccoli",
+     "rules_version": 2,
+     "summary": "Rail Tool porta un programma referral nel tuo prodotto in un pomeriggio.",
+     "undo_token": "ut_9c000006",
+     "undone_by": "",
+     "went_live_at": "2026-10-05T11:00:00Z"
+    },
+    {
+     "approved_by": "policy:auto",
+     "clicks": 0,
+     "failed_action": "restored",
+     "id": "9c000007-0000-4000-8000-000000000007",
+     "kind": "placement",
+     "label": "(link sponsorizzato)",
+     "link_text": "Vedi InvoiceKit",
+     "live_now": false,
+     "plugin_failed_reason": "",
+     "plugin_state": "failed",
+     "policy_rule_id": "category:invoicing",
+     "policy_rule_text": "The category is invoicing.",
+     "position": "after_intro",
+     "post_title": "Preventivi veloci",
+     "rules_version": 2,
+     "summary": "InvoiceKit fa i preventivi in due tap.",
+     "undo_token": "ut_9c000007",
+     "undone_by": "",
+     "went_live_at": "2026-10-04T10:00:00Z"
+    }
+   ],
+   "kind": "site",
+   "mode": "auto",
+   "name": "victormotricala.it",
+   "total_items": 5,
+   "went_live": 2
+  },
+  {
+   "clicks": 4,
+   "clicks_by_source": [
+    {
+     "clicks": 3,
+     "source": "google.com"
+    },
+    {
+     "clicks": 1,
+     "source": "direct"
+    }
+   ],
+   "earnings": [
+    {
+     "amount": 4.0,
+     "currency": "EUR"
+    }
+   ],
+   "id": "0ffe0001-0000-4000-8000-00000000b001",
+   "items": [
+    {
+     "approved_by": "",
+     "clicks": 4,
+     "id": "0ffe0001-0000-4000-8000-00000000b001",
+     "kind": "offer",
+     "label": "Rail Tool",
+     "link_text": "",
+     "live_now": true,
+     "message": null,
+     "plugin_state": "",
+     "policy_rule_id": "",
+     "policy_rule_text": "",
+     "position": "",
+     "post_title": "",
+     "review_reason": null,
+     "rules_version": 0,
+     "status": "listed",
+     "summary": "Rail Tool",
+     "undo_token": "ut_0ffe0001",
+     "undone_by": "",
+     "went_live_at": "2026-10-02T12:00:00Z"
+    }
+   ],
+   "kind": "offer",
+   "mode": "yolo",
+   "name": "Rail Tool",
+   "total_items": 1,
+   "went_live": 1
+  }
+ ],
+ "session": {
+  "signed_in": true
+ },
+ "site_url": "https://victormotricala.it",
+ "totals": {
+  "clicks": 41,
+  "clicks_by_source": [
+   {
+    "clicks": 32,
+    "source": "google.com"
+   },
+   {
+    "clicks": 9,
+    "source": "direct"
+   }
+  ],
+  "earnings": [
+   {
+    "amount": 9.5,
+    "currency": "EUR"
+   },
+   {
+    "amount": 3.0,
+    "currency": "USD"
+   }
+  ],
+  "went_live": 3
+ },
+ "went_live_since_last": 1
+}

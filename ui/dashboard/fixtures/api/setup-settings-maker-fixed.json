@@ -1,0 +1,34 @@
+{
+ "available_modes": [
+  "manual",
+  "auto",
+  "yolo"
+ ],
+ "avoid_topics": [],
+ "box_position": "",
+ "change_url": "https://offerrails.example/owner",
+ "commission": {
+  "currency": "EUR",
+  "type": "fixed",
+  "value": 15
+ },
+ "human_login": true,
+ "install_path": "cursor",
+ "listing_price": null,
+ "listing_url": "https://railtool.example",
+ "mode": "manual",
+ "mode_preselected": "yolo",
+ "mode_shown": "manual",
+ "never_topics": [],
+ "project_name": "Rail Tool",
+ "promote": "Ship a referral offer for your dev tool in one afternoon.",
+ "role": "maker",
+ "saved": true,
+ "saved_at": "2026-10-10T06:58:00Z",
+ "saved_by": "0e0e0001-0000-4000-8000-00000000c001",
+ "session": {
+  "signed_in": true
+ },
+ "site_url": "",
+ "sites_channels": []
+}

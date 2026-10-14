@@ -1,0 +1,26 @@
+{
+ "applied": [
+  {
+   "approval_message": "",
+   "approval_reason": "",
+   "effective_mode": "manual",
+   "id": "5a1e0001-0000-4000-8000-00000000a001",
+   "kill_switch": true,
+   "kind": "site",
+   "mode": "manual",
+   "paused": 0
+  },
+  {
+   "approval_message": "",
+   "approval_reason": "",
+   "effective_mode": "manual",
+   "id": "0ffe0001-0000-4000-8000-00000000b001",
+   "kill_switch": true,
+   "kind": "offer",
+   "mode": "manual",
+   "paused": 1
+  }
+ ],
+ "id": "",
+ "scope": "all"
+}

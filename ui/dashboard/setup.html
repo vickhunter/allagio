@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Set up · Offer Rails</title>
+<link rel="stylesheet" href="assets/offer-rails.css">
+<script src="assets/ui-kit.js" defer></script>
+<script src="assets/api.js" defer></script>
+<script src="assets/contract.js" defer></script>
+<script src="assets/plugin-key.js" defer></script>
+<script src="assets/setup.js" defer></script>
+</head>
+<body class="setup">
+<a class="skip" href="#main">Skip to setup</a>
+<header class="topbar">
+  <a class="brand" href="#preview" aria-label="Offer Rails">offer rails<span class="brand-dot" aria-hidden="true">↗</span></a>
+  <span id="signed-in" class="caption"></span>
+</header>
+<main id="main">
+  <!-- Go template: write the scan JSON here; empty = load fixtures/setup-<?fixture>.json -->
+  <script type="application/json" id="or-setup-data"></script>
+  <div id="setup-status" class="sr-only" role="status"></div>
+  <div id="setup-root" aria-busy="true"><div class="skeleton" data-test="skeleton"><p class="sr-only">Loading what your agent found…</p><div aria-hidden="true"><section class="connected"><div class="rail-line"><div class="station" style="width:150px"><span class="skel skel-line"></span><span class="skel skel-line" style="width:70%"></span></div><div class="track mid"></div><div class="station mid" style="width:150px"><span class="skel skel-line"></span><span class="skel skel-line" style="width:70%"></span></div><div class="track"></div><div class="station" style="width:150px"><span class="skel skel-line"></span><span class="skel skel-line" style="width:70%"></span></div></div><span class="skel skel-line" style="width:140px"></span><span class="skel skel-title"></span><span class="skel skel-line" style="width:85%"></span></section><fieldset class="q"><span class="skel skel-line" style="width:45%;height:16px"></span><span class="skel skel-box"></span><span class="skel skel-line" style="width:70%"></span></fieldset><fieldset class="q"><span class="skel skel-line" style="width:45%;height:16px"></span><span class="skel skel-box"></span><span class="skel skel-line" style="width:70%"></span></fieldset><fieldset class="q"><span class="skel skel-line" style="width:45%;height:16px"></span><span class="skel skel-box"></span><span class="skel skel-line" style="width:70%"></span></fieldset><fieldset class="q"><span class="skel skel-line" style="width:45%;height:16px"></span><span class="skel skel-box"></span><span class="skel skel-line" style="width:70%"></span></fieldset></div></div></div>
+</main>
+</body>
+</html>

@@ -1,0 +1,1350 @@
+{
+ "_source": "vickhunter/affilio PR #21 head fb493f0ce242972b8e1c3eaf1a616be059a13b34. Keys are what each handler writes (gin.H, a Go map: keys go out sorted); read with the GitHub contents API at that ref, never cloned. H = affilio-api/internal/handlers. \"optional\" keys are added only in some cases (stub claim checker, saved settings). | v8: re-read at 6042dcb (handlers/agent_account.go, agent_entry.go, plugin_keys.go, plugin_key_issue_test.go, entry/policy.go via the GitHub connector). Only changes vs fb493f0: projects[].total_items, applied[] effective_mode/approval_reason/approval_message, plugin-key routes, decide/restore 403 for any credential, restore/retry claims_from_offer 422. | v9: re-read at 2d3aed7 (handlers/plugin_keys.go, agent_entry.go digestJSON, listing_review.go, offers.go via the GitHub connector). Changes vs 6042dcb: plugin-key errors {error, reason, message}; digest items undone_by (owner id or ''); poll surface_url + placement.surface_url (optional here); review_reason/message on maker listing routes only. | v9 @ f249a77: every digest offer item has status, review_reason, message (PR body 'Site Keeper fixes'; live :18128 GET /v1/digest confirms; the account digest leaves held offers out of the project items).",
+ "shapes": {
+  "revoke-200": {
+   "endpoint": "POST /v1/placements/:id/revoke",
+   "status": 200,
+   "src": "H/agent_entry.go RevokePlacement",
+   "keys": {
+    "status": "str",
+    "revoked_by_side": "str",
+    "undo": "bool",
+    "undone_at": "str"
+   }
+  },
+  "restore-200": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 200,
+   "src": "H/agent_entry.go RestorePlacement",
+   "keys": {
+    "status": "str",
+    "approved_by": "str",
+    "restored_by": "str",
+    "actor": "str"
+   }
+  },
+  "restore-403": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 403,
+   "src": "H/agent_entry.go RestorePlacement",
+   "keys": {
+    "error": "str"
+   }
+  },
+  "restore-409-window": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 409,
+   "src": "H/agent_entry.go writeNamedConflict (entry.RestoreRefusals)",
+   "keys": {
+    "reason": "str",
+    "message": "str"
+   }
+  },
+  "restore-409-paused": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 409,
+   "src": "H/agent_entry.go writeNamedConflict (entry.RestoreRefusals)",
+   "keys": {
+    "reason": "str",
+    "message": "str"
+   }
+  },
+  "restore-409-not-undone": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 409,
+   "src": "H/agent_entry.go writeNamedConflict (entry.RestoreRefusals)",
+   "keys": {
+    "reason": "str",
+    "message": "str"
+   }
+  },
+  "restore-422-cap": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 422,
+   "src": "H/agent_entry.go writeCheckDenied (entry.HardCheckCatalog)",
+   "keys": {
+    "check_id": "str",
+    "check_text": "str"
+   }
+  },
+  "restore-422-relevance_min": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 422,
+   "src": "H/agent_entry.go writeCheckDenied (entry.HardCheckCatalog)",
+   "keys": {
+    "check_id": "str",
+    "check_text": "str"
+   }
+  },
+  "restore-422-offer_live": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 422,
+   "src": "H/agent_entry.go writeCheckDenied (entry.HardCheckCatalog)",
+   "keys": {
+    "check_id": "str",
+    "check_text": "str"
+   }
+  },
+  "restore-422-disclosure": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 422,
+   "src": "H/agent_entry.go writeCheckDenied (entry.HardCheckCatalog)",
+   "keys": {
+    "check_id": "str",
+    "check_text": "str"
+   }
+  },
+  "retry-200": {
+   "endpoint": "POST /v1/placements/:id/retry",
+   "status": 200,
+   "src": "H/agent_entry.go RetryPlugin",
+   "keys": {
+    "plugin_state": "str",
+    "plugin_failed_reason": "str",
+    "failed_action": "str"
+   }
+  },
+  "retry-403": {
+   "endpoint": "POST /v1/placements/:id/retry",
+   "status": 403,
+   "src": "H/agent_entry.go RetryPlugin",
+   "keys": {
+    "error": "str"
+   }
+  },
+  "retry-409-not_failed": {
+   "endpoint": "POST /v1/placements/:id/retry",
+   "status": 409,
+   "src": "H/agent_entry.go writeNamedConflict (entry.RestoreRefusals)",
+   "keys": {
+    "reason": "str",
+    "message": "str"
+   }
+  },
+  "retry-422-relevance_min": {
+   "endpoint": "POST /v1/placements/:id/retry",
+   "status": 422,
+   "src": "H/agent_entry.go writeCheckDenied (entry.HardCheckCatalog)",
+   "keys": {
+    "check_id": "str",
+    "check_text": "str"
+   }
+  },
+  "placement-429": {
+   "endpoint": "GET /v1/placements/:id",
+   "status": 429,
+   "src": "H/placements.go writePlacementStatus",
+   "keys": {
+    "error": "str"
+   }
+  },
+  "placement-403-maker": {
+   "endpoint": "GET /v1/placements/:id",
+   "status": 403,
+   "src": "H/agent_entry.go PlacementStatus (maker key, other offer)",
+   "keys": {
+    "error": "str"
+   }
+  },
+  "pause-200": {
+   "endpoint": "POST /v1/account/pause",
+   "status": 200,
+   "src": "H/agent_account.go applyScope/applyOne + withEffectiveMode (6042dcb)",
+   "keys": {
+    "scope": "str",
+    "id": "str",
+    "applied": "list"
+   },
+   "each": {
+    "applied": {
+     "kind": "str",
+     "id": "str",
+     "mode": "str",
+     "kill_switch": "bool",
+     "paused": "int",
+     "effective_mode": "str",
+     "approval_reason": "str",
+     "approval_message": "str"
+    }
+   }
+  },
+  "resume-200": {
+   "endpoint": "POST /v1/account/resume",
+   "status": 200,
+   "src": "H/agent_account.go applyScope/applyOne + withEffectiveMode (6042dcb)",
+   "keys": {
+    "scope": "str",
+    "id": "str",
+    "applied": "list"
+   },
+   "each": {
+    "applied": {
+     "kind": "str",
+     "id": "str",
+     "mode": "str",
+     "kill_switch": "bool",
+     "unpaused": "int",
+     "effective_mode": "str",
+     "approval_reason": "str",
+     "approval_message": "str"
+    }
+   }
+  },
+  "resume-403": {
+   "endpoint": "POST /v1/account/resume",
+   "status": 403,
+   "src": "H/agent_account.go AccountResume",
+   "keys": {
+    "error": "str"
+   }
+  },
+  "events-201": {
+   "endpoint": "POST /v1/events",
+   "status": 201,
+   "src": "H/agent_entry.go Events",
+   "keys": {
+    "kind": "str",
+    "user_id": "str",
+    "recorded_at": "str"
+   }
+  },
+  "hard-checks": {
+   "endpoint": "GET /v1/policy/hard-checks",
+   "status": 200,
+   "src": "H/agent_account.go HardChecks",
+   "keys": {
+    "checks": "list"
+   },
+   "each": {
+    "checks": {
+     "check_id": "str",
+     "check_text": "str"
+    }
+   }
+  },
+  "digest": {
+   "endpoint": "GET /v1/digest",
+   "status": 200,
+   "src": "H/agent_entry.go Digest + attachDigestMeta",
+   "keys": {
+    "since": "str|null",
+    "items": "list",
+    "went_live": "int",
+    "session": "dict",
+    "paused": "dict",
+    "went_live_since_last": "int",
+    "change_url": "str",
+    "site_url": "str",
+    "available_modes": "list"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "effective_mode": "str"
+   },
+   "nested": {
+    "session": {
+     "signed_in": "bool"
+    },
+    "paused": {
+     "account": "bool",
+     "site": "bool",
+     "offer": "bool"
+    }
+   }
+  },
+  "setup-403": {
+   "endpoint": "PUT /v1/setup/settings",
+   "status": 403,
+   "src": "H/agent_entry.go PutSetup",
+   "keys": {
+    "error": "str"
+   }
+  },
+  "setup-400": {
+   "endpoint": "PUT /v1/setup/settings",
+   "status": 400,
+   "src": "H/agent_entry.go PutSetup",
+   "keys": {
+    "error": "str"
+   }
+  },
+  "placement-pending": {
+   "endpoint": "GET /v1/placements/:id",
+   "status": 200,
+   "src": "H/placements.go writePlacementStatus",
+   "keys": {
+    "id": "str",
+    "status": "str",
+    "plugin_state": "str",
+    "plugin_failed_reason": "str",
+    "failed_action": "str",
+    "fallback_url": "str",
+    "policy_rule_id": "str",
+    "policy_rule_text": "str"
+   },
+   "optional": {
+    "surface_url": "str",
+    "placement": "dict"
+   }
+  },
+  "placement-pending-live": {
+   "endpoint": "GET /v1/placements/:id",
+   "status": 200,
+   "src": "H/placements.go writePlacementStatus",
+   "keys": {
+    "id": "str",
+    "status": "str",
+    "plugin_state": "str",
+    "plugin_failed_reason": "str",
+    "failed_action": "str",
+    "fallback_url": "str",
+    "policy_rule_id": "str",
+    "policy_rule_text": "str"
+   },
+   "optional": {
+    "surface_url": "str",
+    "placement": "dict"
+   }
+  },
+  "placement-placed": {
+   "endpoint": "GET /v1/placements/:id",
+   "status": 200,
+   "src": "H/placements.go writePlacementStatus",
+   "keys": {
+    "id": "str",
+    "status": "str",
+    "plugin_state": "str",
+    "plugin_failed_reason": "str",
+    "failed_action": "str",
+    "fallback_url": "str",
+    "policy_rule_id": "str",
+    "policy_rule_text": "str"
+   },
+   "optional": {
+    "surface_url": "str",
+    "placement": "dict"
+   }
+  },
+  "placement-removed": {
+   "endpoint": "GET /v1/placements/:id",
+   "status": 200,
+   "src": "H/placements.go writePlacementStatus",
+   "keys": {
+    "id": "str",
+    "status": "str",
+    "plugin_state": "str",
+    "plugin_failed_reason": "str",
+    "failed_action": "str",
+    "fallback_url": "str",
+    "policy_rule_id": "str",
+    "policy_rule_text": "str"
+   },
+   "optional": {
+    "surface_url": "str",
+    "placement": "dict"
+   }
+  },
+  "placement-offline": {
+   "endpoint": "GET /v1/placements/:id",
+   "status": 200,
+   "src": "H/placements.go writePlacementStatus",
+   "keys": {
+    "id": "str",
+    "status": "str",
+    "plugin_state": "str",
+    "plugin_failed_reason": "str",
+    "failed_action": "str",
+    "fallback_url": "str",
+    "policy_rule_id": "str",
+    "policy_rule_text": "str"
+   },
+   "optional": {
+    "surface_url": "str",
+    "placement": "dict"
+   }
+  },
+  "placement-failed": {
+   "endpoint": "GET /v1/placements/:id",
+   "status": 200,
+   "src": "H/placements.go writePlacementStatus",
+   "keys": {
+    "id": "str",
+    "status": "str",
+    "plugin_state": "str",
+    "plugin_failed_reason": "str",
+    "failed_action": "str",
+    "fallback_url": "str",
+    "policy_rule_id": "str",
+    "policy_rule_text": "str"
+   },
+   "optional": {
+    "surface_url": "str",
+    "placement": "dict"
+   }
+  },
+  "placement-failed-restored": {
+   "endpoint": "GET /v1/placements/:id",
+   "status": 200,
+   "src": "H/placements.go writePlacementStatus",
+   "keys": {
+    "id": "str",
+    "status": "str",
+    "plugin_state": "str",
+    "plugin_failed_reason": "str",
+    "failed_action": "str",
+    "fallback_url": "str",
+    "policy_rule_id": "str",
+    "policy_rule_text": "str"
+   },
+   "optional": {
+    "surface_url": "str",
+    "placement": "dict"
+   }
+  },
+  "account-digest": {
+   "endpoint": "GET /v1/account/digest",
+   "status": 200,
+   "src": "H/agent_account.go AccountDigest + H/agent_entry.go attachDigestMeta, digestJSON",
+   "keys": {
+    "totals": "dict",
+    "projects": "list",
+    "earnings_note": "str",
+    "session": "dict",
+    "paused": "dict",
+    "went_live_since_last": "int",
+    "change_url": "str",
+    "site_url": "str",
+    "available_modes": "list"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "effective_mode": "str"
+   },
+   "nested": {
+    "totals": {
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list"
+    },
+    "session": {
+     "signed_in": "bool"
+    },
+    "paused": {
+     "account": "bool",
+     "site": "bool",
+     "offer": "bool"
+    }
+   },
+   "each": {
+    "projects": {
+     "kind": "str",
+     "id": "str",
+     "name": "str",
+     "mode": "str",
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list",
+     "items": "list",
+     "total_items": "int"
+    }
+   },
+   "money": [
+    "totals.earnings",
+    "projects[].earnings"
+   ]
+  },
+  "account-digest-claims-live": {
+   "endpoint": "GET /v1/account/digest",
+   "status": 200,
+   "src": "H/agent_account.go AccountDigest + H/agent_entry.go attachDigestMeta, digestJSON",
+   "keys": {
+    "totals": "dict",
+    "projects": "list",
+    "earnings_note": "str",
+    "session": "dict",
+    "paused": "dict",
+    "went_live_since_last": "int",
+    "change_url": "str",
+    "site_url": "str",
+    "available_modes": "list"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "effective_mode": "str"
+   },
+   "nested": {
+    "totals": {
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list"
+    },
+    "session": {
+     "signed_in": "bool"
+    },
+    "paused": {
+     "account": "bool",
+     "site": "bool",
+     "offer": "bool"
+    }
+   },
+   "each": {
+    "projects": {
+     "kind": "str",
+     "id": "str",
+     "name": "str",
+     "mode": "str",
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list",
+     "items": "list",
+     "total_items": "int"
+    }
+   },
+   "money": [
+    "totals.earnings",
+    "projects[].earnings"
+   ]
+  },
+  "account-digest-paused": {
+   "endpoint": "GET /v1/account/digest",
+   "status": 200,
+   "src": "H/agent_account.go AccountDigest + H/agent_entry.go attachDigestMeta, digestJSON",
+   "keys": {
+    "totals": "dict",
+    "projects": "list",
+    "earnings_note": "str",
+    "session": "dict",
+    "paused": "dict",
+    "went_live_since_last": "int",
+    "change_url": "str",
+    "site_url": "str",
+    "available_modes": "list"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "effective_mode": "str"
+   },
+   "nested": {
+    "totals": {
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list"
+    },
+    "session": {
+     "signed_in": "bool"
+    },
+    "paused": {
+     "account": "bool",
+     "site": "bool",
+     "offer": "bool"
+    }
+   },
+   "each": {
+    "projects": {
+     "kind": "str",
+     "id": "str",
+     "name": "str",
+     "mode": "str",
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list",
+     "items": "list",
+     "total_items": "int"
+    }
+   },
+   "money": [
+    "totals.earnings",
+    "projects[].earnings"
+   ]
+  },
+  "account-digest-site-paused": {
+   "endpoint": "GET /v1/account/digest",
+   "status": 200,
+   "src": "H/agent_account.go AccountDigest + H/agent_entry.go attachDigestMeta, digestJSON",
+   "keys": {
+    "totals": "dict",
+    "projects": "list",
+    "earnings_note": "str",
+    "session": "dict",
+    "paused": "dict",
+    "went_live_since_last": "int",
+    "change_url": "str",
+    "site_url": "str",
+    "available_modes": "list"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "effective_mode": "str"
+   },
+   "nested": {
+    "totals": {
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list"
+    },
+    "session": {
+     "signed_in": "bool"
+    },
+    "paused": {
+     "account": "bool",
+     "site": "bool",
+     "offer": "bool"
+    }
+   },
+   "each": {
+    "projects": {
+     "kind": "str",
+     "id": "str",
+     "name": "str",
+     "mode": "str",
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list",
+     "items": "list",
+     "total_items": "int"
+    }
+   },
+   "money": [
+    "totals.earnings",
+    "projects[].earnings"
+   ]
+  },
+  "account-digest-zero": {
+   "endpoint": "GET /v1/account/digest",
+   "status": 200,
+   "src": "H/agent_account.go AccountDigest + H/agent_entry.go attachDigestMeta, digestJSON",
+   "keys": {
+    "totals": "dict",
+    "projects": "list",
+    "earnings_note": "str",
+    "session": "dict",
+    "paused": "dict",
+    "went_live_since_last": "int",
+    "change_url": "str",
+    "site_url": "str",
+    "available_modes": "list"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "effective_mode": "str"
+   },
+   "nested": {
+    "totals": {
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list"
+    },
+    "session": {
+     "signed_in": "bool"
+    },
+    "paused": {
+     "account": "bool",
+     "site": "bool",
+     "offer": "bool"
+    }
+   },
+   "each": {
+    "projects": {
+     "kind": "str",
+     "id": "str",
+     "name": "str",
+     "mode": "str",
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list",
+     "items": "list",
+     "total_items": "int"
+    }
+   },
+   "money": [
+    "totals.earnings",
+    "projects[].earnings"
+   ]
+  },
+  "account-digest-zero-amount": {
+   "endpoint": "GET /v1/account/digest",
+   "status": 200,
+   "src": "H/agent_account.go AccountDigest + H/agent_entry.go attachDigestMeta, digestJSON",
+   "keys": {
+    "totals": "dict",
+    "projects": "list",
+    "earnings_note": "str",
+    "session": "dict",
+    "paused": "dict",
+    "went_live_since_last": "int",
+    "change_url": "str",
+    "site_url": "str",
+    "available_modes": "list"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "effective_mode": "str"
+   },
+   "nested": {
+    "totals": {
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list"
+    },
+    "session": {
+     "signed_in": "bool"
+    },
+    "paused": {
+     "account": "bool",
+     "site": "bool",
+     "offer": "bool"
+    }
+   },
+   "each": {
+    "projects": {
+     "kind": "str",
+     "id": "str",
+     "name": "str",
+     "mode": "str",
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list",
+     "items": "list",
+     "total_items": "int"
+    }
+   },
+   "money": [
+    "totals.earnings",
+    "projects[].earnings"
+   ]
+  },
+  "account-digest-long": {
+   "endpoint": "GET /v1/account/digest",
+   "status": 200,
+   "src": "H/agent_account.go AccountDigest + H/agent_entry.go attachDigestMeta, digestJSON",
+   "keys": {
+    "totals": "dict",
+    "projects": "list",
+    "earnings_note": "str",
+    "session": "dict",
+    "paused": "dict",
+    "went_live_since_last": "int",
+    "change_url": "str",
+    "site_url": "str",
+    "available_modes": "list"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "effective_mode": "str"
+   },
+   "nested": {
+    "totals": {
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list"
+    },
+    "session": {
+     "signed_in": "bool"
+    },
+    "paused": {
+     "account": "bool",
+     "site": "bool",
+     "offer": "bool"
+    }
+   },
+   "each": {
+    "projects": {
+     "kind": "str",
+     "id": "str",
+     "name": "str",
+     "mode": "str",
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list",
+     "items": "list",
+     "total_items": "int"
+    }
+   },
+   "money": [
+    "totals.earnings",
+    "projects[].earnings"
+   ]
+  },
+  "setup-settings-maker": {
+   "endpoint": "GET|PUT /v1/setup/settings",
+   "status": 200,
+   "src": "H/agent_entry.go setupJSON + finishSetup",
+   "keys": {
+    "saved": "bool",
+    "role": "str",
+    "install_path": "str",
+    "mode": "str",
+    "mode_shown": "str",
+    "mode_preselected": "str",
+    "available_modes": "list",
+    "promote": "str",
+    "avoid_topics": "list",
+    "commission": "dict|null",
+    "project_name": "str",
+    "listing_url": "str",
+    "listing_price": "dict|null",
+    "sites_channels": "list",
+    "never_topics": "list",
+    "box_position": "str",
+    "human_login": "bool",
+    "session": "dict",
+    "change_url": "str",
+    "site_url": "str"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "saved_by": "str",
+    "saved_at": "str"
+   }
+  },
+  "setup-settings-maker-fixed": {
+   "endpoint": "GET|PUT /v1/setup/settings",
+   "status": 200,
+   "src": "H/agent_entry.go setupJSON + finishSetup",
+   "keys": {
+    "saved": "bool",
+    "role": "str",
+    "install_path": "str",
+    "mode": "str",
+    "mode_shown": "str",
+    "mode_preselected": "str",
+    "available_modes": "list",
+    "promote": "str",
+    "avoid_topics": "list",
+    "commission": "dict|null",
+    "project_name": "str",
+    "listing_url": "str",
+    "listing_price": "dict|null",
+    "sites_channels": "list",
+    "never_topics": "list",
+    "box_position": "str",
+    "human_login": "bool",
+    "session": "dict",
+    "change_url": "str",
+    "site_url": "str"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "saved_by": "str",
+    "saved_at": "str"
+   }
+  },
+  "setup-settings-publisher": {
+   "endpoint": "GET|PUT /v1/setup/settings",
+   "status": 200,
+   "src": "H/agent_entry.go setupJSON + finishSetup",
+   "keys": {
+    "saved": "bool",
+    "role": "str",
+    "install_path": "str",
+    "mode": "str",
+    "mode_shown": "str",
+    "mode_preselected": "str",
+    "available_modes": "list",
+    "promote": "str",
+    "avoid_topics": "list",
+    "commission": "dict|null",
+    "project_name": "str",
+    "listing_url": "str",
+    "listing_price": "dict|null",
+    "sites_channels": "list",
+    "never_topics": "list",
+    "box_position": "str",
+    "human_login": "bool",
+    "session": "dict",
+    "change_url": "str",
+    "site_url": "str"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "saved_by": "str",
+    "saved_at": "str"
+   }
+  },
+  "setup-settings-new": {
+   "endpoint": "GET|PUT /v1/setup/settings",
+   "status": 200,
+   "src": "H/agent_entry.go setupJSON + finishSetup",
+   "keys": {
+    "saved": "bool",
+    "role": "str",
+    "install_path": "str",
+    "mode": "str",
+    "mode_shown": "str",
+    "mode_preselected": "str",
+    "available_modes": "list",
+    "promote": "str",
+    "avoid_topics": "list",
+    "commission": "dict|null",
+    "project_name": "str",
+    "listing_url": "str",
+    "listing_price": "dict|null",
+    "sites_channels": "list",
+    "never_topics": "list",
+    "box_position": "str",
+    "human_login": "bool",
+    "session": "dict",
+    "change_url": "str",
+    "site_url": "str"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "saved_by": "str",
+    "saved_at": "str"
+   }
+  },
+  "setup-settings-claims-live": {
+   "endpoint": "GET|PUT /v1/setup/settings",
+   "status": 200,
+   "src": "H/agent_entry.go setupJSON + finishSetup",
+   "keys": {
+    "saved": "bool",
+    "role": "str",
+    "install_path": "str",
+    "mode": "str",
+    "mode_shown": "str",
+    "mode_preselected": "str",
+    "available_modes": "list",
+    "promote": "str",
+    "avoid_topics": "list",
+    "commission": "dict|null",
+    "project_name": "str",
+    "listing_url": "str",
+    "listing_price": "dict|null",
+    "sites_channels": "list",
+    "never_topics": "list",
+    "box_position": "str",
+    "human_login": "bool",
+    "session": "dict",
+    "change_url": "str",
+    "site_url": "str"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "saved_by": "str",
+    "saved_at": "str"
+   }
+  },
+  "setup-settings-source-manual": {
+   "endpoint": "GET|PUT /v1/setup/settings",
+   "status": 200,
+   "src": "H/agent_entry.go setupJSON + finishSetup",
+   "keys": {
+    "saved": "bool",
+    "role": "str",
+    "install_path": "str",
+    "mode": "str",
+    "mode_shown": "str",
+    "mode_preselected": "str",
+    "available_modes": "list",
+    "promote": "str",
+    "avoid_topics": "list",
+    "commission": "dict|null",
+    "project_name": "str",
+    "listing_url": "str",
+    "listing_price": "dict|null",
+    "sites_channels": "list",
+    "never_topics": "list",
+    "box_position": "str",
+    "human_login": "bool",
+    "session": "dict",
+    "change_url": "str",
+    "site_url": "str"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "saved_by": "str",
+    "saved_at": "str"
+   }
+  },
+  "pause-200-claims-live": {
+   "endpoint": "POST /v1/account/pause",
+   "status": 200,
+   "src": "H/agent_account.go applyScope/applyOne + withEffectiveMode (6042dcb)",
+   "keys": {
+    "scope": "str",
+    "id": "str",
+    "applied": "list"
+   },
+   "each": {
+    "applied": {
+     "kind": "str",
+     "id": "str",
+     "mode": "str",
+     "kill_switch": "bool",
+     "paused": "int",
+     "effective_mode": "str",
+     "approval_reason": "str",
+     "approval_message": "str"
+    }
+   }
+  },
+  "resume-200-claims-live": {
+   "endpoint": "POST /v1/account/resume",
+   "status": 200,
+   "src": "H/agent_account.go applyScope/applyOne + withEffectiveMode (6042dcb)",
+   "keys": {
+    "scope": "str",
+    "id": "str",
+    "applied": "list"
+   },
+   "each": {
+    "applied": {
+     "kind": "str",
+     "id": "str",
+     "mode": "str",
+     "kill_switch": "bool",
+     "unpaused": "int",
+     "effective_mode": "str",
+     "approval_reason": "str",
+     "approval_message": "str"
+    }
+   }
+  },
+  "restore-403-session": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 403,
+   "src": "H/agent_entry.go sessionOnlyDecision (credentialPresented, 6042dcb)",
+   "keys": {
+    "error": "str"
+   }
+  },
+  "restore-422-claims_from_offer": {
+   "endpoint": "POST /v1/placements/:id/restore",
+   "status": 422,
+   "src": "H/agent_entry.go writeCheckDenied (claims_from_offer, 6042dcb)",
+   "keys": {
+    "check_id": "str",
+    "check_text": "str"
+   }
+  },
+  "retry-422-claims_from_offer": {
+   "endpoint": "POST /v1/placements/:id/retry",
+   "status": 422,
+   "src": "H/agent_entry.go RetryPlugin writeCheckDenied (6042dcb)",
+   "keys": {
+    "check_id": "str",
+    "check_text": "str"
+   }
+  },
+  "account-projects": {
+   "endpoint": "GET /v1/account/projects",
+   "status": 200,
+   "src": "H/agent_account.go AccountProjects",
+   "keys": {
+    "projects": "list"
+   },
+   "each": {
+    "projects": {
+     "kind": "str",
+     "id": "str",
+     "name": "str",
+     "mode": "str"
+    }
+   }
+  },
+  "plugin-key-201": {
+   "endpoint": "POST /v1/sites/:id/plugin-key",
+   "status": 201,
+   "src": "H/plugin_keys.go IssuePluginKey",
+   "keys": {
+    "plugin_key": "str",
+    "key_prefix": "str"
+   }
+  },
+  "plugin-key-rotate-200": {
+   "endpoint": "POST /v1/sites/:id/plugin-key/rotate",
+   "status": 200,
+   "src": "H/plugin_keys.go RotatePluginKey",
+   "keys": {
+    "plugin_key": "str",
+    "key_prefix": "str"
+   }
+  },
+  "plugin-key-409": {
+   "endpoint": "POST /v1/sites/:id/plugin-key",
+   "status": 409,
+   "src": "H/plugin_keys.go IssuePluginKey (!issued) -> writePluginKeyError @2d3aed7",
+   "keys": {
+    "error": "str",
+    "reason": "str",
+    "message": "str"
+   }
+  },
+  "plugin-key-403": {
+   "endpoint": "POST|GET /v1/sites/:id/plugin-key*",
+   "status": 403,
+   "src": "H/plugin_keys.go sessionSite (pluginKeySessionError) -> writePluginKeyError @2d3aed7",
+   "keys": {
+    "error": "str",
+    "reason": "str",
+    "message": "str"
+   }
+  },
+  "plugin-key-401": {
+   "endpoint": "POST|GET /v1/sites/:id/plugin-key*",
+   "status": 401,
+   "src": "H/agent_entry.go sessionOwner -> writePluginKeyError @2d3aed7",
+   "keys": {
+    "error": "str",
+    "reason": "str",
+    "message": "str"
+   }
+  },
+  "plugin-key-revoke-200": {
+   "endpoint": "POST /v1/sites/:id/plugin-key/revoke",
+   "status": 200,
+   "src": "H/plugin_keys.go RevokePluginKey",
+   "keys": {
+    "revoked": "bool"
+   }
+  },
+  "plugin-key-list": {
+   "endpoint": "GET /v1/sites/:id/plugin-key",
+   "status": 200,
+   "src": "H/plugin_keys.go ListPluginKeys",
+   "keys": {
+    "keys": "list"
+   }
+  },
+  "plugin-key-list-none": {
+   "endpoint": "GET /v1/sites/:id/plugin-key",
+   "status": 200,
+   "src": "H/plugin_keys.go ListPluginKeys",
+   "keys": {
+    "keys": "list"
+   }
+  },
+  "plugin-key-list-revoked": {
+   "endpoint": "GET /v1/sites/:id/plugin-key",
+   "status": 200,
+   "src": "H/plugin_keys.go ListPluginKeys",
+   "keys": {
+    "keys": "list"
+   }
+  },
+  "plugin-key-403-forbidden": {
+   "endpoint": "POST|GET /v1/sites/:id/plugin-key*",
+   "status": 403,
+   "src": "H/plugin_keys.go sessionSite (other session refusal, reason forbidden) @2d3aed7",
+   "keys": {
+    "error": "str",
+    "reason": "str",
+    "message": "str"
+   }
+  },
+  "plugin-key-401-stale": {
+   "endpoint": "POST|GET /v1/sites/:id/plugin-key*",
+   "status": 401,
+   "src": "H/plugin_keys.go session older than 15 min @2d3aed7",
+   "keys": {
+    "error": "str",
+    "reason": "str",
+    "message": "str"
+   }
+  },
+  "account-digest-undone-by": {
+   "endpoint": "GET /v1/account/digest",
+   "status": 200,
+   "src": "H/agent_account.go AccountDigest + H/agent_entry.go attachDigestMeta, digestJSON",
+   "keys": {
+    "totals": "dict",
+    "projects": "list",
+    "earnings_note": "str",
+    "session": "dict",
+    "paused": "dict",
+    "went_live_since_last": "int",
+    "change_url": "str",
+    "site_url": "str",
+    "available_modes": "list"
+   },
+   "optional": {
+    "approval_reason": "str",
+    "approval_message": "str",
+    "effective_mode": "str"
+   },
+   "nested": {
+    "totals": {
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list"
+    },
+    "session": {
+     "signed_in": "bool"
+    },
+    "paused": {
+     "account": "bool",
+     "site": "bool",
+     "offer": "bool"
+    }
+   },
+   "each": {
+    "projects": {
+     "kind": "str",
+     "id": "str",
+     "name": "str",
+     "mode": "str",
+     "went_live": "int",
+     "clicks": "int",
+     "earnings": "list|null",
+     "clicks_by_source": "list",
+     "items": "list",
+     "total_items": "int"
+    }
+   },
+   "money": [
+    "totals.earnings",
+    "projects[].earnings"
+   ]
+  }
+ },
+ "digest_item_keys": {
+  "placement": [
+   "approved_by",
+   "clicks",
+   "failed_action",
+   "id",
+   "kind",
+   "label",
+   "link_text",
+   "live_now",
+   "plugin_failed_reason",
+   "plugin_state",
+   "policy_rule_id",
+   "policy_rule_text",
+   "position",
+   "post_title",
+   "rules_version",
+   "summary",
+   "undo_token",
+   "went_live_at"
+  ],
+  "offer": [
+   "approved_by",
+   "clicks",
+   "id",
+   "kind",
+   "label",
+   "link_text",
+   "live_now",
+   "message",
+   "plugin_state",
+   "policy_rule_id",
+   "policy_rule_text",
+   "position",
+   "post_title",
+   "review_reason",
+   "rules_version",
+   "status",
+   "summary",
+   "undo_token",
+   "went_live_at"
+  ]
+ },
+ "setup_put_keys": [
+  "role",
+  "install_path",
+  "mode",
+  "mode_shown",
+  "promote",
+  "avoid_topics",
+  "project_name",
+  "listing_url",
+  "commission",
+  "listing_price",
+  "sites_channels",
+  "never_topics",
+  "box_position"
+ ],
+ "commission_types": [
+  "percent",
+  "fixed"
+ ],
+ "box_positions": [
+  "after_intro",
+  "matched_section",
+  "end",
+  "main_post",
+  "first_reply",
+  "early_mention",
+  "description",
+  "pinned_comment"
+ ],
+ "install_paths": [
+  "cli",
+  "cursor",
+  "connector",
+  "grok",
+  "chatgpt_dir",
+  "claude_dir"
+ ],
+ "modes": [
+  "manual",
+  "auto",
+  "yolo"
+ ],
+ "claim_check": {
+  "reason": "claim_check_unavailable",
+  "message": "Automatic approval is off until claim checks are live."
+ },
+ "plugin_key_item": {
+  "keys": {
+   "id": "str",
+   "key_prefix": "str",
+   "created_at": "str",
+   "revoked": "bool"
+  },
+  "optional": {
+   "revoked_at": "str"
+  }
+ },
+ "digest_item_optional": {
+  "undone_by": "str"
+ },
+ "plugin_key_error_reasons": [
+  "reauth_required",
+  "forbidden_key_type",
+  "key_exists",
+  "forbidden",
+  "invalid_site_id",
+  "invalid_payload",
+  "invalid_confirmation",
+  "site_not_found",
+  "plugin_key_failed"
+ ],
+ "review_reasons": [
+  "claims",
+  "head",
+  "relevance",
+  "caps"
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "checks": [
+  {
+   "check_id": "disclosure",
+   "check_text": "Add a disclosure."
+  },
+  {
+   "check_id": "rel_sponsored",
+   "check_text": "Add rel=sponsored."
+  },
+  {
+   "check_id": "claims_from_offer",
+   "check_text": "Use only claims from the offer."
+  },
+  {
+   "check_id": "copy_length",
+   "check_text": "Keep the copy to 140 characters."
+  },
+  {
+   "check_id": "one_per_post",
+   "check_text": "Keep one box on this post."
+  },
+  {
+   "check_id": "relevance_min",
+   "check_text": "Relevance is below the minimum."
+  },
+  {
+   "check_id": "offer_live",
+   "check_text": "The offer is not live."
+  },
+  {
+   "check_id": "revoke_path",
+   "check_text": "The revoke path is not available."
+  },
+  {
+   "check_id": "cap",
+   "check_text": "The placement cap is full."
+  }
+ ]
+}

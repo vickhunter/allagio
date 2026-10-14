@@ -1,0 +1,26 @@
+{
+ "applied": [
+  {
+   "approval_message": "Automatic approval is off until claim checks are live.",
+   "approval_reason": "claim_check_unavailable",
+   "effective_mode": "manual",
+   "id": "5a1e0001-0000-4000-8000-00000000a001",
+   "kill_switch": false,
+   "kind": "site",
+   "mode": "auto",
+   "unpaused": 0
+  },
+  {
+   "approval_message": "Automatic approval is off until claim checks are live.",
+   "approval_reason": "claim_check_unavailable",
+   "effective_mode": "manual",
+   "id": "0ffe0001-0000-4000-8000-00000000b001",
+   "kill_switch": false,
+   "kind": "offer",
+   "mode": "yolo",
+   "unpaused": 1
+  }
+ ],
+ "id": "",
+ "scope": "all"
+}

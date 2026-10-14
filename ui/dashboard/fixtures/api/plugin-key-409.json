@@ -1,0 +1,5 @@
+{
+ "error": "a plugin key already exists",
+ "message": "A plugin key already exists.",
+ "reason": "key_exists"
+}

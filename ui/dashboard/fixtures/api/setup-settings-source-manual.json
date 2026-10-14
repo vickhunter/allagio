@@ -1,0 +1,28 @@
+{
+ "available_modes": [
+  "manual",
+  "auto",
+  "yolo"
+ ],
+ "avoid_topics": [],
+ "box_position": "",
+ "change_url": "https://offerrails.example/owner",
+ "commission": null,
+ "human_login": true,
+ "install_path": "cli",
+ "listing_price": null,
+ "listing_url": "",
+ "mode": "manual",
+ "mode_preselected": "manual",
+ "mode_shown": "manual",
+ "never_topics": [],
+ "project_name": "",
+ "promote": "",
+ "role": "publisher",
+ "saved": false,
+ "session": {
+  "signed_in": true
+ },
+ "site_url": "https://victormotricala.it",
+ "sites_channels": []
+}

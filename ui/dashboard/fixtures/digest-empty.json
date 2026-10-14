@@ -1,0 +1,69 @@
+{
+  "digest_id": "dg_2026w41_usr8f2c",
+  "user_id": "usr_8f2c",
+  "period": {
+    "since": "2026-10-03T08:00:00Z",
+    "until": "2026-10-10T08:00:00Z"
+  },
+  "session": {
+    "signed_in": true,
+    "user_id": "usr_8f2c"
+  },
+  "test_mode": true,
+  "paused": false,
+  "totals": {
+    "live_items": 0,
+    "clicks": 0,
+    "earnings": null,
+    "projects": 1,
+    "sites": 2,
+    "went_live": 0
+  },
+  "projects": [
+    {
+      "project_id": "prj_rail",
+      "name": "Rail Tool",
+      "url": "https://rail-tool.example",
+      "role": "maker",
+      "mode": "yolo",
+      "mode_change_url": "/owner/settings/approval?project=prj_rail",
+      "went_live_count": 0,
+      "live_count": 0,
+      "clicks": 0,
+      "earnings": null,
+      "top_sources": [],
+      "items": []
+    }
+  ],
+  "sites": [
+    {
+      "site_id": "site_vm",
+      "name": "victormotricala.it",
+      "url": "https://victormotricala.it",
+      "role": "publisher",
+      "mode": "yolo",
+      "mode_change_url": "/owner/settings/approval?site=site_vm",
+      "went_live_count": 0,
+      "live_count": 0,
+      "clicks": 0,
+      "earnings": null,
+      "top_sources": [],
+      "items": []
+    },
+    {
+      "site_id": "site_nl",
+      "name": "newsletter.victormotricala.it",
+      "url": "https://newsletter.victormotricala.it",
+      "role": "publisher",
+      "mode": "auto",
+      "mode_change_url": "/owner/settings/approval?site=site_nl",
+      "went_live_count": 0,
+      "live_count": 0,
+      "clicks": 0,
+      "earnings": null,
+      "top_sources": [],
+      "items": []
+    }
+  ],
+  "next_digest_at": "2026-10-17T08:00:00Z"
+}

@@ -1,0 +1,30 @@
+{
+ "approval_message": "Automatic approval is off until claim checks are live.",
+ "approval_reason": "claim_check_unavailable",
+ "available_modes": [
+  "manual",
+  "auto",
+  "yolo"
+ ],
+ "avoid_topics": [],
+ "box_position": "",
+ "change_url": "https://offerrails.example/owner",
+ "commission": null,
+ "human_login": true,
+ "install_path": "cursor",
+ "listing_price": null,
+ "listing_url": "",
+ "mode": "manual",
+ "mode_preselected": "yolo",
+ "mode_shown": "yolo",
+ "never_topics": [],
+ "project_name": "",
+ "promote": "",
+ "role": "publisher",
+ "saved": false,
+ "session": {
+  "signed_in": true
+ },
+ "site_url": "https://victormotricala.it",
+ "sites_channels": []
+}
