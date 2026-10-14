@@ -1206,3 +1206,99 @@ func TestPluginRefuseReopensPrepare(t *testing.T) {
 		t.Fatalf("boxes=%d %v", boxes, err)
 	}
 }
+
+func TestRefuseReadsCurrentStateWhenUpdateChangesNothing(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	makerID := insertPublisherMaker(t, db)
+	_, offerID := insertPublisherOffer(t, db, makerID, "none", "percentage", "USD", "InboxPilot", []string{"email", "inbox", "productivity"})
+	siteKey := "site-key-refuse-state"
+	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Tutorials")
+	linkPublisherOwner(t, db, siteID)
+	r := publisherLegRouter(db, true)
+	refuse := func(id string) (*httptest.ResponseRecorder, map[string]interface{}) {
+		t.Helper()
+		return doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/refuse", siteKey, map[string]any{"reason": "The plugin did not insert this box."})
+	}
+
+	openID := insertPlacement(t, db, siteID, offerID, "https://publisher.example.com/open-refuse", "Consider InboxPilot for an email inbox productivity workflow.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', receipt='{"publication_status":"awaiting_evidence"}'::jsonb WHERE id=$1`, openID); err != nil {
+		t.Fatal(err)
+	}
+	fresh, freshBody := refuse(openID)
+	if fresh.Code != http.StatusOK || freshBody["status"] != "pending" || freshBody["publication_status"] != "refused" || strings.Contains(fresh.Body.String(), "already refused") {
+		t.Fatalf("first refuse: %d %s", fresh.Code, fresh.Body.String())
+	}
+	again, againBody := refuse(openID)
+	if again.Code != http.StatusOK || againBody["status"] != "already refused" || againBody["publication_status"] != "refused" {
+		t.Fatalf("already refused: %d %s", again.Code, again.Body.String())
+	}
+
+	recordedID := insertPlacement(t, db, siteID, offerID, "https://publisher.example.com/recorded-refuse", "Consider InboxPilot for an email inbox productivity workflow.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', receipt='{"publication_status":"publisher_reported"}'::jsonb WHERE id=$1`, recordedID); err != nil {
+		t.Fatal(err)
+	}
+	recorded, recordedBody := refuse(recordedID)
+	if recorded.Code != http.StatusConflict || recordedBody["reason"] != "receipt_recorded" || strings.Contains(recorded.Body.String(), "already refused") || strings.Contains(recorded.Body.String(), "publication_status") {
+		t.Fatalf("recorded: %d %s", recorded.Code, recorded.Body.String())
+	}
+	var status, publication string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status, COALESCE(receipt->>'publication_status','') FROM placement_proposals WHERE id=$1`, recordedID).Scan(&status, &publication); err != nil || status != "committed" || publication != "publisher_reported" {
+		t.Fatalf("recorded row status=%s publication=%s err=%v", status, publication, err)
+	}
+
+	missing, _ := refuse("11111111-1111-4111-8111-111111111111")
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing: %d %s", missing.Code, missing.Body.String())
+	}
+}
+
+func TestAccountProjectClicksSumToTotal(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "click-sum-owner", "click-sum@example.com")
+	makerID, offerID := seedListedOffer(t, db, "click-sum-maker", "click-sum-maker@example.com", "Click Sum")
+	siteID := createTestSite(t, db, "click-sum-site", "clicks.example", "Clicks")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	var campaignID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO campaigns(offer_id,site_id,tracking_code) VALUES($1,$2,'click-sum-track') RETURNING id`, offerID, siteID).Scan(&campaignID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO clicks(site_id,campaign_id,referrer) VALUES($1,$2,'https://news.example/both')`, siteID, campaignID); err != nil {
+		t.Fatal(err)
+	}
+	rec, digest := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/account/digest", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("digest: %d %s", rec.Code, rec.Body.String())
+	}
+	totals := digest["totals"].(map[string]any)
+	if totals["clicks"] != float64(1) {
+		t.Fatalf("totals: %s", rec.Body.String())
+	}
+	var sum float64
+	var sawSite, sawOffer bool
+	for _, raw := range digest["projects"].([]any) {
+		project := raw.(map[string]any)
+		clicks, _ := project["clicks"].(float64)
+		sum += clicks
+		switch project["id"] {
+		case siteID:
+			sawSite = true
+			if clicks != 1 {
+				t.Fatalf("site project: %v", project)
+			}
+		case offerID:
+			sawOffer = true
+			if clicks != 0 {
+				t.Fatalf("offer project: %v", project)
+			}
+		}
+	}
+	if !sawSite || !sawOffer || sum != totals["clicks"].(float64) {
+		t.Fatalf("sum %v totals %v body %s", sum, totals["clicks"], rec.Body.String())
+	}
+}

@@ -141,6 +141,10 @@ func (d *DB) AccountDigest(ctx context.Context, ownerID string) (AccountDigest, 
 	}
 	var digest AccountDigest
 	seenClicks := map[string]string{}
+	// A click on this owner's site and on this owner's offer is one id.
+	// Count it on the first project that has it, the same id set the
+	// account total keeps, so the project counts add up to that total.
+	seenProjectClicks := map[string]struct{}{}
 	var siteIDs, offerIDs []string
 	for i := range projects {
 		project := &projects[i]
@@ -159,7 +163,7 @@ func (d *DB) AccountDigest(ctx context.Context, ownerID string) (AccountDigest, 
 			if err != nil {
 				return AccountDigest{}, err
 			}
-			project.ClicksBySource, err = d.clickSources(ctx, `SELECT c.id::text, COALESCE(c.referrer,'') FROM clicks c WHERE c.site_id=$1`, project.ID)
+			project.ClicksBySource, err = d.clickSources(ctx, `SELECT c.id::text, COALESCE(c.referrer,'') FROM clicks c WHERE c.site_id=$1`, project.ID, seenProjectClicks)
 			if err != nil {
 				return AccountDigest{}, err
 			}
@@ -172,7 +176,7 @@ func (d *DB) AccountDigest(ctx context.Context, ownerID string) (AccountDigest, 
 			}
 			project.TotalItems = len(project.Items)
 			project.ClicksBySource, err = d.clickSources(ctx, `SELECT c.id::text, COALESCE(c.referrer,'')
-FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=$1`, project.ID)
+FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=$1`, project.ID, seenProjectClicks)
 			if err != nil {
 				return AccountDigest{}, err
 			}
@@ -257,7 +261,7 @@ func (d *DB) projectMode(ctx context.Context, kind, id string) (string, error) {
 	return mode, err
 }
 
-func (d *DB) clickSources(ctx context.Context, query, id string) ([]SourceCount, error) {
+func (d *DB) clickSources(ctx context.Context, query, id string, seen map[string]struct{}) ([]SourceCount, error) {
 	rows, err := d.Pool.Query(ctx, query, id)
 	if err != nil {
 		return nil, err
@@ -269,6 +273,10 @@ func (d *DB) clickSources(ctx context.Context, query, id string) ([]SourceCount,
 		if err = rows.Scan(&clickID, &referrer); err != nil {
 			return nil, err
 		}
+		if _, ok := seen[clickID]; ok {
+			continue
+		}
+		seen[clickID] = struct{}{}
 		counts[clickID] = referrer
 	}
 	if err = rows.Err(); err != nil {
