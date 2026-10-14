@@ -1,3 +1,7 @@
+## October 14 — plugin 0.1.24 syncs boxes missing from the index
+
+`sync_known_boxes` still reads `affilio_box_index`, and it also selects published posts and pages whose content contains `affilio-placement-`. The query is a paged `LIKE` match, 20 rows at a time, and it does not include drafts. Ids come from `placement_ids_in_content` and are merged with the index so each placement is checked once. A revoked placement still follows the existing `GET /placements/:id`, `revoke_box`, and plugin-ack path. The five-minute `affilio_sync_plugin_boxes` schedule is unchanged.
+
 ## October 14 — plugin 0.1.23 restores a missing box sync
 
 `affilio_sync_plugin_boxes` is scheduled again on `init` when `wp_next_scheduled` says it is gone. The same five-minute interval is used. A load that finds the event already scheduled does nothing, so the event is not duplicated. Deactivation still clears it. The next time that sync runs, a placement the server reports as revoked is removed from the post.

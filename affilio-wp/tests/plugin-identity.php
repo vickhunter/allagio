@@ -2,11 +2,12 @@
 
 $root = dirname(__DIR__);
 $main = file_get_contents($root . '/affilio.php');
-check_identity(strpos($main, 'Version: 0.1.23') !== false, 'plugin header is not 0.1.23');
-check_identity(strpos($main, "define('AFFILIO_VERSION', '0.1.23');") !== false, 'AFFILIO_VERSION is not 0.1.23');
+check_identity(strpos($main, 'Version: 0.1.24') !== false, 'plugin header is not 0.1.24');
+check_identity(strpos($main, "define('AFFILIO_VERSION', '0.1.24');") !== false, 'AFFILIO_VERSION is not 0.1.24');
 $readme = file_get_contents($root . '/readme.txt');
-check_identity(strpos($readme, 'Stable tag: 0.1.23') !== false, 'readme stable tag is not 0.1.23');
-check_identity(strpos($readme, '= 0.1.23 =') !== false, 'readme changelog is missing 0.1.23');
+check_identity(strpos($readme, 'Stable tag: 0.1.24') !== false, 'readme stable tag is not 0.1.24');
+check_identity(strpos($readme, '= 0.1.24 =') !== false, 'readme changelog is missing 0.1.24');
+check_identity(strpos($readme, '= 0.1.23 =') !== false, 'readme changelog dropped 0.1.23');
 check_identity(strpos($readme, '= 0.1.22 =') !== false, 'readme changelog dropped 0.1.22');
 check_identity(strpos($readme, '= 0.1.21 =') !== false, 'readme changelog dropped 0.1.21');
 check_identity(strpos($readme, '= 0.1.20 =') !== false, 'readme changelog dropped 0.1.20');
@@ -43,7 +44,7 @@ echo "loaded\n";
 ');
 check_identity($old[0] === 0 && strpos($old[1], 'loaded') !== false, "load beside v0.1.6 fataled:\n" . $old[1]);
 
-echo "Plugin 0.1.23 packages as affilio-wp/affilio.php and survives a double load.\n";
+echo "Plugin 0.1.24 packages as affilio-wp/affilio.php and survives a double load.\n";
 
 function check_identity($condition, $message) {
     if (!$condition) {

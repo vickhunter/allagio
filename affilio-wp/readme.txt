@@ -1,11 +1,14 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.23
+Stable tag: 0.1.24
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.24 =
+* The five-minute box sync also checks published posts and pages whose content contains an Affilio box, even when that box is missing from the local index. A draft is not scanned. A placement revoked on the server is removed and acknowledged.
 
 = 0.1.23 =
 * If the five-minute box sync is not scheduled, the next load schedules it again. A second load does not add another event. A placement revoked on the server is removed from the post when that sync runs.

@@ -63,4 +63,9 @@ class WalkBlockersTest extends TestCase {
         affilio_walk_scheduled_sync_removes_revoked_box();
         $this->assertTrue(true);
     }
+
+    public function test_unindexed_published_box_is_revoked_by_sync() {
+        affilio_walk_unindexed_published_box_is_revoked_by_sync();
+        $this->assertTrue(true);
+    }
 }

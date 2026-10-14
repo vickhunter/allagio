@@ -150,7 +150,7 @@ class ReleaseTests(unittest.TestCase):
             release.archive_names(["package/package.json", "package/package.json"])
 
     def test_plugin_origin_and_hosted_asset_exclusion(self):
-        guarded = "<?php\n/* Plugin Name: Affilio\n * Version: 0.1.23\n */\ndefine('AFFILIO_VERSION', '0.1.23');\nif (!function_exists('affilio_init')) {\nfunction affilio_init() {}\n}\n"
+        guarded = "<?php\n/* Plugin Name: Affilio\n * Version: 0.1.24\n */\ndefine('AFFILIO_VERSION', '0.1.24');\nif (!function_exists('affilio_init')) {\nfunction affilio_init() {}\n}\n"
 
         def archive(plugin=guarded, extra=None, drop=None):
             return plugin_archive(plugin, extra, drop)
@@ -164,8 +164,8 @@ class ReleaseTests(unittest.TestCase):
             release.validate_plugin(archive(drop="affilio-wp/admin/build/analytics.js"))
         with self.assertRaisesRegex(release.ReleaseError, "unguarded function affilio_init"):
             release.validate_plugin(archive(plugin="<?php\n/* Plugin Name: Affilio */\nfunction affilio_init() {}\n"))
-        with self.assertRaisesRegex(release.ReleaseError, "0.1.23"):
-            release.validate_plugin(archive(plugin=guarded.replace("0.1.23", "0.1.9")))
+        with self.assertRaisesRegex(release.ReleaseError, "0.1.24"):
+            release.validate_plugin(archive(plugin=guarded.replace("0.1.24", "0.1.9")))
         with self.assertRaisesRegex(release.ReleaseError, "hosted UI"):
             release.validate_plugin(archive(extra=("affilio-wp/admin/build/landing-scene.bundle.js", "unexpected")))
         for extra in (

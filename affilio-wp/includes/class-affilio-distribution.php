@@ -1144,14 +1144,39 @@ class Affilio_Distribution {
         if (!function_exists('get_option')) {
             return;
         }
+        $targets = array();
         $index = get_option('affilio_box_index', array());
-        if (!is_array($index)) {
-            return;
+        if (is_array($index)) {
+            foreach ($index as $id => $row) {
+                if (!is_array($row) || empty($row['post_id'])) {
+                    continue;
+                }
+                $targets[strtolower((string) $id)] = array(
+                    'id' => (string) $id,
+                    'row' => $row,
+                );
+            }
         }
-        foreach ($index as $id => $row) {
-            if (!is_array($row) || empty($row['post_id'])) {
+        foreach ($this->published_placement_rows() as $post) {
+            $post_id = is_object($post) && isset($post->ID) ? (int) $post->ID : 0;
+            $content = is_object($post) && isset($post->post_content) ? (string) $post->post_content : '';
+            if ($post_id <= 0 || strpos($content, 'affilio-placement-') === false) {
                 continue;
             }
+            foreach (self::placement_ids_in_content($content) as $id) {
+                $key = strtolower((string) $id);
+                if (isset($targets[$key])) {
+                    continue;
+                }
+                $targets[$key] = array(
+                    'id' => (string) $id,
+                    'row' => array('post_id' => $post_id),
+                );
+            }
+        }
+        foreach ($targets as $target) {
+            $id = $target['id'];
+            $row = $target['row'];
             $data = $this->request('GET', '/placements/' . $id);
             if (is_wp_error($data) || !is_array($data)) {
                 continue;
@@ -1168,6 +1193,43 @@ class Affilio_Distribution {
                 $this->restore_box((int) $row['post_id'], $id, $row);
             }
         }
+    }
+
+    private function published_placement_rows() {
+        global $wpdb;
+        if (!is_object($wpdb) || !method_exists($wpdb, 'prepare') || !method_exists($wpdb, 'get_results') || empty($wpdb->posts)) {
+            return array();
+        }
+        $like = 'affilio-placement-';
+        if (method_exists($wpdb, 'esc_like')) {
+            $like = $wpdb->esc_like($like);
+        }
+        $per_page = 20;
+        $offset = 0;
+        $found = array();
+        for ($page = 0; $page < 200; $page++) {
+            $batch = $wpdb->get_results($wpdb->prepare(
+                "SELECT ID, post_content FROM {$wpdb->posts} WHERE post_status = %s AND post_type IN (%s, %s) AND post_content LIKE %s ORDER BY ID ASC LIMIT %d OFFSET %d",
+                'publish',
+                'post',
+                'page',
+                '%' . $like . '%',
+                $per_page,
+                $offset
+            ));
+            if (!is_array($batch) || !$batch) {
+                break;
+            }
+            foreach ($batch as $row) {
+                $found[] = $row;
+            }
+            $count = count($batch);
+            $offset += $per_page;
+            if ($count < $per_page) {
+                break;
+            }
+        }
+        return $found;
     }
 
     public static function server_wants_removed($data) {

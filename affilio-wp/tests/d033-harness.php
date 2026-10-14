@@ -37,6 +37,63 @@ if (!function_exists('check')) {
     }
 }
 
+if (!class_exists('Affilio_Walk_Wpdb')) {
+    class Affilio_Walk_Wpdb {
+        public $posts = 'wp_posts';
+        public function esc_like($text) {
+            return addcslashes((string) $text, '_%\\');
+        }
+        public function prepare($query) {
+            $args = array_slice(func_get_args(), 1);
+            $index = 0;
+            return preg_replace_callback('/%[sdf]/', function ($match) use (&$index, $args) {
+                $value = $args[$index++];
+                if ($match[0] === '%d') {
+                    return (string) (int) $value;
+                }
+                return "'" . str_replace("'", "''", (string) $value) . "'";
+            }, $query);
+        }
+        public function get_results($sql) {
+            if (!isset($GLOBALS['affilio_box_scan_sql']) || !is_array($GLOBALS['affilio_box_scan_sql'])) {
+                $GLOBALS['affilio_box_scan_sql'] = array();
+            }
+            $GLOBALS['affilio_box_scan_sql'][] = (string) $sql;
+            if (!preg_match("/post_status = '([^']+)'/", (string) $sql, $status)) {
+                return array();
+            }
+            if (!preg_match("/post_type IN \\('([^']+)', '([^']+)'\\)/", (string) $sql, $types)) {
+                return array();
+            }
+            if (!preg_match("/LIKE '([^']*)'/", (string) $sql, $like)) {
+                return array();
+            }
+            if (!preg_match('/LIMIT (\\d+) OFFSET (\\d+)/', (string) $sql, $page)) {
+                return array();
+            }
+            $needle = str_replace(array('\\%', '\\_', '\\\\'), array('%', '_', '\\'), $like[1]);
+            $needle = trim($needle, '%');
+            $allowed = array($types[1], $types[2]);
+            $matched = array();
+            foreach ($GLOBALS['posts'] as $post) {
+                if (!is_object($post) || !isset($post->post_status) || (string) $post->post_status !== $status[1]) {
+                    continue;
+                }
+                $type = isset($post->post_type) ? (string) $post->post_type : '';
+                if (!in_array($type, $allowed, true)) {
+                    continue;
+                }
+                $content = isset($post->post_content) ? (string) $post->post_content : '';
+                if ($needle !== '' && strpos($content, $needle) === false) {
+                    continue;
+                }
+                $matched[] = $post;
+            }
+            return array_slice($matched, (int) $page[2], (int) $page[1]);
+        }
+    }
+}
+
 if (!function_exists('is_wp_error')) {
     function is_wp_error($value) { return $value instanceof WP_Error; }
     function rest_ensure_response($value) { return $value; }
@@ -80,6 +137,9 @@ if (!function_exists('is_wp_error')) {
             }
         }
         return $matched;
+    }
+    if (!isset($GLOBALS['wpdb'])) {
+        $GLOBALS['wpdb'] = new Affilio_Walk_Wpdb();
     }
     function apply_filters($name, $value) {
         $passed = affilio_test_run_filters($name, array_slice(func_get_args(), 1));

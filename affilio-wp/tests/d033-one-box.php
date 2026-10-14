@@ -3,7 +3,7 @@
 require __DIR__ . '/d033-harness.php';
 
 if (!defined('AFFILIO_VERSION')) {
-    define('AFFILIO_VERSION', '0.1.23');
+    define('AFFILIO_VERSION', '0.1.24');
 }
 require __DIR__ . '/../includes/class-affilio-plugin-ack.php';
 require __DIR__ . '/../includes/class-affilio-go.php';

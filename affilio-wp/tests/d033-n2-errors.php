@@ -96,7 +96,7 @@ if (!class_exists('Affilio_API')) {
 }
 
 if (!defined('AFFILIO_VERSION')) {
-    define('AFFILIO_VERSION', '0.1.23');
+    define('AFFILIO_VERSION', '0.1.24');
 }
 if (!defined('AFFILIO_PLUGIN_ACK_OPTION')) {
     define('AFFILIO_PLUGIN_ACK_OPTION', 'affilio_plugin_key');

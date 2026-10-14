@@ -594,6 +594,78 @@ function affilio_walk_scheduled_sync_removes_revoked_box() {
     check(count($acks) === 1 && $acks[0]['body']['action'] === 'removed', 'scheduled sync did not acknowledge the removal');
 }
 
+function affilio_walk_unindexed_published_box_is_revoked_by_sync() {
+    affilio_walk_boot();
+    if (empty($GLOBALS['actions']['affilio_sync_plugin_boxes'])) {
+        affilio_init();
+    }
+    $sync = null;
+    foreach ($GLOBALS['actions']['affilio_sync_plugin_boxes'] as $callback) {
+        if (is_array($callback) && $callback[1] === 'sync_known_boxes') {
+            $sync = $callback;
+            break;
+        }
+    }
+    check($sync !== null, 'affilio_sync_plugin_boxes is not bound to sync_known_boxes');
+    $GLOBALS['actions']['affilio_sync_plugin_boxes'] = array($sync);
+    $published_id = '13131313-1313-1313-1313-131313131313';
+    $draft_id = '14141414-1414-1414-1414-141414141414';
+    $page = (object) array(
+        'ID' => 5252,
+        'post_type' => 'page',
+        'post_status' => 'publish',
+        'post_title' => 'Published page',
+        'post_content' => affilio_walk_box($published_id),
+    );
+    $draft = (object) array(
+        'ID' => 5253,
+        'post_type' => 'post',
+        'post_status' => 'draft',
+        'post_title' => 'Draft',
+        'post_content' => affilio_walk_box($draft_id),
+    );
+    $GLOBALS['posts'] = array($page, $draft);
+    $GLOBALS['post'] = $page;
+    $GLOBALS['options']['affilio_plugin_key'] = 'plugin-only-key';
+    update_option('affilio_box_index', array());
+    update_option(Affilio_Distribution::ack_queue_option(), array());
+    $GLOBALS['http'] = array();
+    $GLOBALS['sync_placement_gets'] = array();
+    $GLOBALS['affilio_box_scan_sql'] = array();
+    unset($GLOBALS['http_handler']);
+    $GLOBALS['affilio_api_request'] = function ($method, $path) use ($published_id, $draft_id) {
+        $GLOBALS['sync_placement_gets'][] = (string) $path;
+        if ($method === 'GET' && (strpos((string) $path, $published_id) !== false || strpos((string) $path, $draft_id) !== false)) {
+            return array('code' => 200, 'data' => array(
+                'status' => 'revoked',
+                'plugin_state' => 'pending',
+            ));
+        }
+        return array('code' => 200, 'data' => array());
+    };
+    affilio_walk_do_action('affilio_sync_plugin_boxes');
+    unset($GLOBALS['affilio_api_request']);
+    check(strpos($page->post_content, 'affilio-placement-' . $published_id) === false, 'sync left an unindexed revoked box on the published page');
+    check(strpos($draft->post_content, 'affilio-placement-' . $draft_id) !== false, 'sync removed a box from a draft');
+    $acks = d033_ack_bodies();
+    check(count($acks) === 1 && $acks[0]['body']['action'] === 'removed', 'sync did not acknowledge the unindexed removal');
+    check(strpos($acks[0]['url'], $published_id) !== false, 'the removal ack was not for the published box');
+    $saw_published = false;
+    foreach ($GLOBALS['sync_placement_gets'] as $path) {
+        check(strpos($path, $draft_id) === false, 'sync requested a draft placement');
+        if (strpos($path, $published_id) !== false) {
+            $saw_published = true;
+        }
+    }
+    check($saw_published, 'sync did not request the published placement');
+    check($GLOBALS['affilio_box_scan_sql'] !== array(), 'sync did not query published content');
+    foreach ($GLOBALS['affilio_box_scan_sql'] as $sql) {
+        check(strpos($sql, "post_status = 'publish'") !== false, 'the content scan was not limited to published posts');
+        check(strpos($sql, 'affilio-placement-') !== false, 'the content scan did not match affilio-placement-');
+        check(strpos($sql, 'LIMIT 20 OFFSET') !== false, 'the content scan was not paged');
+    }
+}
+
 function affilio_walk_run_all() {
     affilio_walk_b1_front_page_does_not_call_get_query_var();
     affilio_walk_b2_upgrade_saves_marker_after_partial_failure();
@@ -606,6 +678,7 @@ function affilio_walk_run_all() {
     affilio_walk_upgrade_then_front_page();
     affilio_walk_sync_cron_returns_on_load();
     affilio_walk_scheduled_sync_removes_revoked_box();
+    affilio_walk_unindexed_published_box_is_revoked_by_sync();
     echo "D-033 walk blockers passed.\n";
 }
 
