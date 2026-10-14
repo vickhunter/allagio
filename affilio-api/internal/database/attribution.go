@@ -361,7 +361,7 @@ ORDER BY cv.created_at DESC LIMIT 1`, objectID, clickID, currency, amount).Scan(
 		}
 		if err == nil {
 			if trustRank(trustLevel) > trustRank(existingTrust) {
-				if _, err = tx.Exec(ctx, `UPDATE conversions SET trust_level=$2 WHERE id=$1`, existingID, trustLevel); err != nil {
+				if _, err = tx.Exec(ctx, `UPDATE conversions SET trust_level=$2, provider=$3, provider_event_id=$4 WHERE id=$1`, existingID, trustLevel, provider, eventID); err != nil {
 					return nil, err
 				}
 				if err = tx.Commit(ctx); err != nil {
@@ -504,7 +504,7 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
  WHERE cv.provider_object_id=$1 AND $1 <> '' AND cv.kind IN ('sale','renewal')
  AND p.maker_id::text=$3
  AND ($4='' OR cv.offer_id::text=$4)
- AND (NOT $5 OR cv.provider <> 'seller_report')
+ AND (NOT $5 OR cv.provider=$2)
  ORDER BY (cv.provider=$2) DESC, cv.created_at DESC LIMIT 1`, objectID, provider, makerID, scopeOfferID, signedOnly).
 		Scan(&saleID, &campaignID, &siteID, &offerID, &clickID, &netMinor, &commissionMinor, &currency, &grossMinor, &paymentMode, &saleTrust)
 	if errors.Is(err, pgx.ErrNoRows) {

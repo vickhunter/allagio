@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -22,7 +24,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const testLemonSecret = "lemon_test_secret"
+const (
+	testLemonSecret = "lemon_test_secret"
+	testPolarSecret = "polar_test_secret"
+)
 
 func newRefundTrustRouter(db *database.DB) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -32,7 +37,7 @@ func newRefundTrustRouter(db *database.DB) *gin.Engine {
 	webhooks := &WebhooksHandler{
 		DB:      db,
 		Cipher:  testConnectionCipher(),
-		Secrets: map[string]string{"lemonsqueezy": testLemonSecret},
+		Secrets: map[string]string{"lemonsqueezy": testLemonSecret, "polar": testPolarSecret},
 	}
 	payouts := &PayoutsHandler{DB: db}
 	entry := &AgentEntry{DB: db}
@@ -278,7 +283,7 @@ func TestRefundTrustAcceptsOnlyEqualOrHigherSource(t *testing.T) {
 		unmatched bool
 	}{
 		{"provider_verified", "provider_verified", true, false},
-		{"provider_verified", "seller_signed_webhook", false, false},
+		{"provider_verified", "seller_signed_webhook", false, true},
 		{"provider_verified", "seller_reported", false, false},
 		{"seller_signed_webhook", "provider_verified", true, false},
 		{"seller_signed_webhook", "seller_signed_webhook", true, false},
@@ -824,7 +829,7 @@ func TestSignedSaleUpgradesTrustOnlyWhenTheSaleMatches(t *testing.T) {
 		t.Fatalf("matching signed sale: %d %v", rec.Code, body)
 	}
 	facts := fx.saleFacts("order-match")
-	if len(facts) != 1 || facts[0]["provider"] != "seller_report" || facts[0]["trust"] != "provider_verified" || facts[0]["click_id"] != fx.clickID || facts[0]["currency"] != "USD" || !moneyNear(facts[0]["amount"].(float64), 100) {
+	if len(facts) != 1 || facts[0]["provider"] != "stripe" || facts[0]["trust"] != "provider_verified" || facts[0]["click_id"] != fx.clickID || facts[0]["currency"] != "USD" || !moneyNear(facts[0]["amount"].(float64), 100) {
 		t.Fatalf("matching sale was copied instead of upgraded: %v", facts)
 	}
 	if !moneyNear(fx.pendingForSeller("order-match"), 20) {
@@ -1115,6 +1120,130 @@ WHERE cv.provider_object_id=$1 AND le.kind='clawback'`, objectID).Scan(&n)
 		fx.t.Fatal(err)
 	}
 	return n
+}
+
+func TestSignedRefundDoesNotClawAnotherProvidersSale(t *testing.T) {
+	fx := newTrustFixture(t)
+	fx.sendPolarSale("order-polar-only", fx.clickID, "USD", 10000)
+	rec, body := fx.sendLemon(lemonOrder("order_refunded", "order-polar-only", "", 0, "provider_verified"))
+	if rec.Code != http.StatusServiceUnavailable || body["status"] != "unmatched" {
+		t.Fatalf("lemon refund clawed the polar sale: %d %v", rec.Code, body)
+	}
+	status, amount := fx.commissionLedger("order-polar-only", "polar")
+	if status != "pending" || !moneyNear(amount, 20) {
+		t.Fatalf("polar commission after lemon refund: %s %v", status, amount)
+	}
+
+	fx.sendLemon(lemonOrder("order_created", "order-lemon-only", fx.clickID, 10000, "provider_verified"))
+	rec, body = fx.sendPolarRefund("order-lemon-only")
+	if rec.Code != http.StatusServiceUnavailable || body["status"] != "unmatched" {
+		t.Fatalf("polar refund clawed the lemon sale: %d %v", rec.Code, body)
+	}
+	status, amount = fx.commissionLedger("order-lemon-only", "lemonsqueezy")
+	if status != "pending" || !moneyNear(amount, 20) {
+		t.Fatalf("lemon commission after polar refund: %s %v", status, amount)
+	}
+}
+
+func TestFullRefundStaysOnItsProviderAndCurrency(t *testing.T) {
+	fx := newTrustFixture(t)
+	fx.reportSale("order-xcur", "provider_verified")
+	lemon := lemonOrder("order_created", "order-xcur", fx.clickID, 10000, "provider_verified")
+	lemon["data"].(map[string]interface{})["attributes"].(map[string]interface{})["currency"] = "EUR"
+	rec, body := fx.sendLemon(lemon)
+	if rec.Code != http.StatusOK || body["status"] != "recorded" || body["trust_level"] != "seller_signed_webhook" {
+		t.Fatalf("eur sale: %d %v", rec.Code, body)
+	}
+	var offers int
+	if err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT COUNT(DISTINCT offer_id) FROM conversions WHERE provider_object_id='order-xcur' AND kind='sale'`).Scan(&offers); err != nil {
+		t.Fatal(err)
+	}
+	if offers != 1 {
+		t.Fatalf("cross-currency sales split across %d offers", offers)
+	}
+	rec, body = fx.sendLemon(lemonOrder("order_refunded", "order-xcur", "", 0, "provider_verified"))
+	if rec.Code != http.StatusOK || body["status"] != "refunded" || body["refund_status"] != "applied" {
+		t.Fatalf("eur refund: %d %v", rec.Code, body)
+	}
+	eurStatus, eurAmount := fx.commissionLedger("order-xcur", "lemonsqueezy")
+	usdStatus, usdAmount := fx.commissionLedger("order-xcur", "seller_report")
+	if eurStatus != "reversed" || !moneyNear(eurAmount, 20) {
+		t.Fatalf("eur commission: %s %v", eurStatus, eurAmount)
+	}
+	if usdStatus != "pending" || !moneyNear(usdAmount, 20) {
+		t.Fatalf("eur refund reversed the usd sale: %s %v", usdStatus, usdAmount)
+	}
+	if got, want := fx.refundSaleID("order-xcur", "lemonsqueezy"), fx.saleID("order-xcur", "lemonsqueezy"); got != want {
+		t.Fatalf("eur refund linked %s, eur sale %s", got, want)
+	}
+}
+
+func TestUpgradedSaleRefundsFromItsNewProvider(t *testing.T) {
+	fx := newTrustFixture(t)
+	fx.reportSale("order-upgraded", "provider_verified")
+	rec, body := fx.sendLemon(lemonOrder("order_created", "order-upgraded", fx.clickID, 10000, "seller_reported"))
+	if rec.Code != http.StatusOK || body["status"] != "duplicate" || body["trust_level"] != "seller_signed_webhook" {
+		t.Fatalf("upgrade: %d %v", rec.Code, body)
+	}
+	var provider, eventID, trust string
+	if err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT provider, provider_event_id, trust_level FROM conversions
+WHERE provider_object_id='order-upgraded' AND kind='sale'`).Scan(&provider, &eventID, &trust); err != nil {
+		t.Fatal(err)
+	}
+	if provider != "lemonsqueezy" || eventID != "order_created:order-upgraded" || trust != "seller_signed_webhook" {
+		t.Fatalf("upgraded row provider %s event %s trust %s", provider, eventID, trust)
+	}
+	rec, body = fx.sendLemon(lemonOrder("order_refunded", "order-upgraded", "", 0, "provider_verified"))
+	if rec.Code != http.StatusOK || body["status"] != "refunded" || body["refund_status"] != "applied" || !moneyNear(fx.pending("order-upgraded"), 0) {
+		t.Fatalf("refund of upgraded sale: %d %v pending %v", rec.Code, body, fx.pending("order-upgraded"))
+	}
+}
+
+func (fx *trustFixture) sendPolarSale(objectID, clickID, currency string, amount int) {
+	fx.t.Helper()
+	rec, body := fx.sendPolar("order.created", objectID, clickID, currency, amount)
+	if rec.Code != http.StatusOK || body["status"] != "recorded" || body["trust_level"] != "seller_signed_webhook" {
+		fx.t.Fatalf("polar sale %s: %d %v", objectID, rec.Code, body)
+	}
+}
+
+func (fx *trustFixture) sendPolarRefund(objectID string) (*httptest.ResponseRecorder, map[string]interface{}) {
+	fx.t.Helper()
+	return fx.sendPolar("order.refunded", objectID, "", "USD", 0)
+}
+
+func (fx *trustFixture) sendPolar(eventType, objectID, clickID, currency string, amount int) (*httptest.ResponseRecorder, map[string]interface{}) {
+	fx.t.Helper()
+	data := map[string]interface{}{
+		"id":         objectID,
+		"amount":     amount,
+		"currency":   currency,
+		"created_at": time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339),
+		"metadata":   map[string]string{},
+	}
+	if clickID != "" {
+		data["metadata"] = map[string]string{"dtr": clickID}
+	}
+	raw, err := json.Marshal(map[string]interface{}{"type": eventType, "data": data})
+	if err != nil {
+		fx.t.Fatal(err)
+	}
+	msgID := "msg-" + eventType + "-" + objectID
+	timestamp := fmt.Sprintf("%d", time.Now().Unix())
+	mac := hmac.New(sha256.New, []byte(testPolarSecret))
+	mac.Write([]byte(msgID + "." + timestamp + "."))
+	mac.Write(raw)
+	req := httptest.NewRequest(http.MethodPost, "/v1/webhooks/polar", strings.NewReader(string(raw)))
+	req.Header.Set("webhook-id", msgID)
+	req.Header.Set("webhook-timestamp", timestamp)
+	req.Header.Set("webhook-signature", "v1,"+base64.StdEncoding.EncodeToString(mac.Sum(nil)))
+	rec := httptest.NewRecorder()
+	fx.r.ServeHTTP(rec, req)
+	body := map[string]interface{}{}
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	return rec, body
 }
 
 func TestRefundTrustMigrationIsIdempotent(t *testing.T) {

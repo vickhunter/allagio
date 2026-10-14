@@ -135,19 +135,11 @@ VALUES($1,$2,$3,$4,$5,$6,'refund',$7,$8,$9,$10,NULLIF($11,0),$12,$13,$14,NULLIF(
 }
 
 func distinctSaleMakers(ctx context.Context, tx pgx.Tx, provider, objectID string) ([]string, error) {
-	ids, err := makerIDsForSales(ctx, tx, `SELECT DISTINCT p.maker_id::text
-FROM conversions cv
-JOIN offers o ON o.id=cv.offer_id
-JOIN products p ON p.id=o.product_id
-WHERE cv.provider=$1 AND cv.provider_object_id=$2 AND $2 <> '' AND cv.kind IN ('sale','renewal')`, provider, objectID)
-	if err != nil || len(ids) > 0 {
-		return ids, err
-	}
 	return makerIDsForSales(ctx, tx, `SELECT DISTINCT p.maker_id::text
 FROM conversions cv
 JOIN offers o ON o.id=cv.offer_id
 JOIN products p ON p.id=o.product_id
-WHERE cv.provider <> 'seller_report' AND cv.provider_object_id=$1 AND $1 <> '' AND cv.kind IN ('sale','renewal')`, objectID)
+WHERE cv.provider=$1 AND cv.provider_object_id=$2 AND $2 <> '' AND cv.kind IN ('sale','renewal')`, provider, objectID)
 }
 
 func makerIDsForSales(ctx context.Context, tx pgx.Tx, query string, args ...any) ([]string, error) {
