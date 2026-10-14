@@ -306,7 +306,7 @@ func (h *WebhooksHandler) processProductEvent(ctx context.Context, productID str
 			var makerID string
 			makerID, err = h.DB.MakerIDForProduct(ctx, productID)
 			if err == nil {
-				out, err = h.DB.RecordPartialRefund(ctx, "stripe", event.EventID, event.ObjectID, event.RefundedMinor, event.OccurredAt, database.TrustProviderVerified, makerID, "")
+				out, err = h.DB.RecordPartialRefund(ctx, "stripe", event.EventID, event.ObjectID, event.RefundedMinor, event.OccurredAt, database.TrustProviderVerified, makerID, "", false)
 			}
 			if err == nil {
 				result = refundResult(out, database.TrustProviderVerified)

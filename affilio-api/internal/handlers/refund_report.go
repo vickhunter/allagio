@@ -28,6 +28,7 @@ type reportRefundRequest struct {
 	ObjectID    string `json:"object_id"`
 	Currency    string `json:"currency"`
 	AmountMinor *int64 `json:"amount_refunded_minor"`
+	Full        *bool  `json:"full"`
 	OccurredAt  string `json:"occurred_at"`
 }
 
@@ -109,11 +110,12 @@ func (h *RefundReportHandler) ReportRefund(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "currency does not match the sale"})
 		return
 	}
-	amount := int64(-1)
+	amount := int64(0)
 	if req.AmountMinor != nil {
 		amount = *req.AmountMinor
 	}
-	out, err := h.DB.RecordPartialRefund(c.Request.Context(), database.ProviderSellerReport, req.EventID, req.ObjectID, amount, occurred, database.TrustSellerReported, makerID(c), c.GetString("offer_scope_id"))
+	fullRefund := req.AmountMinor == nil && (req.Full == nil || *req.Full)
+	out, err := h.DB.RecordPartialRefund(c.Request.Context(), database.ProviderSellerReport, req.EventID, req.ObjectID, amount, occurred, database.TrustSellerReported, makerID(c), c.GetString("offer_scope_id"), fullRefund)
 	if errors.Is(err, database.ErrConversionNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "sale was not found"})
 		return

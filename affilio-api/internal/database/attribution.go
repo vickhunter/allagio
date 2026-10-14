@@ -352,7 +352,10 @@ AND p.maker_id = (
   JOIN products p2 ON p2.id=o2.product_id
   WHERE cl.id=$2
 )
-ORDER BY cv.created_at DESC LIMIT 1`, objectID, clickID).Scan(&existingID, &existingTrust)
+AND cv.click_id=$2
+AND upper(cv.currency)=upper($3)
+AND abs(cv.amount - $4::numeric) < 0.005
+ORDER BY cv.created_at DESC LIMIT 1`, objectID, clickID, currency, amount).Scan(&existingID, &existingTrust)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return nil, err
 		}
@@ -462,10 +465,10 @@ VALUES ($1,$2,'commission',$3,$4,'pending',$5)`, out.SiteID, out.ConversionID, o
 }
 
 func (d *DB) RecordRefund(ctx context.Context, provider, eventID, objectID string, occurredAt time.Time, trustLevel string) (*RefundOutcome, error) {
-	return d.RecordPartialRefund(ctx, provider, eventID, objectID, -1, occurredAt, trustLevel, "", "")
+	return d.RecordPartialRefund(ctx, provider, eventID, objectID, 0, occurredAt, trustLevel, "", "", true)
 }
 
-func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectID string, cumulativeMinor int64, occurredAt time.Time, trustLevel, makerID, scopeOfferID string) (*RefundOutcome, error) {
+func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectID string, cumulativeMinor int64, occurredAt time.Time, trustLevel, makerID, scopeOfferID string, fullRefund bool) (*RefundOutcome, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -477,8 +480,9 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
 	if existing, ok, err := refundByEvent(ctx, tx, provider, eventID, makerID); err != nil || ok {
 		return existing, err
 	}
+	signedOnly := false
 	if makerID == "" {
-		makers, err := distinctSaleMakers(ctx, tx, objectID)
+		makers, err := distinctSaleMakers(ctx, tx, provider, objectID)
 		if err != nil {
 			return nil, err
 		}
@@ -486,6 +490,7 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
 			return nil, ErrConversionNotFound
 		}
 		makerID = makers[0]
+		signedOnly = true
 	}
 	var saleID, campaignID, siteID, offerID, currency, paymentMode, saleTrust string
 	var clickID *string
@@ -499,7 +504,8 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
  WHERE cv.provider_object_id=$1 AND $1 <> '' AND cv.kind IN ('sale','renewal')
  AND p.maker_id::text=$3
  AND ($4='' OR cv.offer_id::text=$4)
- ORDER BY (cv.provider=$2) DESC, cv.created_at DESC LIMIT 1`, objectID, provider, makerID, scopeOfferID).
+ AND (NOT $5 OR cv.provider <> 'seller_report')
+ ORDER BY (cv.provider=$2) DESC, cv.created_at DESC LIMIT 1`, objectID, provider, makerID, scopeOfferID, signedOnly).
 		Scan(&saleID, &campaignID, &siteID, &offerID, &clickID, &netMinor, &commissionMinor, &currency, &grossMinor, &paymentMode, &saleTrust)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrConversionNotFound
@@ -507,7 +513,7 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
 	if err != nil {
 		return nil, err
 	}
-	if cumulativeMinor == -1 {
+	if fullRefund {
 		cumulativeMinor = grossMinor
 	}
 	priorGross, priorNet, priorCommission, err := appliedRefundTotals(ctx, tx, objectID, offerID)

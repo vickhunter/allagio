@@ -13,7 +13,7 @@ import (
 const clearMaturedSQL = `
 UPDATE ledger_entries le SET status='cleared'
 WHERE le.status='pending' AND le.clears_at <= NOW()
-  AND NOT EXISTS (SELECT 1 FROM conversions cv JOIN conversions source ON source.provider=cv.provider AND source.provider_object_id=cv.provider_object_id WHERE cv.id=le.conversion_id AND source.flagged)`
+  AND NOT EXISTS (SELECT 1 FROM conversions cv JOIN conversions source ON source.provider=cv.provider AND source.provider_object_id=cv.provider_object_id AND source.offer_id=cv.offer_id WHERE cv.id=le.conversion_id AND source.flagged)`
 
 // ClearMaturedLedgerEntries runs cheaply before balance reads and payout batches.
 func (d *DB) ClearMaturedLedgerEntries(ctx context.Context) (int64, error) {
