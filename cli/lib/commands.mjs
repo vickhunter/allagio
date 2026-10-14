@@ -225,7 +225,8 @@ export async function statusCommand(io) {
 
 export async function digestCommand(io) {
   const config = loadConfig(io);
-  const res = await apiRequest(io, '/v1/digest', { headers: authHeaders(config) });
+  const path = config.key_header === 'X-Maker-Key' ? '/v1/maker/digest' : '/v1/digest';
+  const res = await apiRequest(io, path, { headers: authHeaders(config) });
   if (res.status !== 200) {
     io.stderr(`digest failed (${res.status})\n`);
     io.stdout(`${res.text || ''}\n`);

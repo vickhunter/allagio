@@ -1393,7 +1393,11 @@ VALUES($1,'or_digo',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPI
 	if siteDigest.Code != http.StatusOK || siteBody["session"].(map[string]any)["signed_in"] != false {
 		t.Fatalf("site project digest: %d %s", siteDigest.Code, siteDigest.Body.String())
 	}
-	rec, body := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-Maker-Key": offerKey})
+	ownerDenied, ownerDeniedBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-Maker-Key": offerKey})
+	if ownerDenied.Code != http.StatusForbidden || ownerDeniedBody["reason"] != "forbidden_key_type" {
+		t.Fatalf("offer project key owner digest: %d %s", ownerDenied.Code, ownerDenied.Body.String())
+	}
+	rec, body := postJSON(t, r, http.MethodGet, "/v1/maker/digest", nil, map[string]string{"X-Maker-Key": offerKey})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("offer project digest: %d %s", rec.Code, rec.Body.String())
 	}

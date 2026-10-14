@@ -2303,9 +2303,25 @@ func (h *AgentEntry) MakerDigest(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 		return
 	}
+	ownerID := ""
+	if id, err := h.DB.OwnerIDByMaker(c.Request.Context(), makerID); err == nil {
+		ownerID = id
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
+	}
 	items := make([]gin.H, 0, len(offers))
 	for _, item := range offers {
-		items = append(items, h.digestJSON(item, ""))
+		token := ""
+		if ownerID != "" {
+			issued, err := h.issueUndo(c, ownerID, item)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+				return
+			}
+			token = issued
+		}
+		items = append(items, h.digestJSON(item, token))
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "session": gin.H{"signed_in": false}})
 }

@@ -370,7 +370,7 @@ test('digest prints the mode and mode_preselected the server returns', async () 
   const { io, stdout } = projectIO(offer, [
     {
       method: 'GET',
-      path: '/v1/digest',
+      path: '/v1/maker/digest',
       body: {
         effective_mode: 'manual',
         items: [{ summary: 'Paste Forge', live_now: true, undo_token: 'tok' }],
