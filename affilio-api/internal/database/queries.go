@@ -106,6 +106,11 @@ type ClickSummary struct {
 	TotalClicks           int `json:"total_clicks"`
 	UniqueArticles        int `json:"unique_articles"`
 	UniqueRecommendations int `json:"unique_recommendations"`
+	PaidClicks            int `json:"paid_clicks"`
+	BrowserClicks         int `json:"browser_clicks"`
+	VerifiedAgentClicks   int `json:"verified_agent_clicks"`
+	DeclaredAgentClicks   int `json:"declared_agent_clicks"`
+	UnknownClicks         int `json:"unknown_clicks"`
 }
 
 type DailyClickCount struct {
@@ -665,12 +670,17 @@ func (d *DB) GetClickSummary(ctx context.Context, siteID string, days int) (*Cli
 SELECT
     COUNT(c.id) AS total_clicks,
     COUNT(DISTINCT c.article_id) AS unique_articles,
-    COUNT(DISTINCT c.recommendation_id) AS unique_recommendations
+    COUNT(DISTINCT c.recommendation_id) AS unique_recommendations,
+    COUNT(c.id) FILTER (WHERE c.click_class = 'browser') AS paid_clicks,
+    COUNT(c.id) FILTER (WHERE c.click_class = 'browser') AS browser_clicks,
+    COUNT(c.id) FILTER (WHERE c.click_class = 'verified_agent') AS verified_agent_clicks,
+    COUNT(c.id) FILTER (WHERE c.click_class = 'declared_agent') AS declared_agent_clicks,
+    COUNT(c.id) FILTER (WHERE c.click_class = 'unknown') AS unknown_clicks
 FROM clicks c
 WHERE c.site_id=$1
   AND ($2 = 0 OR c.clicked_at >= NOW() - ($2 * INTERVAL '1 day'))`, siteID, days)
 	var out ClickSummary
-	if err := row.Scan(&out.TotalClicks, &out.UniqueArticles, &out.UniqueRecommendations); err != nil {
+	if err := row.Scan(&out.TotalClicks, &out.UniqueArticles, &out.UniqueRecommendations, &out.PaidClicks, &out.BrowserClicks, &out.VerifiedAgentClicks, &out.DeclaredAgentClicks, &out.UnknownClicks); err != nil {
 		return nil, err
 	}
 	return &out, nil

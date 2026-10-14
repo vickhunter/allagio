@@ -477,7 +477,9 @@ func TestTwoIndependentStdioAgentsRevenueLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tracked, nil))
+	clickReq := httptest.NewRequest(http.MethodGet, tracked, nil)
+	clickReq.Header.Set("User-Agent", testBrowserUA)
+	r.ServeHTTP(rec, clickReq)
 	u, err := url.Parse(rec.Header().Get("Location"))
 	if err != nil {
 		t.Fatal(err)

@@ -75,12 +75,14 @@ func (h *OfferReviewHandler) Approve(c *gin.Context) {
 		return
 	}
 	if blocked {
-		c.JSON(http.StatusConflict, gin.H{
+		body := gin.H{
 			"error":         "offer claims are not ready to publish",
 			"status":        "submitted",
 			"review_reason": reason,
 			"message":       message,
-		})
+		}
+		attachClaimsCheck(body, h.ClaimsCheck, "submitted", reason)
+		c.JSON(http.StatusConflict, body)
 		return
 	}
 	slug := offerSlug(item.ProductName, offer.ID)
@@ -89,7 +91,9 @@ func (h *OfferReviewHandler) Approve(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to promote offer"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "listed", "offer_id": offer.ID, "program_id": programID, "slug": slug})
+	body := gin.H{"status": "listed", "offer_id": offer.ID, "program_id": programID, "slug": slug}
+	attachClaimsCheck(body, h.ClaimsCheck, "listed", "")
+	c.JSON(http.StatusOK, body)
 }
 
 func (h *OfferReviewHandler) Reject(c *gin.Context) {

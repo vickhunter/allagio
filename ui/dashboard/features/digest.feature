@@ -195,8 +195,8 @@ Feature: Digest, all my projects and sites on one page (D-032)
     And "Next step:" says what to do, and no time is promised
     Examples:
       | reason    | check                                                           |
-      | claims    | We’re checking the offer’s claims against the merchant page.    |
-      | head      | The offer page didn’t answer when we checked it.                |
+      | claims    | Claims are not checked yet.                                      |
+      | head      | The offer page did not answer.                                   |
       | relevance | The offer scored below the minimum relevance.                   |
       | caps      | You already have as many offers listed as the cap allows.       |
   Scenario: Hosted runs CLAIMS_CHECK=stub (listing_in_review_claims)

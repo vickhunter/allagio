@@ -1,11 +1,14 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.24
+Stable tag: 0.1.25
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.25 =
+* The "Vedi il prodotto" link is an inline-block at least 44px tall, so it is a tap target on a 390px-wide screen.
 
 = 0.1.24 =
 * The five-minute box sync also checks published posts and pages whose content contains an Affilio box, even when that box is missing from the local index. A draft is not scanned. A placement revoked on the server is removed and acknowledged.

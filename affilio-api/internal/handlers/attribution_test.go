@@ -373,7 +373,7 @@ func insertCampaignClick(t *testing.T, db *database.DB, code string) string {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT id::text, site_id::text FROM campaigns WHERE tracking_code=$1`, code).Scan(&campaignID, &siteID); err != nil {
 		t.Fatal(err)
 	}
-	id, err := db.InsertPlacementClick(context.Background(), campaignID, siteID, nil, "test-hash", "Mozilla/5.0", "https://example.com/post", "")
+	id, err := db.InsertPlacementClick(context.Background(), campaignID, siteID, nil, "test-hash", "Mozilla/5.0", "https://example.com/post", "", ClickClassBrowser)
 	if err != nil {
 		t.Fatal(err)
 	}

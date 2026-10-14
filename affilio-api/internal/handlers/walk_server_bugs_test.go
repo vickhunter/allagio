@@ -37,7 +37,7 @@ func TestLiveGoLinkRecordsClickAndKeepsRef(t *testing.T) {
 	r.GET("/v1/go/:code", (&RedirectsHandler{DB: db, IPSaltSecret: "live-go-salt"}).Go)
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+id, nil)
 	req.RemoteAddr = "203.0.113.50:1000"
-	req.Header.Set("User-Agent", "Mozilla/5.0 reader")
+	req.Header.Set("User-Agent", testBrowserUA)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 

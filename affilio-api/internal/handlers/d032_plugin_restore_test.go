@@ -168,7 +168,7 @@ func TestRevokedGoLink(t *testing.T) {
 	siteKey := map[string]string{"X-API-Key": "golink-site-key"}
 	path := "/v1/go/revoked-go?placement=" + placementID
 
-	pending := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
+	pending := hitGo(t, r, http.MethodGet, path, testBrowserUA)
 	requirePlainRedirect(t, pending, "https://example.com")
 	if placementClickCount(t, db, placementID) != 0 {
 		t.Fatal("a committed placement that is not placed recorded a click")
@@ -176,7 +176,7 @@ func TestRevokedGoLink(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='placed', plugin_wait_at=NOW(), plugin_failed_reason='', failed_action='', restore_unconfirmed=false WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
 	}
-	live := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
+	live := hitGo(t, r, http.MethodGet, path, testBrowserUA)
 	if live.Code != http.StatusFound || live.Header().Get("Location") == "" || !containsAll(live.Header().Get("Location"), "https://example.com", "via=") {
 		t.Fatalf("live redirect: %d %s", live.Code, live.Header().Get("Location"))
 	}
@@ -192,8 +192,8 @@ func TestRevokedGoLink(t *testing.T) {
 		method string
 		agent  string
 	}{
-		{http.MethodGet, "Mozilla/5.0"},
-		{http.MethodHead, "Mozilla/5.0"},
+		{http.MethodGet, testBrowserUA},
+		{http.MethodHead, testBrowserUA},
 		{http.MethodGet, "Twitterbot/1.0"},
 	} {
 		stopped := hitGo(t, r, hit.method, path, hit.agent)
@@ -207,7 +207,7 @@ func TestRevokedGoLink(t *testing.T) {
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
-	again := hitGo(t, r, http.MethodGet, path, "RedoReader/1")
+	again := hitGo(t, r, http.MethodGet, path, testFirefoxUA)
 	if again.Code != http.StatusFound || !strings.Contains(again.Header().Get("Location"), "via=") {
 		t.Fatalf("undo and redo before the plugin ack: %d %s", again.Code, again.Header().Get("Location"))
 	}
@@ -221,7 +221,7 @@ func TestRevokedGoLink(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='paused' WHERE id=$1`, offerID); err != nil {
 		t.Fatal(err)
 	}
-	paused := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
+	paused := hitGo(t, r, http.MethodGet, path, testBrowserUA)
 	requirePlainRedirect(t, paused, "https://golink.example/post")
 	if placementClickCount(t, db, placementID) != 2 {
 		t.Fatal("an offer that is not live credited a click")
@@ -229,7 +229,7 @@ func TestRevokedGoLink(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET post_url='' WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
 	}
-	home := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
+	home := hitGo(t, r, http.MethodGet, path, testBrowserUA)
 	requirePlainRedirect(t, home, "https://golink.example/")
 }
 
@@ -665,14 +665,14 @@ func TestPluginFailureAndRetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	goPath := "/v1/go/fail-go?placement=" + placementID
-	live := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	live := hitGo(t, r, http.MethodGet, goPath, testBrowserUA)
 	if live.Code != http.StatusFound {
 		t.Fatalf("live redirect: %d", live.Code)
 	}
 	clicks := placementClickCount(t, db, placementID)
 	stopped := func() {
 		t.Helper()
-		hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+		hit := hitGo(t, r, http.MethodGet, goPath, testBrowserUA)
 		requirePlainRedirect(t, hit, "https://example.com")
 		if placementClickCount(t, db, placementID) != clicks {
 			t.Fatal("revoked go link credited a click")
@@ -923,7 +923,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 		return wentLive, earnings
 	}
 	clicks := placementClickCount(t, db, id)
-	live := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	live := hitGo(t, r, http.MethodGet, goPath, testBrowserUA)
 	if live.Code != http.StatusFound {
 		t.Fatalf("live redirect: %d %s", live.Code, live.Body.String())
 	}
@@ -952,7 +952,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
-	again := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	again := hitGo(t, r, http.MethodGet, goPath, testBrowserUA)
 	if again.Code != http.StatusFound {
 		t.Fatalf("restore redirect: %d %s", again.Code, again.Body.String())
 	}
@@ -967,7 +967,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	}
 	dark := func() {
 		t.Helper()
-		hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+		hit := hitGo(t, r, http.MethodGet, goPath, testBrowserUA)
 		requirePlainRedirect(t, hit, "https://example.com")
 		if placementClickCount(t, db, id) != clicks {
 			t.Fatal("failed restore credited a click")
@@ -993,7 +993,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	if placed.Code != http.StatusOK || placedBody["plugin_state"] != "placed" {
 		t.Fatalf("ack restored: %d %s", placed.Code, placed.Body.String())
 	}
-	back := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	back := hitGo(t, r, http.MethodGet, goPath, testBrowserUA)
 	if back.Code != http.StatusFound {
 		t.Fatalf("confirmed redirect: %d %s", back.Code, back.Body.String())
 	}
@@ -1123,7 +1123,7 @@ VALUES($1,'stripe','leave-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id
 	}
 	stopped := func(path, id string, clicks int) {
 		t.Helper()
-		hit := hitGo(t, r, http.MethodGet, path, "Mozilla/5.0")
+		hit := hitGo(t, r, http.MethodGet, path, testBrowserUA)
 		requirePlainRedirect(t, hit, "https://example.com")
 		if placementClickCount(t, db, id) != clicks {
 			t.Fatal("clicks-off go link credited a click")
@@ -1452,7 +1452,7 @@ WHERE id=$1`, id, current, campaignID, current.Add(48*time.Hour)); err != nil {
 	expect("pending", 1, 0, "pending", false)
 
 	makeLive()
-	hit := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	hit := hitGo(t, r, http.MethodGet, goPath, testBrowserUA)
 	if hit.Code != http.StatusFound {
 		t.Fatalf("placed go link: %d %s", hit.Code, hit.Body.String())
 	}
@@ -1518,7 +1518,7 @@ WHERE id=$1`, id); err != nil {
 		t.Fatal(err)
 	}
 	expect("revoked but placed", 1, 0, "placed", false)
-	stopped := hitGo(t, r, http.MethodGet, goPath, "Mozilla/5.0")
+	stopped := hitGo(t, r, http.MethodGet, goPath, testBrowserUA)
 	requirePlainRedirect(t, stopped, "https://example.com")
 }
 

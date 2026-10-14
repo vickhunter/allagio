@@ -37,7 +37,7 @@ func TestCommittedPlacementStillCountsClicksAfterExpiry(t *testing.T) {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT EXISTS(SELECT 1 FROM placement_counts_as_live WHERE id=$1)`, placementID).Scan(&live); err != nil || !live {
 		t.Fatalf("committed placement dropped out of the live view: %v %v", live, err)
 	}
-	hit := hitGo(t, r, http.MethodGet, "/v1/go/"+placementID, "Mozilla/5.0")
+	hit := hitGo(t, r, http.MethodGet, "/v1/go/"+placementID, testBrowserUA)
 	if hit.Code != http.StatusFound || placementClickCount(t, db, placementID) != 1 {
 		t.Fatalf("expired committed click: %d clicks %d", hit.Code, placementClickCount(t, db, placementID))
 	}
@@ -430,7 +430,7 @@ VALUES($1,$2,'legacy-code',true,'active') RETURNING id`, offerID, siteID).Scan(&
 		}
 		return n
 	}
-	none := hitGo(t, r, http.MethodGet, "/v1/go/legacy-code", "Mozilla/5.0")
+	none := hitGo(t, r, http.MethodGet, "/v1/go/legacy-code", testBrowserUA)
 	requirePlainRedirect(t, none, "https://example.com")
 	if clicks() != 0 {
 		t.Fatal("zero live placements recorded a hit")
@@ -439,7 +439,7 @@ VALUES($1,$2,'legacy-code',true,'active') RETURNING id`, offerID, siteID).Scan(&
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', plugin_wait='placed', plugin_wait_at=NOW(), campaign_id=$2, expires_at=NOW()+INTERVAL '2 days' WHERE id=$1`, second, campaignID); err != nil {
 		t.Fatal(err)
 	}
-	both := hitGo(t, r, http.MethodGet, "/v1/go/legacy-code", "Mozilla/5.0")
+	both := hitGo(t, r, http.MethodGet, "/v1/go/legacy-code", testBrowserUA)
 	requirePlainRedirect(t, both, "https://example.com")
 	if clicks() != 0 {
 		t.Fatal("two live placements recorded a hit")
@@ -447,7 +447,7 @@ VALUES($1,$2,'legacy-code',true,'active') RETURNING id`, offerID, siteID).Scan(&
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='removed' WHERE id=$1`, second); err != nil {
 		t.Fatal(err)
 	}
-	one := hitGo(t, r, http.MethodGet, "/v1/go/legacy-code", "Mozilla/5.0")
+	one := hitGo(t, r, http.MethodGet, "/v1/go/legacy-code", testBrowserUA)
 	if one.Code != http.StatusFound || clicks() != 1 {
 		t.Fatalf("exactly one: %d clicks %d", one.Code, clicks())
 	}

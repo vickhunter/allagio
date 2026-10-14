@@ -32,6 +32,8 @@
     cap: 'This site reached the most new boxes your rules allow.'
   };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  // Paid clicks when the digest sends them. Older payloads only have the total.
+  function clickCount(it) { return typeof it.paid_clicks === 'number' ? it.paid_clicks : it.clicks; }
   function day(iso) { try { return iso ? new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : ''; } catch (e) { return ''; } }
   function plainString(s) { return typeof s === 'string' && s.length < 300 && !/[{}\[\]<>]/.test(s) ? s : null; }
 
@@ -60,9 +62,9 @@
   OR.whoText = whoText;
   // 2d3aed7 review_reason -> which check is holding the listing, in plain words, and the next step. No times are promised.
   var REVIEW = {
-    claims: { check: 'We\u2019re checking the offer\u2019s claims against the merchant page.',
+    claims: { check: 'Claims are not checked yet.',
       next: 'Nothing to do for now. If the copy uses a number the offer doesn\u2019t show, change the copy to match the offer and submit again.' },
-    head: { check: 'The offer page didn\u2019t answer when we checked it.', next: 'Make sure the offer link opens in a browser, then submit again.' },
+    head: { check: 'The offer page did not answer.', next: 'Make sure the offer link opens in a browser, then submit again.' },
     relevance: { check: 'The offer scored below the minimum relevance.', next: 'Make the offer\u2019s description say plainly what the product does, then submit again.' },
     caps: { check: 'You already have as many offers listed as the cap allows.', next: 'End or pause a listed offer to make room, then submit again.' }
   };
@@ -148,7 +150,7 @@
           '</div>' +
           '<div class="di-side">' +
             '<span class="di-state" data-test="state"></span>' +
-            '<span class="clicks">' + (it.clicks == null ? '' : esc(it.clicks) + (it.clicks === 1 ? ' click' : ' clicks')) + '</span>' +
+            '<span class="clicks">' + (clickCount(it) == null ? '' : esc(clickCount(it)) + (clickCount(it) === 1 ? ' click' : ' clicks')) + '</span>' +
             '<button type="button" class="btn secondary" data-action="toggle"></button>' +
             '<button type="button" class="btn quiet di-open" data-action="details" aria-haspopup="dialog">Details</button>' +
           '</div>' +

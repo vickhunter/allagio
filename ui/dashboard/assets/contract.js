@@ -46,7 +46,8 @@
   function viewItem(it, p) {
     var side = p.kind === 'site' ? 'publisher' : 'maker';
     var common = { item_id: it.id, side: side, site: { name: p.name }, copy: it.summary, went_live_at: it.went_live_at, undo_token: it.undo_token,
-      clicks: typeof it.clicks === 'number' ? it.clicks : null, live_now: it.live_now === true };
+      clicks: typeof it.clicks === 'number' ? it.clicks : null,
+      paid_clicks: typeof it.paid_clicks === 'number' ? it.paid_clicks : null, live_now: it.live_now === true };
     if (it.kind !== 'placement') {
       // 2d3aed7: an untrusted maker's offer that failed a server check stays `submitted` with review_reason + message.
       // Both fields are optional (null or absent when listed); without them the row stays a plain listing.
@@ -67,6 +68,7 @@
       top_sources: sources(p.clicks_by_source), items: (p.items || []).map(function (it) { return viewItem(it, p); }),
       server_kind: p.kind, server_id: p.id, mode_change_url: safeUrl(env.change_url),
       total_items: typeof p.total_items === 'number' ? p.total_items : null, // 6042dcb: all items, not capped at 50
+      truncated: p.truncated === true,
       paused: p.kind === 'site' ? paused.site === true : paused.offer === true };
     if (p.kind === 'site') { s.site_id = p.id; s.url = safeUrl(env.site_url); } else s.project_id = p.id;
     return s;

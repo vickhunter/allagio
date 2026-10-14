@@ -139,15 +139,18 @@ func (d *DB) LookupPlacementRedirect(ctx context.Context, placementID string) (P
 // RecentPlacementClick returns a hit from the same reader hash and user agent
 // on this site and placement inside the dedup window. An empty hash is not a
 // reader, so it never matches. An empty id means there is no recent hit.
-func (d *DB) RecentPlacementClick(ctx context.Context, siteID, placementID, ipHash, userAgent string, withinSeconds int) (string, error) {
+func (d *DB) RecentPlacementClick(ctx context.Context, siteID, placementID, ipHash, userAgent, clickClass string, withinSeconds int) (string, error) {
 	if ipHash == "" {
 		return "", nil
 	}
+	if clickClass != "verified_agent" && clickClass != "declared_agent" && clickClass != "browser" && clickClass != "unknown" {
+		clickClass = "unknown"
+	}
 	var id string
 	err := d.Pool.QueryRow(ctx, `SELECT id::text FROM clicks
-WHERE site_id=$1 AND placement_id=$2 AND ip_hash=$3 AND COALESCE(user_agent,'')=$4
+WHERE site_id=$1 AND placement_id=$2 AND ip_hash=$3 AND COALESCE(user_agent,'')=$4 AND click_class=$6
 AND clicked_at >= NOW() - ($5 * INTERVAL '1 second')
-ORDER BY clicked_at DESC LIMIT 1`, siteID, placementID, ipHash, userAgent, withinSeconds).Scan(&id)
+ORDER BY clicked_at DESC LIMIT 1`, siteID, placementID, ipHash, userAgent, withinSeconds, clickClass).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil
 	}
@@ -204,7 +207,7 @@ WHERE c.tracking_code=$1`, code)
 }
 
 func (d *DB) InsertCampaignClick(ctx context.Context, campaignID, siteID string, programID *string, ipHash, userAgent, referrer string) (string, error) {
-	return d.InsertPlacementClick(ctx, campaignID, siteID, programID, ipHash, userAgent, referrer, "")
+	return d.InsertPlacementClick(ctx, campaignID, siteID, programID, ipHash, userAgent, referrer, "", "")
 }
 
 // LivePlacementForCampaign returns the placement id only when exactly one
@@ -228,7 +231,7 @@ WHERE clicked_at < $1
 	return err
 }
 
-func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string, programID *string, ipHash, userAgent, referrer, placementID string) (string, error) {
+func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string, programID *string, ipHash, userAgent, referrer, placementID, clickClass string) (string, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return "", err
@@ -246,12 +249,15 @@ func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string
 		}
 	}
 	var id string
-	err = tx.QueryRow(ctx, `INSERT INTO clicks(site_id,campaign_id,program_id,ip_hash,user_agent,referrer,terms_snapshot,placement_id)
+	if clickClass != "verified_agent" && clickClass != "declared_agent" && clickClass != "browser" && clickClass != "unknown" {
+		clickClass = "unknown"
+	}
+	err = tx.QueryRow(ctx, `INSERT INTO clicks(site_id,campaign_id,program_id,ip_hash,user_agent,referrer,terms_snapshot,placement_id,click_class)
  SELECT $1,$2,$3,$4,$5,$6,COALESCE($7::jsonb,jsonb_build_object(
  'product_id',o.product_id,'commission_type',o.commission_type,'commission_value_minor',(o.commission_value*100)::bigint,
- 'currency',o.commission_currency,'cookie_duration_days',o.cookie_duration_days,'refund_window_days',o.refund_window_days)),NULLIF($8,'')::uuid
+ 'currency',o.commission_currency,'cookie_duration_days',o.cookie_duration_days,'refund_window_days',o.refund_window_days)),NULLIF($8,'')::uuid,$9
  FROM campaigns cam JOIN offers o ON o.id=cam.offer_id WHERE cam.id=$2 RETURNING id`,
-		siteID, campaignID, programID, ipHash, userAgent, referrer, snapshot, placementID).Scan(&id)
+		siteID, campaignID, programID, ipHash, userAgent, referrer, snapshot, placementID, clickClass).Scan(&id)
 	if err != nil {
 		return "", err
 	}

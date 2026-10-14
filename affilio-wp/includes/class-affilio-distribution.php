@@ -555,7 +555,7 @@ class Affilio_Distribution {
         $href = self::local_go_href($id);
         $copy = isset($placement['copy']) ? (string) $placement['copy'] : '';
         $disclosure = isset($placement['disclosure']) ? (string) $placement['disclosure'] : '';
-        $inner = esc_html($copy) . ' <a href="' . esc_url($href) . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)';
+        $inner = esc_html($copy) . ' <a class="affilio-product-link" href="' . esc_url($href) . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)';
         $content .= "\n" . $this->paragraph_block('<p class="' . $class . '">' . $inner . '</p>', $class);
         if (!self::disclosure_suppressed($content) && ($disclosure === '' || strpos($content, esc_html($disclosure)) === false)) {
             $disclosure_class = 'affilio-disclosure-' . $id;

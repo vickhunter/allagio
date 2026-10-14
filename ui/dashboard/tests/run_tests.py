@@ -148,6 +148,8 @@ def setup_maker_happy(page, w):
     assert page.locator('label.choice:has(input[value=yolo])').inner_text().startswith('Approve anything that passes the checks')
     assert not re.search(r'\b(manual|auto|yolo)\b', visible_text(page), re.I), 'internal mode name on screen'
     page.wait_for_selector('section.checks[aria-busy=false]')
+    assert page.locator('#h-checks').text_content() == 'Rules every listing must follow'
+    assert 'checked' not in page.locator('#h-checks').text_content().lower()
     assert page.locator('[data-test=hard-checks] li').all_inner_texts() == [c['check_text'] for c in json.loads(fx('hard-checks'))['checks']]
     no_overflow(page); shot(page, 'setup-maker', w)
     page.click('#continue'); page.wait_for_selector('[data-test=success]')
@@ -1408,7 +1410,8 @@ def keycap_continue(page, w):
     assert ty() == -4, ty()
     page.hover('#continue'); page.wait_for_timeout(260)
     if w == 1440: assert ty() == -6, ty()
-    assert 'Nothing goes live without passing every check' in page.inner_text('.actions')
+    assert 'Nothing goes live until it follows the rules above' in page.inner_text('.actions')
+    assert 'checked' not in page.locator('#continue-reassure').inner_text().lower()
     page.goto(BASE + 'digest.html?fixture=normal'); page.wait_for_selector('digest-item')
     assert page.locator('.keycap').count() == 0, 'one primary per screen: setup Continue only'
 
@@ -1659,6 +1662,20 @@ def csrf_window_global_ignored(page, w):
     hs = [c for c in page.mock.calls if c['path'].endswith('/rotate')]
     assert hs and 'x-csrf-token' not in hs[0]['headers'], 'no meta, no token: the window fallback is gone'
 
+def digest_paid_clicks_and_truncation(page, w):
+    acct = json.loads(fx('account-digest'))
+    offer = next(p for p in acct['projects'] if p['id'] == OFFER_RAIL)
+    offer['truncated'] = True
+    offer['items'][0]['clicks'] = 99
+    offer['items'][0]['paid_clicks'] = 3
+    real_digest(page, acct=acct)
+    sec = '[data-section="%s"]' % OFFER_RAIL
+    note = ' '.join(page.inner_text(sec + ' [data-test=page-note]').split())
+    assert 'The list was cut' in note, note
+    assert page.locator(sec + ' .clicks').first.inner_text() == '3 clicks'
+
+TESTS.append(digest_paid_clicks_and_truncation)
+
 def real_latest_50_of_n(page, w):
     real_digest(page, acct='account-digest-long')
     sec = '[data-section="%s"]' % SITE_VM
@@ -1699,8 +1716,8 @@ TESTS += V8
 USER_ID = '0e0e0001-0000-4000-8000-00000000c001'
 OFFER2 = '0ffe0002-0000-4000-8000-00000000b002'
 REVIEW_COPY = {
-    'claims': ('We\u2019re checking the offer\u2019s claims against the merchant page.', 'Use only claims from the offer.', 'Nothing to do for now.'),
-    'head': ('The offer page didn\u2019t answer when we checked it.', 'The offer page did not answer.', 'Make sure the offer link opens'),
+    'claims': ('Claims are not checked yet.', 'Use only claims from the offer.', 'Nothing to do for now.'),
+    'head': ('The offer page did not answer.', 'The offer page did not answer.', 'Make sure the offer link opens'),
     'relevance': ('The offer scored below the minimum relevance.', 'Relevance is below the minimum.', 'Make the offer\u2019s description'),
     'caps': ('You already have as many offers listed as the cap allows.', 'The placement cap is full.', 'End or pause a listed offer')}
 def in_review_case(page, w, reason, shoot):
@@ -1848,7 +1865,7 @@ def in_review_from_account_digest(page, w):
     """65a1871 live shape: the held offer is in its /v1/account/digest project items; /v1/digest is read only for "since"
     (an offer item only there is not merged in any more)."""
     pid = '0ffe0009-0000-4000-8000-00000000b009'
-    held = {'approved_by': '', 'clicks': 0, 'id': pid, 'kind': 'offer', 'label': 'Northwind Builder', 'link_text': '', 'live_now': False, 'message': 'The claims check is not live yet.',
+    held = {'approved_by': '', 'clicks': 0, 'id': pid, 'kind': 'offer', 'label': 'Northwind Builder', 'link_text': '', 'live_now': False, 'message': 'Claims are not checked yet.',
         'plugin_state': '', 'policy_rule_id': '', 'policy_rule_text': '', 'position': '', 'post_title': '', 'review_reason': 'claims', 'rules_version': 0, 'status': 'submitted',
         'summary': 'Northwind Builder', 'undo_token': 'x', 'undone_by': '', 'went_live_at': '2026-10-13T22:24:00Z'}
     acct = json.loads(fx('account-digest'))
@@ -1860,7 +1877,7 @@ def in_review_from_account_digest(page, w):
     real_digest(page, acct=acct)
     it = ritem(page, pid); it.scroll_into_view_if_needed()
     assert it.count() == 1 and state(it) == 'In review', 'the held offer appears once, in its own section'
-    assert it.locator('[data-test=review-message]').text_content() == 'Server says: \u201cThe claims check is not live yet.\u201d'
+    assert it.locator('[data-test=review-message]').text_content() == 'Server says: \u201cClaims are not checked yet.\u201d'
     assert ritem(page, ghost['id']).count() == 0, '/v1/digest items are no longer merged into offer sections'
     no_overflow(page); axe(page); shot(page, 'v9-in-review-from-account-digest', w, full=False)
 V9 = [in_review_from_account_digest, yolo_pending_f249a77, yolo_pending_server_reason, yolo_pending_fallback, post_title_fallback, csrf_window_global_ignored, listing_in_review_claims, listing_in_review_head, listing_in_review_relevance, listing_in_review_caps, listing_review_optional,

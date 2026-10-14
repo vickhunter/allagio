@@ -82,7 +82,7 @@ WHERE id=$1`, id, current, campaignID, current.Add(48*time.Hour), postURL); err 
 		t.Helper()
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.RemoteAddr = remote
-		req.Header.Set("User-Agent", "Mozilla/5.0 reader")
+		req.Header.Set("User-Agent", testBrowserUA)
 		req.Header.Set("Referer", postURL)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
@@ -241,9 +241,13 @@ WHERE id=$1`, id); err != nil {
 				{"bare", bare, fmt.Sprintf("198.51.%d.10:443", i+1), tc.bareWant},
 				{"placement", query, fmt.Sprintf("203.0.%d.10:443", i+1), tc.queryWant},
 			}
-			for _, form := range forms {
+			for i, form := range forms {
 				if tc.limited {
-					check(tc.name+" "+form.name+" allowed", form.path, form.ip, plain, true)
+					// The cap is the placement. The first reader is tracked. A
+					// second hit, including one from another address, is not.
+					if i == 0 {
+						check(tc.name+" "+form.name+" allowed", form.path, form.ip, plain, true)
+					}
 					check(tc.name+" "+form.name, form.path, form.ip, form.want, false)
 					continue
 				}

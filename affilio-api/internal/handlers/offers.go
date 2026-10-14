@@ -227,12 +227,14 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{
+		body := gin.H{
 			"id":            offer.ID,
 			"status":        "submitted",
 			"review_reason": reviewReasonClaims,
 			"message":       reviewClaimsNotLive,
-		})
+		}
+		attachClaimsCheck(body, h.ClaimsCheck, "submitted", reviewReasonClaims)
+		c.JSON(http.StatusOK, body)
 		return
 	}
 	listed, err := h.DB.CountListedOffers(c.Request.Context(), makerID(c))
@@ -245,7 +247,9 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"id": offer.ID, "status": "submitted", "review_reason": reason, "message": message})
+		body := gin.H{"id": offer.ID, "status": "submitted", "review_reason": reason, "message": message}
+		attachClaimsCheck(body, h.ClaimsCheck, "submitted", reason)
+		c.JSON(http.StatusOK, body)
 		return
 	}
 	h.listOffer(c, offer, product)
@@ -257,7 +261,9 @@ func (h *OffersHandler) listOffer(c *gin.Context, offer *database.Offer, product
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list offer"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"id": offer.ID, "status": "listed", "program_id": programID, "review_reason": nil, "message": nil})
+	body := gin.H{"id": offer.ID, "status": "listed", "program_id": programID, "review_reason": nil, "message": nil}
+	attachClaimsCheck(body, h.ClaimsCheck, "listed", "")
+	c.JSON(http.StatusOK, body)
 }
 
 // Matches ranks the network's publishers by topical fit with the offer's
@@ -402,6 +408,7 @@ func (h *OffersHandler) presentWith(c *gin.Context, offer *database.Offer, liste
 		}
 	}
 	item := offerJSON(offer, reason, message)
+	attachClaimsCheck(item, h.ClaimsCheck, offer.Status, reason)
 	if product == nil {
 		if cached := products[offer.ProductID]; cached != nil {
 			product = cached

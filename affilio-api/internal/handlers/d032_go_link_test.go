@@ -99,7 +99,7 @@ WHERE id=$1`, id, current, campaignID, current.Add(48*time.Hour), postURL); err 
 	expect := func(label, want string, hit bool) {
 		t.Helper()
 		before := clicks()
-		rec := goHit(label, "/v1/go/"+id, "192.0.2.1:1000", "Mozilla/5.0 reader", "https://go.example/the-post", nil)
+		rec := goHit(label, "/v1/go/"+id, "192.0.2.1:1000", testBrowserUA, "https://go.example/the-post", nil)
 		if rec.Header().Get("Location") != want {
 			t.Fatalf("%s: location %s", label, rec.Header().Get("Location"))
 		}
@@ -199,7 +199,7 @@ WHERE id=$1`, id); err != nil {
 
 	makeLive()
 	beforeLive := clicks()
-	live := goHit("live", "/v1/go/"+id, "198.51.100.8:1000", "Mozilla/5.0 reader", "https://go.example/the-post", nil)
+	live := goHit("live", "/v1/go/"+id, "198.51.100.8:1000", testBrowserUA, "https://go.example/the-post", nil)
 	liveURL, err := url.Parse(live.Header().Get("Location"))
 	if err != nil || liveURL.Scheme+"://"+liveURL.Host+liveURL.Path != plain || liveURL.Query().Get("via") == "" {
 		t.Fatalf("live location: %s", live.Header().Get("Location"))
@@ -213,10 +213,10 @@ WHERE id=$1`, id); err != nil {
 	forwarded := map[string]string{
 		"X-OR-Client-IP":   "203.0.113.50",
 		"X-OR-Client-Hash": readerHash,
-		"X-OR-User-Agent":  "ForwardedReader/9",
+		"X-OR-User-Agent":  testFirefoxUA,
 		"X-OR-Referer":     "https://reader.example/article",
 	}
-	ignored := goHit("headers without key", "/v1/go/"+id+"?via=plugin", "192.0.2.20:1000", "ConnectionBrowser/1.0", "https://server.internal/", forwarded)
+	ignored := goHit("headers without key", "/v1/go/"+id+"?via=plugin", "192.0.2.20:1000", testSafariUA, "https://server.internal/", forwarded)
 	if !strings.Contains(ignored.Header().Get("Location"), "via=") {
 		t.Fatalf("unkeyed plugin call was not tracked: %s", ignored.Header().Get("Location"))
 	}
@@ -224,7 +224,7 @@ WHERE id=$1`, id); err != nil {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT user_agent, referrer, ip_hash FROM clicks WHERE placement_id=$1 ORDER BY clicked_at DESC LIMIT 1`, id).Scan(&ua, &referrer, &ipHash); err != nil {
 		t.Fatal(err)
 	}
-	if ua != "ConnectionBrowser/1.0" || referrer != "https://server.internal/" || ipHash != redirects.directReaderHash("192.0.2.20") || ipHash == readerHash {
+	if ua != testSafariUA || referrer != "https://server.internal/" || ipHash != redirects.directReaderHash("192.0.2.20") || ipHash == readerHash {
 		t.Fatalf("forwarded headers were used without a site key: %s %s %s", ua, referrer, ipHash)
 	}
 
@@ -235,11 +235,11 @@ WHERE id=$1`, id); err != nil {
 		"X-OR-User-Agent":  "OtherSiteReader/1",
 		"X-OR-Referer":     "https://other.example/post",
 	}
-	goHit("headers with other site key", "/v1/go/"+id+"?via=plugin", "192.0.2.21:1000", "ConnectionBrowser/2.0", "https://server.internal/other", wrong)
+	goHit("headers with other site key", "/v1/go/"+id+"?via=plugin", "192.0.2.21:1000", testBrowserUA, "https://server.internal/other", wrong)
 	if err := db.Pool.QueryRow(context.Background(), `SELECT user_agent, referrer, ip_hash FROM clicks WHERE placement_id=$1 ORDER BY clicked_at DESC LIMIT 1`, id).Scan(&ua, &referrer, &ipHash); err != nil {
 		t.Fatal(err)
 	}
-	if ua != "ConnectionBrowser/2.0" || referrer != "https://server.internal/other" || ipHash != redirects.directReaderHash("192.0.2.21") || ipHash == otherHash {
+	if ua != testBrowserUA || referrer != "https://server.internal/other" || ipHash != redirects.directReaderHash("192.0.2.21") || ipHash == otherHash {
 		t.Fatalf("forwarded headers were used for another site's key: %s %s %s", ua, referrer, ipHash)
 	}
 
@@ -247,7 +247,7 @@ WHERE id=$1`, id); err != nil {
 		"X-API-Key":        "go-site-key",
 		"X-OR-Client-IP":   "203.0.113.60",
 		"X-OR-Client-Hash": readerHash,
-		"X-OR-User-Agent":  "ForwardedReader/9",
+		"X-OR-User-Agent":  testFirefoxUA,
 		"X-OR-Referer":     "https://reader.example/article",
 	}
 	tracked := goHit("plugin proxy", "/v1/go/"+id+"?via=plugin", "192.0.2.30:1000", "PublisherServer/1.0", "https://plugin.internal/", matched)
@@ -257,7 +257,7 @@ WHERE id=$1`, id); err != nil {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT user_agent, referrer, ip_hash FROM clicks WHERE placement_id=$1 ORDER BY clicked_at DESC LIMIT 1`, id).Scan(&ua, &referrer, &ipHash); err != nil {
 		t.Fatal(err)
 	}
-	if ua != "ForwardedReader/9" || referrer != "https://reader.example/article" || ipHash != readerHash || strings.Contains(ipHash, "203.0.113.60") {
+	if ua != testFirefoxUA || referrer != "https://reader.example/article" || ipHash != readerHash || strings.Contains(ipHash, "203.0.113.60") {
 		t.Fatalf("plugin proxy did not use reader context: %s %s %s", ua, referrer, ipHash)
 	}
 	beforeDup := clicks()
@@ -265,7 +265,7 @@ WHERE id=$1`, id); err != nil {
 	if clicks() != beforeDup {
 		t.Fatalf("same hash and user agent was not deduped: %d to %d", beforeDup, clicks())
 	}
-	matched["X-OR-User-Agent"] = "OtherReader/2"
+	matched["X-OR-User-Agent"] = testSafariUA
 	goHit("plugin different agent", "/v1/go/"+id+"?via=plugin", "192.0.2.32:1000", "PublisherServer/1.0", "https://plugin.internal/", matched)
 	if clicks() != beforeDup+1 {
 		t.Fatalf("a different user agent should be a new hit: %d", clicks())
@@ -279,9 +279,13 @@ WHERE id=$1`, id); err != nil {
 		"X-OR-User-Agent":  "Twitterbot/1.0",
 		"X-OR-Referer":     "https://reader.example/article",
 	}
-	bot := goHit("forwarded bot", "/v1/go/"+id+"?via=plugin", "192.0.2.40:1000", "Mozilla/5.0 reader", "https://go.example/the-post", botHeaders)
-	if bot.Header().Get("Location") != plain || clicks() != beforeBot {
+	bot := goHit("forwarded bot", "/v1/go/"+id+"?via=plugin", "192.0.2.40:1000", testBrowserUA, "https://go.example/the-post", botHeaders)
+	if bot.Header().Get("Location") != plain || clicks() != beforeBot+1 {
 		t.Fatalf("forwarded bot: %s hits %d", bot.Header().Get("Location"), clicks())
+	}
+	var botClass string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT click_class FROM clicks WHERE placement_id=$1 AND user_agent='Twitterbot/1.0'`, id).Scan(&botClass); err != nil || botClass != "unknown" {
+		t.Fatalf("forwarded bot class %s %v", botClass, err)
 	}
 
 	unknownID := func(label, path string, headers map[string]string) {
@@ -289,7 +293,7 @@ WHERE id=$1`, id); err != nil {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.Host = "127.0.0.1:8443"
 		req.RemoteAddr = "192.0.2.50:1000"
-		req.Header.Set("User-Agent", "Mozilla/5.0 reader")
+		req.Header.Set("User-Agent", testBrowserUA)
 		for key, value := range headers {
 			req.Header.Set(key, value)
 		}

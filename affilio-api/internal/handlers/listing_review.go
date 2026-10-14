@@ -10,6 +10,8 @@ import (
 	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
 	"affilio-api/internal/services"
+
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -22,7 +24,7 @@ const (
 	reviewReasonCaps      = "caps"
 
 	reviewClaimsMessage    = "Use only claims from the offer."
-	reviewClaimsNotLive    = "The claims check is not live yet."
+	reviewClaimsNotLive    = "Claims are not checked yet."
 	reviewHeadMessage      = "The offer page did not answer."
 	reviewRelevanceMessage = "Relevance is below the minimum."
 	reviewCapsMessage      = "The placement cap is full."
@@ -69,6 +71,26 @@ func claimsHeld(mode string) bool {
 
 func claimsReal(mode string) bool {
 	return strings.EqualFold(strings.TrimSpace(mode), config.ClaimsReal)
+}
+
+// claimsCheckValue is the offer field. stub stays not_checked. real and
+// off-local report passed or failed once a draft has been submitted.
+func claimsCheckValue(mode, status, reviewReason string) string {
+	if claimsHeld(mode) {
+		return "not_checked"
+	}
+	switch strings.TrimSpace(status) {
+	case "", "draft":
+		return "not_checked"
+	}
+	if reviewReason == reviewReasonClaims {
+		return "failed"
+	}
+	return "passed"
+}
+
+func attachClaimsCheck(item gin.H, mode, status, reviewReason string) {
+	item["claims_check"] = claimsCheckValue(mode, status, reviewReason)
 }
 
 // listingReview is recomputed on read. It is not stored. Under stub, every

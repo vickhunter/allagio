@@ -155,13 +155,13 @@
         '</div>' +
         '<label class="also"><input type="checkbox" id="also-role"' + (roles.length > 1 ? ' checked' : '') + '> <span id="also-label"></span></label>' +
         '<div id="questions"></div>' +
-        '<section class="checks" aria-labelledby="h-checks" aria-busy="true"><h2 id="h-checks">Always checked, in every mode</h2><ul data-test="hard-checks"></ul>' +
-          '<p class="caption hc-error" data-test="hard-checks-error" hidden>We couldn\'t load the list of checks right now. They still apply to everything, in every mode.</p></section>' +
+        '<section class="checks" aria-labelledby="h-checks" aria-busy="true"><h2 id="h-checks">Rules every listing must follow</h2><ul data-test="hard-checks"></ul>' +
+          '<p class="caption hc-error" data-test="hard-checks-error" hidden>We couldn\'t load the list of rules right now. They still apply to every listing.</p></section>' +
         (keyContext(d) ? '<p class="approval-note" data-test="key-note" id="key-note"><b>Opened from your agent.</b> Your agent can only make approval stricter. ' +
           'Choosing these answers and saving them needs the dashboard: sign in there, then open this page again.</p>' : '') +
         '<div class="actions"><button type="submit" class="keycap" id="continue" aria-describedby="continue-reassure' + (keyContext(d) ? ' key-note" disabled' : '"') + '>' +
           '<span class="keycap-face">Continue</span></button>' +
-        '<span class="reassure" id="continue-reassure">Nothing goes live without passing every check above. You can change any of this later from the dashboard.</span>' +
+        '<span class="reassure" id="continue-reassure">Nothing goes live until it follows the rules above. You can change any of this later from the dashboard.</span>' +
         '<button type="button" class="btn quiet skip-setup" id="skip-setup" data-test="skip-setup">Skip for now</button></div>' +
       '</form>';
 
@@ -498,7 +498,7 @@
         '<p>It will ' + (detail.roles[0] === 'maker' ? 'list <strong>' + esc(name) + '</strong> and look for publishers' : 'start matching offers to your posts') +
         ' using ' + (data.saved ? 'your saved approval mode (<strong>' + esc(modeLabel) + '</strong> right now)' : '<strong>' + esc(modeLabel) + '</strong>') + '. You\'ll get a digest when something goes live, with one-tap undo for every item.</p>' +
         (key ? '<p class="key-note" data-test="plugin-key-note" data-kind="' + esc(key.kind) + '">' + esc(key.text) + '</p>' : '') +
-        '<p class="caption">The checks above apply to everything, in every mode.</p>' +
+        '<p class="caption">These rules apply to every listing.</p>' +
         '<div class="actions"><button type="button" class="btn quiet" id="back-to-agent">Back to my agent</button>' +
         '<span class="caption">You can close this tab and return to ' + esc(back) + '.</span></div>' +
       '</section>';

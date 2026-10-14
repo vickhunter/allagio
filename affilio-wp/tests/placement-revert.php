@@ -172,7 +172,7 @@ $GLOBALS['post'] = (object) array('ID' => 7, 'post_type' => 'post', 'post_status
 $result = $distribution->publish(new Request(array('post_id' => 7, 'placement_id' => $placement_id)));
 check(!is_wp_error($result), 'insert failed');
 $inserted = substr($GLOBALS['post']->post_content, strlen($kept));
-$inner = esc_html($copy) . ' <a href="/go/' . $placement_id . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)';
+$inner = esc_html($copy) . ' <a class="affilio-product-link" href="/go/' . $placement_id . '" rel="sponsored nofollow">Vedi&nbsp;il&nbsp;prodotto</a> (link sponsorizzato)';
 $placement_block = '<!-- wp:paragraph {"className":"affilio-placement-' . $placement_id . '"} -->' . "\n" . '<p class="affilio-placement-' . $placement_id . '">' . $inner . '</p>' . "\n" . '<!-- /wp:paragraph -->';
 $disclosure_block = '<!-- wp:paragraph {"className":"affilio-disclosure-' . $placement_id . '"} -->' . "\n" . '<p class="affilio-disclosure-' . $placement_id . '">' . esc_html($disclosure) . '</p>' . "\n" . '<!-- /wp:paragraph -->';
 check($inserted === "\n" . $placement_block . "\n" . $disclosure_block, "inserted markup was:\n" . $inserted);
