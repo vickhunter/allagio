@@ -1,0 +1,70 @@
+name: Offer Rails CLI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "cli/**"
+      - "affilio-api/**"
+      - ".github/workflows/offer-rails-cli.yml"
+  pull_request:
+    paths:
+      - "cli/**"
+      - "affilio-api/**"
+      - ".github/workflows/offer-rails-cli.yml"
+
+jobs:
+  cli:
+    name: offer-rails-cli
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: affilio_test
+          POSTGRES_USER: affilio
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U affilio -d affilio_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      OFFER_RAILS_PGHOST: 127.0.0.1
+      OFFER_RAILS_PGPORT: "5432"
+      OFFER_RAILS_PGUSER: affilio
+      OFFER_RAILS_PGPASSWORD: password
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: affilio-api/go.mod
+          cache-dependency-path: |
+            affilio-api/go.mod
+            affilio-api/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: CLI unit tests
+        working-directory: cli
+        run: npm test
+
+      - name: PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Handler tests
+        working-directory: affilio-api
+        env:
+          AFFILIO_TEST_DATABASE_URL: postgresql://affilio:password@127.0.0.1:5432/affilio_test
+        run: go test ./internal/handlers -count=1
+
+      - name: Paste test and API integration
+        run: bash cli/scripts/paste-test.sh

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net/url"
 	"sort"
 	"strings"
 	"unicode"
@@ -185,6 +186,36 @@ func normalizeKey(input string) string {
 	input = strings.Split(input, "/")[0]
 	input = strings.TrimSuffix(input, ".com")
 	return input
+}
+
+// ScorePlacement scores copy against the product we already store.
+// Callers do not supply the score.
+func ScorePlacement(copyText, productName, category, website string) int {
+	content := strings.ToLower(copyText)
+	terms := []string{}
+	if name := strings.TrimSpace(productName); name != "" {
+		terms = append(terms, strings.ToLower(name))
+	}
+	if host := landingHost(website); host != "" {
+		terms = append(terms, host)
+	}
+	score, _ := scoreMatch(content, tokenize(content), terms, category)
+	return score
+}
+
+func landingHost(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimPrefix(strings.ToLower(parsed.Hostname()), "www.")
 }
 
 func scoreMatch(content string, tokens []string, terms []string, category string) (int, string) {

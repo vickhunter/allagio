@@ -4,6 +4,16 @@
     const locale = String((AffilioData && AffilioData.locale) || document.documentElement.lang || 'en').toLowerCase();
     const isItalian = locale.startsWith('it');
     const t = (en, it) => (isItalian ? it : en);
+    const affilioProxy = (method, path, body) => {
+        const base = String((AffilioData && AffilioData.restBase) || '').replace(/\/$/, '');
+        const payload = { method: method, path: path };
+        if (body !== undefined) payload.body = body;
+        return fetch(base + '/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': AffilioData.nonce },
+            body: JSON.stringify(payload),
+        });
+    };
     root.classList.add('affilio-dashboard-app');
 
     if (AffilioData.connectionStatus && !AffilioData.connectionStatus.connected) {
@@ -12,7 +22,7 @@
             <div class="affilio-panel affilio-panel-warning">
                 <h2>${t('Offer Marketplace', 'Marketplace Offerte')}</h2>
                 <p><strong>${t('Not connected.', 'Non connesso.')}</strong> ${AffilioData.connectionStatus.message || t('Configure your API key.', 'Configura la tua chiave API.')}</p>
-                <p><a class="button button-primary" href="${settings}">${t('Open settings', 'Apri impostazioni')}</a></p>
+                <p><a class="button button-primary" data-primary-action href="${settings}">${t('Open settings', 'Apri impostazioni')}</a></p>
             </div>
         `;
         return;
@@ -46,7 +56,7 @@
         return `<span class="${cls}">${t('Fit', 'Affinità')} ${score}</span>`;
     };
 
-    const offerCard = (offer) => {
+    const offerCard = (offer, primary) => {
         const joined = !!offer.joined;
         const joinedPill = joined
             ? `<span class="affilio-rec-status affilio-rec-status-approved">${t('Joined', 'Attiva')}</span>`
@@ -63,7 +73,7 @@
                 <button class="button" data-copy-link="${esc(offer.offer_id)}" data-link="${esc(link)}">${t('Copy link', 'Copia link')}</button>
             `;
         } else {
-            actions = `<button class="button button-primary" data-join-offer="${esc(offer.offer_id)}">${t('Join offer', 'Attiva offerta')}</button>`;
+            actions = `<button class="button${primary ? ' button-primary' : ''}" ${primary ? 'data-primary-action' : ''} data-join-offer="${esc(offer.offer_id)}">${t('Join offer', 'Attiva offerta')}</button>`;
         }
         return `
             <div class="affilio-rec-item" data-offer-card="${esc(offer.offer_id)}">
@@ -82,7 +92,12 @@
     };
 
     const render = (offers) => {
-        const cards = (offers || []).map(offerCard).join('');
+        let assigned = false;
+        const cards = (offers || []).map(offer => {
+            const primary = !offer.joined && !assigned;
+            if (primary) assigned = true;
+            return offerCard(offer, primary);
+        }).join('');
         const empty = `<p class="affilio-empty-inline">${t('No listed offers yet. New offers appear here as makers join the network.', 'Nessuna offerta al momento. Le nuove offerte compariranno qui quando i maker si uniranno alla rete.')}</p>`;
         root.innerHTML = `
             <div class="affilio-panel">
@@ -97,6 +112,16 @@
             </div>
         `;
         bind(offers || []);
+        if (!(offers || []).some(offer => !offer.joined)) {
+            const copy = root.querySelector('[data-copy-link]');
+            if (copy) {
+                copy.setAttribute('data-primary-action', '');
+                copy.classList.add('button-primary');
+            } else {
+                const note = root.querySelector('.affilio-empty-inline');
+                if (note) note.setAttribute('data-primary-action', '');
+            }
+        }
     };
 
     const bind = (offers) => {
@@ -105,16 +130,26 @@
                 button.disabled = true;
                 button.textContent = t('Joining...', 'Attivazione...');
                 try {
-                    const res = await fetch(`${AffilioData.apiUrl}/marketplace/offers/${button.getAttribute('data-join-offer')}/join`, {
-                        method: 'POST',
-                        headers: { 'X-API-Key': AffilioData.apiKey },
-                    });
+                    const res = await affilioProxy('POST', '/marketplace/offers/' + button.getAttribute('data-join-offer') + '/join');
                     if (!res.ok) throw new Error('join failed');
                     await load();
                 } catch (err) {
                     button.disabled = false;
                     button.textContent = t('Join offer', 'Attiva offerta');
-                    window.alert(t('Could not join the offer. Try again.', 'Impossibile attivare l\'offerta. Riprova.'));
+                    const text = t('Could not join the offer. Try again.', 'Impossibile attivare l\'offerta. Riprova.');
+                    let slot = button.parentElement.querySelector('.affilio-field-error');
+                    if (!slot) {
+                        slot = document.createElement('p');
+                        slot.className = 'affilio-field-error';
+                        slot.setAttribute('role', 'alert');
+                        slot.tabIndex = -1;
+                        button.insertAdjacentElement('afterend', slot);
+                    }
+                    slot.id = 'join-error-' + button.getAttribute('data-join-offer');
+                    slot.textContent = text;
+                    button.setAttribute('aria-describedby', slot.id);
+                    slot.focus({preventScroll: true});
+                    slot.scrollIntoView({block: 'center', inline: 'nearest'});
                 }
             });
         });
@@ -134,9 +169,7 @@
 
     const load = async () => {
         try {
-            const res = await fetch(AffilioData.apiUrl + '/marketplace/offers', {
-                headers: { 'X-API-Key': AffilioData.apiKey },
-            });
+            const res = await affilioProxy('GET', '/marketplace/offers');
             if (!res.ok) throw new Error('load failed');
             const data = await res.json();
             const offers = (data.offers || []).map((offer) => {
@@ -152,9 +185,13 @@
             root.innerHTML = `
                 <div class="affilio-panel affilio-panel-warning">
                     <h2>${t('Offer Marketplace', 'Marketplace Offerte')}</h2>
-                    <p>${t('Could not load offers from the Affilio API.', 'Impossibile caricare le offerte dall\'API di Affilio.')}</p>
+                    <p class="affilio-field-error" role="alert" tabindex="-1">${t('Could not load offers from the Affilio API.', 'Impossibile caricare le offerte dall\'API di Affilio.')}</p>
+                    <p><button class="button button-primary" data-primary-action data-retry>${t('Retry', 'Riprova')}</button></p>
                 </div>
             `;
+            const alert = root.querySelector('[role="alert"]');
+            if (alert) alert.focus();
+            root.querySelector('[data-retry]').addEventListener('click', load);
         }
     };
 

@@ -1,0 +1,14 @@
+{
+ "failed_action": "",
+ "fallback_url": "https://fattura-lampo.example/",
+ "id": "9c000001-0000-4000-8000-000000000001",
+ "placement": {
+  "surface_url": "https://victormotricala.it/come-fatturare-da-freelance-2026/"
+ },
+ "plugin_failed_reason": "",
+ "plugin_state": "pending",
+ "policy_rule_id": "category:invoicing",
+ "policy_rule_text": "The category is invoicing.",
+ "status": "revoked",
+ "surface_url": "https://victormotricala.it/come-fatturare-da-freelance-2026/"
+}

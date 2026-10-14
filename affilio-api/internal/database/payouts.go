@@ -250,8 +250,8 @@ type OfferEarnings struct {
 
 // MakerEarnings aggregates the demand side's activity per offer so the maker
 // sees clicks, conversions, gross revenue, and the commission they owe.
-func (d *DB) MakerEarnings(ctx context.Context, makerID string) ([]OfferEarnings, error) {
-	rows, err := d.Pool.Query(ctx, `
+func (d *DB) MakerEarnings(ctx context.Context, makerID, offerID string) ([]OfferEarnings, error) {
+	query := `
 SELECT o.id, p.name, o.status, o.commission_currency,COALESCE(cv.payment_mode,'none'),
        COALESCE(cl.clicks, 0),
        COALESCE(cv.sales, 0), COALESCE(cv.refunds, 0),
@@ -274,8 +274,14 @@ LEFT JOIN (
     FROM conversions
     GROUP BY offer_id,payment_mode
 ) cv ON cv.offer_id = o.id
-WHERE p.maker_id=$1
-ORDER BY o.created_at DESC`, makerID)
+WHERE p.maker_id=$1`
+	args := []any{makerID}
+	if offerID != "" {
+		query += ` AND o.id=$2`
+		args = append(args, offerID)
+	}
+	query += ` ORDER BY o.created_at DESC`
+	rows, err := d.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

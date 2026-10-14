@@ -1,0 +1,4 @@
+This fixture is the editor re-save of a 0.1.13 placement block.
+It was produced by @wordpress/blocks serialize(parse(legacyMarkup)) after registerCoreBlocks() from @wordpress/block-library, with DOM globals from jsdom.
+The legacy markup is a wp:paragraph whose inner HTML starts with <!-- distributoor-placement:<id> --> immediately before the <p>.
+Regenerate it with: node affilio-wp/tests/block-roundtrip/roundtrip.mjs

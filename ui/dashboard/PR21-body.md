@@ -1,0 +1,191 @@
+<!-- CURSOR_AGENT_PR_BODY_BEGIN -->
+## Summary
+
+Backend for D-032 agent entry and the D-031 approval policy, plus the later interface decisions the UI is built against. Additive only. Migrations `018_d032_agent_entry.sql` through `029_d032_post_url.sql`. No deploys. The WordPress plugin that removes and re-inserts the block is not in this PR. There is no push channel; clients poll.
+
+## Interface the UI uses
+
+1. Approvals return `policy_rule_id` (`hard_checks_passed` or `category:invoicing`) and `policy_rule_text`, a sentence the server writes.
+2. Undo is `POST /v1/placements/:id/revoke` with `{"reason":"undo"}`. It takes effect in that request in the API and in MCP. There is no delay. That records a `placement_undo` event. When the placement is `failed` with `failed_action` `restored`, that same undo sets `plugin_state` to `pending`, clears `failed_action`, stops the go link, and leaves the placement out of Live now. It becomes `removed` only on a verified plugin acknowledgement `action: removed`, `offline` after 10 minutes with no acknowledgement, or `failed` with `failed_action` `removed` on a failed acknowledgement. Digest totals, site totals, and Live now exclude that failed restore. `placed` and `removed` are stored only by that verified plugin acknowledgement. Revoke, restore, retry, pause, and the kill switch do not set them.
+3. `POST /v1/placements/:id/restore` applies only to that placement id, and only within 6 seconds of its server undo timestamp. After that it returns 409 `{"reason":"window_expired","message":"The restore window has expired."}`. Only the same user and key identity that undid it may call it. Anyone else, including the other side, gets 403. If Pause or the kill switch was turned on for that site, offer, or account at any point after the undo, including when it is still on, restore returns 409 `{"reason":"paused","message":"Pause or the kill switch was turned on after the undo."}`. The 409 reasons are `window_expired`, `paused`, and `not_failed`. Every 409 from that enum returns `{reason, message}`, and `message` is the plain-English text. Every 422 returns `{check_id, check_text}`. They live in one enum, and `/llms.txt` and `/docs/modes.md` render it the same way they render the hard checks. The server re-runs every hard check. It also evaluates the current 30-day cap and the current minimum relevance against the score stored when the placement was approved. A failing check returns 422 `{check_id, check_text}` and leaves the placement revoked. Success restores the pre-undo status, keeps `approved_by`, sets `restored_by`, and records a `placement_restore` event. After a successful restore, `plugin_state` is `pending` until the site key acknowledges it.
+4. The same revoke is allowed for the site owner or the offer's maker. `revoked_by_side` is `publisher` or `maker`.
+5. `POST /v1/account/pause` takes `{"scope":"all"|"site"|"offer","id?"}`. The server sets manual mode on every site and offer in that scope and pauses unpublished policy approvals. Any key may pause. `POST /v1/account/resume` uses the same body and is session-only (403 with any key).
+6. `earnings` is null when that scope has no test-mode rows, and 0 when those rows add up to zero. This is the number on account digest totals and on each project.
+7. Setup and digest payloads include `session: {signed_in: bool}`. Setup also includes `human_login`.
+8. Setup includes `mode_preselected`, derived by the server from `install_path`.
+9. `GET /v1/go/<placement_id>` always returns 302, including for an unknown id, and never a 404 or a 5xx page. A ref is attached and a hit is recorded only when `placement_counts_as_live` is true. Revoked, pending undo, paused (`all`, `site`, or `offer`), kill switch, offline, failed, and removed placements redirect to the offer's plain URL with no ref and no hit. When the offer itself is not live, the redirect is the placement `post_url`, or the site home when `post_url` is missing. An unknown id redirects to the site home when `?via=plugin` carries that site's key, and otherwise to the Offer Rails home page. Every go-link response, tracked or not, sends `Cache-Control: no-store` and `X-Robots-Tag: noindex, nofollow`. `GET /v1/go/<placement_id>?via=plugin` with `X-API-Key` accepts `X-OR-Client-Hash`, `X-OR-User-Agent`, and `X-OR-Referer` for hit dedup and bot filtering, and only when that key matches the placement's site. `X-OR-Client-Hash` is the lowercase hex SHA-256 of the truncated address (`/24` for IPv4, `/48` for IPv6) plus a per-site salt that rotates at 00:00 UTC. Dedup uses that hash plus the user agent, scoped to the site. Without a matching site key those headers are ignored and the connection address is truncated and hashed in memory with a server salt from `API_KEY_SECRET` that rotates at 00:00 UTC. The raw address is never stored and is scrubbed from request logs, access logs, and error reports. Do not send `X-OR-Client-IP`. The placement payload includes `fallback_url`, the plain offer URL. The campaign tracking-code URL `GET /v1/go/<code>?placement=` is unchanged: a revoked placement returns 410 `{"error":"link unavailable","reason":"revoked"}` with no `Location` and no click, and a failed restore returns 410 `reason: failed` until a verified `placed` acknowledgement.
+10. Every placement in `GET /v1/digest`, `GET /v1/account/digest`, and `GET /v1/placements/:id` includes `plugin_state`. It is never null. The only values are `pending`, `placed`, `removed`, `offline`, and `failed`. A brand-new placement is `pending` until the site key's first `POST /v1/placements/:id/plugin-ack` with `{"action":"restored"}`, which sets `placed`. After a restore it is `pending` again until that same acknowledgement. After a revoke it is `pending`, then `removed` on `{"action":"removed"}`, or `offline` after `PLUGIN_OFFLINE_AFTER` (default 10 minutes) with no acknowledgement. `offline` is only that missing acknowledgement. `{"action":"failed","reason"}` stores `plugin_failed_reason` and `failed_action` (`removed` or `restored`) and sets `plugin_state` to `failed`. Retry repeats only that action. A later verified acknowledgement for the same action clears the failure. Placement reads and both digests include `plugin_failed_reason` and `failed_action`. Offers do not get those fields. A poll does not change the state.
+11. A 422 from restore, retry, decide, or publisher accept is `{"check_id","check_text"}`. `check_id` is one of `disclosure`, `rel_sponsored`, `claims_from_offer`, `copy_length`, `one_per_post`, `relevance_min`, `offer_live`, `revoke_path`, `cap`. That list and its text live in `HardCheckCatalog`. `/llms.txt` and `/docs/modes.md` render the section from that catalog. `GET /v1/policy/hard-checks` returns the same pairs. When more than one check fails, the body is the earliest id in that order.
+12. There is no push channel. Clients poll `GET /v1/placements/:id`. The read selects `status`, `plugin_wait`, `plugin_wait_at`, `plugin_failed_reason`, and `failed_action` from `placement_proposals` by primary key and does not join another table. The rate limit allows at least one request every 4 seconds per placement per session.
+
+## What the plugin calls later
+
+This PR does not change the WordPress plugin. The merged plugin should poll; nothing is pushed.
+
+- A brand-new placement is `pending`. When the block is in the post, `POST /v1/placements/:id/plugin-ack` with the site key and `{"action":"restored"}`. The state becomes `placed`. That call does not create a post revision.
+- After an undo, `plugin_state` is `pending`. Remove the block with no post revision, then the same endpoint with `{"action":"removed"}`. If that acknowledgement does not arrive within 10 minutes, the state becomes `offline`. A later `removed` acknowledgement still moves `offline` to `removed`.
+- After a restore, `plugin_state` is `pending`. Re-insert the block with no post revision, then `{"action":"restored"}`. The state becomes `placed`.
+- If the post re-read still fails after one retry, call `plugin-ack` with `{"action":"failed","reason":"..."}`. `plugin_state` becomes `failed` and `plugin_failed_reason` stores that reason. `offline` stays the 10-minute outcome of no acknowledgement. A later verified `removed` or `restored` acknowledgement for the pending action clears the failure.
+- The publisher retries with `POST /v1/placements/:id/retry`, using the owner session or the site key. The other side receives 403. Retry repeats only `failed_action`. Any other state returns 409 `{reason: not_failed, message}`. A failed removal re-queues only the removal: `pending`, then `removed`. It does not re-run hard checks, it does not become `placed`, and the go link stays stopped. A failed restore re-runs every hard check. A failure returns 422 `{check_id, check_text}` and leaves the placement failed. Success re-queues the restore: `pending`, then `placed`. A failed restore is not live: the go link stops, and digest totals, site totals, and Live now exclude it, including the went-live count and earnings from its clicks, until a verified `restored` acknowledgement sets `placed`.
+- Leave a failed restore removed with the same undo. `plugin_state` becomes `pending` in that request, `failed_action` is cleared, the go link stops, and the placement does not count as live. It becomes `removed` only on `{"action":"removed"}`, `offline` after 10 minutes with no acknowledgement, or `failed` with `failed_action` `removed` on `{"action":"failed","reason":"..."}`. `placed` and `removed` are stored only by that verified plugin acknowledgement. Revoke, restore, retry, pause, and the kill switch do not set them. Removing the block does not create a post revision.
+- Poll `GET /v1/placements/:id` for `status`, `plugin_state`, `plugin_failed_reason`, `failed_action`, and `fallback_url`. At least one request every 4 seconds per placement per session is allowed. `fallback_url` is the offer's plain URL, so the plugin can cache it. The status SQL stays a single-table read; `fallback_url` is a second query.
+- The merged plugin will serve `/go/<placement_id>` on the publisher site, call `GET /v1/go/<placement_id>?via=plugin` with the site key and a 1.5 second timeout, without following redirects, and forward the `Location`. This PR does not add that WordPress proxy. Send `X-OR-Client-Hash`, `X-OR-User-Agent`, and `X-OR-Referer`. The hash is the lowercase hex SHA-256 of the truncated reader address (`/24` for IPv4, `/48` for IPv6) joined with `|` to a per-site salt that rotates at 00:00 UTC. The salt is the lowercase hex SHA-256 of `siteSecret + "|go-link|" + YYYY-MM-DD`. Those headers count only when the key matches the placement's site. Do not send the raw address.
+
+## Items
+
+1. **Device-code sign-in.** `POST /v1/device/code` returns `device_code`, `user_code`, `verification_uri`, `interval` (5s), and `expires_in` (300s). `POST /v1/device/token` returns `authorization_pending`, `slow_down`, `expired`, or `access_denied`. `POST /v1/device/approve` requires a signed-in owner session. Approval issues an 8-hour project key and sets `human_login=true`. User codes are single-use. Tests: `TestDeviceSignIn`.
+2. **Agent-only accounts.** `POST /v1/agent-accounts` creates a publisher or maker with `agent_only=true`. `GET /v1/agent-signals` (admin) reports the two groups separately. Tests: `TestAgentOnlyAccountsAreSeparate`.
+3. **Setup settings.** `GET`/`PUT /v1/setup/settings` stores maker and publisher answers, the mode shown, the chosen mode, the owner id, and the timestamp. The response includes `mode_preselected` from `install_path`, `human_login`, and `session.signed_in`. Default mode is `yolo` for `cli`, `cursor`, `connector`, and `grok`, and `manual` for `chatgpt_dir` and `claude_dir`. An API key cannot save setup. Tests: `TestSetupSettings`, `TestDefaultModeByInstallPath`, `TestUIInterface`.
+4. **D-031 policy engine.** Per-site and per-offer mode: `manual` | `auto` | `yolo`. Hard checks always run. Approvals store `approved_by`, `policy_version`, and `matched_rule`, and the response adds `policy_rule_id` and `policy_rule_text`. A project key or an account key can only make things stricter. Loosening a mode, raising a cap, or lowering minimum relevance returns 403. A hard-check failure returns 422 `{"check_id","check_text"}`. Tests: `TestPolicyEngineHTTP`, `TestPresentRule`, `TestUIInterface`, `TestSessionOnlyActions`, `TestEveryHardCheckReturns422`.
+5. **Listing cards.** `POST /v1/listing-cards` rejects unknown fields, oversized bodies, source-like text, and secret-like keys. Tests: `TestListingCard`, `TestListingUploadAcceptsCard`, `TestListingUploadRejectsSchemaAndSecrets`.
+6. **Events and digest.** `POST /v1/events` records `digest_opened` and `dashboard_opened`. `GET /v1/digest` and `GET /v1/account/digest` include `session.signed_in` and `plugin_state` on each placement. An undone placement stays in the digest as `pending` instead of disappearing. Undo is the placement revoke with `reason=undo` and takes effect immediately. Restore is `POST /v1/placements/:id/restore`. Tests: `TestDigestUndoAndEvents`, `TestUIInterface`, `TestPlacementRestore`, `TestPluginPlacementState`.
+7. **Sources.** `owners.source` allows `cli` and `mcp`. `GET /from/<source>` returns 302 and counts the hit; unknown values count as `direct`. Tests: `TestSourcePathsAndDocs`.
+8. **Docs.** `GET /llms.txt` and `GET /docs/{device-login,settings,listing-card,modes,account}.md`. The hard-check section, the restore-refusal section, and the plugin-retry section in `/llms.txt` and `/docs/modes.md` are generated from `HardCheckCatalog`, `RestoreRefusals`, and `PluginRetryDoc`. `TestHardCheckDocsFollowTheCatalog` fails if an id, a refusal, or the retry path is missing. Tests: `TestSourcePathsAndDocs`, `TestHardCheckDocsFollowTheCatalog`.
+9. **API parity.** Every setup, dashboard, and digest action and number is a row in `internal/entry/parity.go`. `TestDocumentedScreenActionsHaveEndpoints` fails when a row's method and path are not mounted, and it fails unless the four session-only rows are marked and no other row is. Resume is the session-only kill switch. Restore, leaving a failed restore removed, plugin acknowledgement, plugin retry, and the placement status poll are not session-only. The parity table is below.
+10. **Two kinds of key.** A project key is valid for one site or one offer. An account key is created, listed, and revoked only from a signed-in dashboard session. Creating an account-wide key is session-only. Pause accepts either key. Resume does not. Tests: `TestProjectKeyAndAccountKeyBoundaries`, `TestSessionOnlyActions`, `TestUIInterface`.
+11. **Account digest.** `GET /v1/account/digest` returns account totals and one block per site and offer. `earnings` is null with no test-mode rows and 0 when those rows add up to zero. Publisher amounts are ledger rows joined to `payment_mode=test` conversions. Maker amounts are `commission_amount` on those conversions. Live and legacy rows are omitted. Went-live counts a placement only when `plugin_state` is `placed` and its go link is redirecting. That is the `placement_counts_as_live` view, shared by Live now, site totals, digest went-live, and account totals. Digest totals, site totals, and Live now still exclude a failed restore, including that went-live count and earnings from its clicks, until a verified `restored` acknowledgement. Tests: `TestProjectKeyAndAccountKeyBoundaries`, `TestUIInterface`, `TestPlacementLiveCountExclusions`.
+12. **Session-only actions.** Loosening the approval mode, raising a cap or lowering minimum relevance, resuming a pause, and creating an account-wide key. `TestSessionOnlyActions` tries each with a project key and an account key, with and without the session cookie, and expects 403. The same keys can tighten a mode, lower a cap, raise minimum relevance, and pause.
+13. **Immediate undo and a 6-second restore.** MCP tools `undo_placement` and `restore_placement` call the API in the same request. Restore uses an injectable clock. Within the window the same key succeeds. At 7 seconds the same key gets 409 `reason: window_expired`. The other side, including a session after a key undo, gets 403. A hard check that now fails (offer paused, `offer_live`) returns 422 `{"check_id","check_text"}` and leaves the placement revoked. An undo with no restore stays revoked. Tests: `TestPlacementRestore`, `TestUndoAndRestoreToolsCallImmediately`.
+14. **Pause history, restore-time limits, revoked go links, and plugin state.** A site, offer, or account pause at or after the undo returns 409 `reason: paused`, including after that pause is resumed. The cap and minimum relevance are the policy values at restore time. A cap lowered to 0 returns 422 `cap`. A minimum raised above the stored score returns 422 `relevance_min`. A revoked campaign tracking code returns 410 immediately and redirects again after restore. `GET /v1/go/<placement_id>` always returns 302. `plugin_state` is `pending`, `placed`, `removed`, `offline`, or `failed`, and the field is never null. `POST /v1/placements/:id/plugin-ack` takes the site key and `{"action":"removed"|"restored"|"failed"}`. Tests: `TestRestorePauseAndLimits`, `TestRevokedGoLink`, `TestPluginPlacementState`, `TestPluginState`, `TestPluginStateNeverEmpty`.
+15. **Plugin failure and publisher retry.** `failed` beats the 10-minute offline window. The failed acknowledgement stores `failed_action` as `removed` or `restored`. Retry repeats only that action. A failed removal does not re-run hard checks, ends `removed`, never becomes `placed`, and the go link stays stopped. A failed restore re-runs every hard check and returns 422 `{check_id, check_text}` when one now fails. Any other state returns 409 `{reason, message}` with `not_failed`. The 409 reasons are `window_expired`, `paused`, and `not_failed`, and every one of those bodies has a non-empty `message`. A failed restore is not live until a verified `restored` acknowledgement. Digest totals, site totals, and Live now exclude it. Leaving that failure removed sets `plugin_state` to `pending`. It becomes `removed` only on a verified `removed` acknowledgement, `offline` after 10 minutes with no acknowledgement, or `failed` with `failed_action` `removed` on a failed acknowledgement. Digest totals, site totals, and Live now still exclude the failed restore. `placed` and `removed` are stored only by a verified plugin acknowledgement. Tests: `TestPluginFailureAndRetry`, `TestEveryConflictHasAMessage`, `TestFailedRestoreIsNotLive`, `TestLeaveFailedRestoreRemoved`, `TestPlacedAndRemovedOnlyFromPluginAck`, `TestPluginState`, `TestRestoreRefusalsAreTheOnlyList`.
+16. **Hard-check catalog and the status poll.** `HardCheckCatalog` is the only list of check ids and text. Every id has a test that triggers its 422. `GET /v1/placements/:id` is the poll. Its SQL has no join. The limiter allows one request per 4 seconds per placement per session, and a second session can poll the same placement inside that window. Tests: `TestEveryHardCheckReturns422`, `TestHardCheckCatalogIsTheOnlyList`, `TestPlacementStatusPollAllowsFourSeconds`, `TestHardCheckDocsFollowTheCatalog`.
+
+## Parity table
+
+| Screen | Action or number | Endpoint | Access |
+| --- | --- | --- | --- |
+| setup | Read the saved answers | `GET /v1/setup/settings` | |
+| setup | Number: preselected mode | `GET /v1/setup/settings` | |
+| setup | Save maker answers (what to promote, topics to avoid, commission, mode) | `PUT /v1/setup/settings` | |
+| setup | Save publisher answers (sites and channels, topics never promoted, box position, mode) | `PUT /v1/setup/settings` | |
+| setup | Approve the device code | `POST /v1/device/approve` | |
+| setup | Deny the device code | `POST /v1/device/approve` | |
+| setup | Session signed in and human login | `GET /v1/setup/settings` | |
+| setup | Preselected mode from the install path | `GET /v1/setup/settings` | |
+| dashboard | List sites and offers with their mode | `GET /v1/account/projects` | |
+| dashboard | Number: mode on each project | `GET /v1/account/projects` | |
+| dashboard | Read a site policy | `GET /v1/sites/:id/mode` | |
+| dashboard | Number: minimum relevance | `GET /v1/sites/:id/mode` | |
+| dashboard | Number: maximum new placements per 30 days | `GET /v1/sites/:id/mode` | |
+| dashboard | Save a site mode and policy | `PUT /v1/sites/:id/mode` | |
+| dashboard | Loosen the approval mode (manual to auto, auto to yolo, or manual to yolo) | `PUT /v1/sites/:id/mode` | session-only |
+| dashboard | Raise a cap or lower minimum relevance | `PUT /v1/sites/:id/mode` | session-only |
+| dashboard | Read an offer policy | `GET /v1/offers/:id/mode` | |
+| dashboard | Number: minimum site quality | `GET /v1/offers/:id/mode` | |
+| dashboard | Save an offer mode and policy | `PUT /v1/offers/:id/mode` | |
+| dashboard | Turn the kill switch on | `POST /v1/account/pause` | |
+| dashboard | Turn the kill switch off | `POST /v1/account/resume` | session-only |
+| dashboard | Show the hard checks | `GET /v1/policy/hard-checks` | |
+| dashboard | Create an account-wide key | `POST /v1/account-keys` | session-only |
+| dashboard | List account keys | `GET /v1/account-keys` | |
+| dashboard | Revoke an account key | `POST /v1/account-keys/:id/revoke` | |
+| dashboard | Record dashboard opened | `POST /v1/events` | |
+| dashboard | Number: went live | `GET /v1/account/digest` | |
+| dashboard | Number: clicks | `GET /v1/account/digest` | |
+| dashboard | Number: earnings | `GET /v1/account/digest` | |
+| dashboard | Number: clicks by source | `GET /v1/account/digest` | |
+| dashboard | Approval policy rule id and sentence | `POST /v1/placements/:id/decide` | |
+| digest | Account totals (went live, clicks, earnings, clicks by source) | `GET /v1/account/digest` | |
+| digest | Per project went live, clicks, earnings, clicks by source, and an undo token per item | `GET /v1/account/digest` | |
+| digest | Undo a placement as the publisher or the maker | `POST /v1/placements/:id/revoke` | |
+| digest | Leave a failed restore removed | `POST /v1/placements/:id/revoke` | |
+| digest | Restore a placement within 6 seconds of its undo | `POST /v1/placements/:id/restore` | |
+| digest | Plugin acknowledges a removal or a re-insert | `POST /v1/placements/:id/plugin-ack` | |
+| digest | Retry the plugin action that failed | `POST /v1/placements/:id/retry` | |
+| digest | Poll a placement status | `GET /v1/placements/:id` | |
+| digest | Session signed in | `GET /v1/account/digest` | |
+| digest | Record digest opened | `POST /v1/events` | |
+| digest | List what went live since the last digest open | `GET /v1/digest` | |
+
+## Endpoint table (for the CLI/MCP in part B)
+
+| Method | Path | Auth | Notes |
+| --- | --- | --- | --- |
+| POST | `/v1/device/code` | none | `{device_code, user_code, verification_uri, interval, expires_in}` |
+| POST | `/v1/device/token` | none | 200 `{access_token, token_type, key_header, scope, expires_in}` or 400 `{error, interval}` |
+| POST | `/v1/device/approve` | owner session | `{user_code, decision: approve\|deny, scope: site\|offer, project_id}` |
+| POST | `/v1/agent-accounts` | none | `{role, name, email, domain?, source?}`. Returns the key once, `agent_only: true` |
+| GET | `/v1/agent-signals` | `X-Admin-Key` | `{agent_only, human_login}` |
+| GET | `/v1/setup/settings` | owner session or project/account key | `mode_preselected`, `human_login`, `session.signed_in` |
+| PUT | `/v1/setup/settings` | owner session | A key is 403. Response includes the same setup flags |
+| GET | `/v1/sites/:id/mode` | site key, account key, or owner session | policy JSON |
+| PUT | `/v1/sites/:id/mode` | site key, account key, or owner session | keys may only tighten |
+| POST | `/v1/account/pause` | any key or owner session | `{scope: all\|site\|offer, id?}`. Manual mode and paused unpublished approvals for every target in scope. Recorded so a later restore can see it |
+| POST | `/v1/account/resume` | owner session only | same body. 403 with any key. Restores the mode from before the pause. Does not erase the pause history |
+| GET | `/v1/offers/:id/mode` | offer key, account key, or owner session | includes `min_site_quality` |
+| PUT | `/v1/offers/:id/mode` | offer key, account key, or owner session | keys can only tighten |
+| POST | `/v1/placements/:id/decide` | site key or account key | response includes `policy_rule_id` and `policy_rule_text`. A hard-check failure is 422 `{check_id, check_text}` |
+| POST | `/v1/offers/:id/accept` | offer key or account key | same approval fields. A hard-check failure is 422 `{check_id, check_text}` |
+| POST | `/v1/placements/:id/revoke` | site owner or the offer's maker | `{"reason":"undo"}` revokes immediately, stops the go link, and records `placement_undo` and `revoked_by_side`. A live placement becomes `pending`. A failed restore becomes `pending`, not `removed`, and stays out of Live now. `removed` arrives only on a verified plugin acknowledgement. `placed` and `removed` are never set by revoke, restore, retry, pause, or the kill switch |
+| POST | `/v1/placements/:id/restore` | the same user and key that undid it | within 6 seconds. 409 `{reason, message}` with `window_expired` after the window or `paused` after a later pause, 403 for anyone else, 422 `{check_id, check_text}` when a hard check, the current cap, or the current minimum relevance fails. Success sets `plugin_state` to `pending` |
+| POST | `/v1/placements/:id/plugin-ack` | site key | `{"action":"removed"\|"restored"\|"failed"}`. `failed` requires `reason` and sets `plugin_state` to `failed`. A later verified `removed` or `restored` acknowledgement clears it. 403 without a site key. 409 when that action is not waiting |
+| POST | `/v1/placements/:id/retry` | publisher session or site key | repeats only `failed_action`. Removal: no hard checks, `pending` then `removed`, go link stays stopped. Restore: re-runs hard checks, 422 `{check_id, check_text}` or `pending` then `placed`. 409 `{reason, message}` with `not_failed` otherwise. A failed restore stays dark until `placed` |
+| GET | `/v1/placements/:id` | site key or owner session | cheap poll. The status SQL has no joins. `{id, status, plugin_state, plugin_failed_reason, failed_action, fallback_url}`. `fallback_url` is a second query, the offer's plain URL. At least one request per 4 seconds per placement per session. `plugin_state` is never null |
+| GET | `/v1/go/:code` | none for a campaign code; site key when `?via=plugin` | a placement id (UUID) always returns 302. A hit and a ref are recorded only when `placement_counts_as_live` is true. Clicks-off states redirect to the plain offer URL with no ref and no hit. An offer that is not live redirects to `post_url`, or the site home. An unknown id redirects to the site home when `?via=plugin` has that site's key, otherwise the Offer Rails home. `X-OR-Client-Hash`, `X-OR-User-Agent`, and `X-OR-Referer` are used only when the site key matches the placement. The hash is SHA-256 of the `/24` or `/48` prefix plus a daily 00:00 UTC salt. Every response sends `Cache-Control: no-store` and `X-Robots-Tag: noindex, nofollow`. The raw address is never stored or logged. A campaign tracking code still returns 410 `reason: revoked` or `reason: failed` with no redirect and no click |
+| POST | `/v1/listing-cards` | maker key, offer key, account key, or owner session | `{card, signals, score, payments_check, offer_link_health}` |
+| GET | `/v1/listing-cards/:id` | same maker scope | |
+| POST | `/v1/account-keys` | owner session only | 403 if any API key or bearer token is sent |
+| GET | `/v1/account-keys` | owner session only | prefix and revoked state, never the secret |
+| POST | `/v1/account-keys/:id/revoke` | owner session only | |
+| GET | `/v1/account/projects` | owner session or account key | project key is 403 |
+| GET | `/v1/account/digest` | owner session or account key | `earnings` is null or a number. `session.signed_in`. `went_live` is Live now, the site total, and the account total, and it reads `placement_counts_as_live`. A placement counts only when `plugin_state` is `placed` and the go link is redirecting. Digest totals, site totals, and Live now exclude a failed restore. Placements include `plugin_state`, `plugin_failed_reason`, and `failed_action`. `plugin_state` is never null |
+| GET | `/v1/policy/hard-checks` | none | `{checks:[{check_id, check_text}]}` from `HardCheckCatalog` |
+| POST | `/v1/events` | owner session | `{kind: digest_opened\|dashboard_opened}` |
+| GET | `/v1/digest` | owner session | items since the last `digest_opened`, plus placements still waiting on the plugin. `session.signed_in`. Placements include `plugin_state`, `plugin_failed_reason`, and `failed_action`. `plugin_state` is never null. Digest went-live uses `placement_counts_as_live`. Digest totals, site totals, and Live now exclude a failed restore |
+| GET | `/from/:source` | none | 302 to the landing page; hit counted server-side |
+| GET | `/llms.txt` | none | markdown, including the hard-check, restore-refusal, and plugin-retry sections generated from the catalogs |
+| GET | `/docs/:name` | none | `device-login.md`, `settings.md`, `listing-card.md`, `modes.md`, `account.md`. `modes.md` appends the same three sections |
+
+Project keys stay limited to one site or one offer. Account keys are sent as `X-API-Key` for the publisher site or `X-Maker-Key` for every offer on the maker. They still cannot skip a hard check, loosen a mode, raise a cap, lower minimum relevance, or resume a pause.
+
+## Hard checks
+
+| check_id | check_text |
+| --- | --- |
+| `disclosure` | Add a disclosure. |
+| `rel_sponsored` | Add rel=sponsored. |
+| `claims_from_offer` | Use only claims from the offer. |
+| `copy_length` | Keep the copy to 140 characters. |
+| `one_per_post` | Keep one box on this post. |
+| `relevance_min` | Relevance is below the minimum. |
+| `offer_live` | The offer is not live. |
+| `revoke_path` | The revoke path is not available. |
+| `cap` | The placement cap is full. |
+
+## 409 reasons
+
+Every 409 from this list returns `{reason, message}`. Every 422 returns `{check_id, check_text}`.
+
+| reason | text |
+| --- | --- |
+| `window_expired` | The restore window has expired. |
+| `paused` | Pause or the kill switch was turned on after the undo. |
+| `not_failed` | The placement is not failed. |
+
+## Live count
+
+A placement counts as live only when both are true: `plugin_state` is `placed`, and its go link is currently redirecting. `placed` is stored only by a verified plugin acknowledgement. The go link is redirecting when the placement is still committed, not expired, the offer is listed, the campaign is active, Pause is off for that site and that offer, and the kill switch is off. Pending, failed, offline, removed, paused (`all`, `site`, and `offer`), kill switch, and revoked-but-plugin-still-placed placements are out of the count. Live now, site totals, digest went-live, and account totals all use the `placement_counts_as_live` view. Listed offers are not placements. Digest totals, site totals, and Live now still exclude a failed restore, including earnings from its clicks, until a verified `restored` acknowledgement. Tests: `TestPlacementLiveCountExclusions`.
+
+## Migrations
+
+- `018_d032_agent_entry.sql` adds device codes, project keys, setup, policies, listing cards, events, undo tokens, and `cli`/`mcp` sources.
+- `019_d032_account_keys.sql` adds `account_keys`.
+- `020_d032_kill_switch.sql` adds `approval_policies.kill_switch` and `mode_before_kill`.
+- `021_d032_interface.sql` adds `placement_proposals.revoked_by_side` (`publisher` or `maker`).
+- `022_d032_restore.sql` adds the undo timestamp, the undoing identity, `status_before_undo`, `restored_by`, and the `placement_restore` event.
+- `023_d032_plugin_restore.sql` adds `pause_activations`, the stored relevance score, and `plugin_wait`, `plugin_wait_at`, and `plugin_contact_at` on placements.
+- `024_d032_plugin_placed.sql` allows `plugin_wait` value `placed`.
+- `025_d032_plugin_failed.sql` adds `placement_proposals.plugin_failed_reason`.
+- `026_d032_failed_action.sql` adds `placement_proposals.failed_action` (`removed` or `restored`).
+- `027_d032_restore_unconfirmed.sql` holds a failed restore out of Live now, the went-live count, attributed earnings, and the go link until it is confirmed `placed`. Digest totals, site totals, and Live now exclude that placement.
+- `028_d032_placement_live.sql` adds the `placement_counts_as_live` view. Live now, site totals, digest went-live, and account totals all read it. A placement counts only when a verified acknowledgement stored `placed` and the go link is redirecting. The placement go link records a hit only when this view matches.
+- `029_d032_post_url.sql` stores `placement_proposals.post_url`. When the offer itself is not live, `GET /v1/go/<placement_id>` redirects there, or to the site home when it is missing.
+
+## Tests
+
+`go test ./...` with the test database and the isolated `affilio_migration_test` database. Migration history count is 29. Coverage on this revision is 68.5% (gate 25%). `TestUIInterface` covers the earlier UI decisions. `TestPlacementRestore` covers the 6-second window, the other side, a failing hard check (`offer_live`), and an undo that is left revoked. `TestRestorePauseAndLimits` covers pause-then-restore 409, a resumed pause that still blocks, a raised minimum relevance 422 (`relevance_min`), and a lowered cap 422 (`cap`). `TestRevokedGoLink` covers the immediate 410 and the redirect after restore. `TestPluginPlacementState` and `TestPluginStateNeverEmpty` cover `pending`, `placed`, `removed`, `offline`, and `failed`, and that `plugin_state` is never null. `TestPluginFailureAndRetry` covers a failed removal that ends `removed`, never `placed`, with the go link stopped throughout; a failed restore whose check now fails returning 422; and 409 `not_failed` when the placement is not failed. `TestEveryConflictHasAMessage` checks that every 409 is `{reason, message}` with a non-empty `message`. `TestFailedRestoreIsNotLive` checks that a failed restore does not redirect and is left out of digest totals, site totals, and Live now, including the went-live count and earnings, then redirects and counts again after retry plus a verified `restored` acknowledgement. `TestLeaveFailedRestoreRemoved` checks that undo of a failed restore sets `pending`, stops the go link, and stays out of digest totals, site totals, and Live now, then becomes `removed` on a verified acknowledgement, `offline` after 11 minutes, or `failed` with `failed_action` `removed` on a failed acknowledgement. `TestPlacedAndRemovedOnlyFromPluginAck` scans every `plugin_wait` write and asserts `placed` and `removed` are stored only by the verified plugin acknowledgement. `TestRestoreRefusalsAreTheOnlyList` locks the 409 reasons to `window_expired`, `paused`, and `not_failed`. `TestEveryHardCheckReturns422` triggers a 422 for every catalog id. `TestPlacementStatusPollAllowsFourSeconds` covers the join-free poll and the 4-second session limit. `TestPlacementLiveCountExclusions` checks each exclusion from `placement_counts_as_live`: pending, failed, offline, removed, pause for `all`, `site`, and `offer`, the kill switch, and revoked while the plugin is still `placed`. A placed placement whose go link redirects is the only one that counts. `TestPlacementGoLink` checks a 302 target for every clicks-off state, `post_url` when the offer is not live, zero hits in each of those, a tracked hit only when the placement is live, forwarded reader headers ignored without a matching site key, and a 302 (never 404 or 5xx) for an unknown id. `TestGoLinkStoresNoRawIP` checks that a click stores the truncated daily hash and that the row and the logs contain no raw address. `TestGoLinkRateLimitKeepsHeaders` checks the 429. Placement redirects, campaign redirects, 410, 400, 404, HEAD, and the rate limit all require `Cache-Control: no-store` and `X-Robots-Tag: noindex, nofollow`. `TestRevokedGoLink` and `TestFailedRestoreIsNotLive` still use the campaign tracking-code URL, which returns 410.
+
+<!-- CURSOR_AGENT_PR_BODY_END -->
+
+<div><a href="https://cursor.com/agents/bc-e9ad237b-e19e-5443-b3e3-6e0ffcf3976c?cursor_ref=pr_footer&cursor_cta=open_in_web"><picture><source media="(prefers-color-scheme: dark)" srcset="https://cursor.com/assets/images/open-in-web-dark.png"><source media="(prefers-color-scheme: light)" srcset="https://cursor.com/assets/images/open-in-web-light.png"><img alt="Open in Web" width="114" height="28" src="https://cursor.com/assets/images/open-in-web-dark.png"></picture></a>&nbsp;<a href="https://cursor.com/background-agent?bcId=bc-e9ad237b-e19e-5443-b3e3-6e0ffcf3976c&cursor_ref=pr_footer&cursor_cta=open_in_cursor"><picture><source media="(prefers-color-scheme: dark)" srcset="https://cursor.com/assets/images/open-in-cursor-dark.png"><source media="(prefers-color-scheme: light)" srcset="https://cursor.com/assets/images/open-in-cursor-light.png"><img alt="Open in Cursor" width="131" height="28" src="https://cursor.com/assets/images/open-in-cursor-dark.png"></picture></a>&nbsp;</div>
+

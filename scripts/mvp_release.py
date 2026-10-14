@@ -4,6 +4,7 @@ import base64
 import io
 import json
 from pathlib import Path, PurePosixPath
+import re
 import subprocess
 import sys
 import tarfile
@@ -25,13 +26,52 @@ ASSETS = (
     "THIRD_PARTY_NOTICES.md",
 )
 WP_FILES = {
-    "affilio/affilio.php", "affilio/includes/class-affilio-api.php",
-    "affilio/includes/class-affilio-editor-proxy.php",
-    "affilio/includes/class-affilio-onboarding.php",
-    "affilio/includes/class-affilio-distribution.php",
-    "affilio/admin/build/onboarding.js", "affilio/admin/build/distribution.js",
-    "affilio/admin/build/distribution.css",
+    "affilio-wp/affilio.php",
+    "affilio-wp/includes/class-affilio-api.php",
+    "affilio-wp/includes/class-affilio-scanner.php",
+    "affilio-wp/includes/class-affilio-inserter.php",
+    "affilio-wp/includes/class-affilio-tracker.php",
+    "affilio-wp/includes/class-affilio-admin.php",
+    "affilio-wp/includes/class-affilio-editor-proxy.php",
+    "affilio-wp/includes/class-affilio-onboarding.php",
+    "affilio-wp/includes/class-affilio-distribution.php",
+    "affilio-wp/includes/class-affilio-cli.php",
+    "affilio-wp/admin/build/onboarding.js",
+    "affilio-wp/admin/build/distribution.js",
+    "affilio-wp/admin/build/distribution.css",
+    "affilio-wp/admin/build/sidebar.js",
+    "affilio-wp/admin/build/discovery.js",
+    "affilio-wp/admin/build/analytics.js",
+    "affilio-wp/admin/build/dashboard.js",
+    "affilio-wp/admin/build/marketplace.js",
+    "affilio-wp/admin/build/earnings.js",
+    "affilio-wp/admin/css/affilio-admin.css",
+    "affilio-wp/readme.txt",
 }
+PLUGIN_ROOT = "affilio-wp/"
+PLUGIN_VERSION = "0.1.24"
+PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
+PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
+HOSTED_BUILD_NAMES = {"home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}
+HOSTED_BUILD_PREFIXES = ("workspace", "landing", "package")
+ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
+DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
+QUOTED_BUILD = re.compile(r"""(['"])([A-Za-z0-9_.-]+\.(?:js|css))\1""")
+JS_DYNAMIC_IMPORT = re.compile(r"""(?<![.\w$])import\s*\(\s*(['"`])([^'"`]+)\1""")
+JS_FROM = re.compile(r"""\bfrom\s+(['"`])([^'"`]+)\1""")
+JS_SIDE_IMPORT = re.compile(r"""(?<![.\w$])import\s+(['"`])([^'"`]+)\1""")
+PHP_LOAD_CONCAT = re.compile(
+    r"""(?<![.\w])(?:require_once|include_once|require|include)\b\s*(?:\(\s*)?"""
+    r"""(?P<base>AFFILIO_PLUGIN_DIR|__DIR__|dirname\s*\(\s*__DIR__\s*(?:,\s*(?P<dir_levels>\d+)\s*)?\)|dirname\s*\(\s*__FILE__\s*(?:,\s*(?P<file_levels>\d+)\s*)?\))\s*\.\s*"""
+    r"""(['"])(?P<path>[^'"]+)\4"""
+)
+PHP_LOAD_LITERAL = re.compile(
+    r"""(?<![.\w])(?:require_once|include_once|require|include)\b\s*(?:\(\s*)?(['"])(?P<path>[^'"]+\.(?:php|inc|js|css))\1"""
+)
+PHP_ENQUEUE = re.compile(
+    r"""wp_enqueue_(?:script|style)\s*\(\s*(?:(['"])[^'"]+\1|\$[A-Za-z_][A-Za-z0-9_]*)\s*,\s*"""
+    r"""(?:AFFILIO_PLUGIN_URL\s*\.\s*|plugins_url\s*\(\s*)?(['"])([^'"]+)\2"""
+)
 SKILLS = {f"package/skills/distributoor-{name}/SKILL.md" for name in ("onboard", "instrument", "launch")}
 MAX_DOWNLOAD = 20 * 1024 * 1024
 
@@ -61,26 +101,58 @@ def run_json(args):
         raise ReleaseError(f"{args[0]} returned an unexpected response; raw output was withheld.") from None
 
 
-def validate_config(values):
+OPEN_PROXIES = {"*", "0.0.0.0/0", "::/0"}
+
+
+def load_env_file(path):
+    values = {}
+    for raw in Path(path).read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+def https_origin(value):
+    parsed = parse.urlsplit(value)
+    return parsed.scheme == "https" and bool(parsed.hostname) and value == f"https://{parsed.netloc}"
+
+
+def validate_config(values, origin=None):
+    generic = origin is not None
+    expected_origin = origin if generic else ORIGIN
+    label = "service" if generic else "Railway"
     names = {
         "DATABASE_URL", "ADMIN_API_KEY", "CONNECTION_ENCRYPTION_KEY",
         "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET",
         "PUBLIC_BASE_URL", "HOST", "PORT", "AUTO_MIGRATE", "ALLOWED_ORIGINS",
-        "RAILWAY_DOCKERFILE_PATH",
+        "API_KEY_SECRET", "GIN_MODE", "TRUSTED_PROXIES",
     }
-    require(isinstance(values, dict) and all(isinstance(v, str) for v in values.values()), "Unexpected Railway variable format.")
+    if not generic:
+        names.add("RAILWAY_DOCKERFILE_PATH")
+    require(isinstance(values, dict) and all(isinstance(v, str) for v in values.values()), f"Unexpected {label} variable format.")
     missing = sorted(name for name in names if not values.get(name, "").strip())
-    require(not missing, "Missing Railway variables: " + ", ".join(missing))
+    require(not missing, f"Missing {label} variables: " + ", ".join(missing))
+    require(https_origin(expected_origin), "PUBLIC_BASE_URL must be an https origin.")
     expected = {
-        "PUBLIC_BASE_URL": ORIGIN, "OIDC_ISSUER": "https://accounts.google.com",
-        "HOST": "0.0.0.0", "PORT": "8080", "AUTO_MIGRATE": "true",
-        "RAILWAY_DOCKERFILE_PATH": "Dockerfile.mvp",
+        "PUBLIC_BASE_URL": expected_origin, "OIDC_ISSUER": "https://accounts.google.com",
+        "HOST": "0.0.0.0", "AUTO_MIGRATE": "true", "GIN_MODE": "release",
     }
+    if generic:
+        require(values["PORT"].isdigit() and 1 <= int(values["PORT"]) <= 65535, "Incorrect service configuration: PORT.")
+    else:
+        expected["PORT"] = "8080"
+        expected["RAILWAY_DOCKERFILE_PATH"] = "Dockerfile.mvp"
     for name, value in expected.items():
-        require(values[name] == value, f"Incorrect Railway configuration: {name}.")
+        require(values[name] == value, f"Incorrect {label} configuration: {name}.")
     require(values["OIDC_CLIENT_ID"].endswith(".apps.googleusercontent.com"), "OIDC_CLIENT_ID must be the Google Web application client ID.")
-    require(set(values["ALLOWED_ORIGINS"].split(",")) == {ORIGIN}, "ALLOWED_ORIGINS must contain only the MVP origin.")
+    require(set(part.strip() for part in values["ALLOWED_ORIGINS"].split(",")) == {expected_origin}, "ALLOWED_ORIGINS must contain only the MVP origin.")
     require(len(values["ADMIN_API_KEY"]) >= 32, "ADMIN_API_KEY must contain at least 32 characters.")
+    require(values["API_KEY_SECRET"] != "dev-secret" and len(values["API_KEY_SECRET"]) >= 32, "API_KEY_SECRET must contain at least 32 characters and must not be the development default.")
+    proxies = [part.strip() for part in values["TRUSTED_PROXIES"].split(",") if part.strip()]
+    require(proxies and OPEN_PROXIES.isdisjoint(proxies), "TRUSTED_PROXIES must list platform proxy ranges and must not trust every address.")
     try:
         valid_key = len(base64.b64decode(values["CONNECTION_ENCRYPTION_KEY"], validate=True)) == 32
     except ValueError:
@@ -100,9 +172,7 @@ def validate_checks(checks):
     require(not failed, "Required GitHub checks are missing, pending or failed: " + ", ".join(failed))
 
 
-def preflight():
-    values = run_json(["railway", "variables", "--project", PROJECT, "--environment", ENVIRONMENT, "--service", SERVICE, "--json"])
-    validate_config(values)
+def git_preflight():
     require(not run(["git", "status", "--porcelain"]), "Commit the working tree before deploying.")
     branch = run(["git", "branch", "--show-current"])
     require(bool(branch), "Deploy from a pushed branch, not a detached checkout.")
@@ -111,6 +181,22 @@ def preflight():
     require(remote.split()[:1] == [sha], "Push the exact commit before deploying.")
     data = run_json(["gh", "api", f"repos/vickhunter/affilio/commits/{sha}/check-runs?per_page=100"])
     validate_checks(data.get("check_runs", []))
+    return sha
+
+
+def preflight(host="railway", env_file=None):
+    if host == "generic":
+        require(env_file is not None, "Generic host checks require --env-file. Names are checked; values are never printed.")
+        values = load_env_file(env_file)
+        origin = values.get("PUBLIC_BASE_URL", "").strip()
+        validate_config(values, origin=origin)
+        sha = git_preflight()
+        print(f"Preflight passed for {sha[:12]} on {origin}.")
+        return sha
+    require(host == "railway", "Deploy and the Railway variable check stay on --host railway.")
+    values = run_json(["railway", "variables", "--project", PROJECT, "--environment", ENVIRONMENT, "--service", SERVICE, "--json"])
+    validate_config(values)
+    sha = git_preflight()
     print(f"Preflight passed for {sha[:12]} on distributoor-mvp.")
     if not values.get("OPERATOR_OWNER_ID"):
         print("Operator access remains pending: set OPERATOR_OWNER_ID after the first real owner login.")
@@ -125,22 +211,198 @@ def archive_names(names):
         require(not any(part in {".git", ".local", "node_modules", ".env"} or part.startswith(".env.") for part in parts), "Archive contains private or development files.")
 
 
+def strip_code_comments(text):
+    kept = []
+    index = 0
+    length = len(text)
+    while index < length:
+        character = text[index]
+        if character in "'\"`":
+            kept.append(character)
+            index += 1
+            while index < length:
+                kept.append(text[index])
+                if text[index] == "\\":
+                    index += 1
+                    if index < length:
+                        kept.append(text[index])
+                        index += 1
+                    continue
+                if text[index] == character:
+                    index += 1
+                    break
+                index += 1
+            continue
+        if text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            kept.append(" ")
+            index = length if end < 0 else end + 2
+            continue
+        if text.startswith("//", index):
+            end = text.find("\n", index)
+            index = length if end < 0 else end
+            continue
+        kept.append(character)
+        index += 1
+    return "".join(kept)
+
+
+def _packaged_reference(base_parts, spec):
+    spec = spec.strip().split("?", 1)[0].split("#", 1)[0].strip()
+    if not spec or spec.startswith("//") or re.match(r"^[a-z][a-z0-9+.-]*:", spec, re.I):
+        return ""
+    if base_parts is None:
+        return None
+    collapsed = []
+    for part in list(base_parts) + [part for part in PurePosixPath(spec).parts if part != "/"]:
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not collapsed:
+                return None
+            collapsed.pop()
+            continue
+        collapsed.append(part)
+    if not collapsed or collapsed[0] != "affilio-wp":
+        return None
+    relative = "/".join(collapsed[1:])
+    if not relative or "." not in PurePosixPath(relative).name:
+        return ""
+    return relative
+
+
+def _remember_reference(needed, outside, relative, label):
+    if relative is None:
+        outside.append(label.strip() or "..")
+    elif relative:
+        needed.add(relative)
+
+
+def _js_references(source_name, text, needed, outside):
+    base = list(PurePosixPath(source_name).parent.parts)
+    specs = []
+    for pattern in (JS_DYNAMIC_IMPORT, JS_FROM, JS_SIDE_IMPORT):
+        specs.extend(match.group(2) for match in pattern.finditer(text))
+    for spec in specs:
+        cleaned = spec.strip()
+        if not cleaned.startswith(("./", "../")):
+            continue
+        _remember_reference(needed, outside, _packaged_reference(base, cleaned), cleaned)
+
+
+def _php_load_base(source_name, match):
+    kind = match.group("base")
+    if kind == "AFFILIO_PLUGIN_DIR":
+        return ["affilio-wp"]
+    parent = list(PurePosixPath(source_name).parent.parts)
+    if kind == "__DIR__":
+        return parent
+    if match.group("file_levels") is not None or "FILE" in kind:
+        levels = int(match.group("file_levels") or 1) - 1
+    else:
+        levels = int(match.group("dir_levels") or 1)
+    base = parent[:]
+    for _ in range(max(levels, 0)):
+        if not base:
+            return None
+        base.pop()
+    return base
+
+
+def referenced_plugin_files(source_name, text):
+    needed = set()
+    outside = []
+    suffix = PurePosixPath(source_name).suffix.lower()
+    source = strip_code_comments(text)
+    if suffix in {".js", ".mjs"}:
+        _js_references(source_name, source, needed, outside)
+        return needed, outside
+    if suffix != ".php":
+        return needed, outside
+    for match in ASSET_CONCAT.finditer(source):
+        _remember_reference(needed, outside, _packaged_reference(["affilio-wp"], match.group(2)), match.group(2))
+    if DYNAMIC_BUILD.search(source):
+        for match in QUOTED_BUILD.finditer(source):
+            needed.add("admin/build/" + match.group(2))
+    for match in PHP_LOAD_CONCAT.finditer(source):
+        _remember_reference(needed, outside, _packaged_reference(_php_load_base(source_name, match), match.group("path")), match.group("path"))
+    for match in PHP_LOAD_LITERAL.finditer(source):
+        path = match.group("path")
+        base = list(PurePosixPath(source_name).parent.parts) if path.startswith(("./", "../")) else ["affilio-wp"]
+        _remember_reference(needed, outside, _packaged_reference(base, path), path)
+    for match in PHP_ENQUEUE.finditer(source):
+        _remember_reference(needed, outside, _packaged_reference(["affilio-wp"], match.group(3)), match.group(3))
+    return needed, outside
+
+
+def unguarded_init(text):
+    marker = "function affilio_init"
+    start = 0
+    while True:
+        index = text.find(marker, start)
+        if index < 0:
+            return False
+        window = text[max(0, index - 400):index]
+        if "function_exists('affilio_init')" not in window and 'function_exists("affilio_init")' not in window:
+            return True
+        start = index + len(marker)
+
+
+def packaged_out(name):
+    path = PurePosixPath(name)
+    if any(part in PACKAGED_OUT for part in path.parts):
+        return True
+    file = path.name
+    return file in PACKAGED_FILES or file.startswith(".phpunit.")
+
+
+def hosted_build_file(name):
+    return name in HOSTED_BUILD_NAMES or name.startswith(HOSTED_BUILD_PREFIXES)
+
+
+def omit_from_plugin_zip(path):
+    if packaged_out(path):
+        return True
+    return path.startswith(PLUGIN_ROOT + "admin/build/") and hosted_build_file(PurePosixPath(path).name)
+
+
 def validate_plugin(data, origin=None):
+    del origin  # The plugin no longer bakes a deployment origin into its source.
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         names = archive.namelist()
         archive_names(names)
-        require(WP_FILES <= set(names), "WordPress ZIP is missing runtime files.")
         require(sum(file.file_size for file in archive.infolist()) <= MAX_DOWNLOAD, "WordPress ZIP expands beyond the release size limit.")
         require(archive.testzip() is None, "WordPress ZIP failed its checksum check.")
+        for info in archive.infolist():
+            if info.is_dir():
+                continue
+            require(info.compress_type == zipfile.ZIP_DEFLATED, "WordPress ZIP stores " + info.filename + " uncompressed")
+        files = {name: archive.read(name) for name in names if not name.endswith("/")}
+        require(PLUGIN_ROOT + "admin/build/analytics.js" in files, "WordPress ZIP is missing admin/build/analytics.js")
+        missing = sorted(WP_FILES - set(files))
+        require(not missing, "WordPress ZIP is missing " + ", ".join(missing))
         for name in names:
-            require(name.startswith("affilio/"), "WordPress ZIP has an unexpected top-level path.")
-            if name.startswith("affilio/admin/build/"):
-                file = PurePosixPath(name).name
-                require(not file.startswith(("workspace", "landing", "package")) and file not in {"home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}, "WordPress ZIP includes hosted UI or build tools.")
-        plugin = archive.read("affilio/affilio.php").decode("utf8")
+            require(not packaged_out(name), "WordPress ZIP includes tests or test results: " + name)
+        for name, payload in files.items():
+            require(name.startswith(PLUGIN_ROOT), "WordPress ZIP top folder must be affilio-wp/")
+            require(b"railway.app" not in payload, "WordPress ZIP must not contain railway.app")
+            if name.startswith(PLUGIN_ROOT + "admin/build/") and hosted_build_file(PurePosixPath(name).name):
+                raise ReleaseError("WordPress ZIP includes hosted UI or build tools.")
+        plugin = files[PLUGIN_ROOT + "affilio.php"].decode("utf8")
         require("Plugin Name:" in plugin, "WordPress plugin header is missing.")
-        if origin:
-            require(f"'{origin}/v1'" in plugin and "https://affilio-production.up.railway.app/v1" not in plugin, "WordPress download points at the wrong API origin.")
+        php = {name: payload.decode("utf8", "replace") for name, payload in files.items() if name.endswith(".php")}
+        require(not any(unguarded_init(text) for text in php.values()), "WordPress ZIP has an unguarded function affilio_init")
+        require(f"Version: {PLUGIN_VERSION}" in plugin, f"WordPress plugin header is not {PLUGIN_VERSION}")
+        require(f"define('AFFILIO_VERSION', '{PLUGIN_VERSION}')" in plugin, f"AFFILIO_VERSION is not {PLUGIN_VERSION}")
+        require(f"Stable tag: {PLUGIN_VERSION}".encode() in files.get(PLUGIN_ROOT + "readme.txt", b""), f"readme stable tag is not {PLUGIN_VERSION}")
+        for name, payload in files.items():
+            if PurePosixPath(name).suffix.lower() not in {".php", ".js", ".mjs"}:
+                continue
+            needed, outside = referenced_plugin_files(name, payload.decode("utf8", "replace"))
+            if outside:
+                raise ReleaseError("WordPress ZIP references a path outside the plugin: " + outside[0])
+            for relative in sorted(needed):
+                require(PLUGIN_ROOT + relative in files, "WordPress ZIP is missing " + relative)
 
 
 def validate_installer(data):
@@ -168,8 +430,8 @@ class NoRedirect(request.HTTPRedirectHandler):
         return None
 
 
-def fetch(path, method="GET", data=None):
-    req = request.Request(ORIGIN + path, method=method, data=data, headers={"Content-Type": "application/json", "User-Agent": "Distributoor-Release-Check"})
+def fetch(path, method="GET", data=None, origin=ORIGIN):
+    req = request.Request(origin + path, method=method, data=data, headers={"Content-Type": "application/json", "User-Agent": "Distributoor-Release-Check"})
     try:
         response = request.build_opener(NoRedirect).open(req, timeout=20)
     except error.HTTPError as exc:
@@ -182,9 +444,11 @@ def fetch(path, method="GET", data=None):
         return response.code, response.headers, body
 
 
-def verify():
+def verify(origin=ORIGIN):
+    require(https_origin(origin), "--base-url must be an https origin with no path, query, or fragment.")
+
     def get(path):
-        status, headers, body = fetch(path)
+        status, headers, body = fetch(path, "GET", None, origin)
         require(status == 200, f"Public check failed at {path}: HTTP {status}.")
         return headers, body
 
@@ -196,22 +460,22 @@ def verify():
     for name in ASSETS:
         if name not in {"home.html", "workspace.html"}:
             require(bool(get("/assets/" + name)[1]), f"Empty public asset: {name}.")
-    validate_plugin(get("/downloads/affilio.zip")[1], ORIGIN)
+    validate_plugin(get("/downloads/affilio.zip")[1], origin)
     validate_installer(get("/downloads/" + INSTALLER)[1])
     resource = json.loads(get("/.well-known/oauth-protected-resource/mcp")[1])
     authorization = json.loads(get("/.well-known/oauth-authorization-server")[1])
-    require(resource.get("resource") == ORIGIN + "/mcp" and resource.get("authorization_servers") == [ORIGIN] and set(resource.get("scopes_supported", [])) == {"maker", "publisher"}, "MCP discovery is configured for the wrong resource or scopes.")
+    require(resource.get("resource") == origin + "/mcp" and resource.get("authorization_servers") == [origin] and set(resource.get("scopes_supported", [])) == {"maker", "publisher"}, "MCP discovery is configured for the wrong resource or scopes.")
     for field, path in {"issuer": "", "authorization_endpoint": "/oauth/authorize", "token_endpoint": "/oauth/token", "registration_endpoint": "/oauth/register"}.items():
-        require(authorization.get(field) == ORIGIN + path, "OAuth discovery is configured for the wrong origin.")
+        require(authorization.get(field) == origin + path, "OAuth discovery is configured for the wrong origin.")
     require("S256" in authorization.get("code_challenge_methods_supported", []), "OAuth discovery does not advertise S256 PKCE.")
-    status, headers, _ = fetch("/owner")
+    status, headers, _ = fetch("/owner", "GET", None, origin)
     require(status == 302 and headers.get("Location", "").startswith("/auth/login?"), "Anonymous owner access did not require sign-in.")
-    status, headers, _ = fetch("/mcp", "POST", b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"release-check","version":"1"}}}')
-    require(status == 401 and ORIGIN + "/.well-known/oauth-protected-resource/mcp" in headers.get("WWW-Authenticate", ""), "Anonymous MCP access did not require OAuth.")
-    status, headers, _ = fetch("/auth/login?return_to=/owner")
+    status, headers, _ = fetch("/mcp", "POST", b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"release-check","version":"1"}}}', origin)
+    require(status == 401 and origin + "/.well-known/oauth-protected-resource/mcp" in headers.get("WWW-Authenticate", ""), "Anonymous MCP access did not require OAuth.")
+    status, headers, _ = fetch("/auth/login?return_to=/owner", "GET", None, origin)
     target = parse.urlsplit(headers.get("Location", ""))
     params = parse.parse_qs(target.query)
-    require(status == 302 and target.scheme == "https" and target.hostname == "accounts.google.com" and params.get("redirect_uri") == [ORIGIN + "/auth/callback"] and params.get("code_challenge_method") == ["S256"], "Google login start has the wrong callback or PKCE configuration.")
+    require(status == 302 and target.scheme == "https" and target.hostname == "accounts.google.com" and params.get("redirect_uri") == [origin + "/auth/callback"] and params.get("code_challenge_method") == ["S256"], "Google login start has the wrong callback or PKCE configuration.")
     cookie = headers.get("Set-Cookie", "")
     require(cookie.startswith("__Host-dtr_login=") and all(flag in cookie for flag in ("Path=/", "Secure", "HttpOnly", "SameSite=Lax")), "Google login attempt cookie is missing security attributes.")
     print("Public delivery checks passed: health, assets, both downloads, OAuth discovery, protected owner/MCP routes and Google login redirect.")
@@ -222,15 +486,19 @@ def main():
     parser = argparse.ArgumentParser(description="Release only the isolated Distributoor MVP. Configuration values are never printed.")
     parser.add_argument("command", choices=("check", "deploy", "verify", "bundle"), nargs="?", default="check")
     parser.add_argument("path", type=Path, nargs="?", help="Extracted Docker release directory for bundle validation")
+    parser.add_argument("--host", choices=("railway", "generic"), default="railway", help="railway reads Railway variables; generic reads --env-file and does not call the Railway CLI")
+    parser.add_argument("--env-file", type=Path, help="KEY=VALUE file for --host generic. Values are never printed.")
+    parser.add_argument("--base-url", help="https origin for verify, for example https://service.onrender.com")
     args = parser.parse_args()
     try:
         if args.command == "bundle":
             require(args.path is not None, "Provide the extracted release directory.")
             validate_bundle(args.path)
         elif args.command == "verify":
-            verify()
+            verify((args.base_url or ORIGIN).rstrip("/"))
         else:
-            sha = preflight()
+            require(args.command != "deploy" or args.host == "railway", "Deploy stays on the Railway host. Use check --host generic to validate another host.")
+            sha = preflight(args.host, args.env_file)
             if args.command == "deploy":
                 run(["railway", "up", "--project", PROJECT, "--environment", ENVIRONMENT, "--service", SERVICE, "--detach", "--json", "--message", f"Distributoor MVP {sha}"])
                 print(f"Deployment requested for {sha[:12]}. Wait for Railway SUCCESS, then run: python3 scripts/mvp_release.py verify")

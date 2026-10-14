@@ -56,12 +56,10 @@ func testPaidCampaign(t *testing.T) (*database.DB, *gin.Engine, string, string, 
 	createTestSite(t, db, siteKey, "publisher.example.com", "Developer tutorials")
 	_, joined := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
 	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/go/"+joined["tracking_code"].(string), nil))
-	u, err := url.Parse(rec.Header().Get("Location"))
-	if err != nil || rec.Code != http.StatusFound {
-		t.Fatalf("click failed: %d %v", rec.Code, err)
-	}
-	return db, r, siteKey, offerID, u.Query().Get("via")
+	code := joined["tracking_code"].(string)
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil))
+	requirePlainRedirect(t, rec, "https://inboxpilot.example.com")
+	return db, r, siteKey, offerID, insertCampaignClick(t, db, code)
 }
 
 func TestStripePaymentGatesAndBusinessDedupe(t *testing.T) {
@@ -82,17 +80,17 @@ func TestStripePaymentGatesAndBusinessDedupe(t *testing.T) {
 	if rec.Code != 200 || body["status"] != "duplicate" {
 		t.Fatalf("payment counted twice: %d %v", rec.Code, body)
 	}
-	for _, field := range []string{"livemode", "product"} {
-		payload := stripeSalePayload("evt_wrong_"+field, "pi_wrong_"+field, clickID, 10000)
-		if field == "livemode" {
-			payload["livemode"] = true
-		} else {
-			payload["data"].(map[string]interface{})["object"].(map[string]interface{})["metadata"] = map[string]interface{}{"dtr_product_id": "other-product"}
-		}
-		rec, _ = sendStripeEvent(t, db, r, payload)
-		if rec.Code != 400 {
-			t.Fatalf("accepted wrong %s: %d", field, rec.Code)
-		}
+	wrongMode := stripeSalePayload("evt_wrong_livemode", "pi_wrong_livemode", clickID, 10000)
+	wrongMode["livemode"] = true
+	rec, _ = sendStripeEvent(t, db, r, wrongMode)
+	if rec.Code != 400 {
+		t.Fatalf("accepted wrong livemode: %d", rec.Code)
+	}
+	wrongProduct := stripeSalePayload("evt_wrong_product", "pi_wrong_product", clickID, 10000)
+	wrongProduct["data"].(map[string]interface{})["object"].(map[string]interface{})["metadata"] = map[string]interface{}{"dtr_product_id": "other-product"}
+	rec, body = sendStripeEvent(t, db, r, wrongProduct)
+	if rec.Code != 200 || body["status"] != "ignored" {
+		t.Fatalf("wrong product was not ignored: %d %v", rec.Code, body)
 	}
 	var count int
 	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM conversions WHERE kind='sale'`).Scan(&count); err != nil || count != 1 {
@@ -245,7 +243,7 @@ SELECT id,'Other product','https://other.example.com','saas','stripe' FROM maker
 	payload := stripeSalePayload("evt_cross_product", "pi_cross", clickID, 10000)
 	payload["data"].(map[string]interface{})["object"].(map[string]interface{})["metadata"] = map[string]interface{}{"dtr_product_id": otherID}
 	rec, _ := sendScopedStripeEvent(t, r, otherID, payload, testStripeSecret)
-	if rec.Code != 401 {
+	if rec.Code != 400 {
 		t.Fatalf("another connection secret accepted: %d", rec.Code)
 	}
 	rec, body := sendScopedStripeEvent(t, r, otherID, payload, otherSecret)
@@ -289,6 +287,7 @@ func TestPlacementAuthorityAndScopedAgent(t *testing.T) {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT id FROM sites WHERE domain='publisher.example.com'`).Scan(&siteID); err != nil {
 		t.Fatal(err)
 	}
+	linkPublisherOwner(t, db, siteID)
 	_, access := adminJSON(t, r, http.MethodPost, "/v1/offer-review/agent-access/sites/"+siteID, nil)
 	agentKey := access["api_key"].(string)
 	for _, path := range []string{"/v1/marketplace/offers/" + offerID + "/join", "/v1/payouts/11111111-1111-1111-1111-111111111111/confirm-received"} {
@@ -434,6 +433,7 @@ func TestTwoIndependentStdioAgentsRevenueLoop(t *testing.T) {
 	_, makerKey := createTestMaker(t, db)
 	siteKey := "site-key-independent-publisher"
 	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Developer tutorials")
+	linkPublisherOwner(t, db, siteID)
 	_, access := adminJSON(t, r, http.MethodPost, "/v1/offer-review/agent-access/sites/"+siteID, nil)
 	binary := filepath.Join(t.TempDir(), "distributoor-mcp")
 	build := exec.Command("go", "build", "-o", binary, "./cmd/distributoor-mcp")
@@ -473,6 +473,9 @@ func TestTwoIndependentStdioAgentsRevenueLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	publisher.call(t, "record_placement_receipt", map[string]interface{}{"placement_id": id, "surface_url": p["surface_url"], "published_text": text, "evidence": "Local artifact only, no public publication: " + artifact})
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='placed', plugin_wait_at=NOW() WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tracked, nil))
 	u, err := url.Parse(rec.Header().Get("Location"))

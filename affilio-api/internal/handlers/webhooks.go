@@ -160,16 +160,22 @@ func (h *WebhooksHandler) receiveProduct(c *gin.Context) {
 	}
 	adapter := &providers.Stripe{}
 	if !adapter.VerifySignature(c.Request.Header, body, secret) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid signature"})
 		return
 	}
 	event, err := adapter.ParseEvent(body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported event"})
+		log.Printf("webhooks.stripe ignored product=%s reason=%v", productID, err)
+		c.JSON(http.StatusOK, gin.H{"status": "ignored"})
 		return
 	}
-	if event.LiveMode != connection.LiveMode || ((event.Kind == "sale" || event.Kind == "refund") && event.Currency != connection.Currency) || (event.Kind == "sale" && event.ProductID != productID) {
+	if event.LiveMode != connection.LiveMode {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "event does not match product, mode or currency"})
+		return
+	}
+	if !stripeEventIsOurs(event, productID, connection.Currency) {
+		log.Printf("webhooks.stripe ignored product=%s event=%s kind=%s", productID, event.EventID, event.Kind)
+		c.JSON(http.StatusOK, gin.H{"status": "ignored"})
 		return
 	}
 	processed, canonical, err := h.DB.StoreProductWebhook(c.Request.Context(), productID, "stripe", event.EventID, body)
@@ -247,6 +253,17 @@ func (h *WebhooksHandler) processProductEvent(ctx context.Context, productID str
 		return "storage failure", "", err
 	}
 	return status, id, nil
+}
+
+func stripeEventIsOurs(event *providers.ConversionEvent, productID, currency string) bool {
+	switch event.Kind {
+	case "sale":
+		return event.ProductID == productID && event.Currency == currency
+	case "refund":
+		return event.Currency == currency
+	default:
+		return false
+	}
 }
 
 func (h *WebhooksHandler) ReconcilePending(ctx context.Context) error {

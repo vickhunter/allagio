@@ -147,8 +147,8 @@ func TestFraudFlagsHoldCommissionsUntilCleared(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
 	rrec := httptest.NewRecorder()
 	r.ServeHTTP(rrec, req)
-	location := rrec.Header().Get("Location")
-	clickID := location[strings.Index(location, "via=")+4:]
+	requirePlainRedirect(t, rrec, "https://inboxpilot.example.com")
+	clickID := insertCampaignClick(t, db, code)
 
 	// Purchase seconds after the click: booked, but flagged.
 	payload := stripeSalePayload("evt_fraud_1", "pi_fraud", clickID, 10000)
@@ -222,8 +222,8 @@ func TestVelocityCapPausesCampaign(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
 	rrec := httptest.NewRecorder()
 	r.ServeHTTP(rrec, req)
-	location := rrec.Header().Get("Location")
-	clickID := location[strings.Index(location, "via=")+4:]
+	requirePlainRedirect(t, rrec, "https://inboxpilot.example.com")
+	clickID := insertCampaignClick(t, db, code)
 
 	// 21 sales inside an hour: the 21st trips the velocity cap.
 	for i := 1; i <= 21; i++ {

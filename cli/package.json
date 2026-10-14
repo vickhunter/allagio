@@ -1,0 +1,20 @@
+{
+  "name": "offer-rails",
+  "version": "0.1.0",
+  "description": "Offer Rails CLI and local stdio MCP server",
+  "type": "module",
+  "bin": {
+    "offer-rails": "./bin/offer-rails.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -1,6 +1,7 @@
 <?php
 
 define('ABSPATH', __DIR__);
+require_once __DIR__ . '/wp-filters.php';
 $options = array();
 $actions = array();
 $cron = array();
@@ -10,6 +11,7 @@ $posts = array();
 function add_action($name, $callback) { $GLOBALS['actions'][$name][] = $callback; }
 function apply_filters($name, $value) { return $value; }
 function register_activation_hook($path, $callback) { $GLOBALS['actions']['activation'][] = $callback; }
+function register_deactivation_hook($path, $callback) { $GLOBALS['actions']['deactivation'][] = $callback; }
 function plugin_dir_path($path) { return dirname($path) . '/'; }
 function plugin_dir_url($path) { return 'https://blog.example/wp-content/plugins/affilio/'; }
 function get_option($key, $default = false) { return $GLOBALS['options'][$key] ?? $default; }
@@ -30,6 +32,9 @@ function is_wp_error($value) { return $value instanceof WP_Error; }
 function wp_next_scheduled($hook) { return $GLOBALS['cron'][$hook] ?? false; }
 function wp_schedule_single_event($time, $hook) { $GLOBALS['cron'][$hook] = $time; }
 function get_posts($args) {
+    if (isset($args['posts_per_page']) && (int) $args['posts_per_page'] < 0) {
+        return array();
+    }
     check($args['post_status'] === 'publish', 'Setup included unpublished content');
     check($args['posts_per_page'] === 10, 'Setup did not bound scan size');
     return array_slice($GLOBALS['posts'], $args['offset'], $args['posts_per_page']);
@@ -68,9 +73,9 @@ class SetupTestAPI {
                 $this->lose_response = false;
                 return new WP_Error('network', 'Response lost after registration');
             }
-            return array('code' => 200, 'data' => array('site_id' => 'same-site', 'api_key' => $body['installation_key']));
+            return array('code' => 200, 'data' => array('site_id' => 'same-site', 'api_key' => 'server-issued-api-key', 'plugin_key' => 'server-issued-plugin-key'));
         }
-        if ($path === '/scan/full') {
+        if ($path === '/scan/full' || $path === '/scan/single') {
             $this->scans[] = $body;
             return array('code' => $this->fail_scan ? 503 : 202, 'data' => array('status' => 'queued'));
         }
@@ -80,6 +85,7 @@ class SetupTestAPI {
 
 $api = new SetupTestAPI();
 $setup = new Affilio_Onboarding($api);
+update_option('affilio_api_url_override', 'https://api.example.test/v1');
 check($setup->status()['phase'] === 'not_started' && count($api->registrations) === 0, 'Setup phoned home before Connect');
 $administrator = false;
 check(!$setup->allowed() && is_wp_error($setup->connect()), 'Non-admin could connect');
@@ -87,13 +93,16 @@ $administrator = true;
 $api->supports_setup = false;
 check(is_wp_error($setup->connect()) && count($api->registrations) === 0, 'Unsupported backend created an orphan registration');
 $api->supports_setup = true;
-check(is_wp_error($setup->connect()), 'Lost response was marked connected');
-$key = get_option('affilio_installation_key');
-check(strlen($key) === 64 && get_option('affilio_api_key', '') === '', 'Registration did not persist its retry identity safely');
+check(is_wp_error($setup->connect()) && count($api->registrations) === 1, 'Lost response was marked connected');
+check(get_option('affilio_api_key', '') === '', 'Lost response stored a key');
+check($api->registrations[0] === array('site_url' => 'https://blog.example', 'plugin_version' => AFFILIO_VERSION), 'Registration sent more than the site URL and plugin version');
 $state = $setup->connect();
 check($state['phase'] === 'scanning' && $state['connection']['connected'], 'Retry did not connect');
-check($api->registrations[0]['installation_key'] === $api->registrations[1]['installation_key'], 'Retry created a new installation identity');
-check(strpos(json_encode($state), $key) === false, 'Setup leaked a credential to the browser');
+check($api->registrations[0] === $api->registrations[1], 'Retry changed the registration payload');
+check(get_option('affilio_api_key') === 'server-issued-api-key', 'Server API key was not stored');
+check(get_option('affilio_plugin_key') === 'server-issued-plugin-key', 'register did not store plugin_key');
+check(strpos(json_encode($state), 'server-issued-api-key') === false, 'Setup leaked a credential to the browser');
+check(strpos(json_encode($state), 'server-issued-plugin-key') === false, 'Setup leaked the plugin key to the browser');
 $setup->connect();
 check(count($api->registrations) === 2, 'Connected setup registered again');
 
@@ -106,12 +115,12 @@ check(get_option('affilio_setup_state')['scanned'] === 10 && count($api->scans[0
 $api->fail_scan = true;
 unset($cron['affilio_setup_scan']);
 $setup->scan_batch();
-check(get_option('affilio_setup_state')['phase'] === 'scan_error' && get_option('affilio_setup_state')['offset'] === 10, 'Failed scan falsely advanced progress');
+$failed = get_option('affilio_setup_state');
+check($failed['phase'] === 'complete' && $failed['offset'] === 14 && $failed['scanned'] === 10 && count($failed['skipped']) === 4, 'A rejected batch stopped onboarding or counted skipped posts as analyzed');
 $api->fail_scan = false;
 $setup->connect();
-check(get_option('affilio_setup_state')['offset'] === 10, 'Retry lost scan progress');
-$setup->scan_batch();
+check(get_option('affilio_setup_state')['offset'] === 14, 'Retry lost scan progress');
 $state = $setup->status();
-check($state['phase'] === 'complete' && $state['scanned'] === 14 && count($api->registrations) === 2, 'Resumed scan did not finish or registered another account');
+check($state['phase'] === 'complete' && $state['scanned'] === 10 && count($api->registrations) === 2, 'Skipped scan did not finish or registered another account');
 check(get_option('affilio_setup_lock', false) === false, 'Setup did not release its lock');
 echo "WordPress setup: activation, permission, credential recovery, batching and scan retries passed.\n";

@@ -6,7 +6,7 @@ The next pilot supports hosted MCP, signed-in owner review and a Stripe configur
 
 1. Add the pilot's `/mcp` URL to the agent client.
 2. Sign in with the configured OIDC provider. Google is supported by standard OIDC; GitHub user login would require a separate OAuth adapter.
-3. Choose maker or publisher. New accounts need no API key. Existing accounts require their owner key once; neither email matching nor a scoped publisher agent key can claim an account.
+3. Choose maker or publisher. New accounts need no API key. A verified OIDC email links an existing maker with that email when no other owner already holds it. An existing publisher site still requires its owner key once. A scoped publisher agent key cannot claim an account.
 4. Review the requesting client's name, callback and role permissions, then allow access for seven days.
 5. A publisher agent prepares a placement and returns `/owner/placements/{id}`. The owner reviews exact copy, disclosure, commission, refund hold, service fee, currency and payment mode. After approval the agent commits the tracked link and publishes using the owner's existing tool.
 
@@ -19,7 +19,7 @@ The owner workspace creates and edits products and offers, runs readiness checks
 - Dynamic registration: `/oauth/register`. Public clients use exact HTTPS or numeric loopback redirect URIs and S256 PKCE.
 - `/oauth/authorize` requires owner consent. Codes are hashed, expire after five minutes and can be exchanged once. Resource parameters must match the canonical `/mcp` URL.
 - Opaque access tokens expire after one hour. Refresh tokens rotate, last at most seven days and revoke the grant on reuse. Tokens and browser session secrets are stored as SHA-256 hashes; issuer tokens are never forwarded to tools.
-- Verified OIDC issuer + subject establishes identity. Email must be verified, but does not establish ownership of an existing maker or publisher account.
+- Verified OIDC issuer + subject establishes identity. Email must be verified. A verified email links an existing maker that no owner already holds. It does not link a publisher site.
 - New OAuth maker accounts have no legacy API key. Legacy makers keep their existing key authentication, and an operator can explicitly issue a key if a separate integration needs it.
 - Owner sessions last eight hours. Production cookies use Secure, HttpOnly and the `__Host-` prefix; owner mutations require the session's CSRF token and exact Origin.
 - Publisher OAuth tokens cannot approve, revoke placements, confirm funds, alter WordPress settings or use legacy marketplace joins. Maker OAuth tokens cannot configure payment connections or perform operator actions.

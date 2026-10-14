@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"affilio-api/internal/database"
 	"affilio-api/internal/dcp"
 	"affilio-api/internal/services"
+	"github.com/gin-gonic/gin"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -49,7 +49,7 @@ func (h *HostedHandler) MCPTransport() http.Handler {
 		bearer := strings.Fields(r.Header.Get("Authorization"))[1]
 		for _, tool := range hostedTools(g) {
 			readOnly := strings.HasPrefix(tool.Name, "get_") || strings.HasPrefix(tool.Name, "list_") || tool.Name == "find_opportunities" || tool.Name == "preview_revenue"
-			destructive := strings.HasPrefix(tool.Name, "update_")
+			destructive := strings.HasPrefix(tool.Name, "update_") || tool.Name == "undo_placement" || tool.Name == "restore_placement"
 			openWorld := tool.Name == "run_assessment"
 			s.AddTool(&mcp.Tool{Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: readOnly || tool.Name == "commit_placement", DestructiveHint: &destructive, OpenWorldHint: &openWorld}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 				args := map[string]any{}
@@ -89,21 +89,25 @@ func (h *HostedHandler) MCPTransport() http.Handler {
 		}
 		return &auth.TokenInfo{Scopes: strings.Fields(g.Scope), Expiration: g.ExpiresAt, Extra: map[string]any{"grant": g}}, nil
 	}
-	secured := auth.RequireBearerToken(verify, &auth.RequireBearerTokenOptions{ResourceMetadataURL: h.BaseURL + "/.well-known/oauth-protected-resource/mcp"})(transport)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if origin := r.Header.Get("Origin"); origin != "" && origin != h.BaseURL {
-			http.Error(w, "origin not allowed", 403)
-			return
-		}
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			ip = r.RemoteAddr
-		}
-		if h.Limiter != nil && !h.Limiter.Allow(ip) {
-			http.Error(w, "rate limit exceeded", 429)
-			return
-		}
-		r.Body = http.MaxBytesReader(w, r.Body, 1024*1024)
-		secured.ServeHTTP(w, r)
-	})
+	return auth.RequireBearerToken(verify, &auth.RequireBearerTokenOptions{ResourceMetadataURL: h.BaseURL + "/.well-known/oauth-protected-resource/mcp"})(transport)
+}
+
+// MCP is the gin entry point for the hosted stream. Rate limits use ClientIP
+// so a configured trusted proxy supplies the visitor address instead of the
+// platform connection address.
+func (h *HostedHandler) MCP(c *gin.Context) {
+	if origin := c.Request.Header.Get("Origin"); origin != "" && origin != h.BaseURL {
+		http.Error(c.Writer, "origin not allowed", http.StatusForbidden)
+		return
+	}
+	ip := strings.TrimSpace(c.ClientIP())
+	if ip == "" {
+		ip = "unknown"
+	}
+	if h.Limiter != nil && !h.Limiter.Allow(ip) {
+		http.Error(c.Writer, "rate limit exceeded", http.StatusTooManyRequests)
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1024*1024)
+	h.MCPTransport().ServeHTTP(c.Writer, c.Request)
 }

@@ -1,0 +1,266 @@
+{
+  "digest_id": "dg_2026w41_usr8f2c",
+  "user_id": "usr_8f2c",
+  "period": {
+    "since": "2026-10-03T08:00:00Z",
+    "until": "2026-10-10T08:00:00Z"
+  },
+  "session": {
+    "signed_in": true,
+    "user_id": "usr_8f2c"
+  },
+  "test_mode": true,
+  "paused": false,
+  "totals": {
+    "live_items": 6,
+    "clicks": 142,
+    "earnings": null,
+    "projects": 1,
+    "sites": 2,
+    "went_live": 5
+  },
+  "projects": [
+    {
+      "project_id": "prj_rail",
+      "name": "Rail Tool",
+      "url": "https://rail-tool.example",
+      "role": "maker",
+      "mode": "yolo",
+      "mode_change_url": "/owner/settings/approval?project=prj_rail",
+      "went_live_count": 2,
+      "live_count": 2,
+      "clicks": 59,
+      "earnings": null,
+      "top_sources": [
+        {
+          "source": "victormotricala.it",
+          "clicks": 41
+        },
+        {
+          "source": "indiedevweekly.example",
+          "clicks": 18
+        }
+      ],
+      "items": [
+        {
+          "item_id": "itm_001",
+          "kind": "placement",
+          "placement_id": "plc_001",
+          "owner_ref": "prj_rail",
+          "site": {
+            "name": "victormotricala.it",
+            "domain": "victormotricala.it"
+          },
+          "article": {
+            "title": "Come scelgo gli strumenti per il mio SaaS",
+            "url": "https://victormotricala.it/strumenti-saas"
+          },
+          "position": "end",
+          "copy": "Rail Tool: un'offerta referral per il tuo tool, pronta in un pomeriggio.",
+          "link_text": "Vedi il prodotto",
+          "disclosure_label": "(link sponsorizzato)",
+          "approved_by": "policy:yolo",
+          "policy_rule_id": "hard_checks_passed",
+          "policy_rule_text": "Passed all checks",
+          "policy_version": 3,
+          "side": "maker",
+          "plugin_state": "placed",
+          "went_live_at": "2026-10-08T09:12:00Z",
+          "clicks": 41,
+          "status": "live",
+          "preview_href": "#preview"
+        },
+        {
+          "item_id": "itm_002",
+          "kind": "listing",
+          "placement_id": "plc_002",
+          "owner_ref": "prj_rail",
+          "site": {
+            "name": "Indie Dev Weekly",
+            "domain": "indiedevweekly.example"
+          },
+          "article": {
+            "title": "Issue 112: tools we actually pay for",
+            "url": "https://indiedevweekly.example/112"
+          },
+          "position": "section",
+          "copy": "Rail Tool sets up referral offers for dev tools without a sales call.",
+          "link_text": "Vedi il prodotto",
+          "disclosure_label": "(link sponsorizzato)",
+          "approved_by": "owner",
+          "policy_rule_id": null,
+          "policy_rule_text": null,
+          "policy_version": 3,
+          "side": "maker",
+          "plugin_state": "placed",
+          "went_live_at": "2026-10-06T16:40:00Z",
+          "clicks": 18,
+          "status": "live",
+          "preview_href": "#preview"
+        }
+      ]
+    }
+  ],
+  "sites": [
+    {
+      "site_id": "site_vm",
+      "name": "victormotricala.it",
+      "url": "https://victormotricala.it",
+      "role": "publisher",
+      "mode": "yolo",
+      "mode_change_url": "/owner/settings/approval?site=site_vm",
+      "went_live_count": 2,
+      "live_count": 3,
+      "clicks": 77,
+      "earnings": null,
+      "top_sources": [
+        {
+          "source": "google",
+          "clicks": 52
+        },
+        {
+          "source": "newsletter",
+          "clicks": 14
+        },
+        {
+          "source": "direct",
+          "clicks": 11
+        }
+      ],
+      "items": [
+        {
+          "item_id": "itm_003",
+          "kind": "placement",
+          "placement_id": "plc_003",
+          "owner_ref": "site_vm",
+          "site": {
+            "name": "victormotricala.it",
+            "domain": "victormotricala.it"
+          },
+          "article": {
+            "title": "Come scelgo gli strumenti per il mio SaaS",
+            "url": "https://victormotricala.it/strumenti-saas"
+          },
+          "position": "end",
+          "copy": "Rail Tool: un'offerta referral per il tuo tool, pronta in un pomeriggio.",
+          "link_text": "Vedi il prodotto",
+          "disclosure_label": "(link sponsorizzato)",
+          "approved_by": "policy:yolo",
+          "policy_rule_id": "hard_checks_passed",
+          "policy_rule_text": "Passed all checks",
+          "policy_version": 3,
+          "side": "publisher",
+          "plugin_state": "placed",
+          "went_live_at": "2026-10-08T09:12:00Z",
+          "clicks": 41,
+          "status": "live",
+          "preview_href": "#preview"
+        },
+        {
+          "item_id": "itm_004",
+          "kind": "placement",
+          "placement_id": "plc_004",
+          "owner_ref": "site_vm",
+          "site": {
+            "name": "victormotricala.it",
+            "domain": "victormotricala.it"
+          },
+          "article": {
+            "title": "Fatturare da freelance: il mio setup 2026",
+            "url": "https://victormotricala.it/fatturare-freelance"
+          },
+          "position": "section",
+          "copy": "Fattura Lampo crea e invia fatture elettroniche dal telefono, da €9 al mese.",
+          "link_text": "Vedi il prodotto",
+          "disclosure_label": "(link sponsorizzato)",
+          "approved_by": "policy:auto",
+          "policy_rule_id": "auto:category_invoicing+relevance_40",
+          "policy_rule_text": "Matched your rules: invoicing is allowed and relevance 64 is above your 40",
+          "policy_version": 3,
+          "side": "publisher",
+          "plugin_state": "placed",
+          "went_live_at": "2026-10-07T11:03:00Z",
+          "clicks": 27,
+          "status": "live",
+          "preview_href": "#preview"
+        },
+        {
+          "item_id": "itm_005",
+          "kind": "placement",
+          "placement_id": "plc_005",
+          "owner_ref": "site_vm",
+          "site": {
+            "name": "victormotricala.it",
+            "domain": "victormotricala.it"
+          },
+          "article": {
+            "title": "Backup del sito WordPress senza plugin pesanti",
+            "url": "https://victormotricala.it/backup-wordpress"
+          },
+          "position": "start",
+          "copy": "SnapVault salva il tuo sito ogni notte e lo ripristina in un clic.",
+          "link_text": "Vedi il prodotto",
+          "disclosure_label": "(link sponsorizzato)",
+          "approved_by": "owner",
+          "policy_rule_id": null,
+          "policy_rule_text": null,
+          "policy_version": 3,
+          "side": "publisher",
+          "plugin_state": "placed",
+          "went_live_at": "2026-10-05T08:30:00Z",
+          "clicks": 9,
+          "status": "live",
+          "preview_href": "#preview"
+        }
+      ]
+    },
+    {
+      "site_id": "site_nl",
+      "name": "newsletter.victormotricala.it",
+      "url": "https://newsletter.victormotricala.it",
+      "role": "publisher",
+      "mode": "auto",
+      "mode_change_url": "/owner/settings/approval?site=site_nl",
+      "went_live_count": 1,
+      "live_count": 1,
+      "clicks": 6,
+      "earnings": null,
+      "top_sources": [
+        {
+          "source": "email",
+          "clicks": 6
+        }
+      ],
+      "items": [
+        {
+          "item_id": "itm_006",
+          "kind": "placement",
+          "placement_id": "plc_006",
+          "owner_ref": "site_nl",
+          "site": {
+            "name": "newsletter.victormotricala.it",
+            "domain": "newsletter.victormotricala.it"
+          },
+          "article": {
+            "title": "Lettera #31: cosa ho spedito a settembre",
+            "url": "https://newsletter.victormotricala.it/31"
+          },
+          "position": "end",
+          "copy": "Fattura Lampo crea e invia fatture elettroniche dal telefono, da €9 al mese.",
+          "link_text": "Vedi il prodotto",
+          "disclosure_label": "(link sponsorizzato)",
+          "approved_by": "policy:yolo",
+          "policy_rule_id": "hard_checks_passed",
+          "policy_rule_text": "Passed all checks",
+          "policy_version": 3,
+          "side": "publisher",
+          "plugin_state": "placed",
+          "went_live_at": "2026-10-09T07:00:00Z",
+          "clicks": 6,
+          "status": "live",
+          "preview_href": "#preview"
+        }
+      ]
+    }
+  ]
+}

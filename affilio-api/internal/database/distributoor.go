@@ -218,6 +218,17 @@ func (d *DB) UpdateOfferStatus(ctx context.Context, offerID, status string) erro
 	return err
 }
 
+// CountListedOffers counts offers this maker already has live in the catalog.
+func (d *DB) CountListedOffers(ctx context.Context, makerID string) (int, error) {
+	var n int
+	err := d.Pool.QueryRow(ctx, `
+SELECT COUNT(*)
+FROM offers o
+JOIN products p ON p.id = o.product_id
+WHERE p.maker_id=$1 AND o.status='listed'`, makerID).Scan(&n)
+	return n, err
+}
+
 func (d *DB) ListSubmittedOffers(ctx context.Context, limit, offset int) ([]OfferReviewItem, error) {
 	rows, err := d.Pool.Query(ctx, `
 SELECT `+offerColumns+`,

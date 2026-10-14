@@ -56,6 +56,31 @@ func APIKeyAuth(db *database.DB, audit *services.AuditLogger, resources ...strin
 				c.Next()
 				return
 			}
+			projectSiteID, projectErr := db.ProjectSiteKey(c.Request.Context(), keyHash)
+			if projectErr == nil {
+				if !agentRouteAllowed(c) {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "project key is not authorized for this action"})
+					return
+				}
+				c.Set("api_key_hash", keyHash)
+				c.Set("site_id", projectSiteID)
+				c.Set("key_kind", "project")
+				c.Next()
+				return
+			}
+			account, accountErr := db.ActiveAccountKey(c.Request.Context(), keyHash)
+			if accountErr == nil {
+				if account.SiteID == "" {
+					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "this account has no publisher site"})
+					return
+				}
+				c.Set("api_key_hash", keyHash)
+				c.Set("site_id", account.SiteID)
+				c.Set("owner_id", account.OwnerID)
+				c.Set("key_kind", "account")
+				c.Next()
+				return
+			}
 		}
 		if err != nil {
 			if audit != nil {
@@ -128,8 +153,12 @@ func safePrefix(key string) string {
 
 func agentRouteAllowed(c *gin.Context) bool {
 	switch c.FullPath() {
-	case "/v1/revenue/opportunities", "/v1/placements", "/v1/placements/:id", "/v1/placements/:id/commit", "/v1/placements/:id/receipt":
+	case "/v1/revenue/opportunities", "/v1/placements", "/v1/placements/:id", "/v1/placements/:id/commit", "/v1/placements/:id/receipt", "/v1/placements/:id/removed", "/v1/placements/:id/refuse":
 		return c.Request.Method == http.MethodGet || c.Request.Method == http.MethodPost
+	case "/v1/placements/:id/revoke", "/v1/account/pause", "/v1/sites/:id/kill-switch", "/v1/digest/undo":
+		return c.Request.Method == http.MethodPost
+	case "/v1/sites/:id/mode", "/v1/offers/:id/mode":
+		return c.Request.Method == http.MethodPut
 	case "/v1/payouts/balance", "/v1/payouts/history":
 		return c.Request.Method == http.MethodGet
 	}

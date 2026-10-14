@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -27,6 +28,9 @@ type ReadinessEngine struct {
 	APIVersion string
 	// AllowPrivateHosts permits probing loopback/private addresses (tests only).
 	AllowPrivateHosts bool
+	// PublicBaseURL is the only extra origin readiness may probe when it is not a public host.
+	// Behavior is covered by TestReadinessAllowsOnlyTheConfiguredPublicOrigin.
+	PublicBaseURL string
 }
 
 type ReadinessProduct struct {
@@ -37,6 +41,7 @@ type ReadinessProduct struct {
 	PricingURL      string
 	PaymentProvider string
 	RefParam        string
+	CheckoutURL     string
 }
 
 type ReadinessCheck struct {
@@ -68,7 +73,12 @@ var checkoutMarkers = map[string][]string{
 var (
 	pricingMarkerPattern    = regexp.MustCompile(`(?i)[$€£]\s*\d|/\s*(month|mo|year|yr)|price|pricing|free trial`)
 	onboardingMarkerPattern = regexp.MustCompile(`(?i)sign\s*up|get started|start (for )?free|create (an )?account|register|try (it )?free`)
-	privacyMarkerPattern    = regexp.MustCompile(`(?i)href="[^"]*(privacy|terms)[^"]*"`)
+	privacyMarkerPattern    = regexp.MustCompile(`(?i)href="[^"]*privacy[^"]*"`)
+	termsMarkerPattern      = regexp.MustCompile(`(?i)href="[^"]*terms[^"]*"`)
+	checkoutActionText      = regexp.MustCompile(`(?i)\b(buy|subscribe|checkout|start|sign[\s-]*up|get\s+started)\b`)
+	checkoutHrefMarker      = regexp.MustCompile(`(?i)(?:^|[/?#=_-])(buy|subscribe|checkout|signup|sign-up|get-started|start)(?:[/?#=_./-]|$)`)
+	actionTagPattern        = regexp.MustCompile(`(?is)<(a|button)\b([^>]*)>(.*?)</(a|button)>`)
+	hrefAttrPattern         = regexp.MustCompile(`(?i)\bhref\s*=\s*["']([^"']*)["']`)
 	htmlTagPattern          = regexp.MustCompile(`(?s)<script.*?</script>|<style.*?</style>|<[^>]*>`)
 )
 
@@ -79,18 +89,25 @@ func (e *ReadinessEngine) Assess(ctx context.Context, product ReadinessProduct) 
 	}
 
 	site := e.fetchPage(ctx, product.WebsiteURL)
+	checkout, providerWarning := e.checkCheckoutPresent(ctx, product, site)
 	checks := []ReadinessCheck{
 		e.checkSiteReachable(site),
-		e.checkCheckoutPresent(ctx, product, site),
-		e.checkRefParamSurvives(ctx, product.WebsiteURL, refParam),
+		checkout,
+		e.checkRefParamSurvives(ctx, product.WebsiteURL, product.PricingURL, refParam),
 		e.checkPricingPage(ctx, product.PricingURL),
 		e.checkDocsPresent(ctx, product.DocsURL),
-		checkBodyMarker(site, "privacy_policy", privacyMarkerPattern,
-			"Privacy/terms links found on the landing page.",
-			"Add discoverable Privacy Policy and Terms links to the landing page."),
-		checkBodyMarker(site, "onboarding_flow", onboardingMarkerPattern,
+		checkBodyMarker(site, "privacy_policy", privacyMarkerPattern, true,
+			"Privacy Policy link found on the landing page.",
+			"Add a discoverable Privacy Policy link to the landing page."),
+		checkBodyMarker(site, "terms", termsMarkerPattern, true,
+			"Terms link found on the landing page.",
+			"Add a discoverable Terms link to the landing page."),
+		checkBodyMarker(site, "onboarding_flow", onboardingMarkerPattern, false,
 			"Signup call-to-action found on the landing page.",
 			"Add a clear signup / get-started call-to-action to the landing page."),
+	}
+	if providerWarning != nil {
+		checks = append(checks, *providerWarning)
 	}
 
 	result := ReadinessResult{}
@@ -136,7 +153,16 @@ func (e *ReadinessEngine) httpClient() *http.Client {
 		transport = existing.Clone()
 	}
 	transport.Proxy = nil
-	transport.DialContext = dialPublicProbe
+	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+		if e.publicOriginHost(host) {
+			return (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, address)
+		}
+		return dialPublicProbe(ctx, network, address)
+	}
 	client.Transport = transport
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 10 {
@@ -181,6 +207,13 @@ func publicProbeAddresses(ctx context.Context, host string) ([]net.IPAddr, error
 	return addresses, nil
 }
 
+// FetchPublicPage GETs a public page with the readiness timeout and the
+// 512 KiB body cap. ok is true only for an HTTP 2xx response.
+func (e *ReadinessEngine) FetchPublicPage(ctx context.Context, rawURL string) (body string, status int, ok bool) {
+	page := e.fetchPage(ctx, rawURL)
+	return page.Body, page.Status, page.OK
+}
+
 func (e *ReadinessEngine) fetchPage(ctx context.Context, rawURL string) fetchedPage {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
@@ -213,7 +246,7 @@ func (e *ReadinessEngine) fetchPage(ctx context.Context, rawURL string) fetchedP
 // hostAllowed blocks probes of loopback/private/link-local addresses so a maker
 // cannot point readiness checks at internal infrastructure.
 func (e *ReadinessEngine) hostAllowed(ctx context.Context, rawURL string) error {
-	if e.AllowPrivateHosts {
+	if e.AllowPrivateHosts || e.originAllowed(rawURL) {
 		return nil
 	}
 	parsed, err := url.Parse(rawURL)
@@ -241,35 +274,124 @@ func (e *ReadinessEngine) checkSiteReachable(site fetchedPage) ReadinessCheck {
 	return check
 }
 
-func (e *ReadinessEngine) checkCheckoutPresent(ctx context.Context, product ReadinessProduct, site fetchedPage) ReadinessCheck {
-	check := ReadinessCheck{Key: "checkout_present", Kind: "probe", Gate: true}
-	haystack := strings.ToLower(site.Body)
-	if product.PricingURL != "" && product.PricingURL != product.WebsiteURL {
-		pricing := e.fetchPage(ctx, product.PricingURL)
-		haystack += "\n" + strings.ToLower(pricing.Body)
+// originAllowed is the only SSRF exception: probes of PUBLIC_BASE_URL, so this
+// server can assess its own demo product. Every other private host stays blocked.
+func (e *ReadinessEngine) originAllowed(rawURL string) bool {
+	base := strings.TrimSpace(e.PublicBaseURL)
+	if base == "" {
+		return false
 	}
+	allowed, err := url.Parse(base)
+	if err != nil || allowed.Hostname() == "" || (allowed.Scheme != "http" && allowed.Scheme != "https") {
+		return false
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(parsed.Scheme, allowed.Scheme) && e.publicOriginHost(parsed.Hostname()) && parsed.Port() == allowed.Port()
+}
+
+func (e *ReadinessEngine) publicOriginHost(host string) bool {
+	allowed, err := url.Parse(strings.TrimSpace(e.PublicBaseURL))
+	if err != nil || allowed.Hostname() == "" {
+		return false
+	}
+	return strings.EqualFold(host, allowed.Hostname())
+}
+
+func pageHasCheckoutAction(html string) bool {
+	for _, match := range actionTagPattern.FindAllStringSubmatch(html, -1) {
+		href := ""
+		if found := hrefAttrPattern.FindStringSubmatch(match[2]); found != nil {
+			href = found[1]
+		}
+		if checkoutActionText.MatchString(stripHTML(match[3])) || checkoutHrefMarker.MatchString(href) {
+			return true
+		}
+	}
+	return false
+}
+
+func detectCheckoutProvider(haystack string) (string, string) {
 	for provider, markers := range checkoutMarkers {
 		for _, marker := range markers {
 			if strings.Contains(haystack, marker) {
-				check.Status = "pass"
-				check.Score = 100
-				check.Evidence = fmt.Sprintf("detected %s checkout marker %q", provider, marker)
-				if product.PaymentProvider != "" && product.PaymentProvider != "none" && product.PaymentProvider != provider {
-					check.Status = "warn"
-					check.Score = 60
-					check.Evidence += fmt.Sprintf(" but product declares payment_provider=%s", product.PaymentProvider)
-				}
-				return check
+				return provider, marker
 			}
 		}
 	}
-	check.Status = "fail"
-	check.Evidence = "no Stripe / Lemon Squeezy / Polar checkout marker found on landing or pricing page"
-	check.Remediation = "Wire a checkout with Stripe, Lemon Squeezy, or Polar and expose it from the landing or pricing page; without payments there is nothing to attribute commissions against."
-	return check
+	return "", ""
 }
 
-func (e *ReadinessEngine) checkRefParamSurvives(ctx context.Context, websiteURL, refParam string) ReadinessCheck {
+func (e *ReadinessEngine) checkCheckoutPresent(ctx context.Context, product ReadinessProduct, site fetchedPage) (ReadinessCheck, *ReadinessCheck) {
+	check := ReadinessCheck{Key: "checkout_present", Kind: "probe", Gate: true}
+	bodies := site.Body
+	if product.PricingURL != "" && product.PricingURL != product.WebsiteURL {
+		pricing := e.fetchPage(ctx, product.PricingURL)
+		bodies += "\n" + pricing.Body
+	}
+	haystack := strings.ToLower(bodies + "\n" + product.CheckoutURL)
+	provider, marker := detectCheckoutProvider(haystack)
+	if strings.TrimSpace(product.CheckoutURL) == "" && !pageHasCheckoutAction(bodies) {
+		check.Status = "fail"
+		check.Evidence = "no checkout, buy, or sign-up link found on the landing or pricing page"
+		check.Remediation = "Add a buy, subscribe, checkout, or sign-up link on the landing or pricing page, or set a checkout URL. Offer Rails does not require a particular payment provider."
+		return check, nil
+	}
+	check.Status = "pass"
+	check.Score = 100
+	if provider != "" {
+		check.Evidence = fmt.Sprintf("detected %s checkout marker %q", provider, marker)
+		if product.PaymentProvider != "" && product.PaymentProvider != "none" && product.PaymentProvider != provider {
+			check.Status = "warn"
+			check.Score = 60
+			check.Evidence += fmt.Sprintf(" but product declares payment_provider=%s", product.PaymentProvider)
+		}
+		return check, nil
+	}
+	if strings.TrimSpace(product.CheckoutURL) != "" {
+		check.Evidence = "declared checkout URL"
+	} else {
+		check.Evidence = "checkout or sign-up link found"
+	}
+	return check, &ReadinessCheck{
+		Key:         "payment_provider",
+		Kind:        "probe",
+		Status:      "warn",
+		Score:       60,
+		Evidence:    "no known payment provider",
+		Remediation: "No known payment provider was detected. Offer Rails does not hold money and does not require Stripe, Lemon Squeezy, or Polar.",
+	}
+}
+
+var ctaLinkPattern = regexp.MustCompile(`(?is)<a\b[^>]*\bhref\s*=\s*["']([^"']*)["'][^>]*>(.*?)</a>`)
+
+func attributionLinkDrops(body, pageURL, refParam, probeValue string) bool {
+	base, err := url.Parse(pageURL)
+	if err != nil {
+		return false
+	}
+	for _, match := range ctaLinkPattern.FindAllStringSubmatch(body, -1) {
+		href := html.UnescapeString(strings.TrimSpace(match[1]))
+		text := strings.ToLower(strings.TrimSpace(stripHTML(match[2])))
+		ref, err := url.Parse(href)
+		if err != nil {
+			continue
+		}
+		abs := base.ResolveReference(ref)
+		path := strings.TrimRight(abs.EscapedPath(), "/")
+		if text != "get started" && !strings.HasSuffix(path, "/start") && !strings.HasSuffix(path, "/pricing") {
+			continue
+		}
+		if abs.Query().Get(refParam) != probeValue {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *ReadinessEngine) checkRefParamSurvives(ctx context.Context, websiteURL, pricingURL, refParam string) ReadinessCheck {
 	check := ReadinessCheck{Key: "ref_param_survives", Kind: "probe", Gate: true}
 	probeValue := "dtr-probe"
 	probeURL, err := url.Parse(websiteURL)
@@ -291,6 +413,12 @@ func (e *ReadinessEngine) checkRefParamSurvives(ctx context.Context, websiteURL,
 		return check
 	}
 	if page.FinalURL != nil && page.FinalURL.Query().Get(refParam) == probeValue {
+		if attributionLinkDrops(page.Body, page.FinalURL.String(), refParam, probeValue) || e.pricingLinkDrops(ctx, pricingURL, websiteURL, refParam, probeValue) {
+			check.Status = "fail"
+			check.Evidence = fmt.Sprintf("a get-started or pricing link dropped ?%s=", refParam)
+			check.Remediation = fmt.Sprintf("Keep ?%s= on get-started and pricing links as well as on the landing URL. It carries the click id.", refParam)
+			return check
+		}
 		check.Status = "pass"
 		check.Score = 100
 		check.Evidence = fmt.Sprintf("?%s= parameter survived to the final URL", refParam)
@@ -302,11 +430,29 @@ func (e *ReadinessEngine) checkRefParamSurvives(ctx context.Context, websiteURL,
 	return check
 }
 
+func (e *ReadinessEngine) pricingLinkDrops(ctx context.Context, pricingURL, websiteURL, refParam, probeValue string) bool {
+	pricingURL = strings.TrimSpace(pricingURL)
+	if pricingURL == "" || pricingURL == websiteURL {
+		return false
+	}
+	probe, err := url.Parse(pricingURL)
+	if err != nil {
+		return false
+	}
+	q := probe.Query()
+	q.Set(refParam, probeValue)
+	probe.RawQuery = q.Encode()
+	page := e.fetchPage(ctx, probe.String())
+	if !page.OK || page.FinalURL == nil {
+		return false
+	}
+	return attributionLinkDrops(page.Body, page.FinalURL.String(), refParam, probeValue)
+}
+
 func (e *ReadinessEngine) checkPricingPage(ctx context.Context, pricingURL string) ReadinessCheck {
-	check := ReadinessCheck{Key: "pricing_page", Kind: "probe"}
+	check := ReadinessCheck{Key: "pricing_page", Kind: "probe", Gate: true}
 	if strings.TrimSpace(pricingURL) == "" {
-		check.Status = "warn"
-		check.Score = 40
+		check.Status = "fail"
 		check.Evidence = "no pricing_url provided"
 		check.Remediation = "Publish a pricing page and set pricing_url; publishers convert better when the price is visible."
 		return check
@@ -318,8 +464,7 @@ func (e *ReadinessEngine) checkPricingPage(ctx context.Context, pricingURL strin
 		check.Evidence = "pricing page resolves and states a price"
 		return check
 	}
-	check.Status = "warn"
-	check.Score = 40
+	check.Status = "fail"
 	if !page.OK {
 		check.Evidence = "pricing page did not resolve: " + page.Err
 	} else {
@@ -330,10 +475,9 @@ func (e *ReadinessEngine) checkPricingPage(ctx context.Context, pricingURL strin
 }
 
 func (e *ReadinessEngine) checkDocsPresent(ctx context.Context, docsURL string) ReadinessCheck {
-	check := ReadinessCheck{Key: "docs_present", Kind: "probe"}
+	check := ReadinessCheck{Key: "docs_present", Kind: "probe", Gate: true}
 	if strings.TrimSpace(docsURL) == "" {
-		check.Status = "warn"
-		check.Score = 40
+		check.Status = "fail"
 		check.Evidence = "no docs_url provided"
 		check.Remediation = "Publish documentation and set docs_url; publishers link to docs to support their recommendation."
 		return check
@@ -345,8 +489,7 @@ func (e *ReadinessEngine) checkDocsPresent(ctx context.Context, docsURL string) 
 		check.Evidence = "docs resolve with non-trivial content"
 		return check
 	}
-	check.Status = "warn"
-	check.Score = 40
+	check.Status = "fail"
 	if !page.OK {
 		check.Evidence = "docs page did not resolve: " + page.Err
 	} else {
@@ -356,18 +499,22 @@ func (e *ReadinessEngine) checkDocsPresent(ctx context.Context, docsURL string) 
 	return check
 }
 
-func checkBodyMarker(site fetchedPage, key string, pattern *regexp.Regexp, passEvidence, remediation string) ReadinessCheck {
-	check := ReadinessCheck{Key: key, Kind: "probe"}
+func checkBodyMarker(site fetchedPage, key string, pattern *regexp.Regexp, gate bool, passEvidence, remediation string) ReadinessCheck {
+	check := ReadinessCheck{Key: key, Kind: "probe", Gate: gate}
 	if site.OK && pattern.MatchString(site.Body) {
 		check.Status = "pass"
 		check.Score = 100
 		check.Evidence = passEvidence
 		return check
 	}
-	check.Status = "warn"
-	check.Score = 40
 	check.Evidence = "marker not found on the landing page"
 	check.Remediation = remediation
+	if gate {
+		check.Status = "fail"
+		return check
+	}
+	check.Status = "warn"
+	check.Score = 40
 	return check
 }
 

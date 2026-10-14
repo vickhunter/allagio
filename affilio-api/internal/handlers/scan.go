@@ -1,16 +1,25 @@
 package handlers
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
+)
+
+const (
+	maxScanTitleBytes   = 512
+	maxScanContentBytes = 1 << 20
 )
 
 type ScanHandler struct {
@@ -23,10 +32,13 @@ type scanFullRequest struct {
 }
 
 type scanArticle struct {
-	WPPostID int64  `json:"wp_post_id"`
-	Title    string `json:"title"`
-	Content  string `json:"content"`
-	URL      string `json:"url"`
+	WPPostID        int64  `json:"wp_post_id"`
+	Title           string `json:"title"`
+	Content         string `json:"content"`
+	TitleB64        string `json:"title_b64"`
+	ContentB64      string `json:"content_b64"`
+	ContentEncoding string `json:"content_encoding"`
+	URL             string `json:"url"`
 }
 
 func (h *ScanHandler) ScanFull(c *gin.Context) {
@@ -35,6 +47,12 @@ func (h *ScanHandler) ScanFull(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}
+	articles, err := decodeScanArticles(req.Articles)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return
+	}
+	req.Articles = articles
 	siteID := c.GetString("site_id")
 	jobID, err := h.DB.CreateScanJob(c.Request.Context(), siteID, len(req.Articles))
 	if err != nil {
@@ -63,6 +81,12 @@ func (h *ScanHandler) ScanSingle(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
 		return
 	}
+	decoded, err := decodeScanArticle(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+		return
+	}
+	req = decoded
 	siteID := c.GetString("site_id")
 	articleID, _, err := h.upsertAndAnalyze(c, siteID, req)
 	if err != nil {
@@ -87,6 +111,76 @@ func (h *ScanHandler) ScanStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, job)
+}
+
+func decodeScanArticles(articles []scanArticle) ([]scanArticle, error) {
+	decoded := make([]scanArticle, len(articles))
+	for i, article := range articles {
+		next, err := decodeScanArticle(article)
+		if err != nil {
+			return nil, err
+		}
+		decoded[i] = next
+	}
+	return decoded, nil
+}
+
+func decodeScanArticle(article scanArticle) (scanArticle, error) {
+	title, err := decodeScanField(article.Title, article.TitleB64, article.ContentEncoding, maxScanTitleBytes)
+	if err != nil {
+		return article, err
+	}
+	content, err := decodeScanField(article.Content, article.ContentB64, article.ContentEncoding, maxScanContentBytes)
+	if err != nil {
+		return article, err
+	}
+	article.Title = title
+	article.Content = content
+	article.TitleB64 = ""
+	article.ContentB64 = ""
+	article.ContentEncoding = ""
+	return article, nil
+}
+
+func decodeScanField(raw, encoded, encoding string, limit int) (string, error) {
+	if raw != "" && encoded != "" {
+		return "", fmt.Errorf("conflicting scan fields")
+	}
+	if encoded == "" {
+		if len(raw) > limit {
+			return "", fmt.Errorf("scan field exceeds size limit")
+		}
+		return raw, nil
+	}
+	if encoding == "" {
+		encoding = "base64"
+	}
+	if encoding != "base64" && encoding != "gzip+base64" {
+		return "", fmt.Errorf("unknown content encoding")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", fmt.Errorf("invalid base64")
+	}
+	if encoding == "gzip+base64" {
+		reader, err := gzip.NewReader(bytes.NewReader(decoded))
+		if err != nil {
+			return "", fmt.Errorf("invalid gzip")
+		}
+		defer reader.Close()
+		limited, err := io.ReadAll(io.LimitReader(reader, int64(limit)+1))
+		if err != nil {
+			return "", fmt.Errorf("invalid gzip")
+		}
+		if len(limited) > limit {
+			return "", fmt.Errorf("scan field exceeds size limit")
+		}
+		return string(limited), nil
+	}
+	if len(decoded) > limit {
+		return "", fmt.Errorf("scan field exceeds size limit")
+	}
+	return string(decoded), nil
 }
 
 func (h *ScanHandler) upsertAndAnalyze(c *gin.Context, siteID string, article scanArticle) (string, int, error) {

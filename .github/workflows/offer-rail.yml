@@ -1,0 +1,81 @@
+name: Offer rail
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "affilio-wp/admin/build/workspace.*"
+      - "affilio-wp/admin/build/landing.css"
+      - "affilio-wp/admin/build/home.html"
+      - "affilio-wp/admin/build/distribution.*"
+      - "affilio-wp/admin/build/marketplace.js"
+      - "affilio-wp/admin/build/earnings.js"
+      - "affilio-wp/admin/css/affilio-admin.css"
+      - "affilio-wp/e2e/offer-rail.spec.js"
+      - "affilio-wp/e2e/offer-rail.config.js"
+      - "affilio-wp/e2e/package.json"
+      - ".github/workflows/offer-rail.yml"
+  pull_request:
+    paths:
+      - "affilio-wp/admin/build/workspace.*"
+      - "affilio-wp/admin/build/landing.css"
+      - "affilio-wp/admin/build/home.html"
+      - "affilio-wp/admin/build/distribution.*"
+      - "affilio-wp/admin/build/marketplace.js"
+      - "affilio-wp/admin/build/earnings.js"
+      - "affilio-wp/admin/css/affilio-admin.css"
+      - "affilio-wp/e2e/offer-rail.spec.js"
+      - "affilio-wp/e2e/offer-rail.config.js"
+      - "affilio-wp/e2e/package.json"
+      - ".github/workflows/offer-rail.yml"
+
+jobs:
+  offer-rail:
+    name: offer-rail
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache-dependency-path: affilio-api/go.sum
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('affilio-wp/e2e/package.json') }}
+
+      - name: Install test runner
+        working-directory: affilio-wp/e2e
+        run: npm install
+
+      - name: Install Chromium
+        working-directory: affilio-wp/e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Offer rail at 1440 and 390
+        working-directory: affilio-wp/e2e
+        env:
+          OFFER_RAIL_ARTIFACTS: ${{ github.workspace }}/offer-rail-artifacts
+        run: npx playwright test --config offer-rail.config.js
+
+      - name: Upload rail screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offer-rail-screenshots
+          path: offer-rail-artifacts
+          if-no-files-found: ignore

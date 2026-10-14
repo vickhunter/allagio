@@ -1,0 +1,16 @@
+{
+ "projects": [
+  {
+   "id": "5a1e0001-0000-4000-8000-00000000a001",
+   "kind": "site",
+   "mode": "manual",
+   "name": "victormotricala.it"
+  },
+  {
+   "id": "0ffe0001-0000-4000-8000-00000000b001",
+   "kind": "offer",
+   "mode": "manual",
+   "name": "Rail Tool"
+  }
+ ]
+}

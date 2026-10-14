@@ -28,6 +28,7 @@ func newAttributionRouter(db *database.DB) *gin.Engine {
 	redirects := &RedirectsHandler{DB: db}
 	webhooks := &WebhooksHandler{DB: db, Cipher: testConnectionCipher()}
 	r.GET("/v1/go/:code", redirects.Go)
+	r.HEAD("/v1/go/:code", redirects.Go)
 	r.POST("/v1/webhooks/:provider", webhooks.Receive)
 	r.POST("/v1/webhooks/:provider/:product_id", webhooks.Receive)
 	site := r.Group("/v1")
@@ -189,16 +190,15 @@ func TestAttributionEndToEnd(t *testing.T) {
 	if rrec.Code != http.StatusFound {
 		t.Fatalf("redirect: expected 302, got %d", rrec.Code)
 	}
+	requireGoLinkHeaders(t, rrec)
 	location := rrec.Header().Get("Location")
-	if !strings.Contains(location, "inboxpilot.example.com") || !strings.Contains(location, "via=") {
-		t.Fatalf("unexpected redirect location %q", location)
+	if !strings.Contains(location, "inboxpilot.example.com") || strings.Contains(location, "via=") {
+		t.Fatalf("marketplace link must stay a plain offer URL, got %q", location)
 	}
-	clickID := location[strings.Index(location, "via=")+4:]
-
-	var clickCount int
-	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks WHERE id=$1`, clickID).Scan(&clickCount); err != nil || clickCount != 1 {
-		t.Fatalf("expected click row for %s, err=%v count=%d", clickID, err, clickCount)
+	if n := clickCount(t, db); n != 0 {
+		t.Fatalf("marketplace link recorded %d clicks", n)
 	}
+	clickID := insertCampaignClick(t, db, code)
 
 	// A signed sale webhook books the conversion and a pending ledger entry.
 	wrec, wbody := sendStripeEvent(t, db, r, stripeSalePayload("evt_sale_1", "pi_100", clickID, 10000))
@@ -262,8 +262,8 @@ func TestWebhookRejectsBadSignatureAndUnattributed(t *testing.T) {
 	req.Header.Set("Stripe-Signature", "t=1,v1=bad")
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401 for bad signature, got %d", rec.Code)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for bad signature, got %d", rec.Code)
 	}
 	var stored int
 	_ = db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM webhook_events`).Scan(&stored)
@@ -311,28 +311,180 @@ func TestRedirectStopsAttributingWhenPaused(t *testing.T) {
 		t.Fatalf("pause: expected 200, got %d", rec.Code)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
+	assertReaderRedirect(t, r, db, "/v1/go/"+code, "https://blog2.example.com/")
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/go/doesnotexist", nil)
 	rrec := httptest.NewRecorder()
 	r.ServeHTTP(rrec, req)
-	if rrec.Code != http.StatusFound {
-		t.Fatalf("expected 302 for paused offer, got %d", rrec.Code)
+	requirePlainRedirect(t, rrec, "https://offerrails.com/")
+}
+
+func TestRedirectRefusesPausedUnlistedAndDeleted(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, makerKey := createTestMaker(t, db)
+	r := newAttributionRouter(db)
+	offerID := listedOffer(t, db, r, makerKey)
+	siteKey := "site-key-unavailable"
+	createTestSite(t, db, siteKey, "gone.example.com", "Gone Blog")
+	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
+	code := join["tracking_code"].(string)
+
+	rec, _ := doJSON(t, r, http.MethodPatch, "/v1/maker/offers/"+offerID, makerKey, map[string]interface{}{"status": "paused"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("pause: expected 200, got %d", rec.Code)
 	}
-	if strings.Contains(rrec.Header().Get("Location"), "via=") {
-		t.Fatalf("paused offer must not carry attribution, got %q", rrec.Header().Get("Location"))
+	t.Run("paused", func(t *testing.T) {
+		assertReaderRedirect(t, r, db, "/v1/go/"+code, "https://gone.example.com/")
+		bot := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
+		bot.Header.Set("User-Agent", "Slackbot-LinkExpanding 1.0")
+		botRec := httptest.NewRecorder()
+		r.ServeHTTP(botRec, bot)
+		requirePlainRedirect(t, botRec, "https://gone.example.com/")
+		if strings.Contains(botRec.Header().Get("Location"), "inboxpilot") {
+			t.Fatalf("preview bot must not be redirected to a paused offer, got %q", botRec.Header().Get("Location"))
+		}
+	})
+
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='draft' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("unlisted", func(t *testing.T) {
+		assertReaderRedirect(t, r, db, "/v1/go/"+code, "https://gone.example.com/")
+	})
+
+	if _, err := db.Pool.Exec(context.Background(), `DELETE FROM campaigns WHERE tracking_code=$1`, code); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("deleted", func(t *testing.T) {
+		deleted := httptest.NewRecorder()
+		r.ServeHTTP(deleted, httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil))
+		requirePlainRedirect(t, deleted, "https://offerrails.com/")
+		if n := clickCount(t, db); n != 0 {
+			t.Fatalf("deleted code recorded %d clicks", n)
+		}
+	})
+}
+
+func insertCampaignClick(t *testing.T, db *database.DB, code string) string {
+	t.Helper()
+	var campaignID, siteID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT id::text, site_id::text FROM campaigns WHERE tracking_code=$1`, code).Scan(&campaignID, &siteID); err != nil {
+		t.Fatal(err)
+	}
+	id, err := db.InsertPlacementClick(context.Background(), campaignID, siteID, nil, "test-hash", "Mozilla/5.0", "https://example.com/post", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+func assertReaderRedirect(t *testing.T, r *gin.Engine, db *database.DB, path, want string) {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	requirePlainRedirect(t, rec, want)
+	var clicks int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks`).Scan(&clicks); err != nil {
+		t.Fatal(err)
+	}
+	if clicks != 0 {
+		t.Fatalf("%s: expected no clicks, got %d", path, clicks)
+	}
+}
+
+func assertUnavailable(t *testing.T, r *gin.Engine, db *database.DB, path string, want int, reason string) {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+	if rec.Code != want {
+		t.Fatalf("%s: expected %d, got %d %s", path, want, rec.Code, rec.Body.String())
+	}
+	requireGoLinkHeaders(t, rec)
+	if loc := rec.Header().Get("Location"); loc != "" {
+		t.Fatalf("%s: must not redirect, got %q", path, loc)
+	}
+	if reason != "" && !strings.Contains(rec.Body.String(), reason) {
+		t.Fatalf("%s: body %s missing reason %q", path, rec.Body.String(), reason)
 	}
 	var clicks int
-	_ = db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks`).Scan(&clicks)
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks`).Scan(&clicks); err != nil {
+		t.Fatal(err)
+	}
 	if clicks != 0 {
-		t.Fatalf("expected no clicks logged while paused, got %d", clicks)
+		t.Fatalf("%s: expected no clicks, got %d", path, clicks)
 	}
+}
 
-	// Unknown code 404s.
-	req = httptest.NewRequest(http.MethodGet, "/v1/go/doesnotexist", nil)
-	rrec = httptest.NewRecorder()
-	r.ServeHTTP(rrec, req)
-	if rrec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for unknown code, got %d", rrec.Code)
+func TestDestinationURLsRejectHTTP(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	_, makerKey := createTestMaker(t, db)
+	r := newAttributionRouter(db)
+	t.Run("create website", func(t *testing.T) {
+		rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+			"name":             "Insecure",
+			"website_url":      "http://insecure.example.com",
+			"product_type":     "saas",
+			"payment_provider": "stripe",
+		})
+		if rec.Code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(body["error"]), "https") {
+			t.Fatalf("http website_url must be rejected with an https error, got %d %v", rec.Code, body)
+		}
+	})
+
+	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":             "InboxPilot",
+		"website_url":      "https://inboxpilot.example.com",
+		"docs_url":         "http://docs.inboxpilot.example.com",
+		"product_type":     "saas",
+		"payment_provider": "stripe",
+	})
+	if product["id"] == nil {
+		t.Fatal("https product with an http docs_url should still be accepted")
 	}
+	productID := product["id"].(string)
+	t.Run("update website", func(t *testing.T) {
+		rec, body := doJSON(t, r, http.MethodPatch, "/v1/maker/products/"+productID, makerKey, map[string]interface{}{
+			"website_url": "http://insecure.example.com/path",
+		})
+		if rec.Code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(body["error"]), "https") {
+			t.Fatalf("http website_url update must be rejected, got %d %v", rec.Code, body)
+		}
+	})
+	t.Run("create landing", func(t *testing.T) {
+		rec, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+			"product_id":       productID,
+			"commission_type":  "percentage",
+			"commission_value": 20,
+			"landing_url":      "http://insecure.example.com/offer",
+		})
+		if rec.Code != http.StatusBadRequest || !strings.Contains(fmt.Sprint(offer["error"]), "https") {
+			t.Fatalf("http landing_url must be rejected with an https error, got %d %v", rec.Code, offer)
+		}
+	})
+
+	offerID := listedOffer(t, db, r, makerKey)
+	siteKey := "site-key-http-dest"
+	createTestSite(t, db, siteKey, "httpdest.example.com", "HTTP Dest")
+	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
+	code := join["tracking_code"].(string)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET landing_url='http://insecure.example.com/stored' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("stored destination", func(t *testing.T) {
+		assertReaderRedirect(t, r, db, "/v1/go/"+code, "https://httpdest.example.com/")
+		bot := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
+		bot.Header.Set("User-Agent", "Twitterbot/1.0")
+		botRec := httptest.NewRecorder()
+		r.ServeHTTP(botRec, bot)
+		requirePlainRedirect(t, botRec, "https://httpdest.example.com/")
+		if strings.Contains(botRec.Header().Get("Location"), "insecure.example.com") {
+			t.Fatalf("preview bot must not be sent to a non-https destination, got %q", botRec.Header().Get("Location"))
+		}
+	})
 }
 
 func testConnectionCipher() *services.ConnectionCipher {

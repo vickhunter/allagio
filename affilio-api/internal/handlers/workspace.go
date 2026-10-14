@@ -27,6 +27,7 @@ func (h *HostedHandler) LoadWorkspace() error {
 	h.Page = page
 	if h.Payments != nil {
 		h.Payments.Page = page
+		h.Payments.OperatorID = h.OperatorID
 	}
 	return nil
 }
@@ -49,7 +50,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		c.JSON(200, gin.H{"name": o.Name, "email": o.Email, "owner_id": o.ID, "maker": o.MakerID != "", "publisher": o.SiteID != "", "operator": h.OperatorID != "" && o.ID == h.OperatorID, "mcp_url": h.resource(), "install_command": h.installCommand()})
 	})
 	products := &ProductsHandler{DB: h.DB}
-	offers := &OffersHandler{DB: h.DB}
+	offers := &OffersHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}
 	placements := &PlacementsHandler{DB: h.DB, RequireVerifiedConnection: true}
 	payouts := &PayoutsHandler{DB: h.DB}
 	maker := api.Group("", h.requireMaker)
@@ -61,6 +62,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	maker.PATCH("/offers/:id", offers.Patch)
 	maker.POST("/offers/:id/submit", offers.Submit)
 	maker.GET("/earnings/maker", payouts.MakerEarnings)
+	maker.GET("/maker-placements", placements.ListForMaker)
 	maker.GET("/payments", h.MerchantPayments)
 	maker.POST("/payments/:id/report", h.ReportMerchantPayment)
 	if h.Assessments != nil {
@@ -69,6 +71,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	}
 	publisher := api.Group("", h.requirePublisher)
 	publisher.POST("/opportunities", placements.Find)
+	publisher.POST("/article-text", placements.ArticleText)
 	publisher.POST("/placements", placements.Prepare)
 	publisher.GET("/placements", placements.List)
 	publisher.POST("/placements/:id/commit", placements.Commit)
@@ -77,9 +80,9 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	publisher.GET("/payout-profile", h.PayoutProfile)
 	publisher.POST("/payout-profile", h.SavePayoutProfile)
 	review := api.Group("/review", h.requireOperator)
-	review.GET("/offers", (&OfferReviewHandler{DB: h.DB}).Queue)
-	review.POST("/offers/:id/approve", (&OfferReviewHandler{DB: h.DB}).Approve)
-	review.POST("/offers/:id/reject", (&OfferReviewHandler{DB: h.DB}).Reject)
+	review.GET("/offers", (&OfferReviewHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}).Queue)
+	review.POST("/offers/:id/approve", (&OfferReviewHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}).Approve)
+	review.POST("/offers/:id/reject", (&OfferReviewHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}).Reject)
 	review.POST("/payouts/batch", payouts.RunBatch)
 	if h.AssetsPath != "" {
 		public.GET("/", h.Home)
@@ -166,10 +169,9 @@ func (h *HostedHandler) DownloadWordPress(c *gin.Context) {
 			c.Status(500)
 			return
 		}
-		if file.Name == "affilio/affilio.php" {
-			data = bytes.ReplaceAll(data, []byte("https://affilio-production.up.railway.app/v1"), []byte(h.BaseURL+"/v1"))
-		}
-		entry, err := writer.CreateHeader(&file.FileHeader)
+		data = rewriteDownloadedPlugin(file.Name, data, h.BaseURL)
+		header := &zip.FileHeader{Name: file.Name, Method: zip.Deflate, Modified: file.Modified}
+		entry, err := writer.CreateHeader(header)
 		if err != nil {
 			c.Status(500)
 			return
@@ -185,6 +187,18 @@ func (h *HostedHandler) DownloadWordPress(c *gin.Context) {
 	}
 	c.Header("Content-Disposition", `attachment; filename="affilio.zip"`)
 	c.Data(200, "application/zip", output.Bytes())
+}
+
+func rewriteDownloadedPlugin(name string, data []byte, baseURL string) []byte {
+	if name == "affilio-wp/affilio.php" {
+		replacement := ""
+		base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+		if base != "" && !strings.Contains(strings.ToLower(base), "railway.app") {
+			replacement = base + "/v1"
+		}
+		data = bytes.ReplaceAll(data, []byte("https://affilio-production.up.railway.app/v1"), []byte(replacement))
+	}
+	return bytes.ReplaceAll(data, []byte("railway.app"), nil)
 }
 
 func (h *HostedHandler) placementReceiptHTML(p *database.Placement) template.HTML {

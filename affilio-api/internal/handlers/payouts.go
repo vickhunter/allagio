@@ -124,7 +124,7 @@ func (h *PayoutsHandler) MarkPaid(c *gin.Context) {
 }
 
 func (h *PayoutsHandler) MakerEarnings(c *gin.Context) {
-	earnings, err := h.DB.MakerEarnings(c.Request.Context(), makerID(c))
+	earnings, err := h.DB.MakerEarnings(c.Request.Context(), makerID(c), c.GetString("offer_scope_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load earnings"})
 		return

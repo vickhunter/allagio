@@ -3,8 +3,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,13 +18,25 @@ import (
 )
 
 func newMakerRouter(db *database.DB) *gin.Engine {
+	return newMakerRouterWithClaims(db, "")
+}
+
+func newMakerRouterWithClaims(db *database.DB, claims string) *gin.Engine {
+	return newMakerRouterFull(db, &http.Client{Timeout: 5 * time.Second}, claims)
+}
+
+func newMakerRouterWithReadinessClient(db *database.DB, client *http.Client) *gin.Engine {
+	return newMakerRouterFull(db, client, "")
+}
+
+func newMakerRouterFull(db *database.DB, client *http.Client, claims string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	products := &ProductsHandler{DB: db}
-	offers := &OffersHandler{DB: db}
+	offers := &OffersHandler{DB: db, ClaimsCheck: claims}
 	assessments := &AssessmentsHandler{
 		DB:     db,
-		Engine: &services.ReadinessEngine{AllowPrivateHosts: true, Client: &http.Client{Timeout: 5 * time.Second}},
+		Engine: &services.ReadinessEngine{AllowPrivateHosts: true, Client: client},
 	}
 	maker := r.Group("/v1/maker")
 	maker.Use(middleware.MakerKeyAuth(db))
@@ -40,7 +54,10 @@ func newMakerRouter(db *database.DB) *gin.Engine {
 		maker.POST("/offers/:id/submit", offers.Submit)
 		maker.GET("/offers/:id/matches", offers.Matches)
 	}
-	review := &OfferReviewHandler{DB: db}
+	listings := r.Group("/v1/listings")
+	listings.Use(middleware.MakerKeyAuth(db))
+	listings.GET("", offers.Listings)
+	review := &OfferReviewHandler{DB: db, ClaimsCheck: claims}
 	admin := r.Group("/v1/offer-review")
 	admin.Use(middleware.AdminKeyAuth("admin-secret", services.NewAuditLogger(db)))
 	{
@@ -278,8 +295,8 @@ func TestOfferRejectReturnsToDraft(t *testing.T) {
 	r := newMakerRouter(db)
 
 	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
-		"name":        "PixelQuest",
-		"website_url": "https://pixelquest.example.com",
+		"name":         "PixelQuest",
+		"website_url":  "https://pixelquest.example.com",
 		"product_type": "game",
 	})
 	_, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
@@ -312,19 +329,25 @@ func TestAssessGatesOfferSubmitEndToEnd(t *testing.T) {
 	defer cleanup()
 
 	_, makerKey := createTestMaker(t, db)
-	r := newMakerRouter(db)
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		w.Write([]byte(`<html><body>Sign up <a href="/privacy">Privacy</a> for $9/month <script src="https://js.stripe.com/v3/"></script></body></html>`))
+		if req.URL.Path == "/docs" {
+			w.Write([]byte("<html><body>" + strings.Repeat("ShipFast documents the product for publishers. ", 20) + "</body></html>"))
+			return
+		}
+		w.Write([]byte(`<html><body><a href="/signup">Sign up</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a> for $9/month <script src="https://js.stripe.com/v3/"></script></body></html>`))
 	})
-	site := httptest.NewServer(mux)
+	site := httptest.NewTLSServer(mux)
 	defer site.Close()
+	probe := site.Client()
+	probe.Timeout = 5 * time.Second
+	r := newMakerRouterWithReadinessClient(db, probe)
 
 	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
 		"name":             "ShipFast",
 		"website_url":      site.URL,
 		"pricing_url":      site.URL,
+		"docs_url":         site.URL + "/docs",
 		"product_type":     "saas",
 		"payment_provider": "stripe",
 	})
@@ -365,18 +388,173 @@ func TestAssessGatesOfferSubmitEndToEnd(t *testing.T) {
 	}
 }
 
+func TestUnspecifiedProviderStaysEmptyAndLegacyStripeStillReads(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	demo := ginEngine()
+	hosted := &HostedHandler{BaseURL: "http://127.0.0.1"}
+	hosted.Mount(demo)
+	site := httptest.NewServer(demo)
+	defer site.Close()
+
+	makerID, makerKey := createTestMaker(t, db)
+	client := site.Client()
+	client.Timeout = 5 * time.Second
+	r := newMakerRouterWithReadinessClient(db, client)
+	rec, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":        "Neutral",
+		"website_url": "https://neutral.example",
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("create: %d %v", rec.Code, product)
+	}
+	productID := product["id"].(string)
+	if product["payment_provider"] != "" {
+		t.Fatalf("omitted provider must be stored empty, got %v", product["payment_provider"])
+	}
+	var stored *string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT payment_provider FROM products WHERE id=$1`, productID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored == nil || *stored != "" {
+		t.Fatalf("empty provider must stay an empty string, got %v", stored)
+	}
+
+	var legacyID, legacyProvider string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO products(maker_id, name, website_url, product_type, payment_provider)
+VALUES ($1,'Legacy','https://legacy.example','saas','stripe') RETURNING id`, makerID).Scan(&legacyID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT payment_provider FROM products WHERE id=$1`, legacyID).Scan(&legacyProvider); err != nil {
+		t.Fatal(err)
+	}
+	if legacyProvider != "stripe" {
+		t.Fatalf("legacy stripe insert must still read stripe, got %q", legacyProvider)
+	}
+	var absentID string
+	var absent *string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO products(maker_id, name, website_url, product_type, payment_provider)
+VALUES ($1,'Absent','https://absent.example','saas',NULL) RETURNING id`, makerID).Scan(&absentID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT payment_provider FROM products WHERE id=$1`, absentID).Scan(&absent); err != nil {
+		t.Fatal(err)
+	}
+	if absent != nil {
+		t.Fatalf("NULL provider must stay NULL, got %q", *absent)
+	}
+
+	base := site.URL
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE products SET website_url=$2, pricing_url=$3, docs_url=$4 WHERE id=$1`,
+		productID, base+"/demo", base+"/demo/pricing", base+"/demo/docs"); err != nil {
+		t.Fatal(err)
+	}
+	rec, assessment := doJSON(t, r, http.MethodPost, "/v1/maker/products/"+productID+"/assess", makerKey, nil)
+	if rec.Code != http.StatusOK || assessment["readiness_status"] != "ready" {
+		t.Fatalf("empty provider must still pass readiness, got %d %v", rec.Code, assessment)
+	}
+	_, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       productID,
+		"commission_type":  "flat",
+		"commission_value": 8,
+	})
+	submitted, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offer["id"].(string)+"/submit", makerKey, nil)
+	if submitted.Code != http.StatusOK || body["status"] != "submitted" {
+		t.Fatalf("empty provider must submit, got %d %v", submitted.Code, body)
+	}
+}
+
+func TestSubmitDoesNotRequireAPaymentConnection(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	makerID, makerKey := createTestMaker(t, db)
+	r := newMakerRouter(db)
+	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":             "Agnostic",
+		"website_url":      "https://agnostic.example",
+		"payment_provider": "none",
+	})
+	productID := product["id"].(string)
+	var connections int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM product_connections WHERE product_id=$1`, productID).Scan(&connections); err != nil {
+		t.Fatal(err)
+	}
+	if connections != 0 {
+		t.Fatalf("expected no payment connection, got %d", connections)
+	}
+	markProductReady(t, db, productID)
+	_, blocked := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       productID,
+		"commission_type":  "flat",
+		"commission_value": 8,
+	})
+	// A second offer is created after the first submit so the trusted path can list.
+	firstID := blocked["id"].(string)
+	early, earlyBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+firstID+"/submit", makerKey, nil)
+	if early.Code != http.StatusOK || earlyBody["status"] != "submitted" {
+		t.Fatalf("ready product with no provider connection must submit, got %d %v", early.Code, earlyBody)
+	}
+	if hint, _ := earlyBody["hint"].(string); strings.Contains(hint, "/v1/") || strings.Contains(fmt.Sprint(earlyBody["error"]), "/v1/") {
+		t.Fatalf("submit response must not name an API path: %v", earlyBody)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/offer-review/makers/"+makerID+"/trust", newJSONRequest(t, http.MethodPost, "", map[string]interface{}{"trusted": true}))
+	req.Header.Set("X-Admin-Key", "admin-secret")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("trust: %d %s", rec.Code, rec.Body.String())
+	}
+	_, listedOffer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       productID,
+		"commission_type":  "flat",
+		"commission_value": 9,
+	})
+	listed, listedBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+listedOffer["id"].(string)+"/submit", makerKey, nil)
+	if listed.Code != http.StatusOK || listedBody["status"] != "listed" || listedBody["program_id"] == nil || listedBody["program_id"] == "" {
+		t.Fatalf("trusted maker with no provider connection must list, got %d %v", listed.Code, listedBody)
+	}
+}
+
+func TestUnreadySubmitErrorHasNoAPIPath(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	_, makerKey := createTestMaker(t, db)
+	r := newMakerRouter(db)
+	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
+		"name":        "NotReady",
+		"website_url": "https://notready.example",
+	})
+	_, offer := doJSON(t, r, http.MethodPost, "/v1/maker/offers", makerKey, map[string]interface{}{
+		"product_id":       product["id"],
+		"commission_type":  "flat",
+		"commission_value": 4,
+	})
+	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offer["id"].(string)+"/submit", makerKey, nil)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", rec.Code)
+	}
+	encoded := fmt.Sprint(body)
+	if strings.Contains(encoded, "/v1/") || strings.Contains(encoded, "POST ") {
+		t.Fatalf("readiness refusal must be plain language, got %s", encoded)
+	}
+}
+
 func TestAssessFailingProductBlocksSubmit(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 
 	_, makerKey := createTestMaker(t, db)
-	r := newMakerRouter(db)
-
 	// No checkout marker anywhere: the checkout_present gate must fail.
-	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	site := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(`<html><body>Just a landing page</body></html>`))
 	}))
 	defer site.Close()
+	probe := site.Client()
+	probe.Timeout = 5 * time.Second
+	r := newMakerRouterWithReadinessClient(db, probe)
 
 	_, product := doJSON(t, r, http.MethodPost, "/v1/maker/products", makerKey, map[string]interface{}{
 		"name":        "NoCheckout",

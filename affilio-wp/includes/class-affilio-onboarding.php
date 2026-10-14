@@ -1,5 +1,9 @@
 <?php
 
+if (class_exists('Affilio_Onboarding')) {
+    return;
+}
+
 class Affilio_Onboarding {
     private $api;
 
@@ -10,8 +14,8 @@ class Affilio_Onboarding {
 
     public function register_routes() {
         register_rest_route('affilio/v1', '/setup', array(
-            array('methods' => 'GET', 'callback' => array($this, 'status'), 'permission_callback' => array($this, 'allowed')),
-            array('methods' => 'POST', 'callback' => array($this, 'connect'), 'permission_callback' => array($this, 'allowed')),
+            array('methods' => 'GET', 'callback' => array($this, 'status'), 'permission_callback' => array($this, 'rest_permission')),
+            array('methods' => 'POST', 'callback' => array($this, 'connect'), 'permission_callback' => array($this, 'rest_permission')),
         ));
     }
 
@@ -19,10 +23,26 @@ class Affilio_Onboarding {
         return current_user_can('manage_options');
     }
 
+    public function rest_permission() {
+        if ($this->allowed()) {
+            return true;
+        }
+        return new WP_Error('affilio_forbidden', $this->t('Administrator access required.', 'Serve un amministratore.'), array('status' => 403));
+    }
+
     public function status() {
         $state = get_option('affilio_setup_state', array('phase' => 'not_started', 'scanned' => 0));
-        if ($state['phase'] === 'scanning') {
+        if (!is_array($state)) {
+            $state = array('phase' => 'not_started', 'scanned' => 0);
+        }
+        if (isset($state['phase']) && $state['phase'] === 'scanning') {
             $this->schedule_scan();
+        }
+        if (!isset($state['skipped']) || !is_array($state['skipped'])) {
+            $state['skipped'] = array();
+        }
+        if (isset($state['phase']) && $state['phase'] === 'complete') {
+            $state['summary'] = affilio_scan_summary(isset($state['scanned']) ? (int) $state['scanned'] : 0, count($state['skipped']));
         }
         $state['connection'] = $this->api->get_connection_status();
         $state['dashboard_url'] = admin_url('admin.php?page=affilio');
@@ -39,31 +59,33 @@ class Affilio_Onboarding {
 
     public function connect() {
         if (!$this->allowed()) {
-            return new WP_Error('affilio_forbidden', 'Administrator access required.', array('status' => 403));
+            return new WP_Error('affilio_forbidden', $this->t('Administrator access required.', 'Serve un amministratore.'), array('status' => 403));
+        }
+        if (Affilio_API::resolve_base_url() === '') {
+            return new WP_Error('affilio_missing_url', $this->t('Set the API URL in Settings before connecting.', 'Imposta l\'URL API in Impostazioni prima di collegarti.'), array('status' => 400));
         }
         if (!$this->lock()) {
-            return new WP_Error('affilio_busy', 'Setup is already running. Try again shortly.', array('status' => 409));
+            return new WP_Error('affilio_busy', $this->t('Setup is already running. Try again shortly.', 'La configurazione è già in corso. Riprova tra poco.'), array('status' => 409));
         }
         try {
             if (trim((string) get_option('affilio_api_key', '')) === '') {
                 $health = $this->api->request('GET', '/health');
-                if (is_wp_error($health) || $health['code'] !== 200 || empty($health['data']['site_installation_registration'])) {
-                    return new WP_Error('affilio_version', 'This service is not ready for one-click setup. Update the backend before connecting.', array('status' => 503));
+                if (is_wp_error($health)) {
+                    return $health;
                 }
-                $domain = strtolower((string) wp_parse_url(home_url(), PHP_URL_HOST));
-                if (!$domain || strpos($domain, '.') === false) {
-                    return new WP_Error('affilio_domain', 'Use a public site domain before connecting.', array('status' => 400));
+                if ($health['code'] !== 200 || empty($health['data']['site_installation_registration'])) {
+                    return new WP_Error('affilio_version', $this->t('This service is not ready for one-click setup. Update the backend before connecting.', 'Questo servizio non è pronto per il collegamento in un clic. Aggiorna il backend prima di collegarti.'), array('status' => 503));
                 }
-                add_option('affilio_installation_key', bin2hex(random_bytes(32)), '', false);
-                $key = get_option('affilio_installation_key');
                 $response = $this->api->request('POST', '/sites/register', array(
-                    'domain' => $domain, 'name' => get_bloginfo('name'), 'installation_key' => $key,
+                    'site_url' => home_url(),
+                    'plugin_version' => AFFILIO_VERSION,
                 ));
-                if (is_wp_error($response) || $response['code'] !== 200 || empty($response['data']['site_id']) || !isset($response['data']['api_key']) || !hash_equals($key, (string) $response['data']['api_key'])) {
-                    return new WP_Error('affilio_connect', 'Could not connect. Your setup can be retried safely.', array('status' => 502));
+                if (is_wp_error($response) || $response['code'] !== 200 || empty($response['data']['site_id']) || empty($response['data']['api_key'])) {
+                    return new WP_Error('affilio_connect', $this->t('Could not connect. Your setup can be retried safely.', 'Collegamento non riuscito. Puoi riprovare in sicurezza.'), array('status' => 502));
                 }
-                update_option('affilio_api_key', $key, false);
+                update_option('affilio_api_key', (string) $response['data']['api_key'], false);
                 update_option('affilio_site_id', $response['data']['site_id'], false);
+                $this->store_issued_plugin_key($response['data']);
             }
             $this->api->invalidate_status_cache();
             $connection = $this->api->get_connection_status(true);
@@ -86,6 +108,18 @@ class Affilio_Onboarding {
         }
     }
 
+    private function store_issued_plugin_key($data) {
+        if (!is_array($data) || !isset($data['plugin_key']) || !is_string($data['plugin_key'])) {
+            return;
+        }
+        $plugin_key = trim($data['plugin_key']);
+        if ($plugin_key === '') {
+            return;
+        }
+        $option = defined('AFFILIO_PLUGIN_ACK_OPTION') ? AFFILIO_PLUGIN_ACK_OPTION : 'affilio_plugin_key';
+        update_option($option, $plugin_key, false);
+    }
+
     private function schedule_scan() {
         if (!wp_next_scheduled('affilio_setup_scan')) {
             wp_schedule_single_event(time() + 1, 'affilio_setup_scan');
@@ -102,24 +136,22 @@ class Affilio_Onboarding {
             if (!isset($state['phase']) || $state['phase'] !== 'scanning') {
                 return;
             }
-            $posts = get_posts(array('post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 10, 'offset' => $state['offset'], 'orderby' => 'ID', 'order' => 'ASC'));
+            $offset = isset($state['offset']) ? (int) $state['offset'] : 0;
+            $posts = get_posts(array('post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 10, 'offset' => $offset, 'orderby' => 'ID', 'order' => 'ASC'));
             if (!$posts) {
                 $state['phase'] = 'complete';
                 update_option('affilio_setup_state', $state, false);
                 return;
             }
-            $articles = array();
-            foreach ($posts as $post) {
-                $articles[] = array('wp_post_id' => $post->ID, 'title' => $post->post_title, 'content' => $post->post_content, 'url' => get_permalink($post));
+            $result = (new Affilio_Scanner($this->api))->scan_posts($posts);
+            if (!isset($state['skipped']) || !is_array($state['skipped'])) {
+                $state['skipped'] = array();
             }
-            $response = $this->api->request('POST', '/scan/full', array('articles' => $articles));
-            if (is_wp_error($response) || $response['code'] < 200 || $response['code'] >= 300) {
-                $state['phase'] = 'scan_error';
-                update_option('affilio_setup_state', $state, false);
-                return;
+            $state['offset'] = $offset + count($posts);
+            $state['scanned'] = (isset($state['scanned']) ? (int) $state['scanned'] : 0) + (isset($result['scanned']) ? (int) $result['scanned'] : 0);
+            if (isset($result['skipped']) && is_array($result['skipped'])) {
+                $state['skipped'] = array_merge($state['skipped'], $result['skipped']);
             }
-            $state['offset'] += count($posts);
-            $state['scanned'] += count($posts);
             if (count($posts) < 10) {
                 $state['phase'] = 'complete';
             } else {
@@ -129,5 +161,18 @@ class Affilio_Onboarding {
         } finally {
             delete_option('affilio_setup_lock');
         }
+    }
+
+    private function t($en, $it) {
+        $locale = 'en_US';
+        if (function_exists('get_user_locale')) {
+            $locale = get_user_locale();
+        } elseif (function_exists('get_locale')) {
+            $locale = get_locale();
+        }
+        if (strpos(strtolower((string) $locale), 'it') === 0) {
+            return $it;
+        }
+        return $en;
     }
 }

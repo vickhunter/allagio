@@ -12,7 +12,7 @@
         status.textContent = '';
         try {
             await navigator.clipboard.writeText(content.value ?? content.textContent);
-            status.textContent = 'Copied. Paste it into your terminal.';
+            status.textContent = button.getAttribute('data-copied') || 'Copied. Paste it into your terminal.';
         } catch {
             if (content instanceof HTMLTextAreaElement) {
                 content.focus();
@@ -24,7 +24,7 @@
                 selection.removeAllRanges();
                 selection.addRange(range);
             }
-            status.textContent = 'Select and copy the command below.';
+            status.textContent = button.hasAttribute('data-copied') ? 'Select and copy the line below.' : 'Select and copy the command below.';
         } finally {
             button.disabled = false;
         }

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Digest · Offer Rails</title>
+<link rel="stylesheet" href="assets/offer-rails.css">
+<script src="assets/ui-kit.js" defer></script>
+<script src="assets/api.js" defer></script>
+<script src="assets/mock-api.js" defer></script>
+<script src="assets/contract.js" defer></script>
+<script src="assets/plugin-key.js" defer></script>
+<script src="assets/digest-item.js" defer></script>
+<script src="assets/digest.js" defer></script>
+<script src="assets/digest-ui.js" defer></script>
+<script src="assets/site-settings.js" defer></script>
+</head>
+<body class="digest">
+<a class="skip" href="#main">Skip to digest</a>
+<header class="topbar">
+  <a class="brand" href="#preview" aria-label="Offer Rails">offer rails<span class="brand-dot" aria-hidden="true">↗</span></a>
+  <span class="caption" id="period-label"></span>
+</header>
+<main id="main">
+  <!-- Go template: write the digest JSON here; empty = load fixtures/digest-<?fixture>.json -->
+  <script type="application/json" id="or-digest-data"></script>
+  <div id="digest-status" class="sr-only" role="status"></div>
+  <div id="digest-root" aria-busy="true"><div class="skeleton" data-test="skeleton"><p class="sr-only">Loading your digest…</p><div aria-hidden="true"><div class="digest-head"><div style="flex:1"><span class="skel skel-line" style="width:180px"></span><span class="skel skel-title" style="max-width:420px"></span><span class="skel skel-line" style="width:60%;max-width:380px"></span></div></div><section class="totals" data-test="skeleton-totals"><div class="total"><span class="skel skel-line" style="width:45%"></span><span class="skel skel-big"></span><span class="skel skel-line" style="width:75%"></span></div><div class="total"><span class="skel skel-line" style="width:45%"></span><span class="skel skel-big"></span><span class="skel skel-line" style="width:75%"></span></div><div class="total"><span class="skel skel-line" style="width:45%"></span><span class="skel skel-big"></span><span class="skel skel-line" style="width:75%"></span></div><div class="total"><span class="skel skel-line" style="width:45%"></span><span class="skel skel-big"></span><span class="skel skel-line" style="width:75%"></span></div><div class="total"><span class="skel skel-line" style="width:45%"></span><span class="skel skel-big"></span><span class="skel skel-line" style="width:75%"></span></div></section><div class="group-title"><span class="skel skel-line" style="width:160px;height:20px"></span></div><section class="project"><div class="project-head"><div style="flex:1"><span class="skel skel-line" style="width:60px"></span><span class="skel skel-title" style="width:40%"></span></div></div><ul class="items"><li><div class="digest-item" style="display:flex;gap:16px"><div style="flex:1"><span class="skel skel-line" style="width:55%"></span><span class="skel skel-box"></span><span class="skel skel-line" style="width:35%"></span></div><div style="width:120px"><span class="skel skel-line"></span><span class="skel skel-line" style="width:60%"></span></div></div></li><li><div class="digest-item" style="display:flex;gap:16px"><div style="flex:1"><span class="skel skel-line" style="width:55%"></span><span class="skel skel-box"></span><span class="skel skel-line" style="width:35%"></span></div><div style="width:120px"><span class="skel skel-line"></span><span class="skel skel-line" style="width:60%"></span></div></div></li><li><div class="digest-item" style="display:flex;gap:16px"><div style="flex:1"><span class="skel skel-line" style="width:55%"></span><span class="skel skel-box"></span><span class="skel skel-line" style="width:35%"></span></div><div style="width:120px"><span class="skel skel-line"></span><span class="skel skel-line" style="width:60%"></span></div></div></li></ul></section></div></div></div>
+</main>
+<div class="toast" id="toast" role="status" hidden>
+  <p id="toast-text"></p>
+  <button type="button" class="btn" id="toast-redo">Redo</button>
+  <span class="bar" aria-hidden="true"></span>
+</div>
+</body>
+</html>

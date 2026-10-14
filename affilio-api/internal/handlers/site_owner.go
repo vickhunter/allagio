@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"affilio-api/internal/database"
 	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 )
@@ -48,7 +49,11 @@ func (h *HostedHandler) ReviewSiteConnection(c *gin.Context) {
 		h.render(c, "Connection link expired", "Return to WordPress and connect your publisher account again.", nil)
 		return
 	}
-	body := template.HTML(fmt.Sprintf(`<section><h2>Connect %s</h2><p>This connection was requested from your WordPress installation. Linking it lets you review distribution placements for this site and connect your own agent.</p><form method="post" action="/owner/connect-site"><input type="hidden" name="csrf" value="%s"><input type="hidden" name="token" value="%s"><button>Connect this site to my account</button></form></section>`, template.HTMLEscapeString(domain), template.HTMLEscapeString(ownerFrom(c).CSRF), template.HTMLEscapeString(token)))
+	sourceField := ""
+	if raw := c.Query("source"); raw != "" {
+		sourceField = fmt.Sprintf(`<input type="hidden" name="source" value="%s">`, template.HTMLEscapeString(raw))
+	}
+	body := template.HTML(fmt.Sprintf(`<section><h2>Connect %s</h2><p>This connection was requested from your WordPress installation. Linking it lets you review distribution placements for this site and connect your own agent.</p><form method="post" action="/owner/connect-site"><input type="hidden" name="csrf" value="%s"><input type="hidden" name="token" value="%s">%s<button>Connect this site to my account</button></form></section>`, template.HTMLEscapeString(domain), template.HTMLEscapeString(ownerFrom(c).CSRF), template.HTMLEscapeString(token), sourceField))
 	h.render(c, "Connect your WordPress site", "Confirm the site before continuing.", body)
 }
 
@@ -58,10 +63,31 @@ func (h *HostedHandler) CompleteSiteConnection(c *gin.Context) {
 		c.Status(400)
 		return
 	}
-	if err := h.DB.CompleteSiteOwnerConnection(c.Request.Context(), ownerFrom(c).ID, services.HashAPIKey(token)); err != nil {
+	source := ""
+	if raw := c.PostForm("source"); raw != "" {
+		source = database.NormalizeAttributionSource(raw)
+	}
+	ownerID := ownerFrom(c).ID
+	if err := h.DB.CompleteSiteOwnerConnection(c.Request.Context(), ownerID, services.HashAPIKey(token), source); err != nil {
 		c.Status(409)
 		h.render(c, "Site connection unavailable", "This link expired, was already used, or the site/account is already connected. Return to WordPress to retry.", nil)
 		return
 	}
-	h.render(c, "Your site is connected", "Return to WordPress to find offers and publish approved recommendations.", template.HTML(`<p><a class="button" href="/owner/placements">Open placements</a></p>`))
+	body := `<p><a class="button" href="/owner/placements">Open placements</a></p>`
+	var siteID string
+	if err := h.DB.Pool.QueryRow(c.Request.Context(), `SELECT COALESCE(site_id::text,'') FROM owners WHERE id=$1`, ownerID).Scan(&siteID); err != nil {
+		c.Status(500)
+		return
+	}
+	if siteID != "" {
+		raw, issued, err := mintPluginKey(c.Request.Context(), h.DB, siteID)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+		if issued {
+			body += `<p>Plugin key, shown once: <code>` + template.HTMLEscapeString(raw) + `</code></p><p>Save it in WordPress. It cannot be shown again.</p>`
+		}
+	}
+	h.render(c, "Your site is connected", "Return to WordPress to find offers and publish approved recommendations.", template.HTML(body))
 }

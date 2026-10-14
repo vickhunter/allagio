@@ -75,11 +75,11 @@ var Tools = []Tool{
 		InputSchema: schema([]string{"name", "website_url"}, map[string]interface{}{
 			"name":             str("Product name"),
 			"tagline":          str("One-line description"),
-			"website_url":      str("Live landing page URL (http/https)"),
+			"website_url":      str("Live landing page URL (https only)"),
 			"docs_url":         str("Documentation URL"),
 			"pricing_url":      str("Pricing page URL"),
 			"product_type":     str("One of: saas, game, shopify_app, dev_tool, other"),
-			"payment_provider": str("One of: stripe, lemonsqueezy, polar, none"),
+			"payment_provider": str("Optional. One of: stripe, lemonsqueezy, polar, none. Readiness does not require a known provider."),
 			"primary_category": str("Lowercase category used for matching"),
 			"tags":             strList("Tags used for matching"),
 			"keywords":         strList("Keywords used for matching"),
@@ -117,11 +117,11 @@ var Tools = []Tool{
 			"product_id":       str("Product id"),
 			"name":             str("Product name"),
 			"tagline":          str("One-line description"),
-			"website_url":      str("Live landing page URL"),
+			"website_url":      str("Live landing page URL (https only)"),
 			"docs_url":         str("Documentation URL"),
 			"pricing_url":      str("Pricing page URL"),
 			"product_type":     str("One of: saas, game, shopify_app, dev_tool, other"),
-			"payment_provider": str("One of: stripe, lemonsqueezy, polar, none"),
+			"payment_provider": str("Optional. One of: stripe, lemonsqueezy, polar, none. Readiness does not require a known provider."),
 			"primary_category": str("Lowercase category used for matching"),
 			"tags":             strList("Tags used for matching"),
 			"keywords":         strList("Keywords used for matching"),
@@ -136,10 +136,11 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "run_assessment",
-		Description: "Run the distribution-readiness assessment against the product's live pages. Fix every failing gate check using each check's remediation field, then run again; offers can only be submitted while the product is 'ready'.",
+		Description: "Run the distribution-readiness assessment against the product's live pages. Checkout is provider-agnostic: a buy, subscribe, checkout, start, or sign-up link passes, and no known payment provider is only a warning. Reachable site, pricing, docs, privacy, and terms are gates. Fix every failing gate using each check's remediation, then run again. Offers can be submitted only while the product is ready, with or without a connected payment provider.",
 		InputSchema: schema([]string{"product_id"}, map[string]interface{}{
-			"product_id": str("Product id"),
-			"ref_param":  str("Query parameter the product preserves for attribution (default: via)"),
+			"product_id":   str("Product id"),
+			"ref_param":    str("Query parameter the product preserves for attribution (default: via)"),
+			"checkout_url": str("Optional declared checkout URL. A known provider is not required."),
 		}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			id, err := pathArg(args, "product_id")
@@ -173,7 +174,7 @@ var Tools = []Tool{
 			"commission_currency":  str("3-letter currency code (default USD)"),
 			"cookie_duration_days": num("Attribution window in days (default 30)"),
 			"refund_window_days":   num("Hold period before commissions clear (default 30)"),
-			"landing_url":          str("Offer landing URL (defaults to the product website)"),
+			"landing_url":          str("Offer landing URL, https only (defaults to the product website)"),
 			"ref_param":            str("Query parameter carrying the click id (default via)"),
 			"terms":                str("Human-readable offer terms"),
 		}),
@@ -183,10 +184,18 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "list_offers",
-		Description: "List the maker's offers with their statuses.",
+		Description: "List the maker's offers with their statuses. Each offer includes review_reason (claims, head, relevance, or caps) and message while it is in review. Both are null when the offer is listed.",
 		InputSchema: schema(nil, map[string]interface{}{}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			return c.Do(http.MethodGet, "/v1/maker/offers", nil)
+		},
+	},
+	{
+		Name:        "list_listings",
+		Description: "List this maker's listing cards. review_reason is claims, head, relevance, or caps while the offer is in review, with a human message. Both are null when the offer is listed.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.Do(http.MethodGet, "/v1/listings", nil)
 		},
 	},
 	{
@@ -214,7 +223,7 @@ var Tools = []Tool{
 			"commission_currency":  str("3-letter currency code"),
 			"cookie_duration_days": num("Attribution window in days"),
 			"refund_window_days":   num("Hold period in days"),
-			"landing_url":          str("Offer landing URL"),
+			"landing_url":          str("Offer landing URL (https only)"),
 			"ref_param":            str("Attribution query parameter"),
 			"terms":                str("Human-readable offer terms"),
 		}),
@@ -228,7 +237,7 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "submit_offer",
-		Description: "Submit a draft offer for listing review. Requires the product's readiness to be 'ready'; after human approval the offer is listed in the publisher catalog.",
+		Description: "Submit a draft offer. Requires the product's readiness to be 'ready'. A connected payment provider is not required. On a hosted server the claims check defaults to stub and stays there: hosted refuses real. Local real compares the listing card with the merchant page. Local off-local lists when the claims check, the cached HEAD check, minimum relevance, and the cap all pass. Trusted makers list directly. A readiness failure returns reason and message.",
 		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
 			"offer_id": str("Offer id"),
 		}),

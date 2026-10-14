@@ -13,7 +13,8 @@ This guide covers production deployment for `affilio-api` and required integrati
 - `PORT` (default: `8080`)
 - `DATABASE_URL` (required)
 - `ADMIN_API_KEY` (required for discovery/admin routes)
-- `API_KEY_SECRET` (required for site registration workflows)
+- `API_KEY_SECRET` (required for site registration workflows; `GIN_MODE=release` refuses an empty value or `dev-secret`)
+- `GIN_MODE` (`release` also refuses `ALLOWED_ORIGINS=*`)
 
 ## Optional Environment Variables
 - `CLAUDE_API_KEY` (enable AI classification/generation)
@@ -21,6 +22,8 @@ This guide covers production deployment for `affilio-api` and required integrati
 - `CLAUDE_API_URL` (defaults to Anthropic endpoint)
 - `CLAUDE_API_VERSION` (defaults to `2023-06-01`)
 - `ALLOWED_ORIGINS` (if CORS restrictions are required)
+- `TRUSTED_PROXIES` (comma-separated proxy IPs or CIDRs; empty ignores forwarded client IP headers). On Render, trust the Cloudflare ranges in front of the load balancer and add the observed Render proxy range if the client IP never changes. See [HOSTING.md](../docs/HOSTING.md). Do not set `0.0.0.0/0`.
+- `CLAIMS_CHECK` (optional). Leave unset. Hosted is `GIN_MODE=release`, the same signal as the production startup guard, and that default is `stub`: an untrusted offer stays in review because the claims check is not live yet. `off-local` keeps the four listing checks and is refused when `GIN_MODE=release`. `real` compares the listing card with the merchant page on local and dev, and a hosted server still refuses it and stays on `stub`. Do not set `real` or `off-local` on a hosted server.
 
 ## Database Migration Order
 Run migrations in this exact order:

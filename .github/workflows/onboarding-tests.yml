@@ -3,9 +3,9 @@ name: Onboarding Tests
 on:
   workflow_dispatch:
   push:
-    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", ".github/workflows/onboarding-tests.yml"]
+    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", "affilio-api/**", "scripts/**", "Dockerfile.mvp", "docs/**", ".github/workflows/onboarding-tests.yml"]
   pull_request:
-    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", ".github/workflows/onboarding-tests.yml"]
+    paths: ["packages/distributoor-setup/**", "distributoor-plugin/skills/**", "affilio-wp/**", "affilio-api/**", "scripts/**", "Dockerfile.mvp", "docs/**", ".github/workflows/onboarding-tests.yml"]
 
 jobs:
   onboarding:
@@ -22,13 +22,18 @@ jobs:
         working-directory: packages/distributoor-setup
         run: npm pack --dry-run
       - name: Check WordPress PHP
-        run: find affilio-wp -name '*.php' -print0 | xargs -0 -n1 php -l
-      - name: Test WordPress setup
-        run: php affilio-wp/tests/onboarding.php
-      - name: Test WordPress distribution
-        run: php affilio-wp/tests/distribution.php
+        run: find affilio-wp -name '*.php' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 php -l
+      - name: Test WordPress plugin
+        run: find affilio-wp/tests -name '*.php' ! -name 'bootstrap.php' -not -path '*/node_modules/*' -print0 | xargs -0 -n1 php
+      - name: PHPUnit walk blockers
+        run: |
+          curl -fsSL -o /tmp/phpunit.phar https://phar.phpunit.de/phpunit-10.5.45.phar
+          php /tmp/phpunit.phar --do-not-cache-result -c affilio-wp/phpunit.xml.dist
       - name: Build landing illustration
         working-directory: affilio-wp/admin/build
-        run: npm ci --ignore-scripts && npm run build
+        run: npm ci --ignore-scripts && npm run build && git diff --exit-code -- landing-scene.bundle.js landing-scene.bundle.js.LEGAL.txt
+      - name: Gutenberg block round-trip
+        working-directory: affilio-wp/tests/block-roundtrip
+        run: npm ci --ignore-scripts && node roundtrip.mjs
       - name: Check workspace scripts
-        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/setup-controls.js && node --check affilio-wp/admin/build/landing.js && node --check affilio-wp/admin/build/distribution.js
+        run: node --check affilio-wp/admin/build/workspace.js && node --check affilio-wp/admin/build/setup-controls.js && node --check affilio-wp/admin/build/landing.js && node --check affilio-wp/admin/build/distribution.js && node affilio-wp/tests/distribution-empty.js && node affilio-wp/tests/find-empty.js && node affilio-wp/tests/attribution-source.js

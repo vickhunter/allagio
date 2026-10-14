@@ -19,7 +19,8 @@ type AssessmentsHandler struct {
 }
 
 type assessRequest struct {
-	RefParam string `json:"ref_param"`
+	RefParam    string `json:"ref_param"`
+	CheckoutURL string `json:"checkout_url"`
 }
 
 // Assess runs the readiness check catalog against the product's live pages,
@@ -46,6 +47,7 @@ func (h *AssessmentsHandler) Assess(c *gin.Context) {
 		PricingURL:      product.PricingURL,
 		PaymentProvider: product.PaymentProvider,
 		RefParam:        strings.TrimSpace(req.RefParam),
+		CheckoutURL:     strings.TrimSpace(req.CheckoutURL),
 	})
 
 	checksJSON, err := json.Marshal(result.Checks)

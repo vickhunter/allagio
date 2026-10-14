@@ -9,3 +9,9 @@
 **/playwright-report
 **/coverage.out
 **/*.tgz
+affilio-wp/e2e
+affilio-wp/tests
+affilio-wp/phpunit.xml
+affilio-wp/phpunit.xml.dist
+**/.phpunit.result.cache
+**/.phpunit.cache

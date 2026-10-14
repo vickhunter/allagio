@@ -4,6 +4,16 @@
     const locale = String((AffilioData && AffilioData.locale) || document.documentElement.lang || 'en').toLowerCase();
     const isItalian = locale.startsWith('it');
     const t = (en, it) => (isItalian ? it : en);
+    const affilioProxy = (method, path, body) => {
+        const base = String((AffilioData && AffilioData.restBase) || '').replace(/\/$/, '');
+        const payload = { method: method, path: path };
+        if (body !== undefined) payload.body = body;
+        return fetch(base + '/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': AffilioData.nonce },
+            body: JSON.stringify(payload),
+        });
+    };
     root.classList.add('affilio-dashboard-app');
 
     if (AffilioData.connectionStatus && !AffilioData.connectionStatus.connected) {
@@ -12,7 +22,7 @@
             <div class="affilio-panel affilio-panel-warning">
                 <h2>${t('Earnings', 'Guadagni')}</h2>
                 <p><strong>${t('Not connected.', 'Non connesso.')}</strong> ${AffilioData.connectionStatus.message || t('Configure your API key.', 'Configura la tua chiave API.')}</p>
-                <p><a class="button button-primary" href="${settings}">${t('Open settings', 'Apri impostazioni')}</a></p>
+                <p><a class="button button-primary" data-primary-action href="${settings}">${t('Open settings', 'Apri impostazioni')}</a></p>
             </div>
         `;
         return;
@@ -133,10 +143,9 @@
 
     const load = async () => {
         try {
-            const headers = { 'X-API-Key': AffilioData.apiKey };
             const [balanceRes, historyRes] = await Promise.all([
-                fetch(AffilioData.apiUrl + '/payouts/balance', { headers }),
-                fetch(AffilioData.apiUrl + '/payouts/history', { headers }),
+                affilioProxy('GET', '/payouts/balance'),
+                affilioProxy('GET', '/payouts/history'),
             ]);
             if (!balanceRes.ok || !historyRes.ok) throw new Error('load failed');
             const balance = await balanceRes.json();
@@ -170,9 +179,13 @@
             root.innerHTML = `
                 <div class="affilio-panel affilio-panel-warning">
                     <h2>${t('Earnings', 'Guadagni')}</h2>
-                    <p>${t('Could not load your balance from the Affilio API.', 'Impossibile caricare il saldo dall\'API di Affilio.')}</p>
+                    <p class="affilio-field-error" role="alert" tabindex="-1">${t('Could not load your balance from the Affilio API.', 'Impossibile caricare il saldo dall\'API di Affilio.')}</p>
+                    <p><button class="button button-primary" data-primary-action data-retry>${t('Retry', 'Riprova')}</button></p>
                 </div>
             `;
+            const alert = root.querySelector('[role="alert"]');
+            if (alert) alert.focus();
+            root.querySelector('[data-retry]').addEventListener('click', load);
         }
     };
 

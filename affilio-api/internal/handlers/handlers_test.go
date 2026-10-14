@@ -15,6 +15,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func issuePluginKey(t *testing.T, db *database.DB, siteID, raw string) map[string]string {
+	t.Helper()
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO plugin_keys(key_hash,key_prefix,site_id) VALUES($1,$2,$3)`, services.HashAPIKey(raw), services.KeyPrefix(raw), siteID); err != nil {
+		t.Fatal(err)
+	}
+	return map[string]string{"X-Plugin-Key": raw}
+}
+
 func setupTestDB(t *testing.T) (*database.DB, func()) {
 	t.Helper()
 	url := strings.TrimSpace(os.Getenv("AFFILIO_TEST_DATABASE_URL"))
@@ -62,6 +70,23 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"013_hosted_identity.sql",
 		"014_verified_stripe_connections.sql",
 		"015_site_owner_connection.sql",
+		"016_placement_removed_at.sql",
+		"017_owner_attribution_source.sql",
+		"018_d032_agent_entry.sql",
+		"019_d032_account_keys.sql",
+		"020_d032_kill_switch.sql",
+		"021_d032_interface.sql",
+		"022_d032_restore.sql",
+		"023_d032_plugin_restore.sql",
+		"024_d032_plugin_placed.sql",
+		"025_d032_plugin_failed.sql",
+		"026_d032_failed_action.sql",
+		"027_d032_restore_unconfirmed.sql",
+		"028_d032_placement_live.sql",
+		"029_d032_post_url.sql",
+		"030_d032_ui_wiring.sql",
+		"031_d032_committed_live_plugin_keys.sql",
+		"032_d032_box_identity.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)

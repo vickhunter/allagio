@@ -80,7 +80,7 @@ try {
     await builder.goto(fixture.base + '/owner/settings');
     const command = await builder.locator('.setup-command pre').textContent();
     await builder.getByRole('button', { name: 'Copy command', exact: true }).click();
-    await expect(builder.locator('.copy-status')).toContainText('Copied.');
+    await expect(builder.locator('.setup-command .copy-status')).toContainText('Copied.');
     expect(await builder.evaluate(() => navigator.clipboard.readText())).toBe(command);
     await builder.context().clearPermissions();
     await builder.addInitScript(() => {
@@ -88,7 +88,7 @@ try {
     });
     await builder.reload();
     await builder.getByRole('button', { name: 'Copy command', exact: true }).click();
-    await expect(builder.locator('.copy-status')).toContainText('Select and copy');
+    await expect(builder.locator('.setup-command .copy-status')).toContainText('Select and copy');
     expect(await builder.evaluate(() => window.getSelection().toString())).toBe(command);
     await builder.goto(fixture.base + '/owner/products');
     await builder.getByLabel('Product name', { exact: true }).fill('Browser Tool <script>');

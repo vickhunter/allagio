@@ -1,0 +1,5 @@
+{
+ "error": "sign in at /auth/login",
+ "message": "This session is too old. Sign in again to manage plugin keys.",
+ "reason": "reauth_required"
+}

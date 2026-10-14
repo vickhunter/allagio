@@ -13,4 +13,3 @@ packages/distributoor-setup/*.tgz
 affilio-wp/e2e/test-results/
 affilio-wp/e2e/playwright-report/
 __pycache__/
-affilio-wp/admin/build/landing-scene.bundle.js*

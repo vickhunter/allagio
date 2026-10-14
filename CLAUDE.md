@@ -77,6 +77,7 @@ go run ./cmd/server                 # Starts API on :8080
 | `STRIPE_WEBHOOK_SECRET` | No  | (empty)                                          | Stripe webhook signature secret (Distributoor conversions) |
 | `LEMONSQUEEZY_WEBHOOK_SECRET` | No | (empty)                                     | Lemon Squeezy webhook signature secret |
 | `POLAR_WEBHOOK_SECRET` | No   | (empty)                                          | Polar webhook signature secret |
+| `CLAIMS_CHECK`     | No       | `stub` when `GIN_MODE=release`, otherwise `off-local` | `stub` holds an untrusted offer in review. `off-local` is local and dev only and keeps the four listing checks. `real` compares the listing card with the merchant page and is local-only. A hosted server refuses `real` and stays on `stub`. |
 
 *AI features fall back to safe defaults when `CLAUDE_API_KEY` is empty.
 

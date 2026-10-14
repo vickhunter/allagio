@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""Build the WordPress plugin zip from tracked files and run the release gate.
+
+Git tracks hosted pages and build inputs under affilio-wp/admin/build. Those
+files stay in the repository for the hosted image, and this script leaves them
+out of the plugin zip. setup-controls.js is one of them: the plugin never
+enqueues it. The hosted home and workspace pages load it from /assets.
+
+The written file is named affilio-<version>.zip. The version is the
+"Version:" line in affilio-wp/affilio.php. A path whose filename is an older
+release, such as affilio-0.1.19.zip, is written next to that path under the
+header version. Entry names are sorted and every timestamp is 1980-01-01, so
+two builds of the same tree have the same sha256.
+"""
+import re
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import mvp_release as release  # noqa: E402
+
+HEADER_VERSION = re.compile(r"(?m)^[ \t]*\*[ \t]*Version:[ \t]*([0-9]+\.[0-9]+\.[0-9]+)[ \t]*$")
+FIXED_DATE = (1980, 1, 1, 0, 0, 0)
+
+
+def plugin_header_version():
+    header = (ROOT / "affilio-wp" / "affilio.php").read_text()
+    match = HEADER_VERSION.search(header)
+    if match is None:
+        raise release.ReleaseError("WordPress plugin header has no Version.")
+    return match.group(1)
+
+
+def versioned_output(argument, version):
+    path = Path(argument)
+    filename = "affilio-%s.zip" % version
+    if path.suffix.lower() == ".zip":
+        return path.with_name(filename)
+    return path / filename
+
+
+def tracked_plugin_files():
+    result = subprocess.run(
+        ["git", "ls-files", "-z", "--", "affilio-wp"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.decode(errors="replace").strip()
+        if result.returncode == 128 or "not a git repository" in detail.lower():
+            raise release.ReleaseError("package-wp-zip needs a git checkout.")
+        raise release.ReleaseError(detail or "git ls-files failed.")
+    return [name.decode() for name in result.stdout.split(b"\0") if name]
+
+
+def write_plugin_zip(output, names):
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name in names:
+            info = zipfile.ZipInfo(filename=name, date_time=FIXED_DATE)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.create_system = 3
+            info.external_attr = (0o100644) << 16
+            archive.writestr(info, (ROOT / name).read_bytes(), compresslevel=6)
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("usage: scripts/package-wp-zip OUTPUT.zip", file=sys.stderr)
+        return 2
+    version = plugin_header_version()
+    output = versioned_output(sys.argv[1], version)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    names = sorted(name for name in tracked_plugin_files() if not release.omit_from_plugin_zip(name))
+    write_plugin_zip(output, names)
+    try:
+        release.validate_plugin(output.read_bytes())
+    except release.ReleaseError as exc:
+        print("Release stopped: " + str(exc), file=sys.stderr)
+        return 1
+    print("WordPress ZIP passed the release gate with %d files: %s" % (len(names), output.name))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except release.ReleaseError as exc:
+        print("Release stopped: " + str(exc), file=sys.stderr)
+        sys.exit(1)
+    except (OSError, subprocess.CalledProcessError, zipfile.BadZipFile):
+        print("Release stopped: could not build the WordPress ZIP.", file=sys.stderr)
+        sys.exit(1)

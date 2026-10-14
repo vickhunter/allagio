@@ -1,0 +1,25 @@
+{
+  "setup_id": "st_01J9PUB",
+  "session": { "user_id": "usr_3d1a", "signed_in": true, "human_login": true, "device_code": "LMNB-42PQ" },
+  "agent": { "source": "cursor", "client_name": "Cursor", "install_path": "cursor_link" },
+  "detected_roles": ["publisher"],
+  "project": { "project_id": null, "name": "victormotricala.it", "url": "https://victormotricala.it" },
+  "mode_preselected": "yolo",
+  "publisher": {
+    "sites": [
+      { "site_id": "site_vm", "domain": "victormotricala.it", "kind": "blog", "found_by": "repo", "selected": true },
+      { "site_id": "site_nl", "domain": "newsletter.victormotricala.it", "kind": "newsletter", "found_by": "links", "selected": true },
+      { "site_id": null, "domain": "youtube.com/@victormotricala", "kind": "channel", "found_by": "links", "selected": false }
+    ],
+    "readiness": {
+      "score": 80,
+      "signals": [
+        { "id": "gsc_traffic", "label": "Search traffic shared", "pass": true, "reason": "Search Console: about 3,100 clicks in the last 28 days." },
+        { "id": "disclosure", "label": "Disclosure already on site", "pass": true, "reason": "Found an affiliate disclosure page." },
+        { "id": "page_speed", "label": "Page speed stays the same", "pass": true, "reason": "The box adds no script; measured before and after." }
+      ]
+    },
+    "never_topics": ["gambling", "crypto"],
+    "box_position": "end"
+  }
+}

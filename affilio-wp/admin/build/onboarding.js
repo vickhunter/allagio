@@ -3,7 +3,7 @@
     if (!root) return;
     const it = String(AffilioSetup.locale || '').toLowerCase().startsWith('it');
     const t = (en, italian) => it ? italian : en;
-    root.innerHTML = '<h2></h2><p data-description></p><p data-progress role="status" aria-live="polite"></p><p data-error role="alert"></p><button type="button" class="button button-primary" data-connect></button><p><a data-dashboard hidden></a></p>';
+    root.innerHTML = '<h2></h2><p data-description></p><p data-progress role="status" aria-live="polite"></p><ul data-skipped hidden></ul><p data-error role="alert"></p><button type="button" class="button button-primary" data-connect></button><p><a data-dashboard hidden></a></p>';
     root.querySelector('h2').textContent = t('Find earning opportunities in your posts', 'Trova opportunità di guadagno nei tuoi articoli');
     root.querySelector('[data-description]').textContent = t('Connect to create your site account and analyze published posts with Affilio. Your domain, site name and published article content are sent to ', 'Collega per creare il tuo account e analizzare gli articoli pubblicati con Affilio. Dominio, nome del sito e contenuto degli articoli pubblicati vengono inviati a ') + AffilioSetup.serviceUrl + '. ' + t('You review suggestions before anything is inserted.', 'Puoi rivedere i suggerimenti prima di ogni inserimento.');
     const button = root.querySelector('[data-connect]');
@@ -23,10 +23,18 @@
         button.textContent = t('Connect and find opportunities', 'Collega e trova opportunità');
         if (data.phase === 'scan_error') {
             button.textContent = t('Retry analysis', 'Riprova analisi');
-            error.textContent = t('Connected, but analysis failed. Retry to continue.', 'Collegato, ma analisi non riuscita. Riprova per continuare.');
+            error.textContent = data.summary || t('Connected. Analysis will continue.', 'Collegato. L\'analisi continua.');
         }
+        const skipped = root.querySelector('[data-skipped]');
+        skipped.textContent = '';
+        (Array.isArray(data.skipped) ? data.skipped : []).forEach((row) => {
+            const item = document.createElement('li');
+            item.textContent = String(row.wp_post_id || '') + (row.reason ? ': ' + row.reason : '');
+            skipped.appendChild(item);
+        });
+        skipped.hidden = skipped.childElementCount === 0;
         progress.textContent = complete
-            ? `${data.scanned || 0} ` + t('published posts analyzed. Review your suggestions.', 'articoli pubblicati analizzati. Rivedi i suggerimenti.')
+            ? (data.summary || (`${data.scanned || 0} ` + t('published posts analyzed. Review your suggestions.', 'articoli pubblicati analizzati. Rivedi i suggerimenti.')))
             : scanning ? `${data.scanned || 0} ` + t('posts analyzed. Scanning in the background…', 'articoli analizzati. Analisi in background…')
                 : data.connection.connected ? t('Connected. Start your first analysis.', 'Collegato. Avvia la prima analisi.') : t('Ready to connect. No API key to copy.', 'Pronto per il collegamento. Nessuna chiave API da copiare.');
         dashboard.hidden = !complete;

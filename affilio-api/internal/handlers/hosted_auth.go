@@ -21,17 +21,19 @@ import (
 )
 
 type HostedHandler struct {
-	DB            *database.DB
-	BaseURL       string
-	LoopbackURL   string
-	Login         services.OwnerLogin
-	Limiter       *IPRateLimiter
-	Payments      *MerchantConnectionsHandler
-	Page          *template.Template
-	AssetsPath    string
-	DownloadsPath string
-	OperatorID    string
-	Assessments   *AssessmentsHandler
+	DB              *database.DB
+	BaseURL         string
+	LoopbackURL     string
+	Login           services.OwnerLogin
+	Limiter         *IPRateLimiter
+	Payments        *MerchantConnectionsHandler
+	Page            *template.Template
+	AssetsPath      string
+	DownloadsPath   string
+	OperatorID      string
+	Assessments     *AssessmentsHandler
+	DemoCheckoutURL string
+	ClaimsCheck     string
 }
 
 func ValidatePublicURL(raw string) error {
@@ -52,11 +54,15 @@ func randomToken() (string, error) {
 }
 func (h *HostedHandler) resource() string { return h.BaseURL + "/mcp" }
 func (h *HostedHandler) secure() bool     { return strings.HasPrefix(h.BaseURL, "https://") }
-func (h *HostedHandler) cookieName() string {
-	if h.secure() {
+func ownerCookieName(baseURL string) string {
+	if strings.HasPrefix(baseURL, "https://") {
 		return "__Host-dtr_owner"
 	}
 	return "dtr_owner"
+}
+
+func (h *HostedHandler) cookieName() string {
+	return ownerCookieName(h.BaseURL)
 }
 func (h *HostedHandler) loginCookieName() string {
 	if h.secure() {
@@ -70,6 +76,7 @@ func (h *HostedHandler) cookie(c *gin.Context, name, value string, maxAge int) {
 
 func (h *HostedHandler) Mount(r *gin.Engine) {
 	public := r.Group("", h.headers)
+	h.mountDemo(public)
 	public.GET("/.well-known/oauth-protected-resource", h.resourceMetadata)
 	public.GET("/.well-known/oauth-protected-resource/mcp", h.resourceMetadata)
 	public.GET("/.well-known/oauth-authorization-server", h.authorizationMetadata)
@@ -95,15 +102,14 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 		owner.GET("/products/:id/connection", h.Payments.Form)
 		owner.POST("/products/:id/connection", h.Payments.Connect)
 	}
-	transport := h.MCPTransport()
-	public.Any("/mcp", func(c *gin.Context) { transport.ServeHTTP(c.Writer, c.Request) })
+	public.Any("/mcp", h.MCP)
 }
 
 func (h *HostedHandler) headers(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Referrer-Policy", "strict-origin")
-	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 	c.Next()
 }
 
@@ -159,6 +165,8 @@ func (h *HostedHandler) ownerSession(c *gin.Context) {
 	c.Next()
 }
 
+func (h *HostedHandler) RequireOwnerSession(c *gin.Context) { h.ownerSession(c) }
+
 func ownerFrom(c *gin.Context) *database.Owner { return c.MustGet("owner").(*database.Owner) }
 
 func (h *HostedHandler) requirePublisher(c *gin.Context) {
@@ -176,7 +184,13 @@ func (h *HostedHandler) LoginStart(c *gin.Context) {
 	returnTo := c.DefaultQuery("return_to", "/owner")
 	u, err := url.Parse(returnTo)
 	validPath := u != nil && (u.Path == "/owner" || u.Path == "/owner/products" || u.Path == "/owner/placements" || u.Path == "/owner/earnings" || u.Path == "/owner/settings" || u.Path == "/owner/review" || u.Path == "/owner/connect-site" || u.Path == "/oauth/authorize" || strings.HasPrefix(u.Path, "/owner/placements/") && uuidPattern.MatchString(strings.TrimPrefix(u.Path, "/owner/placements/")))
-	if err != nil || !validPath || u.IsAbs() || u.Host != "" || u.Fragment != "" || len(returnTo) > 8192 {
+	if err != nil || !validPath || u.IsAbs() || u.Host != "" || u.Fragment != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
+		return
+	}
+	returnTo = mergeAttributionSource(returnTo, c.Query("source"))
+	returnTo = mergeDemoReferral(returnTo, c.Query("ref"), c.Query("via"))
+	if len(returnTo) > 8192 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return
 	}
@@ -234,6 +248,7 @@ func (h *HostedHandler) LoginCallback(c *gin.Context) {
 		c.Status(500)
 		return
 	}
+	o.Source = attributionSourceFromReturn(a.ReturnTo)
 	if err = h.DB.StartOwnerSession(c.Request.Context(), o, services.HashAPIKey(token), csrf); err != nil {
 		c.Status(500)
 		return
@@ -601,7 +616,15 @@ func (h *HostedHandler) ReviewPlacement(c *gin.Context) {
 		commission = fmt.Sprintf("%.2f%% of the first paid checkout, excluding tax and shipping", float64(terms.CommissionValueMinor)/100)
 	}
 	summary := fmt.Sprintf("Destination: %s\n%s\nRefund hold: %d days. Attribution window: %d days.\nMerchant pays directly. Service fee: %d%% of commission.\nCurrency: %s. Payment mode: %s.\n%s", terms.LandingURL, commission, terms.RefundDays, terms.CookieDays, terms.FeePercent, terms.Currency, terms.Mode, terms.Text)
-	body := fmt.Sprintf(`<p>Status: %s · Expires: %s</p><p><a href="%s">%s</a></p><h2>Recommendation</h2><pre>%s</pre><h2>Disclosure</h2><pre>%s</pre><h2>Terms</h2><pre>%s</pre>`, template.HTMLEscapeString(p.Status), p.ExpiresAt.Format(time.RFC3339), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy), template.HTMLEscapeString(p.Disclosure), template.HTMLEscapeString(summary))
+	approvedBy := ""
+	if p.ApprovedBy != "" {
+		approvedBy = `<p>Approved by: ` + template.HTMLEscapeString(p.ApprovedBy)
+		if p.MatchedRule != "" {
+			approvedBy += template.HTMLEscapeString(" · " + p.MatchedRule)
+		}
+		approvedBy += `</p>`
+	}
+	body := fmt.Sprintf(`<p>Status: %s · Expires: %s</p>%s<p><a href="%s">%s</a></p><h2>Recommendation</h2><pre>%s</pre><h2>Disclosure</h2><pre>%s</pre><h2>Terms</h2><pre>%s</pre>`, template.HTMLEscapeString(PlacementDashboardLabel(p.Status, p.RemovedAt)), p.ExpiresAt.Format(time.RFC3339), approvedBy, template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy), template.HTMLEscapeString(p.Disclosure), template.HTMLEscapeString(summary))
 	if p.Status == "pending" && p.ExpiresAt.After(time.Now()) {
 		body += fmt.Sprintf(`<form method="post" action="/owner/placements/%s/approve"><input type="hidden" name="csrf" value="%s"><button>Approve this exact placement</button></form>`, p.ID, template.HTMLEscapeString(o.CSRF))
 	}
@@ -635,7 +658,7 @@ func (h *HostedHandler) ApprovePlacement(c *gin.Context) {
 	c.Redirect(303, "/owner/placements/"+c.Param("id"))
 }
 
-var ownerPage = template.Must(template.New("owner").Parse(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{.Title}} · Distributoor</title><style>body{margin:40px auto;max-width:760px;padding:0 20px;font:17px/1.6 system-ui;color:#172b28;background:#f7faf8}h1{line-height:1.2}h2{margin-top:32px}a{color:#006a50}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:16px;border:1px solid #d5e0da}input,select,button{font:inherit;padding:10px;margin:6px 0;max-width:100%;box-sizing:border-box}button{background:#006a50;color:white;border:0;cursor:pointer}label{display:block}section{padding:16px;border:1px solid #d5e0da;margin:16px 0}</style><header><a href="/owner">Distributoor</a></header><main><h1>{{.Title}}</h1><p>{{.Message}}</p>{{.Body}}</main></html>`))
+var ownerPage = template.Must(template.New("owner").Parse(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{.CSRF}}"><title>{{.Title}} · Distributoor</title><style>body{margin:40px auto;max-width:760px;padding:0 20px;font:17px/1.6 system-ui;color:#172b28;background:#f7faf8}h1{line-height:1.2}h2{margin-top:32px}a{color:#006a50}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:16px;border:1px solid #d5e0da}input,select,button{font:inherit;padding:10px;margin:6px 0;max-width:100%;box-sizing:border-box}button{background:#006a50;color:white;border:0;cursor:pointer}label{display:block}section{padding:16px;border:1px solid #d5e0da;margin:16px 0}</style><header><a href="/owner">Distributoor</a></header><main><h1>{{.Title}}</h1><p>{{.Message}}</p>{{.Body}}</main></html>`))
 
 func (h *HostedHandler) render(c *gin.Context, title, message string, body any) {
 	c.Header("Content-Type", "text/html; charset=utf-8")
@@ -643,7 +666,7 @@ func (h *HostedHandler) render(c *gin.Context, title, message string, body any) 
 	if h.Page != nil {
 		page = h.Page
 	}
-	data := map[string]any{"Title": title, "Message": message, "Body": body, "BaseURL": h.BaseURL}
+	data := map[string]any{"Title": title, "Message": message, "Body": body, "BaseURL": h.BaseURL, "CSRF": ""}
 	if value, ok := c.Get("owner"); ok {
 		o := value.(*database.Owner)
 		data["CSRF"], data["Name"], data["OwnerID"] = o.CSRF, o.Name, o.ID
@@ -711,7 +734,7 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 		}
 		body.WriteString(`<h2>Placement inbox</h2>`)
 		for _, p := range placements {
-			fmt.Fprintf(&body, `<section><a href="/owner/placements/%s">Review placement</a><p>%s · %s</p><p>%s</p></section>`, p.ID, template.HTMLEscapeString(p.Status), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy))
+			fmt.Fprintf(&body, `<section><a href="/owner/placements/%s">Review placement</a><p>%s · %s</p><p>%s</p></section>`, p.ID, template.HTMLEscapeString(PlacementDashboardLabel(p.Status, p.RemovedAt)), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy))
 		}
 		payouts, err := h.DB.ListPayouts(c.Request.Context(), o.SiteID)
 		if err != nil {
@@ -739,6 +762,15 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 		body.WriteString(`<h2>Products</h2>`)
 		for _, p := range products {
 			fmt.Fprintf(&body, `<p>%s · <a href="/owner/products/%s/connection">Connect Stripe</a></p>`, template.HTMLEscapeString(p.Name), p.ID)
+		}
+		makerPlacements, err := h.DB.ListMakerPlacements(c.Request.Context(), o.MakerID)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+		body.WriteString(`<h2>Publisher placements</h2>`)
+		for _, p := range makerPlacements {
+			fmt.Fprintf(&body, `<section><p>%s · %s</p><p>%s</p></section>`, template.HTMLEscapeString(PlacementDashboardLabel(p.Status, p.RemovedAt)), template.HTMLEscapeString(p.SurfaceURL), template.HTMLEscapeString(p.Copy))
 		}
 	}
 	grants, err := h.DB.OwnerGrants(c.Request.Context(), o.ID)

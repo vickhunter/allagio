@@ -1,0 +1,1 @@
+ALTER TABLE placement_proposals ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ;

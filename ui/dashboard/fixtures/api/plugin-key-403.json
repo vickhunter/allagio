@@ -1,0 +1,5 @@
+{
+ "error": "plugin keys can only be managed from a signed-in dashboard session",
+ "message": "A site, maker, project, or account key, or a bearer token, cannot manage plugin keys.",
+ "reason": "forbidden_key_type"
+}

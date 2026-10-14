@@ -1,0 +1,5 @@
+{
+ "error": "plugin keys can only be managed from a signed-in dashboard session",
+ "message": "plugin keys can only be managed from a signed-in dashboard session",
+ "reason": "forbidden"
+}

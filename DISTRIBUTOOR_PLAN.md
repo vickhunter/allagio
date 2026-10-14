@@ -340,12 +340,14 @@ product's latest assessment passes all P0 checks.
 | Check | P0? | How |
 |---|---|---|
 | `site_reachable` | ✅ | GET landing_url, expect 2xx, TLS valid |
-| `checkout_present` | ✅ | Detect stripe.com / lemonsqueezy / polar.sh / buy.polar.sh in checkout flow or pricing page |
+| `checkout_present` | ✅ | Pass when the product declares a checkout URL, or the landing or pricing page has a link or button whose text or href indicates buy, subscribe, checkout, start, or sign up. A known marker (Stripe, Lemon Squeezy, Polar) is reported in the evidence. Absence of a known provider does not fail this gate. |
+| `payment_provider` | — | Non-gating warning when a checkout action exists but no known provider marker was found. Offer Rails does not hold money and does not require a provider connection. |
 | `ref_param_survives` | ✅ | Fetch `landing_url?via=dtr-probe`, follow redirects, verify the param isn't stripped (evidence for cookie/attribution viability) |
 | `webhook_configured` | ✅ (for payout phase) | Provider webhook registered and test event received |
-| `pricing_page` | — | pricing_url resolves and mentions a price |
-| `docs_present` | — | docs_url resolves, non-trivial content length |
-| `privacy_policy` | — | Discoverable privacy/terms links |
+| `pricing_page` | ✅ | pricing_url resolves and mentions a price |
+| `docs_present` | ✅ | docs_url resolves, non-trivial content length |
+| `privacy_policy` | ✅ | Discoverable privacy link on the landing page |
+| `terms` | ✅ | Discoverable terms link on the landing page |
 | `onboarding_flow` | — | Signup/CTA reachable from landing page |
 
 ### AI rubric checks (Claude, same pattern as `ai_classifier.go` / `ai_generator.go`)
