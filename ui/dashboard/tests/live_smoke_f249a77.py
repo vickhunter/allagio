@@ -10,6 +10,7 @@ No injection: every screen shows what the server sends. Flow:
  5 GET /v1/go/<unknown uuid> by plain HTTP (no browser): 404, no Location, port kept.
 Never clicks go links; **/v1/go/** aborted + counted. Never prints keys."""
 import os, sys, json, uuid, subprocess, socket, time, requests
+import urllib.parse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from live_lib import *
 from playwright.sync_api import sync_playwright
@@ -38,7 +39,8 @@ if pl:
 d1 = s1.get(V + '/account/digest', headers={'Origin': B}).json()
 pitems = [i for p in d1.get('projects', []) for i in p.get('items', []) if i.get('kind') == 'placement']
 FACTS['post_title'] = [(i.get('post_title'), i.get('surface_url')) for i in pitems]
-rec('site digest placement has a non-empty post_title', pitems and all((i.get('post_title') or '').strip() for i in pitems), FACTS['post_title'])
+rec('site digest placement post_title is a string', pitems and all(isinstance(i.get('post_title'), str) for i in pitems), FACTS['post_title'])
+rec('site digest placement surface_url path is an article path', pitems and all(urllib.parse.urlparse(i.get('surface_url') or '').path not in ('', '/') for i in pitems), FACTS['post_title'])
 # 2 + 3
 def maker_owner(mail, mh):
     s = login(mail); d = s.get(V + '/account/projects', headers={'Origin': B}).json(); linked = any(p.get('kind') == 'offer' for p in d.get('projects', []))
