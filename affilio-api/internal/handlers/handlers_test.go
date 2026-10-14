@@ -88,6 +88,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"031_d032_committed_live_plugin_keys.sql",
 		"032_d032_box_identity.sql",
 		"033_click_classes.sql",
+		"034_refund_trust.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)

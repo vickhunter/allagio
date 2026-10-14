@@ -234,6 +234,10 @@
           ' <a href="' + esc(s.mode_change_url || '#preview') + '">See them all in the dashboard</a></p>' : '') +
         (items.length > SHOW_FIRST ? '<p style="padding:0 24px 16px;margin:0"><button type="button" class="btn secondary" data-more="' + esc(ref) + '">Show all ' + items.length + ' items</button></p>' : '')
         : '<p class="items-empty">Nothing live here yet.</p>') +
+      (Array.isArray(s.conversions) && s.conversions.length ? '<div class="stats"><div class="stat"><span class="flag">Sales and refunds</span><ul class="sources">' + s.conversions.map(function (row) {
+          var refundStatus = row.refund_status == null || row.refund_status === '' ? 'none' : row.refund_status;
+          return '<li><span>' + esc(row.kind) + ' · ' + esc(row.trust_level) + ' · ' + esc(refundStatus) + '</span><span>' + esc(row.object_id) + '</span></li>';
+        }).join('') + '</ul><span class="caption">A refund is applied only when its source is at least as trusted as the sale. A less trusted refund stays in review and does not change the commission.</span></div></div>' : '') +
       '</section>';
   }
   // 6042dcb: total_items is every item for the project; the digest sends at most 50 (no paging).

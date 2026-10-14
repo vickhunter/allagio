@@ -120,9 +120,13 @@ AND c.clicked_at + make_interval(days=>COALESCE((c.terms_snapshot->>'cookie_dura
 }
 
 func (d *DB) ProductOwnsPayment(ctx context.Context, productID, objectID, currency string) (bool, error) {
+	if objectID == "" {
+		return false, ErrConversionNotFound
+	}
 	var valid bool
-	err := d.Pool.QueryRow(ctx, `SELECT o.product_id=$1 AND cv.currency=$3 FROM conversions cv JOIN offers o ON o.id=cv.offer_id
-WHERE cv.provider='stripe' AND cv.provider_object_id=$2 AND cv.kind='sale'`, productID, objectID, currency).Scan(&valid)
+	err := d.Pool.QueryRow(ctx, `SELECT o.product_id::text=$1 AND cv.currency=$3 FROM conversions cv JOIN offers o ON o.id=cv.offer_id
+WHERE cv.provider_object_id=$2 AND cv.kind IN ('sale','renewal')
+ORDER BY cv.created_at DESC LIMIT 1`, productID, objectID, currency).Scan(&valid)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, ErrConversionNotFound
 	}

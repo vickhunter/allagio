@@ -302,7 +302,7 @@ GROUP BY le.currency ORDER BY le.currency`, siteID)
 func (d *DB) testMakerEarnings(ctx context.Context, offerID string) ([]MoneyAmount, error) {
 	return d.moneyQuery(ctx, `SELECT cv.currency, COALESCE(SUM(cv.commission_amount),0)
 FROM conversions cv
-WHERE cv.offer_id=$1 AND cv.payment_mode='test' AND cv.commission_amount IS NOT NULL`+unconfirmedRestoreEarnings+`
+WHERE cv.offer_id=$1 AND cv.payment_mode='test' AND cv.commission_amount IS NOT NULL AND COALESCE(cv.refund_status,'applied')='applied'`+unconfirmedRestoreEarnings+`
 GROUP BY cv.currency ORDER BY cv.currency`, offerID)
 }
 
@@ -321,7 +321,7 @@ FROM conversions cv
 JOIN offers ofr ON ofr.id=cv.offer_id
 JOIN products p ON p.id=ofr.product_id
 JOIN owners o ON o.maker_id=p.maker_id
-WHERE o.id=$1 AND cv.payment_mode='test' AND cv.commission_amount IS NOT NULL`+unconfirmedRestoreEarnings+`
+WHERE o.id=$1 AND cv.payment_mode='test' AND cv.commission_amount IS NOT NULL AND COALESCE(cv.refund_status,'applied')='applied'`+unconfirmedRestoreEarnings+`
 GROUP BY cv.currency ORDER BY cv.currency`, ownerID)
 }
 

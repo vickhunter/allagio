@@ -269,6 +269,11 @@ export async function digestCommand(io) {
     saveConfig(io, { ...loadConfig(io), undo_token: items[0].undo_token });
   }
   printDigestLimit(io, res.json, items);
+  const conversions = Array.isArray(res.json.conversions) ? res.json.conversions : [];
+  for (const row of conversions) {
+    const refundStatus = row.refund_status == null || row.refund_status === '' ? 'none' : row.refund_status;
+    io.stdout(`conversion: ${row.kind} ${row.object_id} trust ${row.trust_level} refund ${refundStatus}\n`);
+  }
   if (items.length === 0) {
     io.stdout('items: 0\n');
     return { exitCode: 0 };

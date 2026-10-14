@@ -1125,6 +1125,12 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 		return
 	}
+	conversions, err := h.scopedConversions(c, owner.MakerID, owner.SiteID, offerFilter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
+	}
+	body["conversions"] = conversions
 	c.JSON(http.StatusOK, body)
 }
 
@@ -2359,14 +2365,63 @@ func (h *AgentEntry) MakerDigest(c *gin.Context) {
 		}
 		items = append(items, h.digestJSON(item, token))
 	}
+	conversions, err := h.loadConversions(c, makerID, "", offerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
+	}
 	body := gin.H{
 		"items": items, "session": gin.H{"signed_in": false},
 		"truncated": total > len(items), "total": total,
+		"conversions": conversions,
 	}
 	if claimsHeld(h.ClaimsCheck) {
 		body["claims_check"] = "not_checked"
 	}
 	c.JSON(http.StatusOK, body)
+}
+
+func (h *AgentEntry) loadConversions(c *gin.Context, makerID, siteID, offerID string) ([]gin.H, error) {
+	if h.DB == nil {
+		return []gin.H{}, nil
+	}
+	rows, err := h.DB.ListConversionReports(c.Request.Context(), makerID, siteID, offerID, 50)
+	if err != nil {
+		return nil, err
+	}
+	return conversionsJSON(rows), nil
+}
+
+func (h *AgentEntry) scopedConversions(c *gin.Context, makerID, siteID, offerID string) ([]gin.H, error) {
+	out := []gin.H{}
+	seen := map[string]bool{}
+	add := func(rows []gin.H) {
+		for _, row := range rows {
+			id, _ := row["id"].(string)
+			if id != "" && seen[id] {
+				continue
+			}
+			if id != "" {
+				seen[id] = true
+			}
+			out = append(out, row)
+		}
+	}
+	if siteID != "" {
+		rows, err := h.loadConversions(c, "", siteID, "")
+		if err != nil {
+			return nil, err
+		}
+		add(rows)
+	}
+	if makerID != "" {
+		rows, err := h.loadConversions(c, makerID, "", offerID)
+		if err != nil {
+			return nil, err
+		}
+		add(rows)
+	}
+	return out, nil
 }
 
 func filledDigestPosition(position string) string {
