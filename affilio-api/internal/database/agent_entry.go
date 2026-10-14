@@ -743,9 +743,13 @@ func normalizedSurfaceSQL(expr string) string {
 	return `regexp_replace(lower(split_part(split_part(` + expr + `, '#', 1), '?', 1)), '/+$', '')`
 }
 
+// An approved placement that expired without being committed is not the box.
+// A pending row and a committed row still are, including a committed row
+// whose prepare window has passed.
 var placementBoxCountSQL = `SELECT COUNT(*) FROM placement_proposals
 WHERE site_id=$1 AND id<>$3::uuid AND status<>'revoked' AND removed_at IS NULL
 AND NOT (status='pending' AND COALESCE(receipt->>'publication_status','')='refused')
+AND NOT (status='approved' AND expires_at <= NOW())
 AND (
   ($4::bigint > 0 AND wp_post_id = $4::bigint)
   OR (

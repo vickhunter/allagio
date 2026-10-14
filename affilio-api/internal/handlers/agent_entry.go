@@ -1505,6 +1505,29 @@ func writeCheckDenied(c *gin.Context, failures []string) {
 	c.JSON(http.StatusUnprocessableEntity, gin.H{"check_id": check.ID, "check_text": check.Text})
 }
 
+// writeClaimsDenied is the 422 for copy the offer does not support. check_id
+// and check_text stay the catalog pair. reason, message, and error name the
+// unsupported claim. error is the same sentence as message so a client that
+// only reads error does not fall back to a generic failure.
+func writeClaimsDenied(c *gin.Context, err error) {
+	check, ok := entry.FirstCheck([]string{"claims_from_offer"})
+	if !ok {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "check failed"})
+		return
+	}
+	reason := entry.ClaimReasonNumberNotInOffer
+	message := "The copy states a claim the offer does not support."
+	var mismatch entry.ClaimMismatch
+	if errors.As(err, &mismatch) && mismatch.Reason != "" {
+		reason = mismatch.Reason
+		message = mismatch.PublicMessage()
+	}
+	c.JSON(http.StatusUnprocessableEntity, gin.H{
+		"check_id": check.ID, "check_text": check.Text,
+		"reason": reason, "message": message, "error": message,
+	})
+}
+
 func (h *AgentEntry) pluginWindow() time.Duration {
 	if h.PluginOfflineAfter > 0 {
 		return h.PluginOfflineAfter
@@ -1963,13 +1986,18 @@ func (h *AgentEntry) yoloHeld(c *gin.Context, siteID string, saved bool, mode st
 func setupJSON(s database.SetupSettings, saved, human, signedIn bool, source string, claims entry.ClaimChecker, holdYolo bool) gin.H {
 	mode := s.Mode
 	preselected := entry.DefaultMode(source)
-	if s.Mode == entry.ModeYolo {
+	// A saved yolo, including one stored only as mode_shown because an earlier
+	// mode was kept, is what the next read preselects. The source default is
+	// used only when yolo was not saved.
+	if s.Mode == entry.ModeYolo || s.ModeShown == entry.ModeYolo {
 		preselected = entry.ModeYolo
 	}
 	reason, message := "", ""
 	if claims == nil || !claims.Real() {
-		if mode == entry.ModeYolo || mode == entry.ModeAuto {
-			mode = entry.ModeManual
+		if mode == entry.ModeYolo || mode == entry.ModeAuto || s.ModeShown == entry.ModeYolo {
+			if mode == entry.ModeYolo || mode == entry.ModeAuto {
+				mode = entry.ModeManual
+			}
 			reason = entry.ClaimCheckReason
 			message = entry.ClaimCheckMessage
 			if holdYolo && s.Mode == entry.ModeYolo {

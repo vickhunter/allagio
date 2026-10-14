@@ -145,7 +145,7 @@ func TestClaimsCheckedOnPrepareAndCommit(t *testing.T) {
 	blocked, blockedBody := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
 		"offer_id": offerID, "surface_url": article, "context": contextText, "copy": "InboxPilot improves this workflow by 90%.",
 	})
-	if blocked.Code != http.StatusUnprocessableEntity || blockedBody["check_id"] != "claims_from_offer" || blockedBody["check_text"] != "Use only claims from the offer." {
+	if blocked.Code != http.StatusUnprocessableEntity || !claimDenialNames(blockedBody, "90%") {
 		t.Fatalf("prepare 90%%: %d %v", blocked.Code, blockedBody)
 	}
 	var n int
@@ -170,7 +170,7 @@ func TestClaimsCheckedOnPrepareAndCommit(t *testing.T) {
 		t.Fatalf("approve: %d %s", approved.Code, approved.Body.String())
 	}
 	commit, commitBody := doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/commit", siteKey, nil)
-	if commit.Code != http.StatusUnprocessableEntity || commitBody["check_id"] != "claims_from_offer" {
+	if commit.Code != http.StatusUnprocessableEntity || !claimDenialNames(commitBody, "90%") {
 		t.Fatalf("commit 90%%: %d %v", commit.Code, commitBody)
 	}
 	var status string
@@ -464,7 +464,7 @@ func TestStubUntrustedNinetyPercentNeverGoesLive(t *testing.T) {
 	copyBlocked, copyBody := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
 		"offer_id": honestID, "surface_url": article, "context": contextText, "copy": "InboxPilot improves this workflow by 90%.",
 	})
-	if copyBlocked.Code != http.StatusUnprocessableEntity || copyBody["check_id"] != "claims_from_offer" {
+	if copyBlocked.Code != http.StatusUnprocessableEntity || !claimDenialNames(copyBody, "90%") {
 		t.Fatalf("prepare listed 90%%: %d %v", copyBlocked.Code, copyBody)
 	}
 	var n int
@@ -488,7 +488,7 @@ func TestStubUntrustedNinetyPercentNeverGoesLive(t *testing.T) {
 		t.Fatalf("approve: %d %s", approved.Code, approved.Body.String())
 	}
 	commit, commitBody := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements/"+id+"/commit", siteKey, nil)
-	if commit.Code != http.StatusUnprocessableEntity || commitBody["check_id"] != "claims_from_offer" {
+	if commit.Code != http.StatusUnprocessableEntity || !claimDenialNames(commitBody, "90%") {
 		t.Fatalf("commit 90%%: %d %v", commit.Code, commitBody)
 	}
 	var placementStatus string
@@ -777,6 +777,120 @@ func assertYoloHeld(t *testing.T, rec *httptest.ResponseRecorder, body map[strin
 	t.Helper()
 	if rec.Code != http.StatusOK || body["mode"] != "manual" || body["mode_preselected"] != "yolo" || body["approval_reason"] != entry.YoloAfterFirstReason || body["approval_message"] != entry.YoloAfterFirstMessage {
 		t.Fatalf("yolo hold: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func claimDenialNames(body map[string]interface{}, claim string) bool {
+	message, _ := body["message"].(string)
+	errText, _ := body["error"].(string)
+	return body["check_id"] == "claims_from_offer" && body["check_text"] == "Use only claims from the offer." && body["reason"] == entry.ClaimReasonNumberNotInOffer && strings.Contains(message, claim) && errText == message
+}
+
+func TestYoloSaveReadsBackForOwnerAndSiteKey(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	api.Claims = entry.StubClaimChecker{}
+	owner, cookie := testOwnerSession(t, h, "yolo-readback", "yolo-readback@example.com")
+	siteID := createTestSite(t, db, "yolo-readback-key", "yolo-readback.example", "Yolo Readback")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, source='direct' WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	saved, savedBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/setup/settings", map[string]any{
+		"role": "publisher", "mode": "yolo", "mode_shown": "yolo",
+	})
+	assertYoloHeld(t, saved, savedBody)
+	got, gotBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher", nil)
+	assertYoloHeld(t, got, gotBody)
+	keyed, keyBody := postJSON(t, r, http.MethodGet, "/v1/setup/settings?role=publisher", nil, map[string]string{"X-API-Key": "yolo-readback-key"})
+	assertYoloHeld(t, keyed, keyBody)
+	var stored string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT mode FROM owner_setup WHERE owner_id=$1 AND role='publisher'`, owner.ID).Scan(&stored); err != nil || stored != "yolo" {
+		t.Fatalf("stored mode %s %v", stored, err)
+	}
+}
+
+func TestShownYoloReadsBackWhenStoredModeIsKept(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "yolo-kept", "yolo-kept@example.com")
+	siteID := createTestSite(t, db, "yolo-kept-key", "yolo-kept.example", "Yolo Kept")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, source='direct' WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/setup/settings", map[string]any{
+		"role": "publisher", "install_path": "cli", "mode": "manual", "mode_shown": "manual",
+	})
+	if first.Code != http.StatusOK {
+		t.Fatalf("first save: %d %s", first.Code, first.Body.String())
+	}
+	api.Claims = entry.StubClaimChecker{}
+	saved, savedBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/setup/settings", map[string]any{
+		"role": "publisher", "mode": "yolo", "mode_shown": "yolo",
+	})
+	assertClaimCheckYolo(t, saved, savedBody)
+	got, gotBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/setup/settings?role=publisher", nil)
+	assertClaimCheckYolo(t, got, gotBody)
+	keyed, keyBody := postJSON(t, r, http.MethodGet, "/v1/setup/settings?role=publisher", nil, map[string]string{"X-API-Key": "yolo-kept-key"})
+	assertClaimCheckYolo(t, keyed, keyBody)
+	var stored string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT mode FROM owner_setup WHERE owner_id=$1 AND role='publisher'`, owner.ID).Scan(&stored); err != nil || stored != "manual" {
+		t.Fatalf("stored mode %s %v", stored, err)
+	}
+}
+
+func assertClaimCheckYolo(t *testing.T, rec *httptest.ResponseRecorder, body map[string]any) {
+	t.Helper()
+	if rec.Code != http.StatusOK || body["mode"] != "manual" || body["mode_preselected"] != "yolo" || body["approval_reason"] != entry.ClaimCheckReason || body["approval_message"] != entry.ClaimCheckMessage {
+		t.Fatalf("yolo read-back: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestExpiredApprovedPlacementDoesNotBlockPrepare(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	ginSetTest(t)
+	makerID := insertPublisherMaker(t, db)
+	_, offerID := insertPublisherOffer(t, db, makerID, "none", "percentage", "USD", "InboxPilot", []string{"email", "inbox", "productivity"})
+	siteKey := "site-key-expired-box"
+	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Tutorials")
+	linkTestOwner(t, db, siteID, "expired-box-owner", "expired-box@example.com")
+	r := publisherLegRouter(db, false)
+	contextText := "InboxPilot email inbox productivity tutorial for developers"
+	article := "https://publisher.example.com/expired-box"
+	copy := "Consider InboxPilot for an email inbox productivity workflow."
+	placed, prepared := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+		"offer_id": offerID, "surface_url": article, "context": contextText, "copy": copy,
+	})
+	if placed.Code != http.StatusCreated {
+		t.Fatalf("place: %d %s", placed.Code, placed.Body.String())
+	}
+	id := prepared["placement"].(map[string]interface{})["id"].(string)
+	pending, pendingBody := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+		"offer_id": offerID, "surface_url": article, "context": contextText, "copy": "InboxPilot is one tool for this inbox workflow.",
+	})
+	if pending.Code != http.StatusConflict || pendingBody["reason"] != "one_per_post" {
+		t.Fatalf("pending still blocks: %d %v", pending.Code, pendingBody)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW(), expires_at=NOW()-INTERVAL '1 hour' WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	again, againBody := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+		"offer_id": offerID, "surface_url": article, "context": contextText, "copy": "InboxPilot is one tool for this inbox workflow.",
+	})
+	if again.Code != http.StatusCreated || againBody["reason"] == "one_per_post" {
+		t.Fatalf("expired approved blocked prepare: %d %v", again.Code, againBody)
+	}
+	nextID := againBody["placement"].(map[string]interface{})["id"].(string)
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', expires_at=NOW()-INTERVAL '1 hour' WHERE id=$1`, nextID); err != nil {
+		t.Fatal(err)
+	}
+	blocked, blockedBody := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{
+		"offer_id": offerID, "surface_url": article, "context": contextText, "copy": copy,
+	})
+	if blocked.Code != http.StatusConflict || blockedBody["reason"] != "one_per_post" {
+		t.Fatalf("expired committed: %d %v", blocked.Code, blockedBody)
 	}
 }
 

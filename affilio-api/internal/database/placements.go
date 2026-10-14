@@ -20,6 +20,24 @@ var ErrOnePerPost = errors.New("one box per post")
 // ErrClaimsFromOffer is copy that states a number the offer does not contain.
 var ErrClaimsFromOffer = errors.New("claims_from_offer")
 
+// ClaimsFromOfferError is that same refusal, with the reason code and the
+// unsupported claim so the 422 can name it.
+type ClaimsFromOfferError struct {
+	Reason string
+	Claim  string
+}
+
+func (e ClaimsFromOfferError) Error() string { return ErrClaimsFromOffer.Error() }
+
+func (e ClaimsFromOfferError) Is(target error) bool { return target == ErrClaimsFromOffer }
+
+func (e ClaimsFromOfferError) Unwrap() error {
+	if e.Reason == "" && e.Claim == "" {
+		return nil
+	}
+	return entry.ClaimMismatch{Reason: e.Reason, Claim: e.Claim}
+}
+
 type Placement struct {
 	ID            string          `json:"id"`
 	SiteID        string          `json:"site_id"`
@@ -413,7 +431,15 @@ FROM offers o JOIN products pr ON pr.id=o.product_id WHERE o.id=$1`, p.OfferID).
 	if err != nil {
 		return nil, err
 	}
-	if entry.ClaimsFail(claims, p.Copy, strings.TrimSpace(strings.Join([]string{product, category, website, terms, commission}, "\n"))) {
+	checker := claims
+	if checker == nil {
+		checker = entry.StubClaimChecker{}
+	}
+	if claimErr := checker.CheckClaims(p.Copy, strings.TrimSpace(strings.Join([]string{product, category, website, terms, commission}, "\n"))); claimErr != nil {
+		var mismatch entry.ClaimMismatch
+		if errors.As(claimErr, &mismatch) {
+			return nil, ClaimsFromOfferError{Reason: mismatch.Reason, Claim: mismatch.Claim}
+		}
 		return nil, ErrClaimsFromOffer
 	}
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))`, siteID); err != nil {

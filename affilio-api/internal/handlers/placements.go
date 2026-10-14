@@ -207,8 +207,8 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
 		return
 	}
-	if entry.ClaimsFail(h.claims(), strings.TrimSpace(req.Copy), offerText) {
-		writeCheckDenied(c, []string{"claims_from_offer"})
+	if claimErr := h.claims().CheckClaims(strings.TrimSpace(req.Copy), offerText); claimErr != nil {
+		writeClaimsDenied(c, claimErr)
 		return
 	}
 	postID := req.PostID
@@ -363,7 +363,7 @@ func (h *PlacementsHandler) Commit(c *gin.Context) {
 		return
 	}
 	if errors.Is(err, database.ErrClaimsFromOffer) {
-		writeCheckDenied(c, []string{"claims_from_offer"})
+		writeClaimsDenied(c, err)
 		return
 	}
 	if errors.Is(err, database.ErrOnePerPost) {
