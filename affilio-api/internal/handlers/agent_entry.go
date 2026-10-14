@@ -79,6 +79,7 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.GET("/v1/listing-cards/:id", h.GetListing)
 	r.POST("/v1/events", h.RecordEvent)
 	r.GET("/v1/digest", h.Digest)
+	r.GET("/v1/maker/digest", h.MakerDigest)
 	r.GET("/v1/account/digest", h.AccountDigest)
 	r.GET("/v1/account/projects", h.AccountProjects)
 	r.POST("/v1/account-keys", h.CreateAccountKey)
@@ -977,6 +978,14 @@ func (h *AgentEntry) RecordEvent(c *gin.Context) {
 }
 
 func (h *AgentEntry) Digest(c *gin.Context) {
+	if c.GetHeader("X-Maker-Key") != "" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "maker key cannot read the owner digest",
+			"reason":  "forbidden_key_type",
+			"message": "Read this maker's offers with GET /v1/maker/digest.",
+		})
+		return
+	}
 	owner, ok := h.sessionOwner(c)
 	if !ok {
 		return
@@ -2026,6 +2035,7 @@ func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 	if item.Kind == "placement" {
 		body["plugin_failed_reason"] = item.PluginFailedReason
 		body["failed_action"] = item.FailedAction
+		body["message"] = item.Summary
 	}
 	if item.Kind == "offer" {
 		status := item.Status
@@ -2096,10 +2106,56 @@ func filledDigestTitle(item database.DigestItem) string {
 	if title := strings.TrimSpace(item.PostTitle); title != "" {
 		return title
 	}
-	if summary := strings.TrimSpace(item.Summary); summary != "" {
-		return summary
-	}
 	return "Untitled"
+}
+
+func (h *AgentEntry) MakerDigest(c *gin.Context) {
+	if h.DB == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing maker key"})
+		return
+	}
+	middleware.MakerKeyAuth(h.DB)(c)
+	if c.IsAborted() {
+		return
+	}
+	makerID := c.GetString("maker_id")
+	if makerID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing maker key"})
+		return
+	}
+	offerID := strings.TrimSpace(c.Query("offer_id"))
+	scoped := c.GetString("offer_scope_id")
+	if offerID != "" {
+		if !uuidPattern.MatchString(offerID) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid offer id"})
+			return
+		}
+		if scoped != "" && scoped != offerID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "key is scoped to a different offer", "reason": "forbidden", "message": "This key can read only its own offers."})
+			return
+		}
+		_, ownerMaker, _, err := h.DB.OfferFacts(c.Request.Context(), offerID)
+		if err != nil || ownerMaker != makerID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "offer is not on this account", "reason": "forbidden", "message": "This key can read only its own offers."})
+			return
+		}
+	} else if scoped != "" {
+		offerID = scoped
+	}
+	offers, err := h.DB.MakerDigestOffers(c.Request.Context(), makerID, offerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
+	}
+	if err = h.annotateOfferReviews(c, offers); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
+	}
+	items := make([]gin.H, 0, len(offers))
+	for _, item := range offers {
+		items = append(items, h.digestJSON(item, ""))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "session": gin.H{"signed_in": false}})
 }
 
 func filledDigestPosition(position string) string {

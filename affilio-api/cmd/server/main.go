@@ -289,6 +289,7 @@ func main() {
 		secured.GET("/placements", placements.List)
 		secured.POST("/placements/:id/commit", placements.Commit)
 		secured.POST("/placements/:id/receipt", placements.RecordReceipt)
+		secured.POST("/placements/:id/refuse", placements.Refuse)
 		secured.POST("/placements/:id/removed", placements.MarkRemoved)
 		// Revoke lives on AgentEntry so a site owner or the offer's maker can call it.
 		secured.GET("/marketplace/offers", marketplace.ListOffers)

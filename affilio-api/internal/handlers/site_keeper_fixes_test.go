@@ -842,3 +842,182 @@ func TestAdminApproveMatchesOfferClaimsText(t *testing.T) {
 		t.Fatalf("approve: %d %v row %v", blocked.Code, blockedBody, rowBody["message"])
 	}
 }
+
+func TestDigestPostTitleIsArticleNotCopy(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "article-title-owner", "article-title@example.com")
+	makerID := insertPublisherMaker(t, db)
+	_, offerID := insertPublisherOffer(t, db, makerID, "none", "percentage", "USD", "InboxPilot", []string{"email", "inbox", "productivity"})
+	siteKey := "site-key-article-title"
+	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Tutorials")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	publishers := publisherLegRouter(db, true)
+	const (
+		surface = "https://publisher.example.com/how-to-ship"
+		title   = "How to ship a WordPress post"
+		copy    = "Consider InboxPilot for an email inbox productivity workflow."
+		postID  = 88
+	)
+	prepared, preparedBody := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements", siteKey, map[string]any{
+		"offer_id": offerID, "surface_url": surface, "context": "InboxPilot email inbox productivity tutorial for developers",
+		"copy": copy, "post_title": title, "post_id": postID,
+	})
+	if prepared.Code != http.StatusCreated {
+		t.Fatalf("prepare: %d %s", prepared.Code, prepared.Body.String())
+	}
+	placementID := preparedBody["placement"].(map[string]any)["id"].(string)
+	var storedTitle string
+	var storedPost int64
+	if err := db.Pool.QueryRow(context.Background(), `SELECT post_title, wp_post_id FROM placement_proposals WHERE id=$1`, placementID).Scan(&storedTitle, &storedPost); err != nil || storedTitle != title || storedPost != postID {
+		t.Fatalf("stored title %q post %d (%v)", storedTitle, storedPost, err)
+	}
+	approved, _ := adminJSON(t, publishers, http.MethodPost, "/v1/offer-review/placements/"+placementID+"/approve", map[string]any{
+		"site_id": siteID, "owner_email": "publisher@example.com", "evidence": "Publisher approved this exact providerless placement.",
+	})
+	if approved.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", approved.Code, approved.Body.String())
+	}
+	committed, _ := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements/"+placementID+"/commit", siteKey, nil)
+	if committed.Code != http.StatusOK {
+		t.Fatalf("commit: %d %s", committed.Code, committed.Body.String())
+	}
+	check := func(path string) {
+		t.Helper()
+		rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, path, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		item := findDigestItem(itemsFromDigest(t, body), placementID)
+		if item == nil || item["post_title"] != title || item["message"] != copy || item["post_title"] == copy {
+			t.Fatalf("%s placement: %v", path, item)
+		}
+		offer := findDigestItem(itemsFromDigest(t, body), offerID)
+		if offer == nil || offer["post_title"] != title {
+			t.Fatalf("%s offer: %v", path, offer)
+		}
+	}
+	check("/v1/digest")
+	check("/v1/account/digest")
+
+	receipt, receiptBody := doSiteJSON(t, publishers, http.MethodPost, "/v1/placements/"+placementID+"/receipt", siteKey, map[string]any{
+		"surface_url": surface, "post_title": title, "post_id": postID,
+		"published_text": copy + "\n\nAffiliate disclosure: I may earn a commission if you buy through this link.\n/go/" + placementID,
+		"evidence":       "The plugin published this article.",
+	})
+	if receipt.Code != http.StatusOK {
+		t.Fatalf("receipt: %d %v", receipt.Code, receiptBody)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT post_title, wp_post_id FROM placement_proposals WHERE id=$1`, placementID).Scan(&storedTitle, &storedPost); err != nil || storedTitle != title || storedPost != postID {
+		t.Fatalf("receipt stored title %q post %d (%v)", storedTitle, storedPost, err)
+	}
+	check("/v1/digest")
+	check("/v1/account/digest")
+}
+
+func TestMakerDigestReadsOwnOffersOnly(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	api.ClaimsCheck = config.ClaimsStub
+	_, listedID := seedListedOffer(t, db, "maker-digest-key", "maker-digest@example.com", "Live Product")
+	var heldID string
+	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO offers(product_id,status,commission_type,commission_value,landing_url)
+SELECT product_id,'submitted',commission_type,commission_value,landing_url FROM offers WHERE id=$1 RETURNING id`, listedID).Scan(&heldID); err != nil {
+		t.Fatal(err)
+	}
+	_, otherID := seedListedOffer(t, db, "other-maker-digest-key", "other-maker-digest@example.com", "Other Product")
+	own, ownBody := postJSON(t, r, http.MethodGet, "/v1/maker/digest", nil, map[string]string{"X-Maker-Key": "maker-digest-key"})
+	if own.Code != http.StatusOK {
+		t.Fatalf("own digest: %d %s", own.Code, own.Body.String())
+	}
+	items := itemsFromDigest(t, ownBody)
+	live := findDigestItem(items, listedID)
+	held := findDigestItem(items, heldID)
+	if live == nil || live["status"] != "listed" || findDigestItem(items, otherID) != nil {
+		t.Fatalf("own live: %v", items)
+	}
+	if held == nil || held["status"] != "submitted" || held["review_reason"] != "claims" {
+		t.Fatalf("own held: %v", held)
+	}
+	other, otherBody := postJSON(t, r, http.MethodGet, "/v1/maker/digest?offer_id="+listedID, nil, map[string]string{"X-Maker-Key": "other-maker-digest-key"})
+	if other.Code != http.StatusForbidden || otherBody["message"] != "This key can read only its own offers." {
+		t.Fatalf("other maker: %d %s", other.Code, other.Body.String())
+	}
+	otherList, otherListBody := postJSON(t, r, http.MethodGet, "/v1/maker/digest", nil, map[string]string{"X-Maker-Key": "other-maker-digest-key"})
+	if otherList.Code != http.StatusOK || findDigestItem(itemsFromDigest(t, otherListBody), listedID) != nil || findDigestItem(itemsFromDigest(t, otherListBody), heldID) != nil {
+		t.Fatalf("other list: %d %s", otherList.Code, otherList.Body.String())
+	}
+	ownerRoute, ownerRouteBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-Maker-Key": "maker-digest-key"})
+	if ownerRoute.Code != http.StatusForbidden || ownerRouteBody["reason"] != "forbidden_key_type" || strings.Contains(ownerRoute.Body.String(), "invalid return path") {
+		t.Fatalf("owner digest with maker key: %d %s", ownerRoute.Code, ownerRoute.Body.String())
+	}
+	_ = h
+}
+
+func TestPluginRefuseReopensPrepare(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	makerID := insertPublisherMaker(t, db)
+	_, offerID := insertPublisherOffer(t, db, makerID, "none", "percentage", "USD", "InboxPilot", []string{"email", "inbox", "productivity"})
+	siteKey := "site-key-plugin-refuse"
+	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Tutorials")
+	linkPublisherOwner(t, db, siteID)
+	r := publisherLegRouter(db, true)
+	surface := "https://publisher.example.com/refused-locally"
+	copy := "Consider InboxPilot for an email inbox productivity workflow."
+	prepare := func() (int, map[string]any) {
+		t.Helper()
+		rec, body := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]any{
+			"offer_id": offerID, "surface_url": surface, "context": "InboxPilot email inbox productivity tutorial for developers", "copy": copy,
+		})
+		return rec.Code, body
+	}
+	code, prepared := prepare()
+	if code != http.StatusCreated {
+		t.Fatalf("prepare: %d %v", code, prepared)
+	}
+	placementID := prepared["placement"].(map[string]any)["id"].(string)
+	approved, _ := adminJSON(t, r, http.MethodPost, "/v1/offer-review/placements/"+placementID+"/approve", map[string]any{
+		"site_id": siteID, "owner_email": "publisher@example.com", "evidence": "Publisher approved this exact providerless placement.",
+	})
+	if approved.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", approved.Code, approved.Body.String())
+	}
+	committed, _ := doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/commit", siteKey, nil)
+	if committed.Code != http.StatusOK {
+		t.Fatalf("commit: %d %s", committed.Code, committed.Body.String())
+	}
+	refuse := func() (*httptest.ResponseRecorder, map[string]any) {
+		t.Helper()
+		return doSiteJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/refuse", siteKey, map[string]any{"reason": "The plugin did not insert this box."})
+	}
+	first, firstBody := refuse()
+	if first.Code != http.StatusOK || firstBody["status"] != "pending" || firstBody["publication_status"] != "refused" {
+		t.Fatalf("refuse: %d %v", first.Code, firstBody)
+	}
+	again, againBody := refuse()
+	if again.Code != http.StatusOK || againBody["publication_status"] != "refused" {
+		t.Fatalf("second refuse: %d %v", again.Code, againBody)
+	}
+	var status, publication string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status, COALESCE(receipt->>'publication_status','') FROM placement_proposals WHERE id=$1`, placementID).Scan(&status, &publication); err != nil || status != "pending" || publication != "refused" {
+		t.Fatalf("after refuse status=%s publication=%s err=%v", status, publication, err)
+	}
+	nextCode, nextBody := prepare()
+	if nextCode != http.StatusCreated || nextBody["reason"] == "one_per_post" {
+		t.Fatalf("prepare after refuse: %d %v", nextCode, nextBody)
+	}
+	nextID := nextBody["placement"].(map[string]any)["id"].(string)
+	if nextID == "" || nextID == placementID {
+		t.Fatalf("expected a new box, got %v", nextBody)
+	}
+	boxes, err := db.CountPlacementBoxes(context.Background(), siteID, surface, "00000000-0000-0000-0000-000000000000", 0)
+	if err != nil || boxes != 1 {
+		t.Fatalf("boxes=%d %v", boxes, err)
+	}
+}

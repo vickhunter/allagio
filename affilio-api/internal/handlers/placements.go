@@ -450,6 +450,8 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		PublishedText string `json:"published_text"`
 		Evidence      string `json:"evidence"`
 		PostTitle     string `json:"post_title"`
+		PostID        int64  `json:"post_id"`
+		WPPostID      int64  `json:"wp_post_id"`
 	}
 	if !uuidPattern.MatchString(c.Param("id")) || bindBoundedJSON(c, &req) != nil || len(req.PublishedText) > 16000 || len(req.Evidence) < 10 || len(req.Evidence) > 2000 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "surface_url, published_text and evidence required"})
@@ -474,7 +476,11 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		return
 	}
 	hash := sha256.Sum256([]byte(req.PublishedText))
-	updated, err := h.DB.RecordPlacementReceipt(c.Request.Context(), siteIDFrom(c), p.ID, req.SurfaceURL, hex.EncodeToString(hash[:]), req.Evidence, strings.TrimSpace(req.PostTitle), h.now())
+	postID := req.PostID
+	if req.WPPostID > 0 {
+		postID = req.WPPostID
+	}
+	updated, err := h.DB.RecordPlacementReceipt(c.Request.Context(), siteIDFrom(c), p.ID, req.SurfaceURL, hex.EncodeToString(hash[:]), req.Evidence, strings.TrimSpace(req.PostTitle), postID, h.now())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "receipt recording failed"})
 		return
@@ -484,6 +490,36 @@ func (h *PlacementsHandler) RecordReceipt(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "publisher_reported", "content_sha256": hex.EncodeToString(hash[:])})
+}
+
+func (h *PlacementsHandler) Refuse(c *gin.Context) {
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if !uuidPattern.MatchString(c.Param("id")) || bindBoundedJSON(c, &req) != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "placement id and reason required"})
+		return
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" || len(reason) > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "reason required"})
+		return
+	}
+	outcome, err := h.DB.RefusePlacement(c.Request.Context(), siteIDFrom(c), c.Param("id"), reason)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement refusal failed"})
+		return
+	}
+	switch outcome {
+	case "missing":
+		c.JSON(http.StatusNotFound, gin.H{"error": "placement not found"})
+	case "recorded":
+		writeNamedConflict(c, "receipt_recorded")
+	case "unavailable":
+		writeNamedConflict(c, "placement_unavailable")
+	default:
+		c.JSON(http.StatusOK, gin.H{"status": "pending", "publication_status": "refused", "placement_id": c.Param("id")})
+	}
 }
 
 func (h *PlacementsHandler) MarkRemoved(c *gin.Context) {

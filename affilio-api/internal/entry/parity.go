@@ -65,4 +65,5 @@ var ScreenActions = []ScreenAction{
 	{Screen: "dashboard", Action: "Approval policy rule id and sentence", Method: "POST", Path: "/v1/placements/:id/decide"},
 	{Screen: "digest", Action: "Record digest opened", Method: "POST", Path: "/v1/events"},
 	{Screen: "digest", Action: "List what went live since the last digest open", Method: "GET", Path: "/v1/digest"},
+	{Screen: "digest", Action: "Read this maker's held, in-review, and live offers", Method: "GET", Path: "/v1/maker/digest"},
 }

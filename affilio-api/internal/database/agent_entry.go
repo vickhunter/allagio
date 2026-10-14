@@ -978,9 +978,8 @@ func (d *DB) CountDigestPlacements(ctx context.Context, siteID string, since tim
 	return n, err
 }
 
-// digestPostTitleSQL prefers the plugin receipt, then the stored placement
-// title, then the article title when the URLs match, then the stored copy so
-// the digest title is never empty.
+// digestPostTitleSQL is the WordPress article title. The plugin sends it on
+// prepare or receipt. The box copy is not a title.
 const digestPostTitleSQL = `COALESCE(NULLIF(receipt->>'post_title', ''), NULLIF(post_title, ''), (
   SELECT a.title FROM articles a
   WHERE a.site_id = placement_proposals.site_id
@@ -989,7 +988,7 @@ const digestPostTitleSQL = `COALESCE(NULLIF(receipt->>'post_title', ''), NULLIF(
       = regexp_replace(lower(split_part(split_part(placement_proposals.surface_url, '#', 1), '?', 1)), '/+$', '')
   ORDER BY a.updated_at DESC
   LIMIT 1
-), NULLIF(copy, ''), 'Untitled')`
+), 'Untitled')`
 
 // digestPositionSQL uses the stored position, then the publisher's saved box
 // position, then end, so a digest item never has an empty position.
@@ -1037,7 +1036,7 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 // digestOfferColumns is the shared offer row for both digest endpoints.
 // Title and URL come from the offer's placement receipt, then that placement,
 // then the product name and landing URL so a held offer with no placement
-// still has both fields.
+// still has both fields. The placement copy is not the title.
 const digestOfferColumns = `o.id::text, p.name,
 (o.updated_at AT TIME ZONE current_setting('TimeZone')),
 (SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
@@ -1094,6 +1093,26 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 		out = append(out, item)
 	}
 	return out, rows.Err()
+}
+
+// MakerDigestOffers lists this maker's held, in-review, and live offers.
+// Submitted stays until it leaves that state. Listed stays with no digest window.
+// offerID limits the read to one offer when the key is scoped to it.
+func (d *DB) MakerDigestOffers(ctx context.Context, makerID, offerID string) ([]DigestItem, error) {
+	limit := DigestPageSize
+	if limit < 1 {
+		limit = 50
+	}
+	rows, err := d.Pool.Query(ctx, `SELECT `+digestOfferColumns+`
+`+digestOfferFrom+`
+WHERE p.maker_id=$1 AND o.status IN ('listed','submitted')
+AND ($2 = '' OR o.id::text = $2)
+ORDER BY o.updated_at DESC LIMIT $3`, makerID, offerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanDigest(rows, "offer")
 }
 
 func (d *DB) StoreUndoToken(ctx context.Context, hash, ownerID, kind, placementID, offerID string, expires time.Time) error {

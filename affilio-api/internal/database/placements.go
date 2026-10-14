@@ -441,13 +441,13 @@ FROM offers o JOIN products pr ON pr.id=o.product_id WHERE o.id=$1`, p.OfferID).
 		return nil, ErrPlacementAuthority
 	}
 	var postTitle string
-	if err = tx.QueryRow(ctx, `SELECT COALESCE(post_title,'') FROM placement_proposals WHERE id=$1`, p.ID).Scan(&postTitle); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT COALESCE(post_title,''), wp_post_id FROM placement_proposals WHERE id=$1`, p.ID).Scan(&postTitle, &postID); err != nil {
 		return nil, err
 	}
 	receipt, err := json.Marshal(map[string]interface{}{"placement_id": p.ID, "campaign_id": campaignID,
 		"tracked_link": "/v1/go/" + p.ID, "publication_status": "awaiting_evidence",
 		"approved_text": p.Copy + "\n\n" + p.Disclosure, "terms": p.Terms,
-		"post_title": postTitle, "surface_url": p.SurfaceURL})
+		"post_title": postTitle, "post_id": postID, "surface_url": p.SurfaceURL})
 	if err != nil {
 		return nil, err
 	}
@@ -477,20 +477,57 @@ WHERE id=$1 AND site_id=$2 AND status='committed'
 	return err
 }
 
-func (d *DB) RecordPlacementReceipt(ctx context.Context, siteID, id, surfaceURL, contentHash, evidence, postTitle string, at time.Time) (bool, error) {
-	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='committed', receipt=receipt || jsonb_build_object(
+func (d *DB) RecordPlacementReceipt(ctx context.Context, siteID, id, surfaceURL, contentHash, evidence, postTitle string, postID int64, at time.Time) (bool, error) {
+	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals SET status='committed',
+ post_title = COALESCE(NULLIF($7, ''), NULLIF(post_title, ''), ''),
+ wp_post_id = CASE WHEN $8::bigint > 0 THEN $8::bigint ELSE wp_post_id END,
+ receipt=receipt || jsonb_build_object(
  'publication_status','publisher_reported','surface_url',$3::text,'content_sha256',$4::text,'evidence',$5::text,
- 'post_title', COALESCE(NULLIF($7, ''), NULLIF(post_title, ''), receipt->>'post_title', '')),
+ 'post_title', COALESCE(NULLIF($7, ''), NULLIF(post_title, ''), receipt->>'post_title', ''),
+ 'post_id', CASE WHEN $8::bigint > 0 THEN $8::bigint ELSE wp_post_id END),
  plugin_contact_at=$6
  WHERE id=$1 AND site_id=$2 AND surface_url=$3
  AND (
    (status='committed' AND receipt->>'publication_status'='awaiting_evidence')
    OR (status='pending' AND receipt->>'publication_status'='refused')
- )`, id, siteID, surfaceURL, contentHash, evidence, at, postTitle)
+ )`, id, siteID, surfaceURL, contentHash, evidence, at, postTitle, postID)
 	if err != nil {
 		return false, err
 	}
 	return res.RowsAffected() == 1, nil
+}
+
+// RefusePlacement returns a placement to pending when the plugin will not
+// insert it, before a receipt. publication_status refused is the same open
+// state as a refused receipt, so the row no longer occupies the post.
+// A receipt that already reported publication is left committed.
+// Calling it again on an already refused row is a no-op success.
+func (d *DB) RefusePlacement(ctx context.Context, siteID, id, reason string) (string, error) {
+	var status, publication string
+	err := d.Pool.QueryRow(ctx, `SELECT status, COALESCE(receipt->>'publication_status','')
+FROM placement_proposals WHERE id=$1 AND site_id=$2`, id, siteID).Scan(&status, &publication)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "missing", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if publication == "publisher_reported" {
+		return "recorded", nil
+	}
+	if status != "pending" && status != "approved" && status != "committed" {
+		return "unavailable", nil
+	}
+	_, err = d.Pool.Exec(ctx, `UPDATE placement_proposals
+SET status='pending',
+    receipt = COALESCE(receipt, '{}'::jsonb) || jsonb_build_object('publication_status', 'refused', 'refuse_reason', $3::text)
+WHERE id=$1 AND site_id=$2
+  AND status IN ('pending','approved','committed')
+  AND COALESCE(receipt->>'publication_status', '') <> 'publisher_reported'`, id, siteID, reason)
+	if err != nil {
+		return "", err
+	}
+	return "refused", nil
 }
 
 func (d *DB) TouchPlacementContact(ctx context.Context, siteID string, at time.Time) error {
