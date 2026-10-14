@@ -209,6 +209,96 @@ class Affilio_Distribution {
         return mb_substr($text, 0, 3000, 'UTF-8');
     }
 
+    private function article_payload($post) {
+        $title = isset($post->post_title) ? (string) $post->post_title : '';
+        if (function_exists('get_the_title')) {
+            $from_wordpress = get_the_title($post);
+            if (is_string($from_wordpress)) {
+                $title = $from_wordpress;
+            }
+        }
+        return array(
+            'post_title' => html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            'post_id' => (int) $post->ID,
+        );
+    }
+
+    public static function refuse_queue_option() {
+        return 'affilio_refuse_queue';
+    }
+
+    private static function refuse_retryable($error) {
+        $data = is_wp_error($error) ? $error->get_error_data() : array();
+        $status = 503;
+        if (is_array($data) && isset($data['status'])) {
+            $status = (int) $data['status'];
+        }
+        return $status >= 500;
+    }
+
+    private function queue_refuse($id, $reason) {
+        if (!function_exists('get_option') || !function_exists('update_option')) {
+            return;
+        }
+        $queue = get_option(self::refuse_queue_option(), array());
+        if (!is_array($queue)) {
+            $queue = array();
+        }
+        $queue[(string) $id] = array('reason' => (string) $reason);
+        update_option(self::refuse_queue_option(), $queue, false);
+    }
+
+    private function forget_refuse($id) {
+        if (!function_exists('get_option') || !function_exists('update_option')) {
+            return;
+        }
+        $queue = get_option(self::refuse_queue_option(), array());
+        if (!is_array($queue) || !isset($queue[(string) $id])) {
+            return;
+        }
+        unset($queue[(string) $id]);
+        update_option(self::refuse_queue_option(), $queue, false);
+    }
+
+    private function send_refuse($id, $reason) {
+        $result = $this->request('POST', '/placements/' . $id . '/refuse', array('reason' => (string) $reason));
+        if (is_wp_error($result)) {
+            if (self::refuse_retryable($result)) {
+                $this->queue_refuse($id, $reason);
+            } else {
+                $this->forget_refuse($id);
+            }
+            return $result;
+        }
+        $this->forget_refuse($id);
+        return true;
+    }
+
+    private function retry_pending_refusals() {
+        if (!function_exists('get_option')) {
+            return true;
+        }
+        $queue = get_option(self::refuse_queue_option(), array());
+        if (!is_array($queue) || !$queue) {
+            return true;
+        }
+        foreach ($queue as $id => $entry) {
+            if (!is_string($id) || !preg_match('/^[a-f0-9-]{36}$/i', $id)) {
+                $this->forget_refuse($id);
+                continue;
+            }
+            $reason = 'local_rollback';
+            if (is_array($entry) && isset($entry['reason']) && is_string($entry['reason']) && $entry['reason'] !== '') {
+                $reason = $entry['reason'];
+            }
+            $result = $this->send_refuse($id, $reason);
+            if (is_wp_error($result)) {
+                return $result;
+            }
+        }
+        return true;
+    }
+
     public function status() {
         $connection = $this->api->get_connection_status();
         $publisher = $connection['connected'] ? $this->request('GET', '/sites/owner-connection') : null;
@@ -259,7 +349,19 @@ class Affilio_Distribution {
         if (is_wp_error($post)) {
             return $post;
         }
-        return $this->request('POST', '/placements', array('offer_id' => (string) $request->get_param('offer_id'), 'surface_url' => get_permalink($post), 'context' => $this->context($post), 'copy' => (string) $request->get_param('copy')));
+        $pending = $this->retry_pending_refusals();
+        if (is_wp_error($pending)) {
+            return $pending;
+        }
+        $article = $this->article_payload($post);
+        return $this->request('POST', '/placements', array(
+            'offer_id' => (string) $request->get_param('offer_id'),
+            'surface_url' => get_permalink($post),
+            'context' => $this->context($post),
+            'copy' => (string) $request->get_param('copy'),
+            'post_title' => $article['post_title'],
+            'post_id' => $article['post_id'],
+        ));
     }
 
     public function placements() {
@@ -356,14 +458,28 @@ class Affilio_Distribution {
                     $published = $excerpt . "\n" . $published;
                 }
             }
-            $receipt = $this->request('POST', '/placements/' . $id . '/receipt', array('surface_url' => get_permalink($post), 'published_text' => $published, 'evidence' => 'WordPress administrator inserted the approved placement in published post ' . $post->ID));
+            $article = $this->article_payload($post);
+            $receipt = $this->request('POST', '/placements/' . $id . '/receipt', array(
+                'surface_url' => get_permalink($post),
+                'published_text' => $published,
+                'evidence' => 'WordPress administrator inserted the approved placement in published post ' . $post->ID,
+                'post_title' => $article['post_title'],
+                'post_id' => $article['post_id'],
+            ));
             if (is_wp_error($receipt)) {
-                if ($inserted && !$this->rollback_inserted_placement($post->ID, $id)) {
-                    $reason = trim((string) $receipt->get_error_message());
-                    if ($reason === '') {
-                        $reason = 'block still present after rollback retry';
+                $removed = false;
+                if ($inserted) {
+                    $removed = $this->rollback_inserted_placement($post->ID, $id);
+                    if (!$removed) {
+                        $reason = trim((string) $receipt->get_error_message());
+                        if ($reason === '') {
+                            $reason = 'block still present after rollback retry';
+                        }
+                        $this->report_live_without_receipt($post->ID, $id, $reason);
                     }
-                    $this->report_live_without_receipt($post->ID, $id, $reason);
+                }
+                if ($removed) {
+                    $this->send_refuse($id, 'local_rollback');
                 }
                 $status = 502;
                 $error_data = $receipt->get_error_data();

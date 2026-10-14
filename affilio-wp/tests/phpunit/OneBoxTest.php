@@ -51,4 +51,22 @@ class OneBoxTest extends TestCase {
         affilio_review_unknown_go_id_is_404();
         $this->assertTrue(true);
     }
+
+    /**
+     * @runInSeparateProcess
+     */
+    public function test_prepare_and_receipt_send_decoded_title() {
+        require_once dirname(__DIR__) . '/d033-one-box.php';
+        affilio_review_prepare_and_receipt_send_decoded_title();
+        $this->assertTrue(true);
+    }
+
+    /**
+     * @runInSeparateProcess
+     */
+    public function test_local_refuse_then_prepare_keeps_one_box() {
+        require_once dirname(__DIR__) . '/d033-one-box.php';
+        affilio_review_local_refuse_then_prepare_keeps_one_box();
+        $this->assertTrue(true);
+    }
 }

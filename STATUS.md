@@ -1,3 +1,7 @@
+## October 14 — plugin 0.1.22 article title and local refuse
+
+Prepare (`POST /placements`) and the publication receipt send `post_title` and `post_id`. `post_title` is `get_the_title` for that post, with HTML entities decoded. When a receipt never reaches the server and the box this request inserted is removed, the plugin calls `POST /placements/{id}/refuse` with `{reason: local_rollback}` on the site key. That asks the server to put the placement back to pending. A transport failure or HTTP 5xx is stored in `affilio_refuse_queue` and retried at the start of the next prepare, before another placement is created. A successful refuse is not sent again.
+
 ## October 14 — package the WordPress zip from tracked files
 
 `scripts/package-wp-zip` builds the WordPress ZIP from files git tracks under `affilio-wp/`, leaves out the 14 hosted and build files under `admin/build/`, and runs `validate_plugin`. Those files are the landing scene, the workspace and home pages, `setup-controls.js`, `THIRD_PARTY_NOTICES.md`, and `package*.json`. The plugin does not enqueue any of them. `setup-controls.js` is loaded only by the hosted home and workspace pages. The zip contains 24 files.

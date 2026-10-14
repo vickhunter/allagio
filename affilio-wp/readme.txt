@@ -1,11 +1,15 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.21
+Stable tag: 0.1.22
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.22 =
+* Prepare and the publication receipt send the article's decoded WordPress title and post id.
+* When a new box is removed because the receipt never reached the server, the plugin asks the server to put that placement back to pending. A failed call is retried on the next prepare, before another placement is created.
 
 = 0.1.21 =
 * A refused receipt returns the server status and the server reason. Connect stores plugin_key when the register response includes it.

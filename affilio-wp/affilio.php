@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Affilio
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.21
+ * Version: 0.1.22
  * Author: Affilio
  */
 
@@ -15,7 +15,7 @@ if (defined('AFFILIO_LOADED')) {
 }
 define('AFFILIO_LOADED', true);
 
-define('AFFILIO_VERSION', '0.1.21');
+define('AFFILIO_VERSION', '0.1.22');
 
 if (!defined('AFFILIO_PLUGIN_ACK_HEADER')) {
     define('AFFILIO_PLUGIN_ACK_HEADER', 'X-Plugin-Key');

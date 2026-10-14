@@ -3,11 +3,23 @@
 require __DIR__ . '/d033-harness.php';
 
 if (!defined('AFFILIO_VERSION')) {
-    define('AFFILIO_VERSION', '0.1.21');
+    define('AFFILIO_VERSION', '0.1.22');
 }
 require __DIR__ . '/../includes/class-affilio-plugin-ack.php';
 require __DIR__ . '/../includes/class-affilio-go.php';
 require __DIR__ . '/../includes/class-affilio-distribution.php';
+
+if (!function_exists('get_the_title')) {
+    function get_the_title($post = 0) {
+        if (isset($GLOBALS['affilio_encoded_title'])) {
+            return $GLOBALS['affilio_encoded_title'];
+        }
+        if (is_object($post) && isset($post->post_title)) {
+            return $post->post_title;
+        }
+        return '';
+    }
+}
 
 if (!class_exists('OneBoxRequest')) {
     class OneBoxRequest {
@@ -20,9 +32,17 @@ if (!class_exists('OneBoxRequest')) {
 if (!class_exists('OneBoxAPI')) {
     class OneBoxAPI {
         public $commit_status = 200;
+        public $receipt_error = false;
+        public $refuse_failures = 0;
+        public $prepared_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+        public $seen = array();
         public function request($method, $path, $body = null) {
             $GLOBALS['api_calls'][] = $method . ' ' . $path;
+            $this->seen[] = array('method' => $method, 'path' => $path, 'body' => $body);
             $id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+            if (preg_match('#/placements/([a-f0-9-]{36})#i', $path, $match)) {
+                $id = $match[1];
+            }
             $placement = array(
                 'id' => $id,
                 'surface_url' => 'https://blog.example/post',
@@ -48,7 +68,23 @@ if (!class_exists('OneBoxAPI')) {
                 return array('code' => 200, 'data' => array('placement' => $placement));
             }
             if (strpos($path, '/receipt') !== false) {
+                if ($this->receipt_error) {
+                    return new WP_Error('http_request_failed', 'network down');
+                }
                 return array('code' => 200, 'data' => array('ok' => true));
+            }
+            if (strpos($path, '/refuse') !== false) {
+                if ((int) $this->refuse_failures > 0) {
+                    $this->refuse_failures--;
+                    return new WP_Error('http_request_failed', 'network down');
+                }
+                return array('code' => 200, 'data' => array('status' => 'pending'));
+            }
+            if ($method === 'POST' && rtrim($path, '/') === '/placements') {
+                $created = $placement;
+                $created['id'] = $this->prepared_id;
+                $created['status'] = 'pending';
+                return array('code' => 200, 'data' => array('id' => $this->prepared_id, 'placement' => $created));
             }
             return array('code' => 404, 'data' => array());
         }
@@ -72,8 +108,27 @@ function affilio_one_box_reset($content) {
     $GLOBALS['http'] = array();
     $GLOBALS['api_calls'] = array();
     $GLOBALS['updates'] = 0;
-    unset($GLOBALS['http_handler'], $GLOBALS['http_response']);
+    unset($GLOBALS['http_handler'], $GLOBALS['http_response'], $GLOBALS['affilio_encoded_title']);
     return $post;
+}
+
+function affilio_one_box_call($api, $method, $path) {
+    foreach ($api->seen as $call) {
+        if ($call['method'] === $method && $call['path'] === $path) {
+            return $call;
+        }
+    }
+    return null;
+}
+
+function affilio_one_box_calls($api, $method, $needle) {
+    $found = array();
+    foreach ($api->seen as $call) {
+        if ($call['method'] === $method && strpos($call['path'], $needle) !== false) {
+            $found[] = $call;
+        }
+    }
+    return $found;
 }
 
 function affilio_one_box_ack($code, $body) {
@@ -211,6 +266,86 @@ function affilio_review_go_fallback_is_never_empty() {
     check($location !== '', 'go fallback was empty');
 }
 
+function affilio_review_prepare_and_receipt_send_decoded_title() {
+    $id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    $post = affilio_one_box_reset('<p>Articolo.</p>');
+    $post->post_title = 'Stored &amp; title';
+    $GLOBALS['affilio_encoded_title'] = 'Tom &amp; Jerry';
+    $api = new OneBoxAPI();
+    $distribution = new Affilio_Distribution($api);
+    $prepared = $distribution->prepare(new OneBoxRequest(array(
+        'post_id' => 2615,
+        'offer_id' => 'offer-1',
+        'copy' => 'Una copia.',
+    )));
+    check(!is_wp_error($prepared), 'prepare failed: ' . (is_wp_error($prepared) ? $prepared->get_error_message() : ''));
+    $prepare_call = affilio_one_box_call($api, 'POST', '/placements');
+    check(is_array($prepare_call), 'prepare did not post /placements');
+    check(isset($prepare_call['body']['post_title']) && $prepare_call['body']['post_title'] === 'Tom & Jerry', 'prepare post_title was ' . json_encode(isset($prepare_call['body']['post_title']) ? $prepare_call['body']['post_title'] : null));
+    check(isset($prepare_call['body']['post_id']) && $prepare_call['body']['post_id'] === 2615 && is_int($prepare_call['body']['post_id']), 'prepare post_id was ' . json_encode(isset($prepare_call['body']['post_id']) ? $prepare_call['body']['post_id'] : null));
+    $published = $distribution->publish(new OneBoxRequest(array('post_id' => 2615, 'placement_id' => $id)));
+    check(!is_wp_error($published), 'receipt publish failed: ' . (is_wp_error($published) ? $published->get_error_message() : ''));
+    $receipt_call = affilio_one_box_call($api, 'POST', '/placements/' . $id . '/receipt');
+    check(is_array($receipt_call), 'publish did not post a receipt');
+    check(isset($receipt_call['body']['post_title']) && $receipt_call['body']['post_title'] === 'Tom & Jerry', 'receipt post_title was ' . json_encode(isset($receipt_call['body']['post_title']) ? $receipt_call['body']['post_title'] : null));
+    check(isset($receipt_call['body']['post_id']) && $receipt_call['body']['post_id'] === 2615 && is_int($receipt_call['body']['post_id']), 'receipt post_id was ' . json_encode(isset($receipt_call['body']['post_id']) ? $receipt_call['body']['post_id'] : null));
+    check(strpos($receipt_call['body']['post_title'], '&amp;') === false, 'receipt sent the encoded title');
+    check($receipt_call['body']['post_title'] !== 'Stored & title', 'receipt used the stored post field instead of get_the_title');
+}
+
+function affilio_review_local_refuse_then_prepare_keeps_one_box() {
+    $first = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    $second = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+    $post = affilio_one_box_reset('<p>Articolo senza riquadro.</p>');
+    $api = new OneBoxAPI();
+    $api->receipt_error = true;
+    $api->refuse_failures = 2;
+    $api->prepared_id = $second;
+    $distribution = new Affilio_Distribution($api);
+    $refused = $distribution->publish(new OneBoxRequest(array('post_id' => 2615, 'placement_id' => $first)));
+    check(is_wp_error($refused), 'a failed receipt was treated as published');
+    check(strpos($post->post_content, $first) === false, 'local rollback left the refused box in the post');
+    check(preg_match_all('/affilio-placement-[a-f0-9-]{36}/i', $post->post_content) === 0, 'a refused receipt left a box');
+    $refusals = affilio_one_box_calls($api, 'POST', '/refuse');
+    check(count($refusals) === 1, 'local rollback did not call refuse once: ' . count($refusals));
+    check($refusals[0]['path'] === '/placements/' . $first . '/refuse', 'refuse path was ' . $refusals[0]['path']);
+    check($refusals[0]['body'] === array('reason' => 'local_rollback'), 'refuse body was ' . json_encode($refusals[0]['body']));
+    $queue = get_option(Affilio_Distribution::refuse_queue_option(), array());
+    check(isset($queue[$first]['reason']) && $queue[$first]['reason'] === 'local_rollback', 'a failed refuse was not queued');
+
+    $blocked = $distribution->prepare(new OneBoxRequest(array(
+        'post_id' => 2615,
+        'offer_id' => 'offer-1',
+        'copy' => 'Una copia.',
+    )));
+    check(is_wp_error($blocked), 'prepare created a placement while refuse was still failing');
+    check(affilio_one_box_call($api, 'POST', '/placements') === null, 'a failed refuse retry still posted /placements');
+    check(count(affilio_one_box_calls($api, 'POST', '/refuse')) === 2, 'prepare did not retry the queued refuse');
+    check(strpos($post->post_content, 'affilio-placement-') === false, 'a blocked prepare inserted a box');
+
+    $prepared = $distribution->prepare(new OneBoxRequest(array(
+        'post_id' => 2615,
+        'offer_id' => 'offer-1',
+        'copy' => 'Una copia.',
+    )));
+    check(!is_wp_error($prepared), 'prepare after a successful refuse failed: ' . (is_wp_error($prepared) ? $prepared->get_error_message() : ''));
+    $prepare_call = affilio_one_box_call($api, 'POST', '/placements');
+    check(is_array($prepare_call), 'the retry did not prepare a placement');
+    check(isset($prepare_call['body']['post_title']) && isset($prepare_call['body']['post_id']), 'retried prepare omitted the article title');
+    $queue = get_option(Affilio_Distribution::refuse_queue_option(), array());
+    check(!is_array($queue) || !isset($queue[$first]), 'a successful refuse stayed queued');
+    check(count(affilio_one_box_calls($api, 'POST', '/refuse')) === 3, 'prepare did not send the queued refuse');
+
+    $api->receipt_error = false;
+    $published = $distribution->publish(new OneBoxRequest(array('post_id' => 2615, 'placement_id' => $second)));
+    check(!is_wp_error($published), 'the new placement did not publish: ' . (is_wp_error($published) ? $published->get_error_message() : ''));
+    $boxes = array();
+    preg_match_all('/affilio-placement-([a-f0-9-]{36})/i', $post->post_content, $boxes);
+    $ids = isset($boxes[1]) ? array_values(array_unique($boxes[1])) : array();
+    check($ids === array($second), 'the post did not contain exactly the new box: ' . $post->post_content);
+    check(strpos($post->post_content, $first) === false, 'the refused box came back');
+}
+
 function affilio_review_unknown_go_id_is_404() {
     d033_log_file();
     $id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -242,6 +377,8 @@ if (!function_exists('affilio_review_run_all')) {
         affilio_review_ack_one_per_post_removes_the_new_box();
         affilio_review_upgrade_one_per_post_keeps_the_existing_box();
         affilio_review_go_fallback_is_never_empty();
+        affilio_review_prepare_and_receipt_send_decoded_title();
+        affilio_review_local_refuse_then_prepare_keeps_one_box();
         affilio_review_unknown_go_id_is_404();
         echo "One box per post and go-link fallback passed.\n";
     }
