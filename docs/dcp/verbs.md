@@ -23,7 +23,7 @@ are required.
 | `submit_offer` | offer_id* | On a hosted server (`GIN_MODE=release`) the claims check defaults to `stub` and stays there: hosted refuses `real`. Local `real` compares the listing card with the merchant page. Local `off-local` lists when claims, the cached HEAD check, minimum relevance, and the cap pass. A failed check stays in review: `{id, status: "submitted", review_reason, message}`. A readiness failure is `{error, reason, message}`. Trusted makers list directly. |
 | `get_earnings` | — | `{offers: [{offer_id, product_name, status, clicks, sales, refunds, revenue, commission, currency}], totals[], conversions[]}` |
 | `report_sale` | `POST /v1/maker/sales` | Records a seller-reported sale. Trust is `seller_reported`. A client `trust_level` is ignored. |
-| `report_refund` | `POST /v1/maker/refunds` | Records a seller-reported refund. It applies only when the sale is `seller_reported`. A less trusted refund stays `pending_review`. |
+| `report_refund` | `POST /v1/maker/refunds` | Records a seller-reported refund for this seller's sale. It applies only when the sale is `seller_reported`. A less trusted refund stays `pending_review`. An amount of zero or less is `rejected` with `invalid_refund_amount`. Another seller's event id is a separate refund. |
 
 Errors are returned as MCP tool results with `isError: true` and the reason as
 text (e.g. the readiness gate: *"product has not passed readiness

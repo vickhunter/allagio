@@ -19,6 +19,7 @@ const (
 	RefundDuplicate              = "duplicate"
 	ReasonRefundTrustBelowSale   = "refund_trust_below_sale"
 	ReasonRefundExceedsRemaining = "refund_exceeds_remaining"
+	ReasonInvalidRefundAmount    = "invalid_refund_amount"
 )
 
 type RefundOutcome struct {
@@ -68,18 +69,28 @@ func saleTrustRank(level string) int {
 }
 
 type refundInsert struct {
-	offerID, campaignID, provider, eventID, objectID, currency, paymentMode, trustLevel, status, reason string
-	clickID                                                                                             *string
-	amount, commission                                                                                  float64
-	grossMinor                                                                                          int64
-	occurredAt                                                                                          time.Time
+	offerID, campaignID, provider, eventID, objectID, currency, paymentMode, trustLevel, status, reason, makerID string
+	clickID                                                                                                      *string
+	amount, commission                                                                                           float64
+	grossMinor                                                                                                   int64
+	occurredAt                                                                                                   time.Time
 }
 
-func refundByEvent(ctx context.Context, tx pgx.Tx, provider, eventID string) (*RefundOutcome, bool, error) {
+func refundByEvent(ctx context.Context, tx pgx.Tx, provider, eventID, makerID string) (*RefundOutcome, bool, error) {
 	var id, trust, reason string
 	var status *string
-	err := tx.QueryRow(ctx, `SELECT id::text, COALESCE(trust_level,''), refund_status, COALESCE(refund_reason,'')
-FROM conversions WHERE provider=$1 AND provider_event_id=$2`, provider, eventID).Scan(&id, &trust, &status, &reason)
+	query := `SELECT cv.id::text, COALESCE(cv.trust_level,''), cv.refund_status, COALESCE(cv.refund_reason,'')
+FROM conversions cv WHERE cv.provider=$1 AND cv.provider_event_id=$2`
+	args := []any{provider, eventID}
+	if provider == ProviderSellerReport {
+		query = `SELECT cv.id::text, COALESCE(cv.trust_level,''), cv.refund_status, COALESCE(cv.refund_reason,'')
+FROM conversions cv
+JOIN offers o ON o.id=cv.offer_id
+JOIN products p ON p.id=o.product_id
+WHERE cv.provider=$1 AND cv.provider_event_id=$2 AND p.maker_id::text=$3`
+		args = append(args, makerID)
+	}
+	err := tx.QueryRow(ctx, query, args...).Scan(&id, &trust, &status, &reason)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, false, nil
 	}
@@ -93,21 +104,25 @@ FROM conversions WHERE provider=$1 AND provider_event_id=$2`, provider, eventID)
 	return &RefundOutcome{ID: id, TrustLevel: trust, Status: RefundDuplicate, RowStatus: row, Reason: reason}, true, nil
 }
 
-func appliedRefundTotals(ctx context.Context, tx pgx.Tx, objectID string) (gross, net, commission int64, err error) {
+func appliedRefundTotals(ctx context.Context, tx pgx.Tx, objectID, offerID string) (gross, net, commission int64, err error) {
 	err = tx.QueryRow(ctx, `SELECT COALESCE(SUM(COALESCE(gross_minor,(amount*100)::bigint)),0)::bigint,
  COALESCE(SUM(amount*100),0)::bigint, COALESCE(SUM(commission_amount*100),0)::bigint
- FROM conversions WHERE provider_object_id=$1 AND kind='refund' AND COALESCE(refund_status,'applied')='applied'`, objectID).Scan(&gross, &net, &commission)
+ FROM conversions WHERE provider_object_id=$1 AND offer_id=$2 AND kind='refund' AND COALESCE(refund_status,'applied')='applied'`, objectID, offerID).Scan(&gross, &net, &commission)
 	return gross, net, commission, err
 }
 
 func insertRefund(ctx context.Context, tx pgx.Tx, row refundInsert) (*RefundOutcome, error) {
 	var id string
+	conflict := `ON CONFLICT (provider, provider_event_id) WHERE provider <> 'seller_report' DO NOTHING`
+	if row.provider == ProviderSellerReport {
+		conflict = `ON CONFLICT (offer_id, provider_event_id) WHERE provider = 'seller_report' DO NOTHING`
+	}
 	err := tx.QueryRow(ctx, `INSERT INTO conversions(offer_id,campaign_id,click_id,provider,provider_event_id,provider_object_id,kind,amount,currency,commission_amount,occurred_at,gross_minor,payment_mode,trust_level,refund_status,refund_reason)
 VALUES($1,$2,$3,$4,$5,$6,'refund',$7,$8,$9,$10,NULLIF($11,0),$12,$13,$14,NULLIF($15,''))
-ON CONFLICT(provider,provider_event_id) DO NOTHING RETURNING id::text`,
+`+conflict+` RETURNING id::text`,
 		row.offerID, row.campaignID, row.clickID, row.provider, row.eventID, row.objectID, row.amount, row.currency, row.commission, row.occurredAt, row.grossMinor, row.paymentMode, row.trustLevel, row.status, row.reason).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		existing, ok, qerr := refundByEvent(ctx, tx, row.provider, row.eventID)
+		existing, ok, qerr := refundByEvent(ctx, tx, row.provider, row.eventID, row.makerID)
 		if qerr != nil || ok {
 			return existing, qerr
 		}
@@ -117,6 +132,27 @@ ON CONFLICT(provider,provider_event_id) DO NOTHING RETURNING id::text`,
 		return nil, err
 	}
 	return &RefundOutcome{ID: id, TrustLevel: row.trustLevel, Status: row.status, RowStatus: row.status, Reason: row.reason}, nil
+}
+
+func distinctSaleMakers(ctx context.Context, tx pgx.Tx, objectID string) ([]string, error) {
+	rows, err := tx.Query(ctx, `SELECT DISTINCT p.maker_id::text
+FROM conversions cv
+JOIN offers o ON o.id=cv.offer_id
+JOIN products p ON p.id=o.product_id
+WHERE cv.provider_object_id=$1 AND $1 <> '' AND cv.kind IN ('sale','renewal')`, objectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func commitRefund(ctx context.Context, tx pgx.Tx, out *RefundOutcome, err error) (*RefundOutcome, error) {
@@ -140,6 +176,15 @@ FROM conversions WHERE provider=$1 AND provider_event_id=$2`, provider, eventID)
 		refundStatus = *status
 	}
 	return id, trust, refundStatus, reason, true, nil
+}
+
+func (d *DB) MakerIDForProduct(ctx context.Context, productID string) (string, error) {
+	var id string
+	err := d.Pool.QueryRow(ctx, `SELECT maker_id::text FROM products WHERE id=$1`, productID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrConversionNotFound
+	}
+	return id, err
 }
 
 func (d *DB) ClickSaleContext(ctx context.Context, clickID string) (ClickSaleContext, error) {

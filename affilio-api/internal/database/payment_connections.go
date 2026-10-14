@@ -126,7 +126,7 @@ func (d *DB) ProductOwnsPayment(ctx context.Context, productID, objectID, curren
 	var valid bool
 	err := d.Pool.QueryRow(ctx, `SELECT o.product_id::text=$1 AND cv.currency=$3 FROM conversions cv JOIN offers o ON o.id=cv.offer_id
 WHERE cv.provider_object_id=$2 AND cv.kind IN ('sale','renewal')
-ORDER BY cv.created_at DESC LIMIT 1`, productID, objectID, currency).Scan(&valid)
+ORDER BY (o.product_id::text=$1) DESC, cv.created_at DESC LIMIT 1`, productID, objectID, currency).Scan(&valid)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, ErrConversionNotFound
 	}

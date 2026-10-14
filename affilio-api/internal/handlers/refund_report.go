@@ -113,7 +113,7 @@ func (h *RefundReportHandler) ReportRefund(c *gin.Context) {
 	if req.AmountMinor != nil {
 		amount = *req.AmountMinor
 	}
-	out, err := h.DB.RecordPartialRefund(c.Request.Context(), database.ProviderSellerReport, req.EventID, req.ObjectID, amount, occurred, database.TrustSellerReported)
+	out, err := h.DB.RecordPartialRefund(c.Request.Context(), database.ProviderSellerReport, req.EventID, req.ObjectID, amount, occurred, database.TrustSellerReported, makerID(c), c.GetString("offer_scope_id"))
 	if errors.Is(err, database.ErrConversionNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "sale was not found"})
 		return
