@@ -148,8 +148,8 @@ def setup_maker_happy(page, w):
     assert page.locator('label.choice:has(input[value=yolo])').inner_text().startswith('Approve anything that passes the checks')
     assert not re.search(r'\b(manual|auto|yolo)\b', visible_text(page), re.I), 'internal mode name on screen'
     page.wait_for_selector('section.checks[aria-busy=false]')
-    assert page.locator('#h-checks').inner_text() == 'Rules every listing must follow'
-    assert 'checked' not in page.locator('#h-checks').inner_text().lower()
+    assert page.locator('#h-checks').text_content() == 'Rules every listing must follow'
+    assert 'checked' not in page.locator('#h-checks').text_content().lower()
     assert page.locator('[data-test=hard-checks] li').all_inner_texts() == [c['check_text'] for c in json.loads(fx('hard-checks'))['checks']]
     no_overflow(page); shot(page, 'setup-maker', w)
     page.click('#continue'); page.wait_for_selector('[data-test=success]')
@@ -1505,7 +1505,7 @@ TESTS = [setup_maker_happy, setup_publisher_happy, setup_edit_prefilled, setup_f
          real_digest_loads, real_pending_resolves_by_poll, real_undo_redo, real_undone_by, real_poll_429,
          real_restore_409_not_undone, real_restore_409_server_message, real_failed_flow, real_retry_restore_422,
          real_maker_no_retry, real_key_context, real_pause_resume, real_resume_under_stub, real_paused_envelope,
-         real_earnings_zero_null, real_long_list, digest_paid_clicks_and_truncation, real_api_base_guard,
+         real_earnings_zero_null, real_long_list, real_api_base_guard,
          real_setup_hard_checks, real_setup_publisher, real_setup_stub_modes, real_setup_maker_auto_off, real_setup_maker_put,
          real_setup_maker_fixed, real_setup_claims_live, real_setup_source_manual, real_setup_new, real_setup_key_context, real_setup_403,
          totals_grid_layout,
@@ -1673,6 +1673,8 @@ def digest_paid_clicks_and_truncation(page, w):
     note = ' '.join(page.inner_text(sec + ' [data-test=page-note]').split())
     assert 'The list was cut' in note, note
     assert page.locator(sec + ' .clicks').first.inner_text() == '3 clicks'
+
+TESTS.append(digest_paid_clicks_and_truncation)
 
 def real_latest_50_of_n(page, w):
     real_digest(page, acct='account-digest-long')
