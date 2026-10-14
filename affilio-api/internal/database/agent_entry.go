@@ -1104,6 +1104,12 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 	return out, rows.Err()
 }
 
+func (d *DB) PeekUndo(ctx context.Context, hash, ownerID string, now time.Time) (kind, placementID, offerID string, err error) {
+	err = d.Pool.QueryRow(ctx, `SELECT kind, COALESCE(placement_id::text,''), COALESCE(offer_id::text,'')
+FROM undo_tokens WHERE token_hash=$1 AND owner_id=$2 AND used_at IS NULL AND expires_at>$3`, hash, ownerID, now).Scan(&kind, &placementID, &offerID)
+	return kind, placementID, offerID, err
+}
+
 // MakerDigestOffers lists this maker's held, in-review, and live offers.
 // Submitted stays until it leaves that state. Listed stays with no digest window.
 // offerID limits the read to one offer when the key is scoped to it.
