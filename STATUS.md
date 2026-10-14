@@ -1,3 +1,7 @@
+## October 14 — a seller-report refund uses its sale's currency
+
+A seller-report refund checks currency on the sale it will match. That sale is the seller report for the order when one is in the request currency, then the newest sale in that currency. A newer sale in another currency does not reject the refund, and a refund does not reverse an older seller report in a different currency. A Stripe refund whose order exists only under another provider is rejected and is not retried. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 14 — a signed refund matches its own provider
 
 A Stripe refund matches a Stripe sale only. A Lemon or Polar refund matches a sale stored for that provider only. The product ownership check uses the same provider. With no sale from that provider, a Stripe refund stays pending and a Lemon or Polar refund is unmatched. A signed sale rewrites provider and event id only when the existing row is `seller_report`. A Lemon sale stays a Lemon sale when a Stripe event arrives for the same click, currency, and amount. The original seller-report event id stays reserved, so replaying that report does not insert a second commission. Migration `037_reserved_sale_events.sql` is idempotent and must run before the new binary. `AUTO_MIGRATE` stays off unless it is set to `true`.

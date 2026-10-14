@@ -206,7 +206,7 @@ WHERE cl.id=$1`, clickID).Scan(&out.OfferID, &out.ProductID, &out.MakerID, &out.
 	return out, err
 }
 
-func (d *DB) SaleForMaker(ctx context.Context, makerID, objectID, offerID string) (currency string, ok bool, err error) {
+func (d *DB) SaleForMaker(ctx context.Context, makerID, objectID, offerID, currency string) (saleCurrency string, ok bool, err error) {
 	if objectID == "" {
 		return "", false, nil
 	}
@@ -215,14 +215,15 @@ JOIN offers o ON o.id=cv.offer_id
 JOIN products p ON p.id=o.product_id
 WHERE cv.provider_object_id=$1 AND cv.kind IN ('sale','renewal') AND p.maker_id::text=$2
 AND ($3='' OR o.id::text=$3)
-ORDER BY cv.created_at DESC LIMIT 1`, objectID, makerID, offerID).Scan(&currency)
+AND ($4='' OR upper(cv.currency)=upper($4))
+ORDER BY (cv.provider=$5) DESC, cv.created_at DESC LIMIT 1`, objectID, makerID, offerID, currency, ProviderSellerReport).Scan(&saleCurrency)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", false, nil
 	}
 	if err != nil {
 		return "", false, err
 	}
-	return currency, true, nil
+	return saleCurrency, true, nil
 }
 
 func (d *DB) ListConversionReports(ctx context.Context, makerID, siteID, offerID string, limit int) ([]ConversionReport, error) {

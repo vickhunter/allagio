@@ -97,7 +97,7 @@ func (h *RefundReportHandler) ReportRefund(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "occurred_at must be RFC3339"})
 		return
 	}
-	saleCurrency, found, err := h.DB.SaleForMaker(c.Request.Context(), makerID(c), req.ObjectID, c.GetString("offer_scope_id"))
+	saleCurrency, found, err := h.DB.SaleForMaker(c.Request.Context(), makerID(c), req.ObjectID, c.GetString("offer_scope_id"), currency)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "refund was not recorded"})
 		return
@@ -115,7 +115,7 @@ func (h *RefundReportHandler) ReportRefund(c *gin.Context) {
 		amount = *req.AmountMinor
 	}
 	fullRefund := req.AmountMinor == nil && (req.Full == nil || *req.Full)
-	out, err := h.DB.RecordPartialRefund(c.Request.Context(), database.ProviderSellerReport, req.EventID, req.ObjectID, amount, occurred, database.TrustSellerReported, makerID(c), c.GetString("offer_scope_id"), fullRefund)
+	out, err := h.DB.RecordPartialRefund(c.Request.Context(), database.ProviderSellerReport, req.EventID, req.ObjectID, amount, occurred, database.TrustSellerReported, makerID(c), c.GetString("offer_scope_id"), currency, fullRefund)
 	if errors.Is(err, database.ErrConversionNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "sale was not found"})
 		return

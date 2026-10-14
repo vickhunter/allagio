@@ -128,6 +128,14 @@ func (d *DB) ProductOwnsPayment(ctx context.Context, productID, provider, object
 WHERE cv.provider=$2 AND cv.provider_object_id=$3 AND cv.kind IN ('sale','renewal')
 ORDER BY (o.product_id::text=$1) DESC, cv.created_at DESC LIMIT 1`, productID, provider, objectID, currency).Scan(&valid)
 	if errors.Is(err, pgx.ErrNoRows) {
+		var other bool
+		if err = d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM conversions
+WHERE provider_object_id=$1 AND $1 <> '' AND kind IN ('sale','renewal') AND provider <> $2)`, objectID, provider).Scan(&other); err != nil {
+			return false, err
+		}
+		if other {
+			return false, nil
+		}
 		return false, ErrConversionNotFound
 	}
 	return valid, err

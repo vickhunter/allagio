@@ -486,11 +486,11 @@ VALUES ($1,$2,'commission',$3,$4,'pending',$5)`, out.SiteID, out.ConversionID, o
 	return &out, tx.Commit(ctx)
 }
 
-func (d *DB) RecordRefund(ctx context.Context, provider, eventID, objectID string, occurredAt time.Time, trustLevel string) (*RefundOutcome, error) {
-	return d.RecordPartialRefund(ctx, provider, eventID, objectID, 0, occurredAt, trustLevel, "", "", true)
+func (d *DB) RecordRefund(ctx context.Context, provider, eventID, objectID string, occurredAt time.Time, trustLevel, currency string) (*RefundOutcome, error) {
+	return d.RecordPartialRefund(ctx, provider, eventID, objectID, 0, occurredAt, trustLevel, "", "", currency, true)
 }
 
-func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectID string, cumulativeMinor int64, occurredAt time.Time, trustLevel, makerID, scopeOfferID string, fullRefund bool) (*RefundOutcome, error) {
+func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectID string, cumulativeMinor int64, occurredAt time.Time, trustLevel, makerID, scopeOfferID, requestCurrency string, fullRefund bool) (*RefundOutcome, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -526,7 +526,8 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
  AND p.maker_id::text=$3
  AND ($4='' OR cv.offer_id::text=$4)
  AND (NOT $5 OR cv.provider=$2)
- ORDER BY (cv.provider=$2) DESC, cv.created_at DESC LIMIT 1`, objectID, provider, makerID, scopeOfferID, matchProvider).
+ AND ($6='' OR upper(cv.currency)=upper($6))
+ ORDER BY (cv.provider=$2) DESC, cv.created_at DESC LIMIT 1`, objectID, provider, makerID, scopeOfferID, matchProvider, requestCurrency).
 		Scan(&saleID, &campaignID, &siteID, &offerID, &clickID, &netMinor, &commissionMinor, &currency, &grossMinor, &paymentMode, &saleTrust)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrConversionNotFound

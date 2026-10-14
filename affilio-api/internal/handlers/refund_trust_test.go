@@ -306,7 +306,7 @@ func TestRefundTrustAcceptsOnlyEqualOrHigherSource(t *testing.T) {
 		fx.refuseGuarantee(rec)
 		if tc.unmatched {
 			if tc.refund == "provider_verified" {
-				if rec.Code != http.StatusAccepted || body["status"] != "pending" || body["reason"] != "awaiting reconciliation" {
+				if rec.Code != http.StatusOK || body["status"] != "rejected" {
 					t.Fatalf("stripe refund matched %s: %d %v", tc.sale, rec.Code, body)
 				}
 			} else if rec.Code != http.StatusServiceUnavailable || body["status"] != "unmatched" {
@@ -1136,7 +1136,7 @@ func TestStripeRefundMatchesOnlyItsOwnSale(t *testing.T) {
 	fx := newTrustFixture(t)
 	fx.sell("seller_signed_webhook", "order-stripe-of-lemon")
 	rec, body := fx.refund("provider_verified", "order-stripe-of-lemon", "evt-stripe-of-lemon", 10000)
-	if rec.Code != http.StatusAccepted || body["status"] != "pending" || body["reason"] != "awaiting reconciliation" {
+	if rec.Code != http.StatusOK || body["status"] != "rejected" {
 		t.Fatalf("stripe refund matched the lemon sale: %d %v", rec.Code, body)
 	}
 	if !moneyNear(fx.pendingForSeller("order-stripe-of-lemon"), 20) {
@@ -1146,7 +1146,7 @@ func TestStripeRefundMatchesOnlyItsOwnSale(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = fx.db.RecordPartialRefund(context.Background(), "stripe", "evt-stripe-of-lemon-direct", "order-stripe-of-lemon", 0, time.Now().Add(2*time.Hour), database.TrustProviderVerified, makerID, "", true)
+	_, err = fx.db.RecordPartialRefund(context.Background(), "stripe", "evt-stripe-of-lemon-direct", "order-stripe-of-lemon", 0, time.Now().Add(2*time.Hour), database.TrustProviderVerified, makerID, "", "USD", true)
 	if !errors.Is(err, database.ErrConversionNotFound) {
 		t.Fatalf("sale match accepted another provider: %v", err)
 	}
@@ -1156,13 +1156,13 @@ func TestStripeRefundMatchesOnlyItsOwnSale(t *testing.T) {
 
 	fx.sell("seller_reported", "order-stripe-of-report")
 	rec, body = fx.refund("provider_verified", "order-stripe-of-report", "evt-stripe-of-report", 10000)
-	if rec.Code != http.StatusAccepted || body["status"] != "pending" || body["reason"] != "awaiting reconciliation" {
+	if rec.Code != http.StatusOK || body["status"] != "rejected" {
 		t.Fatalf("stripe refund matched the seller report: %d %v", rec.Code, body)
 	}
 	if !moneyNear(fx.pendingForSeller("order-stripe-of-report"), 20) {
 		t.Fatalf("stripe refund reversed the seller report: %v", fx.pendingForSeller("order-stripe-of-report"))
 	}
-	_, err = fx.db.RecordPartialRefund(context.Background(), "stripe", "evt-stripe-of-report-direct", "order-stripe-of-report", 0, time.Now().Add(2*time.Hour), database.TrustProviderVerified, makerID, "", true)
+	_, err = fx.db.RecordPartialRefund(context.Background(), "stripe", "evt-stripe-of-report-direct", "order-stripe-of-report", 0, time.Now().Add(2*time.Hour), database.TrustProviderVerified, makerID, "", "USD", true)
 	if !errors.Is(err, database.ErrConversionNotFound) {
 		t.Fatalf("sale match accepted a seller report: %v", err)
 	}
@@ -1200,7 +1200,7 @@ SELECT provider_event_id FROM conversions WHERE provider_object_id='order-lemon-
 		t.Fatalf("rewrite booked commission %v", fx.pendingForSeller("order-lemon-stays"))
 	}
 	rec, body = fx.refund("provider_verified", "order-lemon-stays", "evt-lemon-stays-refund", 10000)
-	if rec.Code != http.StatusAccepted || body["status"] != "pending" || body["reason"] != "awaiting reconciliation" {
+	if rec.Code != http.StatusOK || body["status"] != "rejected" {
 		t.Fatalf("stripe refund of the untouched lemon sale: %d %v", rec.Code, body)
 	}
 	if !moneyNear(fx.pendingForSeller("order-lemon-stays"), 20) {
@@ -1265,6 +1265,63 @@ func TestSignedRefundDoesNotClawAnotherProvidersSale(t *testing.T) {
 	}
 }
 
+func TestSellerReportRefundUsesTheMatchedSaleCurrency(t *testing.T) {
+	fx := newTrustFixture(t)
+
+	t.Run("newer usd sale", func(t *testing.T) {
+		fx.reportSale("order-eur-then-usd", "provider_verified")
+		if _, err := fx.db.Pool.Exec(context.Background(), `
+UPDATE conversions SET currency='EUR'
+WHERE provider_object_id='order-eur-then-usd' AND provider='seller_report' AND kind='sale'`); err != nil {
+			t.Fatal(err)
+		}
+		rec, body := fx.sendLemon(lemonOrder("order_created", "order-eur-then-usd", fx.clickID, 10000, "provider_verified"))
+		if rec.Code != http.StatusOK || body["status"] != "recorded" || body["trust_level"] != "seller_signed_webhook" {
+			t.Fatalf("newer usd sale: %d %v", rec.Code, body)
+		}
+		rec, body = fx.reportRefund("order-eur-then-usd", "evt-usd-after-eur", -1, "provider_verified")
+		eurStatus, eurAmount := fx.commissionLedger("order-eur-then-usd", "seller_report")
+		usdStatus, usdAmount := fx.commissionLedger("order-eur-then-usd", "lemonsqueezy")
+		if eurStatus != "pending" || !moneyNear(eurAmount, 20) {
+			t.Fatalf("usd refund reversed the eur report: %s %v body %d %v", eurStatus, eurAmount, rec.Code, body)
+		}
+		if usdStatus != "pending" || !moneyNear(usdAmount, 20) {
+			t.Fatalf("usd refund reversed the usd sale: %s %v", usdStatus, usdAmount)
+		}
+		if rec.Code != http.StatusOK || body["status"] != "pending_review" || body["reason"] != "refund_trust_below_sale" {
+			t.Fatalf("usd refund of the usd sale: %d %v", rec.Code, body)
+		}
+		if got, want := fx.refundSaleID("order-eur-then-usd", "seller_report"), fx.saleID("order-eur-then-usd", "lemonsqueezy"); got != want {
+			t.Fatalf("usd refund linked %s, usd sale %s", got, want)
+		}
+	})
+
+	t.Run("newer other currency", func(t *testing.T) {
+		fx.reportSale("order-usd-then-eur", "provider_verified")
+		lemon := lemonOrder("order_created", "order-usd-then-eur", fx.clickID, 10000, "provider_verified")
+		lemon["data"].(map[string]interface{})["attributes"].(map[string]interface{})["currency"] = "EUR"
+		rec, body := fx.sendLemon(lemon)
+		if rec.Code != http.StatusOK || body["status"] != "recorded" || body["trust_level"] != "seller_signed_webhook" {
+			t.Fatalf("newer eur sale: %d %v", rec.Code, body)
+		}
+		rec, body = fx.reportRefund("order-usd-then-eur", "evt-usd-before-eur", -1, "provider_verified")
+		if rec.Code != http.StatusOK || body["status"] != "refunded" || body["refund_status"] != "applied" {
+			t.Fatalf("usd refund of the usd report: %d %v", rec.Code, body)
+		}
+		usdStatus, usdAmount := fx.commissionLedger("order-usd-then-eur", "seller_report")
+		eurStatus, eurAmount := fx.commissionLedger("order-usd-then-eur", "lemonsqueezy")
+		if usdStatus != "reversed" || !moneyNear(usdAmount, 20) {
+			t.Fatalf("usd report after its refund: %s %v", usdStatus, usdAmount)
+		}
+		if eurStatus != "pending" || !moneyNear(eurAmount, 20) {
+			t.Fatalf("usd refund reversed the eur sale: %s %v", eurStatus, eurAmount)
+		}
+		if got, want := fx.refundSaleID("order-usd-then-eur", "seller_report"), fx.saleID("order-usd-then-eur", "seller_report"); got != want {
+			t.Fatalf("usd refund linked %s, usd report %s", got, want)
+		}
+	})
+}
+
 func TestFullRefundStaysOnItsProviderAndCurrency(t *testing.T) {
 	fx := newTrustFixture(t)
 	fx.reportSale("order-xcur", "provider_verified")
@@ -1282,7 +1339,9 @@ SELECT COUNT(DISTINCT offer_id) FROM conversions WHERE provider_object_id='order
 	if offers != 1 {
 		t.Fatalf("cross-currency sales split across %d offers", offers)
 	}
-	rec, body = fx.sendLemon(lemonOrder("order_refunded", "order-xcur", "", 0, "provider_verified"))
+	refund := lemonOrder("order_refunded", "order-xcur", "", 0, "provider_verified")
+	refund["data"].(map[string]interface{})["attributes"].(map[string]interface{})["currency"] = "EUR"
+	rec, body = fx.sendLemon(refund)
 	if rec.Code != http.StatusOK || body["status"] != "refunded" || body["refund_status"] != "applied" {
 		t.Fatalf("eur refund: %d %v", rec.Code, body)
 	}

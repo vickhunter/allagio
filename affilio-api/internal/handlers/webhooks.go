@@ -178,7 +178,7 @@ func (h *WebhooksHandler) processEvent(c *gin.Context, providerName string, even
 		}
 		return webhookResult{Status: "recorded", ConversionID: conversion.ConversionID, TrustLevel: conversion.TrustLevel}
 	case "refund":
-		out, err := h.DB.RecordRefund(ctx, providerName, event.EventID, event.ObjectID, event.OccurredAt, database.TrustSellerSignedWebhook)
+		out, err := h.DB.RecordRefund(ctx, providerName, event.EventID, event.ObjectID, event.OccurredAt, database.TrustSellerSignedWebhook, event.Currency)
 		if err != nil {
 			if errors.Is(err, database.ErrConversionNotFound) {
 				return webhookResult{Status: "unmatched"}
@@ -306,7 +306,7 @@ func (h *WebhooksHandler) processProductEvent(ctx context.Context, productID str
 			var makerID string
 			makerID, err = h.DB.MakerIDForProduct(ctx, productID)
 			if err == nil {
-				out, err = h.DB.RecordPartialRefund(ctx, "stripe", event.EventID, event.ObjectID, event.RefundedMinor, event.OccurredAt, database.TrustProviderVerified, makerID, "", false)
+				out, err = h.DB.RecordPartialRefund(ctx, "stripe", event.EventID, event.ObjectID, event.RefundedMinor, event.OccurredAt, database.TrustProviderVerified, makerID, "", event.Currency, false)
 			}
 			if err == nil {
 				result = refundResult(out, database.TrustProviderVerified)
