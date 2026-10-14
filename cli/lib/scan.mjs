@@ -16,7 +16,14 @@ function clip(value, max) {
 }
 
 function looksSensitive(value) {
-  return /sk_live_|sk_test_|rk_live_|pk_live_|whsec_|-----BEGIN |ghp_|github_pat_|<\?php|<\s*script\b|\bfunc\s+\w+\s*\(|\bfunction\s+\w+\s*\(/i.test(String(value || ''));
+  const text = String(value || '');
+  if (/sk_live_|sk_test_|rk_live_|pk_live_|whsec_|-----BEGIN |ghp_|github_pat_|xox[baprs]-|sk-ant-|sk-proj-|glpat-|AKIA[0-9A-Z]|<\?php|<\s*script\b|\bfunc\s+\w+\s*\(|\bfunction\s+\w+\s*\(/i.test(text)) {
+    return true;
+  }
+  // Same shapes that skip a file: an .env assignment, or a private-key block.
+  if (/(?:^|\n)\s*(?:export\s+)?[A-Z][A-Z0-9_]{2,}\s*=\s*\S/.test(text)) return true;
+  if (/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/.test(text)) return true;
+  return false;
 }
 
 function isSensitiveFile(name) {

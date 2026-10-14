@@ -152,6 +152,28 @@ test('scan sends only the card, signals, and score', async () => {
   }
 });
 
+test('scan drops a summary that looks like an env line, a private key, or a token', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'offer-rails-secret-summary-'));
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({
+    name: 'Safe Widget',
+    description: 'SECRET=hunter2\n-----BEGIN OPENSSH PRIVATE KEY-----\nxoxb-1234567890',
+  }));
+  const { io, stdout } = tempIO({
+    cwd: root,
+    readLine: async () => 'y',
+    fetch: async () => jsonResponse(201, { id: '33333333-3333-4333-8333-333333333333', score: 0 }),
+  });
+  fs.writeFileSync(configPath(io), `${JSON.stringify({ access_token: 'or_test', key_header: 'X-Maker-Key', scope: 'offer:11111111-1111-4111-8111-111111111111' })}\n`, { mode: 0o600 });
+  const result = await run(['scan', '.'], io);
+  assert.equal(result.exitCode, 0);
+  const text = stdout();
+  const payload = JSON.parse(text.split('--- payload ---\n')[1].split('\n--- end ---')[0]);
+  assert.equal(payload.card.summary, 'Local readiness scan. No page text is included.');
+  for (const secret of ['hunter2', 'BEGIN OPENSSH', 'xoxb-']) {
+    assert.equal(text.includes(secret), false, secret);
+  }
+});
+
 test('an empty answer does not upload the scan', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'offer-rails-empty-'));
   fs.writeFileSync(path.join(root, 'README.md'), '# Empty\n');

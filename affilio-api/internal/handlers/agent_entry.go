@@ -996,7 +996,9 @@ func (h *AgentEntry) digestCaller(c *gin.Context) (owner *database.Owner, actor 
 		owner.MakerID = actor.MakerID
 		return owner, actor, actor.OfferID, true, true
 	}
-	if c.GetString("key_kind") == "project" && actor.SiteID != "" {
+	// A site key that is not an account key reads this site only. LoadOwnerScope
+	// also returns the owner's maker, which would attach that maker's offers.
+	if actor.SiteID != "" && c.GetString("key_kind") != "account" {
 		owner.SiteID = actor.SiteID
 		return owner, actor, "", true, true
 	}

@@ -1390,7 +1390,8 @@ VALUES($1,'or_digo',$2,'offer',$3,$4,NOW()+INTERVAL '1 hour')`, services.HashAPI
 		t.Fatalf("offer project key account digest: %d %s", accountBlocked.Code, accountBlocked.Body.String())
 	}
 	siteDigest, siteBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-API-Key": siteKey})
-	if siteDigest.Code != http.StatusOK || siteBody["session"].(map[string]any)["signed_in"] != false {
+	errText, _ := siteBody["error"].(string)
+	if siteDigest.Code != http.StatusForbidden || !strings.Contains(errText, "project key") {
 		t.Fatalf("site project digest: %d %s", siteDigest.Code, siteDigest.Body.String())
 	}
 	ownerDenied, ownerDeniedBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-Maker-Key": offerKey})
@@ -1429,5 +1430,33 @@ VALUES($1,$2,'offer',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(outside),
 	}
 	if err := db.Pool.QueryRow(context.Background(), `SELECT status FROM offers WHERE id=$1`, otherOffer).Scan(&status); err != nil || status != "listed" {
 		t.Fatalf("other offer status %s %v", status, err)
+	}
+}
+
+func TestSiteKeyDigestOmitsMakerOffers(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, _ := testOwnerSession(t, h, "site-key-digest", "site-key-digest@example.com")
+	siteKey := "plain-site-digest-key"
+	siteID := createTestSite(t, db, siteKey, "site-key-digest.example", "Site Key Digest")
+	makerID, offerID := seedListedOffer(t, db, "site-key-digest-maker", "site-key-digest-maker@example.com", "Hidden Offer")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2, maker_id=$3 WHERE id=$1`, owner.ID, siteID, makerID); err != nil {
+		t.Fatal(err)
+	}
+	rec, body := postJSON(t, r, http.MethodGet, "/v1/digest", nil, map[string]string{"X-API-Key": siteKey})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("site key digest: %d %s", rec.Code, rec.Body.String())
+	}
+	items, _ := body["items"].([]any)
+	for _, raw := range items {
+		item := raw.(map[string]any)
+		if item["kind"] == "offer" || item["id"] == offerID {
+			t.Fatalf("site key digest included a maker offer: %s", rec.Body.String())
+		}
+	}
+	var offerTokens int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM undo_tokens WHERE owner_id=$1 AND kind='offer'`, owner.ID).Scan(&offerTokens); err != nil || offerTokens != 0 {
+		t.Fatalf("offer undo tokens %d %v", offerTokens, err)
 	}
 }
