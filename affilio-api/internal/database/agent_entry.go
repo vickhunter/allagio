@@ -108,6 +108,7 @@ type DigestItem struct {
 	LinkText           string
 	Label              string
 	Clicks             int
+	PaidClicks         int
 	ApprovedBy         string
 	PolicyVersion      int
 	UndoneBy           string
@@ -1039,6 +1040,7 @@ func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Tim
 plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
 `+digestPostTitleSQL+`, `+digestSurfaceSQL+`, `+digestPositionSQL+`, COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
 (SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
+(SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id AND click_class = 'browser'),
 COALESCE(approved_by_kind,''), COALESCE(policy_version,0), COALESCE(undone_by_user::text,'')
 FROM placement_proposals
 WHERE `+digestPlacementWhere+`
@@ -1051,7 +1053,7 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = "placement"
-		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.SurfaceURL, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.ApprovedBy, &item.PolicyVersion, &item.UndoneBy); err != nil {
+		if err = rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.PluginWait, &item.PluginWaitAt, &item.PluginContactAt, &item.PluginFailedReason, &item.FailedAction, &item.CountsAsLive, &item.MatchedRule, &item.PostTitle, &item.SurfaceURL, &item.Position, &item.LinkText, &item.Label, &item.Clicks, &item.PaidClicks, &item.ApprovedBy, &item.PolicyVersion, &item.UndoneBy); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -1067,6 +1069,7 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 const digestOfferColumns = `o.id::text, p.name,
 (o.updated_at AT TIME ZONE current_setting('TimeZone')),
 (SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
+(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id AND c.click_class = 'browser'),
 o.status,
 CASE WHEN place.id IS NOT NULL
   THEN COALESCE(NULLIF(place.receipt->>'post_title', ''), NULLIF(place.post_title, ''), '')
@@ -1115,7 +1118,7 @@ func scanDigest(rows pgx.Rows, kind string) ([]DigestItem, error) {
 	for rows.Next() {
 		var item DigestItem
 		item.Kind = kind
-		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.Status, &item.PostTitle, &item.SurfaceURL, &item.Position); err != nil {
+		if err := rows.Scan(&item.ID, &item.Summary, &item.WentLiveAt, &item.Clicks, &item.PaidClicks, &item.Status, &item.PostTitle, &item.SurfaceURL, &item.Position); err != nil {
 			return nil, err
 		}
 		item.Label = item.Summary

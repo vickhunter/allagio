@@ -196,7 +196,7 @@ func TestUndoRedoBeforePluginAckKeepsGoClicks(t *testing.T) {
 	siteKey := map[string]string{"X-API-Key": "redo-click-key"}
 	path := "/v1/go/" + id
 
-	live := hitGo(t, r, http.MethodGet, path, "LiveReader/1")
+	live := hitGo(t, r, http.MethodGet, path, testBrowserUA)
 	if live.Code != http.StatusFound || !strings.Contains(live.Header().Get("Location"), "via=") || placementClickCount(t, db, id) != 1 {
 		t.Fatalf("live click: %d %s count %d", live.Code, live.Header().Get("Location"), placementClickCount(t, db, id))
 	}
@@ -223,7 +223,7 @@ func TestUndoRedoBeforePluginAckKeepsGoClicks(t *testing.T) {
 	if polled.Code != http.StatusOK || pollBody["plugin_state"] != "placed" || pluginWait != "placed" {
 		t.Fatalf("redo before ack: %d wait %s %s", polled.Code, pluginWait, polled.Body.String())
 	}
-	again := hitGo(t, r, http.MethodGet, path, "RedoReader/2")
+	again := hitGo(t, r, http.MethodGet, path, testFirefoxUA)
 	if again.Code != http.StatusFound || !strings.Contains(again.Header().Get("Location"), "via=") || placementClickCount(t, db, id) != 2 {
 		t.Fatalf("redo click: %d %s count %d", again.Code, again.Header().Get("Location"), placementClickCount(t, db, id))
 	}

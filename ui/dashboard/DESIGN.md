@@ -82,7 +82,7 @@ A rule for new tokens: compute the ratio before using a colour for text, and add
 ## 3. The raised keycap primary button
 ```html
 <button class="keycap" id="continue"><span class="keycap-face">Continue</span></button>
-<span class="reassure">Nothing goes live without passing every check above. You can change any of this later from the dashboard.</span>
+<span class="reassure">Nothing goes live until it follows the rules above. You can change any of this later from the dashboard.</span>
 ```
 - Two layers: the outer `.keycap` is the *edge* (accent-edge colour, which shows as the side of the key). The inner `.keycap-face` is the
   accent face with white text. The face sits at `translateY(-4px)` at rest, `-6px` on hover and `-2px` while pressed. It lifts with `--dur-move`

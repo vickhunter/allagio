@@ -187,8 +187,18 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req g
 		return
 	}
 	class := ClassifyClick(c.Request.Method, reader.userAgent, c.Request.Header)
-	// The cap is the placement, shared by every reader class.
-	if h.RateLimiter != nil && !h.RateLimiter.Allow("placement:"+placementID) {
+	if !PaidClick(class) {
+		h.finishPlacementRedirect(c, link, placementID, reader, class, plain, "unpaid:"+placementID)
+		return
+	}
+	h.finishPlacementRedirect(c, link, placementID, reader, class, plain, "placement:"+placementID)
+}
+
+// finishPlacementRedirect records the hit when the named budget still has
+// room. Paid clicks use the placement budget. Every other class uses its own
+// budget and returns before that placement budget is touched.
+func (h *RedirectsHandler) finishPlacementRedirect(c *gin.Context, link database.PlacementRedirect, placementID string, reader goReader, class, plain, limitKey string) {
+	if h.RateLimiter != nil && !h.RateLimiter.Allow(limitKey) {
 		c.Redirect(http.StatusFound, plain)
 		return
 	}

@@ -75,7 +75,7 @@ func TestPlacementRemoval(t *testing.T) {
 
 	before := placementClickCount(t, db, placementID)
 	goReq := httptest.NewRequest(http.MethodGet, tracked, nil)
-	goReq.Header.Set("User-Agent", "Mozilla/5.0")
+	goReq.Header.Set("User-Agent", testBrowserUA)
 	goRes := httptest.NewRecorder()
 	r.ServeHTTP(goRes, goReq)
 	if goRes.Code != http.StatusFound || !strings.Contains(goRes.Header().Get("Location"), "via=") {

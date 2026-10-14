@@ -20,7 +20,7 @@ func TestPreviewBotsAndHeadRedirectWithoutClicks(t *testing.T) {
 	markPlacementLive(t, db, siteID, offerID, id, "preview-go", "https://previews.example.com/the-post")
 	r := newAttributionRouter(db)
 
-	browser := followGo(t, r, http.MethodGet, id, "Mozilla/5.0")
+	browser := followGo(t, r, http.MethodGet, id, testBrowserUA)
 	if browser.Code != http.StatusFound || !strings.Contains(browser.Header().Get("Location"), "via=") {
 		t.Fatalf("browser click must stay a 302 with via=, got %d %q", browser.Code, browser.Header().Get("Location"))
 	}

@@ -32,6 +32,8 @@
     cap: 'This site reached the most new boxes your rules allow.'
   };
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  // Paid clicks when the digest sends them. Older payloads only have the total.
+  function clickCount(it) { return typeof it.paid_clicks === 'number' ? it.paid_clicks : it.clicks; }
   function day(iso) { try { return iso ? new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : ''; } catch (e) { return ''; } }
   function plainString(s) { return typeof s === 'string' && s.length < 300 && !/[{}\[\]<>]/.test(s) ? s : null; }
 
@@ -148,7 +150,7 @@
           '</div>' +
           '<div class="di-side">' +
             '<span class="di-state" data-test="state"></span>' +
-            '<span class="clicks">' + (it.clicks == null ? '' : esc(it.clicks) + (it.clicks === 1 ? ' click' : ' clicks')) + '</span>' +
+            '<span class="clicks">' + (clickCount(it) == null ? '' : esc(clickCount(it)) + (clickCount(it) === 1 ? ' click' : ' clicks')) + '</span>' +
             '<button type="button" class="btn secondary" data-action="toggle"></button>' +
             '<button type="button" class="btn quiet di-open" data-action="details" aria-haspopup="dialog">Details</button>' +
           '</div>' +

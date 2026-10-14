@@ -14,7 +14,7 @@ Feature: Setup page after device-code sign-in (D-032)
     And I see at most 4 questions, all prefilled
     And "Approve anything that passes the checks" is preselected
     And the words "manual", "auto" and "yolo" do not appear on screen
-    And I see the fixed list "Always checked, in every mode" with 7 checks
+    And I see the fixed list "Rules every listing must follow" with 7 checks
     When I press "Continue"
     Then an "offerrails:setup-submit" event fires with roles ["maker"], mode_shown "yolo" and mode_chosen "yolo"
     And I see the success state "Your agent can take it from here"

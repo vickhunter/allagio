@@ -82,7 +82,7 @@ WHERE id=$1`, id, current, campaignID, current.Add(48*time.Hour), postURL); err 
 		t.Helper()
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.RemoteAddr = remote
-		req.Header.Set("User-Agent", "Mozilla/5.0 reader")
+		req.Header.Set("User-Agent", testBrowserUA)
 		req.Header.Set("Referer", postURL)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)

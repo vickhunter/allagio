@@ -158,11 +158,11 @@ WHERE id=$1`, id, now, campaignID, now.Add(48*time.Hour)); err != nil {
 		r.ServeHTTP(rec, req)
 		return rec
 	}
-	first := hit(rawIP, "Mozilla/5.0 reader")
+	first := hit(rawIP, testBrowserUA)
 	if first.Code != http.StatusFound || first.Header().Get("Cache-Control") != "no-store" || first.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
 		t.Fatalf("first hit: %d cache %q robots %q", first.Code, first.Header().Get("Cache-Control"), first.Header().Get("X-Robots-Tag"))
 	}
-	second := hit(samePrefix, "Mozilla/5.0 reader")
+	second := hit(samePrefix, testBrowserUA)
 	if second.Code != http.StatusFound {
 		t.Fatalf("same /24: %d", second.Code)
 	}
@@ -230,7 +230,7 @@ func TestGoLinkRateLimitKeepsHeaders(t *testing.T) {
 		t.Helper()
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.RemoteAddr = "203.0.113.77:1000"
-		req.Header.Set("User-Agent", "Mozilla/5.0 reader")
+		req.Header.Set("User-Agent", testBrowserUA)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 		requireGoLinkHeaders(t, rec)

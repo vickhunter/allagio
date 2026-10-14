@@ -64,6 +64,100 @@ func TestDigestTruncationNotice(t *testing.T) {
 	}
 }
 
+func TestHeadFloodDoesNotSpendPlacementBudget(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	siteID := createTestSite(t, db, "flood-site-key", "flood.example", "Flood")
+	_, offerID := seedListedOffer(t, db, "flood-maker-key", "flood-maker@example.com", "Flood Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET landing_url='https://offer.example/buy', status='listed' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	id := insertPlacement(t, db, siteID, offerID, "https://flood.example/the-post", "Flood Product is worth a look.")
+	markPlacementLive(t, db, siteID, offerID, id, "flood-go", "https://flood.example/the-post")
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	if err := r.SetTrustedProxies(nil); err != nil {
+		t.Fatal(err)
+	}
+	redirects := &RedirectsHandler{DB: db, IPSaltSecret: "flood-salt", RateLimiter: NewIPRateLimiter(1, time.Hour)}
+	r.GET("/v1/go/:code", redirects.Go)
+	r.HEAD("/v1/go/:code", redirects.Go)
+
+	hit := func(method, ip, ua string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(method, "/v1/go/"+id, nil)
+		req.RemoteAddr = ip + ":1000"
+		req.Header.Set("User-Agent", ua)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		return rec
+	}
+	crawler := hit(http.MethodGet, "203.0.113.31", "Mozilla/5.0 (compatible; GPTBot/1.2)")
+	if !strings.Contains(crawler.Header().Get("Location"), "via=") {
+		t.Fatalf("crawler lost its ref: %s", crawler.Header().Get("Location"))
+	}
+	for i := 0; i < 5; i++ {
+		head := hit(http.MethodHead, "203.0.113.30", testBrowserUA)
+		if strings.Contains(head.Header().Get("Location"), "via=") {
+			t.Fatalf("HEAD %d carried a ref: %s", i, head.Header().Get("Location"))
+		}
+	}
+	scanner := hit(http.MethodGet, "203.0.113.32", "Mozilla/5.0 (compatible; Microsoft SafeLinks)")
+	if strings.Contains(scanner.Header().Get("Location"), "via=") {
+		t.Fatalf("scanner carried a ref: %s", scanner.Header().Get("Location"))
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+id, nil)
+	req.RemoteAddr = "203.0.113.33:1000"
+	req.Header.Set("User-Agent", testBrowserUA)
+	req.Header.Set("Purpose", "prefetch")
+	prefetched := httptest.NewRecorder()
+	r.ServeHTTP(prefetched, req)
+	if strings.Contains(prefetched.Header().Get("Location"), "via=") {
+		t.Fatalf("prefetch carried a ref: %s", prefetched.Header().Get("Location"))
+	}
+	browser := hit(http.MethodGet, "203.0.113.34", testBrowserUA)
+	if !strings.Contains(browser.Header().Get("Location"), "via=") {
+		t.Fatalf("browser after the flood: %s", browser.Header().Get("Location"))
+	}
+	var browserN int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks WHERE placement_id=$1 AND click_class='browser'`, id).Scan(&browserN); err != nil || browserN != 1 {
+		t.Fatalf("browser clicks %d (%v)", browserN, err)
+	}
+}
+
+func TestDigestItemPaidClicks(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, _, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "paid-click-owner", "paid-click-owner@example.com")
+	siteID := createTestSite(t, db, "paid-click-site", "paid-click.example", "Paid")
+	_, offerID := seedListedOffer(t, db, "paid-click-maker", "paid-click-maker@example.com", "Paid Product")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	id := insertPlacement(t, db, siteID, offerID, "https://paid-click.example/post", "Paid Product is worth a look.")
+	markPlacementLive(t, db, siteID, offerID, id, "paid-click-go", "https://paid-click.example/post")
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO clicks(site_id, placement_id, user_agent, click_class) VALUES
+($1,$2,$3,'browser'), ($1,$2,'GPTBot/1.0','verified_agent')`, siteID, id, testBrowserUA); err != nil {
+		t.Fatal(err)
+	}
+	rec, body := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodGet, "/v1/digest", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("digest: %d %s", rec.Code, rec.Body.String())
+	}
+	var item map[string]any
+	for _, raw := range body["items"].([]any) {
+		row := raw.(map[string]any)
+		if row["id"] == id {
+			item = row
+		}
+	}
+	if item == nil || item["clicks"] != float64(2) || item["paid_clicks"] != float64(1) {
+		t.Fatalf("digest item clicks: %v", item)
+	}
+}
+
 func TestClickClassStoredPaidAndCapped(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -97,7 +191,7 @@ func TestClickClassStoredPaidAndCapped(t *testing.T) {
 		requireGoLinkHeaders(t, rec)
 		return rec
 	}
-	if loc := hit(http.MethodGet, "203.0.113.10", "Mozilla/5.0 reader", nil).Header().Get("Location"); !strings.Contains(loc, "via=") {
+	if loc := hit(http.MethodGet, "203.0.113.10", testBrowserUA, nil).Header().Get("Location"); !strings.Contains(loc, "via=") {
 		t.Fatalf("browser: %s", loc)
 	}
 	if loc := hit(http.MethodGet, "203.0.113.11", "Mozilla/5.0 (compatible; GPTBot/1.2)", nil).Header().Get("Location"); !strings.Contains(loc, "via=") {
@@ -172,7 +266,7 @@ FROM clicks WHERE placement_id=$1`, id).Scan(&browserN, &verifiedN, &declaredN, 
 		t.Helper()
 		req := httptest.NewRequest(http.MethodGet, "/v1/go/"+cappedID, nil)
 		req.RemoteAddr = ip + ":1000"
-		req.Header.Set("User-Agent", "Mozilla/5.0 reader")
+		req.Header.Set("User-Agent", testBrowserUA)
 		rec := httptest.NewRecorder()
 		limited.ServeHTTP(rec, req)
 		return rec

@@ -306,7 +306,7 @@ func TestReviewCampaignPathAndHeadProbe(t *testing.T) {
 		t.Helper()
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		req.RemoteAddr = "203.0.113.40:1000"
-		req.Header.Set("User-Agent", "Mozilla/5.0 reader")
+		req.Header.Set("User-Agent", testBrowserUA)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
 		return rec

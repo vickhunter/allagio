@@ -237,9 +237,19 @@
       '</section>';
   }
   // 6042dcb: total_items is every item for the project; the digest sends at most 50 (no paging).
+  // truncated is the server flag that this page was cut, even when total_items is not larger than the page.
   function pageNote(s, items) {
-    if (typeof s.total_items === 'number') return s.total_items > items.length ? 'Showing the latest <b>' + num(items.length) + '</b> of <b>' + num(s.total_items) + '</b>.' : '';
-    return items.length >= PAGE && s.live_count > itemCount(items) ? 'Showing the latest ' + plural(itemCount(items), 'item', 'items') + '. ' + num(s.live_count) + ' are live.' : '';
+    var count = '';
+    if (typeof s.total_items === 'number') {
+      count = s.total_items > items.length ? 'Showing the latest <b>' + num(items.length) + '</b> of <b>' + num(s.total_items) + '</b>.' : '';
+    } else if (items.length >= PAGE && s.live_count > itemCount(items)) {
+      count = 'Showing the latest ' + plural(itemCount(items), 'item', 'items') + '. ' + num(s.live_count) + ' are live.';
+    }
+    if (s.truncated === true) {
+      var cut = 'The list was cut.';
+      return count ? count + ' ' + cut : cut;
+    }
+    return count;
   }
   function itemCount(items) { return items.filter(function (i) { return i.kind !== 'listing'; }).length; }
   function stat(l, v, key) { return '<div class="stat"><span class="flag">' + esc(l) + '</span><b' + (key ? ' data-stat="' + key + '"' : '') + '>' + esc(v) + '</b></div>'; }

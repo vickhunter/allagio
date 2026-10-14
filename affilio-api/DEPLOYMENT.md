@@ -26,17 +26,45 @@ This guide covers production deployment for `affilio-api` and required integrati
 - `CLAIMS_CHECK` (optional). Leave unset. Hosted is `GIN_MODE=release`, the same signal as the production startup guard, and that default is `stub`: an untrusted offer stays in review with the message "Claims are not checked yet." `off-local` keeps the four listing checks and is refused when `GIN_MODE=release`. `real` compares the listing card with the merchant page on local and dev, and a hosted server still refuses it and stays on `stub`. Do not set `real` or `off-local` on a hosted server.
 
 ## Database Migration Order
-Run migrations in this exact order:
+Run migrations in this exact order, before the new binary starts. `033_click_classes.sql` adds `clicks.click_class`. The new binary reads that column on every go-link hit and digest, so apply `033_click_classes.sql` before the new binary starts.
 1. `internal/migrations/001_initial.sql`
 2. `internal/migrations/002_seed_programs.sql`
 3. `internal/migrations/003_add_user_program_id.sql`
 4. `internal/migrations/004_discovery_reviews.sql`
 5. `internal/migrations/005_api_key_rotation.sql`
 6. `internal/migrations/006_recommendation_status_guardrails.sql`
+7. `internal/migrations/007_distributoor_core.sql`
+8. `internal/migrations/008_attribution_payouts.sql`
+9. `internal/migrations/009_scale_fraud_trust.sql`
+10. `internal/migrations/010_audit_events.sql`
+11. `internal/migrations/011_hash_api_keys.sql`
+12. `internal/migrations/012_agent_revenue_poc.sql`
+13. `internal/migrations/013_hosted_identity.sql`
+14. `internal/migrations/014_verified_stripe_connections.sql`
+15. `internal/migrations/015_site_owner_connection.sql`
+16. `internal/migrations/016_placement_removed_at.sql`
+17. `internal/migrations/017_owner_attribution_source.sql`
+18. `internal/migrations/018_d032_agent_entry.sql`
+19. `internal/migrations/019_d032_account_keys.sql`
+20. `internal/migrations/020_d032_kill_switch.sql`
+21. `internal/migrations/021_d032_interface.sql`
+22. `internal/migrations/022_d032_restore.sql`
+23. `internal/migrations/023_d032_plugin_restore.sql`
+24. `internal/migrations/024_d032_plugin_placed.sql`
+25. `internal/migrations/025_d032_plugin_failed.sql`
+26. `internal/migrations/026_d032_failed_action.sql`
+27. `internal/migrations/027_d032_restore_unconfirmed.sql`
+28. `internal/migrations/028_d032_placement_live.sql`
+29. `internal/migrations/029_d032_post_url.sql`
+30. `internal/migrations/030_d032_ui_wiring.sql`
+31. `internal/migrations/031_d032_committed_live_plugin_keys.sql`
+32. `internal/migrations/032_d032_box_identity.sql`
+33. `internal/migrations/033_click_classes.sql`
 
 Notes:
 - `002_seed_programs.sql` uses upsert semantics on `slug`.
 - `005_api_key_rotation.sql` adds key rotation support and audit table.
+- `033_click_classes.sql` must run before the new binary. A binary that starts first will fail reads and writes that use `clicks.click_class`.
 
 ## Build and Release
 1. Build image:

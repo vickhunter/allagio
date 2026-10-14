@@ -52,9 +52,28 @@ var emailScannerMarkers = []string{
 	"ppbot",
 }
 
+// browserEngineTokens are the engine names a real browser sends next to
+// Mozilla/. A User-Agent that only says Mozilla, or that names no engine,
+// is not a browser.
+var browserEngineTokens = []string{
+	"applewebkit",
+	"chrome/",
+	"crios/",
+	"firefox/",
+	"fxios/",
+	"safari/",
+	"edg/",
+	"edgios/",
+	"opr/",
+	"opera/",
+	"gecko/",
+	"trident/",
+}
+
 // ClassifyClick labels a go-link hit. Only a browser click is paid.
 // Verified and declared agents stay attributable so a completed sale still
-// earns commission. Scanners, prefetch, and HEAD are unknown.
+// earns commission. An empty User-Agent, a non-browser client, scanners,
+// prefetch, and HEAD are unknown.
 func ClassifyClick(method, userAgent string, header http.Header) string {
 	ua := strings.ToLower(strings.TrimSpace(userAgent))
 	if containsMarker(ua, aiCrawlerMarkers) {
@@ -66,7 +85,17 @@ func ClassifyClick(method, userAgent string, header http.Header) string {
 	if declaredAgent(ua, header) {
 		return ClickClassDeclaredAgent
 	}
+	if !looksLikeBrowser(ua) {
+		return ClickClassUnknown
+	}
 	return ClickClassBrowser
+}
+
+func looksLikeBrowser(ua string) bool {
+	if ua == "" || !strings.Contains(ua, "mozilla/") {
+		return false
+	}
+	return containsMarker(ua, browserEngineTokens)
 }
 
 // PaidClick is the pay-per-click rule: a browser click counts, and the other
