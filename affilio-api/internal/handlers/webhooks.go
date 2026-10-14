@@ -296,7 +296,7 @@ func (h *WebhooksHandler) processProductEvent(ctx context.Context, productID str
 		}
 	case "refund":
 		var valid bool
-		valid, err = h.DB.ProductOwnsPayment(ctx, productID, event.ObjectID, event.Currency)
+		valid, err = h.DB.ProductOwnsPayment(ctx, productID, "stripe", event.ObjectID, event.Currency)
 		if err == nil && !valid {
 			result.Status = "rejected"
 			break

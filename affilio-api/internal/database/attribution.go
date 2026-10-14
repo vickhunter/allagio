@@ -340,8 +340,8 @@ func (d *DB) recordSale(ctx context.Context, productID, clickID, provider, event
 		return nil, err
 	}
 	if objectID != "" {
-		var existingID, existingTrust string
-		err = tx.QueryRow(ctx, `SELECT cv.id::text, COALESCE(cv.trust_level,'') FROM conversions cv
+		var existingID, existingTrust, existingProvider string
+		err = tx.QueryRow(ctx, `SELECT cv.id::text, COALESCE(cv.trust_level,''), cv.provider FROM conversions cv
 JOIN offers o ON o.id=cv.offer_id
 JOIN products p ON p.id=o.product_id
 WHERE cv.provider_object_id=$1 AND cv.kind IN ('sale','renewal')
@@ -355,12 +355,12 @@ AND p.maker_id = (
 AND cv.click_id=$2
 AND upper(cv.currency)=upper($3)
 AND abs(cv.amount - $4::numeric) < 0.005
-ORDER BY cv.created_at DESC LIMIT 1`, objectID, clickID, currency, amount).Scan(&existingID, &existingTrust)
+ORDER BY cv.created_at DESC LIMIT 1`, objectID, clickID, currency, amount).Scan(&existingID, &existingTrust, &existingProvider)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return nil, err
 		}
 		if err == nil {
-			if trustRank(trustLevel) > trustRank(existingTrust) {
+			if existingProvider == ProviderSellerReport && trustRank(trustLevel) > trustRank(existingTrust) {
 				if _, err = tx.Exec(ctx, `UPDATE conversions SET trust_level=$2, provider=$3, provider_event_id=$4 WHERE id=$1`, existingID, trustLevel, provider, eventID); err != nil {
 					return nil, err
 				}
@@ -395,6 +395,22 @@ WHERE cl.id=$1 AND ($2='' OR o.product_id::text=$2)`, clickID, productID).Scan(&
 			return nil, ErrClickNotFound
 		}
 		return nil, err
+	}
+	if provider == ProviderSellerReport {
+		var stored string
+		qerr := tx.QueryRow(ctx, `SELECT COALESCE(cv.trust_level,'')
+FROM reserved_sale_events r
+JOIN conversions cv ON cv.id = r.conversion_id
+WHERE r.offer_id=$1 AND r.provider_event_id=$2`, out.OfferID, eventID).Scan(&stored)
+		if qerr != nil && !errors.Is(qerr, pgx.ErrNoRows) {
+			return nil, qerr
+		}
+		if qerr == nil {
+			if stored == "" {
+				stored = trustLevel
+			}
+			return &SaleConversion{TrustLevel: stored, Duplicate: true}, nil
+		}
 	}
 	out.Commission = commissionFor(commissionType, float64(commissionValueMinor)/100, amount)
 	if productID != "" {
@@ -455,6 +471,12 @@ RETURNING id`, out.OfferID, out.CampaignID, clickID, provider, eventID, objectID
 		return nil, err
 	}
 
+	if provider == ProviderSellerReport {
+		if _, err = tx.Exec(ctx, `INSERT INTO reserved_sale_events (offer_id, provider_event_id, conversion_id)
+VALUES ($1,$2,$3)`, out.OfferID, eventID, out.ConversionID); err != nil {
+			return nil, err
+		}
+	}
 	clearsAt := occurredAt.Add(time.Duration(refundWindowDays) * 24 * time.Hour)
 	if _, err := tx.Exec(ctx, `
 INSERT INTO ledger_entries (site_id, conversion_id, kind, amount, currency, status, clears_at)
@@ -480,7 +502,7 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
 	if existing, ok, err := refundByEvent(ctx, tx, provider, eventID, makerID); err != nil || ok {
 		return existing, err
 	}
-	signedOnly := false
+	matchProvider := provider != ProviderSellerReport
 	if makerID == "" {
 		makers, err := distinctSaleMakers(ctx, tx, provider, objectID)
 		if err != nil {
@@ -490,7 +512,6 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
 			return nil, ErrConversionNotFound
 		}
 		makerID = makers[0]
-		signedOnly = true
 	}
 	var saleID, campaignID, siteID, offerID, currency, paymentMode, saleTrust string
 	var clickID *string
@@ -505,7 +526,7 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
  AND p.maker_id::text=$3
  AND ($4='' OR cv.offer_id::text=$4)
  AND (NOT $5 OR cv.provider=$2)
- ORDER BY (cv.provider=$2) DESC, cv.created_at DESC LIMIT 1`, objectID, provider, makerID, scopeOfferID, signedOnly).
+ ORDER BY (cv.provider=$2) DESC, cv.created_at DESC LIMIT 1`, objectID, provider, makerID, scopeOfferID, matchProvider).
 		Scan(&saleID, &campaignID, &siteID, &offerID, &clickID, &netMinor, &commissionMinor, &currency, &grossMinor, &paymentMode, &saleTrust)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrConversionNotFound

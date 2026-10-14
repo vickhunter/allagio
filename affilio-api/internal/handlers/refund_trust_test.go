@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -245,11 +246,16 @@ func lemonOrder(eventName, objectID, clickID string, total int, spoofTrust strin
 
 func (fx *trustFixture) reportSale(objectID, spoofTrust string) (*httptest.ResponseRecorder, map[string]interface{}) {
 	fx.t.Helper()
+	return fx.reportSaleEvent("report-sale-"+objectID, objectID, 10000, spoofTrust)
+}
+
+func (fx *trustFixture) reportSaleEvent(eventID, objectID string, amount int, spoofTrust string) (*httptest.ResponseRecorder, map[string]interface{}) {
+	fx.t.Helper()
 	return doJSON(fx.t, fx.r, http.MethodPost, "/v1/maker/sales", fx.makerKey, map[string]interface{}{
 		"click_id":      fx.clickID,
-		"event_id":      "report-sale-" + objectID,
+		"event_id":      eventID,
 		"object_id":     objectID,
-		"amount_minor":  10000,
+		"amount_minor":  amount,
 		"currency":      "USD",
 		"occurred_at":   time.Now().Add(2 * time.Hour).UTC().Format(time.RFC3339),
 		"trust_level":   spoofTrust,
@@ -285,10 +291,10 @@ func TestRefundTrustAcceptsOnlyEqualOrHigherSource(t *testing.T) {
 		{"provider_verified", "provider_verified", true, false},
 		{"provider_verified", "seller_signed_webhook", false, true},
 		{"provider_verified", "seller_reported", false, false},
-		{"seller_signed_webhook", "provider_verified", true, false},
+		{"seller_signed_webhook", "provider_verified", false, true},
 		{"seller_signed_webhook", "seller_signed_webhook", true, false},
 		{"seller_signed_webhook", "seller_reported", false, false},
-		{"seller_reported", "provider_verified", true, false},
+		{"seller_reported", "provider_verified", false, true},
 		{"seller_reported", "seller_signed_webhook", false, true},
 		{"seller_reported", "seller_reported", true, false},
 	}
@@ -299,7 +305,11 @@ func TestRefundTrustAcceptsOnlyEqualOrHigherSource(t *testing.T) {
 		rec, body := fx.refund(tc.refund, objectID, "evt-"+objectID, 10000)
 		fx.refuseGuarantee(rec)
 		if tc.unmatched {
-			if rec.Code != http.StatusServiceUnavailable || body["status"] != "unmatched" {
+			if tc.refund == "provider_verified" {
+				if rec.Code != http.StatusAccepted || body["status"] != "pending" || body["reason"] != "awaiting reconciliation" {
+					t.Fatalf("stripe refund matched %s: %d %v", tc.sale, rec.Code, body)
+				}
+			} else if rec.Code != http.StatusServiceUnavailable || body["status"] != "unmatched" {
 				t.Fatalf("report satisfied %s -> %s: %d %v", tc.sale, tc.refund, rec.Code, body)
 			}
 			if !moneyNear(fx.pending(objectID), 20) {
@@ -370,7 +380,7 @@ func TestRefundTrustAcceptsOnlyEqualOrHigherSource(t *testing.T) {
 		revenue += row["revenue"].(float64)
 		commission += row["commission"].(float64)
 	}
-	if sales != 9 || refunds != 5 || !moneyNear(revenue, 400) || !moneyNear(commission, 80) {
+	if sales != 9 || refunds != 3 || !moneyNear(revenue, 600) || !moneyNear(commission, 120) {
 		t.Fatalf("earnings counted held refunds: sales %v refunds %v revenue %v commission %v", sales, refunds, revenue, commission)
 	}
 	if findReportedConversion(t, earnings, heldID, "refund")["refund_status"] != "pending_review" {
@@ -1122,6 +1132,116 @@ WHERE cv.provider_object_id=$1 AND le.kind='clawback'`, objectID).Scan(&n)
 	return n
 }
 
+func TestStripeRefundMatchesOnlyItsOwnSale(t *testing.T) {
+	fx := newTrustFixture(t)
+	fx.sell("seller_signed_webhook", "order-stripe-of-lemon")
+	rec, body := fx.refund("provider_verified", "order-stripe-of-lemon", "evt-stripe-of-lemon", 10000)
+	if rec.Code != http.StatusAccepted || body["status"] != "pending" || body["reason"] != "awaiting reconciliation" {
+		t.Fatalf("stripe refund matched the lemon sale: %d %v", rec.Code, body)
+	}
+	if !moneyNear(fx.pendingForSeller("order-stripe-of-lemon"), 20) {
+		t.Fatalf("stripe refund reversed the lemon sale: %v", fx.pendingForSeller("order-stripe-of-lemon"))
+	}
+	makerID, err := fx.db.MakerIDForProduct(context.Background(), fx.productID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = fx.db.RecordPartialRefund(context.Background(), "stripe", "evt-stripe-of-lemon-direct", "order-stripe-of-lemon", 0, time.Now().Add(2*time.Hour), database.TrustProviderVerified, makerID, "", true)
+	if !errors.Is(err, database.ErrConversionNotFound) {
+		t.Fatalf("sale match accepted another provider: %v", err)
+	}
+	if !moneyNear(fx.pendingForSeller("order-stripe-of-lemon"), 20) {
+		t.Fatalf("direct stripe refund reversed the lemon sale: %v", fx.pendingForSeller("order-stripe-of-lemon"))
+	}
+
+	fx.sell("seller_reported", "order-stripe-of-report")
+	rec, body = fx.refund("provider_verified", "order-stripe-of-report", "evt-stripe-of-report", 10000)
+	if rec.Code != http.StatusAccepted || body["status"] != "pending" || body["reason"] != "awaiting reconciliation" {
+		t.Fatalf("stripe refund matched the seller report: %d %v", rec.Code, body)
+	}
+	if !moneyNear(fx.pendingForSeller("order-stripe-of-report"), 20) {
+		t.Fatalf("stripe refund reversed the seller report: %v", fx.pendingForSeller("order-stripe-of-report"))
+	}
+	_, err = fx.db.RecordPartialRefund(context.Background(), "stripe", "evt-stripe-of-report-direct", "order-stripe-of-report", 0, time.Now().Add(2*time.Hour), database.TrustProviderVerified, makerID, "", true)
+	if !errors.Is(err, database.ErrConversionNotFound) {
+		t.Fatalf("sale match accepted a seller report: %v", err)
+	}
+	if !moneyNear(fx.pendingForSeller("order-stripe-of-report"), 20) {
+		t.Fatalf("direct stripe refund reversed the seller report: %v", fx.pendingForSeller("order-stripe-of-report"))
+	}
+}
+
+func TestSignedUpgradeLeavesAnotherProvidersSale(t *testing.T) {
+	fx := newTrustFixture(t)
+	rec, body := fx.sendLemon(lemonOrder("order_created", "order-lemon-stays", fx.clickID, 10000, "provider_verified"))
+	if rec.Code != http.StatusOK || body["status"] != "recorded" || body["trust_level"] != "seller_signed_webhook" {
+		t.Fatalf("lemon sale: %d %v", rec.Code, body)
+	}
+	payload := stripeSalePayload("evt-lemon-stays", "order-lemon-stays", fx.clickID, 10000)
+	object := payload["data"].(map[string]interface{})["object"].(map[string]interface{})
+	object["metadata"] = map[string]interface{}{"dtr_product_id": fx.productID}
+	rec, body = sendScopedStripeEvent(t, fx.r, fx.productID, payload, testStripeSecret)
+	if rec.Code != http.StatusOK || body["status"] != "duplicate" || body["trust_level"] != "seller_signed_webhook" {
+		t.Fatalf("stripe rewrote the lemon sale: %d %v", rec.Code, body)
+	}
+	facts := fx.saleFacts("order-lemon-stays")
+	if len(facts) != 1 || facts[0]["provider"] != "lemonsqueezy" || facts[0]["trust"] != "seller_signed_webhook" {
+		t.Fatalf("lemon row changed: %v", facts)
+	}
+	var eventID string
+	if err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT provider_event_id FROM conversions WHERE provider_object_id='order-lemon-stays' AND kind='sale'`).Scan(&eventID); err != nil {
+		t.Fatal(err)
+	}
+	if eventID != "order_created:order-lemon-stays" {
+		t.Fatalf("lemon event id became %s", eventID)
+	}
+	if !moneyNear(fx.pendingForSeller("order-lemon-stays"), 20) {
+		t.Fatalf("rewrite booked commission %v", fx.pendingForSeller("order-lemon-stays"))
+	}
+	rec, body = fx.refund("provider_verified", "order-lemon-stays", "evt-lemon-stays-refund", 10000)
+	if rec.Code != http.StatusAccepted || body["status"] != "pending" || body["reason"] != "awaiting reconciliation" {
+		t.Fatalf("stripe refund of the untouched lemon sale: %d %v", rec.Code, body)
+	}
+	if !moneyNear(fx.pendingForSeller("order-lemon-stays"), 20) {
+		t.Fatalf("stripe refund reversed the lemon sale: %v", fx.pendingForSeller("order-lemon-stays"))
+	}
+	rec, body = fx.sendLemon(lemonOrder("order_refunded", "order-lemon-stays", "", 0, "provider_verified"))
+	if rec.Code != http.StatusOK || body["status"] != "refunded" || body["refund_status"] != "applied" || !moneyNear(fx.pendingForSeller("order-lemon-stays"), 0) {
+		t.Fatalf("lemon refund after a stripe arrival: %d %v pending %v", rec.Code, body, fx.pendingForSeller("order-lemon-stays"))
+	}
+}
+
+func TestUpgradedReportReservesItsEventID(t *testing.T) {
+	fx := newTrustFixture(t)
+	rec, body := fx.reportSaleEvent("report-evt-keep", "order-keep", 10000, "provider_verified")
+	if rec.Code != http.StatusOK || body["status"] != "recorded" || body["trust_level"] != "seller_reported" {
+		t.Fatalf("report: %d %v", rec.Code, body)
+	}
+	payload := stripeSalePayload("evt-keep-upgrade", "order-keep", fx.clickID, 10000)
+	object := payload["data"].(map[string]interface{})["object"].(map[string]interface{})
+	object["metadata"] = map[string]interface{}{"dtr_product_id": fx.productID}
+	rec, body = sendScopedStripeEvent(t, fx.r, fx.productID, payload, testStripeSecret)
+	if rec.Code != http.StatusOK || body["status"] != "duplicate" || body["trust_level"] != "provider_verified" {
+		t.Fatalf("upgrade: %d %v", rec.Code, body)
+	}
+	replay, replayBody := fx.reportSaleEvent("report-evt-keep", "order-keep-other", 10000, "provider_verified")
+	if replay.Code != http.StatusOK || replayBody["status"] != "duplicate" || replayBody["trust_level"] != "provider_verified" {
+		t.Fatalf("reserved report inserted again: %d %v", replay.Code, replayBody)
+	}
+	if len(fx.saleFacts("order-keep-other")) != 0 {
+		t.Fatalf("second object booked a sale: %v", fx.saleFacts("order-keep-other"))
+	}
+	if !moneyNear(fx.pendingForSeller("order-keep"), 20) {
+		t.Fatalf("reserved report changed commission to %v", fx.pendingForSeller("order-keep"))
+	}
+	var reserved int
+	if err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT COUNT(*) FROM reserved_sale_events WHERE provider_event_id='report-evt-keep'`).Scan(&reserved); err != nil || reserved != 1 {
+		t.Fatalf("reserved events %d err %v", reserved, err)
+	}
+}
+
 func TestSignedRefundDoesNotClawAnotherProvidersSale(t *testing.T) {
 	fx := newTrustFixture(t)
 	fx.sendPolarSale("order-polar-only", fx.clickID, "USD", 10000)
@@ -1278,6 +1398,16 @@ func TestRefundTrustMigrationIsIdempotent(t *testing.T) {
 	}
 	if _, err = db.Pool.Exec(context.Background(), string(link)); err != nil {
 		t.Fatalf("second sale-link apply: %v", err)
+	}
+	reserved, err := os.ReadFile(filepath.Join("..", "migrations", "037_reserved_sale_events.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Pool.Exec(context.Background(), string(reserved)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Pool.Exec(context.Background(), string(reserved)); err != nil {
+		t.Fatalf("second reserved-event apply: %v", err)
 	}
 	_, err = db.Pool.Exec(context.Background(), `
 INSERT INTO conversions (provider, provider_event_id, kind, amount, currency, occurred_at, trust_level)
