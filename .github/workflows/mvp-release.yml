@@ -3,9 +3,9 @@ name: MVP Release Package
 on:
   workflow_dispatch:
   push:
-    paths: ["affilio-api/**", "affilio-wp/**", "packages/distributoor-setup/**", "distributoor-plugin/skills/**", "Dockerfile.mvp", ".dockerignore", "scripts/mvp_release.py", "scripts/test_mvp_release.py", ".github/workflows/mvp-release.yml"]
+    paths: ["affilio-api/**", "affilio-wp/**", "packages/distributoor-setup/**", "distributoor-plugin/skills/**", "Dockerfile.mvp", ".dockerignore", "scripts/mvp_release.py", "scripts/package-wp-zip", "scripts/test_mvp_release.py", ".github/workflows/mvp-release.yml"]
   pull_request:
-    paths: ["affilio-api/**", "affilio-wp/**", "packages/distributoor-setup/**", "distributoor-plugin/skills/**", "Dockerfile.mvp", ".dockerignore", "scripts/mvp_release.py", "scripts/test_mvp_release.py", ".github/workflows/mvp-release.yml"]
+    paths: ["affilio-api/**", "affilio-wp/**", "packages/distributoor-setup/**", "distributoor-plugin/skills/**", "Dockerfile.mvp", ".dockerignore", "scripts/mvp_release.py", "scripts/package-wp-zip", "scripts/test_mvp_release.py", ".github/workflows/mvp-release.yml"]
 
 jobs:
   release:

@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+"""Build the WordPress plugin zip from tracked files and run the release gate.
+
+Git tracks hosted pages and build inputs under affilio-wp/admin/build. Those
+files stay in the repository for the hosted image, and this script leaves them
+out of the plugin zip. setup-controls.js is one of them: the plugin never
+enqueues it. The hosted home and workspace pages load it from /assets.
+"""
+import subprocess
+import sys
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import mvp_release as release  # noqa: E402
+
+
+def tracked_plugin_files():
+    result = subprocess.run(
+        ["git", "ls-files", "-z", "--", "affilio-wp"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    return [name.decode() for name in result.stdout.split(b"\0") if name]
+
+
+def main():
+    if len(sys.argv) != 2:
+        print("usage: scripts/package-wp-zip OUTPUT.zip", file=sys.stderr)
+        return 2
+    output = Path(sys.argv[1])
+    output.parent.mkdir(parents=True, exist_ok=True)
+    names = [name for name in tracked_plugin_files() if not release.omit_from_plugin_zip(name)]
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name in names:
+            archive.write(ROOT / name, name)
+    try:
+        release.validate_plugin(output.read_bytes())
+    except release.ReleaseError as exc:
+        print("Release stopped: " + str(exc), file=sys.stderr)
+        return 1
+    print(f"WordPress ZIP passed the release gate with {len(names)} files.")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, subprocess.CalledProcessError, zipfile.BadZipFile) as exc:
+        print("Release stopped: could not build the WordPress ZIP.", file=sys.stderr)
+        return_code = getattr(exc, "returncode", 1)
+        sys.exit(return_code or 1)

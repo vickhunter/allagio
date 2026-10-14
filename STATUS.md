@@ -1,3 +1,7 @@
+## October 14 — package the WordPress zip from tracked files
+
+`scripts/package-wp-zip` builds the WordPress ZIP from files git tracks under `affilio-wp/`, leaves out the 14 hosted and build files under `admin/build/`, and runs `validate_plugin`. Those files are the landing scene, the workspace and home pages, `setup-controls.js`, `THIRD_PARTY_NOTICES.md`, and `package*.json`. The plugin does not enqueue any of them. `setup-controls.js` is loaded only by the hosted home and workspace pages. The zip contains 24 files.
+
 ## October 13 — release zip rejects a missing reference
 
 The WordPress release ZIP fails when a file inside it points at a path that is not in the archive. The check covers a JavaScript `import` and `import()`, a `wp_enqueue_script` or `wp_enqueue_style` source, and a PHP `require` or `include`. A packaged script that imports `landing-scene.bundle.js` fails when that file is absent. Hosted landing files stay out of the WordPress ZIP, so the committed bundle is not required there.

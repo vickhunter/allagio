@@ -208,6 +208,34 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(release.ReleaseError, "outside the plugin"):
             release.validate_plugin(plugin_archive(bodies={php: "<?php\nrequire __DIR__ . '/../../outside.php';\n"}))
 
+    def test_package_wp_zip_passes_the_release_gate(self):
+        hosted = {
+            "landing.js", "landing-scene.js", "landing.css",
+            "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt",
+            "workspace.js", "workspace.css", "workspace.html",
+            "home.html", "agent-poc.html", "setup-controls.js",
+            "THIRD_PARTY_NOTICES.md", "package.json", "package-lock.json",
+        }
+        admin = release.ROOT / "affilio-wp/includes/class-affilio-admin.php"
+        needed, outside = release.referenced_plugin_files(str(admin.relative_to(release.ROOT)), admin.read_text())
+        self.assertEqual(outside, [])
+        self.assertNotIn("setup-controls.js", admin.read_text())
+        for relative in needed:
+            self.assertFalse(release.hosted_build_file(Path(relative).name), relative)
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "affilio.zip"
+            script = release.ROOT / "scripts" / "package-wp-zip"
+            result = subprocess.run([str(script), str(target)], cwd=release.ROOT, capture_output=True, text=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertIn("passed the release gate with 24 files", result.stdout)
+            release.validate_plugin(target.read_bytes())
+            with zipfile.ZipFile(target) as archive:
+                names = [name for name in archive.namelist() if not name.endswith("/")]
+            self.assertEqual(len(names), 24)
+            self.assertTrue(hosted.isdisjoint(Path(name).name for name in names))
+            for relative in needed:
+                self.assertIn(release.PLUGIN_ROOT + relative, names)
+
     def test_plugin_zip_rejects_stored_entries(self):
         output = io.BytesIO()
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:

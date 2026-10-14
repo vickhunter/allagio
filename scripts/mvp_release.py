@@ -52,6 +52,8 @@ PLUGIN_ROOT = "affilio-wp/"
 PLUGIN_VERSION = "0.1.21"
 PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
 PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
+HOSTED_BUILD_NAMES = {"home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}
+HOSTED_BUILD_PREFIXES = ("workspace", "landing", "package")
 ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
 DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
 QUOTED_BUILD = re.compile(r"""(['"])([A-Za-z0-9_.-]+\.(?:js|css))\1""")
@@ -354,6 +356,16 @@ def packaged_out(name):
     return file in PACKAGED_FILES or file.startswith(".phpunit.")
 
 
+def hosted_build_file(name):
+    return name in HOSTED_BUILD_NAMES or name.startswith(HOSTED_BUILD_PREFIXES)
+
+
+def omit_from_plugin_zip(path):
+    if packaged_out(path):
+        return True
+    return path.startswith(PLUGIN_ROOT + "admin/build/") and hosted_build_file(PurePosixPath(path).name)
+
+
 def validate_plugin(data, origin=None):
     del origin  # The plugin no longer bakes a deployment origin into its source.
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
@@ -374,9 +386,8 @@ def validate_plugin(data, origin=None):
         for name, payload in files.items():
             require(name.startswith(PLUGIN_ROOT), "WordPress ZIP top folder must be affilio-wp/")
             require(b"railway.app" not in payload, "WordPress ZIP must not contain railway.app")
-            if name.startswith(PLUGIN_ROOT + "admin/build/"):
-                file = PurePosixPath(name).name
-                require(not file.startswith(("workspace", "landing", "package")) and file not in {"home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}, "WordPress ZIP includes hosted UI or build tools.")
+            if name.startswith(PLUGIN_ROOT + "admin/build/") and hosted_build_file(PurePosixPath(name).name):
+                raise ReleaseError("WordPress ZIP includes hosted UI or build tools.")
         plugin = files[PLUGIN_ROOT + "affilio.php"].decode("utf8")
         require("Plugin Name:" in plugin, "WordPress plugin header is missing.")
         php = {name: payload.decode("utf8", "replace") for name, payload in files.items() if name.endswith(".php")}
