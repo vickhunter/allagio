@@ -1,0 +1,5 @@
+{
+ "error": "sign in at /auth/login",
+ "message": "Sign in again to manage plugin keys.",
+ "reason": "reauth_required"
+}

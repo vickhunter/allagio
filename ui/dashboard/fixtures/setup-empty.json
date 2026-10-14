@@ -1,0 +1,39 @@
+{
+  "setup_id": "st_01J9EMPTY",
+  "session": {
+    "user_id": "usr_0000",
+    "signed_in": true,
+    "human_login": true,
+    "device_code": "AAAA-0000"
+  },
+  "agent": {
+    "source": "mcp",
+    "client_name": "MCP",
+    "install_path": "mcp_stdio"
+  },
+  "detected_roles": [],
+  "project": {
+    "project_id": null,
+    "name": "",
+    "url": ""
+  },
+  "mode_preselected": "yolo",
+  "maker": {
+    "listing": {
+      "name": "",
+      "pitch": "",
+      "price": "",
+      "url": ""
+    },
+    "readiness": {
+      "score": null,
+      "signals": []
+    },
+    "avoid_topics": [],
+    "avoid_publisher_types": [],
+    "commission": {
+      "type": "percent",
+      "value": null
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "setup_id": "st_01J9NOMODE",
+  "session": {
+    "user_id": "usr_8f2c",
+    "signed_in": true,
+    "human_login": true,
+    "device_code": "QXRT-7K2M"
+  },
+  "agent": {
+    "source": "cli",
+    "client_name": "npx offer-rails",
+    "install_path": "cli"
+  },
+  "detected_roles": [
+    "maker"
+  ],
+  "project": {
+    "project_id": "prj_rail",
+    "name": "Rail Tool",
+    "url": "https://rail-tool.example"
+  },
+  "mode_preselected": null,
+  "maker": {
+    "listing": {
+      "name": "Rail Tool",
+      "pitch": "Ship a referral offer for your dev tool in one afternoon.",
+      "price": "€19/month",
+      "url": "https://rail-tool.example"
+    },
+    "readiness": {
+      "score": 72,
+      "signals": [
+        {
+          "id": "site_reachable",
+          "label": "Site is reachable",
+          "pass": true,
+          "reason": "Landing page answered in 0.4 s."
+        },
+        {
+          "id": "pricing_page",
+          "label": "Pricing is public",
+          "pass": true,
+          "reason": "Found €19/month on /pricing."
+        },
+        {
+          "id": "payment_sdk",
+          "label": "Payments are wired",
+          "pass": true,
+          "reason": "Stripe Checkout found in the code."
+        },
+        {
+          "id": "webhook",
+          "label": "Webhook verified",
+          "pass": false,
+          "reason": "No handler for a completed checkout, so sales cannot be attributed yet. Your agent can add one."
+        },
+        {
+          "id": "referral_param",
+          "label": "Referral parameter survives",
+          "pass": true,
+          "reason": "?ref stayed on the final checkout URL."
+        }
+      ]
+    },
+    "avoid_topics": [
+      "gambling",
+      "adult"
+    ],
+    "avoid_publisher_types": [
+      "coupon sites"
+    ],
+    "commission": {
+      "type": "percent",
+      "value": 20
+    }
+  }
+}

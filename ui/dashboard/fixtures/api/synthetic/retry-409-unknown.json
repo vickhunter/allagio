@@ -1,0 +1,5 @@
+{
+ "error": "retry_not_allowed",
+ "reason": "site_key_rotated",
+ "message": "Your site key changed. Reconnect the plugin, then try again."
+}

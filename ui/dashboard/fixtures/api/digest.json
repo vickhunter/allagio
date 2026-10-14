@@ -1,0 +1,46 @@
+{
+ "approval_message": "Automatic approval is off until claim checks are live.",
+ "approval_reason": "claim_check_unavailable",
+ "available_modes": [
+  "manual",
+  "auto",
+  "yolo"
+ ],
+ "change_url": "https://offerrails.example/owner",
+ "effective_mode": "manual",
+ "items": [
+  {
+   "approved_by": "policy:auto",
+   "clicks": 23,
+   "failed_action": "",
+   "id": "9c000003-0000-4000-8000-000000000003",
+   "kind": "placement",
+   "label": "(link sponsorizzato)",
+   "link_text": "Prova Fattura Lampo",
+   "live_now": true,
+   "plugin_failed_reason": "",
+   "plugin_state": "placed",
+   "policy_rule_id": "category:invoicing",
+   "policy_rule_text": "The category is invoicing.",
+   "position": "matched_section",
+   "post_title": "Come fatturare da freelance nel 2026",
+   "rules_version": 3,
+   "summary": "Fattura Lampo crea e invia fatture elettroniche dal telefono, da €9 al mese.",
+   "undo_token": "ut_9c000003",
+   "undone_by": "",
+   "went_live_at": "2026-10-08T09:12:00Z"
+  }
+ ],
+ "paused": {
+  "account": false,
+  "offer": false,
+  "site": false
+ },
+ "session": {
+  "signed_in": true
+ },
+ "since": "2026-10-03T07:00:00Z",
+ "site_url": "https://victormotricala.it",
+ "went_live": 2,
+ "went_live_since_last": 1
+}
