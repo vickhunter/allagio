@@ -527,10 +527,26 @@ func (d *DB) RecordPlacementReceipt(ctx context.Context, siteID, id, surfaceURL,
 // insert it, before a receipt. publication_status refused is the same open
 // state as a refused receipt, so the row no longer occupies the post.
 // A receipt that already reported publication is left committed.
-// Calling it again on an already refused row is a no-op success.
+// The update is the decision. When it changes no row, the current row is
+// read again: a missing id is "missing", a row already refused is
+// "already refused", and any other state is returned as itself (a receipt
+// that landed as publisher_reported is "recorded"). That result does not
+// claim the placement was refused.
 func (d *DB) RefusePlacement(ctx context.Context, siteID, id, reason string) (string, error) {
+	tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
+SET status='pending',
+    receipt = COALESCE(receipt, '{}'::jsonb) || jsonb_build_object('publication_status', 'refused', 'refuse_reason', $3::text)
+WHERE id=$1 AND site_id=$2
+  AND status IN ('pending','approved','committed')
+  AND COALESCE(receipt->>'publication_status', '') NOT IN ('publisher_reported', 'refused')`, id, siteID, reason)
+	if err != nil {
+		return "", err
+	}
+	if tag.RowsAffected() > 0 {
+		return "refused", nil
+	}
 	var status, publication string
-	err := d.Pool.QueryRow(ctx, `SELECT status, COALESCE(receipt->>'publication_status','')
+	err = d.Pool.QueryRow(ctx, `SELECT status, COALESCE(receipt->>'publication_status','')
 FROM placement_proposals WHERE id=$1 AND site_id=$2`, id, siteID).Scan(&status, &publication)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "missing", nil
@@ -541,19 +557,13 @@ FROM placement_proposals WHERE id=$1 AND site_id=$2`, id, siteID).Scan(&status, 
 	if publication == "publisher_reported" {
 		return "recorded", nil
 	}
+	if publication == "refused" && (status == "pending" || status == "approved" || status == "committed") {
+		return "already refused", nil
+	}
 	if status != "pending" && status != "approved" && status != "committed" {
 		return "unavailable", nil
 	}
-	_, err = d.Pool.Exec(ctx, `UPDATE placement_proposals
-SET status='pending',
-    receipt = COALESCE(receipt, '{}'::jsonb) || jsonb_build_object('publication_status', 'refused', 'refuse_reason', $3::text)
-WHERE id=$1 AND site_id=$2
-  AND status IN ('pending','approved','committed')
-  AND COALESCE(receipt->>'publication_status', '') <> 'publisher_reported'`, id, siteID, reason)
-	if err != nil {
-		return "", err
-	}
-	return "refused", nil
+	return status, nil
 }
 
 func (d *DB) TouchPlacementContact(ctx context.Context, siteID string, at time.Time) error {

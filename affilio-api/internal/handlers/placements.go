@@ -517,8 +517,12 @@ func (h *PlacementsHandler) Refuse(c *gin.Context) {
 		writeNamedConflict(c, "receipt_recorded")
 	case "unavailable":
 		writeNamedConflict(c, "placement_unavailable")
-	default:
+	case "already refused":
+		c.JSON(http.StatusOK, gin.H{"status": "already refused", "publication_status": "refused", "placement_id": c.Param("id")})
+	case "refused":
 		c.JSON(http.StatusOK, gin.H{"status": "pending", "publication_status": "refused", "placement_id": c.Param("id")})
+	default:
+		writeNamedConflict(c, "placement_unavailable")
 	}
 }
 
