@@ -57,7 +57,7 @@ func newMakerRouterFull(db *database.DB, client *http.Client, claims string) *gi
 	listings := r.Group("/v1/listings")
 	listings.Use(middleware.MakerKeyAuth(db))
 	listings.GET("", offers.Listings)
-	review := &OfferReviewHandler{DB: db}
+	review := &OfferReviewHandler{DB: db, ClaimsCheck: claims}
 	admin := r.Group("/v1/offer-review")
 	admin.Use(middleware.AdminKeyAuth("admin-secret", services.NewAuditLogger(db)))
 	{

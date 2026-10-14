@@ -127,6 +127,7 @@ func publisherLegRouter(db *database.DB, verified bool) *gin.Engine {
 	site.POST("/placements", h.Prepare)
 	site.POST("/placements/:id/commit", h.Commit)
 	site.POST("/placements/:id/receipt", h.RecordReceipt)
+	site.POST("/placements/:id/refuse", h.Refuse)
 	admin := r.Group("/v1/offer-review")
 	admin.Use(middleware.AdminKeyAuth("admin-secret", nil))
 	admin.POST("/placements/:id/approve", h.Approve)

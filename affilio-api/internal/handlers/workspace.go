@@ -80,9 +80,9 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	publisher.GET("/payout-profile", h.PayoutProfile)
 	publisher.POST("/payout-profile", h.SavePayoutProfile)
 	review := api.Group("/review", h.requireOperator)
-	review.GET("/offers", (&OfferReviewHandler{DB: h.DB}).Queue)
-	review.POST("/offers/:id/approve", (&OfferReviewHandler{DB: h.DB}).Approve)
-	review.POST("/offers/:id/reject", (&OfferReviewHandler{DB: h.DB}).Reject)
+	review.GET("/offers", (&OfferReviewHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}).Queue)
+	review.POST("/offers/:id/approve", (&OfferReviewHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}).Approve)
+	review.POST("/offers/:id/reject", (&OfferReviewHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}).Reject)
 	review.POST("/payouts/batch", payouts.RunBatch)
 	if h.AssetsPath != "" {
 		public.GET("/", h.Home)

@@ -79,6 +79,7 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.GET("/v1/listing-cards/:id", h.GetListing)
 	r.POST("/v1/events", h.RecordEvent)
 	r.GET("/v1/digest", h.Digest)
+	r.GET("/v1/maker/digest", h.MakerDigest)
 	r.GET("/v1/account/digest", h.AccountDigest)
 	r.GET("/v1/account/projects", h.AccountProjects)
 	r.POST("/v1/account-keys", h.CreateAccountKey)
@@ -382,7 +383,7 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 			path = entry.DefaultInstallPath(source)
 		}
 		mode := entry.DefaultMode(source)
-		h.finishSetup(c, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn, source, h.claims()), actor.SiteID)
+		h.finishSetup(c, setupJSON(database.SetupSettings{Role: role, InstallPath: path, Mode: mode, ModeShown: mode}, false, human, signedIn, source, h.claims(), false), actor.SiteID)
 		return
 	}
 	if err != nil {
@@ -394,7 +395,12 @@ func (h *AgentEntry) GetSetup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings unavailable"})
 		return
 	}
-	h.finishSetup(c, setupJSON(saved, true, human, signedIn, source, h.claims()), actor.SiteID)
+	held, holdErr := h.yoloHeld(c, actor.SiteID, true, saved.Mode)
+	if holdErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings unavailable"})
+		return
+	}
+	h.finishSetup(c, setupJSON(saved, true, human, signedIn, source, h.claims(), held), actor.SiteID)
 }
 
 type setupCommission struct {
@@ -502,7 +508,12 @@ func (h *AgentEntry) PutSetup(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
 		return
 	}
-	h.finishSetup(c, setupJSON(saved, true, human, true, source, h.claims()), owner.SiteID)
+	held, holdErr := h.yoloHeld(c, owner.SiteID, true, saved.Mode)
+	if holdErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "settings were not saved"})
+		return
+	}
+	h.finishSetup(c, setupJSON(saved, true, human, true, source, h.claims(), held), owner.SiteID)
 }
 
 func (h *AgentEntry) applySetupMode(c *gin.Context, owner *database.Owner, saved database.SetupSettings) error {
@@ -670,6 +681,11 @@ func (h *AgentEntry) putMode(c *gin.Context, scope string) {
 		return
 	}
 	next.Version = version
+	if scope == "site" {
+		next.SiteID = c.Param("id")
+	} else {
+		next.OfferID = c.Param("id")
+	}
 	h.writePolicy(c, next, "policy")
 }
 
@@ -770,7 +786,7 @@ func (h *AgentEntry) DecidePlacement(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "offer lookup failed"})
 		return
 	}
-	boxes, err := h.DB.CountPlacementBoxes(c.Request.Context(), siteID, placement.SurfaceURL, placement.ID)
+	boxes, err := h.DB.CountPlacementBoxes(c.Request.Context(), siteID, placement.SurfaceURL, placement.ID, 0)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "placement lookup failed"})
 		return
@@ -1002,6 +1018,14 @@ func (h *AgentEntry) digestCaller(c *gin.Context) (owner *database.Owner, actor 
 }
 
 func (h *AgentEntry) Digest(c *gin.Context) {
+	if c.GetHeader("X-Maker-Key") != "" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "maker key cannot read the owner digest",
+			"reason":  "forbidden_key_type",
+			"message": "Read this maker's offers with GET /v1/maker/digest.",
+		})
+		return
+	}
 	owner, _, offerFilter, keyed, ok := h.digestCaller(c)
 	if !ok {
 		return
@@ -1013,7 +1037,7 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 	}
 	floor := time.Unix(0, 0).UTC()
 	if since != nil {
-		floor = *since
+		floor = since.UTC()
 	}
 	items := []gin.H{}
 	if owner.SiteID != "" {
@@ -1034,6 +1058,10 @@ func (h *AgentEntry) Digest(c *gin.Context) {
 	if owner.MakerID != "" {
 		offers, err := h.DB.DigestOffers(c.Request.Context(), owner.MakerID, floor)
 		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+			return
+		}
+		if err = h.annotateOfferReviews(c, offers); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
 			return
 		}
@@ -1345,7 +1373,7 @@ func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementU
 	if err != nil {
 		return nil, err
 	}
-	boxes, err := h.DB.CountPlacementBoxes(c.Request.Context(), row.SiteID, row.SurfaceURL, c.Param("id"))
+	boxes, err := h.DB.CountPlacementBoxes(c.Request.Context(), row.SiteID, row.SurfaceURL, c.Param("id"), 0)
 	if err != nil {
 		return nil, err
 	}
@@ -1372,7 +1400,7 @@ func (h *AgentEntry) restoreHardFailures(c *gin.Context, row database.PlacementU
 }
 
 func serverOfferData(offer database.OfferCopy) string {
-	return strings.TrimSpace(offer.ProductName + "\n" + offer.Category + "\n" + offer.Website)
+	return strings.TrimSpace(strings.Join([]string{offer.ProductName, offer.Category, offer.Website, offer.Terms, offer.Commission}, "\n"))
 }
 
 func (h *AgentEntry) PluginAck(c *gin.Context) {
@@ -1383,17 +1411,17 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 	// The plugin sends only X-Plugin-Key. A site, project, account, agent, or
 	// maker key on this route must not be able to set placed.
 	if c.GetHeader("X-API-Key") != "" || c.GetHeader("Authorization") != "" || c.GetHeader("X-Maker-Key") != "" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "plugin key required"})
+		writePluginAckForbidden(c, "plugin_key_required", "Send the plugin key in X-Plugin-Key.", "plugin key required")
 		return
 	}
 	rawKey := strings.TrimSpace(c.GetHeader("X-Plugin-Key"))
 	if rawKey == "" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "plugin key required"})
+		writePluginAckForbidden(c, "plugin_key_required", "Send the plugin key in X-Plugin-Key.", "plugin key required")
 		return
 	}
 	siteID, err := h.DB.PluginSite(c.Request.Context(), services.HashAPIKey(rawKey))
 	if err != nil || siteID == "" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "plugin key required"})
+		writePluginAckForbidden(c, "plugin_key_required", "Send the plugin key in X-Plugin-Key.", "plugin key required")
 		return
 	}
 	body, err := readJSONBody(c, 65536)
@@ -1425,7 +1453,7 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		return
 	}
 	if placement.SiteID != siteID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "placement is not on this site"})
+		writePluginAckForbidden(c, "wrong_site", "This placement is not on this site.", "placement is not on this site")
 		return
 	}
 	if req.Action == "placed" || req.Action == "restored" {
@@ -1438,7 +1466,7 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 			writeCheckDenied(c, []string{"rel_sponsored"})
 			return
 		}
-		boxes, boxErr := h.DB.CountPlacementBoxes(c.Request.Context(), siteID, placement.SurfaceURL, placement.ID)
+		boxes, boxErr := h.DB.CountPlacementBoxes(c.Request.Context(), siteID, placement.SurfaceURL, placement.ID, 0)
 		if boxErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
 			return
@@ -1602,6 +1630,29 @@ func writeCheckDenied(c *gin.Context, failures []string) {
 		return
 	}
 	c.JSON(http.StatusUnprocessableEntity, gin.H{"check_id": check.ID, "check_text": check.Text})
+}
+
+// writeClaimsDenied is the 422 for copy the offer does not support. check_id
+// and check_text stay the catalog pair. reason, message, and error name the
+// unsupported claim. error is the same sentence as message so a client that
+// only reads error does not fall back to a generic failure.
+func writeClaimsDenied(c *gin.Context, err error) {
+	check, ok := entry.FirstCheck([]string{"claims_from_offer"})
+	if !ok {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "check failed"})
+		return
+	}
+	reason := entry.ClaimReasonNumberNotInOffer
+	message := "The copy states a claim the offer does not support."
+	var mismatch entry.ClaimMismatch
+	if errors.As(err, &mismatch) && mismatch.Reason != "" {
+		reason = mismatch.Reason
+		message = mismatch.PublicMessage()
+	}
+	c.JSON(http.StatusUnprocessableEntity, gin.H{
+		"check_id": check.ID, "check_text": check.Text,
+		"reason": reason, "message": message, "error": message,
+	})
 }
 
 func (h *AgentEntry) pluginWindow() time.Duration {
@@ -1782,13 +1833,16 @@ func (h *AgentEntry) sitePolicy(c *gin.Context, siteID string) (database.Approva
 		saved, setupErr := h.DB.GetSetup(c.Request.Context(), ownerID, "publisher")
 		if setupErr == nil {
 			policy = defaultPolicy(saved.Mode)
+			policy.SiteID = siteID
 			if saved.BoxPosition != "" {
 				policy.AllowedPositions = []string{saved.BoxPosition}
 			}
 			return policy, "setup", nil
 		}
 	}
-	return defaultPolicy(entry.ModeManual), "default", nil
+	policy = defaultPolicy(entry.ModeManual)
+	policy.SiteID = siteID
+	return policy, "default", nil
 }
 
 func (h *AgentEntry) offerPolicy(c *gin.Context, offerID string) (database.ApprovalPolicy, string, error) {
@@ -1946,7 +2000,7 @@ func (h *AgentEntry) attachDigestMeta(c *gin.Context, owner *database.Owner, bod
 	}
 	floor := time.Unix(0, 0).UTC()
 	if since != nil {
-		floor = *since
+		floor = since.UTC()
 	}
 	wentSince, err := h.DB.CountWentLiveSince(c.Request.Context(), owner.SiteID, floor)
 	if err != nil {
@@ -2045,19 +2099,43 @@ func validListingURL(raw string) bool {
 	return parsed.Scheme == "https" || parsed.Scheme == "http"
 }
 
-func setupJSON(s database.SetupSettings, saved, human, signedIn bool, source string, claims entry.ClaimChecker) gin.H {
+func (h *AgentEntry) yoloHeld(c *gin.Context, siteID string, saved bool, mode string) (bool, error) {
+	if !saved || mode != entry.ModeYolo || siteID == "" || h.claims().Real() {
+		return false, nil
+	}
+	has, err := h.DB.SiteHasApprovedPlacement(c.Request.Context(), siteID)
+	if err != nil {
+		return false, err
+	}
+	return !has, nil
+}
+
+func setupJSON(s database.SetupSettings, saved, human, signedIn bool, source string, claims entry.ClaimChecker, holdYolo bool) gin.H {
 	mode := s.Mode
+	preselected := entry.DefaultMode(source)
+	// A saved yolo, including one stored only as mode_shown because an earlier
+	// mode was kept, is what the next read preselects. The source default is
+	// used only when yolo was not saved.
+	if s.Mode == entry.ModeYolo || s.ModeShown == entry.ModeYolo {
+		preselected = entry.ModeYolo
+	}
 	reason, message := "", ""
 	if claims == nil || !claims.Real() {
-		if mode == entry.ModeYolo || mode == entry.ModeAuto {
-			mode = entry.ModeManual
+		if mode == entry.ModeYolo || mode == entry.ModeAuto || s.ModeShown == entry.ModeYolo {
+			if mode == entry.ModeYolo || mode == entry.ModeAuto {
+				mode = entry.ModeManual
+			}
 			reason = entry.ClaimCheckReason
 			message = entry.ClaimCheckMessage
+			if holdYolo && s.Mode == entry.ModeYolo {
+				reason = entry.YoloAfterFirstReason
+				message = entry.YoloAfterFirstMessage
+			}
 		}
 	}
 	body := gin.H{
 		"saved": saved, "role": s.Role, "install_path": s.InstallPath, "mode": mode, "mode_shown": s.ModeShown,
-		"mode_preselected": entry.DefaultMode(source), "available_modes": entry.AvailableModes(),
+		"mode_preselected": preselected, "available_modes": entry.AvailableModes(),
 		"promote": s.Promote, "avoid_topics": listOrEmpty(s.AvoidTopics), "commission": commissionJSON(s),
 		"project_name": s.ProjectName, "listing_url": s.ListingURL, "listing_price": listingPriceJSON(s),
 		"sites_channels": listOrEmpty(s.SitesChannels), "never_topics": listOrEmpty(s.NeverTopics), "box_position": s.BoxPosition,
@@ -2105,20 +2183,158 @@ func (h *AgentEntry) digestJSON(item database.DigestItem, token string) gin.H {
 	body := gin.H{
 		"kind": item.Kind, "id": item.ID, "summary": item.Summary, "went_live_at": item.WentLiveAt.UTC().Format(time.RFC3339), "undo_token": token,
 		"plugin_state": pluginState, "live_now": item.CountsAsLive,
-		"post_title": item.PostTitle, "position": item.Position, "link_text": item.LinkText, "label": item.Label,
+		"post_title": filledDigestTitle(item), "surface_url": item.SurfaceURL, "position": filledDigestPosition(item.Position), "link_text": item.LinkText, "label": item.Label,
 		"clicks": item.Clicks, "approved_by": item.ApprovedBy, "undone_by": item.UndoneBy,
 		"policy_rule_id": ruleID, "policy_rule_text": ruleText, "rules_version": item.PolicyVersion,
 	}
 	if item.Kind == "placement" {
 		body["plugin_failed_reason"] = item.PluginFailedReason
 		body["failed_action"] = item.FailedAction
+		body["message"] = item.Summary
+	}
+	if item.Kind == "offer" {
+		status := item.Status
+		if status == "" {
+			status = "listed"
+		}
+		body["status"] = status
+		if item.ReviewReason == "" {
+			body["review_reason"] = nil
+			body["message"] = nil
+		} else {
+			body["review_reason"] = item.ReviewReason
+			body["message"] = item.ReviewMessage
+		}
 	}
 	return body
+}
+
+func (h *AgentEntry) annotateOfferReviews(c *gin.Context, items []database.DigestItem) error {
+	listedByMaker := map[string]int{}
+	for i := range items {
+		if items[i].Kind != "offer" {
+			continue
+		}
+		if items[i].Status == "" {
+			items[i].Status = "listed"
+		}
+		if items[i].Status != "submitted" {
+			items[i].ReviewReason = ""
+			items[i].ReviewMessage = ""
+			continue
+		}
+		if claimsHeld(h.ClaimsCheck) {
+			items[i].ReviewReason = reviewReasonClaims
+			items[i].ReviewMessage = reviewClaimsNotLive
+			continue
+		}
+		offer, err := h.DB.GetOfferByID(c.Request.Context(), items[i].ID)
+		if err != nil {
+			return err
+		}
+		var makerID string
+		if err = h.DB.Pool.QueryRow(c.Request.Context(), `SELECT p.maker_id::text FROM products p WHERE p.id=$1`, offer.ProductID).Scan(&makerID); err != nil {
+			return err
+		}
+		product, err := h.DB.GetProduct(c.Request.Context(), makerID, offer.ProductID)
+		if err != nil {
+			return err
+		}
+		listed, ok := listedByMaker[makerID]
+		if !ok {
+			listed, err = h.DB.CountListedOffers(c.Request.Context(), makerID)
+			if err != nil {
+				return err
+			}
+			listedByMaker[makerID] = listed
+		}
+		items[i].ReviewReason, items[i].ReviewMessage = listingReview(c.Request.Context(), h.DB, h.ClaimsCheck, *offer, *product, listed)
+	}
+	return nil
+}
+
+func writePluginAckForbidden(c *gin.Context, reason, message, compat string) {
+	c.JSON(http.StatusForbidden, gin.H{"error": compat, "reason": reason, "message": message})
+}
+
+func filledDigestTitle(item database.DigestItem) string {
+	return strings.TrimSpace(item.PostTitle)
+}
+
+func (h *AgentEntry) MakerDigest(c *gin.Context) {
+	if h.DB == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing maker key"})
+		return
+	}
+	middleware.MakerKeyAuth(h.DB)(c)
+	if c.IsAborted() {
+		return
+	}
+	makerID := c.GetString("maker_id")
+	if makerID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing maker key"})
+		return
+	}
+	offerID := strings.TrimSpace(c.Query("offer_id"))
+	scoped := c.GetString("offer_scope_id")
+	if offerID != "" {
+		if !uuidPattern.MatchString(offerID) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid offer id"})
+			return
+		}
+		if scoped != "" && scoped != offerID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "key is scoped to a different offer", "reason": "forbidden", "message": "This key can read only its own offers."})
+			return
+		}
+		_, ownerMaker, _, err := h.DB.OfferFacts(c.Request.Context(), offerID)
+		if err != nil || ownerMaker != makerID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "offer is not on this account", "reason": "forbidden", "message": "This key can read only its own offers."})
+			return
+		}
+	} else if scoped != "" {
+		offerID = scoped
+	}
+	offers, err := h.DB.MakerDigestOffers(c.Request.Context(), makerID, offerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
+	}
+	if err = h.annotateOfferReviews(c, offers); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+		return
+	}
+	items := make([]gin.H, 0, len(offers))
+	for _, item := range offers {
+		items = append(items, h.digestJSON(item, ""))
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items, "session": gin.H{"signed_in": false}})
+}
+
+func filledDigestPosition(position string) string {
+	if entry.ValidPosition(position) {
+		return position
+	}
+	return "end"
 }
 
 func (h *AgentEntry) writePolicy(c *gin.Context, policy database.ApprovalPolicy, source string) {
 	body := policyJSON(policy, source)
 	mode, reason, message := h.presentMode(policy.Mode)
+	if policy.Mode == entry.ModeYolo {
+		body["mode_preselected"] = entry.ModeYolo
+		if policy.SiteID != "" && !h.claims().Real() {
+			has, err := h.DB.SiteHasApprovedPlacement(c.Request.Context(), policy.SiteID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "mode unavailable"})
+				return
+			}
+			if !has {
+				mode = entry.ModeManual
+				reason = entry.YoloAfterFirstReason
+				message = entry.YoloAfterFirstMessage
+			}
+		}
+	}
 	body["mode"] = mode
 	if reason != "" {
 		body["approval_reason"] = reason

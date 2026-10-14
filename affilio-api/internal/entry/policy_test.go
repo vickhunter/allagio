@@ -242,7 +242,8 @@ func TestStubClaimCheckerPassesConsistentClaims(t *testing.T) {
 	log.SetOutput(&logs)
 	t.Cleanup(func() { log.SetOutput(prev) })
 	err := stub.CheckClaims("Claims Product is a solid fit. 99%", offer)
-	if err == nil || !strings.Contains(err.Error(), ClaimReasonNumberNotInOffer) {
+	var mismatch ClaimMismatch
+	if !errors.As(err, &mismatch) || mismatch.Reason != ClaimReasonNumberNotInOffer || mismatch.Claim != "99%" {
 		t.Fatalf("inconsistent claim: %v", err)
 	}
 	if !strings.Contains(logs.String(), "reason="+ClaimReasonNumberNotInOffer) {

@@ -63,6 +63,23 @@ RETURNING id`, o.Issuer, o.Subject, o.Email, o.Name, source).Scan(&o.ID)
 	if err != nil {
 		return err
 	}
+	email := strings.ToLower(strings.TrimSpace(o.Email))
+	if email != "" {
+		// A verified sign-in links an existing maker with this email when no
+		// other owner already holds it. It does not take a publisher site.
+		_, err = tx.Exec(ctx, `UPDATE owners o SET maker_id = picked.id
+FROM (
+  SELECT m.id FROM makers m
+  WHERE lower(m.email) = lower($2)
+    AND NOT EXISTS (SELECT 1 FROM owners other WHERE other.maker_id = m.id)
+  ORDER BY m.created_at ASC
+  LIMIT 1
+) picked
+WHERE o.id = $1 AND o.maker_id IS NULL`, o.ID, email)
+		if err != nil {
+			return err
+		}
+	}
 	_, err = tx.Exec(ctx, `INSERT INTO owner_sessions VALUES($1,$2,$3,NOW()+INTERVAL '8 hours')`, tokenHash, o.ID, csrf)
 	if err != nil {
 		return err

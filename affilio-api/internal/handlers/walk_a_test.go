@@ -36,6 +36,15 @@ func TestSurfaceURLProblem(t *testing.T) {
 	if surfaceURLProblem("http://evil.example/post", "127.0.0.1") == "" {
 		t.Fatal("hostname mismatch was accepted")
 	}
+	if problem := surfaceURLProblem("http://127.0.0.1:8088/post", "127.0.0.1"); problem != "" {
+		t.Fatal(problem)
+	}
+	if problem := surfaceURLProblem("https://Publisher.Example:8443/post", "publisher.example:8443"); problem != "" {
+		t.Fatal(problem)
+	}
+	if surfaceURLProblem("https://publisher.example/post", "publisher.example:8443") == "" {
+		t.Fatal("article dropped the registered port")
+	}
 }
 
 func TestPrepareSurfaceURLAllowsLocalHTTP(t *testing.T) {
