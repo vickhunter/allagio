@@ -1,3 +1,7 @@
+## October 14 — a Stripe refund waits when this product can still take the sale
+
+A Stripe refund stays pending when this product has no Stripe sale yet. Another seller's sale with the same order id does not close it. A seller report on this product in the refund currency stays pending too, because a later Stripe sale can still upgrade that report and the refund then applies. The refund is rejected and is not retried only when this product's sale for that order belongs to a different signed provider. A Lemon or Polar refund whose currency does not match the sale is rejected and is not retried. A refund that arrives before any sale stays unmatched. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 14 — a seller-report refund uses its sale's currency
 
 A seller-report refund checks currency on the sale it will match. That sale is the seller report for the order when one is in the request currency, then the newest sale in that currency. A newer sale in another currency does not reject the refund, and a refund does not reverse an older seller report in a different currency. A Stripe refund whose order exists only under another provider is rejected and is not retried. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.

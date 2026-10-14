@@ -305,7 +305,15 @@ func TestRefundTrustAcceptsOnlyEqualOrHigherSource(t *testing.T) {
 		rec, body := fx.refund(tc.refund, objectID, "evt-"+objectID, 10000)
 		fx.refuseGuarantee(rec)
 		if tc.unmatched {
-			if tc.refund == "provider_verified" {
+			if tc.sale == "seller_reported" && tc.refund == "provider_verified" {
+				if rec.Code != http.StatusAccepted || body["status"] != "pending" {
+					t.Fatalf("upgradeable report closed the stripe refund: %d %v", rec.Code, body)
+				}
+				var processed bool
+				if err := fx.db.Pool.QueryRow(context.Background(), `SELECT processed_at IS NOT NULL FROM webhook_events WHERE provider='stripe' AND provider_event_id=$1`, "evt-"+objectID).Scan(&processed); err != nil || processed {
+					t.Fatalf("upgradeable report marked the refund processed: %v %v", processed, err)
+				}
+			} else if tc.refund == "provider_verified" {
 				if rec.Code != http.StatusOK || body["status"] != "rejected" {
 					t.Fatalf("stripe refund matched %s: %d %v", tc.sale, rec.Code, body)
 				}
@@ -1156,8 +1164,12 @@ func TestStripeRefundMatchesOnlyItsOwnSale(t *testing.T) {
 
 	fx.sell("seller_reported", "order-stripe-of-report")
 	rec, body = fx.refund("provider_verified", "order-stripe-of-report", "evt-stripe-of-report", 10000)
-	if rec.Code != http.StatusOK || body["status"] != "rejected" {
-		t.Fatalf("stripe refund matched the seller report: %d %v", rec.Code, body)
+	if rec.Code != http.StatusAccepted || body["status"] != "pending" {
+		t.Fatalf("seller report closed the stripe refund: %d %v", rec.Code, body)
+	}
+	var reportProcessed bool
+	if err = fx.db.Pool.QueryRow(context.Background(), `SELECT processed_at IS NOT NULL FROM webhook_events WHERE provider='stripe' AND provider_event_id='evt-stripe-of-report'`).Scan(&reportProcessed); err != nil || reportProcessed {
+		t.Fatalf("seller report marked the refund processed: %v %v", reportProcessed, err)
 	}
 	if !moneyNear(fx.pendingForSeller("order-stripe-of-report"), 20) {
 		t.Fatalf("stripe refund reversed the seller report: %v", fx.pendingForSeller("order-stripe-of-report"))
@@ -1168,6 +1180,135 @@ func TestStripeRefundMatchesOnlyItsOwnSale(t *testing.T) {
 	}
 	if !moneyNear(fx.pendingForSeller("order-stripe-of-report"), 20) {
 		t.Fatalf("direct stripe refund reversed the seller report: %v", fx.pendingForSeller("order-stripe-of-report"))
+	}
+}
+
+func TestStripeRefundWaitsForAnUpgradeableReport(t *testing.T) {
+	fx := newTrustFixture(t)
+	fx.sell("seller_reported", "order-upgrade-later")
+	rec, body := fx.refund("provider_verified", "order-upgrade-later", "evt-upgrade-later", 10000)
+	if rec.Code != http.StatusAccepted || body["status"] != "pending" {
+		t.Fatalf("seller report closed the stripe refund: %d %v", rec.Code, body)
+	}
+	var processed bool
+	if err := fx.db.Pool.QueryRow(context.Background(), `SELECT processed_at IS NOT NULL FROM webhook_events WHERE provider='stripe' AND provider_event_id='evt-upgrade-later'`).Scan(&processed); err != nil || processed {
+		t.Fatalf("refund marked processed: processed %v err %v", processed, err)
+	}
+	if !moneyNear(fx.pendingForSeller("order-upgrade-later"), 20) {
+		t.Fatalf("pending refund reversed the report: %v", fx.pendingForSeller("order-upgrade-later"))
+	}
+	payload := stripeSalePayload("evt-upgrade-later-sale", "order-upgrade-later", fx.clickID, 10000)
+	object := payload["data"].(map[string]interface{})["object"].(map[string]interface{})
+	object["metadata"] = map[string]interface{}{"dtr_product_id": fx.productID}
+	rec, body = sendScopedStripeEvent(t, fx.r, fx.productID, payload, testStripeSecret)
+	if rec.Code != http.StatusOK || body["status"] != "duplicate" || body["trust_level"] != "provider_verified" {
+		t.Fatalf("stripe sale did not upgrade the report: %d %v", rec.Code, body)
+	}
+	if _, err := fx.db.Pool.Exec(context.Background(), `UPDATE webhook_events SET next_attempt_at=NOW() WHERE provider_event_id='evt-upgrade-later'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&WebhooksHandler{DB: fx.db}).ReconcilePending(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !moneyNear(fx.pendingForSeller("order-upgrade-later"), 0) {
+		t.Fatalf("refund after upgrade left commission %v", fx.pendingForSeller("order-upgrade-later"))
+	}
+	provider, _, _, _, sales := fx.saleRow("order-upgrade-later")
+	if provider != "stripe" || sales != 1 {
+		t.Fatalf("upgraded sale provider %s rows %d", provider, sales)
+	}
+	if got, want := fx.refundSaleID("order-upgrade-later", "stripe"), fx.saleID("order-upgrade-later", "stripe"); got != want {
+		t.Fatalf("refund linked %s want %s", got, want)
+	}
+}
+
+func TestStripeRefundWaitsWhenAnotherSellerHasTheOrder(t *testing.T) {
+	sellerA := newTrustFixture(t)
+	sellerB := sellerA.anotherSeller()
+	sellerB.sell("seller_signed_webhook", "order-shared-seller")
+	rec, body := sellerA.refund("provider_verified", "order-shared-seller", "evt-shared-seller", 10000)
+	if rec.Code != http.StatusAccepted || body["status"] != "pending" {
+		t.Fatalf("other seller closed the stripe refund: %d %v", rec.Code, body)
+	}
+	var processed bool
+	if err := sellerA.db.Pool.QueryRow(context.Background(), `SELECT processed_at IS NOT NULL FROM webhook_events WHERE provider='stripe' AND provider_event_id='evt-shared-seller'`).Scan(&processed); err != nil || processed {
+		t.Fatalf("refund marked processed: processed %v err %v", processed, err)
+	}
+	if !moneyNear(sellerB.pendingForSeller("order-shared-seller"), 20) {
+		t.Fatalf("other seller commission %v", sellerB.pendingForSeller("order-shared-seller"))
+	}
+	payload := stripeSalePayload("evt-shared-seller-sale", "order-shared-seller", sellerA.clickID, 10000)
+	object := payload["data"].(map[string]interface{})["object"].(map[string]interface{})
+	object["metadata"] = map[string]interface{}{"dtr_product_id": sellerA.productID}
+	rec, body = sendScopedStripeEvent(t, sellerA.r, sellerA.productID, payload, testStripeSecret)
+	if rec.Code != http.StatusOK || body["status"] != "recorded" || body["trust_level"] != "provider_verified" {
+		t.Fatalf("stripe sale: %d %v", rec.Code, body)
+	}
+	if !moneyNear(sellerA.pendingForSeller("order-shared-seller"), 20) {
+		t.Fatalf("seller A commission before refund replay %v", sellerA.pendingForSeller("order-shared-seller"))
+	}
+	if _, err := sellerA.db.Pool.Exec(context.Background(), `UPDATE webhook_events SET next_attempt_at=NOW() WHERE provider_event_id='evt-shared-seller'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&WebhooksHandler{DB: sellerA.db}).ReconcilePending(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !moneyNear(sellerA.pendingForSeller("order-shared-seller"), 0) {
+		t.Fatalf("seller A commission after refund %v", sellerA.pendingForSeller("order-shared-seller"))
+	}
+	if !moneyNear(sellerB.pendingForSeller("order-shared-seller"), 20) {
+		t.Fatalf("other seller commission changed: %v", sellerB.pendingForSeller("order-shared-seller"))
+	}
+	if got, want := sellerA.refundSaleID("order-shared-seller", "stripe"), sellerA.saleID("order-shared-seller", "stripe"); got != want {
+		t.Fatalf("refund linked %s want %s", got, want)
+	}
+}
+
+func TestSignedRefundCurrencyMismatchIsRejected(t *testing.T) {
+	fx := newTrustFixture(t)
+	fx.sell("seller_signed_webhook", "order-cur-mismatch")
+	payload := lemonOrder("order_refunded", "order-cur-mismatch", "", 0, "provider_verified")
+	payload["data"].(map[string]interface{})["attributes"].(map[string]interface{})["currency"] = "EUR"
+	rec, body := fx.sendLemon(payload)
+	if rec.Code != http.StatusOK || body["status"] != "rejected" {
+		t.Fatalf("lemon currency mismatch stayed retryable: %d %v", rec.Code, body)
+	}
+	if !moneyNear(fx.pendingForSeller("order-cur-mismatch"), 20) {
+		t.Fatalf("lemon currency mismatch moved commission: %v", fx.pendingForSeller("order-cur-mismatch"))
+	}
+	var processed bool
+	if err := fx.db.Pool.QueryRow(context.Background(), `SELECT processed_at IS NOT NULL FROM webhook_events WHERE provider='lemonsqueezy' AND provider_event_id='order_refunded:order-cur-mismatch'`).Scan(&processed); err != nil || !processed {
+		t.Fatalf("lemon currency mismatch was not marked processed: %v %v", processed, err)
+	}
+	replay, replayBody := fx.sendLemon(payload)
+	if replay.Code != http.StatusOK || replayBody["status"] == "unmatched" {
+		t.Fatalf("lemon currency mismatch was retried: %d %v", replay.Code, replayBody)
+	}
+	if !moneyNear(fx.pendingForSeller("order-cur-mismatch"), 20) {
+		t.Fatalf("lemon replay moved commission: %v", fx.pendingForSeller("order-cur-mismatch"))
+	}
+
+	fx.sendPolarSale("order-polar-cur", fx.clickID, "USD", 10000)
+	rec, body = fx.sendPolar("order.refunded", "order-polar-cur", "", "EUR", 0)
+	if rec.Code != http.StatusOK || body["status"] != "rejected" {
+		t.Fatalf("polar currency mismatch stayed retryable: %d %v", rec.Code, body)
+	}
+	status, amount := fx.commissionLedger("order-polar-cur", "polar")
+	if status != "pending" || !moneyNear(amount, 20) {
+		t.Fatalf("polar currency mismatch moved commission: %s %v", status, amount)
+	}
+	if err := fx.db.Pool.QueryRow(context.Background(), `SELECT processed_at IS NOT NULL FROM webhook_events WHERE provider='polar' AND provider_event_id='order.refunded:order-polar-cur'`).Scan(&processed); err != nil || !processed {
+		t.Fatalf("polar currency mismatch was not marked processed: %v %v", processed, err)
+	}
+
+	early := lemonOrder("order_refunded", "order-not-yet", "", 0, "")
+	rec, body = fx.sendLemon(early)
+	if rec.Code != http.StatusServiceUnavailable || body["status"] != "unmatched" {
+		t.Fatalf("refund before sale: %d %v", rec.Code, body)
+	}
+	var earlyProcessed bool
+	if err := fx.db.Pool.QueryRow(context.Background(), `SELECT processed_at IS NOT NULL FROM webhook_events WHERE provider='lemonsqueezy' AND provider_event_id='order_refunded:order-not-yet'`).Scan(&earlyProcessed); err != nil || earlyProcessed {
+		t.Fatalf("early refund was closed: %v %v", earlyProcessed, err)
 	}
 }
 

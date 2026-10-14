@@ -180,6 +180,10 @@ func (h *WebhooksHandler) processEvent(c *gin.Context, providerName string, even
 	case "refund":
 		out, err := h.DB.RecordRefund(ctx, providerName, event.EventID, event.ObjectID, event.OccurredAt, database.TrustSellerSignedWebhook, event.Currency)
 		if err != nil {
+			if errors.Is(err, database.ErrRefundCurrencyMismatch) {
+				markProcessed("rejected")
+				return webhookResult{Status: "rejected"}
+			}
 			if errors.Is(err, database.ErrConversionNotFound) {
 				return webhookResult{Status: "unmatched"}
 			}

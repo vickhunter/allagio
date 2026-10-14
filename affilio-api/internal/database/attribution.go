@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrClickNotFound      = errors.New("click not found")
-	ErrConversionNotFound = errors.New("conversion not found")
+	ErrClickNotFound          = errors.New("click not found")
+	ErrConversionNotFound     = errors.New("conversion not found")
+	ErrRefundCurrencyMismatch = errors.New("refund currency does not match the sale")
 )
 
 type MarketplaceOffer struct {
@@ -530,6 +531,22 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
  ORDER BY (cv.provider=$2) DESC, cv.created_at DESC LIMIT 1`, objectID, provider, makerID, scopeOfferID, matchProvider, requestCurrency).
 		Scan(&saleID, &campaignID, &siteID, &offerID, &clickID, &netMinor, &commissionMinor, &currency, &grossMinor, &paymentMode, &saleTrust)
 	if errors.Is(err, pgx.ErrNoRows) {
+		if requestCurrency != "" {
+			var sameSale bool
+			qerr := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM conversions cv
+JOIN offers o ON o.id=cv.offer_id
+JOIN products p ON p.id=o.product_id
+WHERE cv.provider_object_id=$1 AND $1 <> '' AND cv.kind IN ('sale','renewal')
+AND p.maker_id::text=$2
+AND ($3='' OR cv.offer_id::text=$3)
+AND (NOT $4 OR cv.provider=$5))`, objectID, makerID, scopeOfferID, matchProvider, provider).Scan(&sameSale)
+			if qerr != nil {
+				return nil, qerr
+			}
+			if sameSale {
+				return nil, ErrRefundCurrencyMismatch
+			}
+		}
 		return nil, ErrConversionNotFound
 	}
 	if err != nil {
