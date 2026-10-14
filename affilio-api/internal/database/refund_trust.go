@@ -69,11 +69,11 @@ func saleTrustRank(level string) int {
 }
 
 type refundInsert struct {
-	offerID, campaignID, provider, eventID, objectID, currency, paymentMode, trustLevel, status, reason, makerID string
-	clickID                                                                                                      *string
-	amount, commission                                                                                           float64
-	grossMinor                                                                                                   int64
-	occurredAt                                                                                                   time.Time
+	offerID, campaignID, provider, eventID, objectID, currency, paymentMode, trustLevel, status, reason, makerID, saleID string
+	clickID                                                                                                              *string
+	amount, commission                                                                                                   float64
+	grossMinor                                                                                                           int64
+	occurredAt                                                                                                           time.Time
 }
 
 func refundByEvent(ctx context.Context, tx pgx.Tx, provider, eventID, makerID string) (*RefundOutcome, bool, error) {
@@ -104,10 +104,10 @@ WHERE cv.provider=$1 AND cv.provider_event_id=$2 AND p.maker_id::text=$3`
 	return &RefundOutcome{ID: id, TrustLevel: trust, Status: RefundDuplicate, RowStatus: row, Reason: reason}, true, nil
 }
 
-func appliedRefundTotals(ctx context.Context, tx pgx.Tx, objectID, offerID string) (gross, net, commission int64, err error) {
+func appliedRefundTotals(ctx context.Context, tx pgx.Tx, saleID string) (gross, net, commission int64, err error) {
 	err = tx.QueryRow(ctx, `SELECT COALESCE(SUM(COALESCE(gross_minor,(amount*100)::bigint)),0)::bigint,
  COALESCE(SUM(amount*100),0)::bigint, COALESCE(SUM(commission_amount*100),0)::bigint
- FROM conversions WHERE provider_object_id=$1 AND offer_id=$2 AND kind='refund' AND COALESCE(refund_status,'applied')='applied'`, objectID, offerID).Scan(&gross, &net, &commission)
+ FROM conversions WHERE refunded_conversion_id=$1 AND kind='refund' AND COALESCE(refund_status,'applied')='applied'`, saleID).Scan(&gross, &net, &commission)
 	return gross, net, commission, err
 }
 
@@ -117,10 +117,10 @@ func insertRefund(ctx context.Context, tx pgx.Tx, row refundInsert) (*RefundOutc
 	if row.provider == ProviderSellerReport {
 		conflict = `ON CONFLICT (offer_id, provider_event_id) WHERE provider = 'seller_report' DO NOTHING`
 	}
-	err := tx.QueryRow(ctx, `INSERT INTO conversions(offer_id,campaign_id,click_id,provider,provider_event_id,provider_object_id,kind,amount,currency,commission_amount,occurred_at,gross_minor,payment_mode,trust_level,refund_status,refund_reason)
-VALUES($1,$2,$3,$4,$5,$6,'refund',$7,$8,$9,$10,NULLIF($11,0),$12,$13,$14,NULLIF($15,''))
+	err := tx.QueryRow(ctx, `INSERT INTO conversions(offer_id,campaign_id,click_id,provider,provider_event_id,provider_object_id,kind,amount,currency,commission_amount,occurred_at,gross_minor,payment_mode,trust_level,refund_status,refund_reason,refunded_conversion_id)
+VALUES($1,$2,$3,$4,$5,$6,'refund',$7,$8,$9,$10,NULLIF($11,0),$12,$13,$14,NULLIF($15,''),NULLIF($16,'')::uuid)
 `+conflict+` RETURNING id::text`,
-		row.offerID, row.campaignID, row.clickID, row.provider, row.eventID, row.objectID, row.amount, row.currency, row.commission, row.occurredAt, row.grossMinor, row.paymentMode, row.trustLevel, row.status, row.reason).Scan(&id)
+		row.offerID, row.campaignID, row.clickID, row.provider, row.eventID, row.objectID, row.amount, row.currency, row.commission, row.occurredAt, row.grossMinor, row.paymentMode, row.trustLevel, row.status, row.reason, row.saleID).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		existing, ok, qerr := refundByEvent(ctx, tx, row.provider, row.eventID, row.makerID)
 		if qerr != nil || ok {

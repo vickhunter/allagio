@@ -90,6 +90,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"033_click_classes.sql",
 		"034_refund_trust.sql",
 		"035_refund_seller_scope.sql",
+		"036_refund_sale_link.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)

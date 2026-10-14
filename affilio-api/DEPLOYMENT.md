@@ -26,7 +26,7 @@ This guide covers production deployment for `affilio-api` and required integrati
 - `CLAIMS_CHECK` (optional). Leave unset. Hosted is `GIN_MODE=release`, the same signal as the production startup guard, and that default is `stub`: an untrusted offer stays in review with the message "Claims are not checked yet." `off-local` keeps the four listing checks and is refused when `GIN_MODE=release`. `real` compares the listing card with the merchant page on local and dev, and a hosted server still refuses it and stays on `stub`. Do not set `real` or `off-local` on a hosted server.
 
 ## Database Migration Order
-Run migrations in this exact order, before the new binary starts. `033_click_classes.sql` adds `clicks.click_class`. The new binary reads that column on every go-link hit and digest, so apply `033_click_classes.sql` before the new binary starts. `034_refund_trust.sql` adds `conversions.trust_level`, `conversions.refund_status`, and `conversions.refund_reason`. The new binary reads those columns on every sale, refund, earnings, and digest response, so apply `034_refund_trust.sql` before the new binary starts. `035_refund_seller_scope.sql` replaces the global `(provider, provider_event_id)` unique constraint with a provider-wide index for signed webhooks and an offer-scoped index for `seller_report`. Sale and refund inserts use those indexes, so apply `035_refund_seller_scope.sql` before the new binary starts. `AUTO_MIGRATE` stays off unless it is set to `true`.
+Run migrations in this exact order, before the new binary starts. `033_click_classes.sql` adds `clicks.click_class`. The new binary reads that column on every go-link hit and digest, so apply `033_click_classes.sql` before the new binary starts. `034_refund_trust.sql` adds `conversions.trust_level`, `conversions.refund_status`, and `conversions.refund_reason`. The new binary reads those columns on every sale, refund, earnings, and digest response, so apply `034_refund_trust.sql` before the new binary starts. `035_refund_seller_scope.sql` replaces the global `(provider, provider_event_id)` unique constraint with a provider-wide index for signed webhooks and an offer-scoped index for `seller_report`. Sale and refund inserts use those indexes, so apply `035_refund_seller_scope.sql` before the new binary starts. `036_refund_sale_link.sql` adds `conversions.refunded_conversion_id`. Refund inserts write that column, so apply `036_refund_sale_link.sql` before the new binary starts. `AUTO_MIGRATE` stays off unless it is set to `true`.
 1. `internal/migrations/001_initial.sql`
 2. `internal/migrations/002_seed_programs.sql`
 3. `internal/migrations/003_add_user_program_id.sql`
@@ -62,6 +62,7 @@ Run migrations in this exact order, before the new binary starts. `033_click_cla
 33. `internal/migrations/033_click_classes.sql`
 34. `internal/migrations/034_refund_trust.sql`
 35. `internal/migrations/035_refund_seller_scope.sql`
+36. `internal/migrations/036_refund_sale_link.sql`
 
 Notes:
 - `002_seed_programs.sql` uses upsert semantics on `slug`.
@@ -69,6 +70,7 @@ Notes:
 - `033_click_classes.sql` must run before the new binary. A binary that starts first will fail reads and writes that use `clicks.click_class`.
 - `034_refund_trust.sql` must run before the new binary. A binary that starts first will fail reads and writes that use `conversions.trust_level` or `conversions.refund_status`.
 - `035_refund_seller_scope.sql` must run before the new binary. A binary that starts first will fail sale and refund inserts that rely on the seller-scoped event index.
+- `036_refund_sale_link.sql` must run before the new binary. A binary that starts first will fail refund inserts that write `conversions.refunded_conversion_id`.
 
 ## Build and Release
 1. Build image:

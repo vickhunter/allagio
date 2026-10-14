@@ -516,14 +516,14 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
 	if fullRefund {
 		cumulativeMinor = grossMinor
 	}
-	priorGross, priorNet, priorCommission, err := appliedRefundTotals(ctx, tx, objectID, offerID)
+	priorGross, priorNet, priorCommission, err := appliedRefundTotals(ctx, tx, saleID)
 	if err != nil {
 		return nil, err
 	}
 	if cumulativeMinor <= 0 {
 		out, err := insertRefund(ctx, tx, refundInsert{
 			offerID: offerID, campaignID: campaignID, clickID: clickID, provider: provider, eventID: eventID, objectID: objectID,
-			currency: currency, occurredAt: occurredAt, paymentMode: paymentMode, trustLevel: trustLevel, makerID: makerID,
+			currency: currency, occurredAt: occurredAt, paymentMode: paymentMode, trustLevel: trustLevel, makerID: makerID, saleID: saleID,
 			status: RefundRejected, reason: ReasonInvalidRefundAmount,
 		})
 		return commitRefund(ctx, tx, out, err)
@@ -538,14 +538,14 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
 		out, err := insertRefund(ctx, tx, refundInsert{
 			offerID: offerID, campaignID: campaignID, clickID: clickID, provider: provider, eventID: eventID, objectID: objectID,
 			amount: float64(amount) / 100, currency: currency, commission: float64(commission) / 100, occurredAt: occurredAt,
-			grossMinor: incremental, paymentMode: paymentMode, trustLevel: trustLevel, makerID: makerID, status: RefundPendingReview, reason: ReasonRefundTrustBelowSale,
+			grossMinor: incremental, paymentMode: paymentMode, trustLevel: trustLevel, makerID: makerID, saleID: saleID, status: RefundPendingReview, reason: ReasonRefundTrustBelowSale,
 		})
 		return commitRefund(ctx, tx, out, err)
 	}
 	if cumulativeMinor > grossMinor {
 		out, err := insertRefund(ctx, tx, refundInsert{
 			offerID: offerID, campaignID: campaignID, clickID: clickID, provider: provider, eventID: eventID, objectID: objectID,
-			currency: currency, occurredAt: occurredAt, paymentMode: paymentMode, trustLevel: trustLevel, makerID: makerID,
+			currency: currency, occurredAt: occurredAt, paymentMode: paymentMode, trustLevel: trustLevel, makerID: makerID, saleID: saleID,
 			status: RefundRejected, reason: ReasonRefundExceedsRemaining,
 		})
 		return commitRefund(ctx, tx, out, err)
@@ -558,7 +558,7 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
 	out, err := insertRefund(ctx, tx, refundInsert{
 		offerID: offerID, campaignID: campaignID, clickID: clickID, provider: provider, eventID: eventID, objectID: objectID,
 		amount: float64(netDelta) / 100, currency: currency, commission: float64(commissionDelta) / 100, occurredAt: occurredAt,
-		grossMinor: cumulativeMinor - priorGross, paymentMode: paymentMode, trustLevel: trustLevel, makerID: makerID, status: RefundApplied,
+		grossMinor: cumulativeMinor - priorGross, paymentMode: paymentMode, trustLevel: trustLevel, makerID: makerID, saleID: saleID, status: RefundApplied,
 	})
 	if err != nil || out.Status == RefundDuplicate {
 		return out, err
@@ -579,7 +579,7 @@ func (d *DB) RecordPartialRefund(ctx context.Context, provider, eventID, objectI
 	}
 	if ledgerStatus == "pending" && cumulativeMinor == grossMinor {
 		_, err = tx.Exec(ctx, `UPDATE ledger_entries SET status='reversed' WHERE status='pending' AND conversion_id IN
-  (SELECT id FROM conversions WHERE provider_object_id=$1 AND offer_id=$2)`, objectID, offerID)
+  (SELECT id FROM conversions WHERE id=$1 OR refunded_conversion_id=$1)`, saleID)
 	} else if commissionDelta > 0 {
 		_, err = tx.Exec(ctx, `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency,status,clears_at)
   VALUES($1,$2,'clawback',$3,$4,$5,$6)`, siteID, out.ID, -float64(commissionDelta)/100, currency, ledgerStatus, clearsAt)

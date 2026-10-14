@@ -988,6 +988,135 @@ WHERE cv.provider_object_id=$1 AND cv.kind='sale' AND le.kind='commission' AND m
 	return status
 }
 
+func TestRefundFollowsTheSaleItMatched(t *testing.T) {
+	fx := newTrustFixture(t)
+	fx.pairSales("order-report-refund")
+	rec, body := fx.reportRefund("order-report-refund", "evt-report-full", -1, "provider_verified")
+	if rec.Code != http.StatusOK || body["status"] != "refunded" || body["refund_status"] != "applied" {
+		t.Fatalf("reported full refund: %d %v", rec.Code, body)
+	}
+	reportStatus, reportAmount := fx.commissionLedger("order-report-refund", "seller_report")
+	signedStatus, signedAmount := fx.commissionLedger("order-report-refund", "stripe")
+	if reportStatus != "reversed" || !moneyNear(reportAmount, 20) {
+		t.Fatalf("reported commission: %s %v", reportStatus, reportAmount)
+	}
+	if signedStatus != "pending" || !moneyNear(signedAmount, 20) {
+		t.Fatalf("reported refund changed the signed sale: %s %v", signedStatus, signedAmount)
+	}
+	if clawbacks := fx.clawbacks("order-report-refund"); clawbacks != 0 {
+		t.Fatalf("reported refund inserted %d clawbacks", clawbacks)
+	}
+	if got, want := fx.refundSaleID("order-report-refund", "seller_report"), fx.saleID("order-report-refund", "seller_report"); got != want {
+		t.Fatalf("reported refund linked %s, sale %s", got, want)
+	}
+
+	fx.pairSales("order-signed-refund")
+	rec, body = fx.refund("provider_verified", "order-signed-refund", "evt-signed-full", 10000)
+	if rec.Code != http.StatusOK || body["status"] != "refunded" || body["refund_status"] != "applied" {
+		t.Fatalf("signed full refund: %d %v", rec.Code, body)
+	}
+	reportStatus, reportAmount = fx.commissionLedger("order-signed-refund", "seller_report")
+	signedStatus, signedAmount = fx.commissionLedger("order-signed-refund", "stripe")
+	if signedStatus != "reversed" || !moneyNear(signedAmount, 20) {
+		t.Fatalf("signed commission: %s %v", signedStatus, signedAmount)
+	}
+	if reportStatus != "pending" || !moneyNear(reportAmount, 20) {
+		t.Fatalf("signed refund counted against the reported sale: %s %v", reportStatus, reportAmount)
+	}
+	if got, want := fx.refundSaleID("order-signed-refund", "stripe"), fx.saleID("order-signed-refund", "stripe"); got != want {
+		t.Fatalf("signed refund linked %s, sale %s", got, want)
+	}
+	rec, body = fx.reportRefund("order-signed-refund", "evt-report-after-signed", -1, "provider_verified")
+	if rec.Code != http.StatusOK || body["status"] != "refunded" || body["refund_status"] != "applied" {
+		t.Fatalf("reported refund after signed refund: %d %v", rec.Code, body)
+	}
+	reportStatus, _ = fx.commissionLedger("order-signed-refund", "seller_report")
+	signedStatus, _ = fx.commissionLedger("order-signed-refund", "stripe")
+	if reportStatus != "reversed" || signedStatus != "reversed" {
+		t.Fatalf("after both refunds report %s signed %s", reportStatus, signedStatus)
+	}
+	var reportedRefund float64
+	if err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT amount FROM conversions WHERE provider_object_id='order-signed-refund' AND kind='refund' AND provider='seller_report'`).Scan(&reportedRefund); err != nil {
+		t.Fatal(err)
+	}
+	if !moneyNear(reportedRefund, 100) {
+		t.Fatalf("reported refund amount %v", reportedRefund)
+	}
+	if clawbacks := fx.clawbacks("order-signed-refund"); clawbacks != 0 {
+		t.Fatalf("signed refund inserted %d clawbacks", clawbacks)
+	}
+}
+
+func (fx *trustFixture) pairSales(objectID string) {
+	fx.t.Helper()
+	fx.reportSale(objectID, "provider_verified")
+	other := fx.anotherClick()
+	payload := stripeSalePayload("evt-sale-"+objectID, objectID, other, 10000)
+	object := payload["data"].(map[string]interface{})["object"].(map[string]interface{})
+	object["metadata"] = map[string]interface{}{"dtr_product_id": fx.productID}
+	rec, body := sendScopedStripeEvent(fx.t, fx.r, fx.productID, payload, testStripeSecret)
+	if rec.Code != http.StatusOK || body["status"] != "recorded" || body["trust_level"] != "provider_verified" {
+		fx.t.Fatalf("signed twin %s: %d %v", objectID, rec.Code, body)
+	}
+	var offers int
+	if err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT COUNT(DISTINCT offer_id) FROM conversions WHERE provider_object_id=$1 AND kind='sale'`, objectID).Scan(&offers); err != nil {
+		fx.t.Fatal(err)
+	}
+	if offers != 1 || len(fx.saleFacts(objectID)) != 2 {
+		fx.t.Fatalf("pair %s offers %d sales %v", objectID, offers, fx.saleFacts(objectID))
+	}
+}
+
+func (fx *trustFixture) commissionLedger(objectID, provider string) (status string, amount float64) {
+	fx.t.Helper()
+	err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT le.status, le.amount
+FROM ledger_entries le
+JOIN conversions cv ON cv.id = le.conversion_id
+WHERE cv.provider_object_id=$1 AND cv.kind='sale' AND cv.provider=$2 AND le.kind='commission'`, objectID, provider).Scan(&status, &amount)
+	if err != nil {
+		fx.t.Fatalf("ledger %s %s: %v", objectID, provider, err)
+	}
+	return status, amount
+}
+
+func (fx *trustFixture) saleID(objectID, provider string) string {
+	fx.t.Helper()
+	var id string
+	err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT id::text FROM conversions WHERE provider_object_id=$1 AND kind='sale' AND provider=$2`, objectID, provider).Scan(&id)
+	if err != nil {
+		fx.t.Fatalf("sale id %s %s: %v", objectID, provider, err)
+	}
+	return id
+}
+
+func (fx *trustFixture) refundSaleID(objectID, provider string) string {
+	fx.t.Helper()
+	var id string
+	err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT refunded_conversion_id::text FROM conversions WHERE provider_object_id=$1 AND kind='refund' AND provider=$2`, objectID, provider).Scan(&id)
+	if err != nil {
+		fx.t.Fatalf("refund link %s %s: %v", objectID, provider, err)
+	}
+	return id
+}
+
+func (fx *trustFixture) clawbacks(objectID string) int {
+	fx.t.Helper()
+	var n int
+	err := fx.db.Pool.QueryRow(context.Background(), `
+SELECT COUNT(*) FROM ledger_entries le
+JOIN conversions cv ON cv.id = le.conversion_id
+WHERE cv.provider_object_id=$1 AND le.kind='clawback'`, objectID).Scan(&n)
+	if err != nil {
+		fx.t.Fatal(err)
+	}
+	return n
+}
+
 func TestRefundTrustMigrationIsIdempotent(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -1010,6 +1139,16 @@ func TestRefundTrustMigrationIsIdempotent(t *testing.T) {
 	}
 	if _, err = db.Pool.Exec(context.Background(), string(scope)); err != nil {
 		t.Fatalf("second seller-scope apply: %v", err)
+	}
+	link, err := os.ReadFile(filepath.Join("..", "migrations", "036_refund_sale_link.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Pool.Exec(context.Background(), string(link)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Pool.Exec(context.Background(), string(link)); err != nil {
+		t.Fatalf("second sale-link apply: %v", err)
 	}
 	_, err = db.Pool.Exec(context.Background(), `
 INSERT INTO conversions (provider, provider_event_id, kind, amount, currency, occurred_at, trust_level)
