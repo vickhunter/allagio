@@ -438,6 +438,50 @@ class ReleaseTests(unittest.TestCase):
         for relative in needed:
             self.assertIn(release.PLUGIN_ROOT + relative, names)
 
+    def _admin_src_plugin(self, directory, built):
+        plugin = Path(directory) / "src-plugin"
+        (plugin / "admin" / "src").mkdir(parents=True)
+        (plugin / "admin" / "build").mkdir(parents=True)
+        (plugin / "admin" / "src" / "dashboard.js").write_text("export const label = 'Analisi in corso';\n", encoding="utf-8")
+        (plugin / "admin" / "build" / "dashboard.js").write_text(built, encoding="utf-8")
+        return plugin
+
+    def test_fresh_admin_bundle_matches_source(self):
+        release.validate_built_admin_js(release.ROOT / "affilio-wp")
+        source = "export const label = 'Analisi in corso';\n"
+        release.validate_plugin(plugin_archive(
+            extra=("affilio-wp/admin/src/dashboard.js", source),
+            bodies={"affilio-wp/admin/build/dashboard.js": "(function () { return 'Analisi in corso'; })();\n"},
+        ))
+        with tempfile.TemporaryDirectory() as directory:
+            plugin = self._admin_src_plugin(directory, "(function () { return 'Analisi in corso'; })();\n")
+            release.validate_built_admin_js(plugin)
+
+    def test_stale_admin_bundle_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            dest = Path(directory) / "affilio-wp"
+            shutil.copytree(release.ROOT / "affilio-wp", dest, ignore=shutil.ignore_patterns("node_modules"))
+            bundle = dest / "admin/build/landing-scene.bundle.js"
+            bundle.write_bytes(bundle.read_bytes() + b"\n/* stale */\n")
+            with self.assertRaisesRegex(release.ReleaseError, r"admin/build/landing-scene\.bundle\.js"):
+                release.validate_built_admin_js(dest)
+        source = "export const label = 'Analisi in corso';\n"
+        stale = plugin_archive(
+            extra=("affilio-wp/admin/src/dashboard.js", source),
+            bodies={"affilio-wp/admin/build/dashboard.js": "(function () { return 'Analisi completata'; })();\n"},
+        )
+        with self.assertRaisesRegex(release.ReleaseError, "Analisi in corso"):
+            release.validate_plugin(stale)
+        with tempfile.TemporaryDirectory() as directory:
+            plugin = self._admin_src_plugin(directory, "(function () { return 'Analisi completata'; })();\n")
+            with self.assertRaisesRegex(release.ReleaseError, "Analisi in corso"):
+                release.validate_built_admin_js(plugin)
+        commented = plugin_archive(
+            extra=("affilio-wp/admin/src/dashboard.js", "// 'Analisi in corso'\nconst label = 'Analisi completata';\n"),
+            bodies={"affilio-wp/admin/build/dashboard.js": "(function () { return 'Analisi completata'; })();\n"},
+        )
+        release.validate_plugin(commented)
+
     def test_plugin_zip_rejects_stored_entries(self):
         output = io.BytesIO()
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:

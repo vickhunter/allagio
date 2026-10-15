@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 import argparse
 import base64
+import hashlib
 import io
 import json
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 from urllib import error, parse, request
 import zipfile
 
@@ -382,6 +385,179 @@ def omit_from_plugin_zip(path):
     return path.startswith(PLUGIN_ROOT + "admin/build/") and hosted_build_file(PurePosixPath(path).name)
 
 
+_canonical_admin_js_ok = False
+_JS_ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "'": "'", '"': '"', "\\": "\\", "`": "`"}
+
+
+def _js_unescape(value):
+    chars = []
+    index = 0
+    while index < len(value):
+        if value[index] == "\\" and index + 1 < len(value):
+            chars.append(_JS_ESCAPES.get(value[index + 1], value[index + 1]))
+            index += 2
+            continue
+        chars.append(value[index])
+        index += 1
+    return "".join(chars)
+
+
+def user_visible_string_literals(text):
+    """UI copy a built bundle has to keep, such as an Italian label."""
+    found = []
+    seen = set()
+    index = 0
+    length = len(text)
+    while index < length:
+        character = text[index]
+        if character in "'\"`":
+            index += 1
+            raw = []
+            while index < length:
+                if text[index] == "\\":
+                    raw.append(text[index])
+                    index += 1
+                    if index < length:
+                        raw.append(text[index])
+                        index += 1
+                    continue
+                if text[index] == character:
+                    index += 1
+                    break
+                raw.append(text[index])
+                index += 1
+            literal = "".join(raw)
+            if character == "`" and "${" in literal:
+                continue
+            value = _js_unescape(literal)
+            visible = any(char.isalpha() for char in value) and (
+                any(char.isspace() for char in value) or any(ord(char) > 127 and char.isalpha() for char in value)
+            )
+            if visible and value not in seen:
+                seen.add(value)
+                found.append(value)
+            continue
+        if text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            index = length if end < 0 else end + 2
+            continue
+        if text.startswith("//", index):
+            end = text.find("\n", index)
+            index = length if end < 0 else end
+            continue
+        index += 1
+    return found
+
+
+def _built_admin_files(build_dir):
+    files = {}
+    if not build_dir.is_dir():
+        return files
+    for path in sorted(build_dir.iterdir()):
+        if not path.is_file():
+            continue
+        if path.suffix == ".js" or path.name.endswith(".js.LEGAL.txt"):
+            files[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return files
+
+
+def _npm(build_dir, args):
+    try:
+        result = subprocess.run(args, cwd=build_dir, capture_output=True, text=True, timeout=180)
+    except (OSError, subprocess.TimeoutExpired):
+        raise ReleaseError("Admin JS rebuild could not run; check node, npm, and the admin/build toolchain.") from None
+    require(result.returncode == 0, "Admin JS rebuild failed; inspect npm locally. Command output was withheld.")
+
+
+def _fresh_admin_hashes(plugin_dir):
+    package_path = plugin_dir / "admin" / "build" / "package.json"
+    if not package_path.is_file():
+        return None
+    try:
+        manifest = json.loads(package_path.read_text())
+    except ValueError:
+        return None
+    if "build" not in manifest.get("scripts", {}):
+        return None
+    with tempfile.TemporaryDirectory() as directory:
+        copy = Path(directory) / "affilio-wp"
+        shutil.copytree(plugin_dir, copy, ignore=shutil.ignore_patterns("node_modules"))
+        build_dir = copy / "admin" / "build"
+        _npm(build_dir, ["npm", "ci", "--ignore-scripts"])
+        _npm(build_dir, ["npm", "run", "build"])
+        first = _built_admin_files(build_dir)
+        _npm(build_dir, ["npm", "run", "build"])
+        second = _built_admin_files(build_dir)
+    if not first or first != second:
+        return None
+    return first
+
+
+def _bundle_text(bundles, source_name):
+    if source_name in bundles:
+        return bundles[source_name]
+    return "\n".join(bundles.values())
+
+
+def _require_admin_src_strings(plugin_dir):
+    src = plugin_dir / "admin" / "src"
+    require(src.is_dir(), "Admin JS rebuild is not deterministic and admin/src is missing.")
+    sources = sorted(path for path in src.rglob("*.js") if path.is_file())
+    require(sources, "Admin JS rebuild is not deterministic and admin/src has no scripts.")
+    bundles = {}
+    build_dir = plugin_dir / "admin" / "build"
+    if build_dir.is_dir():
+        for path in sorted(build_dir.glob("*.js")):
+            bundles[path.name] = path.read_text(encoding="utf-8", errors="replace")
+    for source in sources:
+        literals = user_visible_string_literals(source.read_text(encoding="utf-8", errors="replace"))
+        bundle = _bundle_text(bundles, source.name)
+        for literal in literals:
+            require(literal in bundle, "Built admin JS is missing %r from admin/build/%s" % (literal, source.name))
+
+
+def _require_zip_admin_src_strings(files):
+    prefix = PLUGIN_ROOT + "admin/src/"
+    sources = sorted(name for name in files if name.startswith(prefix) and name.endswith(".js"))
+    if not sources:
+        return
+    bundles = {}
+    build_prefix = PLUGIN_ROOT + "admin/build/"
+    for name, payload in files.items():
+        relative = name[len(build_prefix):] if name.startswith(build_prefix) else ""
+        if relative.endswith(".js") and "/" not in relative:
+            bundles[relative] = payload.decode("utf-8", "replace")
+    for name in sources:
+        source_name = PurePosixPath(name).name
+        literals = user_visible_string_literals(files[name].decode("utf-8", "replace"))
+        bundle = _bundle_text(bundles, source_name)
+        for literal in literals:
+            require(literal in bundle, "Built admin JS is missing %r from admin/build/%s" % (literal, source_name))
+
+
+def validate_built_admin_js(plugin_dir):
+    """Fail when admin/build scripts do not match a fresh rebuild of the plugin."""
+    global _canonical_admin_js_ok
+    plugin_dir = Path(plugin_dir).resolve()
+    canonical = (ROOT / "affilio-wp").resolve()
+    if plugin_dir == canonical and _canonical_admin_js_ok:
+        return
+    require((plugin_dir / "admin" / "build").is_dir(), "WordPress plugin is missing admin/build.")
+    fresh = _fresh_admin_hashes(plugin_dir)
+    if fresh is None:
+        _require_admin_src_strings(plugin_dir)
+    else:
+        committed = _built_admin_files(plugin_dir / "admin" / "build")
+        for name, digest in sorted(fresh.items()):
+            require(committed.get(name) == digest, "Built admin JS does not match its source: admin/build/" + name)
+        for name in sorted(set(committed) - set(fresh)):
+            require(False, "Fresh admin build dropped admin/build/" + name)
+        if (plugin_dir / "admin" / "src").is_dir():
+            _require_admin_src_strings(plugin_dir)
+    if plugin_dir == canonical:
+        _canonical_admin_js_ok = True
+
+
 def validate_plugin(data, origin=None):
     del origin  # The plugin no longer bakes a deployment origin into its source.
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
@@ -422,6 +598,8 @@ def validate_plugin(data, origin=None):
                 raise ReleaseError("WordPress ZIP references a path outside the plugin: " + outside[0])
             for relative in sorted(needed):
                 require(PLUGIN_ROOT + relative in files, "WordPress ZIP is missing " + relative)
+        _require_zip_admin_src_strings(files)
+        validate_built_admin_js(ROOT / "affilio-wp")
 
 
 def validate_installer(data):
