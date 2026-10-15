@@ -198,10 +198,11 @@ class Affilio_Admin {
                 echo '</form>';
             }
         }
-        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+        echo '<form id="affilio-scan-all" method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         wp_nonce_field('affilio_scan_all');
         echo '<input type="hidden" name="action" value="affilio_scan_all">';
-        submit_button($this->t('Scan All Posts', 'Scansiona tutti gli articoli'));
+        echo '<p data-scan-status role="status" aria-live="polite"></p>';
+        echo '<button type="submit" class="button button-primary button-large" data-scan>' . esc_html($this->t('Scan All Posts', 'Scansiona tutti gli articoli')) . '</button>';
         echo '</form>';
         echo '</div>';
         echo '</div>';
@@ -479,6 +480,8 @@ class Affilio_Admin {
                 'connected' => __('Connected', 'affilio'),
                 'notConnected' => __('Not connected.', 'affilio'),
                 'connectSite' => __('Connect your site in Settings.', 'affilio'),
+                'analysisInProgress' => __('Analysis in progress', 'affilio'),
+                'analysisComplete' => __('Analysis complete', 'affilio'),
             ),
         );
     }

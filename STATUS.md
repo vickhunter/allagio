@@ -1,3 +1,7 @@
+## October 15 — plugin 0.1.30, dashboard scan stays on the page
+
+The Dashboard scan button runs the same setup scan as Settings. While it runs, the status line reads "Analysis in progress" ("Analisi in corso"). When it finishes, the line reads "Analysis complete" ("Analisi completata"). The button does not open `affilio_scan_continue`. Without JavaScript it still submits `admin-post.php` action `affilio_scan_all`. The button is `button-primary button-large` and at least 44px tall at every width, including 1440. Plugin version is 0.1.30.
+
 ## October 15 — plugin 0.1.29, release ZIP drops test-only seams
 
 The WordPress release ZIP no longer contains the `affilio_go_utc_date` filter or the `affilio_rewrite_requires_wp_rewrite` global. `Affilio_Go::utc_date()` is `gmdate('Y-m-d')`. Rewrite registration still waits for `$wp_rewrite` when `did_action` exists, which is how WordPress loads. The walk fixture defines `did_action` instead of setting a plugin global. `scripts/mvp_release.py` reads every PHP file in a plugin ZIP and stops when either string is present. `GET /v1/go/<recommendation_id>?via=plugin` still ignores `X-OR-Client-Hash`, `X-OR-User-Agent`, and `X-OR-Referer` when `X-API-Key` is absent or belongs to another site, so a WordPress user agent on the connection does not add a click. Plugin version is 0.1.29. `AUTO_MIGRATE` stays off unless it is set to `true`.

@@ -1,11 +1,15 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.29
+Stable tag: 0.1.30
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.30 =
+* The Dashboard scan stays on the page. It shows analysis in progress, then analysis complete. Without JavaScript the same button still submits the scan form.
+* That scan button is at least 44px tall at every width.
 
 = 0.1.29 =
 * The daily visitor hash uses the UTC date. The plugin does not offer a filter that can replace that date.

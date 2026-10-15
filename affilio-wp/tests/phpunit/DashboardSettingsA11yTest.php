@@ -265,6 +265,37 @@ class DashboardSettingsA11yTest extends TestCase {
      * @runInSeparateProcess
      * @preserveGlobalState disabled
      */
+    public function test_dashboard_enqueues_the_scan_script() {
+        $GLOBALS['user_locale'] = 'it_IT';
+        $admin = $this->admin(true);
+        $GLOBALS['scripts'] = array();
+        $admin->enqueue_dashboard_assets('toplevel_page_affilio');
+        $this->assertArrayHasKey('affilio-dashboard', $GLOBALS['scripts']);
+        $this->assertStringContainsString('admin/build/dashboard.js', $GLOBALS['scripts']['affilio-dashboard']);
+        $i18n = $GLOBALS['localized']['affilio-dashboard']['AffilioData']['i18n'];
+        $this->assertSame('Analisi in corso', $i18n['analysisInProgress']);
+        $this->assertSame('Analisi completata', $i18n['analysisComplete']);
+
+        $js = file_get_contents(dirname(__DIR__, 2) . '/admin/build/dashboard.js');
+        $this->assertStringContainsString("getElementById('affilio-scan-all')", $js);
+        $this->assertStringContainsString('event.preventDefault()', $js);
+        $this->assertStringContainsString("base + '/setup'", $js);
+
+        ob_start();
+        $admin->render_dashboard();
+        $html = ob_get_clean();
+        $this->assertStringContainsString('id="affilio-scan-all"', $html);
+        $this->assertStringContainsString('role="status"', $html);
+        $this->assertStringContainsString('button button-primary button-large', $html);
+        $this->assertStringContainsString('action="https://blog.example/wp-admin/admin-post.php"', $html);
+        $this->assertStringContainsString('name="action" value="affilio_scan_all"', $html);
+        $this->assertStringContainsString('>Scansiona tutti gli articoli<', $html);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
     public function test_dashboard_script_escapes_article_and_program_fields() {
         $js = file_get_contents(dirname(__DIR__, 2) . '/admin/build/dashboard.js');
         $this->assertStringContainsString("const title = esc(a.title || '');", $js);

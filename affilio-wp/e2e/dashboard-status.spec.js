@@ -19,6 +19,12 @@ const wpAdminButtons = `
   border-style: solid;
   box-sizing: border-box;
 }
+.wp-core-ui .button.button-large {
+  min-height: 40px;
+  line-height: 38px;
+  font-size: 14px;
+  padding: 0 12px;
+}
 @media screen and (max-width: 782px) {
   .wp-core-ui .button,
   .wp-core-ui .button.button-large,
@@ -319,6 +325,72 @@ test('dashboard text fields are escaped', async ({ page }) => {
   await expect(page.locator('tr.affilio-row-focus')).toHaveCount(1);
   expect(errors).toEqual([]);
   await noHorizontalOverflow(page);
+});
+
+test('the dashboard scan button is at least 44px at 390 and 1440', async ({ page }) => {
+  const html = `<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><style>${wpAdminButtons}</style><body class="wp-admin wp-core-ui"><div class="wrap affilio-admin-page"><form id="affilio-scan-all" method="post" action="https://blog.example/wp-admin/admin-post.php"><p data-scan-status role="status"></p><button type="submit" class="button button-primary button-large" data-scan>Scansiona tutti gli articoli</button></form></div></body>`;
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.setContent(html);
+    const box = await page.getByRole('button', { name: 'Scansiona tutti gli articoli', exact: true }).boundingBox();
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    await noHorizontalOverflow(page);
+  }
+});
+
+test('the dashboard scan stays on the page and shows progress', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><div class="wrap affilio-admin-page"><div id="affilio-dashboard-root"></div><form id="affilio-scan-all" method="post" action="https://blog.example/wp-admin/admin-post.php?affilio_scan_continue=1"><p data-scan-status role="status"></p><button type="submit" class="button button-primary button-large" data-scan>Scansiona tutti gli articoli</button></form></div>`);
+  await page.evaluate(() => {
+    window.AffilioData = {
+      locale: 'it',
+      nonce: 'n',
+      restBase: 'https://blog.example/wp-json/affilio/v1',
+      settingsUrl: 'https://blog.example/wp-admin/admin.php?page=affilio-settings',
+      connectionStatus: { connected: true, state: 'connected' },
+      i18n: {
+        connected: 'Connesso',
+        notConnected: 'Non connesso.',
+        connectSite: 'Collega il sito in Impostazioni.',
+        analysisInProgress: 'Analisi in corso',
+        analysisComplete: 'Analisi completata',
+      },
+    };
+  });
+  let releaseScan;
+  const scanHeld = new Promise((resolve) => {
+    releaseScan = resolve;
+  });
+  await page.route('**/affilio/v1/setup', async (route) => {
+    const scanning = route.request().method() === 'POST';
+    if (!scanning) await scanHeld;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        phase: scanning ? 'scanning' : 'complete',
+        scanned: scanning ? 1 : 3,
+        connection: { connected: true },
+      }),
+    });
+  });
+  await page.route('**/affilio/v1/proxy', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ articles: [], programs: [], recommendations: [] }),
+  }));
+  let continued = false;
+  page.on('request', (request) => {
+    if (request.url().includes('admin-post.php') || request.url().includes('affilio_scan_continue')) continued = true;
+  });
+  await page.addScriptTag({ path: dashboardJs });
+  await page.getByRole('button', { name: 'Scansiona tutti gli articoli', exact: true }).click();
+  await expect(page.locator('[data-scan-status]')).toHaveText('Analisi in corso');
+  releaseScan();
+  await expect(page.locator('[data-scan-status]')).toHaveText('Analisi completata');
+  await expect(page.getByRole('button', { name: 'Analisi completata', exact: true })).toBeDisabled();
+  expect(page.url()).not.toContain('affilio_scan_continue');
+  expect(continued).toBe(false);
 });
 
 test('settings and dashboard buttons are at least 44px at 390px', async ({ page }) => {
