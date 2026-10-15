@@ -121,10 +121,14 @@ func ContainsInternalCopy(text, internalReason string) bool {
 }
 
 // ReaderCopySafe reports whether text can be shown to a reader. It rejects
-// default-ignorable code points, leftover combining marks, odd spaces, markup,
-// mixed scripts, and Latin letters outside the blocks used by European copy.
+// default-ignorable code points, any mark NFC does not compose away, a
+// no-break space between letters, odd spaces, markup, mixed scripts, and
+// Latin letters outside the blocks used by European copy.
 func ReaderCopySafe(text string) bool {
 	if hasMarkup(text) {
+		return false
+	}
+	if nbspBetweenLetters(text) {
 		return false
 	}
 	for _, r := range text {
@@ -147,27 +151,26 @@ func badSpace(r rune) bool {
 	return unicode.IsSpace(r) && r != ' ' && r != '\u00A0'
 }
 
-func hasStandaloneMark(text string) bool {
-	var prev rune
-	for _, r := range norm.NFC.String(foldMicro(text)) {
-		if (unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r)) && !allowedLatinAccent(prev, r) {
+func nbspBetweenLetters(text string) bool {
+	rs := []rune(text)
+	for i, r := range rs {
+		if r != '\u00A0' || i == 0 || i+1 == len(rs) {
+			continue
+		}
+		if unicode.IsLetter(rs[i-1]) && unicode.IsLetter(rs[i+1]) {
 			return true
 		}
-		prev = r
 	}
 	return false
 }
 
-func allowedLatinAccent(base, mark rune) bool {
-	if !latinLetterAllowed(base) {
-		return false
+func hasStandaloneMark(text string) bool {
+	for _, r := range norm.NFC.String(foldMicro(text)) {
+		if unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Mc, r) || unicode.Is(unicode.Me, r) {
+			return true
+		}
 	}
-	switch mark {
-	case '\u0300', '\u0301', '\u0302', '\u0303', '\u0304', '\u0306', '\u0307', '\u0308', '\u0309', '\u030A', '\u030B', '\u030C', '\u0323', '\u0327', '\u0328':
-		return true
-	default:
-		return false
-	}
+	return false
 }
 
 func latinLetterAllowed(r rune) bool {
@@ -210,7 +213,9 @@ func sharesInternalReason(text, reason string) bool {
 }
 
 func hasScoringMarker(normalized string) bool {
-	return strings.Contains(normalized, "performance adjusted") || strings.Contains(normalized, "contextual fit")
+	compact := strings.ReplaceAll(normalized, " ", "")
+	return strings.Contains(normalized, "performance adjusted") || strings.Contains(compact, "performanceadjusted") ||
+		strings.Contains(normalized, "contextual fit") || strings.Contains(compact, "contextualfit")
 }
 
 func classifyReasonSentences(reason string) (long, short []string) {
@@ -256,16 +261,16 @@ func hasLongNGram(textTokens, reasonTokens []string, n int) bool {
 func normalizeForOverlap(text string) string {
 	var b strings.Builder
 	prevSpace := true
-	for _, r := range strings.ToLower(norm.NFKC.String(text)) {
-		switch r {
-		case '"', '\'', '`', '\u2018', '\u2019', '\u201c', '\u201d', '\u00ab', '\u00bb', '\u201a', '\u201e':
+	for _, r := range strings.ToLower(norm.NFKD.String(text)) {
+		if unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Mc, r) || unicode.Is(unicode.Me, r) {
 			continue
-		case '-', '\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2212':
-			r = ' '
 		}
 		if unicode.IsLetter(r) || unicode.IsNumber(r) {
 			b.WriteRune(r)
 			prevSpace = false
+			continue
+		}
+		if r != ' ' {
 			continue
 		}
 		if !prevSpace {

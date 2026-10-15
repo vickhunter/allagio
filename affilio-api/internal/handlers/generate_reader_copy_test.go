@@ -192,7 +192,46 @@ func TestGenerateContentRejectsUnsafeProgramNameAndLink(t *testing.T) {
 	expect("Semrush contex\u034Ftual Program", "https://example.com/aff", http.StatusUnprocessableEntity)
 	expect("A strong contextual fit for readers", "https://example.com/aff", http.StatusUnprocessableEntity)
 	expect("Semrush Affiliate Program", "https://example.com/aff\u200Atrack", http.StatusUnprocessableEntity)
+	expect("Semrush Affiliate Program", "https://example.com/the-article-discusses-email-marketing-making", http.StatusOK)
 	expect("Cœur für Straße", "https://example.com/aff", http.StatusOK)
+}
+
+func TestGenerateContentRegeneratesUnsafeStoredAnchor(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	siteID, recID := seedGenerateRecommendation(t, db, internalFitReason)
+	gen := scriptedGenerator(t, []string{
+		"Mailchimp helps teams schedule campaigns and see which emails get replies.",
+		"Later copy for readers who compare a few tools before they buy.",
+	})
+	first := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+	})
+	if first.Code != http.StatusOK {
+		t.Fatalf("preview generate failed: %d %s", first.Code, first.Body.String())
+	}
+	var stored string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT generated_html FROM recommendations WHERE id=$1`, recID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	poisoned := strings.Replace(stored, "Semrush Affiliate Program", "Semrush i\u0307 Program", 1)
+	if poisoned == stored {
+		t.Fatalf("stored preview had no anchor to poison: %s", stored)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE recommendations SET generated_html=$2 WHERE id=$1`, recID, poisoned); err != nil {
+		t.Fatal(err)
+	}
+	second := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+	})
+	if second.Code != http.StatusOK || !strings.Contains(second.Body.String(), "Later copy for readers") {
+		t.Fatalf("unsafe preview was not regenerated: %d %s", second.Code, second.Body.String())
+	}
+	if strings.Contains(second.Body.String(), "i\u0307") {
+		t.Fatalf("published the stored combining dot: %s", second.Body.String())
+	}
 }
 
 func TestGenerateContentReusesPreviewForTheSameLanguage(t *testing.T) {

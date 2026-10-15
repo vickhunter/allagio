@@ -103,6 +103,34 @@ func TestSanitizeReaderCopyRejectsIgnorableMarksSpacesAndLookalikes(t *testing.T
 	}
 }
 
+func TestSanitizeReaderCopyRejectsDotAboveAndSplitTokens(t *testing.T) {
+	t.Parallel()
+	reason := scoreMatchReason(t)
+	dotted := insertDotAboveIJ(reason)
+	if dotted == reason || !strings.Contains(dotted, "i\u0307") {
+		t.Fatalf("dot was not inserted: %q", dotted)
+	}
+	assertRejectedCopy(t, dotted, reason)
+	assertRejectedCopy(t, strings.ReplaceAll(reason, "fit", "f\u00ECt"), reason)
+	assertRejectedCopy(t, strings.ReplaceAll(reason, "fit", "fi\u0300t"), reason)
+	assertRejectedCopy(t, "Readers can see a strong contex.tual fit for this comparison of tools.", reason)
+	assertRejectedCopy(t, "Readers can see a strong contex\u00A0tual fit for this comparison of tools.", reason)
+	if ReaderCopySafe("j\u0307") || ReaderCopySafe("i\u0307") {
+		t.Fatal("combining dot above on i or j was allowed")
+	}
+}
+
+func insertDotAboveIJ(text string) string {
+	var b strings.Builder
+	for _, r := range text {
+		b.WriteRune(r)
+		if r == 'i' || r == 'I' || r == 'j' || r == 'J' {
+			b.WriteRune('\u0307')
+		}
+	}
+	return b.String()
+}
+
 func TestSanitizeReaderCopyKeepsAccentedEuropeanCopy(t *testing.T) {
 	t.Parallel()
 	reason := scoreMatchReason(t)

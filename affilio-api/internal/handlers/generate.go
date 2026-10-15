@@ -5,6 +5,7 @@ import (
 	"errors"
 	"html"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"affilio-api/internal/database"
@@ -67,7 +68,7 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	}
 	language := services.NormalizeSiteLanguage(req.SiteLanguage)
 	if !services.ReaderCopySafe(rec.ProgramName) || services.ContainsInternalCopy(rec.ProgramName, rec.Reason) ||
-		!services.ReaderCopySafe(link) || services.ContainsInternalCopy(link, rec.Reason) {
+		!services.ReaderCopySafe(link) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
 		return
 	}
@@ -182,10 +183,31 @@ func reusablePreview(raw, language, reason string) (storedReaderPreview, bool) {
 	if services.ContainsInternalCopy(preview.HTML, reason) || services.ContainsInternalCopy(preview.Text, reason) || services.ContainsInternalCopy(preview.Transition, reason) {
 		return storedReaderPreview{}, false
 	}
+	visible := visibleReaderText(preview.HTML)
+	anchor := anchorText(preview.HTML)
+	if visible == "" || !services.ReaderCopySafe(visible) || (anchor != "" && !services.ReaderCopySafe(anchor)) {
+		return storedReaderPreview{}, false
+	}
 	if _, ok := services.SanitizeReaderCopy(preview.Text, reason); !ok {
 		return storedReaderPreview{}, false
 	}
 	return preview, true
+}
+
+var htmlTagPattern = regexp.MustCompile(`(?s)<[^>]*>`)
+
+var anchorPattern = regexp.MustCompile(`(?is)<a\b[^>]*>(.*?)</a>`)
+
+func visibleReaderText(rawHTML string) string {
+	return strings.TrimSpace(html.UnescapeString(htmlTagPattern.ReplaceAllString(rawHTML, " ")))
+}
+
+func anchorText(rawHTML string) string {
+	match := anchorPattern.FindStringSubmatch(rawHTML)
+	if match == nil {
+		return ""
+	}
+	return strings.TrimSpace(html.UnescapeString(htmlTagPattern.ReplaceAllString(match[1], "")))
 }
 
 func writeGenerated(c *gin.Context, rendered, blurb, position, placementReason, transition string, paragraph int, confidence float64, programName, link string) {
