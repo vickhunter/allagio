@@ -64,14 +64,69 @@ func withSessionTimeZone(rawURL, zone string) (string, error) {
 	if zone == "" {
 		return rawURL, nil
 	}
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return "", err
+	if strings.Contains(rawURL, "://") {
+		u, err := url.Parse(rawURL)
+		if err != nil {
+			return "", err
+		}
+		q := u.Query()
+		q.Set("TimeZone", zone)
+		u.RawQuery = q.Encode()
+		return u.String(), nil
 	}
-	q := u.Query()
-	q.Set("TimeZone", zone)
-	u.RawQuery = q.Encode()
-	return u.String(), nil
+	return setKeywordTimeZone(rawURL, zone), nil
+}
+
+// setKeywordTimeZone sets TimeZone on a host=... dbname=... connection string.
+// Spaces inside single or double quotes stay inside that parameter.
+func setKeywordTimeZone(raw, zone string) string {
+	parts := splitKeywordDSN(raw)
+	out := make([]string, 0, len(parts)+1)
+	replaced := false
+	for _, part := range parts {
+		key, _, ok := strings.Cut(part, "=")
+		if ok && strings.EqualFold(strings.Trim(key, `"'`), "timezone") {
+			if !replaced {
+				out = append(out, "TimeZone="+zone)
+				replaced = true
+			}
+			continue
+		}
+		out = append(out, part)
+	}
+	if !replaced {
+		out = append(out, "TimeZone="+zone)
+	}
+	return strings.Join(out, " ")
+}
+
+func splitKeywordDSN(raw string) []string {
+	var parts []string
+	var b strings.Builder
+	var quote rune
+	for _, r := range raw {
+		switch {
+		case quote != 0:
+			b.WriteRune(r)
+			if r == quote {
+				quote = 0
+			}
+		case r == '\'' || r == '"':
+			quote = r
+			b.WriteRune(r)
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			if b.Len() > 0 {
+				parts = append(parts, b.String())
+				b.Reset()
+			}
+		default:
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() > 0 {
+		parts = append(parts, b.String())
+	}
+	return parts
 }
 
 func applyMigrations(t *testing.T, db *database.DB) {
@@ -124,6 +179,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"035_refund_seller_scope.sql",
 		"036_refund_sale_link.sql",
 		"037_reserved_sale_events.sql",
+		"038_timestamptz_instants.sql",
 	}
 	for _, f := range files {
 		path := filepath.Join(root, f)

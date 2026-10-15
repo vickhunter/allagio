@@ -120,6 +120,21 @@ def https_origin(value):
     return parsed.scheme == "https" and bool(parsed.hostname) and value == f"https://{parsed.netloc}"
 
 
+def database_identified(value):
+    if "://" in value:
+        database = parse.urlsplit(value)
+        return database.scheme in {"postgres", "postgresql"} and bool(database.hostname) and database.path not in {"", "/"}
+    fields = {}
+    for part in value.split():
+        if "=" not in part:
+            continue
+        key, item = part.split("=", 1)
+        fields[key.strip().lower()] = item.strip().strip('"').strip("'")
+    host = fields.get("host") or fields.get("hostaddr")
+    name = fields.get("dbname") or fields.get("database")
+    return bool(host and name)
+
+
 def validate_config(values, origin=None):
     generic = origin is not None
     expected_origin = origin if generic else ORIGIN
@@ -158,8 +173,7 @@ def validate_config(values, origin=None):
     except ValueError:
         valid_key = False
     require(valid_key, "CONNECTION_ENCRYPTION_KEY must encode 32 bytes in base64.")
-    database = parse.urlsplit(values["DATABASE_URL"])
-    require(database.scheme in {"postgres", "postgresql"} and database.hostname and database.path not in {"", "/"}, "DATABASE_URL must identify the isolated PostgreSQL database.")
+    require(database_identified(values["DATABASE_URL"]), "DATABASE_URL must identify the isolated PostgreSQL database.")
 
 
 def validate_checks(checks):

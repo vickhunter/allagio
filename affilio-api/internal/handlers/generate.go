@@ -127,6 +127,8 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
 		return
 	}
+	transitionSentence = services.DecodeReaderEntities(transitionSentence)
+	placementReason = services.DecodeReaderEntities(placementReason)
 	if cleaned, transitionOK := services.SanitizeReaderCopy(transitionSentence, rec.Reason); transitionOK {
 		transitionSentence = cleaned
 	} else {
@@ -197,7 +199,7 @@ func reusablePreview(raw, language, reason, programName, link string) (storedRea
 	if _, ok := services.SanitizeReaderCopy(text, reason); !ok {
 		return storedReaderPreview{}, false
 	}
-	if services.ContainsInternalCopy(preview.Transition, reason) || services.ContainsInternalCopy(preview.PlacementReason, reason) {
+	if services.ContainsInternalCopy(services.DecodeReaderEntities(preview.Transition), reason) || services.ContainsInternalCopy(services.DecodeReaderEntities(preview.PlacementReason), reason) {
 		return storedReaderPreview{}, false
 	}
 	if !services.ReaderCopySafe(programName) || services.ContainsInternalCopy(programName, reason) || !services.ReaderCopySafe(link) {
@@ -223,7 +225,12 @@ func visibleReaderText(rawHTML string) string {
 	withoutComments := htmlCommentPattern.ReplaceAllString(rawHTML, "")
 	withoutTags := htmlTagPattern.ReplaceAllString(withoutComments, "")
 	decoded := html.UnescapeString(withoutTags)
-	return strings.ReplaceAll(decoded, "—", " ")
+	return strings.Map(func(r rune) rune {
+		if r >= 0x2010 && r <= 0x2015 || r == 0x2212 {
+			return ' '
+		}
+		return r
+	}, decoded)
 }
 
 func writeGenerated(c *gin.Context, rendered, blurb, position, placementReason, transition string, paragraph int, confidence float64, programName, link string) {

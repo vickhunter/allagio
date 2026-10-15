@@ -9,8 +9,8 @@ import (
 
 // clearMaturedSQL moves pending commissions whose refund window has passed to
 // cleared — except entries whose conversion carries a fraud flag: those stay
-// pending until an admin clears the flag. clears_at is the session wall clock,
-// the same clock NOW() uses, so the comparison does not depend on UTC.
+// pending until an admin clears the flag. clears_at is timestamptz and is
+// compared with NOW().
 const clearMaturedSQL = `
 UPDATE ledger_entries le SET status='cleared'
 WHERE le.status='pending' AND le.clears_at <= NOW()
@@ -86,7 +86,7 @@ type LedgerHistoryEntry struct {
 func (d *DB) ListLedgerHistory(ctx context.Context, siteID string, limit int) ([]LedgerHistoryEntry, error) {
 	rows, err := d.Pool.Query(ctx, `
 SELECT le.id, le.kind, le.amount, le.currency, le.status,
-       COALESCE(p.name, ''), (le.clears_at `+sessionWallAsInstant+`), (le.created_at `+sessionWallAsInstant+`),COALESCE(cv.payment_mode,'legacy'),
+       COALESCE(p.name, ''), le.clears_at, (le.created_at `+sessionWallAsInstant+`),COALESCE(cv.payment_mode,'legacy'),
        COALESCE(cv.trust_level,''), cv.refund_status, COALESCE(cv.refund_reason,'')
 FROM ledger_entries le
 LEFT JOIN conversions cv ON cv.id = le.conversion_id

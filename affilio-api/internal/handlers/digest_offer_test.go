@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -76,14 +75,11 @@ func TestDigestListsOfferWhenSessionTimeZoneIsNotUTC(t *testing.T) {
 	if raw == "" {
 		t.Skip("AFFILIO_TEST_DATABASE_URL not set; skipping DB integration tests")
 	}
-	u, err := url.Parse(raw)
+	dsn, err := withSessionTimeZone(raw, "Europe/Rome")
 	if err != nil {
 		t.Fatal(err)
 	}
-	q := u.Query()
-	q.Set("TimeZone", "Europe/Rome")
-	u.RawQuery = q.Encode()
-	db, err := database.Connect(context.Background(), u.String())
+	db, err := database.Connect(context.Background(), dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
