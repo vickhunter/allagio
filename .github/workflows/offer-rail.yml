@@ -12,7 +12,9 @@ on:
       - "affilio-wp/admin/build/earnings.js"
       - "affilio-wp/admin/css/affilio-admin.css"
       - "affilio-wp/e2e/offer-rail.spec.js"
+      - "affilio-wp/e2e/landing-a11y.spec.js"
       - "affilio-wp/e2e/offer-rail.config.js"
+      - "affilio-api/internal/handlers/demo.go"
       - "affilio-wp/e2e/package.json"
       - ".github/workflows/offer-rail.yml"
   pull_request:
@@ -25,7 +27,9 @@ on:
       - "affilio-wp/admin/build/earnings.js"
       - "affilio-wp/admin/css/affilio-admin.css"
       - "affilio-wp/e2e/offer-rail.spec.js"
+      - "affilio-wp/e2e/landing-a11y.spec.js"
       - "affilio-wp/e2e/offer-rail.config.js"
+      - "affilio-api/internal/handlers/demo.go"
       - "affilio-wp/e2e/package.json"
       - ".github/workflows/offer-rail.yml"
 

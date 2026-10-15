@@ -114,6 +114,7 @@ class Affilio_Admin {
             return;
         }
         if ($hook === 'affilio_page_affilio-settings') {
+            wp_enqueue_style('affilio-admin', AFFILIO_PLUGIN_URL . 'admin/css/affilio-admin.css', array(), AFFILIO_VERSION);
             wp_enqueue_script('affilio-onboarding', AFFILIO_PLUGIN_URL . 'admin/build/onboarding.js', array(), AFFILIO_VERSION, true);
             wp_localize_script('affilio-onboarding', 'AffilioSetup', array('restBase' => rest_url('affilio/v1'), 'nonce' => wp_create_nonce('wp_rest'), 'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(), 'serviceUrl' => Affilio_API::resolve_base_url()));
             return;
@@ -155,11 +156,11 @@ class Affilio_Admin {
         echo '<div class="wrap affilio-admin-page">';
         echo '<div id="affilio-dashboard-root"></div>';
         if (!$status['connected']) {
-            echo '<div class="affilio-panel affilio-panel-warning">';
+            echo '<noscript><div class="affilio-panel affilio-panel-warning">';
             echo '<h2>Affilio Dashboard</h2>';
             echo '<p><strong>' . esc_html($this->t('Not connected.', 'Non connesso.')) . '</strong> ' . esc_html($status['message']) . '</p>';
             echo '<p><a class="button button-primary" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a></p>';
-            echo '</div>';
+            echo '</div></noscript>';
             echo '</div>';
             return;
         }
@@ -288,7 +289,7 @@ class Affilio_Admin {
         $default_api_url = Affilio_API::resolve_base_url();
         $override_api_url = esc_attr(get_option('affilio_api_url_override', ''));
         $saved_key = trim((string) get_option('affilio_api_key', ''));
-        $key_hint = $saved_key === '' ? '' : 'Key saved (' . Affilio_API::mask_key($saved_key) . ')';
+        $key_hint = $saved_key === '' ? '' : sprintf(__('Key saved (%s)', 'affilio'), Affilio_API::mask_key($saved_key));
 
         echo '<div class="wrap affilio-admin-page"><h1>' . esc_html($this->t('Affilio Settings', 'Impostazioni Affilio')) . '</h1>';
         echo '<div class="affilio-status-row">';
@@ -351,7 +352,7 @@ class Affilio_Admin {
             return;
         }
         $saved_key = trim((string) get_option('affilio_api_key', ''));
-        $key_hint = $saved_key === '' ? '' : ' Key saved (' . Affilio_API::mask_key($saved_key) . ').';
+        $key_hint = $saved_key === '' ? '' : ' ' . sprintf(__('Key saved (%s)', 'affilio'), Affilio_API::mask_key($saved_key)) . '.';
         echo '<div class="notice notice-warning"><p><strong>Affilio:</strong> ' . esc_html($status['message'] . $key_hint) . ' ';
         echo '<a href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a>.</p></div>';
     }
@@ -499,7 +500,7 @@ class Affilio_Admin {
 
     private function secret_input($name, $option) {
         $stored = trim((string) get_option($option, ''));
-        $placeholder = $stored === '' ? '' : 'Key saved (' . Affilio_API::mask_key($stored) . ')';
+        $placeholder = $stored === '' ? '' : sprintf(__('Key saved (%s)', 'affilio'), Affilio_API::mask_key($stored));
         echo '<input type="password" name="' . esc_attr($name) . '" value="" placeholder="' . esc_attr($placeholder) . '" class="regular-text" autocomplete="off" spellcheck="false" />';
     }
 
