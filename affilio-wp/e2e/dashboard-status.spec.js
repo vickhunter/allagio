@@ -419,17 +419,24 @@ test('the dashboard scan stays on the page and shows progress', async ({ page })
     releaseScan = resolve;
   });
   let rescanPosts = 0;
+  let setupGets = 0;
   let continued = false;
   page.on('request', (request) => {
     if (request.url().includes('admin-post.php') || request.url().includes('affilio_scan_continue')) continued = true;
   });
   await bootDashboardScan(page, async (route) => {
-    const rescan = route.request().url().includes('/setup/rescan');
-    if (rescan) rescanPosts += 1;
-    if (!rescan) await scanHeld;
+    const rescan = route.request().method() === 'POST' && route.request().url().includes('/setup/rescan');
+    if (!rescan) {
+      setupGets += 1;
+      await route.fulfill(jsonBody({ phase: 'scanning', scanned: 0 }));
+      return;
+    }
+    rescanPosts += 1;
+    if (rescanPosts > 1) await scanHeld;
     await route.fulfill(jsonBody({
-      phase: rescan ? 'scanning' : 'complete',
-      scanned: rescan ? 1 : 3,
+      phase: rescanPosts > 1 ? 'complete' : 'scanning',
+      offset: rescanPosts > 1 ? 3 : 1,
+      scanned: rescanPosts > 1 ? 3 : 1,
       connection: { connected: true },
     }));
   }, { scanPollMs: 30 });
@@ -445,7 +452,8 @@ test('the dashboard scan stays on the page and shows progress', async ({ page })
   await expect(button).toBeFocused();
   await expect(button).toHaveAttribute('aria-busy', 'false');
   await expect(page.getByRole('button', { name: 'Analisi completata' })).toHaveCount(0);
-  expect(rescanPosts).toBe(1);
+  expect(rescanPosts).toBe(2);
+  expect(setupGets).toBe(0);
   expect(page.url()).not.toContain('affilio_scan_continue');
   expect(continued).toBe(false);
 });
@@ -521,19 +529,19 @@ test('a forbidden scan shows the server message', async ({ page }) => {
 });
 
 test('a scan that is already running keeps polling', async ({ page }) => {
-  let gets = 0;
+  let posts = 0;
   await bootDashboardScan(page, async (route) => {
-    if (route.request().method() === 'POST') {
+    posts += 1;
+    if (posts === 1) {
       await route.fulfill(jsonBody({ code: 'affilio_busy', message: 'La configurazione è già in corso. Riprova tra poco.' }, 409));
       return;
     }
-    gets += 1;
     await route.fulfill(jsonBody({ phase: 'complete', scanned: 2 }));
   }, { scanPollMs: 30 });
   const button = page.getByRole('button', { name: scanAction, exact: true });
   await button.click();
   await expect(page.getByRole('status')).toHaveText('Analisi completata');
-  expect(gets).toBeGreaterThan(0);
+  expect(posts).toBeGreaterThan(1);
   await expect(page.getByRole('status')).not.toContainText('già in corso');
   await expect(button).toBeEnabled();
   await expect(button).toHaveText(scanAction);

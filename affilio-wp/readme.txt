@@ -8,7 +8,7 @@ AI affiliate copilot for WordPress. Connect from Settings, then review recommend
 == Changelog ==
 
 = 0.1.31 =
-* The Dashboard scan can run again after the first analysis. Progress stays on the status line, and the button stays "Scan All Posts".
+* The Dashboard scan can run again after the first analysis. Each request processes one batch in the plugin, and the browser repeats it until the scan is done, even when WP-Cron does not run. Progress stays on the status line, and the button stays "Scan All Posts".
 * A failed scan, a scan that is still running after two minutes, or a response that is not JSON shows an error and a way to send the scan form. A scan that is already running keeps polling.
 
 = 0.1.30 =

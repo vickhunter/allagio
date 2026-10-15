@@ -307,11 +307,15 @@ class DashboardSettingsA11yTest extends TestCase {
             'scanned' => 40,
             'skipped' => array(array('wp_post_id' => 9, 'reason' => 'short')),
         );
+        $GLOBALS['posts'] = $this->published_posts(12);
         $api = new class {
             public function get_connection_status($force = false) {
                 return array('connected' => true, 'message' => 'Affilio is connected and ready.', 'state' => 'connected');
             }
             public function invalidate_status_cache() {}
+            public function request($method, $path, $body = null) {
+                return array('code' => 202, 'data' => array('status' => 'queued'));
+            }
         };
         $setup = new Affilio_Onboarding($api);
         $setup->register_routes();
@@ -336,10 +340,9 @@ class DashboardSettingsA11yTest extends TestCase {
         $again = $setup->rescan();
         $this->assertIsArray($again);
         $this->assertSame('scanning', $again['phase']);
-        $this->assertSame(0, $again['offset']);
-        $this->assertSame(0, $again['scanned']);
+        $this->assertSame(10, $again['offset']);
+        $this->assertSame(10, $again['scanned']);
         $this->assertSame(array(), $again['skipped']);
-        $this->assertArrayHasKey('affilio_setup_scan', $GLOBALS['cron']);
         $this->assertArrayNotHasKey('affilio_setup_lock', $GLOBALS['options']);
 
         $GLOBALS['options']['affilio_setup_state'] = array(
@@ -364,6 +367,47 @@ class DashboardSettingsA11yTest extends TestCase {
         $this->assertSame(403, $denied->data['status']);
         $this->assertSame('complete', $GLOBALS['options']['affilio_setup_state']['phase']);
         $this->assertSame(40, $GLOBALS['options']['affilio_setup_state']['scanned']);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_rescan_advances_a_stuck_scan_when_cron_never_fires() {
+        $this->boot();
+        $GLOBALS['posts'] = $this->published_posts(12);
+        $GLOBALS['options']['affilio_setup_state'] = array(
+            'phase' => 'scanning',
+            'offset' => 0,
+            'scanned' => 0,
+            'skipped' => array(),
+        );
+        $api = new class {
+            public function get_connection_status($force = false) {
+                return array('connected' => true, 'message' => 'Affilio is connected and ready.', 'state' => 'connected');
+            }
+            public function invalidate_status_cache() {}
+            public function request($method, $path, $body = null) {
+                return array('code' => 202, 'data' => array('status' => 'queued'));
+            }
+        };
+        $setup = new class($api) extends Affilio_Onboarding {
+            public $cronBatches = 0;
+            public function scan_batch() {
+                $this->cronBatches++;
+                parent::scan_batch();
+            }
+        };
+        $first = $setup->rescan();
+        $this->assertSame('scanning', $first['phase']);
+        $this->assertSame(10, $first['offset']);
+        $this->assertSame(10, $first['scanned']);
+        $second = $setup->rescan();
+        $this->assertSame('complete', $second['phase']);
+        $this->assertSame(12, $second['offset']);
+        $this->assertSame(12, $second['scanned']);
+        $this->assertSame(0, $setup->cronBatches);
+        $this->assertArrayNotHasKey('affilio_setup_lock', $GLOBALS['options']);
     }
 
     /**
@@ -403,6 +447,20 @@ class DashboardSettingsA11yTest extends TestCase {
         $admin->maybe_render_connection_notice();
         $notice = ob_get_clean();
         return $settings . $notice;
+    }
+
+    private function published_posts($count) {
+        $posts = array();
+        for ($id = 1; $id <= $count; $id++) {
+            $posts[] = (object) array(
+                'ID' => $id,
+                'post_title' => 'Post ' . $id,
+                'post_content' => 'Published content',
+                'post_name' => 'post-' . $id,
+                'post_status' => 'publish',
+            );
+        }
+        return $posts;
     }
 
     private function admin($connected) {

@@ -23,11 +23,10 @@
                 return null;
             }
         };
-        const call = async (method) => {
+        const call = async () => {
             const base = String(data.restBase || '').replace(/\/$/, '');
-            const path = method === 'POST' ? '/setup/rescan' : '/setup';
-            const response = await fetch(base + path, {
-                method,
+            const response = await fetch(base + '/setup/rescan', {
+                method: 'POST',
                 headers: { 'X-WP-Nonce': data.nonce || '' },
             });
             if (response.status === 409) return { phase: 'scanning' };
@@ -71,7 +70,7 @@
             if (status) status.textContent = inProgress;
             const deadline = Date.now() + timeoutMs;
             try {
-                let state = await call('POST');
+                let state = await call();
                 while (state && state.phase === 'scanning') {
                     if (Date.now() >= deadline) {
                         finish(timedOut, true);
@@ -83,7 +82,7 @@
                         finish(timedOut, true);
                         return;
                     }
-                    state = await call('GET');
+                    state = await call();
                 }
                 if (state && state.phase === 'complete') {
                     finish(done, false);
