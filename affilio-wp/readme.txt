@@ -1,11 +1,16 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.26
+Stable tag: 0.1.27
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.27 =
+* The disconnected Affilio Dashboard card is drawn by the dashboard script. The server sends that same card only inside noscript, for a browser with JavaScript off.
+* Settings loads the admin stylesheet, so the connection status keeps its spacing.
+* "Key saved (…)" can be translated. Italian (it_IT) uses "Chiave salvata (…)".
 
 = 0.1.26 =
 * POST /wp-json/affilio/v1/insert is removed. The dashboard inserts a generated recommendation through the editor route and does not send HTML to be written into the post.

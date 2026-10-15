@@ -84,6 +84,39 @@ if (!function_exists('add_action')) {
     function wp_create_nonce($action) { return 'test-nonce'; }
     function get_locale() { return isset($GLOBALS['user_locale']) ? $GLOBALS['user_locale'] : 'en_US'; }
     function get_user_locale() { return isset($GLOBALS['user_locale']) ? $GLOBALS['user_locale'] : 'en_US'; }
+    function affilio_test_catalog() {
+        static $catalog = null;
+        if ($catalog !== null) {
+            return $catalog;
+        }
+        $catalog = array();
+        $path = dirname(__DIR__) . '/languages/affilio-it_IT.po';
+        if (!is_file($path)) {
+            return $catalog;
+        }
+        $text = file_get_contents($path);
+        if (preg_match_all('/msgid\s+"((?:\\\\.|[^"\\\\])*)"\s+msgstr\s+"((?:\\\\.|[^"\\\\])*)"/', $text, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $id = stripcslashes($match[1]);
+                if ($id === '') {
+                    continue;
+                }
+                $catalog[$id] = stripcslashes($match[2]);
+            }
+        }
+        return $catalog;
+    }
+    function __($text, $domain = 'default') {
+        if ($domain !== 'affilio') {
+            return $text;
+        }
+        $locale = get_user_locale();
+        if (strpos(strtolower((string) $locale), 'it') !== 0) {
+            return $text;
+        }
+        $catalog = affilio_test_catalog();
+        return array_key_exists($text, $catalog) ? $catalog[$text] : $text;
+    }
     function wp_get_current_user() { return $GLOBALS['current_user']; }
     function get_permalink($post) { return 'https://blog.example/' . (is_object($post) ? $post->post_name : $post); }
     function get_post($id) {

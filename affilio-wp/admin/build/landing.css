@@ -1,6 +1,7 @@
 .landing main, .landing .site-header, .landing .site-footer { max-width: 1440px; }
 .landing .site-header { padding-top: 30px; padding-bottom: 30px; border-bottom: 1px solid var(--line); }
-.landing .site-header nav a:last-child { border: 1px solid var(--line); border-radius: 6px; padding: 10px 15px; background: var(--panel); }
+.landing .site-header nav a:last-child { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 44px; border: 1px solid var(--line); border-radius: 6px; padding: 10px 15px; background: var(--panel); }
+.landing .skip:focus { display: inline-flex; align-items: center; box-sizing: border-box; min-height: 44px; }
 .landing .site-header nav { align-items: center; }
 .landing .hero { gap: 48px; grid-template-columns: 1.12fr 1fr; padding: 68px 0 64px; }
 .hero-copy { min-width: 0; }
@@ -22,7 +23,7 @@
 .distribution-world figcaption { border-top: 1px solid var(--muted); padding: 19px 24px 16px; }
 .world-legend { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; font-size: var(--text-caption); }
 .world-legend li { display: flex; gap: 12px; align-items: baseline; }
-.world-legend li span { font: var(--text-eyebrow) var(--font-mono); color: var(--accent); }
+.world-legend li span { font: var(--text-caption) var(--font-mono); color: #e8ba79; }
 .world-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; font-size: var(--text-eyebrow); color: var(--tint); min-height: 25px; }
 .motion-toggle { padding: 5px 8px; font-size: var(--text-eyebrow); font-weight: 400; border: 1px solid var(--line); color: var(--paper); background: transparent; border-radius: 4px; }
 .motion-toggle[hidden] { display: none; }
@@ -32,9 +33,10 @@
 .landing .entry-points p { max-width: 520px; }
 .install-box { padding: 16px; margin: 24px 0 20px; background: var(--tint); border: 1px solid var(--line); border-radius: 7px; }
 .install-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 27px; }
-.install-heading .command-label { font: var(--text-eyebrow) var(--font-mono); letter-spacing: 1px; }
+.install-heading .command-label { font: var(--text-eyebrow) var(--font-mono); letter-spacing: 1px; color: #5c6257; }
+.landing .copy-action { box-sizing: border-box; min-height: 44px; padding: 10px 14px; }
 .install-box .command { border: 0; padding: 10px 0 0; background: transparent; border-radius: 0; margin: 0; font-size: var(--text-caption); line-height: 1.8; resize: none; min-height: 106px; }
-.text-link { font-size: var(--text-small); font-weight: 600; text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.text-link { display: inline-block; box-sizing: border-box; min-height: 44px; padding: 12px 0; line-height: 20px; font-size: var(--text-small); font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-decoration-thickness: 1px; text-underline-offset: 4px; border-bottom: 0; }
 .plugin-download { margin: 14px 0 0; gap: 12px; border-color: var(--line); background: var(--panel); }
 .plugin-icon { border: 1px solid var(--line); border-radius: 50%; width: 22px; height: 22px; display: inline-flex; justify-content: center; align-items: center; font: 15px var(--font-sans); }
 .publisher-steps { list-style: none; padding: 0; margin: 22px 0 20px; display: grid; gap: 12px; color: var(--muted); font-size: var(--text-caption); }
