@@ -12,6 +12,13 @@
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
     };
+    const safeHref = (value) => {
+        const url = String(value || '').trim();
+        if (url.startsWith('https://') || url.startsWith('http://')) {
+            return url;
+        }
+        return '#';
+    };
     const affilioProxy = (method, path, body) => {
         const base = String((AffilioData && AffilioData.restBase) || '').replace(/\/$/, '');
         const payload = { method: method, path: path };
@@ -30,7 +37,7 @@
             <div class="affilio-panel affilio-panel-warning">
                 <h2>Affilio Dashboard</h2>
                 <p><strong>${t('Not connected.', 'Non connesso.')}</strong> ${esc(message)}</p>
-                <p><a class="button button-primary" href="${esc(settings)}">${t('Open settings', 'Apri impostazioni')}</a></p>
+                <p><a class="button button-primary" href="${esc(safeHref(settings))}">${t('Open settings', 'Apri impostazioni')}</a></p>
             </div>
         `;
         return;
@@ -184,14 +191,6 @@
         if (i === 'high') return t('High click potential', 'Alto potenziale di click');
         if (i === 'medium') return t('Medium click potential', 'Medio potenziale di click');
         return t('Low click potential', 'Basso potenziale di click');
-    };
-
-    const safeHref = (value) => {
-        const url = String(value || '').trim();
-        if (url.startsWith('https://') || url.startsWith('http://')) {
-            return url;
-        }
-        return '#';
     };
 
     const buildSnippetHTML = (programName, linkURL, generatedText) => {
