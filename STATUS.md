@@ -6,6 +6,14 @@
 
 POST `/wp-json/affilio/v1/insert` is removed. That route wrote caller-supplied HTML and an English disclosure into `post_content`. The dashboard confirm action no longer sends HTML. It calls `POST /affilio/v1/editor/approve-insert`, which inserts the generated recommendation. `Affilio_Inserter` stays because that editor route still calls `insert_inline_mention` with sanitized generated HTML. `POST /v1/insert/confirm` stays because the editor records the completed insert there, and the admin proxy still allows that path.
 
+## October 15 — sale windows follow the session clock
+
+`clicks.clicked_at`, `conversions.occurred_at`, and `ledger_entries.clears_at` are timestamps without time zone. `NOW()` stores the session wall clock. A Go instant is bound as `timestamptz` and compared in that same clock, and a column read back for a Go `time.Time` is that instant. A sale at the click stays attributed in `Europe/Rome`, an organic purchase two hours later is not flagged, and the refund hold still clears against `NOW()`. The API does not pin the session to UTC. `AFFILIO_TEST_TIMEZONE` sets the test session, for example `Europe/Rome`, without changing the server. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
+## October 15 — plugin ZIP includes public styles
+
+`Dockerfile.mvp` copies `affilio-wp/public/` into the WordPress ZIP served at `/downloads/affilio.zip`. That ZIP now contains `affilio-wp/public/css/placement.css` and `affilio-wp/public/js/affilio-track.js`, the same paths `scripts/package-wp-zip` writes. The release check builds that ZIP from the Dockerfile copy list and stops when `public/css/placement.css` is missing.
+
 ## October 14 — a Stripe refund waits when this product can still take the sale
 
 A Stripe refund stays pending when this product has no Stripe sale yet. Another seller's sale with the same order id does not close it. A seller report on this product in the refund currency stays pending too, because a later Stripe sale can still upgrade that report and the refund then applies. The refund is rejected and is not retried only when this product's sale for that order belongs to a different signed provider. A Lemon or Polar refund whose currency does not match the sale is rejected and is not retried. A refund that arrives before any sale stays unmatched. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
@@ -449,6 +457,8 @@ See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
 - Branch protection setup script: `scripts/setup_branch_protection.sh` (`make branch-protect`).
 
 ## Changelog
+- 2026-10-15: Sale windows follow the Postgres session clock. A sale at the click stays attributed in `Europe/Rome`, and the refund hold still clears against `NOW()`. No new migration.
+- 2026-10-15: The MVP plugin ZIP includes `affilio-wp/public/css/placement.css` and `affilio-wp/public/js/affilio-track.js`.
 - 2026-10-15: Removed WordPress `POST /affilio/v1/insert`. Plugin 0.1.26. The dashboard inserts through `POST /affilio/v1/editor/approve-insert` and does not send HTML. The inserter class remains for that editor path. `POST /v1/insert/confirm` remains.
 - 2026-10-15: Generated insert copy no longer falls back to the internal recommendation reason. A blurb that shares a sentence, a five-word run, `contextual fit`, or `Performance-adjusted` with that reason is rejected whole. The same language reuses the stored preview. `it_IT` posts get the approved Italian disclosure. No new migration.
 - 2026-02-05: Added MVP checklist + status script, analytics dashboard sorting/top-N, seed dedupe with upsert, new analytics endpoints, Claude integration for detection + content generation, handler tests + test DB compose, make targets.

@@ -118,7 +118,7 @@ func insertRefund(ctx context.Context, tx pgx.Tx, row refundInsert) (*RefundOutc
 		conflict = `ON CONFLICT (offer_id, provider_event_id) WHERE provider = 'seller_report' DO NOTHING`
 	}
 	err := tx.QueryRow(ctx, `INSERT INTO conversions(offer_id,campaign_id,click_id,provider,provider_event_id,provider_object_id,kind,amount,currency,commission_amount,occurred_at,gross_minor,payment_mode,trust_level,refund_status,refund_reason,refunded_conversion_id)
-VALUES($1,$2,$3,$4,$5,$6,'refund',$7,$8,$9,$10,NULLIF($11,0),$12,$13,$14,NULLIF($15,''),NULLIF($16,'')::uuid)
+VALUES($1,$2,$3,$4,$5,$6,'refund',$7,$8,$9,($10`+sessionWallFromInstant+`),NULLIF($11,0),$12,$13,$14,NULLIF($15,''),NULLIF($16,'')::uuid)
 `+conflict+` RETURNING id::text`,
 		row.offerID, row.campaignID, row.clickID, row.provider, row.eventID, row.objectID, row.amount, row.currency, row.commission, row.occurredAt, row.grossMinor, row.paymentMode, row.trustLevel, row.status, row.reason, row.saleID).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {

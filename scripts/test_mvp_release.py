@@ -3,8 +3,10 @@ from email.message import Message
 import hashlib
 import io
 import json
-from pathlib import Path
+import os
+from pathlib import Path, PurePosixPath
 import re
+import shutil
 import subprocess
 import tempfile
 import sys
@@ -61,6 +63,107 @@ def public_responses():
     return result
 
 
+def _dockerfile_lines(text):
+    logical = []
+    pending = ""
+    for raw in text.splitlines():
+        piece = raw.split("#", 1)[0].rstrip()
+        if not piece.strip():
+            continue
+        continued = piece.rstrip().endswith("\\")
+        if continued:
+            piece = piece.rstrip()[:-1].rstrip()
+        pending = (pending + " " + piece.strip()).strip()
+        if continued:
+            continue
+        logical.append(pending)
+        pending = ""
+    if pending:
+        logical.append(pending)
+    return logical
+
+
+def _docker_match(pattern, rel):
+    directory = pattern.endswith("/")
+    pattern = pattern[1:] if pattern.startswith("/") else pattern
+    pattern = pattern.rstrip("/")
+    escaped = re.escape(pattern).replace(r"\*\*", "\0").replace(r"\*", "[^/]*").replace(r"\?", "[^/]").replace("\0", ".*")
+    if "/" not in pattern and not pattern.startswith("**"):
+        escaped = r"(?:^|.*/)" + escaped
+    else:
+        escaped = "^" + escaped
+    escaped += r"(?:/.*)?$" if not directory else r"(?:/.*)$"
+    return re.match(escaped, rel) is not None
+
+
+def _docker_ignored(rel):
+    ignored = False
+    dockerignore = release.ROOT / ".dockerignore"
+    if not dockerignore.is_file():
+        return False
+    for raw in dockerignore.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        negate = line.startswith("!")
+        pattern = line[1:] if negate else line
+        if _docker_match(pattern, rel):
+            ignored = not negate
+    return ignored
+
+
+def _copy_build_source(source, target):
+    if source.is_file():
+        if _docker_ignored(source.relative_to(release.ROOT).as_posix()):
+            return
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        return
+    for dirpath, dirnames, filenames in os.walk(source):
+        current = Path(dirpath)
+        dirnames[:] = [name for name in dirnames if not _docker_ignored((current / name).relative_to(release.ROOT).as_posix())]
+        for name in filenames:
+            path = current / name
+            rel = path.relative_to(release.ROOT).as_posix()
+            if _docker_ignored(rel):
+                continue
+            dest = target / path.relative_to(source)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, dest)
+
+
+def dockerfile_mvp_plugin_zip():
+    text = (release.ROOT / "Dockerfile.mvp").read_text()
+    stages = re.split(r"(?m)^FROM ", text)
+    if len(stages) < 2:
+        raise AssertionError("Dockerfile.mvp has no build stage")
+    lines = _dockerfile_lines(stages[1])
+    copies = [line for line in lines if line.startswith("COPY ") and "/wordpress/" in line]
+    zip_lines = [line for line in lines if "zip -qr" in line and "affilio.zip" in line]
+    if len(copies) == 0 or len(zip_lines) != 1 or " -x " not in zip_lines[0]:
+        raise AssertionError("Dockerfile.mvp releases stage does not zip the WordPress plugin")
+    excludes = re.findall(r"'([^']*)'", zip_lines[0].split(" -x ", 1)[1])
+    with tempfile.TemporaryDirectory() as directory:
+        context = Path(directory)
+        for line in copies:
+            tokens = line.split()
+            if tokens[0] != "COPY" or len(tokens) != 3:
+                raise AssertionError("Dockerfile.mvp plugin COPY must be one source and one destination")
+            source = release.ROOT / tokens[1]
+            target = context.joinpath(*PurePosixPath(tokens[2]).parts)
+            _copy_build_source(source, target)
+        archive = context / "affilio.zip"
+        result = subprocess.run(
+            ["zip", "-qr", str(archive), "affilio-wp", "-x", *excludes],
+            cwd=context / "wordpress",
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise AssertionError(result.stderr or "zip failed while building the Dockerfile.mvp plugin archive")
+        return archive.read_bytes()
+
+
 def plugin_archive(plugin=None, extra=None, drop=None, bodies=None):
     version = release.PLUGIN_VERSION
     if plugin is None:
@@ -91,6 +194,30 @@ class ReleaseTests(unittest.TestCase):
         dockerfile = (release.ROOT / "Dockerfile.mvp").read_text()
         runtime = dockerfile.split("FROM ubuntu:24.04", 1)[1]
         self.assertIn("ENV GIN_MODE=release", runtime)
+
+    def test_dockerfile_mvp_zip_includes_public_placement_css(self):
+        data = dockerfile_mvp_plugin_zip()
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            names = [name for name in archive.namelist() if not name.endswith("/")]
+            self.assertIn("affilio-wp/public/css/placement.css", names)
+            self.assertEqual(
+                archive.read("affilio-wp/public/css/placement.css"),
+                (release.ROOT / "affilio-wp/public/css/placement.css").read_bytes(),
+            )
+        release.validate_plugin(data)
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z", "--", "affilio-wp"],
+            cwd=release.ROOT,
+            capture_output=True,
+            check=True,
+        )
+        expected = sorted(
+            name.decode()
+            for name in tracked.stdout.split(b"\0")
+            if name and not release.omit_from_plugin_zip(name.decode())
+        )
+        self.assertEqual(sorted(names), expected)
+
     def test_missing_oidc_stops_deployment_without_exposing_values(self):
         values = configuration()
         del values["OIDC_CLIENT_ID"]
