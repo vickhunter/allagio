@@ -56,25 +56,61 @@ func TestGenerateContentRejectsBlurbThatIsOnlyTheReason(t *testing.T) {
 	assertNoInternalCopy(t, rec.Body.String())
 }
 
-func TestGenerateContentStripsScoringPatternsFromBlurb(t *testing.T) {
+func TestGenerateContentRejectsScoreMatchReasonInsteadOfStripping(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	siteID, recID := seedGenerateRecommendation(t, db, internalFitReason)
+	reason := services.MatchCuratedPrograms("This article covers email marketing for small teams.", []services.CuratedProgramInput{{
+		ID:   "prog-email",
+		Name: "email marketing",
+	}}, nil)
+	if len(reason) != 1 {
+		t.Fatalf("scoreMatch matches: %#v", reason)
+	}
+	tuned := services.ApplyRecommendationTuning(reason, []services.RecommendationTuneProfile{{
+		ProgramID:  "prog-email",
+		Multiplier: 1.05,
+		SampleSize: 9,
+	}})
+	if len(tuned) != 1 || !strings.Contains(tuned[0].Reason, "Performance-adjusted (") {
+		t.Fatalf("tuning reason: %#v", tuned)
+	}
+	siteID, recID := seedGenerateRecommendation(t, db, tuned[0].Reason)
 	gen := scriptedGenerator(t, []string{
-		"Semrush helps teams research the keywords this article already discusses. strong contextual fit. Performance-adjusted (+4 from 9 historical outcomes).",
+		reason[0].Reason,
+		"The article discusses \u201cemail marketing\u201d, making it a for this recommendation.",
+		"Teams can compare tools here. Performance-adjusted.",
+		"Mailchimp helps teams schedule campaigns and see which emails get replies.",
 	})
 
-	rec := postGenerate(t, db, siteID, gen, map[string]interface{}{
-		"recommendation_id": recID,
-		"site_language":     "en_US",
-	})
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200 after stripping internal scoring, got %d body %s", rec.Code, rec.Body.String())
+	for _, blurb := range []string{
+		reason[0].Reason,
+		"The article discusses \u201cemail marketing\u201d, making it a for this recommendation.",
+		"Teams can compare tools here. Performance-adjusted.",
+	} {
+		rec := postGenerate(t, db, siteID, gen, map[string]interface{}{
+			"recommendation_id": recID,
+			"site_language":     "en",
+			"regenerate":        true,
+		})
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("blurb %q: expected 422, got %d body %s", blurb, rec.Code, rec.Body.String())
+		}
+		body := rec.Body.String()
+		if strings.Contains(body, "making it a for") || strings.Contains(body, "email marketing") || strings.Contains(strings.ToLower(body), "performance-adjusted") {
+			t.Fatalf("blurb %q published internal copy: %s", blurb, body)
+		}
+		if !strings.Contains(body, "no reader-facing copy") {
+			t.Fatalf("blurb %q missing the error: %s", blurb, body)
+		}
 	}
-	body := rec.Body.String()
-	assertNoInternalCopy(t, body)
-	if !strings.Contains(body, "Semrush helps teams research the keywords") {
-		t.Fatalf("expected the reader sentence to remain: %s", body)
+
+	clean := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+		"regenerate":        true,
+	})
+	if clean.Code != http.StatusOK || !strings.Contains(clean.Body.String(), "Mailchimp helps teams schedule campaigns") {
+		t.Fatalf("clean blurb rejected: %d %s", clean.Code, clean.Body.String())
 	}
 }
 
