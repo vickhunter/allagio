@@ -1,3 +1,7 @@
+## October 15 — plugin 0.1.26 removes the legacy insert route
+
+POST `/wp-json/affilio/v1/insert` is removed. That route wrote caller-supplied HTML and an English disclosure into `post_content`. The dashboard confirm action no longer sends HTML. It calls `POST /affilio/v1/editor/approve-insert`, which inserts the generated recommendation. `Affilio_Inserter` stays because that editor route still calls `insert_inline_mention` with sanitized generated HTML. `POST /v1/insert/confirm` stays because the editor records the completed insert there, and the admin proxy still allows that path.
+
 ## October 14 — a Stripe refund waits when this product can still take the sale
 
 A Stripe refund stays pending when this product has no Stripe sale yet. Another seller's sale with the same order id does not close it. A seller report on this product in the refund currency stays pending too, because a later Stripe sale can still upgrade that report and the refund then applies. The refund is rejected and is not retried only when this product's sale for that order belongs to a different signed provider. A Lemon or Polar refund whose currency does not match the sale is rejected and is not retried. A refund that arrives before any sale stays unmatched. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
@@ -367,7 +371,7 @@ Build **Affilio**, an AI affiliate copilot for WordPress (Yoast‑style) that sc
   - Review/Reject actions.
   - Promote action to create curated programs.
 - **Insertion**:
-  - `affilio/v1/insert` REST route inserts HTML and adds FTC disclosure once.
+  - The legacy `affilio/v1/insert` route is removed. The editor route `affilio/v1/editor/approve-insert` inserts generated, sanitized HTML and adds the disclosure once.
 - **Tracking**:
   - Front‑end click beacon to WP REST → backend.
   - Analytics endpoints for click counts by article and recommendation.
@@ -441,6 +445,7 @@ See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
 - Branch protection setup script: `scripts/setup_branch_protection.sh` (`make branch-protect`).
 
 ## Changelog
+- 2026-10-15: Removed WordPress `POST /affilio/v1/insert`. Plugin 0.1.26. The dashboard inserts through `POST /affilio/v1/editor/approve-insert` and does not send HTML. The inserter class remains for that editor path. `POST /v1/insert/confirm` remains.
 - 2026-02-05: Added MVP checklist + status script, analytics dashboard sorting/top-N, seed dedupe with upsert, new analytics endpoints, Claude integration for detection + content generation, handler tests + test DB compose, make targets.
 - 2026-02-06: Added recommendation quality analytics, retention/churn cohorts endpoint + dashboard panel, and tracking handler coverage updates.
 - 2026-02-06: Implemented recommendation quality model tuning loop with outcome-based multipliers and analytics visibility.

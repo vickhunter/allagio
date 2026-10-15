@@ -52,7 +52,7 @@ foreach ($GLOBALS['http'] as $call) {
 check(is_array($registration), 'site registration made no outbound request');
 check(array_keys($registration) === array('site_url', 'plugin_version'), 'registration payload is not limited to site_url and plugin_version');
 check($registration['site_url'] === 'https://blog.example', 'registration did not send the site URL');
-check($registration['plugin_version'] === '0.1.25', 'registration did not send the plugin version');
+check($registration['plugin_version'] === '0.1.26', 'registration did not send the plugin version');
 $contract = json_decode(file_get_contents(__DIR__ . '/fixtures/sites-register.json'), true);
 check($registration === $contract, 'registration payload drifted from the Go contract fixture');
 check($contract['plugin_version'] === AFFILIO_VERSION, 'contract fixture plugin_version is not AFFILIO_VERSION');

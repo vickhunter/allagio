@@ -11,38 +11,6 @@ class Affilio_Inserter {
         $this->api = $api;
     }
 
-    public function register_routes() {
-        register_rest_route('affilio/v1', '/insert', array(
-            'methods'  => 'POST',
-            'callback' => array($this, 'handle_insert'),
-            'permission_callback' => function () {
-                return current_user_can('edit_posts');
-            },
-        ));
-    }
-
-    public function handle_insert($request) {
-        $params = $request->get_json_params();
-        $post_id = isset($params['post_id']) ? intval($params['post_id']) : 0;
-        $html = isset($params['html']) ? $params['html'] : '';
-        $rec_id = isset($params['recommendation_id']) ? $params['recommendation_id'] : '';
-        $suggested_position = isset($params['suggested_position']) ? sanitize_key($params['suggested_position']) : 'end_of_article';
-        if (!$post_id || $html === '') {
-            return rest_ensure_response(array('status' => 'error', 'message' => 'invalid payload'));
-        }
-        if (!current_user_can('edit_post', $post_id)) {
-            return rest_ensure_response(array('status' => 'error', 'message' => 'forbidden'));
-        }
-        $result = $this->insert_inline_mention($post_id, $html, $suggested_position);
-        if (is_wp_error($result)) {
-            return rest_ensure_response(array('status' => 'error', 'message' => $result->get_error_message()));
-        }
-        if ($rec_id) {
-            $this->api->request('POST', '/insert/confirm', array('recommendation_id' => $rec_id));
-        }
-        return rest_ensure_response(array('status' => 'ok'));
-    }
-
     public function insert_inline_mention($post_id, $html, $suggested_position = 'end_of_article') {
         $post = get_post($post_id);
         if (!$post) {
