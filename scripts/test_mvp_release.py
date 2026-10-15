@@ -377,7 +377,7 @@ class ReleaseTests(unittest.TestCase):
                 stale = Path(directory) / "affilio-0.1.19.zip"
                 result = subprocess.run([str(script), str(stale)], cwd=release.ROOT, capture_output=True, text=True, timeout=60)
                 self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-                self.assertIn("passed the release gate with 25 files: affilio-%s.zip" % version, result.stdout)
+                self.assertIn("passed the release gate with 27 files: affilio-%s.zip" % version, result.stdout)
                 written = Path(directory) / ("affilio-%s.zip" % version)
                 self.assertTrue(written.is_file(), result.stdout)
                 self.assertFalse(stale.exists())
@@ -389,7 +389,8 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(names, sorted(names))
             for info in archive.infolist():
                 self.assertEqual(info.date_time, (1980, 1, 1, 0, 0, 0))
-        self.assertEqual(len(names), 25)
+        self.assertEqual(len(names), 27)
+        self.assertIn("affilio-wp/languages/affilio-it_IT.mo", names)
         self.assertTrue(hosted.isdisjoint(Path(name).name for name in names))
         for relative in needed:
             self.assertIn(release.PLUGIN_ROOT + relative, names)

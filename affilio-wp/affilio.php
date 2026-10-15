@@ -77,11 +77,17 @@ require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-distribution.php';
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-plugin-ack.php';
 require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-go.php';
 
-if (!function_exists('affilio_init')) {
-function affilio_init() {
+if (!function_exists('affilio_load_textdomain')) {
+function affilio_load_textdomain() {
     if (function_exists('load_plugin_textdomain') && function_exists('plugin_basename')) {
         load_plugin_textdomain('affilio', false, dirname(plugin_basename(__FILE__)) . '/languages');
     }
+}
+}
+
+if (!function_exists('affilio_init')) {
+function affilio_init() {
+    add_action('init', 'affilio_load_textdomain');
     $api = new Affilio_API();
     $scanner = new Affilio_Scanner($api);
     $inserter = new Affilio_Inserter($api);

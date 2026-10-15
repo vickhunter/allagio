@@ -9,6 +9,7 @@ COPY affilio-wp/readme.txt ./wordpress/affilio-wp/readme.txt
 COPY affilio-wp/includes ./wordpress/affilio-wp/includes
 COPY affilio-wp/admin ./wordpress/affilio-wp/admin
 COPY affilio-wp/public ./wordpress/affilio-wp/public
+COPY affilio-wp/languages ./wordpress/affilio-wp/languages
 RUN cd wordpress && zip -qr /release/affilio.zip affilio-wp \
     -x 'affilio-wp/admin/build/agent-poc.html' 'affilio-wp/admin/build/workspace*' 'affilio-wp/admin/build/home.html' 'affilio-wp/admin/build/landing*' 'affilio-wp/admin/build/setup-controls.js' 'affilio-wp/admin/build/package*.json' 'affilio-wp/admin/build/THIRD_PARTY_NOTICES.md' \
        'affilio-wp/e2e/*' 'affilio-wp/tests/*' 'affilio-wp/phpunit.xml' 'affilio-wp/phpunit.xml.dist' '*test-results*' '*playwright-report*' '*.phpunit.result.cache' '*/.phpunit.*'

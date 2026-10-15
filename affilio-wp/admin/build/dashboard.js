@@ -4,6 +4,14 @@
     const locale = String((AffilioData && AffilioData.locale) || document.documentElement.lang || 'en').toLowerCase();
     const isItalian = locale.startsWith('it');
     const t = (en, it) => (isItalian ? it : en);
+    const esc = (value) => {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    };
     const affilioProxy = (method, path, body) => {
         const base = String((AffilioData && AffilioData.restBase) || '').replace(/\/$/, '');
         const payload = { method: method, path: path };
@@ -17,11 +25,12 @@
     root.classList.add('affilio-dashboard-app');
     if (AffilioData.connectionStatus && !AffilioData.connectionStatus.connected) {
         const settings = AffilioData.settingsUrl || '/wp-admin/admin.php?page=affilio-settings';
+        const message = AffilioData.connectionStatus.message || t('Configure your API key.', 'Configura la tua chiave API.');
         root.innerHTML = `
             <div class="affilio-panel affilio-panel-warning">
                 <h2>Affilio Dashboard</h2>
-                <p><strong>${t('Not connected.', 'Non connesso.')}</strong> ${AffilioData.connectionStatus.message || t('Configure your API key.', 'Configura la tua chiave API.')}</p>
-                <p><a class="button button-primary" href="${settings}">${t('Open settings', 'Apri impostazioni')}</a></p>
+                <p><strong>${t('Not connected.', 'Non connesso.')}</strong> ${esc(message)}</p>
+                <p><a class="button button-primary" href="${esc(settings)}">${t('Open settings', 'Apri impostazioni')}</a></p>
             </div>
         `;
         return;
@@ -130,15 +139,6 @@
         toast.style.zIndex = 1000;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 2000);
-    };
-
-    const esc = (value) => {
-        return String(value || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
     };
 
     const textFromHTML = (value) => {

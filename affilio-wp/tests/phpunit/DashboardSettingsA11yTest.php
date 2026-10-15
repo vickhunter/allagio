@@ -33,6 +33,17 @@ class DashboardSettingsA11yTest extends TestCase {
      * @runInSeparateProcess
      * @preserveGlobalState disabled
      */
+    public function test_textdomain_loads_on_init() {
+        $this->boot();
+        affilio_init();
+        $hooks = isset($GLOBALS['actions']['init']) ? $GLOBALS['actions']['init'] : array();
+        $this->assertContains('affilio_load_textdomain', $hooks);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
     public function test_settings_page_enqueues_admin_stylesheet() {
         $admin = $this->admin(false);
         $GLOBALS['styles'] = array();

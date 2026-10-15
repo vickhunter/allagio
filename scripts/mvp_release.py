@@ -46,6 +46,7 @@ WP_FILES = {
     "affilio-wp/admin/build/marketplace.js",
     "affilio-wp/admin/build/earnings.js",
     "affilio-wp/admin/css/affilio-admin.css",
+    "affilio-wp/languages/affilio-it_IT.mo",
     "affilio-wp/readme.txt",
 }
 PLUGIN_ROOT = "affilio-wp/"
