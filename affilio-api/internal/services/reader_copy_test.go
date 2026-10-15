@@ -184,6 +184,34 @@ func TestSanitizeReaderCopyRejectsDigitStandInsForLetters(t *testing.T) {
 	}
 }
 
+func TestOverlapCatchesDashedEmailMarketingBothWays(t *testing.T) {
+	t.Parallel()
+	const split = "The article discusses email marketing daily."
+	const glued = "The article discusses emailmarketing daily."
+	for _, dash := range []rune{'\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\u2212'} {
+		text := "The article discusses email" + string(dash) + "marketing daily."
+		if !ContainsInternalCopy(text, split) {
+			t.Fatalf("%U split form escaped", dash)
+		}
+		if !ContainsInternalCopy(text, glued) {
+			t.Fatalf("%U glued form escaped", dash)
+		}
+		if !ContainsInternalCopy(split, text) {
+			t.Fatalf("%U split reason escaped a dashed sentence", dash)
+		}
+		if !ContainsInternalCopy(glued, text) {
+			t.Fatalf("%U glued reason escaped a dashed sentence", dash)
+		}
+	}
+	ascii := "The article discusses email-marketing daily."
+	if ContainsInternalCopy(ascii, split) {
+		t.Fatal("ascii hyphen matched the split reason")
+	}
+	if ContainsInternalCopy(split, "The article discusses email-marketing daily.") {
+		t.Fatal("ascii hyphen in the reason matched the split sentence")
+	}
+}
+
 func TestSanitizeReaderCopyRejectsCategoryScoreMatchSentence(t *testing.T) {
 	t.Parallel()
 	matches := MatchCuratedPrograms("seo email marketing", []CuratedProgramInput{{

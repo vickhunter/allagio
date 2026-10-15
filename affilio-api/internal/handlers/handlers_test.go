@@ -131,6 +131,36 @@ func splitKeywordDSN(raw string) []string {
 
 func applyMigrations(t *testing.T, db *database.DB) {
 	t.Helper()
+	applyMigrationsThrough(t, db, "038_timestamptz_instants.sql")
+}
+
+// setupTestDBThrough connects in zone and applies migrations through last,
+// inclusive. last is a file name from migrationFiles, such as 037.
+func setupTestDBThrough(t *testing.T, zone, last string) (*database.DB, func()) {
+	t.Helper()
+	raw := strings.TrimSpace(os.Getenv("AFFILIO_TEST_DATABASE_URL"))
+	if raw == "" {
+		t.Skip("AFFILIO_TEST_DATABASE_URL not set; skipping DB integration tests")
+	}
+	dsn, err := withSessionTimeZone(raw, zone)
+	if err != nil {
+		t.Fatalf("session timezone: %v", err)
+	}
+	ctx := context.Background()
+	db, err := database.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatalf("failed to connect db: %v", err)
+	}
+	applyMigrationsThrough(t, db, last)
+	cleanup := func() {
+		_ = truncateAll(db)
+		db.Close()
+	}
+	return db, cleanup
+}
+
+func applyMigrationsThrough(t *testing.T, db *database.DB, last string) {
+	t.Helper()
 	// Reset public schema so destructive migrations (e.g. column drops) can
 	// be re-applied cleanly when multiple tests share the same database.
 	if _, err := db.Pool.Exec(context.Background(), `
@@ -141,7 +171,28 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		t.Fatalf("reset schema: %v", err)
 	}
 	root := filepath.Join("..", "migrations")
-	files := []string{
+	applied := false
+	for _, f := range migrationFiles() {
+		path := filepath.Join(root, f)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read migration %s: %v", f, err)
+		}
+		if _, err := db.Pool.Exec(context.Background(), string(content)); err != nil {
+			t.Fatalf("apply migration %s: %v", f, err)
+		}
+		if f == last {
+			applied = true
+			break
+		}
+	}
+	if !applied {
+		t.Fatalf("migration %s is not in the harness list", last)
+	}
+}
+
+func migrationFiles() []string {
+	return []string{
 		"001_initial.sql",
 		"002_seed_programs.sql",
 		"003_add_user_program_id.sql",
@@ -180,16 +231,6 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"036_refund_sale_link.sql",
 		"037_reserved_sale_events.sql",
 		"038_timestamptz_instants.sql",
-	}
-	for _, f := range files {
-		path := filepath.Join(root, f)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read migration %s: %v", f, err)
-		}
-		if _, err := db.Pool.Exec(context.Background(), string(content)); err != nil {
-			t.Fatalf("apply migration %s: %v", f, err)
-		}
 	}
 }
 

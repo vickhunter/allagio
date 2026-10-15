@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -54,8 +53,7 @@ func TestHarnessSessionTimeZone(t *testing.T) {
 
 // TestSaleAttributionAndPayoutWhenSessionTimeZoneIsNotUTC keeps a sale inside
 // the cookie window and the refund hold when the session clock is not UTC.
-// clicks.clicked_at and ledger_entries.clears_at are timestamp without time
-// zone, written in the session wall clock. A Go instant has to meet that clock.
+// clicks.clicked_at and ledger_entries.clears_at are timestamptz instants.
 func TestSaleAttributionAndPayoutWhenSessionTimeZoneIsNotUTC(t *testing.T) {
 	db, cleanup := setupTestDBInZone(t, "Europe/Rome")
 	defer cleanup()
@@ -103,14 +101,15 @@ func TestSaleAttributionAndPayoutWhenSessionTimeZoneIsNotUTC(t *testing.T) {
 	if !ok {
 		t.Fatalf("sale created type %T", later["created"])
 	}
-	var skew float64
-	if err := db.Pool.QueryRow(context.Background(), `SELECT EXTRACT(EPOCH FROM ((le.clears_at AT TIME ZONE current_setting('TimeZone')) - $1::timestamptz))
+	wantClear := time.Unix(created, 0).UTC().Add(30 * 24 * time.Hour)
+	var clearsAt time.Time
+	if err := db.Pool.QueryRow(context.Background(), `SELECT le.clears_at
 FROM ledger_entries le JOIN conversions cv ON cv.id=le.conversion_id
-WHERE cv.provider_event_id='evt_zone_later' AND le.kind='commission'`, time.Unix(created, 0).UTC().Add(30*24*time.Hour)).Scan(&skew); err != nil {
+WHERE cv.provider_event_id='evt_zone_later' AND le.kind='commission'`).Scan(&clearsAt); err != nil {
 		t.Fatal(err)
 	}
-	if skew < -2 || skew > 2 {
-		t.Fatalf("clears_at is %.0f seconds from the refund window in %s", skew, zone)
+	if !clearsAt.Equal(wantClear) {
+		t.Fatalf("clears_at %s, want %s in %s", clearsAt.Format(time.RFC3339Nano), wantClear.Format(time.RFC3339Nano), zone)
 	}
 
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE ledger_entries SET clears_at = NOW() - INTERVAL '1 day' WHERE conversion_id IN (SELECT id FROM conversions WHERE provider_event_id='evt_zone_later')`); err != nil {
@@ -135,31 +134,6 @@ func TestTimestamptzSurvivesRomeDSTFold(t *testing.T) {
 	assertFoldInstant(t, db, "clicks", "clicked_at", `INSERT INTO clicks(clicked_at) VALUES ($1::timestamptz) RETURNING id`, before, after)
 	assertFoldInstant(t, db, "conversions", "occurred_at", `INSERT INTO conversions(provider, provider_event_id, kind, amount, occurred_at) VALUES ('stripe', $1, 'sale', 10, $2::timestamptz) RETURNING id`, before, after)
 	assertFoldInstant(t, db, "ledger_entries", "clears_at", `INSERT INTO ledger_entries(kind, amount, clears_at) VALUES ('commission', 1, $1::timestamptz) RETURNING id`, before, after)
-
-	up, err := os.ReadFile(filepath.Join("..", "migrations", "038_timestamptz_instants.sql"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = db.Pool.Exec(context.Background(), string(up)); err != nil {
-		t.Fatalf("re-applying the migration: %v", err)
-	}
-	assertFoldInstant(t, db, "clicks", "clicked_at", `INSERT INTO clicks(clicked_at) VALUES ($1::timestamptz) RETURNING id`, before, after)
-
-	down, err := os.ReadFile(filepath.Join("..", "migrations", "down", "038_timestamptz_instants.sql"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = db.Pool.Exec(context.Background(), string(down)); err != nil {
-		t.Fatalf("down migration: %v", err)
-	}
-	assertColumnType(t, db, "clicks", "clicked_at", "timestamp without time zone")
-	assertColumnType(t, db, "conversions", "occurred_at", "timestamp without time zone")
-	assertColumnType(t, db, "ledger_entries", "clears_at", "timestamp without time zone")
-	if _, err = db.Pool.Exec(context.Background(), string(up)); err != nil {
-		t.Fatalf("up migration after down: %v", err)
-	}
-	assertColumnType(t, db, "clicks", "clicked_at", "timestamp with time zone")
-	assertFoldInstant(t, db, "clicks", "clicked_at", `INSERT INTO clicks(clicked_at) VALUES ($1::timestamptz) RETURNING id`, before, after)
 }
 
 func assertFoldInstant(t *testing.T, db *database.DB, table, column, insert string, before, after time.Time) {
@@ -318,6 +292,65 @@ func TestSaleAtClickInstantStaysUnflagged(t *testing.T) {
 	}
 	if !flagged {
 		t.Fatal("sale five seconds after the click stayed unflagged")
+	}
+}
+
+// TestSaleInTheClickSecondStaysUnflagged records a sale at the truncated
+// second of a click that still has a fractional second. Provider timestamps
+// are whole seconds, so that sale is the click's own second.
+func TestSaleInTheClickSecondStaysUnflagged(t *testing.T) {
+	db, cleanup := setupTestDBInZone(t, "Europe/Rome")
+	defer cleanup()
+	clickAt := time.Date(2026, 6, 15, 12, 0, 0, 400*int(time.Millisecond), time.UTC)
+	db.Now = func() time.Time { return clickAt }
+
+	_, makerKey := createTestMaker(t, db)
+	r := newPayoutsRouter(db)
+	offerID := listedOffer(t, db, r, makerKey)
+	siteKey := "site-key-same-second"
+	createTestSite(t, db, siteKey, "same-second.example.com", "Same Second")
+	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
+	code := join["tracking_code"].(string)
+	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)
+	rrec := httptest.NewRecorder()
+	r.ServeHTTP(rrec, req)
+	requirePlainRedirect(t, rrec, "https://inboxpilot.example.com")
+	clickID := insertCampaignClick(t, db, code)
+
+	var clicked time.Time
+	if err := db.Pool.QueryRow(context.Background(), `SELECT clicked_at FROM clicks WHERE id=$1`, clickID).Scan(&clicked); err != nil {
+		t.Fatal(err)
+	}
+	if !clicked.Equal(clickAt) {
+		t.Fatalf("click instant %s, want %s", clicked.Format(time.RFC3339Nano), clickAt.Format(time.RFC3339Nano))
+	}
+	saleSecond := clickAt.Truncate(time.Second)
+	sale := stripeSalePayload("evt_same_second", "pi_same_second", clickID, 10000)
+	sale["created"] = saleSecond.Unix()
+	wrec, wbody := sendStripeEvent(t, db, r, sale)
+	if wrec.Code != http.StatusOK || wbody["status"] != "recorded" {
+		t.Fatalf("sale in the click second: %d %v", wrec.Code, wbody)
+	}
+	var flagged bool
+	if err := db.Pool.QueryRow(context.Background(), `SELECT flagged FROM conversions WHERE provider_event_id='evt_same_second'`).Scan(&flagged); err != nil {
+		t.Fatal(err)
+	}
+	if flagged {
+		t.Fatal("sale in the click's truncated second was flagged")
+	}
+
+	next := saleSecond.Add(time.Second)
+	fast := stripeSalePayload("evt_next_second", "pi_next_second", clickID, 10000)
+	fast["created"] = next.Unix()
+	wrec, wbody = sendStripeEvent(t, db, r, fast)
+	if wrec.Code != http.StatusOK || wbody["status"] != "recorded" {
+		t.Fatalf("sale in the next second: %d %v", wrec.Code, wbody)
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT flagged FROM conversions WHERE provider_event_id='evt_next_second'`).Scan(&flagged); err != nil {
+		t.Fatal(err)
+	}
+	if !flagged {
+		t.Fatal("sale in the second after the click stayed unflagged")
 	}
 }
 

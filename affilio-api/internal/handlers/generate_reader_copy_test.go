@@ -418,6 +418,25 @@ func TestVisibleTextSplitsUnicodeDashes(t *testing.T) {
 	}
 }
 
+func TestVisibleTextCatchesDashedEmailMarketingBothWays(t *testing.T) {
+	const split = "The article discusses email marketing daily."
+	const glued = "The article discusses emailmarketing daily."
+	for _, dash := range []rune{'\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\u2212'} {
+		html := readerHTML("Mailchimp", "https://example.com/aff", "The article discusses email"+string(dash)+"marketing daily.")
+		visible := visibleReaderText(html)
+		if !services.ContainsInternalCopy(visible, split) {
+			t.Fatalf("%U split form escaped visible text %q", dash, visible)
+		}
+		if !services.ContainsInternalCopy(visible, glued) {
+			t.Fatalf("%U glued form escaped visible text %q", dash, visible)
+		}
+	}
+	ascii := readerHTML("Mailchimp", "https://example.com/aff", "The article discusses email-marketing daily.")
+	if services.ContainsInternalCopy(visibleReaderText(ascii), split) {
+		t.Fatalf("ascii hyphen in visible text matched the split reason: %q", visibleReaderText(ascii))
+	}
+}
+
 func TestGenerateContentRegeneratesEntityEncodedReasonAndTransition(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
