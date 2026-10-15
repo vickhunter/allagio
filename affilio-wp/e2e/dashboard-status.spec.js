@@ -174,7 +174,7 @@ test('a finished scan replaces the start label', async ({ page }) => {
   await noHorizontalOverflow(page);
 });
 
-test('starting analysis from a connected site leaves the start label', async ({ page }) => {
+test('starting analysis from a connected site switches to the in-progress label', async ({ page }) => {
   await bootOnboarding(page, {
     locale: 'en',
     connected: true,
@@ -185,6 +185,9 @@ test('starting analysis from a connected site leaves the start label', async ({ 
       analysisComplete: 'Analysis complete',
     },
   });
+  const button = page.getByRole('button', { name: 'Start analysis', exact: true });
+  await expect(button).toBeEnabled();
+  await page.unroute('**/affilio/v1/setup');
   await page.route('**/affilio/v1/setup', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -196,7 +199,6 @@ test('starting analysis from a connected site leaves the start label', async ({ 
       dashboard_url: 'https://blog.example/wp-admin/admin.php?page=affilio',
     }),
   }));
-  const button = page.getByRole('button', { name: 'Start analysis', exact: true });
   await button.click();
   await expect(page.getByRole('button', { name: 'Analysis in progress', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Start analysis' })).toHaveCount(0);
