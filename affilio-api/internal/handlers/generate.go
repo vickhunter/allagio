@@ -66,6 +66,11 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 		link = "#"
 	}
 	language := services.NormalizeSiteLanguage(req.SiteLanguage)
+	if !services.ReaderCopySafe(rec.ProgramName) || services.ContainsInternalCopy(rec.ProgramName, rec.Reason) ||
+		!services.ReaderCopySafe(link) || services.ContainsInternalCopy(link, rec.Reason) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
+		return
+	}
 	if !req.Regenerate {
 		if preview, ok := reusablePreview(rec.GeneratedHTML, language, rec.Reason); ok {
 			writeGenerated(c, preview.HTML, preview.Text, preview.Position, preview.PlacementReason, preview.Transition, preview.ParagraphIndex, preview.Confidence, rec.ProgramName, link)

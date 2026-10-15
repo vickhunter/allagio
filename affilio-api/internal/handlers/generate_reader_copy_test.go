@@ -154,6 +154,47 @@ func TestGenerateContentRejectsHiddenReaderCopy(t *testing.T) {
 	}
 }
 
+func TestGenerateContentRejectsUnsafeProgramNameAndLink(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	reason := services.MatchCuratedPrograms("This article covers email marketing for small teams.", []services.CuratedProgramInput{{
+		ID:   "prog-name",
+		Name: "email marketing",
+	}}, nil)
+	if len(reason) != 1 {
+		t.Fatalf("scoreMatch matches: %#v", reason)
+	}
+	siteID, recID := seedGenerateRecommendation(t, db, reason[0].Reason)
+	gen := scriptedGenerator(t, []string{
+		"Mailchimp helps teams schedule campaigns and see which emails get replies.",
+	})
+	setProgram := func(name, link string) {
+		t.Helper()
+		if _, err := db.Pool.Exec(context.Background(), `UPDATE affiliate_programs SET name=$1, signup_url=$2 WHERE slug='semrush-reader-copy'`, name, link); err != nil {
+			t.Fatal(err)
+		}
+	}
+	expect := func(name, link string, want int) {
+		t.Helper()
+		setProgram(name, link)
+		rec := postGenerate(t, db, siteID, gen, map[string]interface{}{
+			"recommendation_id": recID,
+			"site_language":     "en",
+			"regenerate":        true,
+		})
+		if rec.Code != want {
+			t.Fatalf("name %q link %q: got %d body %s", name, link, rec.Code, rec.Body.String())
+		}
+		if want == http.StatusUnprocessableEntity && !strings.Contains(rec.Body.String(), "no reader-facing copy") {
+			t.Fatalf("name %q link %q missing the error: %s", name, link, rec.Body.String())
+		}
+	}
+	expect("Semrush contex\u034Ftual Program", "https://example.com/aff", http.StatusUnprocessableEntity)
+	expect("A strong contextual fit for readers", "https://example.com/aff", http.StatusUnprocessableEntity)
+	expect("Semrush Affiliate Program", "https://example.com/aff\u200Atrack", http.StatusUnprocessableEntity)
+	expect("Cœur für Straße", "https://example.com/aff", http.StatusOK)
+}
+
 func TestGenerateContentReusesPreviewForTheSameLanguage(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

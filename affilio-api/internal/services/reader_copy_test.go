@@ -71,6 +71,58 @@ func TestSanitizeReaderCopyRejectsHiddenAndMarkedText(t *testing.T) {
 	}
 }
 
+func TestSanitizeReaderCopyRejectsIgnorableMarksSpacesAndLookalikes(t *testing.T) {
+	t.Parallel()
+	reason := scoreMatchReason(t)
+	base := "Mailchimp helps teams schedule campaigns and see which emails get replies."
+	hide := func(r rune) string {
+		return "Readers can see a strong contex" + string(r) + "tual fit for this comparison of tools."
+	}
+
+	for _, r := range []rune{'\u034F', '\uFE00', '\uFE0F', '\U000E0100', '\U000E01EF', '\u180B', '\u180C', '\u180D', '\u180E', '\u180F', '\u17B4', '\u17B5'} {
+		assertRejectedCopy(t, hide(r), reason)
+	}
+	for r := rune('\u2000'); r <= '\u200A'; r++ {
+		assertRejectedCopy(t, hide(r), reason)
+	}
+	assertRejectedCopy(t, hide('\u3000'), reason)
+	assertRejectedCopy(t, hide('\u202F'), reason)
+
+	assertRejectedCopy(t, strings.Replace(base, "campaigns", "campa\u0131gns", 1), reason)
+	assertRejectedCopy(t, strings.Replace(base, "campaigns", "c\u0251mpaigns", 1), reason)
+	assertRejectedCopy(t, strings.Replace(base, "campaigns", "c\u1D00mpaigns", 1), reason)
+
+	assertRejectedCopy(t, "Readers can see a \uFF1Cem\uFF1Econtextual fit\uFF1C/em\uFF1E in this comparison of tools.", reason)
+	assertRejectedCopy(t, "Readers can see a contex\uFF06#116ual fit for this comparison of tools.", reason)
+	assertRejectedCopy(t, "Readers can see a contex&#116ual fit for this comparison of tools.", reason)
+	assertRejectedCopy(t, "Readers can see a contex&#x74ual fit for this comparison of tools.", reason)
+
+	kept, ok := SanitizeReaderCopy("Mailchimp tracks 50\u00B5s samples and shows which emails get replies.", reason)
+	if !ok || !strings.Contains(kept, "50\u00B5s") {
+		t.Fatalf("micro sign rejected: %q ok=%v", kept, ok)
+	}
+}
+
+func TestSanitizeReaderCopyKeepsAccentedEuropeanCopy(t *testing.T) {
+	t.Parallel()
+	reason := scoreMatchReason(t)
+	samples := []string{
+		"Questa città è più adatta ai lettori che confrontano gli strumenti.",
+		"Questa citta\u0300 e\u0300 piu\u0300 adatta ai lettori che confrontano gli strumenti.",
+		"Für größere Häuser braucht man oft eine bessere Lösung mit Weiß.",
+		"Fu\u0308r gro\u0308ßere Ha\u0308user braucht man oft eine bessere Lo\u0308sung mit Weiß.",
+		"Le français préfère un cœur déjà prêt pour les lecteurs curieux.",
+		"Le franc\u0327ais pre\u0301fe\u0300re un cœur de\u0301ja\u0300 pre\u0302t pour les lecteurs curieux.",
+		"Mailchimp aide les équipes françaises à choisir un cœur déjà prêt.",
+	}
+	for _, sample := range samples {
+		got, ok := SanitizeReaderCopy(sample, reason)
+		if !ok || got != sample {
+			t.Fatalf("European copy rejected: %q ok=%v got %q", sample, ok, got)
+		}
+	}
+}
+
 func TestSanitizeReaderCopyRejectsShortSentenceWhenBlurbIsOnlyThat(t *testing.T) {
 	t.Parallel()
 	reason := "Good fit. Teams should compare a few tools before they buy anything."

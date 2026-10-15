@@ -20,6 +20,39 @@ var blankLetters = map[rune]struct{}{
 	'\uFFA0': {},
 }
 
+// defaultIgnorable is Unicode Default_Ignorable_Code_Point for assigned
+// characters: Other_Default_Ignorable, format characters, and variation
+// selectors, excluding annotation and Egyptian format controls.
+var defaultIgnorable = &unicode.RangeTable{
+	R16: []unicode.Range16{
+		{0x00AD, 0x00AD, 1},
+		{0x034F, 0x034F, 1},
+		{0x0600, 0x0605, 1},
+		{0x061C, 0x061C, 1},
+		{0x06DD, 0x06DD, 1},
+		{0x070F, 0x070F, 1},
+		{0x0890, 0x0891, 1},
+		{0x08E2, 0x08E2, 1},
+		{0x115F, 0x1160, 1},
+		{0x17B4, 0x17B5, 1},
+		{0x180B, 0x180F, 1},
+		{0x200B, 0x200F, 1},
+		{0x202A, 0x202E, 1},
+		{0x2060, 0x206F, 1},
+		{0x3164, 0x3164, 1},
+		{0xFE00, 0xFE0F, 1},
+		{0xFEFF, 0xFEFF, 1},
+		{0xFFA0, 0xFFA0, 1},
+	},
+	R32: []unicode.Range32{
+		{0x110BD, 0x110BD, 1},
+		{0x110CD, 0x110CD, 1},
+		{0x1BCA0, 0x1BCA3, 1},
+		{0x1D173, 0x1D17A, 1},
+		{0xE0000, 0xE0FFF, 1},
+	},
+}
+
 var letterScripts = []struct {
 	name  string
 	table *unicode.RangeTable
@@ -77,7 +110,7 @@ func NormalizeSiteLanguage(language string) string {
 // raw HTML are rejected whole. Nothing is stripped out of a blurb and then published.
 func SanitizeReaderCopy(text, internalReason string) (string, bool) {
 	raw := strings.TrimSpace(text)
-	if raw == "" || !readerCopyOK(raw) || !readerCopySafe(raw) || sharesInternalReason(raw, internalReason) {
+	if raw == "" || !readerCopyOK(raw) || !ReaderCopySafe(raw) || sharesInternalReason(raw, internalReason) {
 		return "", false
 	}
 	return raw, true
@@ -87,16 +120,61 @@ func ContainsInternalCopy(text, internalReason string) bool {
 	return sharesInternalReason(text, internalReason)
 }
 
-func readerCopySafe(text string) bool {
-	if strings.ContainsAny(text, "<>") || htmlEntityPattern.MatchString(text) {
+// ReaderCopySafe reports whether text can be shown to a reader. It rejects
+// default-ignorable code points, leftover combining marks, odd spaces, markup,
+// mixed scripts, and Latin letters outside the blocks used by European copy.
+func ReaderCopySafe(text string) bool {
+	if hasMarkup(text) {
 		return false
 	}
 	for _, r := range text {
-		if _, blank := blankLetters[r]; blank || unicode.Is(unicode.Cf, r) || unicode.IsControl(r) {
+		if _, blank := blankLetters[r]; blank || unicode.Is(unicode.Cf, r) || unicode.IsControl(r) || unicode.Is(defaultIgnorable, r) || badSpace(r) {
 			return false
 		}
 	}
-	return !mixesScripts(text)
+	return !hasStandaloneMark(text) && !mixesScripts(text)
+}
+
+func hasMarkup(text string) bool {
+	folded := norm.NFKC.String(text)
+	if strings.ContainsAny(folded, "<>") || strings.Contains(folded, "&#") {
+		return true
+	}
+	return htmlEntityPattern.MatchString(folded)
+}
+
+func badSpace(r rune) bool {
+	return unicode.IsSpace(r) && r != ' ' && r != '\u00A0'
+}
+
+func hasStandaloneMark(text string) bool {
+	var prev rune
+	for _, r := range norm.NFC.String(foldMicro(text)) {
+		if (unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Me, r)) && !allowedLatinAccent(prev, r) {
+			return true
+		}
+		prev = r
+	}
+	return false
+}
+
+func allowedLatinAccent(base, mark rune) bool {
+	if !latinLetterAllowed(base) {
+		return false
+	}
+	switch mark {
+	case '\u0300', '\u0301', '\u0302', '\u0303', '\u0304', '\u0306', '\u0307', '\u0308', '\u0309', '\u030A', '\u030B', '\u030C', '\u0323', '\u0327', '\u0328':
+		return true
+	default:
+		return false
+	}
+}
+
+func latinLetterAllowed(r rune) bool {
+	if !unicode.IsLetter(r) || r == '\u0130' || r == '\u0131' {
+		return false
+	}
+	return r <= 0x007F || (r >= 0x00A0 && r <= 0x00FF) || (r >= 0x0100 && r <= 0x017F)
 }
 
 func sharesInternalReason(text, reason string) bool {
@@ -198,8 +276,12 @@ func normalizeForOverlap(text string) string {
 	return strings.TrimSpace(b.String())
 }
 
+func foldMicro(text string) string {
+	return strings.ReplaceAll(text, "\u00B5", "u")
+}
+
 func mixesScripts(text string) bool {
-	folded := norm.NFKC.String(text)
+	folded := norm.NFKC.String(foldMicro(text))
 	var word []rune
 	flush := func() bool {
 		if len(word) == 0 {
@@ -224,7 +306,7 @@ func mixesScripts(text string) bool {
 func wordMixesScripts(word []rune) bool {
 	seen := map[string]struct{}{}
 	for _, r := range word {
-		if _, blank := blankLetters[r]; blank {
+		if _, blank := blankLetters[r]; blank || latinOutOfRange(word) {
 			return true
 		}
 		name := scriptName(r)
@@ -233,6 +315,25 @@ func wordMixesScripts(word []rune) bool {
 		}
 		seen[name] = struct{}{}
 		if len(seen) > 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func latinOutOfRange(word []rune) bool {
+	latin := false
+	for _, r := range word {
+		if scriptName(r) == "Latin" {
+			latin = true
+			break
+		}
+	}
+	if !latin {
+		return false
+	}
+	for _, r := range word {
+		if unicode.IsLetter(r) && !latinLetterAllowed(r) {
 			return true
 		}
 	}
