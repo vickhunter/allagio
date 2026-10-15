@@ -11,6 +11,7 @@
             <file>tests/phpunit/ScanContinueTest.php</file>
             <file>tests/phpunit/InsertRouteTest.php</file>
             <file>tests/phpunit/ApproveInsertCopyTest.php</file>
+            <file>tests/phpunit/ConfirmRetryTest.php</file>
             <file>tests/phpunit/DashboardSettingsA11yTest.php</file>
         </testsuite>
     </testsuites>

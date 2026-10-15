@@ -1,11 +1,16 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.27
+Stable tag: 0.1.28
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.28 =
+* An editor insert stores the site /go/ link for the recommendation, so a click is recorded before the browser opens the merchant URL. The link keeps rel="nofollow sponsored". An Italian post still gets one Italian disclosure, with no reason or score in the post.
+* A placement confirm that is not a success stays pending, stores the error, and retries on the five-minute sync and on the next admin load. A 403 from a missing plugin key and a 5xx both wait for that retry.
+* Creating a placement retries once when the first POST is unreachable or returns 503.
 
 = 0.1.27 =
 * The disconnected Affilio Dashboard card is drawn by the dashboard script. The server sends that same card only inside noscript, for a browser with JavaScript off.

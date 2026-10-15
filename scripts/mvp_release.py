@@ -50,7 +50,7 @@ WP_FILES = {
     "affilio-wp/readme.txt",
 }
 PLUGIN_ROOT = "affilio-wp/"
-PLUGIN_VERSION = "0.1.27"
+PLUGIN_VERSION = "0.1.28"
 PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
 PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
 HOSTED_BUILD_NAMES = {"home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}

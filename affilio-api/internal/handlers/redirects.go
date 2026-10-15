@@ -173,6 +173,9 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req g
 		return
 	}
 	if !link.Found {
+		if h.goRecommendation(c, placementID, req) {
+			return
+		}
 		writeUnknownGoLink(c)
 		return
 	}
@@ -192,6 +195,47 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req g
 		return
 	}
 	h.finishPlacementRedirect(c, link, placementID, reader, class, plain, "placement:"+placementID)
+}
+
+// goRecommendation serves GET /v1/go/<recommendation_id>. A known recommendation
+// with an https affiliate URL records one attributable click and answers 302
+// to that URL unchanged, including its merchant ref. An unknown id returns
+// false so the caller can write the placement 404.
+func (h *RedirectsHandler) goRecommendation(c *gin.Context, recommendationID string, req goRequest) bool {
+	rec, err := h.DB.LookupRecommendationRedirect(c.Request.Context(), recommendationID)
+	if err != nil {
+		logGo("redirects.go recommendation lookup failed id=%s err=%v", recommendationID, err)
+		c.Redirect(http.StatusFound, h.offerRailsHome())
+		return true
+	}
+	if !rec.Found || !httpsDestination(rec.Destination) {
+		return false
+	}
+	reader := goReader{
+		hash:      h.directReaderHash(req.clientIP),
+		userAgent: req.userAgent,
+		referer:   req.referer,
+	}
+	class := ClassifyClick(c.Request.Method, reader.userAgent, c.Request.Header)
+	if h.RateLimiter != nil && !h.RateLimiter.Allow("recommendation:"+recommendationID) {
+		c.Redirect(http.StatusFound, rec.Destination)
+		return true
+	}
+	if AttributableClick(class) {
+		if _, err := h.recordRecommendationHit(c, rec, recommendationID, reader, class); err != nil {
+			logGo("redirects.go recommendation click failed id=%s err=%v", recommendationID, err)
+		}
+	}
+	c.Redirect(http.StatusFound, rec.Destination)
+	return true
+}
+
+func (h *RedirectsHandler) recordRecommendationHit(c *gin.Context, rec database.RecommendationRedirect, recommendationID string, reader goReader, class string) (string, error) {
+	existing, err := h.DB.RecentRecommendationClick(c.Request.Context(), rec.SiteID, recommendationID, reader.hash, reader.userAgent, class, placementClickDedupSeconds)
+	if err != nil || existing != "" {
+		return existing, err
+	}
+	return h.DB.InsertRecommendationClick(c.Request.Context(), rec.SiteID, rec.ArticleID, recommendationID, rec.ProgramID, reader.hash, reader.userAgent, reader.referer, class)
 }
 
 // finishPlacementRedirect records the hit when the named budget still has

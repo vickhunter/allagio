@@ -72,12 +72,13 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
 		return
 	}
+	href := recommendationTrackedHref(req.RecommendationID, link)
 	if !req.Regenerate {
-		if preview, ok := reusablePreview(rec.GeneratedHTML, language, rec.Reason, rec.ProgramName, link); ok {
+		if preview, ok := reusablePreview(rec.GeneratedHTML, language, rec.Reason, rec.ProgramName, href); ok {
 			if !publishReaderHTML(c, preview.HTML, rec.Reason) {
 				return
 			}
-			writeGenerated(c, preview.HTML, preview.Text, preview.Position, preview.PlacementReason, preview.Transition, preview.ParagraphIndex, preview.Confidence, rec.ProgramName, link)
+			writeGenerated(c, preview.HTML, preview.Text, preview.Position, preview.PlacementReason, preview.Transition, preview.ParagraphIndex, preview.Confidence, rec.ProgramName, href)
 			return
 		}
 	}
@@ -139,7 +140,7 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	} else {
 		placementReason = ""
 	}
-	rendered := readerHTML(rec.ProgramName, link, blurb)
+	rendered := readerHTML(rec.ProgramName, href, blurb)
 	if !publishReaderHTML(c, rendered, rec.Reason) {
 		return
 	}
@@ -163,7 +164,23 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	if encoded, err := json.Marshal(preview); err == nil {
 		_ = h.DB.SaveRecommendationGeneratedHTML(c.Request.Context(), siteID, req.RecommendationID, string(encoded))
 	}
-	writeGenerated(c, rendered, blurb, position, placementReason, transitionSentence, suggestedParagraphIndex, confidenceScore, rec.ProgramName, link)
+	writeGenerated(c, rendered, blurb, position, placementReason, transitionSentence, suggestedParagraphIndex, confidenceScore, rec.ProgramName, href)
+}
+
+// recommendationTrackedHref is the reader-facing href. An https affiliate URL
+// is published as /v1/go/<recommendation_id> so the click is recorded before
+// the browser follows the merchant link. The merchant ref stays on that
+// destination and is not written into the post.
+func recommendationTrackedHref(recommendationID, destination string) string {
+	recommendationID = strings.TrimSpace(recommendationID)
+	if !uuidPattern.MatchString(recommendationID) || !httpsDestination(destination) {
+		return destination
+	}
+	tracked := "/v1/go/" + recommendationID
+	if !services.ReaderCopySafe(tracked) {
+		return destination
+	}
+	return tracked
 }
 
 const readerHTMLSeparator = " — "
@@ -237,6 +254,9 @@ func writeGenerated(c *gin.Context, rendered, blurb, position, placementReason, 
 		"placement_reason":   placementReason,
 		"program_name":       programName,
 		"link_url":           link,
+	}
+	if strings.HasPrefix(link, "/v1/go/") {
+		resp["tracked_link"] = link
 	}
 	if transition != "" {
 		resp["transition_sentence"] = transition
