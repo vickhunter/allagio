@@ -154,12 +154,22 @@ func (h *AgentEntry) AccountDigest(c *gin.Context) {
 			}
 			items = append(items, h.digestJSON(item, token))
 		}
+		var conversions []gin.H
+		if project.Kind == "site" {
+			conversions, err = h.loadConversions(c, "", project.ID, "")
+		} else {
+			conversions, err = h.loadConversions(c, "", "", project.ID)
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "digest unavailable"})
+			return
+		}
 		projects = append(projects, gin.H{
 			"kind": project.Kind, "id": project.ID, "name": project.Name, "mode": project.Mode,
 			"went_live": project.WentLive, "clicks": project.Clicks, "total_items": project.TotalItems,
 			"truncated": project.TotalItems > len(items),
-			"earnings": earningsList(project.Earnings), "clicks_by_source": sourceJSON(project.ClicksBySource),
-			"items": items,
+			"earnings":  earningsList(project.Earnings), "clicks_by_source": sourceJSON(project.ClicksBySource),
+			"items": items, "conversions": conversions,
 		})
 	}
 	body := gin.H{

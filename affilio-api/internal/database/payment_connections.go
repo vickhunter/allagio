@@ -119,12 +119,30 @@ AND c.clicked_at + make_interval(days=>COALESCE((c.terms_snapshot->>'cookie_dura
 	return valid, err
 }
 
-func (d *DB) ProductOwnsPayment(ctx context.Context, productID, objectID, currency string) (bool, error) {
-	var valid bool
-	err := d.Pool.QueryRow(ctx, `SELECT o.product_id=$1 AND cv.currency=$3 FROM conversions cv JOIN offers o ON o.id=cv.offer_id
-WHERE cv.provider='stripe' AND cv.provider_object_id=$2 AND cv.kind='sale'`, productID, objectID, currency).Scan(&valid)
-	if errors.Is(err, pgx.ErrNoRows) {
+func (d *DB) ProductOwnsPayment(ctx context.Context, productID, provider, objectID, currency string) (bool, error) {
+	if objectID == "" {
 		return false, ErrConversionNotFound
+	}
+	var valid bool
+	err := d.Pool.QueryRow(ctx, `SELECT o.product_id::text=$1 AND cv.currency=$4 FROM conversions cv JOIN offers o ON o.id=cv.offer_id
+WHERE cv.provider=$2 AND cv.provider_object_id=$3 AND cv.kind IN ('sale','renewal')
+ORDER BY (o.product_id::text=$1) DESC, cv.created_at DESC LIMIT 1`, productID, provider, objectID, currency).Scan(&valid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		var upgradeable, signedOther bool
+		err = d.Pool.QueryRow(ctx, `SELECT
+ COALESCE(bool_or(cv.provider=$5 AND upper(cv.currency)=upper($4)), false),
+ COALESCE(bool_or(cv.provider <> $5 AND cv.provider <> $3), false)
+FROM conversions cv
+JOIN offers o ON o.id=cv.offer_id
+WHERE o.product_id::text=$1 AND cv.provider_object_id=$2 AND $2 <> ''
+AND cv.kind IN ('sale','renewal')`, productID, objectID, provider, currency, ProviderSellerReport).Scan(&upgradeable, &signedOther)
+		if err != nil {
+			return false, err
+		}
+		if upgradeable || !signedOther {
+			return false, ErrConversionNotFound
+		}
+		return false, nil
 	}
 	return valid, err
 }

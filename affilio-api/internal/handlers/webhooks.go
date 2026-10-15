@@ -23,6 +23,65 @@ type WebhooksHandler struct {
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
+type webhookResult struct {
+	Status       string
+	ConversionID string
+	TrustLevel   string
+	RefundStatus string
+	Reason       string
+}
+
+func (r webhookResult) json() gin.H {
+	body := gin.H{"status": r.Status}
+	if r.ConversionID != "" {
+		body["conversion_id"] = r.ConversionID
+	}
+	if r.TrustLevel != "" {
+		body["trust_level"] = r.TrustLevel
+	}
+	if r.RefundStatus != "" {
+		body["refund_status"] = r.RefundStatus
+	}
+	if r.Reason != "" {
+		body["reason"] = r.Reason
+	}
+	return body
+}
+
+func refundResult(out *database.RefundOutcome, fallbackTrust string) webhookResult {
+	if out == nil {
+		return webhookResult{Status: "duplicate", TrustLevel: fallbackTrust, RefundStatus: database.RefundApplied}
+	}
+	status := out.Status
+	if status == database.RefundApplied {
+		status = "refunded"
+	}
+	row := out.RowStatus
+	if row == "" && status != "duplicate" {
+		row = out.Status
+	}
+	trust := out.TrustLevel
+	if trust == "" {
+		trust = fallbackTrust
+	}
+	return webhookResult{Status: status, ConversionID: out.ID, TrustLevel: trust, RefundStatus: row, Reason: out.Reason}
+}
+
+func (h *WebhooksHandler) duplicateResult(ctx context.Context, provider, eventID, fallbackTrust string) (webhookResult, error) {
+	result := webhookResult{Status: "duplicate", TrustLevel: fallbackTrust}
+	id, trust, refundStatus, reason, ok, err := h.DB.ConversionByProviderEvent(ctx, provider, eventID)
+	if err != nil || !ok {
+		return result, err
+	}
+	result.ConversionID = id
+	if trust != "" {
+		result.TrustLevel = trust
+	}
+	result.RefundStatus = refundStatus
+	result.Reason = reason
+	return result, nil
+}
+
 func (h *WebhooksHandler) Receive(c *gin.Context) {
 	providerName := c.Param("provider")
 	if c.Param("product_id") != "" {
@@ -69,24 +128,25 @@ func (h *WebhooksHandler) Receive(c *gin.Context) {
 			return
 		}
 		if processed {
-			c.JSON(http.StatusOK, gin.H{"status": "duplicate"})
+			result, err := h.duplicateResult(c.Request.Context(), providerName, event.EventID, database.TrustSellerSignedWebhook)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "event lookup failed"})
+				return
+			}
+			c.JSON(http.StatusOK, result.json())
 			return
 		}
 	}
 
-	status, conversionID := h.processEvent(c, providerName, event)
-	response := gin.H{"status": status}
-	if conversionID != "" {
-		response["conversion_id"] = conversionID
-	}
-	if status == "error" || status == "unmatched" {
-		c.JSON(http.StatusServiceUnavailable, response)
+	result := h.processEvent(c, providerName, event)
+	if result.Status == "error" || result.Status == "unmatched" {
+		c.JSON(http.StatusServiceUnavailable, result.json())
 		return
 	}
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, result.json())
 }
 
-func (h *WebhooksHandler) processEvent(c *gin.Context, providerName string, event *providers.ConversionEvent) (status, conversionID string) {
+func (h *WebhooksHandler) processEvent(c *gin.Context, providerName string, event *providers.ConversionEvent) webhookResult {
 	ctx := c.Request.Context()
 	markProcessed := func(errText string) {
 		if err := h.DB.MarkWebhookProcessed(ctx, providerName, event.EventID, errText); err != nil {
@@ -97,39 +157,44 @@ func (h *WebhooksHandler) processEvent(c *gin.Context, providerName string, even
 	case "sale", "renewal":
 		if !uuidPattern.MatchString(event.Ref) {
 			markProcessed("unattributed: missing or invalid ref")
-			return "unattributed", ""
+			return webhookResult{Status: "unattributed"}
 		}
 		conversion, err := h.DB.RecordSaleConversion(ctx, event.Ref, providerName, event.EventID, event.ObjectID, event.Kind, event.Amount, event.Currency, event.OccurredAt)
 		if err != nil {
 			if errors.Is(err, database.ErrClickNotFound) {
 				markProcessed("unattributed: ref does not match a click")
-				return "unattributed", ""
+				return webhookResult{Status: "unattributed"}
 			}
 			log.Printf("webhooks.receive conversion failed provider=%s event=%s err=%v", providerName, event.EventID, err)
-			return "error", ""
+			return webhookResult{Status: "error"}
 		}
 		markProcessed("")
-		if conversion == nil {
-			return "duplicate", ""
+		if conversion == nil || conversion.Duplicate {
+			trust := database.TrustSellerSignedWebhook
+			if conversion != nil && conversion.TrustLevel != "" {
+				trust = conversion.TrustLevel
+			}
+			return webhookResult{Status: "duplicate", TrustLevel: trust}
 		}
-		return "recorded", conversion.ConversionID
+		return webhookResult{Status: "recorded", ConversionID: conversion.ConversionID, TrustLevel: conversion.TrustLevel}
 	case "refund":
-		refundID, err := h.DB.RecordRefund(ctx, providerName, event.EventID, event.ObjectID, event.OccurredAt)
+		out, err := h.DB.RecordRefund(ctx, providerName, event.EventID, event.ObjectID, event.OccurredAt, database.TrustSellerSignedWebhook, event.Currency)
 		if err != nil {
+			if errors.Is(err, database.ErrRefundCurrencyMismatch) {
+				markProcessed("rejected")
+				return webhookResult{Status: "rejected"}
+			}
 			if errors.Is(err, database.ErrConversionNotFound) {
-				return "unmatched", ""
+				return webhookResult{Status: "unmatched"}
 			}
 			log.Printf("webhooks.receive refund failed provider=%s event=%s err=%v", providerName, event.EventID, err)
-			return "error", ""
+			return webhookResult{Status: "error"}
 		}
 		markProcessed("")
-		if refundID == "" {
-			return "duplicate", ""
-		}
-		return "refunded", refundID
+		return refundResult(out, database.TrustSellerSignedWebhook)
 	default:
 		markProcessed("")
-		return "ignored", ""
+		return webhookResult{Status: "ignored"}
 	}
 }
 
@@ -184,7 +249,12 @@ func (h *WebhooksHandler) receiveProduct(c *gin.Context) {
 		return
 	}
 	if processed {
-		c.JSON(http.StatusOK, gin.H{"status": "duplicate"})
+		result, err := h.duplicateResult(c.Request.Context(), "stripe", event.EventID, database.TrustProviderVerified)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "event lookup failed"})
+			return
+		}
+		c.JSON(http.StatusOK, result.json())
 		return
 	}
 	event, err = adapter.ParseEvent(canonical)
@@ -192,67 +262,78 @@ func (h *WebhooksHandler) receiveProduct(c *gin.Context) {
 		c.JSON(http.StatusAccepted, gin.H{"status": "pending", "reason": "stored event needs reconciliation"})
 		return
 	}
-	status, id, err := h.processProductEvent(c.Request.Context(), productID, event)
+	result, err := h.processProductEvent(c.Request.Context(), productID, event)
 	if err != nil {
-		c.JSON(http.StatusAccepted, gin.H{"status": "pending", "reason": status})
+		c.JSON(http.StatusAccepted, gin.H{"status": "pending", "reason": result.Status})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": status, "conversion_id": id})
+	c.JSON(http.StatusOK, result.json())
 }
 
-func (h *WebhooksHandler) processProductEvent(ctx context.Context, productID string, event *providers.ConversionEvent) (string, string, error) {
-	status, id := "ignored", ""
+func (h *WebhooksHandler) processProductEvent(ctx context.Context, productID string, event *providers.ConversionEvent) (webhookResult, error) {
+	result := webhookResult{Status: "ignored"}
 	var err error
 	switch event.Kind {
 	case "sale":
 		if !uuidPattern.MatchString(event.Ref) {
-			status = "unattributed"
+			result.Status = "unattributed"
 			break
 		}
 		var valid bool
 		valid, err = h.DB.ProductOwnsClick(ctx, productID, event.Ref, event.Currency, event.OccurredAt)
 		if err == nil && !valid {
-			status = "unattributed"
+			result.Status = "unattributed"
 			break
 		}
 		if err == nil {
 			var sale *database.SaleConversion
 			sale, err = h.DB.RecordStripeSale(ctx, productID, event.Ref, event.EventID, event.ObjectID, event.AmountMinor, event.GrossMinor, event.Currency, event.LiveMode, event.OccurredAt)
-			status = "duplicate"
-			if sale != nil {
-				status = "recorded"
-				id = sale.ConversionID
+			result.Status = "duplicate"
+			result.TrustLevel = database.TrustProviderVerified
+			if sale != nil && !sale.Duplicate {
+				result.Status = "recorded"
+				result.ConversionID = sale.ConversionID
+				result.TrustLevel = sale.TrustLevel
+			} else if sale != nil && sale.TrustLevel != "" {
+				result.TrustLevel = sale.TrustLevel
 			}
 		}
 	case "refund":
 		var valid bool
-		valid, err = h.DB.ProductOwnsPayment(ctx, productID, event.ObjectID, event.Currency)
+		valid, err = h.DB.ProductOwnsPayment(ctx, productID, "stripe", event.ObjectID, event.Currency)
 		if err == nil && !valid {
-			status = "rejected"
+			result.Status = "rejected"
 			break
 		}
 		if err == nil {
-			id, err = h.DB.RecordPartialRefund(ctx, "stripe", event.EventID, event.ObjectID, event.RefundedMinor, event.OccurredAt)
-			status = "refunded"
-			if id == "" {
-				status = "duplicate"
+			var out *database.RefundOutcome
+			var makerID string
+			makerID, err = h.DB.MakerIDForProduct(ctx, productID)
+			if err == nil {
+				out, err = h.DB.RecordPartialRefund(ctx, "stripe", event.EventID, event.ObjectID, event.RefundedMinor, event.OccurredAt, database.TrustProviderVerified, makerID, "", event.Currency, false)
+			}
+			if err == nil {
+				result = refundResult(out, database.TrustProviderVerified)
 			}
 		}
 	}
 	if err != nil {
 		if retryErr := h.DB.RetryWebhook(ctx, "stripe", event.EventID, "awaiting reconciliation"); retryErr != nil {
-			return "storage failure", "", retryErr
+			return webhookResult{Status: "storage failure"}, retryErr
 		}
-		return "awaiting reconciliation", "", err
+		return webhookResult{Status: "awaiting reconciliation"}, err
 	}
 	reason := ""
-	if status == "unattributed" || status == "rejected" {
-		reason = status
+	if result.Status == "unattributed" || result.Status == "rejected" || result.Status == "pending_review" {
+		reason = result.Status
+		if result.Reason != "" {
+			reason = result.Reason
+		}
 	}
 	if err := h.DB.MarkWebhookProcessed(ctx, "stripe", event.EventID, reason); err != nil {
-		return "storage failure", "", err
+		return webhookResult{Status: "storage failure"}, err
 	}
-	return status, id, nil
+	return result, nil
 }
 
 func stripeEventIsOurs(event *providers.ConversionEvent, productID, currency string) bool {
@@ -279,7 +360,7 @@ func (h *WebhooksHandler) ReconcilePending(ctx context.Context) error {
 			}
 			continue
 		}
-		if _, _, err = h.processProductEvent(ctx, stored.ProductID, event); err != nil && ctx.Err() != nil {
+		if _, err = h.processProductEvent(ctx, stored.ProductID, event); err != nil && ctx.Err() != nil {
 			return ctx.Err()
 		}
 	}

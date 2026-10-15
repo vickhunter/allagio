@@ -347,6 +347,9 @@ func main() {
 		maker.GET("/offers/:id/matches", offers.Matches)
 
 		maker.GET("/earnings", payouts.MakerEarnings)
+		reports := &handlers.RefundReportHandler{DB: db}
+		maker.POST("/sales", reports.ReportSale)
+		maker.POST("/refunds", reports.ReportRefund)
 	}
 	listings := v1.Group("/listings")
 	listings.Use(middleware.MakerKeyAuth(db, oauthResources...))

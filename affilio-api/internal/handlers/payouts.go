@@ -80,9 +80,20 @@ func (h *PayoutsHandler) History(c *gin.Context) {
 		if e.ClearsAt != nil {
 			item["clears_at"] = e.ClearsAt.Format(time.RFC3339)
 		}
+		item["trust_level"] = e.TrustLevel
+		var refundStatus any
+		if e.RefundStatus != nil {
+			refundStatus = *e.RefundStatus
+		}
+		item["refund_status"] = refundStatus
 		entryList = append(entryList, item)
 	}
-	c.JSON(http.StatusOK, gin.H{"payouts": payoutList, "ledger": entryList})
+	conversions, err := h.DB.ListConversionReports(c.Request.Context(), "", siteID, "", intQuery(c, "limit", 50))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load ledger"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"payouts": payoutList, "ledger": entryList, "conversions": conversionsJSON(conversions)})
 }
 
 // RunBatch is the admin's manual-payout trigger: clears matured holds, then
@@ -157,7 +168,12 @@ func (h *PayoutsHandler) MakerEarnings(c *gin.Context) {
 	for _, t := range totals {
 		totalList = append(totalList, t)
 	}
-	c.JSON(http.StatusOK, gin.H{"offers": offers, "totals": totalList})
+	conversions, err := h.DB.ListConversionReports(c.Request.Context(), makerID(c), "", c.GetString("offer_scope_id"), 50)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load earnings"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"offers": offers, "totals": totalList, "conversions": conversionsJSON(conversions)})
 }
 
 func payoutJSON(p database.Payout) gin.H {

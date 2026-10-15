@@ -13,7 +13,7 @@ import (
 const clearMaturedSQL = `
 UPDATE ledger_entries le SET status='cleared'
 WHERE le.status='pending' AND le.clears_at <= NOW()
-  AND NOT EXISTS (SELECT 1 FROM conversions cv JOIN conversions source ON source.provider=cv.provider AND source.provider_object_id=cv.provider_object_id WHERE cv.id=le.conversion_id AND source.flagged)`
+  AND NOT EXISTS (SELECT 1 FROM conversions cv JOIN conversions source ON source.provider=cv.provider AND source.provider_object_id=cv.provider_object_id AND source.offer_id=cv.offer_id WHERE cv.id=le.conversion_id AND source.flagged)`
 
 // ClearMaturedLedgerEntries runs cheaply before balance reads and payout batches.
 func (d *DB) ClearMaturedLedgerEntries(ctx context.Context) (int64, error) {
@@ -68,21 +68,25 @@ SELECT le.currency,cv.payment_mode,
 }
 
 type LedgerHistoryEntry struct {
-	Mode        string
-	ID          string
-	Kind        string
-	Amount      float64
-	Currency    string
-	Status      string
-	ProductName string
-	ClearsAt    *time.Time
-	CreatedAt   time.Time
+	Mode         string
+	ID           string
+	Kind         string
+	Amount       float64
+	Currency     string
+	Status       string
+	ProductName  string
+	ClearsAt     *time.Time
+	CreatedAt    time.Time
+	TrustLevel   string
+	RefundStatus *string
+	RefundReason string
 }
 
 func (d *DB) ListLedgerHistory(ctx context.Context, siteID string, limit int) ([]LedgerHistoryEntry, error) {
 	rows, err := d.Pool.Query(ctx, `
 SELECT le.id, le.kind, le.amount, le.currency, le.status,
-       COALESCE(p.name, ''), le.clears_at, le.created_at,COALESCE(cv.payment_mode,'legacy')
+       COALESCE(p.name, ''), le.clears_at, le.created_at,COALESCE(cv.payment_mode,'legacy'),
+       COALESCE(cv.trust_level,''), cv.refund_status, COALESCE(cv.refund_reason,'')
 FROM ledger_entries le
 LEFT JOIN conversions cv ON cv.id = le.conversion_id
 LEFT JOIN offers o ON o.id = cv.offer_id
@@ -97,7 +101,7 @@ LIMIT $2`, siteID, limit)
 	out := []LedgerHistoryEntry{}
 	for rows.Next() {
 		var e LedgerHistoryEntry
-		if err := rows.Scan(&e.ID, &e.Kind, &e.Amount, &e.Currency, &e.Status, &e.ProductName, &e.ClearsAt, &e.CreatedAt, &e.Mode); err != nil {
+		if err := rows.Scan(&e.ID, &e.Kind, &e.Amount, &e.Currency, &e.Status, &e.ProductName, &e.ClearsAt, &e.CreatedAt, &e.Mode, &e.TrustLevel, &e.RefundStatus, &e.RefundReason); err != nil {
 			return nil, err
 		}
 		out = append(out, e)
@@ -266,11 +270,11 @@ LEFT JOIN (
 LEFT JOIN (
     SELECT offer_id,payment_mode,
            COUNT(*) FILTER (WHERE kind IN ('sale','renewal')) AS sales,
-           COUNT(*) FILTER (WHERE kind='refund') AS refunds,
+           COUNT(*) FILTER (WHERE kind='refund' AND COALESCE(refund_status,'applied')='applied') AS refunds,
            COALESCE(SUM(amount) FILTER (WHERE kind IN ('sale','renewal')), 0)
-             - COALESCE(SUM(amount) FILTER (WHERE kind='refund'), 0) AS revenue,
+             - COALESCE(SUM(amount) FILTER (WHERE kind='refund' AND COALESCE(refund_status,'applied')='applied'), 0) AS revenue,
            COALESCE(SUM(commission_amount) FILTER (WHERE kind IN ('sale','renewal')), 0)
-             - COALESCE(SUM(commission_amount) FILTER (WHERE kind='refund'), 0) AS commission
+             - COALESCE(SUM(commission_amount) FILTER (WHERE kind='refund' AND COALESCE(refund_status,'applied')='applied'), 0) AS commission
     FROM conversions
     GROUP BY offer_id,payment_mode
 ) cv ON cv.offer_id = o.id

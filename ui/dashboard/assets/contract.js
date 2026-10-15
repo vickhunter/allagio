@@ -70,6 +70,7 @@
       total_items: typeof p.total_items === 'number' ? p.total_items : null, // 6042dcb: all items, not capped at 50
       truncated: p.truncated === true,
       paused: p.kind === 'site' ? paused.site === true : paused.offer === true };
+    if (Array.isArray(p.conversions)) s.conversions = p.conversions;
     if (p.kind === 'site') { s.site_id = p.id; s.url = safeUrl(env.site_url); } else s.project_id = p.id;
     return s;
   }

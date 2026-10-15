@@ -53,6 +53,9 @@ func newMakerRouterFull(db *database.DB, client *http.Client, claims string) *gi
 		maker.PATCH("/offers/:id", offers.Patch)
 		maker.POST("/offers/:id/submit", offers.Submit)
 		maker.GET("/offers/:id/matches", offers.Matches)
+		reports := &RefundReportHandler{DB: db}
+		maker.POST("/sales", reports.ReportSale)
+		maker.POST("/refunds", reports.ReportRefund)
 	}
 	listings := r.Group("/v1/listings")
 	listings.Use(middleware.MakerKeyAuth(db))
