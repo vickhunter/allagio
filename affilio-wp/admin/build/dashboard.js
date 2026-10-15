@@ -1,4 +1,54 @@
 ( function() {
+    const bindDashboardScan = () => {
+        const form = document.getElementById('affilio-scan-all');
+        if (!form) return;
+        const button = form.querySelector('[data-scan]');
+        const status = form.querySelector('[data-scan-status]');
+        if (!button) return;
+        const data = window.AffilioData || {};
+        const italian = String(data.locale || '').toLowerCase().startsWith('it');
+        const i18n = data.i18n || {};
+        const label = (key, en, it) => (i18n[key] ? String(i18n[key]) : (italian ? it : en));
+        const setLabel = (text) => {
+            button.textContent = text;
+            if (status) status.textContent = text;
+        };
+        const call = async (method) => {
+            const base = String(data.restBase || '').replace(/\/$/, '');
+            const response = await fetch(base + '/setup', {
+                method,
+                headers: { 'X-WP-Nonce': data.nonce || '' },
+            });
+            const body = await response.json();
+            if (!response.ok) throw new Error(body.message || 'Setup failed.');
+            return body;
+        };
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            button.disabled = true;
+            const inProgress = label('analysisInProgress', 'Analysis in progress', 'Analisi in corso');
+            const done = label('analysisComplete', 'Analysis complete', 'Analisi completata');
+            setLabel(inProgress);
+            try {
+                let state = await call('POST');
+                while (state && state.phase === 'scanning') {
+                    setLabel(inProgress);
+                    await new Promise((resolve) => setTimeout(resolve, 250));
+                    state = await call('GET');
+                }
+                if (state && state.phase === 'complete') {
+                    setLabel(done);
+                    button.disabled = true;
+                    return;
+                }
+                button.disabled = false;
+            } catch (failure) {
+                if (status) status.textContent = failure.message;
+                button.disabled = false;
+            }
+        });
+    };
+    bindDashboardScan();
     const root = document.getElementById('affilio-dashboard-root');
     if (!root) return;
     const locale = String((AffilioData && AffilioData.locale) || document.documentElement.lang || 'en').toLowerCase();

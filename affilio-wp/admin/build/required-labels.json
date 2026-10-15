@@ -1,0 +1,10 @@
+{
+  "analytics.js": ["Analitiche"],
+  "dashboard.js": ["Analisi in corso", "Analisi completata"],
+  "discovery.js": ["<p>No items pending.</p>"],
+  "distribution.js": ["Nessuna offerta idonea al momento."],
+  "earnings.js": ["Guadagni"],
+  "marketplace.js": ["Marketplace Offerte"],
+  "onboarding.js": ["Trova opportunità di guadagno nei tuoi articoli"],
+  "sidebar.js": ["Analisi in corso..."]
+}

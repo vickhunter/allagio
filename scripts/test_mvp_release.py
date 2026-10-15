@@ -18,6 +18,14 @@ import zipfile
 import mvp_release as release
 
 
+FIXTURES = Path(__file__).resolve().parent / "testdata"
+
+
+def with_labels(script, body):
+    name = PurePosixPath(script).name
+    return release.required_label_script(release.required_label_manifest()[name]) + body
+
+
 def configuration():
     return {
         "DATABASE_URL": "postgresql://qa:qa@postgres.railway.internal/railway",
@@ -182,7 +190,13 @@ def plugin_archive(plugin=None, extra=None, drop=None, bodies=None):
             elif name.endswith("/readme.txt"):
                 body = "=== Affilio ===\nStable tag: %s\n" % version
             else:
-                body = (bodies or {}).get(name, "runtime")
+                override = (bodies or {}).get(name)
+                if override is None:
+                    leaf = PurePosixPath(name).name
+                    labels = release.required_label_manifest().get(leaf) if name.startswith(release.PLUGIN_ROOT + "admin/build/") else None
+                    body = release.required_label_script(labels) if labels else "runtime"
+                else:
+                    body = override
             zipped.writestr(name, body)
         if extra:
             zipped.writestr(extra[0], extra[1])
@@ -369,8 +383,8 @@ class ReleaseTests(unittest.TestCase):
             'await import("./landing-scene.bundle.js");\n',
         ):
             with self.subTest(body=body), self.assertRaisesRegex(release.ReleaseError, "landing-scene.bundle.js"):
-                release.validate_plugin(plugin_archive(bodies={script: body}))
-        release.validate_plugin(plugin_archive(bodies={script: "// import('./landing-scene.bundle.js');\nimport * as THREE from 'three';\nimport './analytics.js';\n"}))
+                release.validate_plugin(plugin_archive(bodies={script: with_labels(script, body)}))
+        release.validate_plugin(plugin_archive(bodies={script: with_labels(script, "// import('./landing-scene.bundle.js');\nimport * as THREE from 'three';\nimport './analytics.js';\n")}))
         header = (
             "<?php\n/* Plugin Name: Affilio\n * Version: %s\n */\n"
             "define('AFFILIO_VERSION', '%s');\n"
@@ -420,7 +434,7 @@ class ReleaseTests(unittest.TestCase):
                 stale = Path(directory) / "affilio-0.1.19.zip"
                 result = subprocess.run([str(script), str(stale)], cwd=release.ROOT, capture_output=True, text=True, timeout=60)
                 self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-                self.assertIn("passed the release gate with 27 files: affilio-%s.zip" % version, result.stdout)
+                self.assertIn("passed the release gate with 28 files: affilio-%s.zip" % version, result.stdout)
                 written = Path(directory) / ("affilio-%s.zip" % version)
                 self.assertTrue(written.is_file(), result.stdout)
                 self.assertFalse(stale.exists())
@@ -432,7 +446,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(names, sorted(names))
             for info in archive.infolist():
                 self.assertEqual(info.date_time, (1980, 1, 1, 0, 0, 0))
-        self.assertEqual(len(names), 27)
+        self.assertEqual(len(names), 28)
         self.assertIn("affilio-wp/languages/affilio-it_IT.mo", names)
         self.assertTrue(hosted.isdisjoint(Path(name).name for name in names))
         for relative in needed:
@@ -451,7 +465,7 @@ class ReleaseTests(unittest.TestCase):
         source = "export const label = 'Analisi in corso';\n"
         release.validate_plugin(plugin_archive(
             extra=("affilio-wp/admin/src/dashboard.js", source),
-            bodies={"affilio-wp/admin/build/dashboard.js": "(function () { return 'Analisi in corso'; })();\n"},
+            bodies={"affilio-wp/admin/build/dashboard.js": with_labels("affilio-wp/admin/build/dashboard.js", "(function () { return 'Analisi in corso'; })();\n")},
         ))
         with tempfile.TemporaryDirectory() as directory:
             plugin = self._admin_src_plugin(directory, "(function () { return 'Analisi in corso'; })();\n")
@@ -478,9 +492,117 @@ class ReleaseTests(unittest.TestCase):
                 release.validate_built_admin_js(plugin)
         commented = plugin_archive(
             extra=("affilio-wp/admin/src/dashboard.js", "// 'Analisi in corso'\nconst label = 'Analisi completata';\n"),
-            bodies={"affilio-wp/admin/build/dashboard.js": "(function () { return 'Analisi completata'; })();\n"},
+            bodies={"affilio-wp/admin/build/dashboard.js": with_labels("affilio-wp/admin/build/dashboard.js", "(function () { return 'Analisi completata'; })();\n")},
         )
         release.validate_plugin(commented)
+
+    def test_required_labels_match_whole_literals_in_one_file(self):
+        stale = (FIXTURES / "dashboard-02a5051.js").read_text(encoding="utf-8")
+        current = (FIXTURES / "dashboard-5e5e468.js").read_text(encoding="utf-8")
+        self.assertNotIn("Analisi in corso", release.js_string_literals(stale))
+        self.assertIn("Analisi in corso", release.js_string_literals(current))
+        self.assertIn("Analisi completata", release.js_string_literals(current))
+        with self.assertRaisesRegex(release.ReleaseError, r"admin/build/dashboard\.js is missing the label 'Analisi in corso'"):
+            release.validate_plugin(plugin_archive(bodies={"affilio-wp/admin/build/dashboard.js": stale}))
+        release.validate_plugin(plugin_archive(bodies={"affilio-wp/admin/build/dashboard.js": current}))
+
+        ellipsis = "const status = 'Analisi in corso...';\nconst done = 'Analisi completata';\n"
+        sidebar = "const status = 'Analisi in corso';\n" + release.required_label_script(release.required_label_manifest()["sidebar.js"])
+        with self.assertRaisesRegex(release.ReleaseError, r"admin/build/dashboard\.js is missing the label 'Analisi in corso'"):
+            release.validate_plugin(plugin_archive(bodies={
+                "affilio-wp/admin/build/dashboard.js": ellipsis,
+                "affilio-wp/admin/build/sidebar.js": sidebar,
+            }))
+        longer = "const status = 'See Analisi in corso now';\nconst done = 'Analisi completata';\n"
+        with self.assertRaisesRegex(release.ReleaseError, "Analisi in corso"):
+            release.validate_plugin(plugin_archive(bodies={"affilio-wp/admin/build/dashboard.js": longer}))
+        commented = "// 'Analisi in corso'\nconst done = 'Analisi completata';\n"
+        with self.assertRaisesRegex(release.ReleaseError, "Analisi in corso"):
+            release.validate_plugin(plugin_archive(bodies={"affilio-wp/admin/build/dashboard.js": commented}))
+
+    def test_label_escapes_and_template_static_parts(self):
+        encoded = "const progress = '\\u0041nalisi\\u0020in\\x20corso';\nconst done = `\\u{41}nalisi completata`;\n"
+        self.assertIn("Analisi in corso", release.js_string_literals(encoded))
+        self.assertIn("Analisi completata", release.js_string_literals(encoded))
+        release.validate_plugin(plugin_archive(bodies={"affilio-wp/admin/build/dashboard.js": encoded}))
+        static = "const progress = `Analisi in corso${extra}`;\nconst done = 'Analisi completata';\n"
+        self.assertIn("Analisi in corso", release.js_string_literals(static))
+        self.assertNotIn("Analisi in corso ", release.user_visible_string_literals("const label = `Analisi in corso${count}`;\n"))
+        release.validate_plugin(plugin_archive(bodies={"affilio-wp/admin/build/dashboard.js": static}))
+        spaced = "const progress = `Analisi in corso ${extra}`;\nconst done = 'Analisi completata';\n"
+        self.assertNotIn("Analisi in corso", release.js_string_literals(spaced))
+        self.assertIn("Analisi in corso ", release.js_string_literals(spaced))
+        with self.assertRaisesRegex(release.ReleaseError, "Analisi in corso"):
+            release.validate_plugin(plugin_archive(bodies={"affilio-wp/admin/build/dashboard.js": spaced}))
+        hidden = "const label = `Analisi in corso${count}`;\n// 'not a visible label'\n"
+        self.assertEqual(release.user_visible_string_literals(hidden), ["Analisi in corso"])
+
+    def test_verify_and_bundle_read_admin_files_from_the_zip(self):
+        stale = (FIXTURES / "dashboard-02a5051.js").read_text(encoding="utf-8")
+        current = (FIXTURES / "dashboard-5e5e468.js").read_text(encoding="utf-8")
+        bad = plugin_archive(bodies={"affilio-wp/admin/build/dashboard.js": stale})
+        good = plugin_archive(bodies={"affilio-wp/admin/build/dashboard.js": current})
+
+        def refuse_checkout(plugin_dir):
+            raise AssertionError("release check read the local admin build at %s" % plugin_dir)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "assets").mkdir()
+            (root / "downloads").mkdir()
+            for name in release.ASSETS:
+                (root / "assets" / name).write_text("asset", encoding="utf-8")
+            (root / "downloads" / release.INSTALLER).write_bytes(b"installer")
+            (root / "downloads" / "affilio.zip").write_bytes(bad)
+            with patch.object(release, "validate_installer"), patch.object(release, "validate_built_admin_js", refuse_checkout), self.assertRaisesRegex(release.ReleaseError, r"admin/build/dashboard\.js"):
+                release.validate_bundle(root)
+            (root / "downloads" / "affilio.zip").write_bytes(good)
+            with patch.object(release, "validate_installer"), patch.object(release, "validate_built_admin_js", refuse_checkout), patch("sys.stdout", io.StringIO()):
+                release.validate_bundle(root)
+
+        responses = public_responses()
+        responses["/downloads/affilio.zip"] = response(body=bad)
+        with patch.object(release, "fetch", side_effect=lambda path, *args: responses[path]), patch.object(release, "validate_installer"), patch.object(release, "validate_built_admin_js", refuse_checkout), self.assertRaisesRegex(release.ReleaseError, "Analisi in corso"):
+            release.verify()
+        responses["/downloads/affilio.zip"] = response(body=good)
+        with patch.object(release, "fetch", side_effect=lambda path, *args: responses[path]), patch.object(release, "validate_installer"), patch.object(release, "validate_built_admin_js", refuse_checkout), patch("sys.stdout", io.StringIO()):
+            release.verify()
+
+    def test_npm_ci_failure_shows_stderr_tail(self):
+        def fake_run(args, **kwargs):
+            if list(args[:2]) == ["npm", "ci"]:
+                stderr = "\n".join(["noise-%d" % i for i in range(40)] + ["npm ERR! distinct-tail"])
+                return subprocess.CompletedProcess(args, 1, "", stderr)
+            if list(args[:3]) == ["npm", "run", "build"]:
+                return subprocess.CompletedProcess(args, 1, "", "npm ERR! build-secret")
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        with tempfile.TemporaryDirectory() as directory:
+            build = Path(directory) / "affilio-wp" / "admin" / "build"
+            build.mkdir(parents=True)
+            (build / "package.json").write_text('{"scripts":{"build":"true"}}\n', encoding="utf-8")
+            (build / "dashboard.js").write_text("var kept = 1;\n", encoding="utf-8")
+            with patch.object(subprocess, "run", fake_run), self.assertRaises(release.ReleaseError) as caught:
+                release.validate_built_admin_js(Path(directory) / "affilio-wp")
+        message = str(caught.exception)
+        self.assertIn("npm ERR! distinct-tail", message)
+        self.assertNotIn("noise-0", message)
+        self.assertNotIn("build-secret", message)
+
+        def build_fails(args, **kwargs):
+            if list(args[:2]) == ["npm", "ci"]:
+                return subprocess.CompletedProcess(args, 0, "", "")
+            return subprocess.CompletedProcess(args, 1, "", "npm ERR! build-secret")
+
+        with tempfile.TemporaryDirectory() as directory:
+            build = Path(directory) / "affilio-wp" / "admin" / "build"
+            build.mkdir(parents=True)
+            (build / "package.json").write_text('{"scripts":{"build":"true"}}\n', encoding="utf-8")
+            (build / "dashboard.js").write_text("var kept = 1;\n", encoding="utf-8")
+            with patch.object(subprocess, "run", build_fails), self.assertRaises(release.ReleaseError) as caught:
+                release.validate_built_admin_js(Path(directory) / "affilio-wp")
+        self.assertIn("withheld", str(caught.exception))
+        self.assertNotIn("build-secret", str(caught.exception))
 
     def test_plugin_zip_rejects_stored_entries(self):
         output = io.BytesIO()

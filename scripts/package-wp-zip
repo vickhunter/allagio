@@ -79,6 +79,7 @@ def main():
     write_plugin_zip(output, names)
     try:
         release.validate_plugin(output.read_bytes())
+        release.validate_built_admin_js(ROOT / "affilio-wp")
     except release.ReleaseError as exc:
         print("Release stopped: " + str(exc), file=sys.stderr)
         return 1
