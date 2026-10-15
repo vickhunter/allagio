@@ -1,3 +1,7 @@
+## October 15 — plugin ZIP includes public styles
+
+`Dockerfile.mvp` copies `affilio-wp/public/` into the WordPress ZIP served at `/downloads/affilio.zip`. That ZIP now contains `affilio-wp/public/css/placement.css` and `affilio-wp/public/js/affilio-track.js`, the same paths `scripts/package-wp-zip` writes. The release check builds that ZIP from the Dockerfile copy list and stops when `public/css/placement.css` is missing.
+
 ## October 14 — a Stripe refund waits when this product can still take the sale
 
 A Stripe refund stays pending when this product has no Stripe sale yet. Another seller's sale with the same order id does not close it. A seller report on this product in the refund currency stays pending too, because a later Stripe sale can still upgrade that report and the refund then applies. The refund is rejected and is not retried only when this product's sale for that order belongs to a different signed provider. A Lemon or Polar refund whose currency does not match the sale is rejected and is not retried. A refund that arrives before any sale stays unmatched. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
