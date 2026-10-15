@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,28 @@ import (
 
 	"github.com/jackc/pgx/v5"
 )
+
+// TestMigration038UsingIsLiteralUTC pins the conversion text. A USING of
+// AT TIME ZONE current_setting('TimeZone') matches the guard's behavior
+// and still passes the fold tests.
+func TestMigration038UsingIsLiteralUTC(t *testing.T) {
+	want := []string{"clicks.clicked_at", "conversions.occurred_at", "ledger_entries.clears_at"}
+	for _, name := range []string{"038_timestamptz_instants.sql", filepath.Join("down", "038_timestamptz_instants.sql")} {
+		got := alterColumnUsings(readMigration(t, name))
+		if len(got) != len(want) {
+			t.Fatalf("%s conversions %v", name, got)
+		}
+		for _, column := range want {
+			using, ok := got[column]
+			if !ok {
+				t.Fatalf("%s missing USING for %s in %v", name, column, got)
+			}
+			if !strings.Contains(using, "AT TIME ZONE 'UTC'") || strings.Contains(strings.ToLower(using), "current_setting") {
+				t.Fatalf("%s %s USING %q", name, column, using)
+			}
+		}
+	}
+}
 
 func TestMigration038ConvertsStoredUTCFaces(t *testing.T) {
 	db, cleanup := setupTestDBThrough(t, "UTC", "037_reserved_sale_events.sql")
@@ -265,11 +288,77 @@ func runMigrationFileLikePsql(t *testing.T, zone, name string) {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	// One transaction on one connection. Pool.Exec would autocommit each
+	// statement on its own session, so a failed guard would still alter.
+	ctx := context.Background()
+	conn, err := db.Pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Release()
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	failed := false
 	for _, stmt := range splitSQLStatements(string(script)) {
-		if _, err := db.Pool.Exec(context.Background(), stmt); err != nil {
+		switch sqlKeyword(stmt) {
+		case "BEGIN", "COMMIT":
+			continue
+		}
+		if _, err := tx.Exec(ctx, stmt); err != nil {
 			t.Logf("statement error: %v", err)
+			failed = true
 		}
 	}
+	if failed {
+		if err := tx.Rollback(ctx); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func sqlKeyword(stmt string) string {
+	s := stmt
+	for {
+		s = strings.TrimSpace(s)
+		switch {
+		case strings.HasPrefix(s, "--"):
+			i := strings.IndexByte(s, '\n')
+			if i < 0 {
+				return ""
+			}
+			s = s[i+1:]
+		case strings.HasPrefix(s, "/*"):
+			i := strings.Index(s, "*/")
+			if i < 0 {
+				return ""
+			}
+			s = s[i+2:]
+		default:
+			fields := strings.Fields(s)
+			if len(fields) == 0 {
+				return ""
+			}
+			return strings.ToUpper(fields[0])
+		}
+	}
+}
+
+var alterColumnUsingPattern = regexp.MustCompile(`(?is)ALTER\s+TABLE\s+([A-Za-z_][A-Za-z0-9_]*)\s+ALTER\s+COLUMN\s+([A-Za-z_][A-Za-z0-9_]*)\s+TYPE\b.*?\bUSING\s+(.*?)\s*;`)
+
+func alterColumnUsings(script string) map[string]string {
+	out := map[string]string{}
+	for _, stmt := range splitSQLStatements(script) {
+		for _, match := range alterColumnUsingPattern.FindAllStringSubmatch(stmt, -1) {
+			out[match[1]+"."+match[2]] = strings.TrimSpace(match[3])
+		}
+	}
+	return out
 }
 
 func mustSessionDSN(t *testing.T, zone string) string {
