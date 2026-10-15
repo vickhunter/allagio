@@ -166,6 +166,24 @@ func TestSanitizeReaderCopyRejectsShortSentenceWhenBlurbIsOnlyThat(t *testing.T)
 	}
 }
 
+func TestSanitizeReaderCopyRejectsDigitStandInsForLetters(t *testing.T) {
+	t.Parallel()
+	reason := scoreMatchReason(t)
+	assertRejectedCopy(t, "There is a c0ntextual fit worth mentioning to readers comparing tools.", reason)
+	assertRejectedCopy(t, "There is a contextua1 fit worth mentioning to readers comparing tools.", reason)
+	assertRejectedCopy(t, "There is a contextual f1t worth mentioning to readers comparing tools.", reason)
+	assertRejectedCopy(t, "Readers notice th3 article discusses email marketing in this comparison.", reason)
+	assertRejectedCopy(t, "A note about making it a 5trong c0ntextual choice for the team.", reason)
+	if !ContainsInternalCopy("There is a strong contex&#116;ual fit for readers comparing tools.", reason) {
+		t.Fatal("an entity hid the internal reason from the overlap check")
+	}
+	clean := "Mailchimp helps 30 teams schedule campaigns and see which emails get replies."
+	got, ok := SanitizeReaderCopy(clean, reason)
+	if !ok || got != clean {
+		t.Fatalf("digits in unrelated copy were rejected: %q ok=%v", got, ok)
+	}
+}
+
 func TestSanitizeReaderCopyRejectsCategoryScoreMatchSentence(t *testing.T) {
 	t.Parallel()
 	matches := MatchCuratedPrograms("seo email marketing", []CuratedProgramInput{{
