@@ -99,7 +99,7 @@ class DashboardSettingsA11yTest extends TestCase {
         $admin->render_settings();
         $html = ob_get_clean();
 
-        $this->assertMatchesRegularExpression('/<div id="affilio-onboarding-root">.*Start analysis.*<\/div>/s', $html);
+        $this->assertMatchesRegularExpression('/<div id="affilio-onboarding-root">.*<form method="post" action="https:\/\/blog\.example\/wp-admin\/admin-post\.php">.*name="_wpnonce" value="test-nonce".*name="action" value="affilio_scan_all".*<button type="submit" class="button button-primary button-large" data-connect>Start analysis<\/button>.*<\/div>/s', $html);
         $this->assertStringContainsString('Your site is connected.', $html);
         $this->assertStringContainsString('>Start analysis<', $html);
         $this->assertStringNotContainsString('Connected. Start your first analysis.', $html);
@@ -107,7 +107,7 @@ class DashboardSettingsA11yTest extends TestCase {
 
         $admin->enqueue_dashboard_assets('affilio_page_affilio-settings');
         $copy = $GLOBALS['localized']['affilio-onboarding']['AffilioSetup']['copy'];
-        $this->assertSame('Start analysis', $copy['startAnalysis']);
+        $this->assertSame('Start analysis|Analysis in progress|Analysis complete', implode('|', array($copy['startAnalysis'], $copy['analysisInProgress'], $copy['analysisComplete'])));
         $this->assertSame('Your site is connected.', $copy['connectedStatus']);
     }
 
@@ -156,7 +156,7 @@ class DashboardSettingsA11yTest extends TestCase {
         $root = dirname(__DIR__, 2);
         $po = file_get_contents($root . '/languages/affilio-it_IT.po');
         $mo = file_get_contents($root . '/languages/affilio-it_IT.mo');
-        $this->assertStringContainsString("msgid \"Start analysis\"\nmsgstr \"Avvia analisi\"", $po);
+        $this->assertStringContainsString("msgid \"Start analysis\"\nmsgstr \"Avvia analisi\"\n\nmsgid \"Analysis in progress\"\nmsgstr \"Analisi in corso\"\n\nmsgid \"Analysis complete\"\nmsgstr \"Analisi completata\"", $po);
         $this->assertStringContainsString("msgid \"Your site is connected.\"\nmsgstr \"Il sito è collegato.\"", $po);
         $this->assertStringContainsString('Avvia analisi', $mo);
         $this->assertStringContainsString('Il sito è collegato.', $mo);
@@ -268,7 +268,11 @@ class DashboardSettingsA11yTest extends TestCase {
     public function test_dashboard_script_escapes_article_and_program_fields() {
         $js = file_get_contents(dirname(__DIR__, 2) . '/admin/build/dashboard.js');
         $this->assertStringContainsString("const title = esc(a.title || '');", $js);
-        $this->assertStringContainsString('const articleId = esc(a.id);', $js);
+        $this->assertTrue(
+            str_contains($js, 'const articleId = esc(a.id);')
+            && str_contains($js, "candidate.getAttribute('data-article-id') === articleId")
+            && !str_contains($js, 'tr[data-article-id="${')
+        );
         $this->assertStringContainsString('const postId = esc(a.wp_post_id);', $js);
         $this->assertStringContainsString('const name = esc(p.name);', $js);
         $this->assertStringContainsString('const domain = p.domain ? esc(p.domain)', $js);

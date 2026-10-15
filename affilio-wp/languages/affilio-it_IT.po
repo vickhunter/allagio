@@ -13,6 +13,12 @@ msgstr "Chiave salvata (%s)"
 msgid "Start analysis"
 msgstr "Avvia analisi"
 
+msgid "Analysis in progress"
+msgstr "Analisi in corso"
+
+msgid "Analysis complete"
+msgstr "Analisi completata"
+
 msgid "Your site is connected."
 msgstr "Il sito è collegato."
 

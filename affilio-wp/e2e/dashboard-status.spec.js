@@ -44,7 +44,7 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 });
 
-async function bootOnboarding(page, { locale, connected, copy }) {
+async function bootOnboarding(page, { locale, connected, copy, phase = 'not_started', scanned = 0, summary = '' }) {
   await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><div class="wrap affilio-admin-page"><div id="affilio-onboarding-root"></div></div>`);
   await page.evaluate((setup) => {
     window.AffilioSetup = setup;
@@ -59,8 +59,9 @@ async function bootOnboarding(page, { locale, connected, copy }) {
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({
-      phase: 'not_started',
-      scanned: 0,
+      phase,
+      scanned,
+      summary,
       skipped: [],
       connection: { connected },
       dashboard_url: 'https://blog.example/wp-admin/admin.php?page=affilio',
@@ -131,6 +132,74 @@ test('italian connected settings use the catalog strings', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Collega e trova opportunità' })).toHaveCount(0);
   await expect(page.locator('[data-progress]')).not.toContainText('Avvia la prima analisi');
   await noHorizontalOverflow(page);
+});
+
+test('a running scan replaces the start label', async ({ page }) => {
+  await bootOnboarding(page, {
+    locale: 'it',
+    connected: true,
+    phase: 'scanning',
+    scanned: 2,
+    copy: {
+      startAnalysis: 'Avvia analisi',
+      connectedStatus: 'Il sito è collegato.',
+      analysisInProgress: 'Analisi in corso',
+      analysisComplete: 'Analisi completata',
+    },
+  });
+  const button = page.getByRole('button', { name: 'Analisi in corso', exact: true });
+  await expect(button).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Avvia analisi' })).toHaveCount(0);
+  await noHorizontalOverflow(page);
+});
+
+test('a finished scan replaces the start label', async ({ page }) => {
+  await bootOnboarding(page, {
+    locale: 'it',
+    connected: true,
+    phase: 'complete',
+    scanned: 4,
+    summary: 'Analisi completata: 4 articoli analizzati',
+    copy: {
+      startAnalysis: 'Avvia analisi',
+      connectedStatus: 'Il sito è collegato.',
+      analysisInProgress: 'Analisi in corso',
+      analysisComplete: 'Analisi completata',
+    },
+  });
+  const button = page.getByRole('button', { name: 'Analisi completata', exact: true });
+  await expect(button).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Avvia analisi' })).toHaveCount(0);
+  await expect(page.locator('[data-progress]')).toHaveText('Analisi completata: 4 articoli analizzati');
+  await noHorizontalOverflow(page);
+});
+
+test('starting analysis from a connected site leaves the start label', async ({ page }) => {
+  await bootOnboarding(page, {
+    locale: 'en',
+    connected: true,
+    copy: {
+      startAnalysis: 'Start analysis',
+      connectedStatus: 'Your site is connected.',
+      analysisInProgress: 'Analysis in progress',
+      analysisComplete: 'Analysis complete',
+    },
+  });
+  await page.route('**/affilio/v1/setup', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      phase: 'scanning',
+      scanned: 0,
+      skipped: [],
+      connection: { connected: true },
+      dashboard_url: 'https://blog.example/wp-admin/admin.php?page=affilio',
+    }),
+  }));
+  const button = page.getByRole('button', { name: 'Start analysis', exact: true });
+  await button.click();
+  await expect(page.getByRole('button', { name: 'Analysis in progress', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Start analysis' })).toHaveCount(0);
 });
 
 test('connected dashboard shows the settings badge', async ({ page }) => {
@@ -242,11 +311,16 @@ test('dashboard text fields are escaped', async ({ page }) => {
   await expect(root).toContainText('<svg/onload=alert(1)>');
   await expect(root).toContainText('evil<img>.test');
   expect(dialogs).toBe(0);
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.getByRole('button', { name: 'Review now', exact: true }).click();
+  await expect(page.locator('tr.affilio-row-focus')).toHaveCount(1);
+  expect(errors).toEqual([]);
   await noHorizontalOverflow(page);
 });
 
 test('settings and dashboard buttons are at least 44px at 390px', async ({ page }) => {
-  await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><style>${wpAdminButtons}</style><body class="wp-admin wp-core-ui"><p><button type="button" class="button button-primary">Posts</button></p><div class="wrap affilio-admin-page"><div id="affilio-onboarding-root"><button type="button" class="button button-primary">Collega e trova opportunità</button><button type="button" class="button button-primary">Avvia analisi</button></div><form class="affilio-settings-form"><p class="submit"><input type="submit" class="button button-primary" value="Salva impostazioni"></p></form><div id="affilio-dashboard-root"><button type="button" class="button button-primary">Rivedi ora</button><button type="button" class="button button-secondary">Aggiungi</button></div></div></body>`);
+  await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><style>${wpAdminButtons}</style><body class="wp-admin wp-core-ui"><p><button type="button" class="button button-primary">Posts</button></p><div class="wrap affilio-admin-page"><div id="affilio-onboarding-root"><button type="button" class="button button-primary">Collega e trova opportunità</button><button type="button" class="button button-primary button-large">Avvia analisi</button></div><form class="affilio-settings-form"><p class="submit"><input type="submit" class="button button-primary button-large" value="Salva impostazioni"></p></form><div id="affilio-dashboard-root"><button type="button" class="button button-primary">Rivedi ora</button><button type="button" class="button button-secondary">Aggiungi</button></div></div></body>`);
   for (const name of ['Collega e trova opportunità', 'Avvia analisi', 'Salva impostazioni', 'Rivedi ora', 'Aggiungi']) {
     const box = await page.getByRole('button', { name, exact: true }).boundingBox();
     expect(box.height).toBeGreaterThanOrEqual(44);

@@ -124,6 +124,8 @@ class Affilio_Admin {
                 'copy' => array(
                     'startAnalysis' => __('Start analysis', 'affilio'),
                     'connectedStatus' => __('Your site is connected.', 'affilio'),
+                    'analysisInProgress' => __('Analysis in progress', 'affilio'),
+                    'analysisComplete' => __('Analysis complete', 'affilio'),
                 ),
             ));
             return;
@@ -312,7 +314,11 @@ class Affilio_Admin {
         echo '<div id="affilio-onboarding-root">';
         if (!empty($status['connected'])) {
             echo '<p data-progress role="status">' . esc_html(__('Your site is connected.', 'affilio')) . '</p>';
-            echo '<button type="button" class="button button-primary" data-connect>' . esc_html(__('Start analysis', 'affilio')) . '</button>';
+            echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+            wp_nonce_field('affilio_scan_all');
+            echo '<input type="hidden" name="action" value="affilio_scan_all" />';
+            echo '<button type="submit" class="button button-primary button-large" data-connect>' . esc_html(__('Start analysis', 'affilio')) . '</button>';
+            echo '</form>';
         }
         echo '</div>';
         echo '<details><summary>' . esc_html($this->t('Existing connection or manual settings', 'Collegamento esistente o impostazioni manuali')) . '</summary>';

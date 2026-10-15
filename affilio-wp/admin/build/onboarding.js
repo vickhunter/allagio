@@ -12,6 +12,7 @@
     const progress = root.querySelector('[data-progress]');
     const error = root.querySelector('[data-error]');
     const dashboard = root.querySelector('[data-dashboard]');
+    let siteConnected = false;
     const call = async (method) => {
         const response = await fetch(AffilioSetup.restBase.replace(/\/$/, '') + '/setup', { method, headers: { 'X-WP-Nonce': AffilioSetup.nonce } });
         const data = await response.json();
@@ -20,11 +21,16 @@
     };
     const render = (data) => {
         const scanning = data.phase === 'scanning';
-        const complete = data.phase === 'complete' && data.connection.connected;
-        button.disabled = scanning || complete;
         const connected = !!(data.connection && data.connection.connected);
+        const complete = data.phase === 'complete' && connected;
+        siteConnected = connected;
+        button.disabled = scanning || complete;
         button.textContent = t('Connect and find opportunities', 'Collega e trova opportunità');
-        if (data.phase === 'scan_error') {
+        if (scanning) {
+            button.textContent = catalog('analysisInProgress', t('Analysis in progress', 'Analisi in corso'));
+        } else if (complete) {
+            button.textContent = catalog('analysisComplete', t('Analysis complete', 'Analisi completata'));
+        } else if (data.phase === 'scan_error') {
             button.textContent = t('Retry analysis', 'Riprova analisi');
             error.textContent = data.summary || t('Connected. Analysis will continue.', 'Collegato. L\'analisi continua.');
         } else if (connected) {
@@ -51,10 +57,16 @@
         try { render(await call('GET')); }
         catch (failure) { error.textContent = failure.message; button.disabled = false; }
     };
-    button.addEventListener('click', async () => {
+    button.addEventListener('click', async (event) => {
+        event.preventDefault();
         button.disabled = true;
         error.textContent = '';
-        progress.textContent = t('Connecting…', 'Collegamento…');
+        if (siteConnected) {
+            button.textContent = catalog('analysisInProgress', t('Analysis in progress', 'Analisi in corso'));
+        }
+        progress.textContent = siteConnected
+            ? (`0 ` + t('posts analyzed. Scanning in the background…', 'articoli analizzati. Analisi in background…'))
+            : t('Connecting…', 'Collegamento…');
         try { render(await call('POST')); }
         catch (failure) { error.textContent = failure.message; button.disabled = false; }
     });

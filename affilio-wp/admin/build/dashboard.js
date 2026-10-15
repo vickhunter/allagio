@@ -300,7 +300,10 @@
             btn.addEventListener('click', () => {
                 if (!table) return;
                 const articleId = btn.getAttribute('data-jump-article');
-                const row = table.querySelector(`tr[data-article-id="${articleId}"]`);
+                const row = Array.prototype.find.call(
+                    table.querySelectorAll('tr[data-article-id]'),
+                    (candidate) => candidate.getAttribute('data-article-id') === articleId
+                ) || null;
                 if (!row) return;
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 row.classList.add('affilio-row-focus');

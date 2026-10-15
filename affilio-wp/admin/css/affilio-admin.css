@@ -146,11 +146,13 @@
   outline-offset: 2px;
 }
 
-/* WordPress sets .wp-core-ui .button to 40px below 782px. Repeat the class so this wins on Affilio screens only. */
+/* WordPress sets .wp-core-ui .button.button-large to 40px below 782px.
+   Prefix .wp-core-ui so this wins on Affilio screens even when buttons.css loads later. */
 @media screen and (max-width: 782px) {
-  .affilio-admin-page .button.button,
-  .affilio-admin-page .button.button-primary,
-  .affilio-admin-page .button.button-secondary {
+  .wp-core-ui .affilio-admin-page .button.button,
+  .wp-core-ui .affilio-admin-page .button.button-primary,
+  .wp-core-ui .affilio-admin-page .button.button-secondary,
+  .wp-core-ui .affilio-admin-page .button.button-large {
     box-sizing: border-box;
     height: auto;
     min-height: 44px;
