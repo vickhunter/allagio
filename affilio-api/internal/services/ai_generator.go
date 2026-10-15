@@ -258,7 +258,9 @@ func buildGenPrompt(input ContentRequest) string {
 		"Preferred tone: " + tone + "\n" +
 		"Target language: " + language + "\n" +
 		"Product: " + input.ProgramName + company + "\n" +
-		"Reason this product fits: " + reason + "\n" +
+		"INTERNAL FIT NOTE (not reader-facing): " + reason + "\n" +
+		"The internal fit note is scoring context for you only. It must not appear in blurb, transition_sentence, or placement_reason. " +
+		"Do not quote it, paraphrase it, or include \"strong contextual fit\", \"Performance-adjusted\", historical outcome counts, or score adjustments.\n" +
 		"Insertion type: " + strings.TrimSpace(input.InsertionType) + "\n" +
 		"Program type: " + strings.TrimSpace(input.ProgramType)
 

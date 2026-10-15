@@ -398,7 +398,8 @@
                                     article_word_count: articleWordCount,
                                     article_category: data.article.category || '',
                                     preferred_tone: 'match article author voice',
-                                    site_language: document.documentElement.lang || 'auto',
+                                    site_language: (typeof AffilioData !== 'undefined' && AffilioData.locale) || document.documentElement.lang || 'en',
+                                    regenerate: action === 'regenerate',
                             });
                             btn.disabled = false;
                             btn.innerText = action === 'preview' ? t('Preview Insert', 'Anteprima inserimento') : t('Regenerate', 'Rigenera');

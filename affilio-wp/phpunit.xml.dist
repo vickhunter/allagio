@@ -10,6 +10,7 @@
             <file>tests/phpunit/OneBoxTest.php</file>
             <file>tests/phpunit/ScanContinueTest.php</file>
             <file>tests/phpunit/InsertRouteTest.php</file>
+            <file>tests/phpunit/ApproveInsertCopyTest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>

@@ -1,3 +1,7 @@
+## October 15 — generated copy does not publish the internal reason
+
+`POST /generate/content` does not use the recommendation reason as reader-facing copy. If the model returns no blurb, or the blurb is only that reason or a score such as "strong contextual fit" or "Performance-adjusted (+N from N historical outcomes)", the response is 422 `no reader-facing copy` and nothing is written to the post. The prompt tells the model the fit note is internal and must not appear. A later generate for the same recommendation and language reuses the preview stored in `recommendations.generated_html` unless the request sets `regenerate`. `POST /affilio/v1/editor/approve-insert` sends `site_language` from the post locale, then the site locale, then `en`, and ignores a caller `html` field. `insert_inline_mention` uses the approved Italian disclosure for `it_IT` and the English disclosure otherwise. The mention and the disclosure pass through `wp_kses_post`. Block content gets a paragraph block. `wp_update_post` receives `wp_slash` content. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 15 — plugin 0.1.26 removes the legacy insert route
 
 POST `/wp-json/affilio/v1/insert` is removed. That route wrote caller-supplied HTML and an English disclosure into `post_content`. The dashboard confirm action no longer sends HTML. It calls `POST /affilio/v1/editor/approve-insert`, which inserts the generated recommendation. `Affilio_Inserter` stays because that editor route still calls `insert_inline_mention` with sanitized generated HTML. `POST /v1/insert/confirm` stays because the editor records the completed insert there, and the admin proxy still allows that path.
@@ -446,6 +450,7 @@ See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
 
 ## Changelog
 - 2026-10-15: Removed WordPress `POST /affilio/v1/insert`. Plugin 0.1.26. The dashboard inserts through `POST /affilio/v1/editor/approve-insert` and does not send HTML. The inserter class remains for that editor path. `POST /v1/insert/confirm` remains.
+- 2026-10-15: Generated insert copy no longer falls back to the internal recommendation reason. The same language reuses the stored preview. `it_IT` posts get the approved Italian disclosure. No new migration.
 - 2026-02-05: Added MVP checklist + status script, analytics dashboard sorting/top-N, seed dedupe with upsert, new analytics endpoints, Claude integration for detection + content generation, handler tests + test DB compose, make targets.
 - 2026-02-06: Added recommendation quality analytics, retention/churn cohorts endpoint + dashboard panel, and tracking handler coverage updates.
 - 2026-02-06: Implemented recommendation quality model tuning loop with outcome-based multipliers and analytics visibility.
