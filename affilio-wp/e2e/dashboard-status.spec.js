@@ -6,6 +6,32 @@ const css = fs.readFileSync(path.join(__dirname, '../admin/css/affilio-admin.css
 const dashboardJs = path.resolve(__dirname, '../admin/build/dashboard.js');
 const onboardingJs = path.resolve(__dirname, '../admin/build/onboarding.js');
 
+// Core admin buttons.css at max-width 782px. Loaded after the plugin sheet, as in wp-admin.
+const wpAdminButtons = `
+.wp-core-ui .button, .wp-core-ui .button-primary, .wp-core-ui .button-secondary {
+  display: inline-block;
+  font-size: 13px;
+  line-height: 2.15384615;
+  min-height: 30px;
+  margin: 0;
+  padding: 0 10px;
+  border-width: 1px;
+  border-style: solid;
+  box-sizing: border-box;
+}
+@media screen and (max-width: 782px) {
+  .wp-core-ui .button,
+  .wp-core-ui .button.button-large,
+  .wp-core-ui .button.button-small {
+    padding: 0 14px;
+    line-height: 2.71428571;
+    font-size: 14px;
+    vertical-align: middle;
+    min-height: 40px;
+    margin-bottom: 4px;
+  }
+}`;
+
 async function noHorizontalOverflow(page) {
   const box = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
@@ -216,6 +242,17 @@ test('dashboard text fields are escaped', async ({ page }) => {
   await expect(root).toContainText('<svg/onload=alert(1)>');
   await expect(root).toContainText('evil<img>.test');
   expect(dialogs).toBe(0);
+  await noHorizontalOverflow(page);
+});
+
+test('settings and dashboard buttons are at least 44px at 390px', async ({ page }) => {
+  await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><style>${wpAdminButtons}</style><body class="wp-admin wp-core-ui"><p><button type="button" class="button button-primary">Posts</button></p><div class="wrap affilio-admin-page"><div id="affilio-onboarding-root"><button type="button" class="button button-primary">Collega e trova opportunità</button><button type="button" class="button button-primary">Avvia analisi</button></div><form class="affilio-settings-form"><p class="submit"><input type="submit" class="button button-primary" value="Salva impostazioni"></p></form><div id="affilio-dashboard-root"><button type="button" class="button button-primary">Rivedi ora</button><button type="button" class="button button-secondary">Aggiungi</button></div></div></body>`);
+  for (const name of ['Collega e trova opportunità', 'Avvia analisi', 'Salva impostazioni', 'Rivedi ora', 'Aggiungi']) {
+    const box = await page.getByRole('button', { name, exact: true }).boundingBox();
+    expect(box.height).toBeGreaterThanOrEqual(44);
+  }
+  const outside = await page.getByRole('button', { name: 'Posts', exact: true }).boundingBox();
+  expect(outside.height).toBeLessThan(44);
   await noHorizontalOverflow(page);
 });
 

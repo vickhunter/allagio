@@ -146,6 +146,20 @@
   outline-offset: 2px;
 }
 
+/* WordPress sets .wp-core-ui .button to 40px below 782px. Repeat the class so this wins on Affilio screens only. */
+@media screen and (max-width: 782px) {
+  .affilio-admin-page .button.button,
+  .affilio-admin-page .button.button-primary,
+  .affilio-admin-page .button.button-secondary {
+    box-sizing: border-box;
+    height: auto;
+    min-height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 42px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .affilio-next-step,
   #affilio-onboarding-root .button,
