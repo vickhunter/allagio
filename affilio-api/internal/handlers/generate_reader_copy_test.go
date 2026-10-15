@@ -359,6 +359,85 @@ func storePoisonedPreview(t *testing.T, db *database.DB, recID, poison, clean st
 	}
 }
 
+func TestGenerateContentRejectsOverlapAcrossAnchorAndBlurb(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	reason := services.MatchCuratedPrograms("This article covers email marketing for small teams.", []services.CuratedProgramInput{{
+		ID:   "prog-boundary",
+		Name: "email marketing",
+	}}, nil)
+	if len(reason) != 1 || !strings.Contains(reason[0].Reason, "email marketing") || !strings.Contains(reason[0].Reason, "contextual fit") {
+		t.Fatalf("scoreMatch reason: %#v", reason)
+	}
+	siteID, recID := seedGenerateRecommendation(t, db, reason[0].Reason)
+	cases := []struct {
+		name  string
+		blurb string
+	}{
+		{"email marketing", "making it a useful comparison for readers who want a tool."},
+		{"contextual", "fit for readers comparing a few tools today."},
+	}
+	for _, tc := range cases {
+		if _, err := db.Pool.Exec(context.Background(), `UPDATE affiliate_programs SET name=$1, signup_url=$2 WHERE slug='semrush-reader-copy'`, tc.name, "https://example.com/aff"); err != nil {
+			t.Fatal(err)
+		}
+		rec := postGenerate(t, db, siteID, scriptedGenerator(t, []string{tc.blurb}), map[string]interface{}{
+			"recommendation_id": recID,
+			"site_language":     "en",
+			"regenerate":        true,
+		})
+		if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "no reader-facing copy") {
+			t.Fatalf("name %q blurb %q: got %d %s", tc.name, tc.blurb, rec.Code, rec.Body.String())
+		}
+		if strings.Contains(rec.Body.String(), tc.blurb) {
+			t.Fatalf("name %q published the blurb: %s", tc.name, rec.Body.String())
+		}
+	}
+}
+
+func TestGenerateContentRegeneratesPoisonedPlacementReason(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	siteID, recID := seedGenerateRecommendation(t, db, internalFitReason)
+	const clean = "Mailchimp helps teams schedule campaigns and see which emails get replies."
+	const later = "Later copy for readers who compare a few tools before they buy."
+	const poisonedReason = "This is a strong contextual fit for the reader."
+	gen := scriptedGenerator(t, []string{clean, later})
+	first := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+	})
+	if first.Code != http.StatusOK {
+		t.Fatalf("preview generate failed: %d %s", first.Code, first.Body.String())
+	}
+	var stored string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT generated_html FROM recommendations WHERE id=$1`, recID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	var preview storedReaderPreview
+	if err := json.Unmarshal([]byte(stored), &preview); err != nil {
+		t.Fatal(err)
+	}
+	preview.PlacementReason = poisonedReason
+	encoded, err := json.Marshal(preview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE recommendations SET generated_html=$2 WHERE id=$1`, recID, string(encoded)); err != nil {
+		t.Fatal(err)
+	}
+	second := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+	})
+	if second.Code != http.StatusOK || !strings.Contains(second.Body.String(), later) {
+		t.Fatalf("poisoned placement reason was not regenerated: %d %s", second.Code, second.Body.String())
+	}
+	if strings.Contains(strings.ToLower(second.Body.String()), "contextual fit") {
+		t.Fatalf("published the stored placement reason: %s", second.Body.String())
+	}
+}
+
 func TestGenerateContentReusesPreviewForTheSameLanguage(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

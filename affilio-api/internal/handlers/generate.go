@@ -74,6 +74,9 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	}
 	if !req.Regenerate {
 		if preview, ok := reusablePreview(rec.GeneratedHTML, language, rec.Reason, rec.ProgramName, link); ok {
+			if !publishReaderHTML(c, preview.HTML, rec.Reason) {
+				return
+			}
 			writeGenerated(c, preview.HTML, preview.Text, preview.Position, preview.PlacementReason, preview.Transition, preview.ParagraphIndex, preview.Confidence, rec.ProgramName, link)
 			return
 		}
@@ -135,8 +138,7 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 		placementReason = ""
 	}
 	rendered := readerHTML(rec.ProgramName, link, blurb)
-	if services.ContainsInternalCopy(rendered, rec.Reason) || services.ContainsInternalCopy(blurb, rec.Reason) {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
+	if !publishReaderHTML(c, rendered, rec.Reason) {
 		return
 	}
 	position = normalizePosition(position)
@@ -162,8 +164,18 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	writeGenerated(c, rendered, blurb, position, placementReason, transitionSentence, suggestedParagraphIndex, confidenceScore, rec.ProgramName, link)
 }
 
+const readerHTMLSeparator = " — "
+
 func readerHTML(programName, link, blurb string) string {
-	return "<p><a href=\"" + html.EscapeString(link) + "\" rel=\"nofollow sponsored\">" + html.EscapeString(programName) + "</a> — " + html.EscapeString(blurb) + "</p>"
+	return "<p><a href=\"" + html.EscapeString(link) + "\" rel=\"nofollow sponsored\">" + html.EscapeString(programName) + "</a>" + readerHTMLSeparator + html.EscapeString(blurb) + "</p>"
+}
+
+func publishReaderHTML(c *gin.Context, rendered, reason string) bool {
+	if services.ContainsInternalCopy(visibleReaderText(rendered), reason) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
+		return false
+	}
+	return true
 }
 
 func reusablePreview(raw, language, reason, programName, link string) (storedReaderPreview, bool) {
@@ -185,7 +197,7 @@ func reusablePreview(raw, language, reason, programName, link string) (storedRea
 	if _, ok := services.SanitizeReaderCopy(text, reason); !ok {
 		return storedReaderPreview{}, false
 	}
-	if services.ContainsInternalCopy(preview.Transition, reason) {
+	if services.ContainsInternalCopy(preview.Transition, reason) || services.ContainsInternalCopy(preview.PlacementReason, reason) {
 		return storedReaderPreview{}, false
 	}
 	if !services.ReaderCopySafe(programName) || services.ContainsInternalCopy(programName, reason) || !services.ReaderCopySafe(link) {
@@ -195,7 +207,7 @@ func reusablePreview(raw, language, reason, programName, link string) (storedRea
 	if rebuilt != preview.HTML {
 		return storedReaderPreview{}, false
 	}
-	if services.ContainsInternalCopy(visibleOverlapText(preview.HTML), reason) {
+	if services.ContainsInternalCopy(visibleReaderText(preview.HTML), reason) {
 		return storedReaderPreview{}, false
 	}
 	preview.HTML = rebuilt
@@ -207,10 +219,11 @@ var htmlCommentPattern = regexp.MustCompile(`(?s)<!--.*?-->`)
 
 var htmlTagPattern = regexp.MustCompile(`(?s)<[^>]*>`)
 
-func visibleOverlapText(rawHTML string) string {
+func visibleReaderText(rawHTML string) string {
 	withoutComments := htmlCommentPattern.ReplaceAllString(rawHTML, "")
 	withoutTags := htmlTagPattern.ReplaceAllString(withoutComments, "")
-	return html.UnescapeString(withoutTags)
+	decoded := html.UnescapeString(withoutTags)
+	return strings.ReplaceAll(decoded, "—", " ")
 }
 
 func writeGenerated(c *gin.Context, rendered, blurb, position, placementReason, transition string, paragraph int, confidence float64, programName, link string) {
