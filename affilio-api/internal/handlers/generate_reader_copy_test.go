@@ -234,6 +234,131 @@ func TestGenerateContentRegeneratesUnsafeStoredAnchor(t *testing.T) {
 	}
 }
 
+func TestGenerateContentRegeneratesPoisonedStoredHTML(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	reason := services.MatchCuratedPrograms("This article covers email marketing for small teams.", []services.CuratedProgramInput{{
+		ID:   "prog-stored",
+		Name: "email marketing",
+	}}, nil)
+	if len(reason) != 1 {
+		t.Fatalf("scoreMatch matches: %#v", reason)
+	}
+	siteID, recID := seedGenerateRecommendation(t, db, reason[0].Reason)
+	const clean = "Mailchimp helps teams schedule campaigns and see which emails get replies."
+	const later = "Later copy for readers who compare a few tools before they buy."
+	gen := scriptedGenerator(t, []string{clean, later})
+	first := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+	})
+	if first.Code != http.StatusOK {
+		t.Fatalf("preview generate failed: %d %s", first.Code, first.Body.String())
+	}
+	poisons := []string{
+		"Readers can see a strong contex&#116;ual fit for this comparison of tools.",
+		"Readers can see a strong contextual&#32;fit for this comparison of tools.",
+		"Readers can see a strong contextual&#x20;fit for this comparison of tools.",
+		"Readers can see a strong contextual&#45;fit for this comparison of tools.",
+		"Readers can see a strong contextual&nbsp; fit for this comparison of tools.",
+		"Readers can see a strong contex<em>tual fit</em> for this comparison of tools.",
+		"Readers can see a strong contex<span></span>tual fit for this comparison of tools.",
+		"Readers can see a strong contextual<b></b>fit for this comparison of tools.",
+		"Readers can see a strong contextual<!--x-->fit for this comparison of tools.",
+		"the <em>article</em> discusses email marketing",
+	}
+	for _, poison := range poisons {
+		storePoisonedPreview(t, db, recID, poison, clean)
+		second := postGenerate(t, db, siteID, gen, map[string]interface{}{
+			"recommendation_id": recID,
+			"site_language":     "en",
+		})
+		if second.Code != http.StatusOK {
+			t.Fatalf("poison %q: got %d %s", poison, second.Code, second.Body.String())
+		}
+		var payload map[string]interface{}
+		if err := json.Unmarshal(second.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("poison %q: decode %v", poison, err)
+		}
+		htmlOut, _ := payload["html"].(string)
+		textOut, _ := payload["generated_text"].(string)
+		if textOut != later || !strings.Contains(htmlOut, later) {
+			t.Fatalf("poison %q was reused or inserted: text %q html %s", poison, textOut, htmlOut)
+		}
+		if strings.Contains(htmlOut, poison) || strings.Contains(htmlOut, "contextual fit") || strings.Contains(strings.ToLower(htmlOut), "article discusses email marketing") {
+			t.Fatalf("poison %q was inserted: %s", poison, htmlOut)
+		}
+	}
+}
+
+func TestGenerateContentReusesCleanAmpersandAndHyphenatedSlug(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	siteID, recID := seedGenerateRecommendation(t, db, internalFitReason)
+	const link = "https://example.com/the-article-discusses-email-marketing-making"
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE affiliate_programs SET name=$1, signup_url=$2 WHERE slug='semrush-reader-copy'`, "H&M", link); err != nil {
+		t.Fatal(err)
+	}
+	const firstBlurb = "Mailchimp helps teams schedule campaigns and see which emails get replies."
+	const secondBlurb = "Later copy for readers who compare a few tools before they buy."
+	gen := scriptedGenerator(t, []string{firstBlurb, secondBlurb})
+	preview := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+	})
+	if preview.Code != http.StatusOK {
+		t.Fatalf("preview generate failed: %d %s", preview.Code, preview.Body.String())
+	}
+	reused := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+	})
+	if reused.Code != http.StatusOK {
+		t.Fatalf("clean preview rejected: %d %s", reused.Code, reused.Body.String())
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(reused.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	htmlOut, _ := payload["html"].(string)
+	textOut, _ := payload["generated_text"].(string)
+	if textOut != firstBlurb || strings.Contains(textOut, secondBlurb) {
+		t.Fatalf("clean preview was not reused: %s", reused.Body.String())
+	}
+	if !strings.Contains(htmlOut, "H&amp;M") || !strings.Contains(htmlOut, link) || !strings.Contains(htmlOut, firstBlurb) {
+		t.Fatalf("reused html lost the escaped name or slug: %s", htmlOut)
+	}
+}
+
+func storePoisonedPreview(t *testing.T, db *database.DB, recID, poison, clean string) {
+	t.Helper()
+	var stored string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT generated_html FROM recommendations WHERE id=$1`, recID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	var preview storedReaderPreview
+	if err := json.Unmarshal([]byte(stored), &preview); err != nil {
+		t.Fatal(err)
+	}
+	const sep = " — "
+	idx := strings.LastIndex(preview.HTML, sep)
+	if idx < 0 || !strings.HasSuffix(preview.HTML, "</p>") {
+		t.Fatalf("stored html has no blurb to poison: %s", preview.HTML)
+	}
+	preview.HTML = preview.HTML[:idx+len(sep)] + poison + "</p>"
+	preview.Text = clean
+	if strings.Contains(preview.Text, poison) {
+		t.Fatalf("text field was not kept clean: %s", preview.Text)
+	}
+	encoded, err := json.Marshal(preview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE recommendations SET generated_html=$2 WHERE id=$1`, recID, string(encoded)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGenerateContentReusesPreviewForTheSameLanguage(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

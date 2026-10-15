@@ -73,7 +73,7 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 		return
 	}
 	if !req.Regenerate {
-		if preview, ok := reusablePreview(rec.GeneratedHTML, language, rec.Reason); ok {
+		if preview, ok := reusablePreview(rec.GeneratedHTML, language, rec.Reason, rec.ProgramName, link); ok {
 			writeGenerated(c, preview.HTML, preview.Text, preview.Position, preview.PlacementReason, preview.Transition, preview.ParagraphIndex, preview.Confidence, rec.ProgramName, link)
 			return
 		}
@@ -134,10 +134,7 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	} else {
 		placementReason = ""
 	}
-	displayName := html.EscapeString(rec.ProgramName)
-	displayBlurb := html.EscapeString(blurb)
-	displayLink := html.EscapeString(link)
-	rendered := "<p><a href=\"" + displayLink + "\" rel=\"nofollow sponsored\">" + displayName + "</a> — " + displayBlurb + "</p>"
+	rendered := readerHTML(rec.ProgramName, link, blurb)
 	if services.ContainsInternalCopy(rendered, rec.Reason) || services.ContainsInternalCopy(blurb, rec.Reason) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
 		return
@@ -165,7 +162,11 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	writeGenerated(c, rendered, blurb, position, placementReason, transitionSentence, suggestedParagraphIndex, confidenceScore, rec.ProgramName, link)
 }
 
-func reusablePreview(raw, language, reason string) (storedReaderPreview, bool) {
+func readerHTML(programName, link, blurb string) string {
+	return "<p><a href=\"" + html.EscapeString(link) + "\" rel=\"nofollow sponsored\">" + html.EscapeString(programName) + "</a> — " + html.EscapeString(blurb) + "</p>"
+}
+
+func reusablePreview(raw, language, reason, programName, link string) (storedReaderPreview, bool) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || !strings.HasPrefix(raw, "{") {
 		return storedReaderPreview{}, false
@@ -177,37 +178,39 @@ func reusablePreview(raw, language, reason string) (storedReaderPreview, bool) {
 	if !strings.EqualFold(services.NormalizeSiteLanguage(preview.Language), services.NormalizeSiteLanguage(language)) {
 		return storedReaderPreview{}, false
 	}
-	if strings.TrimSpace(preview.HTML) == "" || strings.TrimSpace(preview.Text) == "" {
+	text := strings.TrimSpace(preview.Text)
+	if text == "" || strings.TrimSpace(preview.HTML) == "" {
 		return storedReaderPreview{}, false
 	}
-	if services.ContainsInternalCopy(preview.HTML, reason) || services.ContainsInternalCopy(preview.Text, reason) || services.ContainsInternalCopy(preview.Transition, reason) {
+	if _, ok := services.SanitizeReaderCopy(text, reason); !ok {
 		return storedReaderPreview{}, false
 	}
-	visible := visibleReaderText(preview.HTML)
-	anchor := anchorText(preview.HTML)
-	if visible == "" || !services.ReaderCopySafe(visible) || (anchor != "" && !services.ReaderCopySafe(anchor)) {
+	if services.ContainsInternalCopy(preview.Transition, reason) {
 		return storedReaderPreview{}, false
 	}
-	if _, ok := services.SanitizeReaderCopy(preview.Text, reason); !ok {
+	if !services.ReaderCopySafe(programName) || services.ContainsInternalCopy(programName, reason) || !services.ReaderCopySafe(link) {
 		return storedReaderPreview{}, false
 	}
+	rebuilt := readerHTML(programName, link, text)
+	if rebuilt != preview.HTML {
+		return storedReaderPreview{}, false
+	}
+	if services.ContainsInternalCopy(visibleOverlapText(preview.HTML), reason) {
+		return storedReaderPreview{}, false
+	}
+	preview.HTML = rebuilt
+	preview.Text = text
 	return preview, true
 }
 
+var htmlCommentPattern = regexp.MustCompile(`(?s)<!--.*?-->`)
+
 var htmlTagPattern = regexp.MustCompile(`(?s)<[^>]*>`)
 
-var anchorPattern = regexp.MustCompile(`(?is)<a\b[^>]*>(.*?)</a>`)
-
-func visibleReaderText(rawHTML string) string {
-	return strings.TrimSpace(html.UnescapeString(htmlTagPattern.ReplaceAllString(rawHTML, " ")))
-}
-
-func anchorText(rawHTML string) string {
-	match := anchorPattern.FindStringSubmatch(rawHTML)
-	if match == nil {
-		return ""
-	}
-	return strings.TrimSpace(html.UnescapeString(htmlTagPattern.ReplaceAllString(match[1], "")))
+func visibleOverlapText(rawHTML string) string {
+	withoutComments := htmlCommentPattern.ReplaceAllString(rawHTML, "")
+	withoutTags := htmlTagPattern.ReplaceAllString(withoutComments, "")
+	return html.UnescapeString(withoutTags)
 }
 
 func writeGenerated(c *gin.Context, rendered, blurb, position, placementReason, transition string, paragraph int, confidence float64, programName, link string) {
