@@ -13,19 +13,16 @@ $_SERVER['HTTP_REFERER'] = 'https://blog.example/post-2615';
 $_SERVER['REQUEST_URI'] = '/go/' . $placement_id;
 $GLOBALS['options']['affilio_api_key'] = 'site-key-for-go';
 $GLOBALS['options'][AFFILIO_GO_FALLBACKS_OPTION] = array($placement_id => 'https://shop.example/fallback');
-$GLOBALS['filters']['affilio_go_utc_date'] = array(array(
-    'callback' => function ($date) { return '2026-04-10'; },
-    'priority' => 10,
-    'accepted_args' => 1,
-));
+$today = Affilio_Go::utc_date();
 
 check(Affilio_Go::truncate_ip('203.0.113.60') === '203.0.113.0', 'IPv4 /24 was ' . Affilio_Go::truncate_ip('203.0.113.60'));
 check(Affilio_Go::truncate_ip('2001:db8:abcd:1234::1') === '2001:db8:abcd::', 'IPv6 /48 was ' . Affilio_Go::truncate_ip('2001:db8:abcd:1234::1'));
 check(Affilio_Go::truncate_ip('::ffff:203.0.113.60') === '203.0.113.0', 'IPv4-mapped address was not truncated as IPv4');
+check(preg_match('/^\d{4}-\d{2}-\d{2}$/', $today) === 1 && $today === gmdate('Y-m-d'), 'utc date was ' . $today);
 $salt_a = Affilio_Go::daily_salt('site-key-for-go', '2026-04-10');
 $salt_b = Affilio_Go::daily_salt('site-key-for-go', '2026-04-11');
 check($salt_a !== $salt_b && $salt_a === hash('sha256', 'site-key-for-go|go-link|2026-04-10'), 'daily salt is not the documented SHA-256');
-$expected_hash = Affilio_Go::client_hash('203.0.113.0', $salt_a);
+$expected_hash = Affilio_Go::client_hash('203.0.113.0', Affilio_Go::daily_salt('site-key-for-go', $today));
 check(Affilio_Go::visitor_hash() === $expected_hash, 'visitor hash did not use the truncated address and daily salt');
 $_SERVER['REMOTE_ADDR'] = '198.51.100.8';
 check(Affilio_Go::visitor_hash() !== $expected_hash, 'REMOTE_ADDR did not change the hash');

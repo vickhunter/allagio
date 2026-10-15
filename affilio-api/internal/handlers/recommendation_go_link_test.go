@@ -171,6 +171,57 @@ func TestRecommendationPluginProxyIgnoresBadKey(t *testing.T) {
 	}
 }
 
+func TestRecommendationPluginProxyIgnoresMissingKey(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	siteID, recID := seedGenerateRecommendation(t, db, "Strong contextual fit for the article.")
+	referral := "https://example.com/tool?ref=staging"
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE affiliate_programs SET referral_url=$1 WHERE slug='semrush-reader-copy'`, referral); err != nil {
+		t.Fatalf("set referral url: %v", err)
+	}
+	router := recommendationGoRouter(t, db)
+	before := recommendationTotalClicks(t, db, siteID)
+	headers := map[string]string{
+		"X-OR-Client-Hash": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+		"X-OR-User-Agent":  testBrowserUA,
+		"X-OR-Referer":     "https://reader.example/article",
+	}
+	hit := recommendationPluginHit(router, recID, "192.0.2.41:443", headers)
+	if hit.Code != http.StatusFound || hit.Header().Get("Location") != referral {
+		t.Fatalf("missing key go = %d %s", hit.Code, hit.Header().Get("Location"))
+	}
+	if got := recommendationTotalClicks(t, db, siteID); got != before {
+		t.Fatalf("missing key changed total_clicks from %d to %d", before, got)
+	}
+}
+
+func TestRecommendationPluginProxyIgnoresOtherSiteKey(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	siteID, recID := seedGenerateRecommendation(t, db, "Strong contextual fit for the article.")
+	otherKey := "other-site-plugin-key"
+	createTestSite(t, db, otherKey, "other-site.example", "Other Site")
+	referral := "https://example.com/tool?ref=staging"
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE affiliate_programs SET referral_url=$1 WHERE slug='semrush-reader-copy'`, referral); err != nil {
+		t.Fatalf("set referral url: %v", err)
+	}
+	router := recommendationGoRouter(t, db)
+	before := recommendationTotalClicks(t, db, siteID)
+	headers := map[string]string{
+		"X-API-Key":        otherKey,
+		"X-OR-Client-Hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"X-OR-User-Agent":  testBrowserUA,
+		"X-OR-Referer":     "https://reader.example/article",
+	}
+	hit := recommendationPluginHit(router, recID, "192.0.2.42:443", headers)
+	if hit.Code != http.StatusFound || hit.Header().Get("Location") != referral {
+		t.Fatalf("other site key go = %d %s", hit.Code, hit.Header().Get("Location"))
+	}
+	if got := recommendationTotalClicks(t, db, siteID); got != before {
+		t.Fatalf("other site key changed total_clicks from %d to %d", before, got)
+	}
+}
+
 func recommendationGoRouter(t *testing.T, db *database.DB) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)

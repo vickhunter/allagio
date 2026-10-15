@@ -263,9 +263,9 @@ type goReader struct {
 
 // recommendationReader hashes the connection address for a public hit.
 // via=plugin uses the plugin's client hash, user agent, and referer only when
-// the site key matches this recommendation's site. A WordPress user agent on
-// the connection is then not what gets classified or deduped. Any other key
-// leaves those headers unused.
+// the site key matches this recommendation's site. A missing key, a key that
+// does not resolve, and a key for another site leave those headers unused, so
+// a WordPress user agent on the connection is what gets classified.
 func (h *RedirectsHandler) recommendationReader(c *gin.Context, siteID string, req goRequest) goReader {
 	reader := goReader{
 		hash:      h.directReaderHash(req.clientIP),
