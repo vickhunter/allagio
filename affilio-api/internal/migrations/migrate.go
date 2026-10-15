@@ -17,6 +17,32 @@ import (
 //go:embed *.sql
 var files embed.FS
 
+// utcSession reports the TimeZone values 038 accepts. Postgres 16 rejects
+// Universal and Zulu, so they stay off this list.
+func utcSession(zone string) bool {
+	switch zone {
+	case "UTC", "Etc/UTC", "GMT", "Etc/GMT", "Etc/Universal":
+		return true
+	default:
+		return false
+	}
+}
+
+// RequireUTCSession refuses AUTO_MIGRATE when SHOW timezone is not a UTC
+// name. Apply does not change the session. 038 reads stored timestamp faces
+// as UTC, so a server-level timezone of Europe/Rome must stop startup
+// instead of converting those faces in the wrong zone.
+func RequireUTCSession(ctx context.Context, pool *pgxpool.Pool) error {
+	var zone string
+	if err := pool.QueryRow(ctx, `SHOW timezone`).Scan(&zone); err != nil {
+		return fmt.Errorf("AUTO_MIGRATE could not read SHOW timezone: %w", err)
+	}
+	if utcSession(zone) {
+		return nil
+	}
+	return fmt.Errorf("AUTO_MIGRATE refuses to start because the session TimeZone is %s. Migration 038_timestamptz_instants reads stored timestamp faces as UTC and only runs when SHOW timezone is UTC, Etc/UTC, GMT, Etc/GMT, or Etc/Universal. Set the PostgreSQL server timezone in postgresql.conf (the server-level timezone setting, not a session SET) and any role default to UTC, reload, and confirm with SHOW timezone on a fresh connection that does not set TimeZone in the DSN or PGOPTIONS. AUTO_MIGRATE does not change the session to UTC. Leave AUTO_MIGRATE off in production and apply 038 by hand in a UTC session", zone)
+}
+
 func Apply(ctx context.Context, pool *pgxpool.Pool) error {
 	conn, err := pool.Acquire(ctx)
 	if err != nil {
