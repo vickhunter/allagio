@@ -205,6 +205,7 @@ class ReleaseTests(unittest.TestCase):
                 (release.ROOT / "affilio-wp/public/css/placement.css").read_bytes(),
             )
         release.validate_plugin(data)
+        self.assert_zip_php_omits_seams(data)
         tracked = subprocess.run(
             ["git", "ls-files", "-z", "--", "affilio-wp"],
             cwd=release.ROOT,
@@ -283,8 +284,50 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(release.ReleaseError):
             release.archive_names(["package/package.json", "package/package.json"])
 
+    def test_built_plugin_zip_omits_test_only_seams(self):
+        self.assert_zip_php_omits_seams(dockerfile_mvp_plugin_zip())
+        probe = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=release.ROOT,
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode == 0 and probe.stdout.strip() == "true":
+            with tempfile.TemporaryDirectory() as directory:
+                result = subprocess.run(
+                    [str(release.ROOT / "scripts" / "package-wp-zip"), str(Path(directory) / "affilio.zip")],
+                    cwd=release.ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+                written = Path(directory) / ("affilio-%s.zip" % release.PLUGIN_VERSION)
+                self.assert_zip_php_omits_seams(written.read_bytes())
+        for seam in release.TEST_ONLY_PLUGIN_SEAMS:
+            with self.subTest(seam=seam):
+                poisoned = plugin_archive(bodies={
+                    "affilio-wp/includes/class-affilio-api.php": "<?php\n" + seam + "\n",
+                })
+                with self.assertRaisesRegex(release.ReleaseError, re.escape(seam)):
+                    release.validate_plugin(poisoned)
+
+    def assert_zip_php_omits_seams(self, data):
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            php_names = [name for name in archive.namelist() if name.endswith(".php")]
+            self.assertTrue(php_names)
+            for name in php_names:
+                text = archive.read(name).decode("utf8", "replace")
+                for seam in release.TEST_ONLY_PLUGIN_SEAMS:
+                    self.assertNotIn(seam, text, "%s contains %s" % (name, seam))
+
     def test_plugin_origin_and_hosted_asset_exclusion(self):
-        guarded = "<?php\n/* Plugin Name: Affilio\n * Version: 0.1.28\n */\ndefine('AFFILIO_VERSION', '0.1.28');\nif (!function_exists('affilio_init')) {\nfunction affilio_init() {}\n}\n"
+        version = release.PLUGIN_VERSION
+        guarded = (
+            "<?php\n/* Plugin Name: Affilio\n * Version: %s\n */\n"
+            "define('AFFILIO_VERSION', '%s');\n"
+            "if (!function_exists('affilio_init')) {\nfunction affilio_init() {}\n}\n"
+        ) % (version, version)
 
         def archive(plugin=guarded, extra=None, drop=None):
             return plugin_archive(plugin, extra, drop)
@@ -298,8 +341,8 @@ class ReleaseTests(unittest.TestCase):
             release.validate_plugin(archive(drop="affilio-wp/admin/build/analytics.js"))
         with self.assertRaisesRegex(release.ReleaseError, "unguarded function affilio_init"):
             release.validate_plugin(archive(plugin="<?php\n/* Plugin Name: Affilio */\nfunction affilio_init() {}\n"))
-        with self.assertRaisesRegex(release.ReleaseError, "0.1.28"):
-            release.validate_plugin(archive(plugin=guarded.replace("0.1.28", "0.1.9")))
+        with self.assertRaisesRegex(release.ReleaseError, re.escape(version)):
+            release.validate_plugin(archive(plugin=guarded.replace(version, "0.1.9")))
         with self.assertRaisesRegex(release.ReleaseError, "hosted UI"):
             release.validate_plugin(archive(extra=("affilio-wp/admin/build/landing-scene.bundle.js", "unexpected")))
         for extra in (

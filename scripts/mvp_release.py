@@ -50,7 +50,8 @@ WP_FILES = {
     "affilio-wp/readme.txt",
 }
 PLUGIN_ROOT = "affilio-wp/"
-PLUGIN_VERSION = "0.1.28"
+PLUGIN_VERSION = "0.1.29"
+TEST_ONLY_PLUGIN_SEAMS = ("affilio_go_utc_date", "affilio_rewrite_requires_wp_rewrite")
 PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
 PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
 HOSTED_BUILD_NAMES = {"home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}
@@ -406,6 +407,9 @@ def validate_plugin(data, origin=None):
         plugin = files[PLUGIN_ROOT + "affilio.php"].decode("utf8")
         require("Plugin Name:" in plugin, "WordPress plugin header is missing.")
         php = {name: payload.decode("utf8", "replace") for name, payload in files.items() if name.endswith(".php")}
+        for name, text in php.items():
+            for seam in TEST_ONLY_PLUGIN_SEAMS:
+                require(seam not in text, "WordPress ZIP ships a test-only seam " + seam + " in " + name)
         require(not any(unguarded_init(text) for text in php.values()), "WordPress ZIP has an unguarded function affilio_init")
         require(f"Version: {PLUGIN_VERSION}" in plugin, f"WordPress plugin header is not {PLUGIN_VERSION}")
         require(f"define('AFFILIO_VERSION', '{PLUGIN_VERSION}')" in plugin, f"AFFILIO_VERSION is not {PLUGIN_VERSION}")

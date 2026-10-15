@@ -194,7 +194,7 @@ if (!function_exists('is_wp_error')) {
     }
     function add_rewrite_rule($pattern, $query, $priority = 'bottom') {
         global $wp_rewrite;
-        if (!empty($GLOBALS['affilio_rewrite_requires_wp_rewrite']) && !is_object($wp_rewrite)) {
+        if (function_exists('did_action') && !is_object($wp_rewrite)) {
             throw new Error('add_rewrite_rule called before WP_Rewrite exists');
         }
         $GLOBALS['rewrites'][] = array($pattern, $query, $priority);

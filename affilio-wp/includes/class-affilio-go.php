@@ -24,11 +24,9 @@ class Affilio_Go {
             return true;
         }
         // Real WordPress defines did_action before $wp_rewrite exists. Calling
-        // add_rewrite_rule in that window fatals. Test stubs have no did_action.
+        // add_rewrite_rule in that window fatals. Stubs that omit did_action
+        // can still register rules through add_rewrite_rule.
         if (function_exists('did_action')) {
-            return false;
-        }
-        if (!empty($GLOBALS['affilio_rewrite_requires_wp_rewrite'])) {
             return false;
         }
         return function_exists('add_rewrite_rule');
@@ -347,14 +345,7 @@ class Affilio_Go {
     }
 
     public static function utc_date() {
-        $date = gmdate('Y-m-d');
-        if (function_exists('apply_filters')) {
-            $filtered = apply_filters('affilio_go_utc_date', $date);
-            if (is_string($filtered) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filtered)) {
-                return $filtered;
-            }
-        }
-        return $date;
+        return gmdate('Y-m-d');
     }
 
     public static function visitor_hash() {

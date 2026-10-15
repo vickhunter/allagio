@@ -1,11 +1,15 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.28
+Stable tag: 0.1.29
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.29 =
+* The daily visitor hash uses the UTC date. The plugin does not offer a filter that can replace that date.
+* /go/ rewrite rules are registered only after WordPress has loaded its rewrite API.
 
 = 0.1.28 =
 * An editor insert stores the site /go/ link for the recommendation, so a click is recorded before the browser opens the merchant URL. The link keeps rel="nofollow sponsored". An Italian post still gets one Italian disclosure, with no reason or score in the post.

@@ -11,12 +11,16 @@ function affilio_walk_boot() {
     if (!defined('ABSPATH')) {
         define('ABSPATH', __DIR__);
     }
-    $GLOBALS['affilio_rewrite_requires_wp_rewrite'] = true;
     $GLOBALS['get_query_var_calls'] = 0;
     require_once __DIR__ . '/../affilio.php';
 }
 
 function affilio_walk_install_stubs() {
+    if (!function_exists('did_action')) {
+        function did_action($hook_name) {
+            return 0;
+        }
+    }
     if (!function_exists('plugin_dir_path')) {
         function plugin_dir_path($path) { return dirname($path) . '/'; }
         function plugin_dir_url($path) { return 'https://blog.example/wp-content/plugins/affilio-wp/'; }
