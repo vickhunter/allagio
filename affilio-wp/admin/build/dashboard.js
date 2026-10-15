@@ -19,6 +19,32 @@
         }
         return '#';
     };
+    const i18n = (AffilioData && AffilioData.i18n) || {};
+    const phrase = (key, en, it) => {
+        if (Object.prototype.hasOwnProperty.call(i18n, key) && i18n[key] !== '') {
+            return String(i18n[key]);
+        }
+        return t(en, it);
+    };
+    const allowedState = (state) => {
+        const known = ['connected', 'missing_key', 'missing_url', 'invalid_key', 'api_error', 'network_error', 'wrong_api_url', 'starting', 'unknown_error'];
+        return known.indexOf(state) >= 0 ? state : 'unknown_error';
+    };
+    const connectionStatusHTML = () => {
+        if (document.getElementById('affilio-dashboard-connection')) {
+            return '';
+        }
+        const status = (AffilioData && AffilioData.connectionStatus) || {};
+        if (status.connected) {
+            const label = esc(phrase('connected', 'Connected', 'Connesso'));
+            const state = allowedState(String(status.state || 'connected'));
+            return `<div class="affilio-status-row affilio-dashboard-connection" data-connection-status><span class="affilio-status-pill affilio-status-${state}">${label}</span></div>`;
+        }
+        const settings = (AffilioData && AffilioData.settingsUrl) || '/wp-admin/admin.php?page=affilio-settings';
+        const lead = esc(phrase('notConnected', 'Not connected.', 'Non connesso.'));
+        const next = esc(phrase('connectSite', 'Connect your site in Settings.', 'Collega il sito in Impostazioni.'));
+        return `<div class="affilio-status-row affilio-dashboard-connection" data-connection-status><p class="affilio-status-message">${lead} <a class="affilio-next-step" href="${esc(safeHref(settings))}">${next}</a></p></div>`;
+    };
     const affilioProxy = (method, path, body) => {
         const base = String((AffilioData && AffilioData.restBase) || '').replace(/\/$/, '');
         const payload = { method: method, path: path };
@@ -33,7 +59,7 @@
     if (AffilioData.connectionStatus && !AffilioData.connectionStatus.connected) {
         const settings = AffilioData.settingsUrl || '/wp-admin/admin.php?page=affilio-settings';
         const message = AffilioData.connectionStatus.message || t('Configure your API key.', 'Configura la tua chiave API.');
-        root.innerHTML = `
+        root.innerHTML = connectionStatusHTML() + `
             <div class="affilio-panel affilio-panel-warning">
                 <h2>Affilio Dashboard</h2>
                 <p><strong>${t('Not connected.', 'Non connesso.')}</strong> ${esc(message)}</p>
@@ -42,7 +68,7 @@
         `;
         return;
     }
-    root.innerHTML = `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Loading data...', 'Caricamento dati...')}</p></div>`;
+    root.innerHTML = connectionStatusHTML() + `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Loading data...', 'Caricamento dati...')}</p></div>`;
 
     const scoreColor = (score) => {
         if (score < 34) return '#d63638';
@@ -221,14 +247,18 @@
     };
 
     const render = (articles, programs, recommendations) => {
-        let html = `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Review article monetization and manage recommendations.', 'Controlla la monetizzazione degli articoli e gestisci le raccomandazioni.')}</p></div>`;
+        let html = connectionStatusHTML() + `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Review article monetization and manage recommendations.', 'Controlla la monetizzazione degli articoli e gestisci le raccomandazioni.')}</p></div>`;
         if (!articles.length) {
             html += `<div class="affilio-panel"><p>${t('No articles scanned yet.', 'Nessun articolo ancora scansionato.')}</p></div>`;
         } else {
             html += renderOpportunityPanel(articles, recommendations);
             let rows = articles.map(a => {
-                const score = a.monetization_score || 0;
-                return `<tr data-article-id="${a.id}"><td>${a.title || ''}</td><td style="color:${scoreColor(score)};font-weight:bold;">${score}</td><td>${potentialLabel(score)}</td><td>${a.wp_post_id}</td></tr>`;
+                const rawScore = Number(a.monetization_score);
+                const score = Number.isFinite(rawScore) ? rawScore : 0;
+                const title = esc(a.title || '');
+                const articleId = esc(a.id);
+                const postId = esc(a.wp_post_id);
+                return `<tr data-article-id="${articleId}"><td>${title}</td><td style="color:${scoreColor(score)};font-weight:bold;">${score}</td><td>${potentialLabel(score)}</td><td>${postId}</td></tr>`;
             }).join('');
             html += `
                 <div class="affilio-panel">
@@ -254,7 +284,11 @@
         if (!programs.length) {
             html += `<p>${t('No affiliate links detected yet.', 'Nessun link affiliato rilevato al momento.')}</p>`;
         } else {
-            let rows = programs.map(p => `<li>${p.name} (${p.domain || t('unknown', 'sconosciuto')})</li>`).join('');
+            let rows = programs.map(p => {
+                const name = esc(p.name);
+                const domain = p.domain ? esc(p.domain) : t('unknown', 'sconosciuto');
+                return `<li>${name} (${domain})</li>`;
+            }).join('');
             html += `<ul>${rows}</ul>`;
         }
         html += '</div>';
@@ -594,5 +628,5 @@
                 recommendationsResp.recommendations || []
             );
         })
-        .catch(() => { root.innerHTML = `<div class="affilio-panel affilio-panel-warning"><h2>Affilio Dashboard</h2><p>${t('Failed to load data.', 'Caricamento dati non riuscito.')}</p></div>`; });
+        .catch(() => { root.innerHTML = connectionStatusHTML() + `<div class="affilio-panel affilio-panel-warning"><h2>Affilio Dashboard</h2><p>${t('Failed to load data.', 'Caricamento dati non riuscito.')}</p></div>`; });
 } )();

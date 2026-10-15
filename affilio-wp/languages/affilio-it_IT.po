@@ -9,3 +9,18 @@ msgstr ""
 
 msgid "Key saved (%s)"
 msgstr "Chiave salvata (%s)"
+
+msgid "Start analysis"
+msgstr "Avvia analisi"
+
+msgid "Your site is connected."
+msgstr "Il sito è collegato."
+
+msgid "Connected"
+msgstr "Connesso"
+
+msgid "Not connected."
+msgstr "Non connesso."
+
+msgid "Connect your site in Settings."
+msgstr "Collega il sito in Impostazioni."
