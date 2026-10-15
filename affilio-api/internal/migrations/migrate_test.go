@@ -10,6 +10,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+func TestMigration038IsOneTransaction(t *testing.T) {
+	data, err := files.ReadFile("038_timestamptz_instants.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, ok := scriptOwnsTransaction(string(data))
+	if !ok {
+		t.Fatal("038 is not one BEGIN/COMMIT transaction")
+	}
+	if !strings.Contains(body, "RAISE EXCEPTION") || !strings.Contains(body, "ALTER TABLE clicks") || !strings.Contains(body, "ALTER TABLE conversions") || !strings.Contains(body, "ALTER TABLE ledger_entries") {
+		t.Fatalf("038 transaction body dropped work: %s", body)
+	}
+	if strings.Contains(string(data), "'Universal'") || strings.Contains(string(data), "'Zulu'") {
+		t.Fatal("038 allowlist includes a timezone name Postgres rejects")
+	}
+}
+
 func TestMigrationHistoryAndConcurrentStartup(t *testing.T) {
 	url := os.Getenv("AFFILIO_MIGRATION_TEST_DATABASE_URL")
 	if url == "" {

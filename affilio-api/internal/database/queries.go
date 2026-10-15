@@ -887,7 +887,7 @@ WITH article_cohorts AS (
     SELECT a.id, DATE_TRUNC('day', a.created_at)::date AS cohort_date
     FROM articles a
     WHERE a.site_id=$1
-      AND a.created_at >= NOW() - ($2 * INTERVAL '1 day')
+      AND (a.created_at AT TIME ZONE 'UTC') >= NOW() - ($2 * INTERVAL '1 day')
 ),
 recommendation_stats AS (
     SELECT r.article_id, COUNT(*) FILTER (WHERE r.status='inserted')::int AS inserted
@@ -1058,7 +1058,7 @@ WITH base_articles AS (
         a.created_at
     FROM articles a
     WHERE a.site_id=$1
-      AND a.created_at >= NOW() - ($2 * INTERVAL '1 day')
+      AND (a.created_at AT TIME ZONE 'UTC') >= NOW() - ($2 * INTERVAL '1 day')
 ),
 activity AS (
     SELECT
