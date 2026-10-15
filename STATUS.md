@@ -2,6 +2,10 @@
 
 `clicks.clicked_at`, `conversions.occurred_at`, and `ledger_entries.clears_at` are timestamps without time zone. `NOW()` stores the session wall clock. A Go instant is bound as `timestamptz` and compared in that same clock, and a column read back for a Go `time.Time` is that instant. A sale at the click stays attributed in `Europe/Rome`, an organic purchase two hours later is not flagged, and the refund hold still clears against `NOW()`. The API does not pin the session to UTC. `AFFILIO_TEST_TIMEZONE` sets the test session, for example `Europe/Rome`, without changing the server. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
 
+## October 15 — plugin ZIP includes public styles
+
+`Dockerfile.mvp` copies `affilio-wp/public/` into the WordPress ZIP served at `/downloads/affilio.zip`. That ZIP now contains `affilio-wp/public/css/placement.css` and `affilio-wp/public/js/affilio-track.js`, the same paths `scripts/package-wp-zip` writes. The release check builds that ZIP from the Dockerfile copy list and stops when `public/css/placement.css` is missing.
+
 ## October 14 — a Stripe refund waits when this product can still take the sale
 
 A Stripe refund stays pending when this product has no Stripe sale yet. Another seller's sale with the same order id does not close it. A seller report on this product in the refund currency stays pending too, because a later Stripe sale can still upgrade that report and the refund then applies. The refund is rejected and is not retried only when this product's sale for that order belongs to a different signed provider. A Lemon or Polar refund whose currency does not match the sale is rejected and is not retried. A refund that arrives before any sale stays unmatched. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
