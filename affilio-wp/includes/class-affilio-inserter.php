@@ -11,58 +11,81 @@ class Affilio_Inserter {
         $this->api = $api;
     }
 
-    public function register_routes() {
-        register_rest_route('affilio/v1', '/insert', array(
-            'methods'  => 'POST',
-            'callback' => array($this, 'handle_insert'),
-            'permission_callback' => function () {
-                return current_user_can('edit_posts');
-            },
-        ));
-    }
-
-    public function handle_insert($request) {
-        $params = $request->get_json_params();
-        $post_id = isset($params['post_id']) ? intval($params['post_id']) : 0;
-        $html = isset($params['html']) ? $params['html'] : '';
-        $rec_id = isset($params['recommendation_id']) ? $params['recommendation_id'] : '';
-        $suggested_position = isset($params['suggested_position']) ? sanitize_key($params['suggested_position']) : 'end_of_article';
-        if (!$post_id || $html === '') {
-            return rest_ensure_response(array('status' => 'error', 'message' => 'invalid payload'));
-        }
-        if (!current_user_can('edit_post', $post_id)) {
-            return rest_ensure_response(array('status' => 'error', 'message' => 'forbidden'));
-        }
-        $result = $this->insert_inline_mention($post_id, $html, $suggested_position);
-        if (is_wp_error($result)) {
-            return rest_ensure_response(array('status' => 'error', 'message' => $result->get_error_message()));
-        }
-        if ($rec_id) {
-            $this->api->request('POST', '/insert/confirm', array('recommendation_id' => $rec_id));
-        }
-        return rest_ensure_response(array('status' => 'ok'));
-    }
-
     public function insert_inline_mention($post_id, $html, $suggested_position = 'end_of_article') {
         $post = get_post($post_id);
         if (!$post) {
             return new WP_Error('affilio_not_found', 'Post not found');
         }
+        $block = strpos((string) $post->post_content, '<!-- wp:') !== false;
+        $html = wp_kses_post((string) $html);
+        if ($block) {
+            $html = $this->as_paragraph_block($html);
+        }
         $content = $post->post_content;
         $content = $this->inject_by_position($content, $html, $suggested_position);
         if (!get_post_meta($post_id, '_affilio_disclosure_inserted', true) && !Affilio_Distribution::disclosure_suppressed($content)) {
-            $content .= "\n\n" . $this->disclosure_block();
+            $content .= "\n\n" . $this->disclosure_block($post, $block);
             update_post_meta($post_id, '_affilio_disclosure_inserted', 1);
         }
         wp_update_post(array(
             'ID'           => $post_id,
-            'post_content' => $content,
+            'post_content' => wp_slash($content),
         ));
         return true;
     }
 
-    private function disclosure_block() {
-        return '<p class="affilio-disclosure"><em>Disclosure: This post may contain affiliate links, which means we may earn a commission if you click and make a purchase.</em></p>';
+    public static function content_locale($post) {
+        $locale = '';
+        if (is_object($post)) {
+            if (isset($post->locale) && is_string($post->locale) && trim($post->locale) !== '') {
+                $locale = trim($post->locale);
+            } elseif (isset($post->post_locale) && is_string($post->post_locale) && trim($post->post_locale) !== '') {
+                $locale = trim($post->post_locale);
+            }
+            if ($locale === '' && !empty($post->ID) && function_exists('pll_get_post_language')) {
+                $from_post = pll_get_post_language((int) $post->ID, 'locale');
+                if (is_string($from_post) && trim($from_post) !== '') {
+                    $locale = trim($from_post);
+                }
+            }
+            if ($locale === '' && !empty($post->ID) && function_exists('get_post_meta')) {
+                foreach (array('_locale', 'locale') as $key) {
+                    $meta = get_post_meta((int) $post->ID, $key, true);
+                    if (is_string($meta) && trim($meta) !== '') {
+                        $locale = trim($meta);
+                        break;
+                    }
+                }
+            }
+        }
+        if ($locale === '' && function_exists('get_locale')) {
+            $locale = trim((string) get_locale());
+        }
+        if ($locale === '') {
+            return 'en';
+        }
+        return $locale;
+    }
+
+    private function disclosure_block($post, $block) {
+        $sentence = esc_html(self::disclosure_sentence(self::content_locale($post)));
+        $inner = wp_kses_post('<p class="affilio-disclosure"><em>' . $sentence . '</em></p>');
+        if ($block) {
+            return $this->as_paragraph_block($inner);
+        }
+        return $inner;
+    }
+
+    private function as_paragraph_block($html) {
+        return "<!-- wp:paragraph -->\n" . $html . "\n<!-- /wp:paragraph -->";
+    }
+
+    public static function disclosure_sentence($locale) {
+        $normalized = strtolower(str_replace('-', '_', trim((string) $locale)));
+        if ($normalized === 'it' || strpos($normalized, 'it_') === 0) {
+            return 'Nota: alcuni link in questa pagina sono affiliati. Se acquisti tramite questi link, posso ricevere una commissione, senza costi extra per te.';
+        }
+        return 'Disclosure: This post may contain affiliate links, which means we may earn a commission if you click and make a purchase.';
     }
 
     private function inject_by_position($content, $html, $position) {

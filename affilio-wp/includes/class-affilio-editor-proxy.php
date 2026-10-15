@@ -67,7 +67,12 @@ class Affilio_Editor_Proxy {
         if (!$source || !isset($source->post_status) || $source->post_status !== 'publish') {
             return new WP_Error('affilio_unpublished', 'Only published posts can be scanned.', array('status' => 409));
         }
-        $generated = $this->api->request('POST', '/generate/content', array('recommendation_id' => $id, 'article_context' => $source->post_content));
+        // Reader-facing HTML comes from /generate/content. A caller html field is ignored.
+        $generated = $this->api->request('POST', '/generate/content', array(
+            'recommendation_id' => $id,
+            'article_context' => $source->post_content,
+            'site_language' => Affilio_Inserter::content_locale($source),
+        ));
         if (is_wp_error($generated) || $generated['code'] !== 200 || empty($generated['data']['html'])) {
             return $this->response($generated);
         }

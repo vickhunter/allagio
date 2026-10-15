@@ -398,7 +398,8 @@
                                     article_word_count: articleWordCount,
                                     article_category: data.article.category || '',
                                     preferred_tone: 'match article author voice',
-                                    site_language: document.documentElement.lang || 'auto',
+                                    site_language: (typeof AffilioData !== 'undefined' && AffilioData.locale) || document.documentElement.lang || 'en',
+                                    regenerate: action === 'regenerate',
                             });
                             btn.disabled = false;
                             btn.innerText = action === 'preview' ? t('Preview Insert', 'Anteprima inserimento') : t('Regenerate', 'Rigenera');
@@ -441,7 +442,7 @@
                                     <div class="affilio-plan-card">
                                         <div class="affilio-plan-meta">
                                             <strong>${t('Planned position', 'Posizione prevista')}:</strong> ${esc(positionLabel(suggestedPosition))}
-                                            <select class="affilio-position-select" data-rec="${esc(recId)}">
+                                            <select class="affilio-position-select" data-rec="${esc(recId)}" disabled>
                                                 <option value="after_intro" ${suggestedPosition === 'after_intro' ? 'selected' : ''}>${t('After intro', 'Dopo introduzione')}</option>
                                                 <option value="mid_article" ${suggestedPosition === 'mid_article' ? 'selected' : ''}>${t('Mid article', 'Met\u00e0 articolo')}</option>
                                                 <option value="before_conclusion" ${suggestedPosition === 'before_conclusion' ? 'selected' : ''}>${t('Before conclusion', 'Prima della conclusione')}</option>
@@ -461,10 +462,10 @@
                                             </div>
                                             ${diffAfter}
                                         </div>
-                                        <label class="affilio-plan-label" for="affilio-transition-text-${esc(recId)}">${t('Edit transition sentence', 'Modifica frase di transizione')}</label>
-                                        <textarea class="affilio-plan-editor affilio-plan-editor-sm" id="affilio-transition-text-${esc(recId)}" data-rec-transition="${esc(recId)}" rows="2">${esc(defaultTransition)}</textarea>
-                                        <label class="affilio-plan-label" for="affilio-generated-text-${esc(recId)}">${t('Edit recommendation text', 'Modifica testo raccomandazione')}</label>
-                                        <textarea class="affilio-plan-editor" id="affilio-generated-text-${esc(recId)}" data-rec-text="${esc(recId)}" rows="3">${esc(defaultText)}</textarea>
+                                        <label class="affilio-plan-label" for="affilio-transition-text-${esc(recId)}">${t('Generated transition', 'Frase di transizione generata')}</label>
+                                        <textarea class="affilio-plan-editor affilio-plan-editor-sm" id="affilio-transition-text-${esc(recId)}" data-rec-transition="${esc(recId)}" rows="2" readonly>${esc(defaultTransition)}</textarea>
+                                        <label class="affilio-plan-label" for="affilio-generated-text-${esc(recId)}">${t('Generated recommendation', 'Raccomandazione generata')}</label>
+                                        <textarea class="affilio-plan-editor" id="affilio-generated-text-${esc(recId)}" data-rec-text="${esc(recId)}" rows="3" readonly>${esc(defaultText)}</textarea>
                                         <div class="affilio-plan-actions">
                                             <button class="button button-primary" data-rec="${esc(recId)}" data-action="confirm-insert">${t('Insert now', 'Inserisci ora')}</button>
                                             <button class="button" data-rec="${esc(recId)}" data-action="regenerate">${t('Regenerate', 'Rigenera')}</button>
@@ -499,20 +500,7 @@
                                 renderToast(t('Generate preview first', 'Genera prima l\'anteprima'));
                                 return;
                             }
-                            const textArea = detail.querySelector(`textarea[data-rec-text="${recId}"]`);
-                            const transitionArea = detail.querySelector(`textarea[data-rec-transition="${recId}"]`);
-                            const positionSelect = detail.querySelector(`select[data-rec="${recId}"]`);
-                            const editedText = textArea ? String(textArea.value || '').trim() : '';
-                            const editedTransition = transitionArea ? String(transitionArea.value || '').trim() : '';
-                            const chosenPosition = normalizePosition(positionSelect ? positionSelect.value : (plan.suggested_position || 'mid_article'));
-                            const blurbHTML = editedText !== ''
-                                ? buildSnippetHTML(plan.program_name || rec.program_name || rec.id, plan.link_url || '#', editedText)
-                                : (plan.html || '');
-                            const finalHTML = editedTransition
-                                ? `<p>${esc(editedTransition)}</p>` + blurbHTML
-                                : blurbHTML;
 
-                            // Show confirmation overlay
                             const articleTitle = esc(data.article.title || t('this article', 'questo articolo'));
                             if (previewEl) {
                                 const confirmOverlay = document.createElement('div');
@@ -520,8 +508,7 @@
                                 confirmOverlay.innerHTML = `
                                     <div class="affilio-confirm-dialog">
                                         <h4>${t('Confirm insertion', 'Conferma inserimento')}</h4>
-                                        <p>${t('You are inserting this content into', 'Stai inserendo questo contenuto in')} <strong>${articleTitle}</strong> (${esc(positionLabel(chosenPosition))})</p>
-                                        <div class="affilio-confirm-preview">${finalHTML}</div>
+                                        <p>${t('Affilio will insert the generated recommendation into', 'Affilio inserirà la raccomandazione generata in')} <strong>${articleTitle}</strong>.</p>
                                         <div class="affilio-confirm-actions">
                                             <button class="button button-primary" data-confirm="yes">${t('Confirm & Insert', 'Conferma e Inserisci')}</button>
                                             <button class="button" data-confirm="no">${t('Cancel', 'Annulla')}</button>
@@ -540,26 +527,19 @@
                                     confirmBtn.disabled = true;
                                     confirmBtn.innerText = t('Inserting...', 'Inserimento in corso...');
 
-                                    const approve = await affilioProxy('PATCH', '/recommendations/' + recId, { status: 'approved' });
-                                    if (!approve.ok && approve.status !== 409) {
-                                        renderToast(t('Failed to approve recommendation', 'Impossibile approvare la raccomandazione'));
-                                        confirmOverlay.remove();
-                                        return;
-                                    }
-                                    const insert = await fetch('/wp-json/affilio/v1/insert', {
+                                    const restBase = String((AffilioData && AffilioData.restBase) || '/wp-json/affilio/v1').replace(/\/$/, '');
+                                    const insert = await fetch(restBase + '/editor/approve-insert', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': AffilioData.nonce },
                                         body: JSON.stringify({
                                             post_id: data.article.wp_post_id,
-                                            html: finalHTML,
                                             recommendation_id: recId,
-                                            suggested_position: chosenPosition,
                                         }),
                                     });
-                                    const insertData = await insert.json();
+                                    const insertData = await insert.json().catch(() => ({}));
                                     confirmOverlay.remove();
-                                    if (!insert.ok || insertData.status !== 'ok') {
-                                        renderToast((insertData && insertData.message) ? insertData.message : t('Insert failed', 'Inserimento non riuscito'));
+                                    if (!insert.ok) {
+                                        renderToast((insertData && (insertData.error || insertData.message)) ? (insertData.error || insertData.message) : t('Insert failed', 'Inserimento non riuscito'));
                                         return;
                                     }
                                     previewEl.innerHTML = `<p class="affilio-rec-done">${t('Inserted successfully.', 'Inserito con successo.')}</p>`;

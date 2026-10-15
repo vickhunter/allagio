@@ -67,6 +67,7 @@ type RecommendationContent struct {
 	Link              string
 	ArticleTitle      string
 	ArticleURL        string
+	GeneratedHTML     string
 }
 
 type UserProgram struct {
@@ -503,7 +504,8 @@ SELECT
        COALESCE(r.suggested_position,'') AS suggested_position,
        COALESCE(saa.affiliate_link, upl.affiliate_link, ap.referral_url, ap.signup_url, ap.website_url, '') AS link,
        COALESCE(a.title,'') AS article_title,
-       COALESCE(a.url,'') AS article_url
+       COALESCE(a.url,'') AS article_url,
+       COALESCE(r.generated_html,'') AS generated_html
 FROM recommendations r
 JOIN articles a ON a.id = r.article_id
 LEFT JOIN affiliate_programs ap ON ap.id = r.program_id
@@ -514,10 +516,25 @@ LEFT JOIN LATERAL (
 ) upl ON true
 WHERE a.site_id=$1 AND r.id=$2`, siteID, recID)
 	var rc RecommendationContent
-	if err := row.Scan(&rc.ProgramName, &rc.ProgramType, &rc.Company, &rc.Reason, &rc.InsertionType, &rc.SuggestedPosition, &rc.Link, &rc.ArticleTitle, &rc.ArticleURL); err != nil {
+	if err := row.Scan(&rc.ProgramName, &rc.ProgramType, &rc.Company, &rc.Reason, &rc.InsertionType, &rc.SuggestedPosition, &rc.Link, &rc.ArticleTitle, &rc.ArticleURL, &rc.GeneratedHTML); err != nil {
 		return nil, err
 	}
 	return &rc, nil
+}
+
+func (d *DB) SaveRecommendationGeneratedHTML(ctx context.Context, siteID, recID, generatedHTML string) error {
+	tag, err := d.Pool.Exec(ctx, `
+UPDATE recommendations AS r
+SET generated_html = $3
+FROM articles AS a
+WHERE r.article_id = a.id AND a.site_id = $1 AND r.id = $2`, siteID, recID, generatedHTML)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (d *DB) CreateRecommendation(ctx context.Context, articleID string, programID *string, userProgramID *string, relevance int, reason string, insertionType string, position string) error {

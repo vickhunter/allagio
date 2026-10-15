@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Affilio
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.25
+ * Version: 0.1.26
  * Author: Affilio
  */
 
@@ -15,7 +15,7 @@ if (defined('AFFILIO_LOADED')) {
 }
 define('AFFILIO_LOADED', true);
 
-define('AFFILIO_VERSION', '0.1.25');
+define('AFFILIO_VERSION', '0.1.26');
 
 if (!defined('AFFILIO_PLUGIN_ACK_HEADER')) {
     define('AFFILIO_PLUGIN_ACK_HEADER', 'X-Plugin-Key');
@@ -90,7 +90,6 @@ function affilio_init() {
     add_action('enqueue_block_editor_assets', array($admin, 'enqueue_sidebar_assets'));
     add_action('admin_enqueue_scripts', array($admin, 'enqueue_dashboard_assets'));
     add_action('rest_api_init', array($admin, 'register_routes'));
-    add_action('rest_api_init', array($inserter, 'register_routes'));
     add_action('rest_api_init', array($editor_proxy, 'register_routes'));
     add_action('rest_api_init', array($onboarding, 'register_routes'));
     add_action('rest_api_init', array($distribution, 'register_routes'));

@@ -37,14 +37,14 @@ func TestGenerateContentFallbackTemplate(t *testing.T) {
 		"insertion_type":    "inline_mention",
 	}))
 	r.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rec.Code)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 when no reader-facing copy exists, got %d body %s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "Semrush") {
-		t.Fatalf("expected program name in response: %s", body)
+	if strings.Contains(body, "Great fit for SEO workflows") {
+		t.Fatalf("published the internal reason: %s", body)
 	}
-	if !strings.Contains(body, "Great fit for SEO workflows") {
-		t.Fatalf("expected reason in response: %s", body)
+	if !strings.Contains(body, "no reader-facing copy") {
+		t.Fatalf("expected a clear error: %s", body)
 	}
 }

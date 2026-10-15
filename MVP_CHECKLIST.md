@@ -47,7 +47,7 @@ Last Updated: February 06, 2026
 - [x] [P0] Validate and restrict recommendation status transitions (`pending -> approved/dismissed -> inserted`)
 - [x] [P0] Harden site lifecycle endpoints (`/sites/register`, `/sites` delete) with proper auth/rate limiting and remove destructive delete by API key alone
 - [x] [P0] Add CORS allowlist enforcement using `ALLOWED_ORIGINS` for browser-based plugin calls
-- [x] [P0] Enforce per-post capability check in WP insert route (`current_user_can('edit_post', $post_id)`)
+- [x] [P0] Enforce per-post capability check on approve-insert (`current_user_can('edit_post', $post_id)`)
 - [x] [P1] Add click anti-abuse controls (basic rate limit + duplicate suppression heuristics) for public tracking route
 - [x] [P1] Reduce API key exposure in WP editor/sidebar (role gating or short-lived scoped token exchange)
 - [x] [P1] Key security hardening: hash/encrypt stored API keys and add previous-key expiry window after rotation

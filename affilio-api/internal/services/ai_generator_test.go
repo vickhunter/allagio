@@ -192,3 +192,26 @@ func TestAIContentGenerator_GenerateSnippet_FallbackWithoutKey(t *testing.T) {
 		t.Fatalf("expected empty output without key, got %q", out)
 	}
 }
+
+func TestBuildGenPromptMarksReasonInternal(t *testing.T) {
+	t.Parallel()
+	reason := "strong contextual fit. Performance-adjusted (+4 from 9 historical outcomes)."
+	prompt := buildGenPrompt(ContentRequest{
+		ProgramName:  "Semrush",
+		Reason:       reason,
+		SiteLanguage: "it_IT",
+	})
+	lower := strings.ToLower(prompt)
+	if !strings.Contains(lower, "internal") {
+		t.Fatalf("prompt does not mark the fit note as internal: %s", prompt)
+	}
+	if !strings.Contains(lower, "must not appear") {
+		t.Fatalf("prompt does not forbid the internal note from reader-facing copy: %s", prompt)
+	}
+	if !strings.Contains(prompt, "strong contextual fit") {
+		t.Fatalf("prompt dropped the internal fit note: %s", prompt)
+	}
+	if !strings.Contains(prompt, "it_IT") {
+		t.Fatalf("prompt dropped the site language: %s", prompt)
+	}
+}

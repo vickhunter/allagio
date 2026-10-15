@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"html"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"affilio-api/internal/database"
@@ -27,6 +29,18 @@ type generateRequest struct {
 	ExistingLinks    []string `json:"existing_links"`
 	ArticleWordCount int      `json:"article_word_count"`
 	ArticleCategory  string   `json:"article_category"`
+	Regenerate       bool     `json:"regenerate"`
+}
+
+type storedReaderPreview struct {
+	Language        string  `json:"language"`
+	HTML            string  `json:"html"`
+	Text            string  `json:"text"`
+	Position        string  `json:"position"`
+	Transition      string  `json:"transition,omitempty"`
+	PlacementReason string  `json:"placement_reason,omitempty"`
+	ParagraphIndex  int     `json:"suggested_paragraph_index,omitempty"`
+	Confidence      float64 `json:"confidence_score,omitempty"`
 }
 
 type confirmRequest struct {
@@ -52,6 +66,21 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	if link == "" {
 		link = "#"
 	}
+	language := services.NormalizeSiteLanguage(req.SiteLanguage)
+	if !services.ReaderCopySafe(rec.ProgramName) || services.ContainsInternalCopy(rec.ProgramName, rec.Reason) ||
+		!services.ReaderCopySafe(link) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
+		return
+	}
+	if !req.Regenerate {
+		if preview, ok := reusablePreview(rec.GeneratedHTML, language, rec.Reason, rec.ProgramName, link); ok {
+			if !publishReaderHTML(c, preview.HTML, rec.Reason) {
+				return
+			}
+			writeGenerated(c, preview.HTML, preview.Text, preview.Position, preview.PlacementReason, preview.Transition, preview.ParagraphIndex, preview.Confidence, rec.ProgramName, link)
+			return
+		}
+	}
 	blurb := ""
 	placementReason := ""
 	position := strings.TrimSpace(rec.SuggestedPosition)
@@ -76,7 +105,7 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 			ArticleURL:       rec.ArticleURL,
 			ArticleContext:   req.ArticleContext,
 			PreferredTone:    req.PreferredTone,
-			SiteLanguage:     req.SiteLanguage,
+			SiteLanguage:     language,
 			ArticleContent:   req.ArticleContent,
 			ArticleHeadings:  req.ArticleHeadings,
 			ExistingLinks:    req.ExistingLinks,
@@ -93,16 +122,25 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 			confidenceScore = plan.ConfidenceScore
 		}
 	}
-	if blurb == "" {
-		blurb = rec.Reason
+	blurb, ok := services.SanitizeReaderCopy(blurb, rec.Reason)
+	if !ok {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
+		return
 	}
-	if blurb == "" {
-		blurb = "A solid option to consider."
+	if cleaned, transitionOK := services.SanitizeReaderCopy(transitionSentence, rec.Reason); transitionOK {
+		transitionSentence = cleaned
+	} else {
+		transitionSentence = ""
 	}
-	displayName := html.EscapeString(rec.ProgramName)
-	displayBlurb := html.EscapeString(blurb)
-	displayLink := html.EscapeString(link)
-	html := "<p><a href=\"" + displayLink + "\" rel=\"nofollow sponsored\">" + displayName + "</a> — " + displayBlurb + "</p>"
+	if cleaned, placementOK := services.SanitizeReaderCopy(placementReason, rec.Reason); placementOK && !services.ContainsInternalCopy(cleaned, rec.Reason) {
+		placementReason = cleaned
+	} else {
+		placementReason = ""
+	}
+	rendered := readerHTML(rec.ProgramName, link, blurb)
+	if !publishReaderHTML(c, rendered, rec.Reason) {
+		return
+	}
 	position = normalizePosition(position)
 	if position == "" {
 		position = inferBestPosition(req.ArticleContext, rec.SuggestedPosition, rec.ProgramName, rec.Reason)
@@ -110,22 +148,101 @@ func (h *GenerateHandler) GenerateContent(c *gin.Context) {
 	if placementReason == "" {
 		placementReason = defaultPlacementReason(position)
 	}
+	preview := storedReaderPreview{
+		Language:        language,
+		HTML:            rendered,
+		Text:            blurb,
+		Position:        position,
+		Transition:      transitionSentence,
+		PlacementReason: placementReason,
+		ParagraphIndex:  suggestedParagraphIndex,
+		Confidence:      confidenceScore,
+	}
+	if encoded, err := json.Marshal(preview); err == nil {
+		_ = h.DB.SaveRecommendationGeneratedHTML(c.Request.Context(), siteID, req.RecommendationID, string(encoded))
+	}
+	writeGenerated(c, rendered, blurb, position, placementReason, transitionSentence, suggestedParagraphIndex, confidenceScore, rec.ProgramName, link)
+}
+
+const readerHTMLSeparator = " — "
+
+func readerHTML(programName, link, blurb string) string {
+	return "<p><a href=\"" + html.EscapeString(link) + "\" rel=\"nofollow sponsored\">" + html.EscapeString(programName) + "</a>" + readerHTMLSeparator + html.EscapeString(blurb) + "</p>"
+}
+
+func publishReaderHTML(c *gin.Context, rendered, reason string) bool {
+	if services.ContainsInternalCopy(visibleReaderText(rendered), reason) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "no reader-facing copy"})
+		return false
+	}
+	return true
+}
+
+func reusablePreview(raw, language, reason, programName, link string) (storedReaderPreview, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || !strings.HasPrefix(raw, "{") {
+		return storedReaderPreview{}, false
+	}
+	var preview storedReaderPreview
+	if err := json.Unmarshal([]byte(raw), &preview); err != nil {
+		return storedReaderPreview{}, false
+	}
+	if !strings.EqualFold(services.NormalizeSiteLanguage(preview.Language), services.NormalizeSiteLanguage(language)) {
+		return storedReaderPreview{}, false
+	}
+	text := strings.TrimSpace(preview.Text)
+	if text == "" || strings.TrimSpace(preview.HTML) == "" {
+		return storedReaderPreview{}, false
+	}
+	if _, ok := services.SanitizeReaderCopy(text, reason); !ok {
+		return storedReaderPreview{}, false
+	}
+	if services.ContainsInternalCopy(preview.Transition, reason) || services.ContainsInternalCopy(preview.PlacementReason, reason) {
+		return storedReaderPreview{}, false
+	}
+	if !services.ReaderCopySafe(programName) || services.ContainsInternalCopy(programName, reason) || !services.ReaderCopySafe(link) {
+		return storedReaderPreview{}, false
+	}
+	rebuilt := readerHTML(programName, link, text)
+	if rebuilt != preview.HTML {
+		return storedReaderPreview{}, false
+	}
+	if services.ContainsInternalCopy(visibleReaderText(preview.HTML), reason) {
+		return storedReaderPreview{}, false
+	}
+	preview.HTML = rebuilt
+	preview.Text = text
+	return preview, true
+}
+
+var htmlCommentPattern = regexp.MustCompile(`(?s)<!--.*?-->`)
+
+var htmlTagPattern = regexp.MustCompile(`(?s)<[^>]*>`)
+
+func visibleReaderText(rawHTML string) string {
+	withoutComments := htmlCommentPattern.ReplaceAllString(rawHTML, "")
+	withoutTags := htmlTagPattern.ReplaceAllString(withoutComments, "")
+	decoded := html.UnescapeString(withoutTags)
+	return strings.ReplaceAll(decoded, "—", " ")
+}
+
+func writeGenerated(c *gin.Context, rendered, blurb, position, placementReason, transition string, paragraph int, confidence float64, programName, link string) {
 	resp := gin.H{
-		"html":               html,
+		"html":               rendered,
 		"generated_text":     blurb,
 		"suggested_position": position,
 		"placement_reason":   placementReason,
-		"program_name":       rec.ProgramName,
+		"program_name":       programName,
 		"link_url":           link,
 	}
-	if transitionSentence != "" {
-		resp["transition_sentence"] = transitionSentence
+	if transition != "" {
+		resp["transition_sentence"] = transition
 	}
-	if suggestedParagraphIndex >= 0 {
-		resp["suggested_paragraph_index"] = suggestedParagraphIndex
+	if paragraph >= 0 {
+		resp["suggested_paragraph_index"] = paragraph
 	}
-	if confidenceScore > 0 {
-		resp["confidence_score"] = confidenceScore
+	if confidence > 0 {
+		resp["confidence_score"] = confidence
 	}
 	c.JSON(http.StatusOK, resp)
 }

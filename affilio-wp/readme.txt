@@ -1,11 +1,15 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.25
+Stable tag: 0.1.26
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.26 =
+* POST /wp-json/affilio/v1/insert is removed. The dashboard inserts a generated recommendation through the editor route and does not send HTML to be written into the post.
+* The editor insert ignores a caller html field. An Italian post (`it_IT`) gets the approved Italian disclosure. Other locales get the English disclosure. Block content stores that disclosure as a paragraph block.
 
 = 0.1.25 =
 * The "Vedi il prodotto" link is an inline-block at least 44px tall, so it is a tap target on a 390px-wide screen.

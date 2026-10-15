@@ -17,6 +17,7 @@ function wp_strip_all_tags($value) { return strip_tags((string) $value); }
 function esc_html($value) { return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8'); }
 function esc_url($value) { return (string) $value; }
 function wp_slash($value) { return addslashes((string) $value); }
+function wp_kses_post($value) { return (string) $value; }
 function wp_update_post($values, $error = false) {
     $GLOBALS['post']->post_content = stripslashes($values['post_content']);
     $GLOBALS['updates']++;
