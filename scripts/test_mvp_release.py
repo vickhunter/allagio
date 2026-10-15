@@ -228,6 +228,13 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("OIDC_CLIENT_ID", output.getvalue())
         self.assertNotIn(values["OIDC_CLIENT_SECRET"], output.getvalue())
 
+    def test_keyword_database_url_identifies_the_database(self):
+        release.validate_config(configuration() | {
+            "DATABASE_URL": "host=postgres.railway.internal port=5432 dbname=railway user=qa password=qa sslmode=require",
+        })
+        with self.assertRaises(release.ReleaseError):
+            release.validate_config(configuration() | {"DATABASE_URL": "host=postgres.railway.internal user=qa password=qa"})
+
     def test_configuration_rejects_wrong_service_origin_and_invalid_cipher(self):
         release.validate_config(configuration())
         for name, value in {"PUBLIC_BASE_URL": "https://affilio-production.up.railway.app", "ALLOWED_ORIGINS": "*", "CONNECTION_ENCRYPTION_KEY": "invalid", "AUTO_MIGRATE": "false"}.items():

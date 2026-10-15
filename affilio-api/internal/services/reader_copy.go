@@ -1,6 +1,7 @@
 package services
 
 import (
+	"html"
 	"regexp"
 	"strings"
 	"unicode"
@@ -181,24 +182,32 @@ func latinLetterAllowed(r rune) bool {
 }
 
 func sharesInternalReason(text, reason string) bool {
+	text = DecodeReaderEntities(text)
+	reason = DecodeReaderEntities(reason)
 	if strings.TrimSpace(text) == "" {
 		return false
 	}
-	normText := normalizeForOverlap(text)
+	// A unicode dash can be read as a word break or as nothing. Check both,
+	// so neither the split form nor the glued form of email–marketing escapes.
+	return shareNormalized(text, reason, true) || shareNormalized(text, reason, false)
+}
+
+func shareNormalized(text, reason string, dashesAsSpaces bool) bool {
+	normText := normalizeForOverlap(text, dashesAsSpaces)
 	if normText == "" {
 		return false
 	}
 	if hasScoringMarker(normText) {
 		return true
 	}
-	normReason := normalizeForOverlap(reason)
+	normReason := normalizeForOverlap(reason, dashesAsSpaces)
 	if normReason == "" {
 		return false
 	}
 	if containsPhrase(normText, normReason) {
 		return true
 	}
-	long, short := classifyReasonSentences(reason)
+	long, short := classifyReasonSentences(reason, dashesAsSpaces)
 	for _, sentence := range long {
 		if containsPhrase(normText, sentence) {
 			return true
@@ -214,16 +223,18 @@ func sharesInternalReason(text, reason string) bool {
 
 func hasScoringMarker(normalized string) bool {
 	compact := strings.ReplaceAll(normalized, " ", "")
-	return strings.Contains(normalized, "performance adjusted") || strings.Contains(compact, "performanceadjusted") ||
-		strings.Contains(normalized, "contextual fit") || strings.Contains(compact, "contextualfit")
+	perf := foldOverlapPhrase("performance adjusted")
+	fit := foldOverlapPhrase("contextual fit")
+	return strings.Contains(normalized, perf) || strings.Contains(compact, strings.ReplaceAll(perf, " ", "")) ||
+		strings.Contains(normalized, fit) || strings.Contains(compact, strings.ReplaceAll(fit, " ", ""))
 }
 
-func classifyReasonSentences(reason string) (long, short []string) {
+func classifyReasonSentences(reason string, dashesAsSpaces bool) (long, short []string) {
 	parts := strings.FieldsFunc(reason, func(r rune) bool {
 		return r == '.' || r == '!' || r == '?'
 	})
 	for _, part := range parts {
-		normalized := normalizeForOverlap(part)
+		normalized := normalizeForOverlap(part, dashesAsSpaces)
 		switch len(strings.Fields(normalized)) {
 		case 0, 1:
 		case 2:
@@ -258,15 +269,18 @@ func hasLongNGram(textTokens, reasonTokens []string, n int) bool {
 	return false
 }
 
-func normalizeForOverlap(text string) string {
+func normalizeForOverlap(text string, dashesAsSpaces bool) string {
 	var b strings.Builder
 	prevSpace := true
 	for _, r := range strings.ToLower(norm.NFKD.String(text)) {
 		if unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Mc, r) || unicode.Is(unicode.Me, r) {
 			continue
 		}
+		if dashesAsSpaces && isUnicodeDash(r) {
+			r = ' '
+		}
 		if unicode.IsLetter(r) || unicode.IsNumber(r) {
-			b.WriteRune(r)
+			b.WriteRune(foldOverlapRune(r))
 			prevSpace = false
 			continue
 		}
@@ -279,6 +293,65 @@ func normalizeForOverlap(text string) string {
 		}
 	}
 	return strings.TrimSpace(b.String())
+}
+
+// foldOverlapRune maps a digit that stands in for a letter. 1, i, and l share
+// one stand-in so either reading of 1 still meets the other side. ASCII
+// hyphen is not folded here.
+func foldOverlapRune(r rune) rune {
+	switch r {
+	case '0':
+		return 'o'
+	case '1', 'i', 'l':
+		return 'i'
+	case '2':
+		return 'z'
+	case '3':
+		return 'e'
+	case '4':
+		return 'a'
+	case '5':
+		return 's'
+	case '6', '9':
+		return 'g'
+	case '7':
+		return 't'
+	case '8':
+		return 'b'
+	default:
+		return r
+	}
+}
+
+func foldOverlapPhrase(text string) string {
+	var b strings.Builder
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			b.WriteRune(foldOverlapRune(r))
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func isUnicodeDash(r rune) bool {
+	return (r >= 0x2010 && r <= 0x2015) || r == 0x2212
+}
+
+// DecodeReaderEntities expands HTML character references, including a second
+// pass when the first pass leaves another entity. Overlap checks use this so
+// a numeric reference cannot hide a letter.
+func DecodeReaderEntities(text string) string {
+	decoded := text
+	for i := 0; i < 3; i++ {
+		next := html.UnescapeString(decoded)
+		if next == decoded {
+			return decoded
+		}
+		decoded = next
+	}
+	return decoded
 }
 
 func foldMicro(text string) string {

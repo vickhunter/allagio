@@ -227,7 +227,7 @@ WHERE pp.campaign_id=$1
 func (d *DB) PurgeClickSignals(ctx context.Context, cutoff time.Time) error {
 	_, err := d.Pool.Exec(ctx, `UPDATE clicks
 SET ip_hash=NULL, user_agent=NULL, referrer=NULL
-WHERE clicked_at < ($1`+sessionWallFromInstant+`)
+WHERE clicked_at < $1
   AND (ip_hash IS NOT NULL OR user_agent IS NOT NULL OR referrer IS NOT NULL)`, cutoff)
 	return err
 }
@@ -253,12 +253,12 @@ func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string
 	if clickClass != "verified_agent" && clickClass != "declared_agent" && clickClass != "browser" && clickClass != "unknown" {
 		clickClass = "unknown"
 	}
-	err = tx.QueryRow(ctx, `INSERT INTO clicks(site_id,campaign_id,program_id,ip_hash,user_agent,referrer,terms_snapshot,placement_id,click_class)
+	err = tx.QueryRow(ctx, `INSERT INTO clicks(site_id,campaign_id,program_id,ip_hash,user_agent,referrer,terms_snapshot,placement_id,click_class,clicked_at)
  SELECT $1,$2,$3,$4,$5,$6,COALESCE($7::jsonb,jsonb_build_object(
  'product_id',o.product_id,'commission_type',o.commission_type,'commission_value_minor',(o.commission_value*100)::bigint,
- 'currency',o.commission_currency,'cookie_duration_days',o.cookie_duration_days,'refund_window_days',o.refund_window_days)),NULLIF($8,'')::uuid,$9
+ 'currency',o.commission_currency,'cookie_duration_days',o.cookie_duration_days,'refund_window_days',o.refund_window_days)),NULLIF($8,'')::uuid,$9,$10
  FROM campaigns cam JOIN offers o ON o.id=cam.offer_id WHERE cam.id=$2 RETURNING id`,
-		siteID, campaignID, programID, ipHash, userAgent, referrer, snapshot, placementID, clickClass).Scan(&id)
+		siteID, campaignID, programID, ipHash, userAgent, referrer, snapshot, placementID, clickClass, d.Clock().UTC()).Scan(&id)
 	if err != nil {
 		return "", err
 	}
@@ -386,7 +386,7 @@ ORDER BY cv.created_at DESC LIMIT 1`, objectID, clickID, currency, amount).Scan(
 SELECT cam.id, cam.site_id, cam.offer_id,
  COALESCE(cl.terms_snapshot->>'commission_type',o.commission_type),
  COALESCE((cl.terms_snapshot->>'commission_value_minor')::bigint,(o.commission_value*100)::bigint),
- COALESCE((cl.terms_snapshot->>'refund_window_days')::int,o.refund_window_days), (cl.clicked_at `+sessionWallAsInstant+`)
+ COALESCE((cl.terms_snapshot->>'refund_window_days')::int,o.refund_window_days), cl.clicked_at
 FROM clicks cl
 JOIN campaigns cam ON cam.id = cl.campaign_id
 JOIN offers o ON o.id = cam.offer_id
@@ -427,7 +427,9 @@ WHERE r.offer_id=$1 AND r.provider_event_id=$2`, out.OfferID, eventID).Scan(&sto
 
 	// A purchase before the click is as suspicious as one seconds after it
 	// (and provider timestamps truncate to seconds, so tiny negatives happen).
-	if interval := occurredAt.Sub(clickedAt); interval < fraudFastPurchaseWindow {
+	// A sale in the same truncated second as the click is that click's own second.
+	sameSecond := occurredAt.Truncate(time.Second).Equal(clickedAt.Truncate(time.Second))
+	if interval := occurredAt.Sub(clickedAt); interval < fraudFastPurchaseWindow && !sameSecond {
 		out.Flagged = true
 		out.FlagReason = "implausibly fast click-to-purchase"
 	}
@@ -452,7 +454,7 @@ WHERE campaign_id=$1 AND kind IN ('sale','renewal') AND created_at >= NOW() - IN
 	}
 	err = tx.QueryRow(ctx, `
 INSERT INTO conversions (offer_id, campaign_id, click_id, provider, provider_event_id, provider_object_id, kind, amount, currency, commission_amount, occurred_at, flagged, flag_reason, gross_minor,payment_mode,trust_level)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,($11`+sessionWallFromInstant+`),$12,NULLIF($13,''),NULLIF($14,0),$15,$16)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,''),NULLIF($14,0),$15,$16)
 `+saleConflict+`
 RETURNING id`, out.OfferID, out.CampaignID, clickID, provider, eventID, objectID, kind, amount, currency, out.Commission, occurredAt, out.Flagged, out.FlagReason, grossMinor, paymentMode, trustLevel).Scan(&out.ConversionID)
 	if err != nil {
@@ -481,7 +483,7 @@ VALUES ($1,$2,$3)`, out.OfferID, eventID, out.ConversionID); err != nil {
 	clearsAt := occurredAt.Add(time.Duration(refundWindowDays) * 24 * time.Hour)
 	if _, err := tx.Exec(ctx, `
 INSERT INTO ledger_entries (site_id, conversion_id, kind, amount, currency, status, clears_at)
-VALUES ($1,$2,'commission',$3,$4,'pending',($5`+sessionWallFromInstant+`))`, out.SiteID, out.ConversionID, out.Commission, currency, clearsAt); err != nil {
+VALUES ($1,$2,'commission',$3,$4,'pending',$5)`, out.SiteID, out.ConversionID, out.Commission, currency, clearsAt); err != nil {
 		return nil, err
 	}
 	return &out, tx.Commit(ctx)
@@ -620,8 +622,8 @@ AND (NOT $4 OR cv.provider=$5))`, objectID, makerID, scopeOfferID, matchProvider
 		_, err = tx.Exec(ctx, `UPDATE ledger_entries SET status='reversed' WHERE status='pending' AND conversion_id IN
   (SELECT id FROM conversions WHERE id=$1 OR refunded_conversion_id=$1)`, saleID)
 	} else if commissionDelta > 0 {
-		// clearsAt is the stored wall clock. Writing it back as timestamp keeps that
-		// clock; casting it through timestamptz would shift it by the session offset.
+		// clearsAt is the commission instant. Writing that scanned timestamptz
+		// back stores the same instant on the clawback.
 		_, err = tx.Exec(ctx, `INSERT INTO ledger_entries(site_id,conversion_id,kind,amount,currency,status,clears_at)
   VALUES($1,$2,'clawback',$3,$4,$5,$6)`, siteID, out.ID, -float64(commissionDelta)/100, currency, ledgerStatus, clearsAt)
 	}
@@ -656,7 +658,7 @@ type FlaggedConversion struct {
 func (d *DB) ListFlaggedConversions(ctx context.Context, limit int) ([]FlaggedConversion, error) {
 	rows, err := d.Pool.Query(ctx, `
 SELECT cv.id, cv.campaign_id, cam.site_id, cv.offer_id, cv.provider, cv.kind,
-       cv.amount, cv.currency, COALESCE(cv.commission_amount,0), COALESCE(cv.flag_reason,''), (cv.occurred_at `+sessionWallAsInstant+`),
+       cv.amount, cv.currency, COALESCE(cv.commission_amount,0), COALESCE(cv.flag_reason,''), cv.occurred_at,
        s.domain, p.name
 FROM conversions cv
 JOIN campaigns cam ON cam.id = cv.campaign_id

@@ -150,9 +150,14 @@ func TestFraudFlagsHoldCommissionsUntilCleared(t *testing.T) {
 	requirePlainRedirect(t, rrec, "https://inboxpilot.example.com")
 	clickID := insertCampaignClick(t, db, code)
 
-	// Purchase seconds after the click: booked, but flagged.
+	// Purchase seconds after the click: booked, but flagged. The click's own
+	// truncated second is not this flag, so the sale is five seconds later.
+	var clicked time.Time
+	if err := db.Pool.QueryRow(context.Background(), `SELECT clicked_at FROM clicks WHERE id=$1`, clickID).Scan(&clicked); err != nil {
+		t.Fatal(err)
+	}
 	payload := stripeSalePayload("evt_fraud_1", "pi_fraud", clickID, 10000)
-	payload["created"] = time.Now().Unix()
+	payload["created"] = clicked.Add(5 * time.Second).Unix()
 	wrec, wbody := sendStripeEvent(t, db, r, payload)
 	if wrec.Code != http.StatusOK || wbody["status"] != "recorded" {
 		t.Fatalf("expected recorded, got %d %v", wrec.Code, wbody)

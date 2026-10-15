@@ -114,8 +114,8 @@ func (d *DB) ProductOwnsClick(ctx context.Context, productID, clickID, currency 
 	var valid bool
 	err := d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id
 JOIN offers o ON o.id=cam.offer_id WHERE c.id=$2 AND o.product_id=$1 AND COALESCE(c.terms_snapshot->>'currency',o.commission_currency)=$3
-AND c.clicked_at <= ($4`+sessionWallFromInstant+`) + INTERVAL '1 second'
-AND c.clicked_at + make_interval(days=>COALESCE((c.terms_snapshot->>'cookie_duration_days')::int,o.cookie_duration_days)) >= ($4`+sessionWallFromInstant+`))`, productID, clickID, currency, occurredAt).Scan(&valid)
+AND c.clicked_at <= ($4::timestamptz + INTERVAL '1 second')
+AND c.clicked_at + make_interval(days=>COALESCE((c.terms_snapshot->>'cookie_duration_days')::int,o.cookie_duration_days)) >= $4::timestamptz)`, productID, clickID, currency, occurredAt).Scan(&valid)
 	return valid, err
 }
 

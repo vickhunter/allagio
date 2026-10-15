@@ -64,21 +64,125 @@ func withSessionTimeZone(rawURL, zone string) (string, error) {
 	if zone == "" {
 		return rawURL, nil
 	}
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return "", err
+	if strings.Contains(rawURL, "://") {
+		u, err := url.Parse(rawURL)
+		if err != nil {
+			return "", err
+		}
+		q := u.Query()
+		q.Set("TimeZone", zone)
+		u.RawQuery = q.Encode()
+		return u.String(), nil
 	}
-	q := u.Query()
-	q.Set("TimeZone", zone)
-	u.RawQuery = q.Encode()
-	return u.String(), nil
+	return setKeywordTimeZone(rawURL, zone), nil
+}
+
+// setKeywordTimeZone sets TimeZone on a host=... dbname=... connection string.
+// Spaces inside single or double quotes stay inside that parameter.
+func setKeywordTimeZone(raw, zone string) string {
+	parts := splitKeywordDSN(raw)
+	out := make([]string, 0, len(parts)+1)
+	replaced := false
+	for _, part := range parts {
+		key, _, ok := strings.Cut(part, "=")
+		if ok && strings.EqualFold(strings.Trim(key, `"'`), "timezone") {
+			if !replaced {
+				out = append(out, "TimeZone="+zone)
+				replaced = true
+			}
+			continue
+		}
+		out = append(out, part)
+	}
+	if !replaced {
+		out = append(out, "TimeZone="+zone)
+	}
+	return strings.Join(out, " ")
+}
+
+func splitKeywordDSN(raw string) []string {
+	var parts []string
+	var b strings.Builder
+	var quote rune
+	for _, r := range raw {
+		switch {
+		case quote != 0:
+			b.WriteRune(r)
+			if r == quote {
+				quote = 0
+			}
+		case r == '\'' || r == '"':
+			quote = r
+			b.WriteRune(r)
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			if b.Len() > 0 {
+				parts = append(parts, b.String())
+				b.Reset()
+			}
+		default:
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() > 0 {
+		parts = append(parts, b.String())
+	}
+	return parts
 }
 
 func applyMigrations(t *testing.T, db *database.DB) {
 	t.Helper()
+	applyMigrationsThrough(t, db, "038_timestamptz_instants.sql")
+}
+
+// setupTestDBThrough connects in zone and applies migrations through last,
+// inclusive. last is a file name from migrationFiles, such as 037.
+func setupTestDBThrough(t *testing.T, zone, last string) (*database.DB, func()) {
+	t.Helper()
+	raw := strings.TrimSpace(os.Getenv("AFFILIO_TEST_DATABASE_URL"))
+	if raw == "" {
+		t.Skip("AFFILIO_TEST_DATABASE_URL not set; skipping DB integration tests")
+	}
+	dsn, err := withSessionTimeZone(raw, zone)
+	if err != nil {
+		t.Fatalf("session timezone: %v", err)
+	}
+	ctx := context.Background()
+	db, err := database.Connect(ctx, dsn)
+	if err != nil {
+		t.Fatalf("failed to connect db: %v", err)
+	}
+	applyMigrationsThrough(t, db, last)
+	cleanup := func() {
+		_ = truncateAll(db)
+		db.Close()
+	}
+	return db, cleanup
+}
+
+func applyMigrationsThrough(t *testing.T, db *database.DB, last string) {
+	t.Helper()
+	ctx := context.Background()
+	// 038 refuses a session that is not UTC. Apply every file on one
+	// connection in UTC, then put that connection back on the test session.
+	// Pool.Exec is not pinned to one connection, so the SET has to live here.
+	conn, err := db.Pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire migration conn: %v", err)
+	}
+	defer conn.Release()
+	var original string
+	if err := conn.QueryRow(ctx, `SHOW timezone`).Scan(&original); err != nil {
+		t.Fatalf("show timezone: %v", err)
+	}
+	if _, err := conn.Exec(ctx, `SET TIME ZONE 'UTC'`); err != nil {
+		t.Fatalf("set utc for migrations: %v", err)
+	}
+	defer func() {
+		_, _ = conn.Exec(context.Background(), `SELECT set_config('TimeZone', $1, false)`, original)
+	}()
 	// Reset public schema so destructive migrations (e.g. column drops) can
 	// be re-applied cleanly when multiple tests share the same database.
-	if _, err := db.Pool.Exec(context.Background(), `
+	if _, err := conn.Exec(ctx, `
 		DROP SCHEMA IF EXISTS public CASCADE;
 		CREATE SCHEMA public;
 		GRANT ALL ON SCHEMA public TO PUBLIC;
@@ -86,7 +190,28 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		t.Fatalf("reset schema: %v", err)
 	}
 	root := filepath.Join("..", "migrations")
-	files := []string{
+	applied := false
+	for _, f := range migrationFiles() {
+		path := filepath.Join(root, f)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read migration %s: %v", f, err)
+		}
+		if _, err := conn.Exec(ctx, string(content)); err != nil {
+			t.Fatalf("apply migration %s: %v", f, err)
+		}
+		if f == last {
+			applied = true
+			break
+		}
+	}
+	if !applied {
+		t.Fatalf("migration %s is not in the harness list", last)
+	}
+}
+
+func migrationFiles() []string {
+	return []string{
 		"001_initial.sql",
 		"002_seed_programs.sql",
 		"003_add_user_program_id.sql",
@@ -124,16 +249,7 @@ func applyMigrations(t *testing.T, db *database.DB) {
 		"035_refund_seller_scope.sql",
 		"036_refund_sale_link.sql",
 		"037_reserved_sale_events.sql",
-	}
-	for _, f := range files {
-		path := filepath.Join(root, f)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read migration %s: %v", f, err)
-		}
-		if _, err := db.Pool.Exec(context.Background(), string(content)); err != nil {
-			t.Fatalf("apply migration %s: %v", f, err)
-		}
+		"038_timestamptz_instants.sql",
 	}
 }
 

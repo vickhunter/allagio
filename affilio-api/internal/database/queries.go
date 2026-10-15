@@ -710,7 +710,7 @@ func (d *DB) ListDailyClickCounts(ctx context.Context, siteID string, days int) 
 	rows, err := d.Pool.Query(ctx, `
 SELECT TO_CHAR(day, 'YYYY-MM-DD') AS day, clicks
 FROM (
-    SELECT DATE_TRUNC('day', c.clicked_at)::date AS day, COUNT(*)::int AS clicks
+    SELECT DATE_TRUNC('day', c.clicked_at AT TIME ZONE 'UTC')::date AS day, COUNT(*)::int AS clicks
     FROM clicks c
     WHERE c.site_id=$1
       AND c.clicked_at >= NOW() - ($2 * INTERVAL '1 day')
@@ -887,7 +887,7 @@ WITH article_cohorts AS (
     SELECT a.id, DATE_TRUNC('day', a.created_at)::date AS cohort_date
     FROM articles a
     WHERE a.site_id=$1
-      AND a.created_at >= NOW() - ($2 * INTERVAL '1 day')
+      AND (a.created_at AT TIME ZONE 'UTC') >= NOW() - ($2 * INTERVAL '1 day')
 ),
 recommendation_stats AS (
     SELECT r.article_id, COUNT(*) FILTER (WHERE r.status='inserted')::int AS inserted
@@ -1058,18 +1058,18 @@ WITH base_articles AS (
         a.created_at
     FROM articles a
     WHERE a.site_id=$1
-      AND a.created_at >= NOW() - ($2 * INTERVAL '1 day')
+      AND (a.created_at AT TIME ZONE 'UTC') >= NOW() - ($2 * INTERVAL '1 day')
 ),
 activity AS (
     SELECT
         ba.article_id,
         ba.cohort_week,
-        FLOOR(EXTRACT(EPOCH FROM (c.clicked_at - ba.created_at)) / 604800)::int AS week_offset
+        FLOOR(EXTRACT(EPOCH FROM (c.clicked_at - (ba.created_at AT TIME ZONE 'UTC'))) / 604800)::int AS week_offset
     FROM base_articles ba
     JOIN clicks c ON c.article_id = ba.article_id
     WHERE c.site_id=$1
-      AND c.clicked_at >= ba.created_at
-      AND c.clicked_at < ba.created_at + INTERVAL '28 days'
+      AND c.clicked_at >= (ba.created_at AT TIME ZONE 'UTC')
+      AND c.clicked_at < (ba.created_at AT TIME ZONE 'UTC') + INTERVAL '28 days'
 )
 SELECT
     TO_CHAR(ba.cohort_week, 'YYYY-MM-DD') AS cohort_week,

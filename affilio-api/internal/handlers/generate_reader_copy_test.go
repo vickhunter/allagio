@@ -395,6 +395,92 @@ func TestGenerateContentRejectsOverlapAcrossAnchorAndBlurb(t *testing.T) {
 	}
 }
 
+func TestVisibleTextSplitsUnicodeDashes(t *testing.T) {
+	matches := services.MatchCuratedPrograms("This article covers email marketing for small teams.", []services.CuratedProgramInput{{
+		ID:   "prog-dash",
+		Name: "email marketing",
+	}}, nil)
+	if len(matches) != 1 {
+		t.Fatalf("matches: %#v", matches)
+	}
+	reason := matches[0].Reason
+	blurb := "making it a useful comparison for readers who want a tool."
+	for _, dash := range []rune{'\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\u2212'} {
+		html := readerHTML("email"+string(dash)+"marketing", "https://example.com/aff", blurb)
+		visible := visibleReaderText(html)
+		if !services.ContainsInternalCopy(visible, reason) {
+			t.Fatalf("%U did not split email and marketing: %q", dash, visible)
+		}
+	}
+	ascii := readerHTML("email-marketing", "https://example.com/the-article-discusses-email-marketing-making", blurb)
+	if services.ContainsInternalCopy(visibleReaderText(ascii), matches[0].Reason) {
+		t.Fatalf("ascii hyphen was treated as a word break: %q", visibleReaderText(ascii))
+	}
+}
+
+func TestVisibleTextCatchesDashedEmailMarketingBothWays(t *testing.T) {
+	const split = "The article discusses email marketing daily."
+	const glued = "The article discusses emailmarketing daily."
+	for _, dash := range []rune{'\u2010', '\u2011', '\u2012', '\u2013', '\u2014', '\u2015', '\u2212'} {
+		html := readerHTML("Mailchimp", "https://example.com/aff", "The article discusses email"+string(dash)+"marketing daily.")
+		visible := visibleReaderText(html)
+		if !services.ContainsInternalCopy(visible, split) {
+			t.Fatalf("%U split form escaped visible text %q", dash, visible)
+		}
+		if !services.ContainsInternalCopy(visible, glued) {
+			t.Fatalf("%U glued form escaped visible text %q", dash, visible)
+		}
+	}
+	ascii := readerHTML("Mailchimp", "https://example.com/aff", "The article discusses email-marketing daily.")
+	if services.ContainsInternalCopy(visibleReaderText(ascii), split) {
+		t.Fatalf("ascii hyphen in visible text matched the split reason: %q", visibleReaderText(ascii))
+	}
+}
+
+func TestGenerateContentRegeneratesEntityEncodedReasonAndTransition(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	siteID, recID := seedGenerateRecommendation(t, db, internalFitReason)
+	const clean = "Mailchimp helps teams schedule campaigns and see which emails get replies."
+	const later = "Later copy for readers who compare a few tools before they buy."
+	gen := scriptedGenerator(t, []string{clean, later})
+	first := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+	})
+	if first.Code != http.StatusOK {
+		t.Fatalf("preview generate failed: %d %s", first.Code, first.Body.String())
+	}
+	var stored string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT generated_html FROM recommendations WHERE id=$1`, recID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	var preview storedReaderPreview
+	if err := json.Unmarshal([]byte(stored), &preview); err != nil {
+		t.Fatal(err)
+	}
+	preview.PlacementReason = "This is a strong contex&#116;ual fit for the reader."
+	preview.Transition = "Readers meet a strong contex&#116;ual fit in this comparison of tools."
+	encoded, err := json.Marshal(preview)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE recommendations SET generated_html=$2 WHERE id=$1`, recID, string(encoded)); err != nil {
+		t.Fatal(err)
+	}
+	second := postGenerate(t, db, siteID, gen, map[string]interface{}{
+		"recommendation_id": recID,
+		"site_language":     "en",
+	})
+	if second.Code != http.StatusOK || !strings.Contains(second.Body.String(), later) {
+		t.Fatalf("entity-encoded placement reason was reused: %d %s", second.Code, second.Body.String())
+	}
+	body := second.Body.String()
+	if strings.Contains(strings.ToLower(body), "contextual") || strings.Contains(body, "&#") {
+		t.Fatalf("published the encoded reason: %s", body)
+	}
+}
+
 func TestGenerateContentRegeneratesPoisonedPlacementReason(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

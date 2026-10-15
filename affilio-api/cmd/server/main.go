@@ -59,6 +59,10 @@ func main() {
 	}
 	defer db.Close()
 	if cfg.AutoMigrate {
+		// 038 reads stored faces as UTC. Do not SET the session to UTC here.
+		if err := migrations.RequireUTCSession(ctx, db.Pool); err != nil {
+			log.Fatalf("%v", err)
+		}
 		if err := migrations.Apply(ctx, db.Pool); err != nil {
 			log.Fatalf("database migration failed: %v", err)
 		}

@@ -3,12 +3,24 @@ package database
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type DB struct {
 	Pool *pgxpool.Pool
+	// Now, when set, replaces the process wall clock for instants this
+	// process writes. Production leaves it nil.
+	Now func() time.Time
+}
+
+// Clock returns the injected instant, or the wall clock when none is set.
+func (d *DB) Clock() time.Time {
+	if d != nil && d.Now != nil {
+		return d.Now()
+	}
+	return time.Now()
 }
 
 func Connect(ctx context.Context, url string) (*DB, error) {
