@@ -188,7 +188,12 @@ class Affilio_Distribution {
         if ($response['code'] < 200 || $response['code'] >= 300) {
             $payload = isset($response['data']) && is_array($response['data']) ? $response['data'] : array();
             $message = self::distribution_error_message($payload);
-            $status = $response['code'] >= 400 && $response['code'] < 500 ? (int) $response['code'] : 502;
+            $code = (int) $response['code'];
+            if ($code === 503 || ($code >= 400 && $code < 500)) {
+                $status = $code;
+            } else {
+                $status = 502;
+            }
             $error_data = array('status' => $status);
             if (isset($payload['reason']) && is_string($payload['reason'])) {
                 $error_data['reason'] = $payload['reason'];
@@ -200,7 +205,7 @@ class Affilio_Distribution {
 
     private function placement_create_should_retry($response) {
         if (is_wp_error($response)) {
-            return true;
+            return $response->get_error_code() !== 'affilio_not_configured';
         }
         return is_array($response) && isset($response['code']) && (int) $response['code'] === 503;
     }
@@ -1526,7 +1531,30 @@ class Affilio_Distribution {
     }
 
     public function retry_pending_acks() {
-        $this->drain_ack_queue(true);
+        if ($this->skip_admin_ack_retry()) {
+            return;
+        }
+        $this->drain_ack_queue(false);
+    }
+
+    private function skip_admin_ack_retry() {
+        if ((defined('DOING_AJAX') && DOING_AJAX) || (function_exists('wp_doing_ajax') && wp_doing_ajax())) {
+            return true;
+        }
+        if ((defined('DOING_CRON') && DOING_CRON) || (function_exists('wp_doing_cron') && wp_doing_cron())) {
+            return true;
+        }
+        $action = isset($_REQUEST['action']) ? (string) $_REQUEST['action'] : '';
+        if (function_exists('wp_unslash')) {
+            $action = (string) wp_unslash($action);
+        }
+        if ($action === 'heartbeat') {
+            return true;
+        }
+        if (!function_exists('current_user_can')) {
+            return true;
+        }
+        return !current_user_can('manage_options') && !current_user_can('edit_posts');
     }
 
     public function drain_ack_queue($force = false) {
@@ -1546,13 +1574,18 @@ class Affilio_Distribution {
             if (!$force && isset($item['next_at']) && (int) $item['next_at'] > $now) {
                 continue;
             }
+            $rel = !empty($item['rel_sponsored']);
+            if (!$this->ack_post_still_matches($item, $rel)) {
+                unset($queue[$key]);
+                continue;
+            }
             $response = (new Affilio_Plugin_Ack())->send(
                 $item['placement_id'],
                 $item['action'],
-                !empty($item['rel_sponsored']),
+                $rel,
                 isset($item['reason']) ? (string) $item['reason'] : ''
             );
-            if (self::ack_succeeded($response)) {
+            if (self::ack_succeeded($response) || self::ack_settled($response)) {
                 unset($queue[$key]);
                 $this->finish_acked_box($item);
                 continue;
@@ -1685,9 +1718,35 @@ class Affilio_Distribution {
             $message = 'Affilio could not confirm the box change.';
         }
         $this->remember_ack_error($placement_id, $status, $message);
-        if (!self::ack_retryable($response)) {
-            $this->enqueue_ack($placement_id, $action, $rel, '');
+    }
+
+    private function ack_post_still_matches($item, &$rel) {
+        $action = isset($item['action']) ? (string) $item['action'] : '';
+        $failed = defined('AFFILIO_PLUGIN_ACK_FAILED') ? AFFILIO_PLUGIN_ACK_FAILED : 'failed';
+        if ($action === $failed) {
+            return true;
         }
+        $id = isset($item['placement_id']) ? (string) $item['placement_id'] : '';
+        $index = function_exists('get_option') ? get_option('affilio_box_index', array()) : array();
+        $post_id = (is_array($index) && isset($index[$id]['post_id'])) ? (int) $index[$id]['post_id'] : 0;
+        if ($id === '' || $post_id <= 0 || !function_exists('get_post')) {
+            return false;
+        }
+        $post = get_post($post_id);
+        if (!$post || !isset($post->post_content)) {
+            return false;
+        }
+        $content = (string) $post->post_content;
+        $present = self::box_in_content($content, $id);
+        $removed = defined('AFFILIO_PLUGIN_ACK_REMOVED') ? AFFILIO_PLUGIN_ACK_REMOVED : 'removed';
+        if ($action === $removed) {
+            return !$present;
+        }
+        if (!self::ack_shows_box($action) || !$present) {
+            return false;
+        }
+        $rel = self::rel_sponsored_from_content($content, $id);
+        return true;
     }
 
     private function remember_ack_error($id, $status, $message) {

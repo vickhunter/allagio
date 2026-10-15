@@ -121,10 +121,6 @@ class ApproveInsertCopyTest extends TestCase {
      * @runInSeparateProcess
      * @preserveGlobalState disabled
      */
-    /**
-     * @runInSeparateProcess
-     * @preserveGlobalState disabled
-     */
     public function test_approve_insert_uses_tracked_go_link() {
         $this->boot_stubs();
         if (!function_exists('home_url')) {

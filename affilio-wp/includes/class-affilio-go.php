@@ -162,7 +162,11 @@ class Affilio_Go {
         if ($id === '') {
             return $match[0];
         }
-        return self::local_href($id);
+        $href = self::local_href($id);
+        if (function_exists('esc_url')) {
+            return esc_url($href);
+        }
+        return $href;
     }
 
     public static function local_href($id) {

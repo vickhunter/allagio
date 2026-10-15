@@ -211,11 +211,7 @@ func (h *RedirectsHandler) goRecommendation(c *gin.Context, recommendationID str
 	if !rec.Found || !httpsDestination(rec.Destination) {
 		return false
 	}
-	reader := goReader{
-		hash:      h.directReaderHash(req.clientIP),
-		userAgent: req.userAgent,
-		referer:   req.referer,
-	}
+	reader := h.recommendationReader(c, rec.SiteID, req)
 	class := ClassifyClick(c.Request.Method, reader.userAgent, c.Request.Header)
 	if h.RateLimiter != nil && !h.RateLimiter.Allow("recommendation:"+recommendationID) {
 		c.Redirect(http.StatusFound, rec.Destination)
@@ -263,6 +259,41 @@ type goReader struct {
 	hash      string
 	userAgent string
 	referer   string
+}
+
+// recommendationReader hashes the connection address for a public hit.
+// via=plugin uses the plugin's client hash, user agent, and referer only when
+// the site key matches this recommendation's site. A WordPress user agent on
+// the connection is then not what gets classified or deduped. Any other key
+// leaves those headers unused.
+func (h *RedirectsHandler) recommendationReader(c *gin.Context, siteID string, req goRequest) goReader {
+	reader := goReader{
+		hash:      h.directReaderHash(req.clientIP),
+		userAgent: req.userAgent,
+		referer:   req.referer,
+	}
+	if req.via != "plugin" || req.apiKey == "" || siteID == "" {
+		return reader
+	}
+	keySite, _, ok, err := h.DB.SiteForGoKey(c.Request.Context(), services.HashAPIKey(req.apiKey), services.KeyPrefix(req.apiKey))
+	if err != nil || !ok || keySite != siteID {
+		if err != nil {
+			logGo("redirects.go plugin key lookup failed err=%v", err)
+		}
+		return reader
+	}
+	if hashed := clientHashHeader(req.pluginHash); hashed != "" {
+		reader.hash = hashed
+	} else {
+		reader.hash = ""
+	}
+	if ua := strings.TrimSpace(req.pluginUA); ua != "" {
+		reader.userAgent = ua
+	}
+	if ref := strings.TrimSpace(req.pluginRef); ref != "" {
+		reader.referer = ref
+	}
+	return reader
 }
 
 // placementReader hashes the connection address for a public hit. via=plugin

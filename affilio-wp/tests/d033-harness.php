@@ -23,6 +23,7 @@ if (!class_exists('WP_Error')) {
             $this->message = $message;
             $this->data = $data;
         }
+        public function get_error_code() { return (string) $this->code; }
         public function get_error_message() { return $this->message; }
         public function get_error_data($code = '') { return $this->data; }
     }
