@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// sessionTimeZoneEnv sets the Postgres session TimeZone for setupTestDB.
+// Europe/Rome reproduces timestamp-without-time-zone failures on a UTC server.
+const sessionTimeZoneEnv = "AFFILIO_TEST_TIMEZONE"
+
 func issuePluginKey(t *testing.T, db *database.DB, siteID, raw string) map[string]string {
 	t.Helper()
 	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO plugin_keys(key_hash,key_prefix,site_id) VALUES($1,$2,$3)`, services.HashAPIKey(raw), services.KeyPrefix(raw), siteID); err != nil {
@@ -25,12 +30,24 @@ func issuePluginKey(t *testing.T, db *database.DB, siteID, raw string) map[strin
 
 func setupTestDB(t *testing.T) (*database.DB, func()) {
 	t.Helper()
-	url := strings.TrimSpace(os.Getenv("AFFILIO_TEST_DATABASE_URL"))
-	if url == "" {
+	return setupTestDBInZone(t, os.Getenv(sessionTimeZoneEnv))
+}
+
+// setupTestDBInZone connects like setupTestDB and sets the session TimeZone.
+// An empty zone leaves the server default. A named zone overrides it, including
+// any TimeZone already present on AFFILIO_TEST_DATABASE_URL.
+func setupTestDBInZone(t *testing.T, zone string) (*database.DB, func()) {
+	t.Helper()
+	raw := strings.TrimSpace(os.Getenv("AFFILIO_TEST_DATABASE_URL"))
+	if raw == "" {
 		t.Skip("AFFILIO_TEST_DATABASE_URL not set; skipping DB integration tests")
 	}
+	dsn, err := withSessionTimeZone(raw, zone)
+	if err != nil {
+		t.Fatalf("session timezone: %v", err)
+	}
 	ctx := context.Background()
-	db, err := database.Connect(ctx, url)
+	db, err := database.Connect(ctx, dsn)
 	if err != nil {
 		t.Fatalf("failed to connect db: %v", err)
 	}
@@ -40,6 +57,21 @@ func setupTestDB(t *testing.T) (*database.DB, func()) {
 		db.Close()
 	}
 	return db, cleanup
+}
+
+func withSessionTimeZone(rawURL, zone string) (string, error) {
+	zone = strings.TrimSpace(zone)
+	if zone == "" {
+		return rawURL, nil
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	q.Set("TimeZone", zone)
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
 
 func applyMigrations(t *testing.T, db *database.DB) {
