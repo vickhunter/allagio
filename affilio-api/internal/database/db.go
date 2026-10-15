@@ -30,13 +30,10 @@ func Connect(ctx context.Context, url string) (*DB, error) {
 	}
 
 	config.ConnConfig.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		d := net.Dialer{}
-		// Railway private networking uses IPv6; try tcp6 first, then fall back.
-		conn, err := d.DialContext(ctx, "tcp6", addr)
-		if err != nil {
-			conn, err = d.DialContext(ctx, "tcp", addr)
-		}
-		return conn, err
+		// Railway private networking uses IPv6. Bound that attempt so a
+		// blackholed AAAA record cannot consume the caller's whole deadline
+		// before the IPv4 dial starts.
+		return dialWithFallback(ctx, (&net.Dialer{}).DialContext, addr, 2*time.Second)
 	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
@@ -48,4 +45,19 @@ func Connect(ctx context.Context, url string) (*DB, error) {
 
 func (d *DB) Close() {
 	d.Pool.Close()
+}
+
+// dialWithFallback tries tcp6, then tcp. firstWait caps the IPv6 attempt.
+// The parent context still bounds the IPv4 dial.
+func dialWithFallback(ctx context.Context, dial func(context.Context, string, string) (net.Conn, error), addr string, firstWait time.Duration) (net.Conn, error) {
+	first, cancel := context.WithTimeout(ctx, firstWait)
+	conn, err := dial(first, "tcp6", addr)
+	cancel()
+	if err == nil {
+		return conn, nil
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	return dial(ctx, "tcp", addr)
 }

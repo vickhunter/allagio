@@ -695,6 +695,72 @@ UPDATE conversions SET flagged=false, flag_reason=NULL WHERE id=$1 AND flagged`,
 	return res.RowsAffected() > 0, nil
 }
 
+// RecommendationRedirect is the https affiliate URL behind GET /v1/go/<recommendation_id>.
+// Found is false when the id is not a recommendation.
+type RecommendationRedirect struct {
+	Found       bool
+	SiteID      string
+	ArticleID   string
+	ProgramID   *string
+	Destination string
+}
+
+func (d *DB) LookupRecommendationRedirect(ctx context.Context, recommendationID string) (RecommendationRedirect, error) {
+	var out RecommendationRedirect
+	err := d.Pool.QueryRow(ctx, `
+SELECT a.site_id::text, a.id::text, r.program_id::text,
+       COALESCE(saa.affiliate_link, upl.affiliate_link, ap.referral_url, ap.signup_url, ap.website_url, '')
+FROM recommendations r
+JOIN articles a ON a.id = r.article_id
+LEFT JOIN affiliate_programs ap ON ap.id = r.program_id
+LEFT JOIN site_affiliate_accounts saa ON saa.program_id = r.program_id AND saa.site_id = a.site_id
+LEFT JOIN user_programs up ON up.id = r.user_program_id
+LEFT JOIN LATERAL (
+    SELECT affiliate_link FROM user_program_links WHERE user_program_id = up.id ORDER BY created_at DESC LIMIT 1
+) upl ON true
+WHERE r.id=$1`, recommendationID).Scan(&out.SiteID, &out.ArticleID, &out.ProgramID, &out.Destination)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return RecommendationRedirect{}, nil
+	}
+	if err != nil {
+		return RecommendationRedirect{}, err
+	}
+	out.Found = true
+	return out, nil
+}
+
+// RecentRecommendationClick returns a hit from the same reader hash and user
+// agent on this recommendation inside the dedup window. An empty hash never
+// matches. An empty id means there is no recent hit.
+func (d *DB) RecentRecommendationClick(ctx context.Context, siteID, recommendationID, ipHash, userAgent, clickClass string, withinSeconds int) (string, error) {
+	if ipHash == "" {
+		return "", nil
+	}
+	if clickClass != "verified_agent" && clickClass != "declared_agent" && clickClass != "browser" && clickClass != "unknown" {
+		clickClass = "unknown"
+	}
+	var id string
+	err := d.Pool.QueryRow(ctx, `SELECT id::text FROM clicks
+WHERE site_id=$1 AND recommendation_id=$2 AND ip_hash=$3 AND COALESCE(user_agent,'')=$4 AND click_class=$5
+AND clicked_at >= $6
+ORDER BY clicked_at DESC LIMIT 1`, siteID, recommendationID, ipHash, userAgent, clickClass, d.Clock().UTC().Add(-time.Duration(withinSeconds)*time.Second)).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
+}
+
+func (d *DB) InsertRecommendationClick(ctx context.Context, siteID, articleID, recommendationID string, programID *string, ipHash, userAgent, referrer, clickClass string) (string, error) {
+	if clickClass != "verified_agent" && clickClass != "declared_agent" && clickClass != "browser" && clickClass != "unknown" {
+		clickClass = "unknown"
+	}
+	var id string
+	err := d.Pool.QueryRow(ctx, `INSERT INTO clicks (site_id, article_id, recommendation_id, program_id, user_agent, referrer, ip_hash, click_class, clicked_at)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id::text`,
+		siteID, articleID, recommendationID, programID, userAgent, referrer, ipHash, clickClass, d.Clock().UTC()).Scan(&id)
+	return id, err
+}
+
 func commissionFor(commissionType string, commissionValue, amount float64) float64 {
 	var commission float64
 	switch commissionType {

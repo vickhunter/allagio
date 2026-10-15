@@ -121,6 +121,56 @@ class ApproveInsertCopyTest extends TestCase {
      * @runInSeparateProcess
      * @preserveGlobalState disabled
      */
+    public function test_approve_insert_uses_tracked_go_link() {
+        $this->boot_stubs();
+        if (!function_exists('home_url')) {
+            function home_url($path = '') {
+                return 'https://blog.example' . $path;
+            }
+        }
+        if (!function_exists('esc_url')) {
+            function esc_url($value) {
+                return (string) $value;
+            }
+        }
+        require_once dirname(__DIR__, 2) . '/includes/class-affilio-go.php';
+        $this->require_inserter();
+        $api = new Affilio_Approve_Insert_Fake_API();
+        $id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+        $api->generate = array(
+            'code' => 200,
+            'data' => array(
+                'html' => '<p><a href="https://example.com/tool?ref=staging" rel="nofollow sponsored">Tool</a> — Una frase utile per questo articolo.</p>',
+                'suggested_position' => 'end_of_article',
+                'tracked_link' => '/v1/go/' . $id,
+                'placement_reason' => 'Strong contextual fit. Score 80.',
+            ),
+        );
+        $proxy = new Affilio_Editor_Proxy($api, new Affilio_Inserter($api));
+        $this->set_post('<p>Articolo pubblicato.</p>', 'it_IT');
+
+        $response = $this->dispatch_approve($proxy, array(
+            'post_id' => 7,
+            'recommendation_id' => $id,
+        ));
+
+        $this->assertInstanceOf(WP_REST_Response::class, $response);
+        $this->assertSame(200, $response->status);
+        $stored = $GLOBALS['affilio_post']->post_content;
+        $this->assertStringContainsString('https://blog.example/go/' . $id, $stored);
+        $this->assertStringNotContainsString('example.com/tool', $stored);
+        $this->assertStringNotContainsString('ref=staging', $stored);
+        $this->assertStringContainsString('rel="nofollow sponsored"', $stored);
+        $italian = 'Nota: alcuni link in questa pagina sono affiliati. Se acquisti tramite questi link, posso ricevere una commissione, senza costi extra per te.';
+        $this->assertSame(1, substr_count($stored, $italian));
+        $this->assertStringNotContainsString('Strong contextual', $stored);
+        $this->assertStringNotContainsString('Score 80', $stored);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
     public function test_approve_insert_writes_nothing_when_generate_fails() {
         $this->boot_stubs();
         $this->require_inserter();

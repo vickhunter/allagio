@@ -80,11 +80,36 @@ class Affilio_Editor_Proxy {
         if (is_wp_error($approved) || $approved['code'] < 200 || $approved['code'] >= 300) {
             return $this->response($approved);
         }
-        $result = $this->inserter->insert_inline_mention($post_id, wp_kses_post($generated['data']['html']), $generated['data']['suggested_position'] ?? 'end_of_article');
+        $html = wp_kses_post($generated['data']['html']);
+        $html = $this->use_tracked_href($html, $generated['data'], $id);
+        $result = $this->inserter->insert_inline_mention($post_id, $html, $generated['data']['suggested_position'] ?? 'end_of_article');
         if (is_wp_error($result)) {
             return $result;
         }
         return $this->response($this->api->request('POST', '/insert/confirm', array('recommendation_id' => $id)));
+    }
+
+    // use_tracked_href stores the site-local /go/<id> proxy. The API href is
+    // /v1/go/<id>, or a tracked_link field beside a merchant href. The
+    // merchant ref stays on the redirect target and is not written into the post.
+    private function use_tracked_href($html, $data, $id) {
+        $tracked = '';
+        if (is_array($data) && isset($data['tracked_link']) && is_string($data['tracked_link'])) {
+            $tracked = $data['tracked_link'];
+        }
+        $tracked_ok = $tracked !== '' && class_exists('Affilio_Distribution') && Affilio_Distribution::tracked_link_ok($tracked, $id);
+        if (!$tracked_ok && strpos((string) $html, '/v1/go/' . $id) === false) {
+            return $html;
+        }
+        if (class_exists('Affilio_Go') && strpos((string) $html, '/v1/go/') !== false) {
+            return Affilio_Go::rewrite_legacy_links($html);
+        }
+        $local = class_exists('Affilio_Go') ? Affilio_Go::local_href($id) : Affilio_Distribution::local_go_href($id);
+        if (function_exists('esc_url')) {
+            $local = esc_url($local);
+        }
+        $rewritten = preg_replace('/href="[^"]*"/', 'href="' . $local . '"', (string) $html, 1);
+        return is_string($rewritten) ? $rewritten : $html;
     }
 
     private function response($response) {
