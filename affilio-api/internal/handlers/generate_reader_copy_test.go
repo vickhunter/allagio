@@ -114,6 +114,46 @@ func TestGenerateContentRejectsScoreMatchReasonInsteadOfStripping(t *testing.T) 
 	}
 }
 
+func TestGenerateContentRejectsHiddenReaderCopy(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	reason := services.MatchCuratedPrograms("This article covers email marketing for small teams.", []services.CuratedProgramInput{{
+		ID:   "prog-hidden",
+		Name: "email marketing",
+	}}, nil)
+	if len(reason) != 1 {
+		t.Fatalf("scoreMatch matches: %#v", reason)
+	}
+	siteID, recID := seedGenerateRecommendation(t, db, reason[0].Reason)
+	blurbs := []string{
+		"Readers can see a strong contex\u200Btual fit for this comparison of tools.",
+		"Readers can see a strong contextual \ufb01t for this comparison of tools.",
+		"Mailchimp helps teams schedule \u0441ampaigns and see which emails get replies.",
+		"Mailchimp helps teams schedule campa\u3164igns and see which emails get replies.",
+		"Readers can see a <em>contextual</em> fit for this comparison of email tools.",
+		"Readers can see a contex&#116;ual fit for this comparison of email tools.",
+		"Mailchimp helps teams schedule campaigns and see which emails get replies.",
+	}
+	gen := scriptedGenerator(t, blurbs)
+	for i, blurb := range blurbs {
+		rec := postGenerate(t, db, siteID, gen, map[string]interface{}{
+			"recommendation_id": recID,
+			"site_language":     "en",
+			"regenerate":        true,
+		})
+		want := http.StatusUnprocessableEntity
+		if i == len(blurbs)-1 {
+			want = http.StatusOK
+		}
+		if rec.Code != want {
+			t.Fatalf("blurb %q: got %d body %s", blurb, rec.Code, rec.Body.String())
+		}
+		if want == http.StatusUnprocessableEntity && !strings.Contains(rec.Body.String(), "no reader-facing copy") {
+			t.Fatalf("blurb %q missing the error: %s", blurb, rec.Body.String())
+		}
+	}
+}
+
 func TestGenerateContentReusesPreviewForTheSameLanguage(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

@@ -539,7 +539,7 @@
                                     const insertData = await insert.json().catch(() => ({}));
                                     confirmOverlay.remove();
                                     if (!insert.ok) {
-                                        renderToast((insertData && insertData.message) ? insertData.message : t('Insert failed', 'Inserimento non riuscito'));
+                                        renderToast((insertData && (insertData.error || insertData.message)) ? (insertData.error || insertData.message) : t('Insert failed', 'Inserimento non riuscito'));
                                         return;
                                     }
                                     previewEl.innerHTML = `<p class="affilio-rec-done">${t('Inserted successfully.', 'Inserito con successo.')}</p>`;

@@ -41,6 +41,51 @@ func TestSanitizeReaderCopyRejectsScoreMatchReasonBeforeStripping(t *testing.T) 
 	}
 }
 
+func TestSanitizeReaderCopyRejectsHiddenAndMarkedText(t *testing.T) {
+	t.Parallel()
+	reason := scoreMatchReason(t)
+	base := "Mailchimp helps teams schedule campaigns and see which emails get replies."
+
+	for _, r := range []rune{'\u200B', '\u200C', '\u200D', '\u2060', '\uFEFF', '\u00AD', '\u0007'} {
+		hidden := "Readers can see a strong contex" + string(r) + "tual fit for this comparison of tools."
+		assertRejectedCopy(t, hidden, reason)
+		assertRejectedCopy(t, strings.Replace(base, "helps", "helps"+string(r), 1), reason)
+	}
+
+	assertRejectedCopy(t, "Readers can see a strong contextual \ufb01t for this comparison of tools.", reason)
+	assertRejectedCopy(t, "Readers can see a strong \uff43\uff4f\uff4e\uff54\uff45\uff58\uff54\uff55\uff41\uff4c \uff46\uff49\uff54 for this comparison of tools.", reason)
+	assertRejectedCopy(t, "Mailchimp helps teams schedule \u0441ampaigns and see which emails get replies.", reason)
+	assertRejectedCopy(t, "Mailchimp helps teams schedule c\u03bfmpaigns and see which emails get replies.", reason)
+	for _, r := range []rune{'\u3164', '\u115F', '\u1160', '\uFFA0', '\u2800'} {
+		assertRejectedCopy(t, strings.Replace(base, "campaigns", "campa"+string(r)+"igns", 1), reason)
+	}
+
+	assertRejectedCopy(t, "Readers can see a <em>contextual</em> fit for this comparison of email tools.", reason)
+	assertRejectedCopy(t, "Readers can see a contex&#116;ual fit for this comparison of email tools.", reason)
+	assertRejectedCopy(t, "Readers can see a contex&shy;tual fit for this comparison of email tools.", reason)
+	assertRejectedCopy(t, "Mailchimp helps teams schedule <campaigns> and see which emails get replies.", reason)
+
+	kept, ok := SanitizeReaderCopy("Mailchimp & Semrush help teams schedule campaigns and see replies.", reason)
+	if !ok || !strings.Contains(kept, "Mailchimp & Semrush") {
+		t.Fatalf("plain ampersand rejected: %q ok=%v", kept, ok)
+	}
+}
+
+func TestSanitizeReaderCopyRejectsShortSentenceWhenBlurbIsOnlyThat(t *testing.T) {
+	t.Parallel()
+	reason := "Good fit. Teams should compare a few tools before they buy anything."
+	if !ContainsInternalCopy("Good fit.", reason) {
+		t.Fatal("accepted a blurb that is only the short reason sentence")
+	}
+	if ContainsInternalCopy("Readers can find a good fit among these tools.", reason) {
+		t.Fatal("rejected a longer blurb that merely contains the short sentence")
+	}
+	kept, ok := SanitizeReaderCopy("Readers can find a good fit among these tools.", reason)
+	if !ok || kept == "" {
+		t.Fatalf("longer blurb rejected: %q ok=%v", kept, ok)
+	}
+}
+
 func TestSanitizeReaderCopyRejectsCategoryScoreMatchSentence(t *testing.T) {
 	t.Parallel()
 	matches := MatchCuratedPrograms("seo email marketing", []CuratedProgramInput{{
