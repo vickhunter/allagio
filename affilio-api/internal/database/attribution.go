@@ -427,8 +427,9 @@ WHERE r.offer_id=$1 AND r.provider_event_id=$2`, out.OfferID, eventID).Scan(&sto
 
 	// A purchase before the click is as suspicious as one seconds after it
 	// (and provider timestamps truncate to seconds, so tiny negatives happen).
-	// The same instant as the click is the truncated timestamp of that click.
-	if interval := occurredAt.Sub(clickedAt); interval < fraudFastPurchaseWindow && !occurredAt.Equal(clickedAt) {
+	// A sale in the same truncated second as the click is that click's own second.
+	sameSecond := occurredAt.Truncate(time.Second).Equal(clickedAt.Truncate(time.Second))
+	if interval := occurredAt.Sub(clickedAt); interval < fraudFastPurchaseWindow && !sameSecond {
 		out.Flagged = true
 		out.FlagReason = "implausibly fast click-to-purchase"
 	}

@@ -1,8 +1,18 @@
 -- clicks.clicked_at, conversions.occurred_at, and ledger_entries.clears_at
--- stored a timestamp without time zone. Treat that clock face as UTC and
--- keep the instant in timestamptz. Safe to run more than once. The reverse
--- is internal/migrations/down/038_timestamptz_instants.sql and is not applied
--- automatically.
+-- stored a timestamp without time zone. This migration reads those faces as
+-- UTC. That reading is true only when the server and role default timezone
+-- has always been UTC. Before applying, run SHOW timezone in the production
+-- session and stop unless it is UTC, Etc/UTC, GMT, Etc/GMT, Etc/Universal,
+-- Universal, or Zulu. The script refuses any other session. Safe to run more
+-- than once. The reverse is internal/migrations/down/038_timestamptz_instants.sql
+-- and is not applied automatically. Apply that down script in a UTC session too.
+
+DO $$
+BEGIN
+  IF current_setting('TimeZone') NOT IN ('UTC', 'Etc/UTC', 'GMT', 'Etc/GMT', 'Etc/Universal', 'Universal', 'Zulu') THEN
+    RAISE EXCEPTION '038_timestamptz_instants requires a UTC session (current TimeZone is %). Verify the server and role default timezone is UTC with SHOW timezone, then apply this migration in that session. Stored timestamp faces are read as UTC.', current_setting('TimeZone');
+  END IF;
+END $$;
 
 DO $$
 BEGIN

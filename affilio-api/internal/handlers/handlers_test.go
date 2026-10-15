@@ -161,9 +161,28 @@ func setupTestDBThrough(t *testing.T, zone, last string) (*database.DB, func()) 
 
 func applyMigrationsThrough(t *testing.T, db *database.DB, last string) {
 	t.Helper()
+	ctx := context.Background()
+	// 038 refuses a session that is not UTC. Apply every file on one
+	// connection in UTC, then put that connection back on the test session.
+	// Pool.Exec is not pinned to one connection, so the SET has to live here.
+	conn, err := db.Pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire migration conn: %v", err)
+	}
+	defer conn.Release()
+	var original string
+	if err := conn.QueryRow(ctx, `SHOW timezone`).Scan(&original); err != nil {
+		t.Fatalf("show timezone: %v", err)
+	}
+	if _, err := conn.Exec(ctx, `SET TIME ZONE 'UTC'`); err != nil {
+		t.Fatalf("set utc for migrations: %v", err)
+	}
+	defer func() {
+		_, _ = conn.Exec(context.Background(), `SELECT set_config('TimeZone', $1, false)`, original)
+	}()
 	// Reset public schema so destructive migrations (e.g. column drops) can
 	// be re-applied cleanly when multiple tests share the same database.
-	if _, err := db.Pool.Exec(context.Background(), `
+	if _, err := conn.Exec(ctx, `
 		DROP SCHEMA IF EXISTS public CASCADE;
 		CREATE SCHEMA public;
 		GRANT ALL ON SCHEMA public TO PUBLIC;
@@ -178,7 +197,7 @@ func applyMigrationsThrough(t *testing.T, db *database.DB, last string) {
 		if err != nil {
 			t.Fatalf("read migration %s: %v", f, err)
 		}
-		if _, err := db.Pool.Exec(context.Background(), string(content)); err != nil {
+		if _, err := conn.Exec(ctx, string(content)); err != nil {
 			t.Fatalf("apply migration %s: %v", f, err)
 		}
 		if f == last {

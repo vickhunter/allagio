@@ -224,13 +224,9 @@ var htmlTagPattern = regexp.MustCompile(`(?s)<[^>]*>`)
 func visibleReaderText(rawHTML string) string {
 	withoutComments := htmlCommentPattern.ReplaceAllString(rawHTML, "")
 	withoutTags := htmlTagPattern.ReplaceAllString(withoutComments, "")
-	decoded := html.UnescapeString(withoutTags)
-	return strings.Map(func(r rune) rune {
-		if r >= 0x2010 && r <= 0x2015 || r == 0x2212 {
-			return ' '
-		}
-		return r
-	}, decoded)
+	// Leave unicode dashes in place. Overlap checks both the split reading
+	// and the glued reading, and converting them here would drop the glued one.
+	return html.UnescapeString(withoutTags)
 }
 
 func writeGenerated(c *gin.Context, rendered, blurb, position, placementReason, transition string, paragraph int, confidence float64, programName, link string) {
