@@ -1,3 +1,7 @@
+## October 15 — sale windows follow the session clock
+
+`clicks.clicked_at`, `conversions.occurred_at`, and `ledger_entries.clears_at` are timestamps without time zone. `NOW()` stores the session wall clock. A Go instant is bound as `timestamptz` and compared in that same clock, and a column read back for a Go `time.Time` is that instant. A sale at the click stays attributed in `Europe/Rome`, an organic purchase two hours later is not flagged, and the refund hold still clears against `NOW()`. The API does not pin the session to UTC. `AFFILIO_TEST_TIMEZONE` sets the test session, for example `Europe/Rome`, without changing the server. No new migration. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 15 — plugin ZIP includes public styles
 
 `Dockerfile.mvp` copies `affilio-wp/public/` into the WordPress ZIP served at `/downloads/affilio.zip`. That ZIP now contains `affilio-wp/public/css/placement.css` and `affilio-wp/public/js/affilio-track.js`, the same paths `scripts/package-wp-zip` writes. The release check builds that ZIP from the Dockerfile copy list and stops when `public/css/placement.css` is missing.

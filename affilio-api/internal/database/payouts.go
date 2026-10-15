@@ -9,7 +9,8 @@ import (
 
 // clearMaturedSQL moves pending commissions whose refund window has passed to
 // cleared — except entries whose conversion carries a fraud flag: those stay
-// pending until an admin clears the flag.
+// pending until an admin clears the flag. clears_at is the session wall clock,
+// the same clock NOW() uses, so the comparison does not depend on UTC.
 const clearMaturedSQL = `
 UPDATE ledger_entries le SET status='cleared'
 WHERE le.status='pending' AND le.clears_at <= NOW()
@@ -85,7 +86,7 @@ type LedgerHistoryEntry struct {
 func (d *DB) ListLedgerHistory(ctx context.Context, siteID string, limit int) ([]LedgerHistoryEntry, error) {
 	rows, err := d.Pool.Query(ctx, `
 SELECT le.id, le.kind, le.amount, le.currency, le.status,
-       COALESCE(p.name, ''), le.clears_at, le.created_at,COALESCE(cv.payment_mode,'legacy'),
+       COALESCE(p.name, ''), (le.clears_at `+sessionWallAsInstant+`), (le.created_at `+sessionWallAsInstant+`),COALESCE(cv.payment_mode,'legacy'),
        COALESCE(cv.trust_level,''), cv.refund_status, COALESCE(cv.refund_reason,'')
 FROM ledger_entries le
 LEFT JOIN conversions cv ON cv.id = le.conversion_id
@@ -126,7 +127,7 @@ type Payout struct {
 
 func (d *DB) ListPayouts(ctx context.Context, siteID string) ([]Payout, error) {
 	rows, err := d.Pool.Query(ctx, `
-SELECT id, site_id, amount, currency, COALESCE(method,''), COALESCE(provider_reference,''), status, created_at, paid_at,maker_id,payment_mode,received_at
+SELECT id, site_id, amount, currency, COALESCE(method,''), COALESCE(provider_reference,''), status, (created_at `+sessionWallAsInstant+`), (paid_at `+sessionWallAsInstant+`),maker_id,payment_mode,received_at
 FROM payouts
 WHERE site_id=$1
 ORDER BY created_at DESC`, siteID)
@@ -196,7 +197,7 @@ HAVING SUM(le.amount) >= $1`, minPayout, includeTest)
 		err := tx.QueryRow(ctx, `
 INSERT INTO payouts (site_id, amount, currency, method, status,maker_id,payment_mode)
 VALUES ($1,$2,$3,'manual','pending',$4,$5)
-RETURNING id, site_id, amount, currency, COALESCE(method,''), COALESCE(provider_reference,''), status, created_at, paid_at,maker_id,payment_mode,received_at`,
+RETURNING id, site_id, amount, currency, COALESCE(method,''), COALESCE(provider_reference,''), status, (created_at `+sessionWallAsInstant+`), (paid_at `+sessionWallAsInstant+`),maker_id,payment_mode,received_at`,
 			item.siteID, item.amount, item.currency, item.makerID, item.mode).Scan(&payout.ID, &payout.SiteID, &payout.Amount, &payout.Currency, &payout.Method, &payout.ProviderReference, &payout.Status, &payout.CreatedAt, &payout.PaidAt, &payout.MakerID, &payout.Mode, &payout.ReceivedAt)
 		if err != nil {
 			return nil, err
