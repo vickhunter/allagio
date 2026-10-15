@@ -1,11 +1,15 @@
 === Affilio ===
 Contributors: affilio
-Stable tag: 0.1.30
+Stable tag: 0.1.31
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.31 =
+* The Dashboard scan can run again after the first analysis. Progress stays on the status line, and the button stays "Scan All Posts".
+* A failed scan, a scan that is still running after two minutes, or a response that is not JSON shows an error and a way to send the scan form. A scan that is already running keeps polling.
 
 = 0.1.30 =
 * The Dashboard scan stays on the page. It shows analysis in progress, then analysis complete. Without JavaScript the same button still submits the scan form.

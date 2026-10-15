@@ -4,49 +4,102 @@
         if (!form) return;
         const button = form.querySelector('[data-scan]');
         const status = form.querySelector('[data-scan-status]');
+        const fallback = form.querySelector('[data-scan-fallback]');
         if (!button) return;
         const data = window.AffilioData || {};
         const italian = String(data.locale || '').toLowerCase().startsWith('it');
         const i18n = data.i18n || {};
         const label = (key, en, it) => (i18n[key] ? String(i18n[key]) : (italian ? it : en));
-        const setLabel = (text) => {
-            button.textContent = text;
-            if (status) status.textContent = text;
+        const actionLabel = button.textContent;
+        const pollMs = Number(data.scanPollMs) > 0 ? Number(data.scanPollMs) : 1500;
+        const timeoutMs = Number(data.scanTimeoutMs) > 0 ? Number(data.scanTimeoutMs) : 120000;
+        const failedText = () => label('scanFailed', 'Analysis failed. Retry, or send the scan form.', 'Analisi non riuscita. Riprova, oppure invia il modulo di scansione.');
+        const parseJson = (raw) => {
+            const trimmed = String(raw || '').trim();
+            if (!trimmed || (trimmed.charAt(0) !== '{' && trimmed.charAt(0) !== '[')) return null;
+            try {
+                return JSON.parse(trimmed);
+            } catch (error) {
+                return null;
+            }
         };
         const call = async (method) => {
             const base = String(data.restBase || '').replace(/\/$/, '');
-            const response = await fetch(base + '/setup', {
+            const path = method === 'POST' ? '/setup/rescan' : '/setup';
+            const response = await fetch(base + path, {
                 method,
                 headers: { 'X-WP-Nonce': data.nonce || '' },
             });
-            const body = await response.json();
-            if (!response.ok) throw new Error(body.message || 'Setup failed.');
+            if (response.status === 409) return { phase: 'scanning' };
+            const raw = await response.text();
+            if (!response.ok) {
+                const parsed = parseJson(raw);
+                const message = parsed && typeof parsed.message === 'string' && parsed.message ? parsed.message : failedText();
+                throw new Error(message);
+            }
+            const body = parseJson(raw);
+            if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error(failedText());
             return body;
         };
+        const setBusy = (busy) => {
+            button.disabled = busy;
+            button.setAttribute('aria-busy', busy ? 'true' : 'false');
+            if (status) status.setAttribute('aria-busy', busy ? 'true' : 'false');
+        };
+        const showFallback = (visible) => {
+            if (!fallback) return;
+            fallback.hidden = !visible;
+        };
+        const finish = (message, errored) => {
+            button.textContent = actionLabel;
+            if (status) status.textContent = message;
+            showFallback(errored);
+            setBusy(false);
+            button.focus();
+        };
+        let running = false;
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
-            button.disabled = true;
+            if (running) return;
+            running = true;
+            button.textContent = actionLabel;
+            showFallback(false);
+            setBusy(true);
             const inProgress = label('analysisInProgress', 'Analysis in progress', 'Analisi in corso');
             const done = label('analysisComplete', 'Analysis complete', 'Analisi completata');
-            setLabel(inProgress);
+            const timedOut = label('scanTimedOut', 'Analysis is taking too long. Retry, or send the scan form.', "L'analisi sta impiegando troppo tempo. Riprova, oppure invia il modulo di scansione.");
+            if (status) status.textContent = inProgress;
+            const deadline = Date.now() + timeoutMs;
             try {
                 let state = await call('POST');
                 while (state && state.phase === 'scanning') {
-                    setLabel(inProgress);
-                    await new Promise((resolve) => setTimeout(resolve, 250));
+                    if (Date.now() >= deadline) {
+                        finish(timedOut, true);
+                        return;
+                    }
+                    if (status) status.textContent = inProgress;
+                    await new Promise((resolve) => setTimeout(resolve, pollMs));
+                    if (Date.now() >= deadline) {
+                        finish(timedOut, true);
+                        return;
+                    }
                     state = await call('GET');
                 }
                 if (state && state.phase === 'complete') {
-                    setLabel(done);
-                    button.disabled = true;
+                    finish(done, false);
                     return;
                 }
-                button.disabled = false;
+                finish(failedText(), true);
             } catch (failure) {
-                if (status) status.textContent = failure.message;
-                button.disabled = false;
+                finish(failure && failure.message ? failure.message : failedText(), true);
+            } finally {
+                running = false;
             }
         });
+        const fallbackButton = fallback ? (fallback.matches('button') ? fallback : fallback.querySelector('button')) : null;
+        if (fallbackButton) {
+            fallbackButton.addEventListener('click', () => form.submit());
+        }
     };
     bindDashboardScan();
     const root = document.getElementById('affilio-dashboard-root');

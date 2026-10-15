@@ -17,6 +17,11 @@ class Affilio_Onboarding {
             array('methods' => 'GET', 'callback' => array($this, 'status'), 'permission_callback' => array($this, 'rest_permission')),
             array('methods' => 'POST', 'callback' => array($this, 'connect'), 'permission_callback' => array($this, 'rest_permission')),
         ));
+        register_rest_route('affilio/v1', '/setup/rescan', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rescan'),
+            'permission_callback' => array($this, 'rest_permission'),
+        ));
     }
 
     public function allowed() {
@@ -102,6 +107,27 @@ class Affilio_Onboarding {
             if (get_option('affilio_setup_state')['phase'] === 'scanning') {
                 $this->schedule_scan();
             }
+            return $this->status();
+        } finally {
+            delete_option('affilio_setup_lock');
+        }
+    }
+
+    public function rescan() {
+        if (!$this->allowed()) {
+            return new WP_Error('affilio_forbidden', $this->t('Administrator access required.', 'Serve un amministratore.'), array('status' => 403));
+        }
+        if (!$this->lock()) {
+            return new WP_Error('affilio_busy', $this->t('Setup is already running. Try again shortly.', 'La configurazione è già in corso. Riprova tra poco.'), array('status' => 409));
+        }
+        try {
+            update_option('affilio_setup_state', array(
+                'phase' => 'scanning',
+                'offset' => 0,
+                'scanned' => 0,
+                'skipped' => array(),
+            ), false);
+            $this->schedule_scan();
             return $this->status();
         } finally {
             delete_option('affilio_setup_lock');

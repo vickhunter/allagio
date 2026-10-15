@@ -275,21 +275,95 @@ class DashboardSettingsA11yTest extends TestCase {
         $i18n = $GLOBALS['localized']['affilio-dashboard']['AffilioData']['i18n'];
         $this->assertSame('Analisi in corso', $i18n['analysisInProgress']);
         $this->assertSame('Analisi completata', $i18n['analysisComplete']);
-
-        $js = file_get_contents(dirname(__DIR__, 2) . '/admin/build/dashboard.js');
-        $this->assertStringContainsString("getElementById('affilio-scan-all')", $js);
-        $this->assertStringContainsString('event.preventDefault()', $js);
-        $this->assertStringContainsString("base + '/setup'", $js);
+        $this->assertSame('Analisi non riuscita. Riprova, oppure invia il modulo di scansione.', $i18n['scanFailed']);
+        $this->assertSame('L\'analisi sta impiegando troppo tempo. Riprova, oppure invia il modulo di scansione.', $i18n['scanTimedOut']);
+        $this->assertSame('Invia il modulo di scansione', $i18n['scanFallback']);
 
         ob_start();
         $admin->render_dashboard();
         $html = ob_get_clean();
         $this->assertStringContainsString('id="affilio-scan-all"', $html);
-        $this->assertStringContainsString('role="status"', $html);
+        $this->assertStringContainsString('<div data-scan-status role="status"></div>', $html);
+        $this->assertStringNotContainsString('aria-live', $html);
         $this->assertStringContainsString('button button-primary button-large', $html);
+        $this->assertStringContainsString('data-scan-fallback', $html);
+        $this->assertStringContainsString('>Invia il modulo di scansione<', $html);
         $this->assertStringContainsString('action="https://blog.example/wp-admin/admin-post.php"', $html);
         $this->assertStringContainsString('name="action" value="affilio_scan_all"', $html);
         $this->assertStringContainsString('>Scansiona tutti gli articoli<', $html);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_rescan_restarts_a_completed_setup() {
+        $this->boot();
+        $GLOBALS['options']['affilio_api_url_override'] = 'https://api.example.test';
+        $GLOBALS['options']['affilio_api_key'] = 'abcdSECRETKEY1234wxyz';
+        $GLOBALS['options']['affilio_setup_state'] = array(
+            'phase' => 'complete',
+            'offset' => 40,
+            'scanned' => 40,
+            'skipped' => array(array('wp_post_id' => 9, 'reason' => 'short')),
+        );
+        $api = new class {
+            public function get_connection_status($force = false) {
+                return array('connected' => true, 'message' => 'Affilio is connected and ready.', 'state' => 'connected');
+            }
+            public function invalidate_status_cache() {}
+        };
+        $setup = new Affilio_Onboarding($api);
+        $setup->register_routes();
+        $registered = null;
+        foreach ($GLOBALS['routes'] as $route) {
+            if ($route[0] === 'affilio/v1' && $route[1] === '/setup/rescan') {
+                $registered = $route[2];
+            }
+        }
+        $this->assertIsArray($registered);
+        $this->assertSame('POST', $registered['methods']);
+        $this->assertSame(array($setup, 'rest_permission'), $registered['permission_callback']);
+        $this->assertSame(array($setup, 'rescan'), $registered['callback']);
+
+        $connect = $setup->connect();
+        $this->assertIsArray($connect);
+        $this->assertSame('complete', $connect['phase']);
+        $this->assertSame(40, $connect['scanned']);
+        $this->assertSame(40, $connect['offset']);
+        $this->assertArrayNotHasKey('affilio_setup_lock', $GLOBALS['options']);
+
+        $again = $setup->rescan();
+        $this->assertIsArray($again);
+        $this->assertSame('scanning', $again['phase']);
+        $this->assertSame(0, $again['offset']);
+        $this->assertSame(0, $again['scanned']);
+        $this->assertSame(array(), $again['skipped']);
+        $this->assertArrayHasKey('affilio_setup_scan', $GLOBALS['cron']);
+        $this->assertArrayNotHasKey('affilio_setup_lock', $GLOBALS['options']);
+
+        $GLOBALS['options']['affilio_setup_state'] = array(
+            'phase' => 'complete',
+            'offset' => 40,
+            'scanned' => 40,
+            'skipped' => array(array('wp_post_id' => 9, 'reason' => 'short')),
+        );
+        $GLOBALS['options']['affilio_setup_lock'] = time();
+        $busy = $setup->rescan();
+        $this->assertInstanceOf(WP_Error::class, $busy);
+        $this->assertSame('affilio_busy', $busy->code);
+        $this->assertSame(409, $busy->data['status']);
+        $this->assertSame('complete', $GLOBALS['options']['affilio_setup_state']['phase']);
+        $this->assertSame(40, $GLOBALS['options']['affilio_setup_state']['scanned']);
+
+        unset($GLOBALS['options']['affilio_setup_lock']);
+        $GLOBALS['administrator'] = false;
+        $denied = $setup->rescan();
+        $this->assertInstanceOf(WP_Error::class, $denied);
+        $this->assertSame('affilio_forbidden', $denied->code);
+        $this->assertSame(403, $denied->data['status']);
+        $this->assertSame('complete', $GLOBALS['options']['affilio_setup_state']['phase']);
+        $this->assertSame(40, $GLOBALS['options']['affilio_setup_state']['scanned']);
     }
 
     /**

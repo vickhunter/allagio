@@ -201,8 +201,9 @@ class Affilio_Admin {
         echo '<form id="affilio-scan-all" method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         wp_nonce_field('affilio_scan_all');
         echo '<input type="hidden" name="action" value="affilio_scan_all">';
-        echo '<p data-scan-status role="status" aria-live="polite"></p>';
+        echo '<div data-scan-status role="status"></div>';
         echo '<button type="submit" class="button button-primary button-large" data-scan>' . esc_html($this->t('Scan All Posts', 'Scansiona tutti gli articoli')) . '</button>';
+        echo '<div data-scan-fallback hidden><button type="button" class="button button-secondary" data-scan-fallback>' . esc_html($this->t('Send the scan form', 'Invia il modulo di scansione')) . '</button></div>';
         echo '</form>';
         echo '</div>';
         echo '</div>';
@@ -480,8 +481,11 @@ class Affilio_Admin {
                 'connected' => __('Connected', 'affilio'),
                 'notConnected' => __('Not connected.', 'affilio'),
                 'connectSite' => __('Connect your site in Settings.', 'affilio'),
-                'analysisInProgress' => __('Analysis in progress', 'affilio'),
-                'analysisComplete' => __('Analysis complete', 'affilio'),
+                'analysisInProgress' => $this->t('Analysis in progress', 'Analisi in corso'),
+                'analysisComplete' => $this->t('Analysis complete', 'Analisi completata'),
+                'scanFailed' => $this->t('Analysis failed. Retry, or send the scan form.', 'Analisi non riuscita. Riprova, oppure invia il modulo di scansione.'),
+                'scanTimedOut' => $this->t('Analysis is taking too long. Retry, or send the scan form.', 'L\'analisi sta impiegando troppo tempo. Riprova, oppure invia il modulo di scansione.'),
+                'scanFallback' => $this->t('Send the scan form', 'Invia il modulo di scansione'),
             ),
         );
     }

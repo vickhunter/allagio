@@ -327,70 +327,255 @@ test('dashboard text fields are escaped', async ({ page }) => {
   await noHorizontalOverflow(page);
 });
 
-test('the dashboard scan button is at least 44px at 390 and 1440', async ({ page }) => {
-  const html = `<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><style>${wpAdminButtons}</style><body class="wp-admin wp-core-ui"><div class="wrap affilio-admin-page"><form id="affilio-scan-all" method="post" action="https://blog.example/wp-admin/admin-post.php"><p data-scan-status role="status"></p><button type="submit" class="button button-primary button-large" data-scan>Scansiona tutti gli articoli</button></form></div></body>`;
-  for (const width of [390, 1440]) {
-    await page.setViewportSize({ width, height: 900 });
-    await page.setContent(html);
-    const box = await page.getByRole('button', { name: 'Scansiona tutti gli articoli', exact: true }).boundingBox();
-    expect(box.height).toBeGreaterThanOrEqual(44);
-    await noHorizontalOverflow(page);
-  }
-});
+const scanAction = 'Scansiona tutti gli articoli';
+const scanFailed = 'Analisi non riuscita. Riprova, oppure invia il modulo di scansione.';
+const scanTimedOut = "L'analisi sta impiegando troppo tempo. Riprova, oppure invia il modulo di scansione.";
+const scanFallback = 'Invia il modulo di scansione';
 
-test('the dashboard scan stays on the page and shows progress', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.setContent(`<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><div class="wrap affilio-admin-page"><div id="affilio-dashboard-root"></div><form id="affilio-scan-all" method="post" action="https://blog.example/wp-admin/admin-post.php?affilio_scan_continue=1"><p data-scan-status role="status"></p><button type="submit" class="button button-primary button-large" data-scan>Scansiona tutti gli articoli</button></form></div>`);
-  await page.evaluate(() => {
-    window.AffilioData = {
-      locale: 'it',
-      nonce: 'n',
-      restBase: 'https://blog.example/wp-json/affilio/v1',
-      settingsUrl: 'https://blog.example/wp-admin/admin.php?page=affilio-settings',
-      connectionStatus: { connected: true, state: 'connected' },
-      i18n: {
-        connected: 'Connesso',
-        notConnected: 'Non connesso.',
-        connectSite: 'Collega il sito in Impostazioni.',
-        analysisInProgress: 'Analisi in corso',
-        analysisComplete: 'Analisi completata',
-      },
-    };
+function scanPageHtml() {
+  return `<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><style>${wpAdminButtons}</style><style>p{margin:16px 0}</style><body class="wp-admin wp-core-ui"><div class="wrap affilio-admin-page"><div id="affilio-dashboard-root"></div><form id="affilio-scan-all" method="post" action="https://blog.example/wp-admin/admin-post.php"><div data-scan-status role="status"></div><button type="submit" class="button button-primary button-large" data-scan>${scanAction}</button><div data-scan-fallback hidden><button type="button" class="button button-secondary">${scanFallback}</button></div></form></div></body>`;
+}
+
+async function bootDashboardScan(page, respond, extra = {}) {
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+  await page.setViewportSize({ width: extra.width || 1440, height: 900 });
+  await page.setContent(scanPageHtml());
+  await page.evaluate((data) => {
+    window.AffilioData = data;
+  }, {
+    locale: 'it',
+    nonce: 'n',
+    restBase: 'https://blog.example/wp-json/affilio/v1',
+    settingsUrl: 'https://blog.example/wp-admin/admin.php?page=affilio-settings',
+    connectionStatus: { connected: true, state: 'connected' },
+    scanPollMs: extra.scanPollMs,
+    scanTimeoutMs: extra.scanTimeoutMs,
+    i18n: {
+      connected: 'Connesso',
+      notConnected: 'Non connesso.',
+      connectSite: 'Collega il sito in Impostazioni.',
+      analysisInProgress: 'Analisi in corso',
+      analysisComplete: 'Analisi completata',
+      scanFailed,
+      scanTimedOut,
+      scanFallback,
+    },
   });
-  let releaseScan;
-  const scanHeld = new Promise((resolve) => {
-    releaseScan = resolve;
-  });
-  await page.route('**/affilio/v1/setup', async (route) => {
-    const scanning = route.request().method() === 'POST';
-    if (!scanning) await scanHeld;
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        phase: scanning ? 'scanning' : 'complete',
-        scanned: scanning ? 1 : 3,
-        connection: { connected: true },
-      }),
-    });
-  });
+  await page.route('**/affilio/v1/setup**', (route) => respond(route));
   await page.route('**/affilio/v1/proxy', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({ articles: [], programs: [], recommendations: [] }),
   }));
+  await page.route('**/admin-post.php**', (route) => route.abort());
+  await page.addScriptTag({ path: dashboardJs });
+}
+
+function jsonBody(payload, status = 200) {
+  return {
+    status,
+    contentType: 'application/json',
+    body: JSON.stringify(payload),
+  };
+}
+
+test('the dashboard scan button is at least 44px at 390 and 1440', async ({ page }) => {
+  const label = 'Scansiona tutti gli articoli pubblicati su questo sito e aggiorna i punteggi';
+  const html = `<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}</style><style>${wpAdminButtons}</style><style>p{margin:16px 0}</style><body class="wp-admin wp-core-ui"><div class="wrap affilio-admin-page"><form id="affilio-scan-all" method="post" action="https://blog.example/wp-admin/admin-post.php"><div data-scan-status role="status"></div><button type="submit" class="button button-primary button-large" data-scan>${label}</button></form></div></body>`;
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.setContent(html);
+    const button = page.getByRole('button', { name: label, exact: true });
+    const metrics = await button.evaluate((el) => {
+      const style = getComputedStyle(el);
+      const box = el.getBoundingClientRect();
+      return {
+        height: box.height,
+        whiteSpace: style.whiteSpace,
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+      };
+    });
+    expect(metrics.height).toBeGreaterThanOrEqual(44);
+    expect(metrics.whiteSpace).toBe('normal');
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+    const status = page.locator('[data-scan-status]');
+    await expect(status).toHaveAttribute('role', 'status');
+    expect(await status.getAttribute('aria-live')).toBeNull();
+    const gap = await status.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { tag: el.tagName, marginTop: style.marginTop, marginBottom: style.marginBottom };
+    });
+    expect(gap.tag).toBe('DIV');
+    expect(gap.marginTop).toBe('0px');
+    expect(gap.marginBottom).toBe('0px');
+    await noHorizontalOverflow(page);
+  }
+});
+
+test('the dashboard scan stays on the page and shows progress', async ({ page }) => {
+  let releaseScan;
+  const scanHeld = new Promise((resolve) => {
+    releaseScan = resolve;
+  });
+  let rescanPosts = 0;
   let continued = false;
   page.on('request', (request) => {
     if (request.url().includes('admin-post.php') || request.url().includes('affilio_scan_continue')) continued = true;
   });
-  await page.addScriptTag({ path: dashboardJs });
-  await page.getByRole('button', { name: 'Scansiona tutti gli articoli', exact: true }).click();
-  await expect(page.locator('[data-scan-status]')).toHaveText('Analisi in corso');
+  await bootDashboardScan(page, async (route) => {
+    const rescan = route.request().url().includes('/setup/rescan');
+    if (rescan) rescanPosts += 1;
+    if (!rescan) await scanHeld;
+    await route.fulfill(jsonBody({
+      phase: rescan ? 'scanning' : 'complete',
+      scanned: rescan ? 1 : 3,
+      connection: { connected: true },
+    }));
+  }, { scanPollMs: 30 });
+  const button = page.getByRole('button', { name: scanAction, exact: true });
+  await button.click();
+  const status = page.getByRole('status');
+  await expect(status).toHaveText('Analisi in corso');
+  await expect(button).toHaveAttribute('aria-busy', 'true');
+  await expect(status).toHaveAttribute('aria-busy', 'true');
   releaseScan();
-  await expect(page.locator('[data-scan-status]')).toHaveText('Analisi completata');
-  await expect(page.getByRole('button', { name: 'Analisi completata', exact: true })).toBeDisabled();
+  await expect(status).toHaveText('Analisi completata');
+  await expect(button).toBeEnabled();
+  await expect(button).toBeFocused();
+  await expect(button).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByRole('button', { name: 'Analisi completata' })).toHaveCount(0);
+  expect(rescanPosts).toBe(1);
   expect(page.url()).not.toContain('affilio_scan_continue');
   expect(continued).toBe(false);
+});
+
+test('a finished dashboard scan can run again', async ({ page }) => {
+  let posts = 0;
+  await bootDashboardScan(page, async (route) => {
+    const rescan = route.request().url().includes('/setup/rescan');
+    if (!rescan) {
+      await route.fulfill(jsonBody({ phase: 'complete', scanned: posts }));
+      return;
+    }
+    posts += 1;
+    await route.fulfill(jsonBody({ phase: 'complete', scanned: posts }));
+  });
+  const button = page.getByRole('button', { name: scanAction, exact: true });
+  await button.click();
+  await expect(page.getByRole('status')).toHaveText('Analisi completata');
+  await expect(button).toBeEnabled();
+  await expect(button).toBeFocused();
+  await button.click();
+  await expect.poll(() => posts).toBe(2);
+  await expect(button).toHaveText(scanAction);
+  await expect(page.getByRole('button', { name: scanFallback })).toBeHidden();
+});
+
+test('a scan error shows a retry and the form fallback', async ({ page }) => {
+  for (const phase of ['scan_error', 'unknown']) {
+    await bootDashboardScan(page, async (route) => {
+      await route.fulfill(jsonBody({ phase, message: 'boom' }));
+    });
+    const button = page.getByRole('button', { name: scanAction, exact: true });
+    await button.click();
+    const status = page.getByRole('status');
+    await expect(status).toHaveText(scanFailed);
+    await expect(status).not.toHaveText('Analisi in corso');
+    await expect(button).toBeEnabled();
+    await expect(button).toHaveText(scanAction);
+    await expect(button).toHaveAttribute('aria-busy', 'false');
+    const fallback = page.getByRole('button', { name: scanFallback, exact: true });
+    await expect(fallback).toBeVisible();
+    const box = await fallback.boundingBox();
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    const submitted = page.waitForRequest((request) => request.url().includes('admin-post.php'));
+    await fallback.click({ noWaitAfter: true });
+    await submitted;
+  }
+});
+
+test('a non-JSON scan response shows the localized error and restores the button', async ({ page }) => {
+  await bootDashboardScan(page, async (route) => {
+    await route.fulfill({ status: 500, contentType: 'text/html', body: '<html>nope</html>' });
+  });
+  const button = page.getByRole('button', { name: scanAction, exact: true });
+  await button.click();
+  await expect(page.getByRole('status')).toHaveText(scanFailed);
+  await expect(button).toBeEnabled();
+  await expect(button).toHaveText(scanAction);
+  await expect(page.getByRole('button', { name: scanFallback, exact: true })).toBeVisible();
+  await expect(page.locator('#affilio-dashboard-root')).not.toContainText('nope');
+});
+
+test('a forbidden scan shows the server message', async ({ page }) => {
+  await bootDashboardScan(page, async (route) => {
+    await route.fulfill(jsonBody({ code: 'affilio_forbidden', message: 'Serve un amministratore.' }, 403));
+  });
+  const button = page.getByRole('button', { name: scanAction, exact: true });
+  await button.click();
+  await expect(page.getByRole('status')).toHaveText('Serve un amministratore.');
+  await expect(button).toBeEnabled();
+  await expect(button).toHaveText(scanAction);
+  await expect(page.getByRole('button', { name: scanFallback, exact: true })).toBeVisible();
+});
+
+test('a scan that is already running keeps polling', async ({ page }) => {
+  let gets = 0;
+  await bootDashboardScan(page, async (route) => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill(jsonBody({ code: 'affilio_busy', message: 'La configurazione è già in corso. Riprova tra poco.' }, 409));
+      return;
+    }
+    gets += 1;
+    await route.fulfill(jsonBody({ phase: 'complete', scanned: 2 }));
+  }, { scanPollMs: 30 });
+  const button = page.getByRole('button', { name: scanAction, exact: true });
+  await button.click();
+  await expect(page.getByRole('status')).toHaveText('Analisi completata');
+  expect(gets).toBeGreaterThan(0);
+  await expect(page.getByRole('status')).not.toContainText('già in corso');
+  await expect(button).toBeEnabled();
+  await expect(button).toHaveText(scanAction);
+});
+
+test('a scan that runs too long shows an error and the form fallback', async ({ page }) => {
+  await bootDashboardScan(page, async (route) => {
+    await route.fulfill(jsonBody({ phase: 'scanning', scanned: 1 }));
+  }, { scanPollMs: 20, scanTimeoutMs: 80 });
+  const button = page.getByRole('button', { name: scanAction, exact: true });
+  await button.click();
+  await expect(page.getByRole('status')).toHaveText(scanTimedOut, { timeout: 5000 });
+  await expect(button).toBeEnabled();
+  await expect(button).toHaveText(scanAction);
+  await expect(button).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByRole('button', { name: scanFallback, exact: true })).toBeVisible();
+});
+
+test('a double click starts one scan', async ({ page }) => {
+  let posts = 0;
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  await bootDashboardScan(page, async (route) => {
+    if (route.request().url().includes('/setup/rescan')) {
+      posts += 1;
+      await gate;
+      await route.fulfill(jsonBody({ phase: 'complete', scanned: 1 }));
+      return;
+    }
+    await route.fulfill(jsonBody({ phase: 'complete', scanned: 1 }));
+  });
+  await page.evaluate(() => {
+    const form = document.getElementById('affilio-scan-all');
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  });
+  await expect.poll(() => posts).toBe(1);
+  release();
+  await expect(page.getByRole('status')).toHaveText('Analisi completata');
+  expect(posts).toBe(1);
 });
 
 test('settings and dashboard buttons are at least 44px at 390px', async ({ page }) => {

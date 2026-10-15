@@ -147,13 +147,23 @@
 }
 
 /* The Dashboard scan button sits outside #affilio-dashboard-root. Keep it 44px at every width. */
-.wp-core-ui .affilio-admin-page #affilio-scan-all .button.button-large {
+.wp-core-ui .affilio-admin-page #affilio-scan-all .button.button-large,
+.wp-core-ui .affilio-admin-page #affilio-scan-all .button.button-secondary {
   box-sizing: border-box;
   height: auto;
+  max-width: 100%;
   min-height: 44px;
-  padding-top: 0;
-  padding-bottom: 0;
-  line-height: 42px;
+  padding: 8px 14px;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+#affilio-scan-all [data-scan-status]:empty {
+  margin: 0;
+}
+
+#affilio-scan-all [data-scan-status]:not(:empty) {
+  margin: 8px 0;
 }
 
 /* WordPress sets .wp-core-ui .button.button-large to 40px below 782px.
