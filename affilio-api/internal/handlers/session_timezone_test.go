@@ -122,53 +122,67 @@ WHERE cv.provider_event_id='evt_zone_later' AND le.kind='commission'`).Scan(&cle
 	}
 }
 
-// TestTimestamptzSurvivesRomeDSTFold writes the two Europe/Rome instants that
-// share the wall clock 02:30 on 25 Oct 2026 and reads each one back. The fall
-// back from CEST to CET makes that local time ambiguous for timestamp without
-// time zone.
+// TestTimestamptzSurvivesRomeDSTFold stores the naive UTC faces 00:30 and
+// 01:30 on 25 Oct 2026, converts them, and reads them in a Europe/Rome
+// session. Both faces are 02:30 locally, one in CEST and one in CET. A USING
+// clause that read those faces in Rome would not return these instants.
 func TestTimestamptzSurvivesRomeDSTFold(t *testing.T) {
-	db, cleanup := setupTestDBInZone(t, "Europe/Rome")
+	db, cleanup := setupTestDBThrough(t, "UTC", "037_reserved_sale_events.sql")
 	defer cleanup()
 	before := time.Date(2026, 10, 25, 0, 30, 0, 0, time.UTC) // 02:30 CEST
 	after := time.Date(2026, 10, 25, 1, 30, 0, 0, time.UTC)  // 02:30 CET
-	assertFoldInstant(t, db, "clicks", "clicked_at", `INSERT INTO clicks(clicked_at) VALUES ($1::timestamptz) RETURNING id`, before, after)
-	assertFoldInstant(t, db, "conversions", "occurred_at", `INSERT INTO conversions(provider, provider_event_id, kind, amount, occurred_at) VALUES ('stripe', $1, 'sale', 10, $2::timestamptz) RETURNING id`, before, after)
-	assertFoldInstant(t, db, "ledger_entries", "clears_at", `INSERT INTO ledger_entries(kind, amount, clears_at) VALUES ('commission', 1, $1::timestamptz) RETURNING id`, before, after)
-}
-
-func assertFoldInstant(t *testing.T, db *database.DB, table, column, insert string, before, after time.Time) {
-	t.Helper()
-	gotBefore := insertAndReadInstant(t, db, table, column, insert, before, "fold-before-"+table)
-	gotAfter := insertAndReadInstant(t, db, table, column, insert, after, "fold-after-"+table)
-	if !gotBefore.Equal(before) {
-		t.Fatalf("%s.%s before fold: got %s want %s", table, column, gotBefore.Format(time.RFC3339Nano), before.Format(time.RFC3339Nano))
+	rows := []struct {
+		table, column, beforeID, afterID string
+	}{
+		{
+			table: "clicks", column: "clicked_at",
+			beforeID: insertReturningID(t, db, `INSERT INTO clicks (clicked_at) VALUES ('2026-10-25 00:30:00') RETURNING id`),
+			afterID:  insertReturningID(t, db, `INSERT INTO clicks (clicked_at) VALUES ('2026-10-25 01:30:00') RETURNING id`),
+		},
+		{
+			table: "conversions", column: "occurred_at",
+			beforeID: insertReturningID(t, db, `INSERT INTO conversions (provider, provider_event_id, kind, amount, occurred_at) VALUES ('stripe', 'fold-face-before', 'sale', 10, '2026-10-25 00:30:00') RETURNING id`),
+			afterID:  insertReturningID(t, db, `INSERT INTO conversions (provider, provider_event_id, kind, amount, occurred_at) VALUES ('stripe', 'fold-face-after', 'sale', 10, '2026-10-25 01:30:00') RETURNING id`),
+		},
+		{
+			table: "ledger_entries", column: "clears_at",
+			beforeID: insertReturningID(t, db, `INSERT INTO ledger_entries (kind, amount, clears_at) VALUES ('commission', 1, '2026-10-25 00:30:00') RETURNING id`),
+			afterID:  insertReturningID(t, db, `INSERT INTO ledger_entries (kind, amount, clears_at) VALUES ('commission', 1, '2026-10-25 01:30:00') RETURNING id`),
+		},
 	}
-	if !gotAfter.Equal(after) {
-		t.Fatalf("%s.%s after fold: got %s want %s", table, column, gotAfter.Format(time.RFC3339Nano), after.Format(time.RFC3339Nano))
+	if _, err := db.Pool.Exec(context.Background(), readMigration(t, "038_timestamptz_instants.sql")); err != nil {
+		t.Fatalf("apply 038: %v", err)
 	}
-	if gotBefore.Equal(gotAfter) || gotAfter.Sub(gotBefore) != time.Hour {
-		t.Fatalf("%s.%s collapsed the fold: %s and %s", table, column, gotBefore.Format(time.RFC3339Nano), gotAfter.Format(time.RFC3339Nano))
-	}
-}
-
-func insertAndReadInstant(t *testing.T, db *database.DB, table, column, insert string, instant time.Time, label string) time.Time {
-	t.Helper()
-	var id string
-	var err error
-	if strings.Contains(insert, "$2") {
-		err = db.Pool.QueryRow(context.Background(), insert, label, instant).Scan(&id)
-	} else {
-		err = db.Pool.QueryRow(context.Background(), insert, instant).Scan(&id)
-	}
+	conn, err := db.Pool.Acquire(context.Background())
 	if err != nil {
-		t.Fatalf("insert %s: %v", table, err)
-	}
-	var got time.Time
-	query := "SELECT " + column + " FROM " + table + " WHERE id=$1"
-	if err = db.Pool.QueryRow(context.Background(), query, id).Scan(&got); err != nil {
 		t.Fatal(err)
 	}
-	return got
+	defer conn.Release()
+	if _, err = conn.Exec(context.Background(), `SET TIME ZONE 'Europe/Rome'`); err != nil {
+		t.Fatal(err)
+	}
+	var zone string
+	if err = conn.QueryRow(context.Background(), `SHOW timezone`).Scan(&zone); err != nil {
+		t.Fatal(err)
+	}
+	if zone != "Europe/Rome" {
+		t.Fatalf("session timezone %s", zone)
+	}
+	for _, row := range rows {
+		gotBefore := scanInstantOn(t, conn, row.table, row.column, row.beforeID)
+		gotAfter := scanInstantOn(t, conn, row.table, row.column, row.afterID)
+		if !gotBefore.Equal(before) || !gotAfter.Equal(after) {
+			t.Fatalf("%s.%s instants %s and %s, want %s and %s", row.table, row.column, gotBefore.UTC().Format(time.RFC3339Nano), gotAfter.UTC().Format(time.RFC3339Nano), before.Format(time.RFC3339Nano), after.Format(time.RFC3339Nano))
+		}
+		if gotBefore.Equal(gotAfter) || gotAfter.Sub(gotBefore) != time.Hour {
+			t.Fatalf("%s.%s collapsed the fold: %s and %s", row.table, row.column, gotBefore.UTC().Format(time.RFC3339Nano), gotAfter.UTC().Format(time.RFC3339Nano))
+		}
+		wallBefore := romeWall(t, conn, row.table, row.column, row.beforeID)
+		wallAfter := romeWall(t, conn, row.table, row.column, row.afterID)
+		if wallBefore != "2026-10-25 02:30:00" || wallAfter != "2026-10-25 02:30:00" {
+			t.Fatalf("%s.%s Rome walls %s and %s, want both 2026-10-25 02:30:00", row.table, row.column, wallBefore, wallAfter)
+		}
+	}
 }
 
 func assertColumnType(t *testing.T, db *database.DB, table, column, want string) {

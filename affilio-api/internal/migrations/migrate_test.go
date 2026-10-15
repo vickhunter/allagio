@@ -44,6 +44,16 @@ func TestMigrationHistoryAndConcurrentStartup(t *testing.T) {
 	if err = pool.QueryRow(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil || count != 38 {
 		t.Fatalf("history: %d %v", count, err)
 	}
+	for _, col := range []struct{ table, column string }{
+		{"clicks", "clicked_at"},
+		{"conversions", "occurred_at"},
+		{"ledger_entries", "clears_at"},
+	} {
+		var typ string
+		if err = pool.QueryRow(ctx, `SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND column_name=$2`, col.table, col.column).Scan(&typ); err != nil || typ != "timestamp with time zone" {
+			t.Fatalf("%s.%s after Apply: %s %v", col.table, col.column, typ, err)
+		}
+	}
 	if err = Apply(ctx, pool); err != nil {
 		t.Fatal("repeat migration failed", err)
 	}

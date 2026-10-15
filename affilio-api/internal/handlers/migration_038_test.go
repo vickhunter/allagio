@@ -3,12 +3,15 @@ package handlers
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"affilio-api/internal/database"
+
+	"github.com/jackc/pgx/v5"
 )
 
 func TestMigration038ConvertsStoredUTCFaces(t *testing.T) {
@@ -137,6 +140,64 @@ func TestRetentionCohortReadsArticleFaceAsUTCUnderRome(t *testing.T) {
 	}
 }
 
+// TestMigration038PsqlFileLeavesNaiveColumnsUnderRome runs the file the way
+// psql -f does: each statement autocommits, and a failed statement does not
+// stop the next one. The guard has to share a transaction with the ALTERs,
+// or the columns still change.
+func TestMigration038PsqlFileLeavesNaiveColumnsUnderRome(t *testing.T) {
+	db, cleanup := setupTestDBThrough(t, "UTC", "037_reserved_sale_events.sql")
+	defer cleanup()
+	runMigrationFileLikePsql(t, "Europe/Rome", "038_timestamptz_instants.sql")
+	assertColumnType(t, db, "clicks", "clicked_at", "timestamp without time zone")
+	assertColumnType(t, db, "conversions", "occurred_at", "timestamp without time zone")
+	assertColumnType(t, db, "ledger_entries", "clears_at", "timestamp without time zone")
+}
+
+func TestMigration038DownPsqlFileLeavesTimestamptzUnderRome(t *testing.T) {
+	db, cleanup := setupTestDBThrough(t, "UTC", "038_timestamptz_instants.sql")
+	defer cleanup()
+	assertColumnType(t, db, "clicks", "clicked_at", "timestamp with time zone")
+	runMigrationFileLikePsql(t, "Europe/Rome", filepath.Join("down", "038_timestamptz_instants.sql"))
+	assertColumnType(t, db, "clicks", "clicked_at", "timestamp with time zone")
+	assertColumnType(t, db, "conversions", "occurred_at", "timestamp with time zone")
+	assertColumnType(t, db, "ledger_entries", "clears_at", "timestamp with time zone")
+}
+
+func TestCohortWindowUsesUTCArticleFaceUnderRome(t *testing.T) {
+	db, cleanup := setupTestDBInZone(t, "Europe/Rome")
+	defer cleanup()
+	siteID := createTestSite(t, db, "site-key-cohort-window", "cohort-window.example.com", "Cohort Window")
+	// Thirty minutes inside a one-day UTC window. Europe/Rome is at least an
+	// hour ahead, so the same face is outside the window when the session
+	// casts the naive timestamp.
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO articles (site_id, wp_post_id, title, created_at) VALUES ($1, 7, 'boundary', (NOW() AT TIME ZONE 'UTC') - INTERVAL '1 day' + INTERVAL '30 minutes')`, siteID); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.ListCohortMetrics(context.Background(), siteID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Articles != 1 {
+		t.Fatalf("cohort metrics %#v, want the article inside the UTC window", rows)
+	}
+}
+
+func TestRetentionWindowUsesUTCArticleFaceUnderRome(t *testing.T) {
+	db, cleanup := setupTestDBInZone(t, "Europe/Rome")
+	defer cleanup()
+	siteID := createTestSite(t, db, "site-key-retention-window", "retention-window.example.com", "Retention Window")
+	if _, err := db.Pool.Exec(context.Background(), `INSERT INTO articles (site_id, wp_post_id, title, created_at) VALUES ($1, 8, 'boundary', (NOW() AT TIME ZONE 'UTC') - INTERVAL '1 day' + INTERVAL '30 minutes')`, siteID); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.ListRetentionCohorts(context.Background(), siteID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Articles != 1 {
+		t.Fatalf("retention %#v, want the article inside the UTC window", rows)
+	}
+}
+
 func insertReturningID(t *testing.T, db *database.DB, query string) string {
 	t.Helper()
 	var id string
@@ -172,6 +233,182 @@ func scanInstant(t *testing.T, db *database.DB, table, column, id string) time.T
 	var got time.Time
 	query := "SELECT " + column + " FROM " + table + " WHERE id=$1"
 	if err := db.Pool.QueryRow(context.Background(), query, id).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+func runMigrationFileLikePsql(t *testing.T, zone, name string) {
+	t.Helper()
+	path := filepath.Join("..", "migrations", name)
+	if _, err := exec.LookPath("psql"); err == nil {
+		raw := strings.TrimSpace(os.Getenv("AFFILIO_TEST_DATABASE_URL"))
+		// libpq rejects TimeZone as a URI parameter. PGOPTIONS sets it
+		// before the script, which is the session psql -f uses.
+		cmd := exec.Command("psql", keywordDSN(t, raw), "-f", path)
+		cmd.Env = append(os.Environ(), "PGOPTIONS=-c TimeZone="+zone)
+		// Plain psql -f, not ON_ERROR_STOP and not -1. Each statement
+		// autocommits, and psql keeps going after an error.
+		out, err := cmd.CombinedOutput()
+		t.Logf("psql %s: %s", name, out)
+		if err != nil {
+			t.Fatalf("psql did not run %s: %v\n%s", name, err, out)
+		}
+		return
+	}
+	script, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Connect(context.Background(), mustSessionDSN(t, zone))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, stmt := range splitSQLStatements(string(script)) {
+		if _, err := db.Pool.Exec(context.Background(), stmt); err != nil {
+			t.Logf("statement error: %v", err)
+		}
+	}
+}
+
+func mustSessionDSN(t *testing.T, zone string) string {
+	t.Helper()
+	dsn, err := withSessionTimeZone(strings.TrimSpace(os.Getenv("AFFILIO_TEST_DATABASE_URL")), zone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dsn
+}
+
+// splitSQLStatements splits a script on semicolons outside quotes and
+// dollar-quotes, the same cuts psql -f makes.
+func splitSQLStatements(script string) []string {
+	var stmts []string
+	var b strings.Builder
+	dollar := ""
+	inSingle := false
+	inLineComment := false
+	inBlockComment := false
+	for i := 0; i < len(script); i++ {
+		c := script[i]
+		if inLineComment {
+			b.WriteByte(c)
+			if c == '\n' {
+				inLineComment = false
+			}
+			continue
+		}
+		if inBlockComment {
+			b.WriteByte(c)
+			if c == '*' && i+1 < len(script) && script[i+1] == '/' {
+				b.WriteByte('/')
+				i++
+				inBlockComment = false
+			}
+			continue
+		}
+		if dollar != "" {
+			if strings.HasPrefix(script[i:], dollar) {
+				b.WriteString(dollar)
+				i += len(dollar) - 1
+				dollar = ""
+				continue
+			}
+			b.WriteByte(c)
+			continue
+		}
+		if inSingle {
+			b.WriteByte(c)
+			if c == '\'' {
+				if i+1 < len(script) && script[i+1] == '\'' {
+					b.WriteByte('\'')
+					i++
+					continue
+				}
+				inSingle = false
+			}
+			continue
+		}
+		if c == '-' && i+1 < len(script) && script[i+1] == '-' {
+			b.WriteString("--")
+			i++
+			inLineComment = true
+			continue
+		}
+		if c == '/' && i+1 < len(script) && script[i+1] == '*' {
+			b.WriteString("/*")
+			i++
+			inBlockComment = true
+			continue
+		}
+		if c == '\'' {
+			b.WriteByte(c)
+			inSingle = true
+			continue
+		}
+		if c == '$' {
+			tag, ok := dollarTagAt(script, i)
+			if ok {
+				dollar = tag
+				b.WriteString(tag)
+				i += len(tag) - 1
+				continue
+			}
+		}
+		if c == ';' {
+			stmt := strings.TrimSpace(b.String())
+			if stmt != "" {
+				stmts = append(stmts, stmt)
+			}
+			b.Reset()
+			continue
+		}
+		b.WriteByte(c)
+	}
+	if stmt := strings.TrimSpace(b.String()); stmt != "" {
+		stmts = append(stmts, stmt)
+	}
+	return stmts
+}
+
+func dollarTagAt(script string, i int) (string, bool) {
+	if i >= len(script) || script[i] != '$' {
+		return "", false
+	}
+	j := i + 1
+	for j < len(script) {
+		c := script[j]
+		if c == '$' {
+			return script[i : j+1], true
+		}
+		if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && (c < '0' || c > '9') && c != '_' {
+			return "", false
+		}
+		j++
+	}
+	return "", false
+}
+
+func scanInstantOn(t *testing.T, conn interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}, table, column, id string) time.Time {
+	t.Helper()
+	var got time.Time
+	query := "SELECT " + column + " FROM " + table + " WHERE id=$1"
+	if err := conn.QueryRow(context.Background(), query, id).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	return got
+}
+
+func romeWall(t *testing.T, conn interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}, table, column, id string) string {
+	t.Helper()
+	var got string
+	query := "SELECT to_char(" + column + " AT TIME ZONE 'Europe/Rome', 'YYYY-MM-DD HH24:MI:SS') FROM " + table + " WHERE id=$1"
+	if err := conn.QueryRow(context.Background(), query, id).Scan(&got); err != nil {
 		t.Fatal(err)
 	}
 	return got
