@@ -325,8 +325,9 @@ func TestGenerateContentReusesCleanAmpersandAndHyphenatedSlug(t *testing.T) {
 	if textOut != firstBlurb || strings.Contains(textOut, secondBlurb) {
 		t.Fatalf("clean preview was not reused: %s", reused.Body.String())
 	}
-	if !strings.Contains(htmlOut, "H&amp;M") || !strings.Contains(htmlOut, link) || !strings.Contains(htmlOut, firstBlurb) {
-		t.Fatalf("reused html lost the escaped name or slug: %s", htmlOut)
+	tracked := "/v1/go/" + recID
+	if !strings.Contains(htmlOut, "H&amp;M") || !strings.Contains(htmlOut, tracked) || !strings.Contains(htmlOut, firstBlurb) || strings.Contains(htmlOut, link) {
+		t.Fatalf("reused html lost the escaped name or tracked link: %s", htmlOut)
 	}
 }
 
