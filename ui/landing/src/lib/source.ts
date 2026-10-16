@@ -1,11 +1,14 @@
 import { useState } from 'react'
 
-// Same allow-list as the owner record. "direct" is the fallback and is not copied onto links.
-const ALLOWED = new Set(['chatgpt', 'claude', 'cursor', 'grok', 'x', 'community', 'cli', 'mcp'])
+// A landing tag is a short slug from /from/<tag>, ?source=, or the or_source cookie.
+// "direct" is the fallback and is not copied onto links. Owner signup still keeps
+// its own allow-list; this one only has to survive a strict-origin referrer.
+const TAG = /^[a-z0-9][a-z0-9_-]{0,63}$/
 
 export function normalizeSource(raw: string | null | undefined) {
   const value = String(raw || '').trim().toLowerCase()
-  return ALLOWED.has(value) ? value : ''
+  if (value === 'direct' || !TAG.test(value)) return ''
+  return value
 }
 
 function readCookie(name: string) {

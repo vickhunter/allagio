@@ -34,6 +34,7 @@ type HostedHandler struct {
 	Assessments     *AssessmentsHandler
 	DemoCheckoutURL string
 	ClaimsCheck     string
+	EventLimiter    *IPRateLimiter
 }
 
 func ValidatePublicURL(raw string) error {
@@ -75,7 +76,11 @@ func (h *HostedHandler) cookie(c *gin.Context, name, value string, maxAge int) {
 }
 
 func (h *HostedHandler) Mount(r *gin.Engine) {
+	if h.EventLimiter == nil {
+		h.EventLimiter = NewIPRateLimiter(60, time.Minute)
+	}
 	public := r.Group("", h.headers)
+	public.POST("/api/events", h.RecordLandingEvent)
 	h.mountDemo(public)
 	public.GET("/.well-known/oauth-protected-resource", h.resourceMetadata)
 	public.GET("/.well-known/oauth-protected-resource/mcp", h.resourceMetadata)

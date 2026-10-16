@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"affilio-api/internal/database"
@@ -108,6 +109,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 			c.FileAttachment(file, "distributoor-setup-0.1.0.tgz")
 		})
 		public.GET("/downloads/affilio.zip", h.DownloadWordPress)
+		public.HEAD("/downloads/affilio.zip", h.DownloadWordPress)
 	}
 }
 
@@ -143,59 +145,69 @@ func (h *HostedHandler) landing(c *gin.Context, name string) {
 	}
 	_, installerErr := os.Stat(filepath.Join(h.DownloadsPath, "distributoor-setup-0.1.0.tgz"))
 	_, pluginErr := os.Stat(filepath.Join(h.DownloadsPath, "affilio.zip"))
-	c.Header("Content-Type", "text/html; charset=utf-8")
-	if err = page.Execute(c.Writer, gin.H{"BaseURL": h.BaseURL, "InstallCommand": h.installCommand(), "InstallerReady": h.DownloadsPath != "" && installerErr == nil, "PluginReady": h.DownloadsPath != "" && pluginErr == nil}); err != nil {
+	var buf bytes.Buffer
+	if err = page.Execute(&buf, gin.H{"BaseURL": h.BaseURL, "InstallCommand": h.installCommand(), "InstallerReady": h.DownloadsPath != "" && installerErr == nil, "PluginReady": h.DownloadsPath != "" && pluginErr == nil}); err != nil {
 		c.Abort()
+		return
 	}
+	c.Data(http.StatusOK, "text/html; charset=utf-8", stampLandingLinks(buf.Bytes(), landingSourceFrom(c)))
 }
 
 func (h *HostedHandler) DownloadWordPress(c *gin.Context) {
-	if h.DownloadsPath == "" {
-		c.Status(503)
+	payload, code := h.wordpressZip()
+	if code != http.StatusOK {
+		c.Status(code)
 		return
+	}
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", `attachment; filename="affilio.zip"`)
+	c.Header("Content-Length", strconv.Itoa(len(payload)))
+	if c.Request.Method == http.MethodHead {
+		c.Status(http.StatusOK)
+		return
+	}
+	c.Status(http.StatusOK)
+	_, _ = c.Writer.Write(payload)
+}
+
+func (h *HostedHandler) wordpressZip() ([]byte, int) {
+	if h.DownloadsPath == "" {
+		return nil, http.StatusServiceUnavailable
 	}
 	source, err := zip.OpenReader(filepath.Join(h.DownloadsPath, "affilio.zip"))
 	if err != nil {
-		c.Status(503)
-		return
+		return nil, http.StatusServiceUnavailable
 	}
 	defer source.Close()
 	var output bytes.Buffer
 	writer := zip.NewWriter(&output)
 	for _, file := range source.File {
 		if file.UncompressedSize64 > 10<<20 {
-			c.Status(500)
-			return
+			return nil, http.StatusInternalServerError
 		}
 		input, err := file.Open()
 		if err != nil {
-			c.Status(500)
-			return
+			return nil, http.StatusInternalServerError
 		}
 		data, err := io.ReadAll(io.LimitReader(input, 10<<20))
 		input.Close()
 		if err != nil {
-			c.Status(500)
-			return
+			return nil, http.StatusInternalServerError
 		}
 		data = rewriteDownloadedPlugin(file.Name, data, h.BaseURL)
 		header := &zip.FileHeader{Name: file.Name, Method: zip.Deflate, Modified: file.Modified}
 		entry, err := writer.CreateHeader(header)
 		if err != nil {
-			c.Status(500)
-			return
+			return nil, http.StatusInternalServerError
 		}
 		if _, err = entry.Write(data); err != nil {
-			c.Status(500)
-			return
+			return nil, http.StatusInternalServerError
 		}
 	}
 	if err = writer.Close(); err != nil {
-		c.Status(500)
-		return
+		return nil, http.StatusInternalServerError
 	}
-	c.Header("Content-Disposition", `attachment; filename="affilio.zip"`)
-	c.Data(200, "application/zip", output.Bytes())
+	return output.Bytes(), http.StatusOK
 }
 
 func rewriteDownloadedPlugin(name string, data []byte, baseURL string) []byte {
