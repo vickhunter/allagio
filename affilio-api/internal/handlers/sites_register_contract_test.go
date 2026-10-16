@@ -66,7 +66,7 @@ func TestSitesRegisterAcceptsPluginContract(t *testing.T) {
 	if domain != "blog.example" || name != "" {
 		t.Fatalf("stored domain %q name %q", domain, name)
 	}
-	if strings.Contains(row, "0.1.29") {
+	if strings.Contains(row, "0.1.31") {
 		t.Fatalf("plugin_version was stored without a column: %s", row)
 	}
 
