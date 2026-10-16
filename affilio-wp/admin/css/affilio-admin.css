@@ -1,5 +1,6 @@
 .affilio-admin-page {
-  max-width: 1180px;
+  max-width: min(1180px, 100%);
+  box-sizing: border-box;
 }
 
 #affilio-dashboard-root.affilio-dashboard-app {
@@ -78,6 +79,115 @@
 
 .affilio-status-message {
   color: #3c434a;
+}
+
+.affilio-dashboard-connection {
+  max-width: 100%;
+}
+
+.affilio-dashboard-connection .affilio-status-message {
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.affilio-next-step {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 44px;
+  min-width: 44px;
+  max-width: 100%;
+  padding: 8px 2px;
+  color: #1d2327;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: background-color 150ms linear, color 150ms linear, border-color 150ms linear, outline-color 150ms linear;
+}
+
+.affilio-next-step:focus {
+  outline: 2px solid #1e6f31;
+  outline-offset: 2px;
+}
+
+#affilio-dashboard-root,
+#affilio-onboarding-root {
+  max-width: 100%;
+}
+
+#affilio-dashboard-root .button {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: auto;
+  max-width: 100%;
+  min-height: 44px;
+  white-space: normal;
+  transition: background-color 150ms linear, color 150ms linear, border-color 150ms linear, outline-color 150ms linear;
+}
+
+#affilio-dashboard-root .button:focus {
+  outline: 2px solid #1e6f31;
+  outline-offset: 2px;
+}
+
+#affilio-onboarding-root .button {
+  box-sizing: border-box;
+  height: auto;
+  max-width: 100%;
+  min-height: 44px;
+  white-space: normal;
+  transition: background-color 150ms linear, color 150ms linear, border-color 150ms linear, outline-color 150ms linear;
+}
+
+#affilio-onboarding-root .button:focus {
+  outline: 2px solid #1e6f31;
+  outline-offset: 2px;
+}
+
+/* The Dashboard scan button sits outside #affilio-dashboard-root. Keep it 44px at every width. */
+.wp-core-ui .affilio-admin-page #affilio-scan-all .button.button-large,
+.wp-core-ui .affilio-admin-page #affilio-scan-all .button.button-secondary {
+  box-sizing: border-box;
+  height: auto;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 8px 14px;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+#affilio-scan-all [data-scan-status]:empty {
+  margin: 0;
+}
+
+#affilio-scan-all [data-scan-status]:not(:empty) {
+  margin: 8px 0;
+}
+
+/* WordPress sets .wp-core-ui .button.button-large to 40px below 782px.
+   Prefix .wp-core-ui so this wins on Affilio screens even when buttons.css loads later. */
+@media screen and (max-width: 782px) {
+  .wp-core-ui .affilio-admin-page .button.button,
+  .wp-core-ui .affilio-admin-page .button.button-primary,
+  .wp-core-ui .affilio-admin-page .button.button-secondary,
+  .wp-core-ui .affilio-admin-page .button.button-large {
+    box-sizing: border-box;
+    height: auto;
+    min-height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .affilio-next-step,
+  #affilio-onboarding-root .button,
+  #affilio-dashboard-root .button {
+    transition: none;
+  }
 }
 
 .affilio-cta-row {
@@ -690,6 +800,12 @@
 @media (max-width: 960px) {
   .affilio-inline-form {
     grid-template-columns: 1fr;
+  }
+
+  #affilio-articles-table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
   }
 
   .affilio-settings-form input.regular-text {

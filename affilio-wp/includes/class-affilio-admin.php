@@ -116,7 +116,18 @@ class Affilio_Admin {
         if ($hook === 'affilio_page_affilio-settings') {
             wp_enqueue_style('affilio-admin', AFFILIO_PLUGIN_URL . 'admin/css/affilio-admin.css', array(), AFFILIO_VERSION);
             wp_enqueue_script('affilio-onboarding', AFFILIO_PLUGIN_URL . 'admin/build/onboarding.js', array(), AFFILIO_VERSION, true);
-            wp_localize_script('affilio-onboarding', 'AffilioSetup', array('restBase' => rest_url('affilio/v1'), 'nonce' => wp_create_nonce('wp_rest'), 'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(), 'serviceUrl' => Affilio_API::resolve_base_url()));
+            wp_localize_script('affilio-onboarding', 'AffilioSetup', array(
+                'restBase' => rest_url('affilio/v1'),
+                'nonce' => wp_create_nonce('wp_rest'),
+                'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
+                'serviceUrl' => Affilio_API::resolve_base_url(),
+                'copy' => array(
+                    'startAnalysis' => __('Start analysis', 'affilio'),
+                    'connectedStatus' => __('Your site is connected.', 'affilio'),
+                    'analysisInProgress' => __('Analysis in progress', 'affilio'),
+                    'analysisComplete' => __('Analysis complete', 'affilio'),
+                ),
+            ));
             return;
         }
         $affilio_hooks = array('toplevel_page_affilio', 'affilio_page_affilio-discovery', 'affilio_page_affilio-analytics', 'affilio_page_affilio-marketplace', 'affilio_page_affilio-earnings');
@@ -154,6 +165,7 @@ class Affilio_Admin {
     public function render_dashboard() {
         $status = $this->api->get_connection_status();
         echo '<div class="wrap affilio-admin-page">';
+        $this->render_dashboard_connection($status);
         echo '<div id="affilio-dashboard-root"></div>';
         if (!$status['connected']) {
             echo '<noscript><div class="affilio-panel affilio-panel-warning">';
@@ -186,10 +198,12 @@ class Affilio_Admin {
                 echo '</form>';
             }
         }
-        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+        echo '<form id="affilio-scan-all" method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
         wp_nonce_field('affilio_scan_all');
         echo '<input type="hidden" name="action" value="affilio_scan_all">';
-        submit_button($this->t('Scan All Posts', 'Scansiona tutti gli articoli'));
+        echo '<div data-scan-status role="status"></div>';
+        echo '<button type="submit" class="button button-primary button-large" data-scan>' . esc_html($this->t('Scan All Posts', 'Scansiona tutti gli articoli')) . '</button>';
+        echo '<div data-scan-fallback hidden><button type="button" class="button button-secondary" data-scan-fallback>' . esc_html($this->t('Send the scan form', 'Invia il modulo di scansione')) . '</button></div>';
         echo '</form>';
         echo '</div>';
         echo '</div>';
@@ -299,7 +313,16 @@ class Affilio_Admin {
             echo '<span class="affilio-key-hint">' . esc_html($key_hint) . '</span>';
         }
         echo '</div>';
-        echo '<div id="affilio-onboarding-root"></div>';
+        echo '<div id="affilio-onboarding-root">';
+        if (!empty($status['connected'])) {
+            echo '<p data-progress role="status">' . esc_html(__('Your site is connected.', 'affilio')) . '</p>';
+            echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+            wp_nonce_field('affilio_scan_all');
+            echo '<input type="hidden" name="action" value="affilio_scan_all" />';
+            echo '<button type="submit" class="button button-primary button-large" data-connect>' . esc_html(__('Start analysis', 'affilio')) . '</button>';
+            echo '</form>';
+        }
+        echo '</div>';
         echo '<details><summary>' . esc_html($this->t('Existing connection or manual settings', 'Collegamento esistente o impostazioni manuali')) . '</summary>';
 
         echo '<form class="affilio-settings-form" method="post">';
@@ -454,7 +477,39 @@ class Affilio_Admin {
             'settingsUrl' => admin_url('admin.php?page=affilio-settings'),
             'connectionStatus' => $this->api->get_connection_status(),
             'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
+            'i18n' => array(
+                'connected' => __('Connected', 'affilio'),
+                'notConnected' => __('Not connected.', 'affilio'),
+                'connectSite' => __('Connect your site in Settings.', 'affilio'),
+                'analysisInProgress' => $this->t('Analysis in progress', 'Analisi in corso'),
+                'analysisComplete' => $this->t('Analysis complete', 'Analisi completata'),
+                'scanFailed' => $this->t('Analysis failed. Retry, or send the scan form.', 'Analisi non riuscita. Riprova, oppure invia il modulo di scansione.'),
+                'scanTimedOut' => $this->t('Analysis is taking too long. Retry, or send the scan form.', 'L\'analisi sta impiegando troppo tempo. Riprova, oppure invia il modulo di scansione.'),
+                'scanFallback' => $this->t('Send the scan form', 'Invia il modulo di scansione'),
+            ),
         );
+    }
+
+    private function render_dashboard_connection($status) {
+        echo '<div id="affilio-dashboard-connection" class="affilio-status-row affilio-dashboard-connection" data-connection-status>';
+        if (!empty($status['connected'])) {
+            $state = $this->connection_state_class(isset($status['state']) ? $status['state'] : 'connected');
+            echo '<span class="affilio-status-pill affilio-status-' . esc_attr($state) . '">' . esc_html(__('Connected', 'affilio')) . '</span>';
+            echo '</div>';
+            return;
+        }
+        echo '<p class="affilio-status-message">' . esc_html(__('Not connected.', 'affilio')) . ' ';
+        echo '<a class="affilio-next-step" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html(__('Connect your site in Settings.', 'affilio')) . '</a>';
+        echo '</p></div>';
+    }
+
+    private function connection_state_class($state) {
+        $allowed = array('connected', 'missing_key', 'missing_url', 'invalid_key', 'api_error', 'network_error', 'wrong_api_url', 'starting', 'unknown_error');
+        $state = (string) $state;
+        if (!in_array($state, $allowed, true)) {
+            return 'unknown_error';
+        }
+        return $state;
     }
 
     private function proxy_target($path) {

@@ -4,49 +4,101 @@
         if (!form) return;
         const button = form.querySelector('[data-scan]');
         const status = form.querySelector('[data-scan-status]');
+        const fallback = form.querySelector('[data-scan-fallback]');
         if (!button) return;
         const data = window.AffilioData || {};
         const italian = String(data.locale || '').toLowerCase().startsWith('it');
         const i18n = data.i18n || {};
         const label = (key, en, it) => (i18n[key] ? String(i18n[key]) : (italian ? it : en));
-        const setLabel = (text) => {
-            button.textContent = text;
-            if (status) status.textContent = text;
+        const actionLabel = button.textContent;
+        const pollMs = Number(data.scanPollMs) > 0 ? Number(data.scanPollMs) : 1500;
+        const timeoutMs = Number(data.scanTimeoutMs) > 0 ? Number(data.scanTimeoutMs) : 120000;
+        const failedText = () => label('scanFailed', 'Analysis failed. Retry, or send the scan form.', 'Analisi non riuscita. Riprova, oppure invia il modulo di scansione.');
+        const parseJson = (raw) => {
+            const trimmed = String(raw || '').trim();
+            if (!trimmed || (trimmed.charAt(0) !== '{' && trimmed.charAt(0) !== '[')) return null;
+            try {
+                return JSON.parse(trimmed);
+            } catch (error) {
+                return null;
+            }
         };
-        const call = async (method) => {
+        const call = async () => {
             const base = String(data.restBase || '').replace(/\/$/, '');
-            const response = await fetch(base + '/setup', {
-                method,
+            const response = await fetch(base + '/setup/rescan', {
+                method: 'POST',
                 headers: { 'X-WP-Nonce': data.nonce || '' },
             });
-            const body = await response.json();
-            if (!response.ok) throw new Error(body.message || 'Setup failed.');
+            if (response.status === 409) return { phase: 'scanning' };
+            const raw = await response.text();
+            if (!response.ok) {
+                const parsed = parseJson(raw);
+                const message = parsed && typeof parsed.message === 'string' && parsed.message ? parsed.message : failedText();
+                throw new Error(message);
+            }
+            const body = parseJson(raw);
+            if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error(failedText());
             return body;
         };
+        const setBusy = (busy) => {
+            button.disabled = busy;
+            button.setAttribute('aria-busy', busy ? 'true' : 'false');
+            if (status) status.setAttribute('aria-busy', busy ? 'true' : 'false');
+        };
+        const showFallback = (visible) => {
+            if (!fallback) return;
+            fallback.hidden = !visible;
+        };
+        const finish = (message, errored) => {
+            button.textContent = actionLabel;
+            if (status) status.textContent = message;
+            showFallback(errored);
+            setBusy(false);
+            button.focus();
+        };
+        let running = false;
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
-            button.disabled = true;
+            if (running) return;
+            running = true;
+            button.textContent = actionLabel;
+            showFallback(false);
+            setBusy(true);
             const inProgress = label('analysisInProgress', 'Analysis in progress', 'Analisi in corso');
             const done = label('analysisComplete', 'Analysis complete', 'Analisi completata');
-            setLabel(inProgress);
+            const timedOut = label('scanTimedOut', 'Analysis is taking too long. Retry, or send the scan form.', "L'analisi sta impiegando troppo tempo. Riprova, oppure invia il modulo di scansione.");
+            if (status) status.textContent = inProgress;
+            const deadline = Date.now() + timeoutMs;
             try {
-                let state = await call('POST');
+                let state = await call();
                 while (state && state.phase === 'scanning') {
-                    setLabel(inProgress);
-                    await new Promise((resolve) => setTimeout(resolve, 250));
-                    state = await call('GET');
+                    if (Date.now() >= deadline) {
+                        finish(timedOut, true);
+                        return;
+                    }
+                    if (status) status.textContent = inProgress;
+                    await new Promise((resolve) => setTimeout(resolve, pollMs));
+                    if (Date.now() >= deadline) {
+                        finish(timedOut, true);
+                        return;
+                    }
+                    state = await call();
                 }
                 if (state && state.phase === 'complete') {
-                    setLabel(done);
-                    button.disabled = true;
+                    finish(done, false);
                     return;
                 }
-                button.disabled = false;
+                finish(failedText(), true);
             } catch (failure) {
-                if (status) status.textContent = failure.message;
-                button.disabled = false;
+                finish(failure && failure.message ? failure.message : failedText(), true);
+            } finally {
+                running = false;
             }
         });
+        const fallbackButton = fallback ? (fallback.matches('button') ? fallback : fallback.querySelector('button')) : null;
+        if (fallbackButton) {
+            fallbackButton.addEventListener('click', () => form.submit());
+        }
     };
     bindDashboardScan();
     const root = document.getElementById('affilio-dashboard-root');
@@ -69,6 +121,32 @@
         }
         return '#';
     };
+    const i18n = (AffilioData && AffilioData.i18n) || {};
+    const phrase = (key, en, it) => {
+        if (Object.prototype.hasOwnProperty.call(i18n, key) && i18n[key] !== '') {
+            return String(i18n[key]);
+        }
+        return t(en, it);
+    };
+    const allowedState = (state) => {
+        const known = ['connected', 'missing_key', 'missing_url', 'invalid_key', 'api_error', 'network_error', 'wrong_api_url', 'starting', 'unknown_error'];
+        return known.indexOf(state) >= 0 ? state : 'unknown_error';
+    };
+    const connectionStatusHTML = () => {
+        if (document.getElementById('affilio-dashboard-connection')) {
+            return '';
+        }
+        const status = (AffilioData && AffilioData.connectionStatus) || {};
+        if (status.connected) {
+            const label = esc(phrase('connected', 'Connected', 'Connesso'));
+            const state = allowedState(String(status.state || 'connected'));
+            return `<div class="affilio-status-row affilio-dashboard-connection" data-connection-status><span class="affilio-status-pill affilio-status-${state}">${label}</span></div>`;
+        }
+        const settings = (AffilioData && AffilioData.settingsUrl) || '/wp-admin/admin.php?page=affilio-settings';
+        const lead = esc(phrase('notConnected', 'Not connected.', 'Non connesso.'));
+        const next = esc(phrase('connectSite', 'Connect your site in Settings.', 'Collega il sito in Impostazioni.'));
+        return `<div class="affilio-status-row affilio-dashboard-connection" data-connection-status><p class="affilio-status-message">${lead} <a class="affilio-next-step" href="${esc(safeHref(settings))}">${next}</a></p></div>`;
+    };
     const affilioProxy = (method, path, body) => {
         const base = String((AffilioData && AffilioData.restBase) || '').replace(/\/$/, '');
         const payload = { method: method, path: path };
@@ -83,7 +161,7 @@
     if (AffilioData.connectionStatus && !AffilioData.connectionStatus.connected) {
         const settings = AffilioData.settingsUrl || '/wp-admin/admin.php?page=affilio-settings';
         const message = AffilioData.connectionStatus.message || t('Configure your API key.', 'Configura la tua chiave API.');
-        root.innerHTML = `
+        root.innerHTML = connectionStatusHTML() + `
             <div class="affilio-panel affilio-panel-warning">
                 <h2>Affilio Dashboard</h2>
                 <p><strong>${t('Not connected.', 'Non connesso.')}</strong> ${esc(message)}</p>
@@ -92,7 +170,7 @@
         `;
         return;
     }
-    root.innerHTML = `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Loading data...', 'Caricamento dati...')}</p></div>`;
+    root.innerHTML = connectionStatusHTML() + `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Loading data...', 'Caricamento dati...')}</p></div>`;
 
     const scoreColor = (score) => {
         if (score < 34) return '#d63638';
@@ -271,14 +349,18 @@
     };
 
     const render = (articles, programs, recommendations) => {
-        let html = `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Review article monetization and manage recommendations.', 'Controlla la monetizzazione degli articoli e gestisci le raccomandazioni.')}</p></div>`;
+        let html = connectionStatusHTML() + `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Review article monetization and manage recommendations.', 'Controlla la monetizzazione degli articoli e gestisci le raccomandazioni.')}</p></div>`;
         if (!articles.length) {
             html += `<div class="affilio-panel"><p>${t('No articles scanned yet.', 'Nessun articolo ancora scansionato.')}</p></div>`;
         } else {
             html += renderOpportunityPanel(articles, recommendations);
             let rows = articles.map(a => {
-                const score = a.monetization_score || 0;
-                return `<tr data-article-id="${a.id}"><td>${a.title || ''}</td><td style="color:${scoreColor(score)};font-weight:bold;">${score}</td><td>${potentialLabel(score)}</td><td>${a.wp_post_id}</td></tr>`;
+                const rawScore = Number(a.monetization_score);
+                const score = Number.isFinite(rawScore) ? rawScore : 0;
+                const title = esc(a.title || '');
+                const articleId = esc(a.id);
+                const postId = esc(a.wp_post_id);
+                return `<tr data-article-id="${articleId}"><td>${title}</td><td style="color:${scoreColor(score)};font-weight:bold;">${score}</td><td>${potentialLabel(score)}</td><td>${postId}</td></tr>`;
             }).join('');
             html += `
                 <div class="affilio-panel">
@@ -304,7 +386,11 @@
         if (!programs.length) {
             html += `<p>${t('No affiliate links detected yet.', 'Nessun link affiliato rilevato al momento.')}</p>`;
         } else {
-            let rows = programs.map(p => `<li>${p.name} (${p.domain || t('unknown', 'sconosciuto')})</li>`).join('');
+            let rows = programs.map(p => {
+                const name = esc(p.name);
+                const domain = p.domain ? esc(p.domain) : t('unknown', 'sconosciuto');
+                return `<li>${name} (${domain})</li>`;
+            }).join('');
             html += `<ul>${rows}</ul>`;
         }
         html += '</div>';
@@ -316,7 +402,10 @@
             btn.addEventListener('click', () => {
                 if (!table) return;
                 const articleId = btn.getAttribute('data-jump-article');
-                const row = table.querySelector(`tr[data-article-id="${articleId}"]`);
+                const row = Array.prototype.find.call(
+                    table.querySelectorAll('tr[data-article-id]'),
+                    (candidate) => candidate.getAttribute('data-article-id') === articleId
+                ) || null;
                 if (!row) return;
                 row.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 row.classList.add('affilio-row-focus');
@@ -644,5 +733,5 @@
                 recommendationsResp.recommendations || []
             );
         })
-        .catch(() => { root.innerHTML = `<div class="affilio-panel affilio-panel-warning"><h2>Affilio Dashboard</h2><p>${t('Failed to load data.', 'Caricamento dati non riuscito.')}</p></div>`; });
+        .catch(() => { root.innerHTML = connectionStatusHTML() + `<div class="affilio-panel affilio-panel-warning"><h2>Affilio Dashboard</h2><p>${t('Failed to load data.', 'Caricamento dati non riuscito.')}</p></div>`; });
 } )();
