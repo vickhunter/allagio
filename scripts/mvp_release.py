@@ -50,7 +50,7 @@ WP_FILES = {
     "affilio-wp/readme.txt",
 }
 PLUGIN_ROOT = "affilio-wp/"
-PLUGIN_VERSION = "0.1.29"
+PLUGIN_VERSION = "0.1.31"
 TEST_ONLY_PLUGIN_SEAMS = ("affilio_go_utc_date", "affilio_rewrite_requires_wp_rewrite")
 PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
 PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}

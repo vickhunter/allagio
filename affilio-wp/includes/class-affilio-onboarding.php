@@ -17,6 +17,11 @@ class Affilio_Onboarding {
             array('methods' => 'GET', 'callback' => array($this, 'status'), 'permission_callback' => array($this, 'rest_permission')),
             array('methods' => 'POST', 'callback' => array($this, 'connect'), 'permission_callback' => array($this, 'rest_permission')),
         ));
+        register_rest_route('affilio/v1', '/setup/rescan', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'rescan'),
+            'permission_callback' => array($this, 'rest_permission'),
+        ));
     }
 
     public function allowed() {
@@ -108,6 +113,30 @@ class Affilio_Onboarding {
         }
     }
 
+    public function rescan() {
+        if (!$this->allowed()) {
+            return new WP_Error('affilio_forbidden', $this->t('Administrator access required.', 'Serve un amministratore.'), array('status' => 403));
+        }
+        if (!$this->lock()) {
+            return new WP_Error('affilio_busy', $this->t('Setup is already running. Try again shortly.', 'La configurazione è già in corso. Riprova tra poco.'), array('status' => 409));
+        }
+        try {
+            $state = get_option('affilio_setup_state', array());
+            if (!is_array($state) || !isset($state['phase']) || $state['phase'] !== 'scanning') {
+                update_option('affilio_setup_state', array(
+                    'phase' => 'scanning',
+                    'offset' => 0,
+                    'scanned' => 0,
+                    'skipped' => array(),
+                ), false);
+            }
+            $this->advance_one_batch(false);
+            return $this->status();
+        } finally {
+            delete_option('affilio_setup_lock');
+        }
+    }
+
     private function store_issued_plugin_key($data) {
         if (!is_array($data) || !isset($data['plugin_key']) || !is_string($data['plugin_key'])) {
             return;
@@ -132,35 +161,39 @@ class Affilio_Onboarding {
             return;
         }
         try {
-            $state = get_option('affilio_setup_state', array());
-            if (!isset($state['phase']) || $state['phase'] !== 'scanning') {
-                return;
-            }
-            $offset = isset($state['offset']) ? (int) $state['offset'] : 0;
-            $posts = get_posts(array('post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 10, 'offset' => $offset, 'orderby' => 'ID', 'order' => 'ASC'));
-            if (!$posts) {
-                $state['phase'] = 'complete';
-                update_option('affilio_setup_state', $state, false);
-                return;
-            }
-            $result = (new Affilio_Scanner($this->api))->scan_posts($posts);
-            if (!isset($state['skipped']) || !is_array($state['skipped'])) {
-                $state['skipped'] = array();
-            }
-            $state['offset'] = $offset + count($posts);
-            $state['scanned'] = (isset($state['scanned']) ? (int) $state['scanned'] : 0) + (isset($result['scanned']) ? (int) $result['scanned'] : 0);
-            if (isset($result['skipped']) && is_array($result['skipped'])) {
-                $state['skipped'] = array_merge($state['skipped'], $result['skipped']);
-            }
-            if (count($posts) < 10) {
-                $state['phase'] = 'complete';
-            } else {
-                $this->schedule_scan();
-            }
-            update_option('affilio_setup_state', $state, false);
+            $this->advance_one_batch(true);
         } finally {
             delete_option('affilio_setup_lock');
         }
+    }
+
+    private function advance_one_batch($schedule_next) {
+        $state = get_option('affilio_setup_state', array());
+        if (!is_array($state) || !isset($state['phase']) || $state['phase'] !== 'scanning') {
+            return;
+        }
+        $offset = isset($state['offset']) ? (int) $state['offset'] : 0;
+        $posts = get_posts(array('post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 10, 'offset' => $offset, 'orderby' => 'ID', 'order' => 'ASC'));
+        if (!$posts) {
+            $state['phase'] = 'complete';
+            update_option('affilio_setup_state', $state, false);
+            return;
+        }
+        $result = (new Affilio_Scanner($this->api))->scan_posts($posts);
+        if (!isset($state['skipped']) || !is_array($state['skipped'])) {
+            $state['skipped'] = array();
+        }
+        $state['offset'] = $offset + count($posts);
+        $state['scanned'] = (isset($state['scanned']) ? (int) $state['scanned'] : 0) + (isset($result['scanned']) ? (int) $result['scanned'] : 0);
+        if (isset($result['skipped']) && is_array($result['skipped'])) {
+            $state['skipped'] = array_merge($state['skipped'], $result['skipped']);
+        }
+        if (count($posts) < 10) {
+            $state['phase'] = 'complete';
+        } elseif ($schedule_next) {
+            $this->schedule_scan();
+        }
+        update_option('affilio_setup_state', $state, false);
     }
 
     private function t($en, $it) {

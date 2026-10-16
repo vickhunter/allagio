@@ -87,6 +87,349 @@ class DashboardSettingsA11yTest extends TestCase {
         $this->assertStringContainsString('Chiave salvata (%s)', $mo);
     }
 
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_connected_settings_replace_the_connect_prompt() {
+        $GLOBALS['user_locale'] = 'en_US';
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $admin = $this->admin(true);
+        ob_start();
+        $admin->render_settings();
+        $html = ob_get_clean();
+
+        $this->assertMatchesRegularExpression('/<div id="affilio-onboarding-root">.*<form method="post" action="https:\/\/blog\.example\/wp-admin\/admin-post\.php">.*name="_wpnonce" value="test-nonce".*name="action" value="affilio_scan_all".*<button type="submit" class="button button-primary button-large" data-connect>Start analysis<\/button>.*<\/div>/s', $html);
+        $this->assertStringContainsString('Your site is connected.', $html);
+        $this->assertStringContainsString('>Start analysis<', $html);
+        $this->assertStringNotContainsString('Connected. Start your first analysis.', $html);
+        $this->assertStringNotContainsString('Connect and find opportunities', $html);
+
+        $admin->enqueue_dashboard_assets('affilio_page_affilio-settings');
+        $copy = $GLOBALS['localized']['affilio-onboarding']['AffilioSetup']['copy'];
+        $this->assertSame('Start analysis|Analysis in progress|Analysis complete', implode('|', array($copy['startAnalysis'], $copy['analysisInProgress'], $copy['analysisComplete'])));
+        $this->assertSame('Your site is connected.', $copy['connectedStatus']);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_disconnected_settings_keep_the_connect_prompt() {
+        $GLOBALS['user_locale'] = 'en_US';
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $admin = $this->admin(false);
+        ob_start();
+        $admin->render_settings();
+        $html = ob_get_clean();
+
+        $this->assertMatchesRegularExpression('/<div id="affilio-onboarding-root">\s*<\/div>/', $html);
+        $this->assertStringNotContainsString('Start analysis', $html);
+        $this->assertStringNotContainsString('Your site is connected.', $html);
+
+        $js = file_get_contents(dirname(__DIR__, 2) . '/admin/build/onboarding.js');
+        $this->assertStringContainsString("t('Connect and find opportunities', 'Collega e trova opportunità')", $js);
+        $this->assertStringContainsString("t('Ready to connect. No API key to copy.', 'Pronto per il collegamento. Nessuna chiave API da copiare.')", $js);
+        $this->assertStringNotContainsString('Connected. Start your first analysis.', $js);
+        $this->assertStringContainsString("catalog('startAnalysis', 'Start analysis')", $js);
+        $this->assertStringContainsString("catalog('connectedStatus', 'Your site is connected.')", $js);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_italian_connected_settings_use_the_catalog() {
+        $GLOBALS['user_locale'] = 'it_IT';
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $admin = $this->admin(true);
+        ob_start();
+        $admin->render_settings();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('Il sito è collegato.', $html);
+        $this->assertStringContainsString('>Avvia analisi<', $html);
+        $this->assertStringNotContainsString('Start analysis', $html);
+        $this->assertStringNotContainsString('Your site is connected.', $html);
+        $this->assertStringNotContainsString('Collegato. Avvia la prima analisi.', $html);
+
+        $root = dirname(__DIR__, 2);
+        $po = file_get_contents($root . '/languages/affilio-it_IT.po');
+        $mo = file_get_contents($root . '/languages/affilio-it_IT.mo');
+        $this->assertStringContainsString("msgid \"Start analysis\"\nmsgstr \"Avvia analisi\"\n\nmsgid \"Analysis in progress\"\nmsgstr \"Analisi in corso\"\n\nmsgid \"Analysis complete\"\nmsgstr \"Analisi completata\"", $po);
+        $this->assertStringContainsString("msgid \"Your site is connected.\"\nmsgstr \"Il sito è collegato.\"", $po);
+        $this->assertStringContainsString('Avvia analisi', $mo);
+        $this->assertStringContainsString('Il sito è collegato.', $mo);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_connected_dashboard_reuses_the_connected_badge() {
+        $GLOBALS['user_locale'] = 'en_US';
+        $admin = $this->admin(true);
+        ob_start();
+        $admin->render_dashboard();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('id="affilio-dashboard-connection"', $html);
+        $this->assertStringContainsString('affilio-status-pill affilio-status-connected', $html);
+        $this->assertStringContainsString('>Connected<', $html);
+        $this->assertStringNotContainsString('affilio-next-step', $html);
+        $this->assertStringNotContainsString('Connect your site in Settings.', $html);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_disconnected_dashboard_links_to_the_connect_step() {
+        $GLOBALS['user_locale'] = 'en_US';
+        $admin = $this->admin(false);
+        ob_start();
+        $admin->render_dashboard();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('class="affilio-status-message"', $html);
+        $this->assertStringContainsString('Not connected.', $html);
+        $this->assertStringContainsString('class="affilio-next-step"', $html);
+        $this->assertStringContainsString('Connect your site in Settings.', $html);
+        $this->assertStringContainsString('href="https://blog.example/wp-admin/admin.php?page=affilio-settings"', $html);
+        $this->assertStringNotContainsString('affilio-status-connected', $html);
+        $this->assertSame(1, substr_count($html, 'affilio-panel-warning'));
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_italian_dashboard_status_uses_the_catalog() {
+        $GLOBALS['user_locale'] = 'it_IT';
+        $disconnected = $this->admin(false);
+        ob_start();
+        $disconnected->render_dashboard();
+        $html = ob_get_clean();
+        $this->assertStringContainsString('Non connesso.', $html);
+        $this->assertStringContainsString('Collega il sito in Impostazioni.', $html);
+        $this->assertStringNotContainsString('Connect your site in Settings.', $html);
+
+        $connected = $this->admin(true);
+        ob_start();
+        $connected->render_dashboard();
+        $connected_html = ob_get_clean();
+        $this->assertStringContainsString('>Connesso<', $connected_html);
+        $this->assertStringContainsString('affilio-status-pill affilio-status-connected', $connected_html);
+
+        $disconnected->enqueue_dashboard_assets('toplevel_page_affilio');
+        $i18n = $GLOBALS['localized']['affilio-dashboard']['AffilioData']['i18n'];
+        $this->assertSame('Connesso', $i18n['connected']);
+        $this->assertSame('Non connesso.', $i18n['notConnected']);
+        $this->assertSame('Collega il sito in Impostazioni.', $i18n['connectSite']);
+
+        $mo = file_get_contents(dirname(__DIR__, 2) . '/languages/affilio-it_IT.mo');
+        $this->assertStringContainsString('Connesso', $mo);
+        $this->assertStringContainsString('Collega il sito in Impostazioni.', $mo);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_dashboard_status_escapes_a_broken_state() {
+        $this->boot();
+        $api = new class {
+            public function get_connection_status($force = false) {
+                return array(
+                    'connected' => true,
+                    'message' => '<img src=x onerror=alert(1)>',
+                    'state' => 'connected"><img src=x>',
+                    'label' => '<Connected>',
+                );
+            }
+            public function invalidate_status_cache() {}
+        };
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+        $admin = new Affilio_Admin($api, null, null);
+        ob_start();
+        $admin->render_dashboard();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('affilio-status-unknown_error', $html);
+        $this->assertStringContainsString('>Connected<', $html);
+        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringNotContainsString('<Connected>', $html);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_dashboard_enqueues_the_scan_script() {
+        $GLOBALS['user_locale'] = 'it_IT';
+        $admin = $this->admin(true);
+        $GLOBALS['scripts'] = array();
+        $admin->enqueue_dashboard_assets('toplevel_page_affilio');
+        $this->assertArrayHasKey('affilio-dashboard', $GLOBALS['scripts']);
+        $this->assertStringContainsString('admin/build/dashboard.js', $GLOBALS['scripts']['affilio-dashboard']);
+        $i18n = $GLOBALS['localized']['affilio-dashboard']['AffilioData']['i18n'];
+        $this->assertSame('Analisi in corso', $i18n['analysisInProgress']);
+        $this->assertSame('Analisi completata', $i18n['analysisComplete']);
+        $this->assertSame('Analisi non riuscita. Riprova, oppure invia il modulo di scansione.', $i18n['scanFailed']);
+        $this->assertSame('L\'analisi sta impiegando troppo tempo. Riprova, oppure invia il modulo di scansione.', $i18n['scanTimedOut']);
+        $this->assertSame('Invia il modulo di scansione', $i18n['scanFallback']);
+
+        ob_start();
+        $admin->render_dashboard();
+        $html = ob_get_clean();
+        $this->assertStringContainsString('id="affilio-scan-all"', $html);
+        $this->assertStringContainsString('<div data-scan-status role="status"></div>', $html);
+        $this->assertStringNotContainsString('aria-live', $html);
+        $this->assertStringContainsString('button button-primary button-large', $html);
+        $this->assertStringContainsString('data-scan-fallback', $html);
+        $this->assertStringContainsString('>Invia il modulo di scansione<', $html);
+        $this->assertStringContainsString('action="https://blog.example/wp-admin/admin-post.php"', $html);
+        $this->assertStringContainsString('name="action" value="affilio_scan_all"', $html);
+        $this->assertStringContainsString('>Scansiona tutti gli articoli<', $html);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_rescan_restarts_a_completed_setup() {
+        $this->boot();
+        $GLOBALS['options']['affilio_api_url_override'] = 'https://api.example.test';
+        $GLOBALS['options']['affilio_api_key'] = 'abcdSECRETKEY1234wxyz';
+        $GLOBALS['options']['affilio_setup_state'] = array(
+            'phase' => 'complete',
+            'offset' => 40,
+            'scanned' => 40,
+            'skipped' => array(array('wp_post_id' => 9, 'reason' => 'short')),
+        );
+        $GLOBALS['posts'] = $this->published_posts(12);
+        $api = new class {
+            public function get_connection_status($force = false) {
+                return array('connected' => true, 'message' => 'Affilio is connected and ready.', 'state' => 'connected');
+            }
+            public function invalidate_status_cache() {}
+            public function request($method, $path, $body = null) {
+                return array('code' => 202, 'data' => array('status' => 'queued'));
+            }
+        };
+        $setup = new Affilio_Onboarding($api);
+        $setup->register_routes();
+        $registered = null;
+        foreach ($GLOBALS['routes'] as $route) {
+            if ($route[0] === 'affilio/v1' && $route[1] === '/setup/rescan') {
+                $registered = $route[2];
+            }
+        }
+        $this->assertIsArray($registered);
+        $this->assertSame('POST', $registered['methods']);
+        $this->assertSame(array($setup, 'rest_permission'), $registered['permission_callback']);
+        $this->assertSame(array($setup, 'rescan'), $registered['callback']);
+
+        $connect = $setup->connect();
+        $this->assertIsArray($connect);
+        $this->assertSame('complete', $connect['phase']);
+        $this->assertSame(40, $connect['scanned']);
+        $this->assertSame(40, $connect['offset']);
+        $this->assertArrayNotHasKey('affilio_setup_lock', $GLOBALS['options']);
+
+        $again = $setup->rescan();
+        $this->assertIsArray($again);
+        $this->assertSame('scanning', $again['phase']);
+        $this->assertSame(10, $again['offset']);
+        $this->assertSame(10, $again['scanned']);
+        $this->assertSame(array(), $again['skipped']);
+        $this->assertArrayNotHasKey('affilio_setup_lock', $GLOBALS['options']);
+
+        $GLOBALS['options']['affilio_setup_state'] = array(
+            'phase' => 'complete',
+            'offset' => 40,
+            'scanned' => 40,
+            'skipped' => array(array('wp_post_id' => 9, 'reason' => 'short')),
+        );
+        $GLOBALS['options']['affilio_setup_lock'] = time();
+        $busy = $setup->rescan();
+        $this->assertInstanceOf(WP_Error::class, $busy);
+        $this->assertSame('affilio_busy', $busy->code);
+        $this->assertSame(409, $busy->data['status']);
+        $this->assertSame('complete', $GLOBALS['options']['affilio_setup_state']['phase']);
+        $this->assertSame(40, $GLOBALS['options']['affilio_setup_state']['scanned']);
+
+        unset($GLOBALS['options']['affilio_setup_lock']);
+        $GLOBALS['administrator'] = false;
+        $denied = $setup->rescan();
+        $this->assertInstanceOf(WP_Error::class, $denied);
+        $this->assertSame('affilio_forbidden', $denied->code);
+        $this->assertSame(403, $denied->data['status']);
+        $this->assertSame('complete', $GLOBALS['options']['affilio_setup_state']['phase']);
+        $this->assertSame(40, $GLOBALS['options']['affilio_setup_state']['scanned']);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_rescan_advances_a_stuck_scan_when_cron_never_fires() {
+        $this->boot();
+        $GLOBALS['posts'] = $this->published_posts(12);
+        $GLOBALS['options']['affilio_setup_state'] = array(
+            'phase' => 'scanning',
+            'offset' => 0,
+            'scanned' => 0,
+            'skipped' => array(),
+        );
+        $api = new class {
+            public function get_connection_status($force = false) {
+                return array('connected' => true, 'message' => 'Affilio is connected and ready.', 'state' => 'connected');
+            }
+            public function invalidate_status_cache() {}
+            public function request($method, $path, $body = null) {
+                return array('code' => 202, 'data' => array('status' => 'queued'));
+            }
+        };
+        $setup = new class($api) extends Affilio_Onboarding {
+            public $cronBatches = 0;
+            public function scan_batch() {
+                $this->cronBatches++;
+                parent::scan_batch();
+            }
+        };
+        $first = $setup->rescan();
+        $this->assertSame('scanning', $first['phase']);
+        $this->assertSame(10, $first['offset']);
+        $this->assertSame(10, $first['scanned']);
+        $second = $setup->rescan();
+        $this->assertSame('complete', $second['phase']);
+        $this->assertSame(12, $second['offset']);
+        $this->assertSame(12, $second['scanned']);
+        $this->assertSame(0, $setup->cronBatches);
+        $this->assertArrayNotHasKey('affilio_setup_lock', $GLOBALS['options']);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_dashboard_script_escapes_article_and_program_fields() {
+        $js = file_get_contents(dirname(__DIR__, 2) . '/admin/build/dashboard.js');
+        $this->assertStringContainsString("const title = esc(a.title || '');", $js);
+        $this->assertTrue(
+            str_contains($js, 'const articleId = esc(a.id);')
+            && str_contains($js, "candidate.getAttribute('data-article-id') === articleId")
+            && !str_contains($js, 'tr[data-article-id="${')
+        );
+        $this->assertStringContainsString('const postId = esc(a.wp_post_id);', $js);
+        $this->assertStringContainsString('const name = esc(p.name);', $js);
+        $this->assertStringContainsString('const domain = p.domain ? esc(p.domain)', $js);
+        $this->assertStringNotContainsString('${a.title', $js);
+        $this->assertStringNotContainsString('${p.name}', $js);
+        $this->assertStringNotContainsString('${p.domain', $js);
+    }
+
     private function settings_and_notice($connected) {
         if (!defined('WP_DEBUG')) {
             define('WP_DEBUG', true);
@@ -104,6 +447,20 @@ class DashboardSettingsA11yTest extends TestCase {
         $admin->maybe_render_connection_notice();
         $notice = ob_get_clean();
         return $settings . $notice;
+    }
+
+    private function published_posts($count) {
+        $posts = array();
+        for ($id = 1; $id <= $count; $id++) {
+            $posts[] = (object) array(
+                'ID' => $id,
+                'post_title' => 'Post ' . $id,
+                'post_content' => 'Published content',
+                'post_name' => 'post-' . $id,
+                'post_status' => 'publish',
+            );
+        }
+        return $posts;
     }
 
     private function admin($connected) {
