@@ -6,21 +6,17 @@ import (
 	"testing"
 	"time"
 
-	"affilio-api/internal/middleware"
-
 	"github.com/gin-gonic/gin"
 )
 
 func TestHostedMCPRateLimitUsesTrustedClientIP(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	h := &HostedHandler{
-		BaseURL: "https://pilot.example",
-		Limiter: NewIPRateLimiter(1, time.Hour),
+		BaseURL:        "https://pilot.example",
+		Limiter:        NewIPRateLimiter(1, time.Hour),
+		TrustedProxies: "192.0.2.1",
 	}
 	trusted := gin.New()
-	if err := middleware.ConfigureTrustedProxies(trusted, "192.0.2.1"); err != nil {
-		t.Fatal(err)
-	}
 	h.Mount(trusted)
 
 	first := mcpStatus(trusted, "192.0.2.1:1234", "203.0.113.10")
@@ -34,9 +30,6 @@ func TestHostedMCPRateLimitUsesTrustedClientIP(t *testing.T) {
 	}
 
 	untrusted := gin.New()
-	if err := middleware.ConfigureTrustedProxies(untrusted, "192.0.2.1"); err != nil {
-		t.Fatal(err)
-	}
 	h.Limiter = NewIPRateLimiter(1, time.Hour)
 	h.Mount(untrusted)
 	spoofed := mcpStatus(untrusted, "198.51.100.8:4321", "203.0.113.10")

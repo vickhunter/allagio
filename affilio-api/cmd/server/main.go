@@ -204,7 +204,7 @@ func main() {
 		if loginErr != nil {
 			log.Fatalf("owner sign-in configuration failed: %v", loginErr)
 		}
-		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments, ClaimsCheck: cfg.ClaimsCheck}
+		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments, ClaimsCheck: cfg.ClaimsCheck, TrustedProxies: cfg.TrustedProxies, Render: cfg.Render, TrustedPlatform: cfg.TrustedPlatform}
 		if err = hosted.LoadWorkspace(); err != nil {
 			log.Fatalf("workspace assets failed: %v", err)
 		}

@@ -12,9 +12,11 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/middleware"
 	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
@@ -34,6 +36,20 @@ type HostedHandler struct {
 	Assessments     *AssessmentsHandler
 	DemoCheckoutURL string
 	ClaimsCheck     string
+	EventLimiter    *IPRateLimiter
+	// TrustedProxies is the TRUSTED_PROXIES list. Empty trusts no proxy.
+	TrustedProxies string
+	// Render is RENDER=true. The landing event limit then uses the client
+	// address Render appended, not the socket address of Render's proxy.
+	Render bool
+	// TrustedPlatform is a dedicated client-IP header name. When set, that
+	// header is the event-limit key and Gin's TrustedPlatform.
+	TrustedPlatform string
+
+	pluginZipMu     sync.Mutex
+	pluginZipKey    string
+	pluginZipBody   []byte
+	pluginZipBuilds int
 }
 
 func ValidatePublicURL(raw string) error {
@@ -75,7 +91,21 @@ func (h *HostedHandler) cookie(c *gin.Context, name, value string, maxAge int) {
 }
 
 func (h *HostedHandler) Mount(r *gin.Engine) {
+	if h.EventLimiter == nil {
+		h.EventLimiter = NewIPRateLimiter(60, time.Minute)
+	}
+	// Gin trusts every proxy until this runs. An empty list trusts none, so a
+	// client cannot pick a new rate-limit key with X-Forwarded-For. Render
+	// traffic does not use that list: eventClientIP reads the address Render
+	// appended, or TrustedPlatform when that header is configured.
+	if err := middleware.ConfigureTrustedProxies(r, h.TrustedProxies); err != nil {
+		_ = middleware.ConfigureTrustedProxies(r, "")
+	}
+	if header := strings.TrimSpace(h.TrustedPlatform); header != "" {
+		r.TrustedPlatform = header
+	}
 	public := r.Group("", h.headers)
+	public.POST("/api/events", h.RecordLandingEvent)
 	h.mountDemo(public)
 	public.GET("/.well-known/oauth-protected-resource", h.resourceMetadata)
 	public.GET("/.well-known/oauth-protected-resource/mcp", h.resourceMetadata)
