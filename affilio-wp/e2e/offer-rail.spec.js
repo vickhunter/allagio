@@ -217,6 +217,12 @@ async function handle(req, res) {
     const titles = { '/owner/products': 'Products & offers', '/owner': 'Your distribution workspace', '/owner/review': 'Offer review', '/owner/settings': 'Setup & agents' };
     return send(res, 200, shell(titles[pathname], '<div id="workspace-app"></div>', true), 'text/html; charset=utf-8');
   }
+  if (pathname.startsWith('/landing-v9/')) {
+    const file = path.join(build, pathname);
+    if (!file.startsWith(build) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return send(res, 404, 'missing');
+    const type = file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.woff2') ? 'font/woff2' : file.endsWith('.svg') ? 'image/svg+xml' : 'text/javascript; charset=utf-8';
+    return send(res, 200, fs.readFileSync(file), type);
+  }
   if (pathname.startsWith('/assets/')) {
     const file = path.join(build, path.basename(pathname));
     if (!file.startsWith(build) || !fs.existsSync(file)) return send(res, 404, 'missing');
@@ -279,8 +285,8 @@ function wpEarnings() {
 function landing() {
   let html = fs.readFileSync(path.join(build, 'home.html'), 'utf8');
   html = html.replaceAll('{{.InstallCommand}}', 'npx distributoor-setup');
-  html = html.replace(/\{\{if \.InstallerReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/, '$1');
-  html = html.replace(/\{\{if \.PluginReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/, '$1');
+  html = html.replace(/\{\{if \.InstallerReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/g, '$1');
+  html = html.replace(/\{\{if \.PluginReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/g, '$1');
   return html;
 }
 
@@ -707,7 +713,7 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     const page = await context.newPage();
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(base + '/landing');
-    await expect(page.getByRole('heading', { name: /You built it/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Someone has the product/ })).toBeVisible();
     await expect(page.locator('[data-primary-action]')).toHaveCount(1);
     await fits(page);
     await frame(page, `after-landing-${viewport.width}`);
@@ -1244,7 +1250,7 @@ test('landing still renders at both widths', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
     const page = await context.newPage();
     await page.goto(base + '/landing');
-    await expect(page.getByRole('heading', { name: /You built it/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Someone has the product/ })).toBeVisible();
     await fits(page);
     await shot(page, `audit-landing-${viewport.tag}`);
     await context.close();

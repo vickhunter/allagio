@@ -44,7 +44,7 @@ func releaseExcluded(rel string) bool {
 
 func hostedBuildFile(name string) bool {
 	switch name {
-	case "home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md":
+	case "home.html", "makers.html", "publishers.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md":
 		return true
 	}
 	return strings.HasPrefix(name, "workspace") || strings.HasPrefix(name, "landing") || strings.HasPrefix(name, "package")
@@ -71,6 +71,9 @@ func releasePluginZip(t *testing.T, mutateMain func([]byte) []byte) []byte {
 			return nil
 		}
 		if info.IsDir() {
+			return nil
+		}
+		if strings.Contains(rel, "affilio-wp/admin/build/landing-v9/") {
 			return nil
 		}
 		if strings.HasPrefix(rel, "affilio-wp/admin/build/") && hostedBuildFile(filepath.Base(path)) {

@@ -26,56 +26,51 @@ try {
     const builder = await owner(fixture.builder);
     await builder.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await builder.goto(fixture.base + '/');
-    await expect(builder.getByRole('heading', { name: 'You built it. Give it a distribution channel.' })).toBeVisible();
+    await expect(builder.getByRole('heading', { name: /Someone has the product/ })).toBeVisible();
     if (await builder.locator('#install').count()) {
         await builder.getByRole('button', { name: 'Copy command', exact: true }).click();
         await expect(builder.locator('.copy-status')).toContainText('Copied.');
         expect(await builder.evaluate(() => navigator.clipboard.readText())).toBe(await builder.locator('#install').inputValue());
         await builder.evaluate(() => window.scrollTo(0, 0));
     }
-    await expect(builder.locator('.world-stage')).toHaveClass(/scene-ready/);
-    await builder.getByRole('button', { name: 'Pause illustration', exact: true }).click();
-    await expect(builder.getByRole('button', { name: 'Play illustration', exact: true })).toBeVisible();
+    await expect(builder.locator('[data-hero-bg]')).toBeVisible();
+    await builder.getByRole('button', { name: 'Pause motion', exact: true }).click();
+    await expect(builder.getByRole('button', { name: 'Play motion', exact: true })).toBeVisible();
     if (fixture.screenshots) {
         await mkdir(fixture.screenshots, { recursive: true });
         await builder.screenshot({ path: join(fixture.screenshots, 'hero.png') });
     }
     await screenshot(builder, 'home');
-    await expect(builder.locator('.world-stage')).toHaveClass(/scene-ready/);
     await builder.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(builder.locator('.world-stage canvas')).toHaveCount(0);
-    await expect(builder.getByRole('button', { name: /illustration$/ })).toBeHidden();
-    await expect(builder.getByRole('link', { name: 'Get customers ↗', exact: true })).toBeVisible();
+    await expect(builder.locator('canvas')).toHaveCount(0);
+    await expect(builder.locator('[data-hero-bg="fallback"]')).toBeVisible();
+    await expect(builder.getByRole('link', { name: 'Sign in with Google' }).first()).toBeVisible();
+    await expect(builder.locator('#how')).toBeVisible();
+    await expect(builder.locator('#publishers')).toBeVisible();
     await builder.setViewportSize({ width: 390, height: 844 });
     expect(await builder.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await screenshot(builder, 'home-mobile');
     await builder.setViewportSize({ width: 1440, height: 1000 });
     await builder.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect(builder.getByRole('button', { name: 'Play illustration', exact: true })).toBeVisible();
+    await expect(builder.getByRole('button', { name: 'Play motion', exact: true })).toBeVisible();
     const fallbackContext = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
     contexts.push(fallbackContext);
     const fallbackPage = await fallbackContext.newPage();
     await fallbackPage.goto(fixture.base + '/');
-    await expect(fallbackPage.getByRole('link', { name: 'Get customers ↗', exact: true })).toBeVisible();
-    await expect(fallbackPage.locator('.world-fallback')).toBeVisible();
+    await expect(fallbackPage.getByRole('link', { name: 'Sign in with Google' }).first()).toBeVisible();
+    await expect(fallbackPage.locator('.hero-fallback').first()).toBeVisible();
     expect(await fallbackPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const noGPUContext = await browser.newContext();
     contexts.push(noGPUContext);
     await noGPUContext.addInitScript(() => {
-        const original = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function(type, ...args) {
-            return type === 'webgl2' ? null : original.call(this, type, ...args);
-        };
+        Object.defineProperty(navigator, 'gpu', { configurable: true, get: () => undefined });
     });
     const noGPUPage = await noGPUContext.newPage();
     noGPUPage.on('pageerror', error => errors.push(error.message));
-    await Promise.all([
-        noGPUPage.waitForResponse(response => response.url().endsWith('/landing-scene.bundle.js')),
-        noGPUPage.goto(fixture.base + '/'),
-    ]);
-    await expect(noGPUPage.locator('.world-stage canvas')).toHaveCount(0);
-    await expect(noGPUPage.locator('.world-fallback')).toBeVisible();
-    await expect(noGPUPage.getByRole('link', { name: 'Get customers ↗', exact: true })).toBeVisible();
+    await noGPUPage.goto(fixture.base + '/');
+    await expect(noGPUPage.locator('canvas')).toHaveCount(0);
+    await expect(noGPUPage.locator('[data-hero-bg="fallback"]')).toBeVisible();
+    await expect(noGPUPage.getByRole('link', { name: 'Sign in with Google' }).first()).toBeVisible();
     await builder.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await builder.goto(fixture.base + '/owner/settings');
     const command = await builder.locator('.setup-command pre').textContent();
@@ -112,7 +107,7 @@ try {
     await expect(builder.getByRole('heading', { name: 'Prepare commission payouts' })).toBeVisible();
     await builder.goto(fixture.base + '/owner/earnings');
     await builder.getByLabel('Payment reference').fill('browser-check-reference');
-    await builder.getByLabel('I have sent this payment outside Distributoor.').check();
+    await builder.getByLabel('I have sent this payment outside Offer Rails.').check();
     await builder.getByRole('button', { name: 'Report payment sent' }).click();
     await expect(builder.locator('#workspace-feedback')).toContainText('publisher must confirm receipt separately');
     const publisher = await owner(fixture.publisher);
