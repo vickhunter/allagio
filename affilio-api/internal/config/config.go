@@ -10,24 +10,29 @@ import (
 )
 
 type Config struct {
-	Port                   string
-	Host                   string
-	POCReportPath          string
-	PublicBaseURL          string
-	UIAssetsPath           string
-	DownloadsPath          string
-	OperatorOwnerID        string
-	AutoMigrate            bool
-	OIDCIssuer             string
-	OIDCClientID           string
-	OIDCClientSecret       string
-	DatabaseURL            string
-	ClaudeAPIKey           string
-	ClaudeModel            string
-	ClaudeAPIURL           string
-	ClaudeAPIVersion       string
-	AllowedOrigins         string
-	TrustedProxies         string
+	Port             string
+	Host             string
+	POCReportPath    string
+	PublicBaseURL    string
+	UIAssetsPath     string
+	DownloadsPath    string
+	OperatorOwnerID  string
+	AutoMigrate      bool
+	OIDCIssuer       string
+	OIDCClientID     string
+	OIDCClientSecret string
+	DatabaseURL      string
+	ClaudeAPIKey     string
+	ClaudeModel      string
+	ClaudeAPIURL     string
+	ClaudeAPIVersion string
+	AllowedOrigins   string
+	TrustedProxies   string
+	// Render is true when RENDER=true, which Render sets on its services.
+	Render bool
+	// TrustedPlatform is a dedicated client-IP header, used as Gin's
+	// TrustedPlatform when the host sets one. Empty leaves that path off.
+	TrustedPlatform        string
 	GinMode                string
 	APIKeySecret           string
 	AdminAPIKey            string
@@ -85,6 +90,8 @@ func Load() Config {
 		ClaudeAPIVersion:       getEnvValue("CLAUDE_API_VERSION", ""),
 		AllowedOrigins:         getEnvValue("ALLOWED_ORIGINS", "*"),
 		TrustedProxies:         os.Getenv("TRUSTED_PROXIES"),
+		Render:                 strings.EqualFold(strings.TrimSpace(os.Getenv("RENDER")), "true"),
+		TrustedPlatform:        strings.TrimSpace(os.Getenv("TRUSTED_PLATFORM")),
 		GinMode:                os.Getenv("GIN_MODE"),
 		APIKeySecret:           os.Getenv("API_KEY_SECRET"),
 		AdminAPIKey:            getEnvValue("ADMIN_API_KEY", ""),

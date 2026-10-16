@@ -305,27 +305,86 @@ func TestLandingEventRotatingForwardedForStillHitsTheLimit(t *testing.T) {
 	}
 }
 
-func TestLandingEventTrustedProxyUsesRightmostForwardedIP(t *testing.T) {
+func TestLandingEventRenderProxyGivesEachClientItsOwnBudget(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	gin.SetMode(gin.TestMode)
 	h := &HostedHandler{
-		DB:             db,
-		BaseURL:        "http://127.0.0.1:8080",
-		AssetsPath:     filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"),
-		DownloadsPath:  t.TempDir(),
-		EventLimiter:   NewIPRateLimiter(1, time.Minute),
-		TrustedProxies: "192.0.2.1",
+		DB:            db,
+		BaseURL:       "http://127.0.0.1:8080",
+		AssetsPath:    filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"),
+		DownloadsPath: t.TempDir(),
+		Render:        true,
 	}
 	r := gin.New()
 	h.Mount(r)
-	const body = `{"event":"zip_download","source":"test"}`
-	first := postLandingEventFrom(t, r, body, "", nil, "", "192.0.2.1:9", "203.0.113.50, 198.51.100.10", "203.0.113.50")
-	spoofedLeft := postLandingEventFrom(t, r, body, "", nil, "", "192.0.2.1:9", "203.0.113.51, 198.51.100.10", "203.0.113.51")
-	otherClient := postLandingEventFrom(t, r, body, "", nil, "", "192.0.2.1:9", "203.0.113.51, 198.51.100.11", "203.0.113.51")
-	if first.Code != http.StatusNoContent || spoofedLeft.Code != http.StatusTooManyRequests || otherClient.Code != http.StatusNoContent {
-		t.Fatalf("rightmost client IP: %d, %d, %d", first.Code, spoofedLeft.Code, otherClient.Code)
+	const body = `{"event":"landing_view","source":"test"}`
+	const proxy = "10.0.0.8:443"
+	for i := 0; i < 60; i++ {
+		forwarded := fmt.Sprintf("198.51.100.%d, 203.0.113.10", i%200)
+		rec := postLandingEventFrom(t, r, body, "", nil, "", proxy, forwarded, "198.51.100.8")
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("client A event %d: %d %s", i, rec.Code, rec.Body.String())
+		}
 	}
+	blocked := postLandingEventFrom(t, r, body, "", nil, "", proxy, "203.0.113.99, 203.0.113.10", "203.0.113.99")
+	if blocked.Code != http.StatusTooManyRequests {
+		t.Fatalf("client A past 60: %d %s", blocked.Code, blocked.Body.String())
+	}
+	for i := 0; i < 60; i++ {
+		forwarded := fmt.Sprintf("192.0.2.%d, 203.0.113.11", (i%250)+1)
+		rec := postLandingEventFrom(t, r, body, "", nil, "", proxy, forwarded, "192.0.2.8")
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("client B event %d: %d %s", i, rec.Code, rec.Body.String())
+		}
+	}
+	blocked = postLandingEventFrom(t, r, body, "", nil, "", proxy, "192.0.2.9, 203.0.113.11", "192.0.2.9")
+	if blocked.Code != http.StatusTooManyRequests {
+		t.Fatalf("client B past 60: %d %s", blocked.Code, blocked.Body.String())
+	}
+	if landingEventCount(t, db) != 120 {
+		t.Fatalf("stored %d events", landingEventCount(t, db))
+	}
+}
+
+func TestLandingEventTrustedPlatformHeaderIsTheClient(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	h := &HostedHandler{
+		DB:              db,
+		BaseURL:         "http://127.0.0.1:8080",
+		AssetsPath:      filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"),
+		DownloadsPath:   t.TempDir(),
+		EventLimiter:    NewIPRateLimiter(1, time.Minute),
+		Render:          true,
+		TrustedPlatform: "CF-Connecting-IP",
+	}
+	r := gin.New()
+	h.Mount(r)
+	if r.TrustedPlatform != "CF-Connecting-IP" {
+		t.Fatalf("TrustedPlatform = %q", r.TrustedPlatform)
+	}
+	const body = `{"event":"signin_click","source":"test"}`
+	const proxy = "10.0.0.8:443"
+	first := postLandingEventPlatform(t, r, body, proxy, "203.0.113.50, 198.51.100.10", "198.51.100.10")
+	sameClient := postLandingEventPlatform(t, r, body, proxy, "203.0.113.77, 198.51.100.77", "198.51.100.10")
+	other := postLandingEventPlatform(t, r, body, proxy, "203.0.113.77, 198.51.100.77", "198.51.100.11")
+	if first.Code != http.StatusNoContent || sameClient.Code != http.StatusTooManyRequests || other.Code != http.StatusNoContent {
+		t.Fatalf("platform header: %d, %d, %d", first.Code, sameClient.Code, other.Code)
+	}
+}
+
+func postLandingEventPlatform(t *testing.T, r http.Handler, raw, remote, forwardedFor, platformIP string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/api/events", strings.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	req.RemoteAddr = remote
+	req.Header.Set("X-Forwarded-For", forwardedFor)
+	req.Header.Set("CF-Connecting-IP", platformIP)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	return rec
 }
 
 func TestWordPressDownloadZipIsCachedUntilTheFileChanges(t *testing.T) {

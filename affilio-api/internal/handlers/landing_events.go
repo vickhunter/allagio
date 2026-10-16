@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 
@@ -20,16 +21,7 @@ var landingEventNames = map[string]struct{}{
 }
 
 func (h *HostedHandler) RecordLandingEvent(c *gin.Context) {
-	// ClientIP uses the engine's trusted-proxy list. Mount sets that list from
-	// TRUSTED_PROXIES and leaves it empty locally, which ignores forwarded
-	// headers. On Render, the list is the load balancer and the proxies in
-	// front of it. Gin then walks X-Forwarded-For from the right and stops at
-	// the address Render appended. A caller-supplied value further left is not
-	// the key.
-	ip := strings.TrimSpace(c.ClientIP())
-	if ip == "" {
-		ip = "unknown"
-	}
+	ip := h.eventClientIP(c)
 	if h.EventLimiter != nil && !h.EventLimiter.Allow(ip) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 		return
@@ -108,4 +100,41 @@ func (h *HostedHandler) RecordLandingEvent(c *gin.Context) {
 func landingEventAllowed(name string) bool {
 	_, ok := landingEventNames[name]
 	return ok
+}
+
+// eventClientIP is the landing-event rate-limit key.
+//
+// Locally, TRUSTED_PROXIES is empty and RENDER is unset, so the key is the
+// socket address. A spoofed X-Forwarded-For does not open another bucket.
+//
+// On Render, RENDER=true and every request arrives from Render's proxy. The
+// key is the rightmost X-Forwarded-For address, which is the one Render
+// appends. The caller-supplied entries to the left are ignored. When
+// TRUSTED_PLATFORM names a dedicated header, that header is the key instead,
+// the same value Gin reads as TrustedPlatform.
+func (h *HostedHandler) eventClientIP(c *gin.Context) string {
+	if header := strings.TrimSpace(h.TrustedPlatform); header != "" {
+		if ip := rightmostForwardedIP(c.GetHeader(header)); ip != "" {
+			return ip
+		}
+	}
+	if h.Render {
+		if ip := rightmostForwardedIP(c.GetHeader("X-Forwarded-For")); ip != "" {
+			return ip
+		}
+	}
+	ip := strings.TrimSpace(c.RemoteIP())
+	if ip == "" {
+		return "unknown"
+	}
+	return ip
+}
+
+func rightmostForwardedIP(header string) string {
+	parts := strings.Split(header, ",")
+	candidate := strings.TrimSpace(parts[len(parts)-1])
+	if net.ParseIP(candidate) == nil {
+		return ""
+	}
+	return candidate
 }
