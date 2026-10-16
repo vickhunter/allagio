@@ -45,7 +45,10 @@ func TestGenerateContentPublishesTrackedGoLink(t *testing.T) {
 		t.Fatalf("reader html pointed at the referral url: %s", html)
 	}
 	lower := strings.ToLower(html)
-	if strings.Contains(lower, "strong contextual") || strings.Contains(lower, "relevance") || strings.Contains(html, "80") {
+	// The relevance score is 80. Strip the tracked go link first: its UUID can
+	// contain those digits, and that is not the score.
+	outsideLink := strings.ReplaceAll(html, tracked, "")
+	if strings.Contains(lower, "strong contextual") || strings.Contains(lower, "relevance") || strings.Contains(outsideLink, "80") {
 		t.Fatalf("reader html included a reason or score: %s", html)
 	}
 	if body["tracked_link"] != tracked {

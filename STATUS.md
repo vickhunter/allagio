@@ -1,3 +1,7 @@
+## October 16 — `/protocol` is in the production image
+
+`Dockerfile.mvp` copies `affilio-wp/admin/build/protocol.html` into `/app/assets` with the other hosted pages. `/protocol` loads that file at startup; without the copy the route returns 500. A handler test fails when a page template loaded from `AssetsPath` is missing from that copy list.
+
 ## October 16 — D-048 landing: how it works, sign-in choice, protocol
 
 The home page leads with a How it works bento (five steps, then why an agent matches) before Chapter A. The join line on home, makers, and publishers is the plain pilot sentence. Each hero asks which side you are: “I sell a product” continues to Google and returns to `/owner?setup=maker`; “I run a site” returns to `/owner`. `/protocol` explains the offer rules in plain language, and Protocol is in the header, footer, and command list. `?source=` still rides on those links. The hosted routes are `/protocol` and `/protocol/`.
