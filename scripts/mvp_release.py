@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 import argparse
 import base64
+import hashlib
 import io
 import json
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 from urllib import error, parse, request
 import zipfile
 
@@ -382,6 +385,328 @@ def omit_from_plugin_zip(path):
     return path.startswith(PLUGIN_ROOT + "admin/build/") and hosted_build_file(PurePosixPath(path).name)
 
 
+_canonical_admin_js_ok = False
+_JS_ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "'": "'", '"': '"', "\\": "\\", "`": "`"}
+_HEX = set("0123456789abcdefABCDEF")
+NPM_CI_STDERR_TAIL = 20
+REQUIRED_LABELS = ROOT / "affilio-wp" / "admin" / "build" / "required-labels.json"
+
+
+def _js_hex(value, index, count):
+    end = index + count
+    if end > len(value) or any(char not in _HEX for char in value[index:end]):
+        return None
+    return int(value[index:end], 16)
+
+
+def _js_unescape(value):
+    """Decode JavaScript string escapes, including \\u, \\u{...}, and \\x."""
+    chars = []
+    index = 0
+    length = len(value)
+    while index < length:
+        if value[index] != "\\" or index + 1 >= length:
+            chars.append(value[index])
+            index += 1
+            continue
+        nxt = value[index + 1]
+        if nxt == "u" and index + 2 < length and value[index + 2] == "{":
+            end = value.find("}", index + 3)
+            body = value[index + 3:end] if end > index + 2 else ""
+            if end != -1 and body and all(char in _HEX for char in body):
+                point = int(body, 16)
+                if point <= 0x10FFFF:
+                    chars.append(chr(point))
+                    index = end + 1
+                    continue
+        if nxt == "u":
+            point = _js_hex(value, index + 2, 4)
+            if point is not None:
+                chars.append(chr(point))
+                index += 6
+                continue
+        if nxt == "x":
+            point = _js_hex(value, index + 2, 2)
+            if point is not None:
+                chars.append(chr(point))
+                index += 4
+                continue
+        chars.append(_JS_ESCAPES.get(nxt, nxt))
+        index += 2
+    return "".join(chars)
+
+
+def js_string_literals(text):
+    """Decoded whole string literals, including each static part of a template."""
+    found = []
+    length = len(text)
+    index = 0
+    frames = [("code", 0)]
+
+    def push(raw):
+        if raw:
+            found.append(_js_unescape(raw))
+
+    while index < length:
+        mode, data = frames[-1]
+        char = text[index]
+        if mode == "line":
+            if char == "\n":
+                frames.pop()
+            index += 1
+            continue
+        if mode == "block":
+            if text.startswith("*/", index):
+                frames.pop()
+                index += 2
+                continue
+            index += 1
+            continue
+        if mode in ("squote", "dquote"):
+            quote = "'" if mode == "squote" else '"'
+            if char == "\\":
+                data.append(char)
+                if index + 1 < length:
+                    data.append(text[index + 1])
+                    index += 2
+                else:
+                    index += 1
+                continue
+            if char == quote:
+                push("".join(data))
+                frames.pop()
+                index += 1
+                continue
+            if char == "\n":
+                frames.pop()
+                index += 1
+                continue
+            data.append(char)
+            index += 1
+            continue
+        if mode == "template":
+            if char == "\\":
+                data.append(char)
+                if index + 1 < length:
+                    data.append(text[index + 1])
+                    index += 2
+                else:
+                    index += 1
+                continue
+            if char == "`":
+                push("".join(data))
+                frames.pop()
+                index += 1
+                continue
+            if text.startswith("${", index):
+                push("".join(data))
+                data.clear()
+                frames.append(("code", 1))
+                index += 2
+                continue
+            data.append(char)
+            index += 1
+            continue
+        depth = data
+        if depth and char == "{":
+            frames[-1] = ("code", depth + 1)
+            index += 1
+            continue
+        if depth and char == "}":
+            depth -= 1
+            if depth == 0:
+                frames.pop()
+            else:
+                frames[-1] = ("code", depth)
+            index += 1
+            continue
+        if text.startswith("//", index):
+            frames.append(("line", None))
+            index += 2
+            continue
+        if text.startswith("/*", index):
+            frames.append(("block", None))
+            index += 2
+            continue
+        if char == "'":
+            frames.append(("squote", []))
+            index += 1
+            continue
+        if char == '"':
+            frames.append(("dquote", []))
+            index += 1
+            continue
+        if char == "`":
+            frames.append(("template", []))
+            index += 1
+            continue
+        index += 1
+    return found
+
+
+def user_visible_string_literals(text):
+    """UI copy a built bundle has to keep, such as an Italian label."""
+    found = []
+    seen = set()
+    for value in js_string_literals(text):
+        visible = any(char.isalpha() for char in value) and (
+            any(char.isspace() for char in value) or any(ord(char) > 127 and char.isalpha() for char in value)
+        )
+        if visible and value not in seen:
+            seen.add(value)
+            found.append(value)
+    return found
+
+
+def required_label_manifest():
+    """Hand-maintained admin scripts and the user-facing strings each one must contain."""
+    try:
+        data = json.loads(REQUIRED_LABELS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise ReleaseError("required-labels.json is missing or invalid.") from None
+    require(isinstance(data, dict) and data, "required-labels.json must map build files to labels.")
+    cleaned = {}
+    for name, labels in data.items():
+        require(isinstance(name, str) and name.endswith(".js") and "/" not in name and name not in cleaned, "required-labels.json has an invalid file name.")
+        require(isinstance(labels, list) and labels and all(isinstance(item, str) and item for item in labels), "required-labels.json labels for " + name + " must be strings.")
+        cleaned[name] = list(labels)
+    return cleaned
+
+
+def required_label_script(labels):
+    return "".join("void %s;\n" % json.dumps(label, ensure_ascii=False) for label in labels)
+
+
+def _built_admin_files(build_dir):
+    files = {}
+    if not build_dir.is_dir():
+        return files
+    for path in sorted(build_dir.iterdir()):
+        if not path.is_file():
+            continue
+        if path.suffix == ".js" or path.name.endswith(".js.LEGAL.txt"):
+            files[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return files
+
+
+def _npm(build_dir, args):
+    try:
+        result = subprocess.run(args, cwd=build_dir, capture_output=True, text=True, timeout=180)
+    except (OSError, subprocess.TimeoutExpired):
+        raise ReleaseError("Admin JS rebuild could not run; check node, npm, and the admin/build toolchain.") from None
+    if result.returncode == 0:
+        return
+    if list(args[:2]) == ["npm", "ci"]:
+        lines = (result.stderr or "").splitlines()
+        tail = "\n".join(lines[-NPM_CI_STDERR_TAIL:])
+        raise ReleaseError("npm ci failed:\n" + (tail or "npm ci produced no stderr."))
+    raise ReleaseError("Admin JS rebuild failed; inspect npm locally. Command output was withheld.")
+
+
+def _fresh_admin_hashes(plugin_dir):
+    package_path = plugin_dir / "admin" / "build" / "package.json"
+    if not package_path.is_file():
+        return None
+    try:
+        manifest = json.loads(package_path.read_text())
+    except ValueError:
+        return None
+    if "build" not in manifest.get("scripts", {}):
+        return None
+    with tempfile.TemporaryDirectory() as directory:
+        copy = Path(directory) / "affilio-wp"
+        shutil.copytree(plugin_dir, copy, ignore=shutil.ignore_patterns("node_modules"))
+        build_dir = copy / "admin" / "build"
+        _npm(build_dir, ["npm", "ci", "--ignore-scripts"])
+        _npm(build_dir, ["npm", "run", "build"])
+        first = _built_admin_files(build_dir)
+        _npm(build_dir, ["npm", "run", "build"])
+        second = _built_admin_files(build_dir)
+    if not first or first != second:
+        return None
+    return first
+
+
+def _require_same_file_literals(literals, bundle, source_name):
+    require(isinstance(bundle, str), "Built admin JS is missing admin/build/" + source_name)
+    present = set(js_string_literals(bundle))
+    for literal in literals:
+        require(literal in present, "Built admin JS is missing %r from admin/build/%s" % (literal, source_name))
+
+
+def _require_admin_src_strings(plugin_dir):
+    src = plugin_dir / "admin" / "src"
+    require(src.is_dir(), "Admin JS rebuild is not deterministic and admin/src is missing.")
+    sources = sorted(path for path in src.rglob("*.js") if path.is_file())
+    require(sources, "Admin JS rebuild is not deterministic and admin/src has no scripts.")
+    bundles = {}
+    build_dir = plugin_dir / "admin" / "build"
+    if build_dir.is_dir():
+        for path in sorted(build_dir.glob("*.js")):
+            bundles[path.name] = path.read_text(encoding="utf-8", errors="replace")
+    for source in sources:
+        literals = user_visible_string_literals(source.read_text(encoding="utf-8", errors="replace"))
+        _require_same_file_literals(literals, bundles.get(source.name), source.name)
+
+
+def _admin_build_scripts(files):
+    prefix = PLUGIN_ROOT + "admin/build/"
+    scripts = {}
+    for name, payload in files.items():
+        if not name.startswith(prefix):
+            continue
+        relative = name[len(prefix):]
+        if "/" in relative or not relative.endswith(".js"):
+            continue
+        scripts[relative] = payload.decode("utf-8", "replace")
+    return scripts
+
+
+def _require_zip_admin_labels(files):
+    """Require each hand-maintained build file in this ZIP to contain its own labels."""
+    scripts = _admin_build_scripts(files)
+    for name, labels in required_label_manifest().items():
+        require(name in scripts, "WordPress ZIP is missing admin/build/" + name)
+        present = set(js_string_literals(scripts[name]))
+        for label in labels:
+            require(label in present, "admin/build/%s is missing the label %r" % (name, label))
+
+
+def _require_zip_admin_src_strings(files):
+    prefix = PLUGIN_ROOT + "admin/src/"
+    sources = sorted(name for name in files if name.startswith(prefix) and name.endswith(".js"))
+    if not sources:
+        return
+    bundles = _admin_build_scripts(files)
+    for name in sources:
+        source_name = PurePosixPath(name).name
+        literals = user_visible_string_literals(files[name].decode("utf-8", "replace"))
+        _require_same_file_literals(literals, bundles.get(source_name), source_name)
+
+
+def validate_built_admin_js(plugin_dir):
+    """Fail when admin/build scripts do not match a fresh rebuild of the plugin."""
+    global _canonical_admin_js_ok
+    plugin_dir = Path(plugin_dir).resolve()
+    canonical = (ROOT / "affilio-wp").resolve()
+    if plugin_dir == canonical and _canonical_admin_js_ok:
+        return
+    require((plugin_dir / "admin" / "build").is_dir(), "WordPress plugin is missing admin/build.")
+    fresh = _fresh_admin_hashes(plugin_dir)
+    if fresh is None:
+        _require_admin_src_strings(plugin_dir)
+    else:
+        committed = _built_admin_files(plugin_dir / "admin" / "build")
+        for name, digest in sorted(fresh.items()):
+            require(committed.get(name) == digest, "Built admin JS does not match its source: admin/build/" + name)
+        for name in sorted(set(committed) - set(fresh)):
+            require(False, "Fresh admin build dropped admin/build/" + name)
+        if (plugin_dir / "admin" / "src").is_dir():
+            _require_admin_src_strings(plugin_dir)
+    if plugin_dir == canonical:
+        _canonical_admin_js_ok = True
+
+
 def validate_plugin(data, origin=None):
     del origin  # The plugin no longer bakes a deployment origin into its source.
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
@@ -422,6 +747,8 @@ def validate_plugin(data, origin=None):
                 raise ReleaseError("WordPress ZIP references a path outside the plugin: " + outside[0])
             for relative in sorted(needed):
                 require(PLUGIN_ROOT + relative in files, "WordPress ZIP is missing " + relative)
+        _require_zip_admin_labels(files)
+        _require_zip_admin_src_strings(files)
 
 
 def validate_installer(data):
