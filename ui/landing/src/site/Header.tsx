@@ -5,11 +5,12 @@ import { CommandPalette, type Command } from '@/components/CommandPalette'
 import { track } from '@/lib/track'
 import { signInHref, useSource, withSource } from '@/lib/source'
 
-export type PageKey = 'home' | 'makers' | 'publishers'
+export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol'
 export const siteCommands: Command[] = [
   { id: 'home', label: 'Home', keys: 'h', href: '/' },
   { id: 'maker', label: 'Makers: every advantage', keys: 'm', href: '/makers/' },
   { id: 'publisher', label: 'Publishers: every advantage', keys: 'p', href: '/publishers/' },
+  { id: 'protocol', label: 'Protocol', href: '/protocol/' },
   { id: 'faq', label: 'Money and FAQ', href: '#faq' },
   { id: 'join', label: 'Join the pilot', keys: 'j', href: '#join' },
 ]
@@ -25,11 +26,12 @@ export function Header({ page }: { page: PageKey }) {
   )
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-s0/90 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-2.5 sm:px-5">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-2.5 sm:px-5">
         <Logo />
-        <nav aria-label="Main" className="flex gap-0.5 text-sm">
+        <nav aria-label="Main" className="order-last flex w-full gap-0.5 text-sm sm:order-none sm:w-auto">
           {link('/makers/', 'Makers', 'makers', 'text-maker hover:bg-maker-soft')}
           {link('/publishers/', 'Publishers', 'publishers', 'text-pub hover:bg-pub-soft')}
+          {link('/protocol/', 'Protocol', 'protocol', 'text-t1 hover:bg-s2')}
         </nav>
         <div className="flex items-center gap-2">
           <button type="button" onClick={() => { setPaused((p) => !p); track('motion_toggle', { paused: !paused }) }} aria-pressed={paused}

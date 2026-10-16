@@ -18,12 +18,13 @@ function page(name) {
     .replace(/\{\{if \.PluginReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/g, '$1')
 }
 
-const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html') }
+const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html'), '/protocol': page('protocol.html'), '/protocol/': page('protocol.html') }
 
 function typeFor(file) {
   if (file.endsWith('.css')) return 'text/css; charset=utf-8'
   if (file.endsWith('.woff2')) return 'font/woff2'
   if (file.endsWith('.svg')) return 'image/svg+xml'
+  if (file.endsWith('.webp')) return 'image/webp'
   if (file.endsWith('.js')) return 'text/javascript; charset=utf-8'
   return 'application/octet-stream'
 }
@@ -122,6 +123,33 @@ try {
       if (zip !== '/downloads/affilio.zip') throw new Error(slug + ' zip ' + zip)
       if (route === '/' && (metrics.how !== 1 || metrics.publishers !== 1)) throw new Error('home anchors ' + metrics.how + '/' + metrics.publishers)
       if (metrics.primary !== 1) throw new Error(slug + ' primary count ' + metrics.primary)
+      if (!(await page.getByText('Offer Rails is in an early pilot with a small group of makers and sites.').count())) throw new Error(slug + ' missing the plain pilot line')
+      if (route === '/') {
+        if (!(await page.getByRole('heading', { name: 'From a product to a paid sale, in five steps.' }).count())) throw new Error('how it works bento missing')
+        const folded = (await page.locator('main').innerText()).toLowerCase()
+        const howAt = folded.indexOf('from a product to a paid sale')
+        const chapterAt = folded.indexOf('chapter a')
+        if (howAt < 0 || chapterAt < 0 || howAt > chapterAt) throw new Error('how it works is not before Chapter A ' + howAt + '/' + chapterAt)
+        await page.getByRole('button', { name: 'I run a site' }).click()
+        const siteHref = await page.getByRole('link', { name: 'Continue with Google' }).getAttribute('href')
+        const siteTo = new URL(siteHref, base).searchParams.get('return_to') || ''
+        if (!siteHref.includes('/auth/login') || !siteHref.includes('source=cursor') || !siteTo.startsWith('/owner') || siteTo.includes('setup=')) throw new Error('I run a site href ' + siteHref)
+        await page.screenshot({ path: join(out, 'dialog-site-' + width + '.png') })
+        await page.keyboard.press('Escape')
+        await page.getByRole('button', { name: 'I sell a product' }).click()
+        const sellHref = await page.getByRole('link', { name: 'Continue with Google' }).getAttribute('href')
+        const sellTo = new URL(sellHref, base).searchParams.get('return_to') || ''
+        if (!sellHref.includes('source=cursor') || !sellTo.includes('setup=maker')) throw new Error('I sell a product href ' + sellHref)
+        await page.keyboard.press('Escape')
+      }
+      if (route === '/makers' && await page.getByRole('button', { name: 'I run a site' }).count()) throw new Error('makers page offers the site choice')
+      if (route === '/publishers') {
+        await page.getByRole('button', { name: 'I run a site' }).click()
+        const siteHref = await page.getByRole('link', { name: 'Continue with Google' }).getAttribute('href')
+        const siteTo = new URL(siteHref, base).searchParams.get('return_to') || ''
+        if (!siteTo.startsWith('/owner') || siteTo.includes('setup=')) throw new Error('publisher page site href ' + siteHref)
+        await page.keyboard.press('Escape')
+      }
       if (route === '/' && metrics.shader !== 0) throw new Error('reduced motion still mounted a shader canvas')
       if (route === '/' && metrics.hero !== 'fallback') throw new Error('reduced motion hero is ' + metrics.hero)
     }
@@ -136,6 +164,23 @@ try {
     const owner = await page.request.get(base + '/owner', { maxRedirects: 0 })
     if (owner.status() !== 302 || !owner.headers().location.includes('/auth/login')) throw new Error('owner did not require sign-in')
     await context.close()
+    const protocolContext = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' })
+    const protocolPage = await protocolContext.newPage()
+    await protocolPage.goto(base + '/protocol?source=cursor', { waitUntil: 'networkidle' })
+    const protocolOk = await protocolPage.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
+      title: document.querySelector('h1')?.textContent || '',
+      nav: document.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.getAttribute('href') || '',
+    }))
+    const protocolAxe = await new AxeBuilder({ page: protocolPage }).analyze()
+    const protocolSerious = protocolAxe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
+    await protocolPage.screenshot({ path: join(out, 'protocol-' + width + '.png'), fullPage: true })
+    summary.push({ slug: 'protocol-' + width, ...protocolOk, serious: protocolSerious.map((item) => item.id) })
+    if (!protocolOk.scroll) throw new Error('protocol-' + width + ' scrolls sideways')
+    if (protocolOk.title !== 'An open way for agents to share offers.') throw new Error('protocol heading ' + protocolOk.title)
+    if (!protocolOk.nav.includes('/protocol/') || !protocolOk.nav.includes('source=cursor')) throw new Error('protocol nav ' + protocolOk.nav)
+    if (protocolSerious.length) throw new Error('protocol-' + width + ' axe ' + protocolSerious.map((item) => item.id).join(' '))
+    await protocolContext.close()
   }
   writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2))
   console.log(JSON.stringify(summary, null, 2))

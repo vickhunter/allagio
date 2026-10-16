@@ -94,3 +94,9 @@ body{margin:0;font-weight:500}
   radial-gradient(50% 60% at 88% 30%, #e8edfa 0%, transparent 70%),
   radial-gradient(70% 60% at 60% 90%, #ecefe2 0%, transparent 70%),
   #f7f7ef}
+
+/* D-048 how-it-works: scroll reveal + step highlight. Static under reduced motion. */
+.hiw[data-shown=n] .hiw-tile{opacity:0;transform:translateY(8px)}
+.hiw .hiw-tile{transition:opacity var(--dur-fade,700ms) var(--ease-out,ease-out) calc(var(--i)*90ms),transform var(--dur-fade,700ms) var(--ease-out,ease-out) calc(var(--i)*90ms),border-color 300ms ease-out,box-shadow 300ms ease-out}
+.hiw .hiw-tile[data-active=y]{border-color:rgb(var(--rgb-text-1)/.55);box-shadow:0 10px 24px -16px rgb(var(--rgb-text-1)/.45)}
+@media (prefers-reduced-motion: reduce){.hiw .hiw-tile{opacity:1!important;transform:none!important;transition:none!important}}

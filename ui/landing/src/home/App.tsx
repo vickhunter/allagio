@@ -1,10 +1,12 @@
 import { ArrowRight } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
-import { Checks, JoinSection, PrimaryCta } from '@/site/bits'
+import { Checks, JoinSection } from '@/site/bits'
+import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
-import { driftChips, example, faq, makerAdvantages, publisherAdvantages } from '@/content'
+import { driftChips, example, faq, makerAdvantages, pilotLine, publisherAdvantages } from '@/content'
 import { HeroShader } from './HeroShader'
+import { HowItWorks } from './HowItWorks'
 import { useSource, withSource } from '@/lib/source'
 
 // Home = C Editorial (Victor, 16 Oct). One Shaders effect behind the hero, real offers drifting at the edge.
@@ -27,7 +29,11 @@ export function App() {
             </h1>
             <div className="mt-8 grid gap-6 border-t border-t1 pt-6 md:grid-cols-[1.1fr_1fr] md:items-start">
               <p className="text-lg leading-relaxed text-t2">Offer Rails is the protocol between them. Agents find the match, check it, place it and keep the record. You keep the switch.</p>
-              <PrimaryCta where="home_hero" />
+              <div>
+                <p className="mb-3 text-[13px] font-semibold text-t2">Sign in. Which one are you?</p>
+                <SignInChoice where="hero" />
+                <p className="mt-2 text-[13px] text-t2">One account can do both.</p>
+              </div>
             </div>
           </div>
           <Drift />
@@ -42,7 +48,9 @@ export function App() {
         </div>
       </section>
 
-      <section id="how" aria-labelledby="sides-h" className="border-t border-line">
+      <HowItWorks />
+
+      <section aria-labelledby="sides-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <p className="eyebrow">Chapter A · Two sides, one rail</p>
           <h2 id="sides-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">On a {example.price} sale at {example.commission}, the publisher earns {example.publisher}. The maker keeps {example.maker}.</h2>
@@ -62,7 +70,7 @@ export function App() {
         </div>
       </section>
 
-      <JoinSection title="Not sure which side? Pick both." sub="Pilot: 3 paid products and 3 independent audiences, WordPress first. One account sells and publishes." />
+      <JoinSection title="Not sure which side? Pick both." sub={pilotLine} />
     </Page>
   )
 }

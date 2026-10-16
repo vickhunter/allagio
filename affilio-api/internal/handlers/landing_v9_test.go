@@ -27,7 +27,7 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	r := gin.New()
 	h.Mount(r)
 
-	for _, path := range []string{"/", "/makers", "/makers/", "/publishers", "/publishers/"} {
+	for _, path := range []string{"/", "/makers", "/makers/", "/publishers", "/publishers/", "/protocol", "/protocol/"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusOK {
@@ -52,6 +52,11 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	}
 	if strings.Contains(body, "source=") {
 		t.Fatal("home without a source tag rewrote owner links")
+	}
+	protocol := httptest.NewRecorder()
+	r.ServeHTTP(protocol, httptest.NewRequest(http.MethodGet, "/protocol/", nil))
+	if !strings.Contains(protocol.Body.String(), "Offer Rails · Protocol") {
+		t.Fatal("protocol page title missing")
 	}
 
 	owner := httptest.NewRecorder()

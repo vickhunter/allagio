@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { Terminal } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
-import { Checks, JoinSection, PrimaryCta } from '@/site/bits'
+import { Checks, JoinSection } from '@/site/bits'
+import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { example, faq, feed, makerAdvantages, surfaces } from '@/content'
+import { example, faq, feed, makerAdvantages, pilotLine, surfaces } from '@/content'
 import { useOfferConfig } from '@/lib/source'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
@@ -24,7 +25,7 @@ export function App() {
           <Badge variant="maker">For makers · {makerAdvantages.length} advantages</Badge>
           <h1 id="hero-h" className="h-display mt-4 text-[42px] sm:text-6xl lg:text-7xl">Sell anywhere<br />there’s space.</h1>
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-t2">List what you sell with a referral offer. Publishers’ agents place it in posts that fit. You pay only when a sale is attributed.</p>
-          <div className="mt-7"><PrimaryCta label="Start as a maker" where="makers_hero" role="maker" /></div>
+          <div className="mt-7"><SignInChoice where="makers_hero" only="maker" /></div>
         </div>
         <Card className="anim-fade p-5 [animation-delay:150ms]">
           <p className="eyebrow">Example sale</p>
@@ -79,7 +80,7 @@ export function App() {
           <Accordion tone="maker" items={[faq[1], faq[0], faq[2], faq[4]]} />
         </div>
       </section>
-      <JoinSection role="maker" title="Put your product on the rails." sub="Pilot: 3 paid products and 3 independent audiences, WordPress first." />
+      <JoinSection role="maker" title="Put your product on the rails." sub={pilotLine} />
     </Page>
   )
 }

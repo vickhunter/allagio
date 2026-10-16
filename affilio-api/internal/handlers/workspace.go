@@ -93,6 +93,8 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/makers/", h.Makers)
 		public.GET("/publishers", h.Publishers)
 		public.GET("/publishers/", h.Publishers)
+		public.GET("/protocol", h.Protocol)
+		public.GET("/protocol/", h.Protocol)
 		public.Static("/landing-v9", filepath.Join(h.AssetsPath, "landing-v9"))
 		for _, name := range []string{"workspace.css", "workspace.js", "setup-controls.js", "landing.css", "landing.js", "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt", "THIRD_PARTY_NOTICES.md"} {
 			file := name
@@ -138,6 +140,7 @@ func (h *HostedHandler) installCommand() string {
 func (h *HostedHandler) Home(c *gin.Context)       { h.landing(c, "home.html") }
 func (h *HostedHandler) Makers(c *gin.Context)     { h.landing(c, "makers.html") }
 func (h *HostedHandler) Publishers(c *gin.Context) { h.landing(c, "publishers.html") }
+func (h *HostedHandler) Protocol(c *gin.Context)   { h.landing(c, "protocol.html") }
 
 func (h *HostedHandler) landing(c *gin.Context, name string) {
 	page, err := template.ParseFiles(filepath.Join(h.AssetsPath, name))

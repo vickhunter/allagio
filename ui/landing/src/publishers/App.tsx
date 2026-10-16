@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { Undo2 } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
-import { Checks, JoinSection, PrimaryCta } from '@/site/bits'
+import { Checks, JoinSection } from '@/site/bits'
+import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { example, faq, publisherAdvantages, surfaces } from '@/content'
+import { example, faq, pilotLine, publisherAdvantages, surfaces } from '@/content'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
 
@@ -30,7 +31,7 @@ export function App() {
             <Badge variant="pub">For publishers · {publisherAdvantages.length} advantages</Badge>
             <h1 id="hero-h" className="h-display mt-5 text-[42px] sm:text-6xl">The right offer,<br className="hidden sm:block" /> travelling to your page.</h1>
             <p className="mt-5 max-w-lg text-lg leading-relaxed text-t2">A blog, an X account, a shop: the space you already have, earning per sale. Every step lands in one digest you can undo.</p>
-            <div className="mt-7"><PrimaryCta label="Start as a publisher" where="publishers_hero" role="publisher" /></div>
+            <div className="mt-7"><SignInChoice where="publishers_hero" only="publisher" /></div>
           </div>
           <LivePanel />
         </div>
@@ -66,7 +67,7 @@ export function App() {
           <Accordion tone="pub" items={[faq[3], faq[1], faq[2], faq[4], faq[0]]} />
         </div>
       </section>
-      <JoinSection role="publisher" title="Get on the first train." sub="Pilot: 3 paid products and 3 independent audiences, WordPress first." />
+      <JoinSection role="publisher" title="Get on the first train." sub={pilotLine} />
     </Page>
   )
 }
