@@ -52,7 +52,7 @@ export function JoinForm({ role: initial = 'both', cta = 'Sign in with Google', 
       ) : (
         <p className="text-[13px] text-t2">The WordPress plugin download is prepared with the hosted package.</p>
       )}
-      <p className="text-[13px] text-t2">We never hold your money. Publishers pay nothing during the pilot.</p>
+      <p className="text-[13px] text-t2">We never hold your money.</p>
     </div>
   )
 }

@@ -2,7 +2,6 @@
 export const brand = 'Offer Rails'
 export const tagline = 'Distribution your agents can negotiate.'
 export const pitch = 'Makers list what they sell with a referral offer. Publishers place it in their own content. Agents on both sides do the discovery and the matchmaking. One account can be both.'
-// "Free to join" is not confirmed. It is not rendered.
 
 export const example = { product: 'Hand-bound notebook', price: '€24.00', commission: '10%', publisher: '€2.40', maker: '€21.60' }
 
@@ -42,7 +41,7 @@ export const feed = [
 
 export const faq = [
   { q: 'Do you hold or move the money?', a: 'No. Your payment provider (Stripe, Polar, Lemon Squeezy, Paddle and others through adapters) handles checkout. We record attribution, refunds and commission, and show whether a sale was provider-attested or seller-reported.' },
-  { q: 'What does it cost?', a: 'During the pilot the maker pays a fee of 10% of the publisher commission. On a €24 sale with 10% commission the publisher earns €2.40 and the fee is €0.24. Publishers pay nothing.' },
+  { q: 'What does it cost?', a: 'During the pilot the maker pays a fee of 10% of the publisher commission. On a €24 sale with 10% commission the publisher earns €2.40 and the fee is €0.24.' },
   { q: 'What does my agent share?', a: 'An Offer card (project, category, commission terms) or an Audience card (surface, topic, size bucket). Never customer names, emails or lists. Enforced in code, not policy text.' },
   { q: 'Can I take a placement back?', a: 'Yes. Undo is one tap in the digest. The box leaves the page at the plugin’s next sync (every 5 minutes) plus any page-cache delay, and clicks stop at the link right away.' },
   { q: 'What if I have no sales yet?', a: 'Swap visibility. Two sites with overlapping topics can cross-promote each other through the same rails, no money involved.' },
@@ -73,7 +72,7 @@ export const makerAdvantages = [
 ] as const
 
 export const publisherAdvantages = [
-  { k: 'free', t: 'Publishers pay nothing', b: 'The pilot fee is paid by the maker. You earn per sale: €2.40 on a €24 sale at 10%.', big: true },
+  { k: 'free', t: 'You earn per sale', b: 'The pilot fee is paid by the maker. You earn per sale: €2.40 on a €24 sale at 10%.', big: true },
   { k: 'one', t: 'One honest box per post', b: 'At most one offer per post, placed in the matching section, labelled and rel="sponsored". Never a wall of ads.' },
   { k: 'fit', t: 'Only offers that fit', b: 'An offer needs a relevance score of 25 or higher and must be live before it can be placed.' },
   { k: 'switch', t: 'You hold the switch', b: 'Ask every time, approve within your rules (categories, minimum relevance, positions, a 30-day cap), or approve anything that passes the checks.' },

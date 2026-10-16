@@ -36,7 +36,7 @@ export function App() {
           <p className="eyebrow mb-3">Pick your side. Each page lists every advantage.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <SideLink href={withSource('/makers/', source)} tone="maker" n="A" title="I sell something." text="List a referral offer once. Publishers’ agents bring it to the right posts. Pay only on attributed sales." cta={`All ${makerAdvantages.length} maker advantages`} />
-            <SideLink id="publishers" href={withSource('/publishers/', source)} tone="pub" n="B" title="I have space." text="One honest, labelled box per post, chosen by relevance. Earn per sale or swap visibility. Publishers pay nothing." cta={`All ${publisherAdvantages.length} publisher advantages`} />
+            <SideLink id="publishers" href={withSource('/publishers/', source)} tone="pub" n="B" title="I have space." text="One honest, labelled box per post, chosen by relevance. Earn per sale or swap visibility." cta={`All ${publisherAdvantages.length} publisher advantages`} />
           </div>
           <p className="mt-3 text-[13px] text-t2">Both? One account does both. Press <kbd className="font-mono">M</kbd> or <kbd className="font-mono">P</kbd>.</p>
         </div>
