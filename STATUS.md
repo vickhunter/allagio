@@ -4,7 +4,7 @@
 
 ## October 16 — landing v9 and Offer Rails
 
-The hosted home is landing v9: home, `/makers`, and `/publishers`, with the Padova skyline and one home hero shader that stays on the static gradient when motion is reduced or WebGPU is missing. Sign-in goes to Google through `/auth/login` and returns to `/owner`, `/owner?setup=maker`, or `/owner/settings`. The install command and `/downloads/affilio.zip` replace the waitlist. `?source=` and the `or_source` cookie from `/from/<tag>` stay on those links. Visible Distributoor wording on the hosted pages is Offer Rails. The installer filename stays in the pasteable command when that download is on disk, because the release check looks for it.
+The hosted home is landing v9: home, `/makers`, and `/publishers`, with the Padova skyline and one home hero shader that stays on the static gradient when motion is reduced or WebGPU is missing. Sign-in goes to Google through `/auth/login` and returns to `/owner`, `/owner?setup=maker`, or `/owner/settings`. The install command and `/downloads/affilio.zip` replace the waitlist. `?source=` and the `or_source` cookie from `/from/<tag>` stay on those links. Visible Distributoor wording on the hosted pages is Offer Rails. The installer filename stays in the pasteable command when that download is on disk, because the release check looks for it. The unused pricing draft component is gone. The join form keeps “We never hold your money.” The publisher card title is “You earn per sale,” already the card body. The FAQ and publisher descriptions drop the unconfirmed closer.
 
 ## October 15 — hand-maintained admin scripts must contain their labels
 
