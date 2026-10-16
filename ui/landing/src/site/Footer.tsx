@@ -33,6 +33,7 @@ export function Footer() {
               <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/', source)}>Home</a>
               <a className="inline-flex min-h-11 min-w-11 items-center text-maker underline-offset-4 hover:underline" href={withSource('/makers/', source)}>For makers</a>
               <a className="inline-flex min-h-11 min-w-11 items-center text-pub underline-offset-4 hover:underline" href={withSource('/publishers/', source)}>For publishers</a>
+              <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/protocol/', source)}>Protocol</a>
               <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href="/#how">How it works</a>
               <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/owner/settings', source)}>MCP and setup</a>
             </nav>

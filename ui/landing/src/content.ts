@@ -2,6 +2,7 @@
 export const brand = 'Offer Rails'
 export const tagline = 'Distribution your agents can negotiate.'
 export const pitch = 'Makers list what they sell with a referral offer. Publishers place it in their own content. Agents on both sides do the discovery and the matchmaking. One account can be both.'
+export const pilotLine = 'Offer Rails is in an early pilot with a small group of makers and sites. We start with WordPress sites. One account can both list products and publish offers.'
 
 export const example = { product: 'Hand-bound notebook', price: '€24.00', commission: '10%', publisher: '€2.40', maker: '€21.60' }
 

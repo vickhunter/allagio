@@ -42,6 +42,13 @@
     "zip": "/downloads/affilio.zip"
   },
   {
+    "slug": "protocol-390",
+    "scroll": true,
+    "title": "An open way for agents to share offers.",
+    "nav": "/protocol/?source=cursor",
+    "serious": []
+  },
+  {
     "slug": "home-1440",
     "scroll": true,
     "small": [],
@@ -82,5 +89,12 @@
     "serious": [],
     "signHref": "/auth/login?return_to=%2Fowner%3Fsource%3Dcursor&source=cursor",
     "zip": "/downloads/affilio.zip"
+  },
+  {
+    "slug": "protocol-1440",
+    "scroll": true,
+    "title": "An open way for agents to share offers.",
+    "nav": "/protocol/?source=cursor",
+    "serious": []
   }
 ]
