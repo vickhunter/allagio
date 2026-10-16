@@ -20,6 +20,12 @@ var landingEventNames = map[string]struct{}{
 }
 
 func (h *HostedHandler) RecordLandingEvent(c *gin.Context) {
+	// ClientIP uses the engine's trusted-proxy list. Mount sets that list from
+	// TRUSTED_PROXIES and leaves it empty locally, which ignores forwarded
+	// headers. On Render, the list is the load balancer and the proxies in
+	// front of it. Gin then walks X-Forwarded-For from the right and stops at
+	// the address Render appended. A caller-supplied value further left is not
+	// the key.
 	ip := strings.TrimSpace(c.ClientIP())
 	if ip == "" {
 		ip = "unknown"

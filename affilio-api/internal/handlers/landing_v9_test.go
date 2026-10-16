@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -143,9 +145,20 @@ func landingApp(t *testing.T, db *database.DB, limiter *IPRateLimiter) (*HostedH
 
 func postLandingEvent(t *testing.T, r http.Handler, raw, query string, cookie *http.Cookie, referer string) *httptest.ResponseRecorder {
 	t.Helper()
+	return postLandingEventFrom(t, r, raw, query, cookie, referer, "203.0.113.8:4242", "", "")
+}
+
+func postLandingEventFrom(t *testing.T, r http.Handler, raw, query string, cookie *http.Cookie, referer, remote, forwardedFor, realIP string) *httptest.ResponseRecorder {
+	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/events"+query, strings.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
-	req.RemoteAddr = "203.0.113.8:4242"
+	req.RemoteAddr = remote
+	if forwardedFor != "" {
+		req.Header.Set("X-Forwarded-For", forwardedFor)
+	}
+	if realIP != "" {
+		req.Header.Set("X-Real-IP", realIP)
+	}
 	if cookie != nil {
 		req.AddCookie(cookie)
 	}
@@ -268,6 +281,140 @@ func TestLandingEventRateLimit(t *testing.T) {
 	if landingEventCount(t, db) != 2 {
 		t.Fatalf("stored %d events past the limit", landingEventCount(t, db))
 	}
+}
+
+func TestLandingEventRotatingForwardedForStillHitsTheLimit(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	_, r := landingApp(t, db, nil)
+	const body = `{"event":"landing_view","source":"test"}`
+	for i := 0; i < 60; i++ {
+		forwarded := fmt.Sprintf("198.51.100.%d, 203.0.113.%d", i%200, (i+1)%200)
+		realIP := fmt.Sprintf("192.0.2.%d", (i%250)+1)
+		rec := postLandingEventFrom(t, r, body, "", nil, "", "203.0.113.8:4242", forwarded, realIP)
+		if rec.Code != http.StatusNoContent {
+			t.Fatalf("event %d: %d %s", i, rec.Code, rec.Body.String())
+		}
+	}
+	rec := postLandingEventFrom(t, r, body, "", nil, "", "203.0.113.8:4242", "198.51.100.250, 203.0.113.250", "192.0.2.250")
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("rate limit: %d %s", rec.Code, rec.Body.String())
+	}
+	if landingEventCount(t, db) != 60 {
+		t.Fatalf("stored %d events past the limit", landingEventCount(t, db))
+	}
+}
+
+func TestLandingEventTrustedProxyUsesRightmostForwardedIP(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	h := &HostedHandler{
+		DB:             db,
+		BaseURL:        "http://127.0.0.1:8080",
+		AssetsPath:     filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"),
+		DownloadsPath:  t.TempDir(),
+		EventLimiter:   NewIPRateLimiter(1, time.Minute),
+		TrustedProxies: "192.0.2.1",
+	}
+	r := gin.New()
+	h.Mount(r)
+	const body = `{"event":"zip_download","source":"test"}`
+	first := postLandingEventFrom(t, r, body, "", nil, "", "192.0.2.1:9", "203.0.113.50, 198.51.100.10", "203.0.113.50")
+	spoofedLeft := postLandingEventFrom(t, r, body, "", nil, "", "192.0.2.1:9", "203.0.113.51, 198.51.100.10", "203.0.113.51")
+	otherClient := postLandingEventFrom(t, r, body, "", nil, "", "192.0.2.1:9", "203.0.113.51, 198.51.100.11", "203.0.113.51")
+	if first.Code != http.StatusNoContent || spoofedLeft.Code != http.StatusTooManyRequests || otherClient.Code != http.StatusNoContent {
+		t.Fatalf("rightmost client IP: %d, %d, %d", first.Code, spoofedLeft.Code, otherClient.Code)
+	}
+}
+
+func TestWordPressDownloadZipIsCachedUntilTheFileChanges(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	first := releasePluginZip(t, nil)
+	if err := os.WriteFile(filepath.Join(dir, "affilio.zip"), first, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h := &HostedHandler{
+		BaseURL:       "http://127.0.0.1:8080",
+		AssetsPath:    filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"),
+		DownloadsPath: dir,
+	}
+	r := gin.New()
+	h.Mount(r)
+	server := httptest.NewServer(r)
+	t.Cleanup(server.Close)
+
+	getBody := fetchZip(t, server.URL, http.MethodGet)
+	headResp, err := http.Head(server.URL + "/downloads/affilio.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	headResp.Body.Close()
+	again := fetchZip(t, server.URL, http.MethodGet)
+	if h.pluginZipBuildCount() != 1 {
+		t.Fatalf("builds after HEAD and GET = %d", h.pluginZipBuildCount())
+	}
+	if !bytes.Equal(getBody, again) {
+		t.Fatal("cached zip bytes changed")
+	}
+	if headResp.Header.Get("Content-Length") != fmt.Sprintf("%d", len(getBody)) {
+		t.Fatalf("HEAD Content-Length %q, body %d", headResp.Header.Get("Content-Length"), len(getBody))
+	}
+
+	revised := releasePluginZip(t, func(main []byte) []byte {
+		return bytes.Replace(main, []byte("Version: 0.1.31"), []byte("Version: 0.1.32"), 1)
+	})
+	if bytes.Equal(first, revised) {
+		t.Fatal("revised plugin zip matched the first")
+	}
+	if err = os.WriteFile(filepath.Join(dir, "affilio.zip"), revised, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	changed := fetchZip(t, server.URL, http.MethodGet)
+	if bytes.Equal(getBody, changed) {
+		t.Fatal("zip cache ignored a new source file")
+	}
+	if h.pluginZipBuildCount() != 2 {
+		t.Fatalf("builds after the source changed = %d", h.pluginZipBuildCount())
+	}
+	_ = fetchZip(t, server.URL, http.MethodHead)
+	if h.pluginZipBuildCount() != 2 {
+		t.Fatalf("HEAD rebuilt a cached zip, builds = %d", h.pluginZipBuildCount())
+	}
+}
+
+func (h *HostedHandler) pluginZipBuildCount() int {
+	h.pluginZipMu.Lock()
+	defer h.pluginZipMu.Unlock()
+	return h.pluginZipBuilds
+}
+
+func fetchZip(t *testing.T, base, method string) []byte {
+	t.Helper()
+	req, err := http.NewRequest(method, base+"/downloads/affilio.zip", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("%s status %d", method, resp.StatusCode)
+	}
+	if method == http.MethodHead && len(body) != 0 {
+		t.Fatalf("HEAD body len %d", len(body))
+	}
+	if method == http.MethodGet && len(body) == 0 {
+		t.Fatal("GET body empty")
+	}
+	return body
 }
 
 func TestFromSourceSurvivesStrictReferrer(t *testing.T) {

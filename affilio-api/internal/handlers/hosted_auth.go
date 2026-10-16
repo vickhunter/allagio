@@ -12,9 +12,11 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/middleware"
 	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"
@@ -35,6 +37,13 @@ type HostedHandler struct {
 	DemoCheckoutURL string
 	ClaimsCheck     string
 	EventLimiter    *IPRateLimiter
+	// TrustedProxies is the TRUSTED_PROXIES list. Empty trusts no proxy.
+	TrustedProxies string
+
+	pluginZipMu     sync.Mutex
+	pluginZipKey    string
+	pluginZipBody   []byte
+	pluginZipBuilds int
 }
 
 func ValidatePublicURL(raw string) error {
@@ -78,6 +87,11 @@ func (h *HostedHandler) cookie(c *gin.Context, name, value string, maxAge int) {
 func (h *HostedHandler) Mount(r *gin.Engine) {
 	if h.EventLimiter == nil {
 		h.EventLimiter = NewIPRateLimiter(60, time.Minute)
+	}
+	// Gin trusts every proxy until this runs. An empty list trusts none, so a
+	// client cannot pick a new rate-limit key with X-Forwarded-For.
+	if err := middleware.ConfigureTrustedProxies(r, h.TrustedProxies); err != nil {
+		_ = middleware.ConfigureTrustedProxies(r, "")
 	}
 	public := r.Group("", h.headers)
 	public.POST("/api/events", h.RecordLandingEvent)

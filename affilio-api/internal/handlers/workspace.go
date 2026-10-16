@@ -3,6 +3,8 @@ package handlers
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -174,11 +176,38 @@ func (h *HostedHandler) wordpressZip() ([]byte, int) {
 	if h.DownloadsPath == "" {
 		return nil, http.StatusServiceUnavailable
 	}
-	source, err := zip.OpenReader(filepath.Join(h.DownloadsPath, "affilio.zip"))
+	raw, err := os.ReadFile(filepath.Join(h.DownloadsPath, "affilio.zip"))
 	if err != nil {
 		return nil, http.StatusServiceUnavailable
 	}
-	defer source.Close()
+	sum := sha256.Sum256(raw)
+	key := hex.EncodeToString(sum[:]) + "\n" + h.BaseURL
+	h.pluginZipMu.Lock()
+	if h.pluginZipKey == key && h.pluginZipBody != nil {
+		payload := h.pluginZipBody
+		h.pluginZipMu.Unlock()
+		return payload, http.StatusOK
+	}
+	h.pluginZipMu.Unlock()
+	payload, code := buildWordPressZip(raw, h.BaseURL)
+	if code != http.StatusOK {
+		return nil, code
+	}
+	h.pluginZipMu.Lock()
+	if h.pluginZipKey != key {
+		h.pluginZipBuilds++
+	}
+	h.pluginZipKey = key
+	h.pluginZipBody = payload
+	h.pluginZipMu.Unlock()
+	return payload, http.StatusOK
+}
+
+func buildWordPressZip(raw []byte, baseURL string) ([]byte, int) {
+	source, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		return nil, http.StatusServiceUnavailable
+	}
 	var output bytes.Buffer
 	writer := zip.NewWriter(&output)
 	for _, file := range source.File {
@@ -194,7 +223,7 @@ func (h *HostedHandler) wordpressZip() ([]byte, int) {
 		if err != nil {
 			return nil, http.StatusInternalServerError
 		}
-		data = rewriteDownloadedPlugin(file.Name, data, h.BaseURL)
+		data = rewriteDownloadedPlugin(file.Name, data, baseURL)
 		header := &zip.FileHeader{Name: file.Name, Method: zip.Deflate, Modified: file.Modified}
 		entry, err := writer.CreateHeader(header)
 		if err != nil {
