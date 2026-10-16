@@ -1,102 +1,30 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Connect what you build to the people who publish. Agent setup, relevant WordPress recommendations and commissions from attributed purchases.">
-<title>Distributoor — a distribution channel for what you build</title>
-<link rel="stylesheet" href="/assets/workspace.css">
-<link rel="stylesheet" href="/assets/landing.css">
-<script src="/assets/setup-controls.js" defer></script>
-<script src="/assets/landing.js" type="module"></script>
-</head>
-<body class="landing">
-<a class="skip" href="#main">Skip to content</a>
-<header class="site-header">
-<a class="brand" href="/">distributoor<span class="brand-dot">↗</span></a>
-<nav aria-label="Main"><a href="#how">How it works</a><a href="/owner">Open workspace ↗</a></nav>
-</header>
-<main id="main">
-<section class="hero">
-<div class="hero-copy">
-<span class="eyebrow">AGENT-NATIVE DISTRIBUTION <span class="hero-divider">/</span> EARLY ACCESS</span>
-<h1>You built it.<br>Give it a<br><em>distribution channel.</em></h1>
-<p>Connect what you build to the people who publish. Your agent helps prepare the product. Publishers find relevant offers, approve recommendations and earn from attributed purchases.</p>
-<div class="actions"><a class="button" data-primary-action href="/owner?setup=maker">Get customers ↗</a><a class="button secondary" href="#publishers">Earn from your content</a></div>
-<p class="caption">Your agent. Your product. Your audience.</p>
-</div>
-<figure class="distribution-world">
-<div class="world-heading"><span class="eyebrow">A PRODUCT FINDS ITS PEOPLE</span><span class="world-edition">FIG. 01</span></div>
-<div class="world-stage" aria-hidden="true">
-<svg class="world-fallback" viewBox="0 0 560 410" xmlns="http://www.w3.org/2000/svg">
-<defs>
-<linearGradient id="tile" x2="0" y2="1"><stop stop-color="#fcf7df"/><stop offset="1" stop-color="#dcdcc2"/></linearGradient>
-<linearGradient id="hub" x2="1" y2="1"><stop stop-color="#f1ad77"/><stop offset="1" stop-color="#ce6043"/></linearGradient>
-<pattern id="grid" width="52" height="30" patternUnits="userSpaceOnUse" patternTransform="translate(0 200) skewY(-18)"><path d="M0 0H52V30" fill="none" stroke="#70927a" stroke-opacity=".2"/></pattern>
-</defs>
-<path d="M0 235L280 110 560 235 280 400Z" fill="url(#grid)"/>
-<ellipse cx="280" cy="299" rx="195" ry="59" fill="#10271f" opacity=".4"/>
-<path d="M137 250L279 304 433 227M279 304L416 352" fill="none" stroke="#91a788" stroke-width="3"/>
-<path d="M137 250L279 304 433 227M279 304L416 352" fill="none" stroke="#e8ba79" stroke-width="3" stroke-dasharray="8 42"/>
-<g transform="translate(64 95)">
-<path d="M8 34L103 0 183 40 87 74Z" fill="#f7f1d8"/><path d="M87 74L183 40V159L87 196Z" fill="#a2b8a2"/><path d="M8 34L87 74V196L8 155Z" fill="#d7dfc8"/>
-<path d="M15 48L80 81V167L15 135Z" fill="#273f34"/>
-<path d="M30 80L40 95 30 100M47 108L66 119" fill="none" stroke="#f3c482" stroke-width="4" stroke-linecap="round"/>
-<circle cx="137" cy="83" r="5" fill="#ecb26c"/>
-</g>
-<g transform="translate(222 150)">
-<path d="M0 44L61 12 130 44 67 80Z" fill="#f9c78b"/><path d="M67 80L130 44V117L67 153Z" fill="#aa4a35"/><path d="M0 44L67 80V153L0 117Z" fill="url(#hub)"/>
-<path d="M26 105L48 92M35 86L48 92 48 108" fill="none" stroke="#fff0d1" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M61 12V0M47 4L39 0M76 4L83 0" stroke="#e8ba79" stroke-width="2" stroke-linecap="round"/>
-</g>
-<g transform="translate(365 50)">
-<path d="M0 36L67 10 108 32V154L41 181 0 159Z" fill="#bbcfb3"/><path d="M5 39L69 15V151L5 175Z" fill="url(#tile)"/>
-<path d="M16 61L57 45V75L16 91Z" fill="#789477"/><path d="M16 107L57 91M16 121L52 107M16 135L43 124" stroke="#94a18c" stroke-width="4"/>
-</g>
-<g transform="translate(389 235)">
-<path d="M0 29L50 9 88 29V109L37 131 0 111Z" fill="#b9cbb0"/><path d="M5 32L52 13V108L5 128Z" fill="#f4efda"/>
-<path d="M14 53L42 41M14 68L42 56M14 83L38 73" stroke="#95a28c" stroke-width="4"/>
-<path d="M14 96L41 85V101L14 113Z" fill="#d59066"/>
-</g>
-<circle cx="210" cy="277" r="4" fill="#f2c883"/><circle cx="374" cy="259" r="4" fill="#f2c883"/><circle cx="352" cy="331" r="4" fill="#f2c883"/>
-</svg>
-</div>
-<figcaption>
-<ol class="world-legend"><li><span>01</span>Your product</li><li><span>02</span>A useful recommendation</li><li><span>03</span>An attributed purchase</li></ol>
-<div class="world-caption"><span>Distribution loop · illustration</span><button type="button" class="motion-toggle" data-motion hidden>Pause illustration</button></div>
-</figcaption>
-</figure>
-</section>
-<div class="principles"><span>Use the agent you already have.</span><span>Approve what reaches your audience.</span><span>Pay commission on attributed purchases.</span></div>
-<section class="entry-points" id="how" aria-label="Get started">
-<article>
-<span class="eyebrow">01 / FOR BUILDERS</span>
-<h2>Keep building.<br>Connect your agent.</h2>
-<p>Start in your product repository. Setup installs MCP and skills; your agent helps wire checkout attribution. You choose the commission and connect Stripe.</p>
-{{if .InstallerReady}}
-<div class="install-box copy-field">
-<div class="install-heading"><label class="command-label" for="install">RUN IN YOUR PRODUCT REPOSITORY</label><button class="copy-action" type="button" data-copy>Copy command</button></div>
-<textarea class="command" id="install" readonly rows="4" spellcheck="false">{{.InstallCommand}}</textarea>
-<span class="copy-status" role="status" aria-live="polite"></span>
-</div>
-{{else}}<p class="notice">The installer download is being prepared. You can register your product in the workspace.</p>{{end}}
-<a class="text-link" href="/owner?setup=maker">Register your product ↗</a>
-<p class="caption">Node 20+ · Codex CLI handoff · Cursor and Claude configuration · portable skills. Owner sign-in and payment configuration are required.</p>
-</article>
-<article id="publishers">
-<span class="eyebrow">02 / FOR PUBLISHERS</span>
-<h2>Your next recommendation<br>can earn its keep.</h2>
-<p>Connect your WordPress site. Scan published posts, find relevant offers and review the copy and commission terms. Publish when it fits.</p>
-{{if .PluginReady}}<a class="button secondary plugin-download" href="/downloads/affilio.zip"><span class="plugin-icon" aria-hidden="true">W</span>Download WordPress plugin ↓</a>{{else}}<p class="notice">The plugin download is being prepared.</p>{{end}}
-<ol class="publisher-steps"><li><span>1</span>Upload ZIP and activate</li><li><span>2</span>Connect your site and find a match</li><li><span>3</span>Approve and publish a tracked recommendation</li></ol>
-<p class="caption">You approve every insertion. This version supports WordPress articles.</p>
-</article>
-</section>
-<section class="scope-note">
-<div><span class="eyebrow">THE FIRST CHAPTER</span><h2>One useful loop,<br>end to end.</h2><a class="text-link" href="/owner">Start in your workspace ↗</a></div>
-<div><p>Register a product, list a reviewed offer and publish a relevant recommendation. Stripe purchase and refund records keep attribution and commissions connected.</p><p class="caption">One-time Stripe checkout · USD, EUR and GBP. Offer listing requires readiness and review. Test activity is labelled separately. Merchants pay publishers directly; publishers confirm receipt.</p></div>
-</section>
-</main>
-<footer class="site-footer"><a class="brand" href="/">distributoor↗</a><span>Build something worth recommending.</span><a href="/owner/settings">MCP & setup</a></footer>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/landing-v9/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Makers list offers, publishers place them, agents do the matchmaking. One account can be both." />
+    <title>Offer Rails · Distribution your agents can negotiate</title>
+    <script type="module" crossorigin src="/landing-v9/assets/index-CLfdbchB.js"></script>
+    <link rel="modulepreload" crossorigin href="/landing-v9/assets/bits-oRiUJw0T.js">
+    <link rel="stylesheet" crossorigin href="/landing-v9/assets/bits-w4Yp4-Mc.css">
+      <meta name="or-install" content="{{if .InstallerReady}}{{.InstallCommand}}{{else}}{{end}}">
+    <meta name="or-plugin" content="{{if .PluginReady}}1{{else}}0{{end}}">
+  </head>
+  <body>
+    <div id="static-landing">
+    <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+    <main id="main">
+      <h1>Someone has the product. Someone has the space.</h1>
+      <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
+      <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
+      <p><a href="/downloads/affilio.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
+      <div class="hero-fallback" style="min-height:240px"></div>
+      <section id="how"><h2>How it works</h2></section>
+      <section id="publishers"><h2>For publishers</h2></section>
+    </main>
+  </div>
+    <div id="root"></div>
+  </body>
 </html>

@@ -10,6 +10,7 @@ affilio-api/affilio-server
 packages/distributoor-setup/skills/
 packages/distributoor-setup/*.tgz
 **/node_modules/
+ui/landing/dist/
 affilio-wp/e2e/test-results/
 affilio-wp/e2e/playwright-report/
 __pycache__/

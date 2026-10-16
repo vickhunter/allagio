@@ -1772,6 +1772,7 @@ func (h *AgentEntry) FromSource(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "redirect unavailable"})
 		return
 	}
+	http.SetCookie(c.Writer, &http.Cookie{Name: "or_source", Value: source, Path: "/", MaxAge: 60 * 60 * 24 * 30, SameSite: http.SameSiteLaxMode, Secure: c.Request.TLS != nil})
 	c.Redirect(http.StatusFound, h.landingLocation())
 }
 

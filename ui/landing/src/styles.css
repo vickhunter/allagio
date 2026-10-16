@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/* Offer Rails tokens (DESIGN.md v7, copied from d032-ui/assets/offer-rails.css). RGB triplets. Shared by A, B, C. */
+@font-face{font-family:"Archivo Rail";src:url(/landing-v9/fonts/archivo-600.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"Archivo Rail";src:url(/landing-v9/fonts/archivo-700.woff2) format("woff2");font-weight:700;font-display:swap}
+@font-face{font-family:"Plex Mono Rail";src:url(/landing-v9/fonts/ibm-plex-mono-400.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Plex Mono Rail";src:url(/landing-v9/fonts/ibm-plex-mono-500.woff2) format("woff2");font-weight:500;font-display:swap}
+
+:root{
+  --rgb-surface-0:247 247 239; --rgb-surface-1:253 253 247; --rgb-surface-2:236 239 226; --rgb-surface-inv:35 39 32;
+  --rgb-text-1:35 39 32; --rgb-text-2:92 98 87; --rgb-text-inv:247 247 239; --rgb-text-inv-2:206 211 194;
+  --rgb-line:221 224 211; --rgb-line-strong:184 189 172;
+  --rgb-setup:35 82 201; --rgb-setup-edge:26 61 150; --rgb-setup-soft:232 237 250;   /* action / next step */
+  --rgb-maker:168 64 44; --rgb-maker-brand:198 79 56; --rgb-maker-soft:248 234 228;   /* makers = digest terracotta */
+  --rgb-pub:63 92 53; --rgb-pub-soft:230 238 223;                                       /* publishers = approvals olive */
+  --rgb-footer:240 234 220; --rgb-footer-line:214 204 182;             /* footer: warm sand (Padova stone) */
+  --dur-color:150ms; --dur-move:200ms; --dur-panel:300ms; --dur-fade:700ms;
+  --ease-out:cubic-bezier(0,0,.2,1); --ease-in:cubic-bezier(.4,0,1,1); --ease-menu:cubic-bezier(.16,1,.3,1);
+}
+
+@theme inline {
+  --color-s0: rgb(var(--rgb-surface-0)); --color-s1: rgb(var(--rgb-surface-1)); --color-s2: rgb(var(--rgb-surface-2)); --color-inv: rgb(var(--rgb-surface-inv));
+  --color-t1: rgb(var(--rgb-text-1)); --color-t2: rgb(var(--rgb-text-2)); --color-tinv: rgb(var(--rgb-text-inv)); --color-tinv2: rgb(var(--rgb-text-inv-2));
+  --color-line: rgb(var(--rgb-line)); --color-line-strong: rgb(var(--rgb-line-strong));
+  --color-setup: rgb(var(--rgb-setup)); --color-setup-edge: rgb(var(--rgb-setup-edge)); --color-setup-soft: rgb(var(--rgb-setup-soft));
+  --color-maker: rgb(var(--rgb-maker)); --color-maker-brand: rgb(var(--rgb-maker-brand)); --color-maker-soft: rgb(var(--rgb-maker-soft));
+  --color-pub: rgb(var(--rgb-pub)); --color-pub-soft: rgb(var(--rgb-pub-soft));
+  --font-display: "Archivo Rail", "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --font-sans: "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Plex Mono Rail", ui-monospace, SFMono-Regular, Consolas, monospace;
+  --ease-out: cubic-bezier(0,0,.2,1); --ease-menu: cubic-bezier(.16,1,.3,1);
+}
+
+html{background:rgb(var(--rgb-surface-0));color:rgb(var(--rgb-text-1));font-family:var(--font-sans);-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+body{margin:0;font-weight:500}
+::selection{background:rgb(var(--rgb-setup-soft))}
+:focus-visible{outline:2px solid rgb(var(--rgb-setup));outline-offset:3px;border-radius:6px}
+.h-display{font-family:var(--font-display);font-weight:700;letter-spacing:-.035em;line-height:1.02}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgb(var(--rgb-text-2))}
+.tabular{font-variant-numeric:tabular-nums}
+
+/* Keycap primary (rule 30): two layers, face lifts 4 / 6 hover / 2 pressed */
+.keycap{display:inline-flex;border-radius:10px;background:rgb(var(--rgb-setup-edge));margin-top:4px;text-decoration:none}
+.keycap>span{display:inline-flex;align-items:center;gap:.5rem;border-radius:10px;background:rgb(var(--rgb-setup));color:#fff;font-weight:700;padding:.75rem 1.25rem;transform:translateY(-4px);transition:transform var(--dur-move) var(--ease-out)}
+.keycap:hover>span{transform:translateY(-6px)} .keycap:active>span{transform:translateY(-2px)}
+
+/* Ambient loops: every one is named here and killed under reduced motion (rule 36) */
+@keyframes rail-dash{to{stroke-dashoffset:-48}}
+@keyframes fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes ride{0%{offset-distance:0%;opacity:0}6%{opacity:1}94%{opacity:1}100%{offset-distance:100%;opacity:0}}
+@keyframes ticker{to{transform:translateX(-50%)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes bob{50%{transform:translateY(-3px)}}
+.anim-fade{animation:fade-up var(--dur-fade) var(--ease-out) both}
+.rail-flow{stroke-dasharray:6 10;animation:rail-dash 2.4s linear infinite}
+/* v9 ----------------------------------------------------------------- */
+/* PostHog-style accordion: grid-template-rows 0fr -> 1fr, 300ms panel timing */
+.acc{display:grid;grid-template-rows:0fr;transition:grid-template-rows var(--dur-panel) var(--ease-menu)}
+.acc[data-open=true]{grid-template-rows:1fr}
+.acc>div{min-height:0}
+
+/* Hand-drawn underline (one, home hero). Draws once on first load (700ms); final state is the default. */
+@keyframes draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+.scribble path{stroke-dasharray:1;stroke-dashoffset:0;animation:draw var(--dur-fade) var(--ease-out) 400ms both}
+
+/* Amp-style drifting offers: transform-only loops, three depths */
+@keyframes drift-a{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(10px,-12px,0)}}
+@keyframes drift-b{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-12px,8px,0)}}
+.drift{animation:drift-a 11s ease-in-out infinite}
+.drift:nth-child(2n){animation-name:drift-b;animation-duration:13s}
+.drift:nth-child(3n){animation-duration:15s;animation-delay:-4s}
+
+/* Shader layer fades in over the static fallback (first load only) */
+.shader-in{animation:fade-in var(--dur-fade) var(--ease-out) both}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+
+/* Padova footer: one SIR1 tram, CSS transform only, container-query units */
+.tram-lane{position:absolute;inset-inline:0;bottom:2.6%;container-type:inline-size;pointer-events:none}
+.tram{width:13.6cqw;min-width:98px;transform:translateX(-110%);animation:tram 42s linear infinite;will-change:transform}
+.tram svg{width:100%;height:auto;display:block}
+@keyframes tram{from{transform:translateX(-110%)}to{transform:translateX(calc(100cqw + 10%))}}
+.padova[data-onscreen=false] .tram{animation-play-state:paused}
+[data-motion=paused] *{animation-play-state:paused!important}
+
+@media (prefers-reduced-motion: reduce){
+  .tram{animation:none;transform:translateX(62cqw)}
+  .drift,.scribble path,.shader-in{animation:none}
+
+  *,*::before,*::after{animation:none!important;transition-duration:0ms!important;scroll-behavior:auto!important}
+}
+/* Static fallback for the hero shader (no WebGPU / reduced motion): same five warm stops, painted once */
+.hero-fallback{background:
+  radial-gradient(60% 70% at 12% 20%, #f8eae4 0%, transparent 70%),
+  radial-gradient(50% 60% at 88% 30%, #e8edfa 0%, transparent 70%),
+  radial-gradient(70% 60% at 60% 90%, #ecefe2 0%, transparent 70%),
+  #f7f7ef}

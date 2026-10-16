@@ -10,8 +10,8 @@ const axePath = path.resolve(__dirname, '../../ui/dashboard/vendor/axe.min.js');
 function landingHtml() {
   let html = fs.readFileSync(path.join(build, 'home.html'), 'utf8');
   html = html.replaceAll('{{.InstallCommand}}', 'npx distributoor-setup');
-  html = html.replace(/\{\{if \.InstallerReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/, '$1');
-  html = html.replace(/\{\{if \.PluginReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/, '$1');
+  html = html.replace(/\{\{if \.InstallerReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/g, '$1');
+  html = html.replace(/\{\{if \.PluginReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/g, '$1');
   return html;
 }
 
@@ -21,6 +21,18 @@ function startLanding() {
     if (url === '/landing') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(landingHtml());
+      return;
+    }
+    if (url.startsWith('/landing-v9/')) {
+      const file = path.join(build, url);
+      if (!file.startsWith(build) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+        res.writeHead(404);
+        res.end('missing');
+        return;
+      }
+      const type = file.endsWith('.css') ? 'text/css; charset=utf-8' : file.endsWith('.woff2') ? 'font/woff2' : file.endsWith('.svg') ? 'image/svg+xml' : 'text/javascript; charset=utf-8';
+      res.writeHead(200, { 'content-type': type });
+      res.end(fs.readFileSync(file));
       return;
     }
     if (url.startsWith('/assets/')) {
@@ -165,20 +177,14 @@ test.describe('public landing contrast and tap targets', () => {
       });
       const page = await context.newPage();
       await page.goto(landing.base + '/landing', { waitUntil: 'networkidle' });
+      await expect(page.getByRole('heading', { name: /Someone has the product/ })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Copy command', exact: true })).toBeVisible();
+      await expect(page.locator('#how')).toHaveCount(1);
+      await expect(page.locator('#publishers')).toHaveCount(1);
+      expect(await axeContrast(page, ['#hero-h', '#join-h'])).toEqual([]);
 
-      const painted = await paint(page);
-      expect(painted.legend.map((step) => step.text)).toEqual(['01', '02', '03']);
-      for (const step of painted.legend) {
-        expect(step.ratio).toBeGreaterThanOrEqual(4.5);
-        expect(step.fontSize).toBeGreaterThanOrEqual(12);
-      }
-      expect(painted.label.text).toContain('RUN IN YOUR PRODUCT REPOSITORY');
-      expect(painted.label.ratio).toBeGreaterThanOrEqual(4.5);
-      expect(await axeContrast(page, ['.world-legend li span', '.install-heading .command-label'])).toEqual([]);
-
-      for (const name of [/Open workspace/, /Register your product/, /Start in your workspace/]) {
-        const box = await page.getByRole('link', { name }).boundingBox();
+      for (const name of [/Sign in with Google/, /Download WordPress plugin/, /MCP and setup/]) {
+        const box = await page.getByRole('link', { name }).first().boundingBox();
         expect(box.height).toBeGreaterThanOrEqual(44);
       }
       const copy = await page.getByRole('button', { name: 'Copy command', exact: true }).boundingBox();

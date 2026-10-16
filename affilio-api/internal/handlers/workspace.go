@@ -86,6 +86,11 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	review.POST("/payouts/batch", payouts.RunBatch)
 	if h.AssetsPath != "" {
 		public.GET("/", h.Home)
+		public.GET("/makers", h.Makers)
+		public.GET("/makers/", h.Makers)
+		public.GET("/publishers", h.Publishers)
+		public.GET("/publishers/", h.Publishers)
+		public.Static("/landing-v9", filepath.Join(h.AssetsPath, "landing-v9"))
 		for _, name := range []string{"workspace.css", "workspace.js", "setup-controls.js", "landing.css", "landing.js", "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt", "THIRD_PARTY_NOTICES.md"} {
 			file := name
 			public.GET("/assets/"+file, func(c *gin.Context) { c.File(filepath.Join(h.AssetsPath, file)) })
@@ -126,8 +131,12 @@ func (h *HostedHandler) installCommand() string {
 	return "npm exec --yes --package=" + h.BaseURL + "/downloads/distributoor-setup-0.1.0.tgz -- distributoor-setup --api-url " + h.BaseURL
 }
 
-func (h *HostedHandler) Home(c *gin.Context) {
-	page, err := template.ParseFiles(filepath.Join(h.AssetsPath, "home.html"))
+func (h *HostedHandler) Home(c *gin.Context)       { h.landing(c, "home.html") }
+func (h *HostedHandler) Makers(c *gin.Context)     { h.landing(c, "makers.html") }
+func (h *HostedHandler) Publishers(c *gin.Context) { h.landing(c, "publishers.html") }
+
+func (h *HostedHandler) landing(c *gin.Context, name string) {
+	page, err := template.ParseFiles(filepath.Join(h.AssetsPath, name))
 	if err != nil {
 		c.Status(500)
 		return

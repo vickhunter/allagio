@@ -57,7 +57,7 @@ PLUGIN_VERSION = "0.1.31"
 TEST_ONLY_PLUGIN_SEAMS = ("affilio_go_utc_date", "affilio_rewrite_requires_wp_rewrite")
 PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
 PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
-HOSTED_BUILD_NAMES = {"home.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}
+HOSTED_BUILD_NAMES = {"home.html", "makers.html", "publishers.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}
 HOSTED_BUILD_PREFIXES = ("workspace", "landing", "package")
 ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
 DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
@@ -381,6 +381,8 @@ def hosted_build_file(name):
 
 def omit_from_plugin_zip(path):
     if packaged_out(path):
+        return True
+    if path.startswith(PLUGIN_ROOT + "admin/build/landing-v9/"):
         return True
     return path.startswith(PLUGIN_ROOT + "admin/build/") and hosted_build_file(PurePosixPath(path).name)
 
