@@ -439,7 +439,7 @@ func TestWordPressDownloadZipIsCachedUntilTheFileChanges(t *testing.T) {
 	}
 
 	revised := releasePluginZip(t, func(main []byte) []byte {
-		return bytes.Replace(main, []byte("Version: 0.1.32"), []byte("Version: 0.1.33"), 1)
+		return bytes.Replace(main, []byte("Version: 0.1.33"), []byte("Version: 0.1.34"), 1)
 	})
 	if bytes.Equal(first, revised) {
 		t.Fatal("revised plugin zip matched the first")

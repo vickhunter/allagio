@@ -314,6 +314,9 @@ func TestTransportSpeaksHTTP1(t *testing.T) {
 	if transport.ForceAttemptHTTP2 {
 		t.Fatal("preview transport offers http2")
 	}
+	if _, offered := transport.TLSNextProto["h2"]; offered || len(transport.TLSNextProto) != 0 {
+		t.Fatalf("TLSNextProto = %#v", transport.TLSNextProto)
+	}
 	if transport.TLSClientConfig == nil {
 		t.Fatal("preview transport has no tls config")
 	}

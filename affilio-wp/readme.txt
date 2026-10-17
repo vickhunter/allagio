@@ -1,11 +1,16 @@
 === Offer Rails ===
 Contributors: affilio
-Stable tag: 0.1.32
+Stable tag: 0.1.33
 License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.33 =
+* The plugin header and this readme name the license: GPLv2 or later, with the GNU license page.
+* Translations use the text domain affilio-wp, the same as the plugin folder. The Italian catalog file is affilio-wp-it_IT. The REST address affilio/v1 and saved option names stay affilio.
 
 = 0.1.32 =
 * The plugin name in WordPress is Offer Rails. The folder, text domain, and update slug stay affilio.
