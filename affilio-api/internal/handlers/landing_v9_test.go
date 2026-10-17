@@ -27,7 +27,7 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	r := gin.New()
 	h.Mount(r)
 
-	for _, path := range []string{"/", "/makers", "/makers/", "/publishers", "/publishers/", "/protocol", "/protocol/"} {
+	for _, path := range []string{"/", "/makers", "/makers/", "/publishers", "/publishers/", "/publishers/setup", "/publishers/setup/", "/protocol", "/protocol/"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusOK {
@@ -57,6 +57,18 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	r.ServeHTTP(protocol, httptest.NewRequest(http.MethodGet, "/protocol/", nil))
 	if !strings.Contains(protocol.Body.String(), "Offer Rails · Protocol") {
 		t.Fatal("protocol page title missing")
+	}
+	setup := httptest.NewRecorder()
+	r.ServeHTTP(setup, httptest.NewRequest(http.MethodGet, "/publishers/setup?source=cursor", nil))
+	setupBody := setup.Body.String()
+	if !strings.Contains(setupBody, "Offer Rails · Publisher setup") || !strings.Contains(setupBody, "Install the plugin") {
+		t.Fatal("publisher setup page is missing its title or first step")
+	}
+	if !strings.Contains(setupBody, `href="/downloads/affilio.zip"`) {
+		t.Fatal("publisher setup is missing the plugin download")
+	}
+	if !strings.Contains(setupBody, `/auth/login?`) || !strings.Contains(setupBody, `return_to=%2Fowner%2Fconnect-site`) || !strings.Contains(setupBody, `source=cursor`) {
+		t.Fatal("publisher setup connect link dropped the owner flow or the source")
 	}
 
 	owner := httptest.NewRecorder()

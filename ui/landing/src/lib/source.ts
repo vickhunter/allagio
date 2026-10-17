@@ -67,7 +67,7 @@ export function signInHref(returnTo: string, source: string) {
 }
 
 export function roleReturn(role: 'maker' | 'publisher' | 'both') {
-  if (role === 'publisher') return '/owner'
+  if (role === 'publisher') return '/publishers/setup'
   return '/owner?setup=maker'
 }
 

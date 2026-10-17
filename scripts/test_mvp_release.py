@@ -415,7 +415,7 @@ class ReleaseTests(unittest.TestCase):
             "landing.js", "landing-scene.js", "landing.css",
             "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt",
             "workspace.js", "workspace.css", "workspace.html",
-            "home.html", "agent-poc.html", "protocol.html", "setup-controls.js",
+            "home.html", "agent-poc.html", "protocol.html", "publishers-setup.html", "setup-controls.js",
             "THIRD_PARTY_NOTICES.md", "package.json", "package-lock.json",
         }
         admin = release.ROOT / "affilio-wp/includes/class-affilio-admin.php"
