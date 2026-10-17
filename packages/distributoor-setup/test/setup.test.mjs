@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readFile, symlink, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { validateAPI, detectProject, checkServer, mergeMCP, installSkills } from '../lib/setup.mjs';
+import { validateAPI, detectProject, checkServer, mergeMCP, installSkills, skillNames } from '../lib/setup.mjs';
 import { previousSkillBodies } from '../lib/previous-skills.mjs';
 
 const execute = promisify(execFile);
@@ -54,6 +54,27 @@ test('refuses malformed configs and paths redirected outside the project', async
   await assert.rejects(mergeMCP(root, 'cursor', 'https://pilot.example/mcp'), /symbolic link/);
 });
 
+test('installs all four skills, including distributoor-revenue', async t => {
+  const root = await fixture(t);
+  const context = { api: 'https://pilot.example', project: { frameworks: [], providers: [] } };
+  assert.deepEqual([...skillNames], [
+    'distributoor-onboard',
+    'distributoor-instrument',
+    'distributoor-launch',
+    'distributoor-revenue',
+  ]);
+  const paths = await installSkills(root, 'skill', context);
+  const names = paths.map(path => path.split('/').at(-2));
+  assert.deepEqual(names, [...skillNames]);
+  const listed = (await readdir(resolve(root, '.agents/skills'))).sort();
+  assert.deepEqual(listed, [...skillNames].sort());
+  for (const name of skillNames) {
+    const body = await readFile(resolve(root, '.agents/skills', name, 'SKILL.md'), 'utf8');
+    assert.match(body, new RegExp(`name: ${name}`));
+    assert.match(body, /Hosted API: https:\/\/pilot\.example/);
+  }
+});
+
 test('skills carry setup context and preserve custom changes', async t => {
   const root = await fixture(t);
   const context = { api: 'https://pilot.example', project: { frameworks: ['next'], providers: ['stripe'] } };
@@ -77,7 +98,10 @@ test('re-running setup upgrades the previous canonical skill text', async t => {
     'distributoor-launch': ['# Distributoor offer launch', '# Offer Rails offer launch'],
   };
   const oldContext = '## This installation\n\nHosted API: https://old.example\n\nDetected dependencies (hints to verify): {"frameworks":["go"],"providers":[]}\n\nRequested product URL: "https://old.example"\n';
-  for (const path of paths) {
+  const legacy = paths.filter(path => previousSkillBodies[path.split('/').at(-2)]);
+  assert.equal(legacy.length, 3);
+  assert.ok(paths.some(path => path.endsWith('/distributoor-revenue/SKILL.md')));
+  for (const path of legacy) {
     const name = path.split('/').at(-2);
     const previous = previousSkillBodies[name];
     assert.match(previous, new RegExp(`name: ${name}`));
@@ -88,8 +112,10 @@ test('re-running setup upgrades the previous canonical skill text', async t => {
   for (const path of paths) {
     const name = path.split('/').at(-2);
     const upgraded = await readFile(path, 'utf8');
-    assert.ok(upgraded.includes(titles[name][1]));
-    assert.equal(upgraded.includes(titles[name][0]), false);
+    if (titles[name]) {
+      assert.ok(upgraded.includes(titles[name][1]));
+      assert.equal(upgraded.includes(titles[name][0]), false);
+    }
     assert.match(upgraded, new RegExp(`name: ${name}`));
     assert.match(upgraded, /Hosted API: https:\/\/pilot\.example/);
     assert.match(upgraded, /https:\/\/product\.example/);
@@ -119,6 +145,7 @@ test('offline CLI prepares a real project without invoking or claiming a connect
   assert.match(stdout, /connection has not been verified/);
   assert.match(stdout, /integration and paid conversion verification are still pending/);
   assert.equal(JSON.parse(await readFile(resolve(root, '.cursor/mcp.json'), 'utf8')).mcpServers.distributoor.url, 'http://127.0.0.1:8086/mcp');
+  assert.deepEqual((await readdir(resolve(root, '.agents/skills'))).sort(), [...skillNames].sort());
 });
 
 test('package command is offer-rails and keeps the old names', async () => {

@@ -90,9 +90,16 @@ function acceptsInstalledSkill(existing, source, name) {
   return canonical && INSTALLER_CONTEXT.test(context);
 }
 
+export const skillNames = [
+  'distributoor-onboard',
+  'distributoor-instrument',
+  'distributoor-launch',
+  'distributoor-revenue',
+];
+
 export async function installSkills(root, client, context) {
   const paths = [];
-  for (const name of ['distributoor-onboard', 'distributoor-instrument', 'distributoor-launch']) {
+  for (const name of skillNames) {
     const path = resolve(root, client === 'claude' ? '.claude/skills' : '.agents/skills', name, 'SKILL.md');
     await writablePath(root, path);
     let source = await readOptional(fileURLToPath(new URL(`../skills/${name}/SKILL.md`, import.meta.url)));

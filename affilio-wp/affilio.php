@@ -2,9 +2,11 @@
 /**
  * Plugin Name: Offer Rails
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.32
+ * Version: 0.1.33
  * Author: Offer Rails
- * Text Domain: affilio
+ * License: GPLv2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain: affilio-wp
  * Domain Path: /languages
  */
 
@@ -17,7 +19,7 @@ if (defined('AFFILIO_LOADED')) {
 }
 define('AFFILIO_LOADED', true);
 
-define('AFFILIO_VERSION', '0.1.32');
+define('AFFILIO_VERSION', '0.1.33');
 
 if (!defined('AFFILIO_PLUGIN_ACK_HEADER')) {
     define('AFFILIO_PLUGIN_ACK_HEADER', 'X-Plugin-Key');
@@ -80,7 +82,7 @@ require_once AFFILIO_PLUGIN_DIR . 'includes/class-affilio-go.php';
 if (!function_exists('affilio_load_textdomain')) {
 function affilio_load_textdomain() {
     if (function_exists('load_plugin_textdomain') && function_exists('plugin_basename')) {
-        load_plugin_textdomain('affilio', false, dirname(plugin_basename(__FILE__)) . '/languages');
+        load_plugin_textdomain('affilio-wp', false, dirname(plugin_basename(__FILE__)) . '/languages');
     }
 }
 }

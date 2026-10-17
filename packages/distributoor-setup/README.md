@@ -55,5 +55,5 @@ deployed readiness, payment configuration and an actual test purchase/refund.
 
 `npm test` checks config preservation, retry behavior, skill conflicts, path
 safety, OAuth metadata validation and offline CLI execution. `npm pack` bundles
-the canonical skills from `distributoor-plugin/skills/`; no runtime packages are
-required. Full integration by a real builder agent is still a pilot check.
+all four skills from `distributoor-plugin/skills/`, including
+`distributoor-revenue`. No runtime packages are required. Full integration by a real builder agent is still a pilot check.

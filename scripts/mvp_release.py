@@ -50,11 +50,11 @@ WP_FILES = {
     "affilio-wp/admin/build/marketplace.js",
     "affilio-wp/admin/build/earnings.js",
     "affilio-wp/admin/css/affilio-admin.css",
-    "affilio-wp/languages/affilio-it_IT.mo",
+    "affilio-wp/languages/affilio-wp-it_IT.mo",
     "affilio-wp/readme.txt",
 }
 PLUGIN_ROOT = "affilio-wp/"
-PLUGIN_VERSION = "0.1.32"
+PLUGIN_VERSION = "0.1.33"
 TEST_ONLY_PLUGIN_SEAMS = ("affilio_go_utc_date", "affilio_rewrite_requires_wp_rewrite")
 PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
 PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
@@ -78,7 +78,7 @@ PHP_ENQUEUE = re.compile(
     r"""wp_enqueue_(?:script|style)\s*\(\s*(?:(['"])[^'"]+\1|\$[A-Za-z_][A-Za-z0-9_]*)\s*,\s*"""
     r"""(?:AFFILIO_PLUGIN_URL\s*\.\s*|plugins_url\s*\(\s*)?(['"])([^'"]+)\2"""
 )
-SKILLS = {f"package/skills/distributoor-{name}/SKILL.md" for name in ("onboard", "instrument", "launch")}
+SKILLS = {f"package/skills/distributoor-{name}/SKILL.md" for name in ("onboard", "instrument", "launch", "revenue")}
 MAX_DOWNLOAD = 20 * 1024 * 1024
 
 

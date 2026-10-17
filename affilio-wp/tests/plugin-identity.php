@@ -3,12 +3,19 @@
 $root = dirname(__DIR__);
 $main = file_get_contents($root . '/affilio.php');
 check_identity(strpos($main, 'Plugin Name: Offer Rails') !== false, 'plugin header name is not Offer Rails');
-check_identity(strpos($main, 'Text Domain: affilio') !== false, 'text domain drifted from affilio');
-check_identity(strpos($main, 'Version: 0.1.32') !== false, 'plugin header is not 0.1.32');
-check_identity(strpos($main, "define('AFFILIO_VERSION', '0.1.32');") !== false, 'AFFILIO_VERSION is not 0.1.32');
+check_identity(strpos($main, 'Text Domain: affilio-wp') !== false, 'text domain is not the plugin slug affilio-wp');
+check_identity(strpos($main, "load_plugin_textdomain('affilio-wp'") !== false, 'textdomain loader is not affilio-wp');
+check_identity(strpos($main, 'License: GPLv2 or later') !== false, 'plugin header is missing License: GPLv2 or later');
+check_identity(strpos($main, 'License URI: https://www.gnu.org/licenses/gpl-2.0.html') !== false, 'plugin header is missing License URI');
+check_identity(strpos($main, 'Version: 0.1.33') !== false, 'plugin header is not 0.1.33');
+check_identity(strpos($main, "define('AFFILIO_VERSION', '0.1.33');") !== false, 'AFFILIO_VERSION is not 0.1.33');
+check_identity(is_file($root . '/languages/affilio-wp-it_IT.po'), 'Italian catalog is not languages/affilio-wp-it_IT.po');
+check_identity(is_file($root . '/languages/affilio-wp-it_IT.mo'), 'Italian catalog is not languages/affilio-wp-it_IT.mo');
 $readme = file_get_contents($root . '/readme.txt');
 check_identity(strpos($readme, '=== Offer Rails ===') === 0, 'readme title is not Offer Rails');
-check_identity(strpos($readme, 'Stable tag: 0.1.32') !== false, 'readme stable tag is not 0.1.32');
+check_identity(strpos($readme, 'License URI: https://www.gnu.org/licenses/gpl-2.0.html') !== false, 'readme is missing License URI');
+check_identity(strpos($readme, 'Stable tag: 0.1.33') !== false, 'readme stable tag is not 0.1.33');
+check_identity(strpos($readme, '= 0.1.33 =') !== false, 'readme changelog is missing 0.1.33');
 check_identity(strpos($readme, '= 0.1.32 =') !== false, 'readme changelog is missing 0.1.32');
 check_identity(strpos($readme, '= 0.1.31 =') !== false, 'readme changelog is missing 0.1.31');
 check_identity(strpos($readme, '= 0.1.30 =') !== false, 'readme changelog dropped 0.1.30');
@@ -55,7 +62,7 @@ echo "loaded\n";
 ');
 check_identity($old[0] === 0 && strpos($old[1], 'loaded') !== false, "load beside v0.1.6 fataled:\n" . $old[1]);
 
-echo "Plugin 0.1.32 packages as affilio-wp/affilio.php and survives a double load.\n";
+echo "Plugin 0.1.33 packages as affilio-wp/affilio.php and survives a double load.\n";
 
 function check_identity($condition, $message) {
     if (!$condition) {

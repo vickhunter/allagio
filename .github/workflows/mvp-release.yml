@@ -34,3 +34,6 @@ jobs:
           npm exec --yes --package=/tmp/distributoor-release/downloads/offer-rails-0.1.0.tgz -- distributoor --help >>/tmp/offer-rails-alias.txt
           grep -q offer-rails /tmp/offer-rails-alias.txt
           test -s /tmp/distributoor-product/.agents/skills/distributoor-onboard/SKILL.md
+          test -s /tmp/distributoor-product/.agents/skills/distributoor-instrument/SKILL.md
+          test -s /tmp/distributoor-product/.agents/skills/distributoor-launch/SKILL.md
+          test -s /tmp/distributoor-product/.agents/skills/distributoor-revenue/SKILL.md
