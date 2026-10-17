@@ -22,10 +22,35 @@ const shell = `<div id="static-landing">
     </main>
   </div>`
 
-function stamp(file) {
+const setupShell = `<div id="static-landing">
+    <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+    <main id="main">
+      <h1>Set up your site.</h1>
+      <ol>
+        <li>
+          <h2>Install the plugin</h2>
+          <p>To do</p>
+          <p><a data-step-action href="/downloads/affilio.zip" style="display:inline-flex;min-height:44px;align-items:center">Download the plugin</a></p>
+        </li>
+        <li>
+          <h2>Connect your site</h2>
+          <p>To do</p>
+          <p><a data-step-action href="/auth/login?return_to=%2Fowner%2Fconnect-site" style="display:inline-flex;min-height:44px;align-items:center">Connect your site</a></p>
+        </li>
+        <li>
+          <h2>Choose the approval mode</h2>
+          <p>To do</p>
+          <p>YOLO is selected.</p>
+          <p><a data-step-action href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Save this mode</a></p>
+        </li>
+      </ol>
+    </main>
+  </div>`
+
+function stamp(file, fallback = shell) {
   let html = readFileSync(file, 'utf8')
   if (!html.includes('name="or-install"')) html = html.replace('</head>', `    ${meta}\n  </head>`)
-  if (!html.includes('id="static-landing"')) html = html.replace('<div id="root"></div>', `${shell}\n    <div id="root"></div>`)
+  if (!html.includes('id="static-landing"')) html = html.replace('<div id="root"></div>', `${fallback}\n    <div id="root"></div>`)
   return html
 }
 
@@ -40,5 +65,6 @@ rmSync(resolve(assets, 'protocol'), { recursive: true, force: true })
 writeFileSync(resolve(build, 'home.html'), stamp(resolve(dist, 'index.html')))
 writeFileSync(resolve(build, 'makers.html'), stamp(resolve(dist, 'makers/index.html')))
 writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers/index.html')))
+writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publishers/setup/index.html'), setupShell))
 writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html')))
 console.log('stamped landing v9 into affilio-wp/admin/build')

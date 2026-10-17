@@ -18,7 +18,7 @@ function page(name) {
     .replace(/\{\{if \.PluginReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/g, '$1')
 }
 
-const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html'), '/protocol': page('protocol.html'), '/protocol/': page('protocol.html') }
+const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html'), '/publishers/setup': page('publishers-setup.html'), '/publishers/setup/': page('publishers-setup.html'), '/protocol': page('protocol.html'), '/protocol/': page('protocol.html') }
 
 function typeFor(file) {
   if (file.endsWith('.css')) return 'text/css; charset=utf-8'
@@ -130,25 +130,25 @@ try {
         const howAt = folded.indexOf('from a product to a paid sale')
         const chapterAt = folded.indexOf('chapter a')
         if (howAt < 0 || chapterAt < 0 || howAt > chapterAt) throw new Error('how it works is not before Chapter A ' + howAt + '/' + chapterAt)
-        await page.getByRole('button', { name: 'I run a site' }).click()
-        const siteHref = await page.getByRole('link', { name: 'Continue with Google' }).getAttribute('href')
-        const siteTo = new URL(siteHref, base).searchParams.get('return_to') || ''
-        if (!siteHref.includes('/auth/login') || !siteHref.includes('source=cursor') || !siteTo.startsWith('/owner') || siteTo.includes('setup=')) throw new Error('I run a site href ' + siteHref)
-        await page.screenshot({ path: join(out, 'dialog-site-' + width + '.png') })
-        await page.keyboard.press('Escape')
+        await page.getByRole('link', { name: 'I run a site' }).click()
+        await page.waitForURL(/\/publishers\/setup/)
+        if (!page.url().includes('source=cursor')) throw new Error('I run a site dropped the source ' + page.url())
+        const stepZip = await page.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
+        if (stepZip !== '/downloads/affilio.zip') throw new Error('I run a site step 1 zip ' + stepZip)
+        await page.goto(base + '/?source=cursor', { waitUntil: 'networkidle' })
         await page.getByRole('button', { name: 'I sell a product' }).click()
         const sellHref = await page.getByRole('link', { name: 'Continue with Google' }).getAttribute('href')
         const sellTo = new URL(sellHref, base).searchParams.get('return_to') || ''
         if (!sellHref.includes('source=cursor') || !sellTo.includes('setup=maker')) throw new Error('I sell a product href ' + sellHref)
         await page.keyboard.press('Escape')
       }
-      if (route === '/makers' && await page.getByRole('button', { name: 'I run a site' }).count()) throw new Error('makers page offers the site choice')
+      if (route === '/makers' && await page.getByRole('link', { name: 'I run a site' }).count()) throw new Error('makers page offers the site choice')
       if (route === '/publishers') {
-        await page.getByRole('button', { name: 'I run a site' }).click()
-        const siteHref = await page.getByRole('link', { name: 'Continue with Google' }).getAttribute('href')
-        const siteTo = new URL(siteHref, base).searchParams.get('return_to') || ''
-        if (!siteTo.startsWith('/owner') || siteTo.includes('setup=')) throw new Error('publisher page site href ' + siteHref)
-        await page.keyboard.press('Escape')
+        await page.getByRole('link', { name: 'I run a site' }).click()
+        await page.waitForURL(/\/publishers\/setup/)
+        if (!page.url().includes('source=cursor')) throw new Error('publisher page site choice dropped the source ' + page.url())
+        const publisherZip = await page.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
+        if (publisherZip !== '/downloads/affilio.zip') throw new Error('publisher page step 1 zip ' + publisherZip)
       }
       if (route === '/' && metrics.shader !== 0) throw new Error('reduced motion still mounted a shader canvas')
       if (route === '/' && metrics.hero !== 'fallback') throw new Error('reduced motion hero is ' + metrics.hero)
@@ -181,6 +181,46 @@ try {
     if (!protocolOk.nav.includes('/protocol/') || !protocolOk.nav.includes('source=cursor')) throw new Error('protocol nav ' + protocolOk.nav)
     if (protocolSerious.length) throw new Error('protocol-' + width + ' axe ' + protocolSerious.map((item) => item.id).join(' '))
     await protocolContext.close()
+    const setupContext = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' })
+    const setupPage = await setupContext.newPage()
+    await setupPage.goto(base + '/publishers/setup?source=cursor', { waitUntil: 'networkidle' })
+    const setupMetrics = await setupPage.evaluate(() => {
+      const text = document.body.innerText
+      const steps = [...document.querySelectorAll('ol > li')]
+      return {
+        scroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
+        small: [...document.querySelectorAll('a, button')].filter((el) => {
+          const style = getComputedStyle(el)
+          if (style.display === 'none' || style.visibility === 'hidden') return false
+          const box = el.getBoundingClientRect()
+          if (box.width < 2 || box.height < 2) return false
+          return box.width < 44 || box.height < 44
+        }).map((el) => ({ text: (el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 80), w: Math.round(el.getBoundingClientRect().width), h: Math.round(el.getBoundingClientRect().height) })),
+        brand: !/affilio|distributoor/i.test(text),
+        steps: steps.length,
+        actions: steps.map((step) => step.querySelectorAll('[data-step-action]').length),
+        todo: (text.match(/To do/g) || []).length,
+      }
+    })
+    const setupAxe = await new AxeBuilder({ page: setupPage }).analyze()
+    const setupSerious = setupAxe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
+    writeFileSync(join(out, `axe-setup-${width}.json`), JSON.stringify({ violations: setupSerious, incomplete: setupAxe.incomplete.map((item) => item.id) }, null, 2))
+    await setupPage.screenshot({ path: join(out, 'setup-' + width + '.png'), fullPage: true })
+    const connectHref = await setupPage.getByRole('link', { name: 'Connect your site' }).getAttribute('href')
+    const connectTo = new URL(connectHref, base).searchParams.get('return_to') || ''
+    const yolo = await setupPage.getByRole('radio', { name: /YOLO/ }).isChecked()
+    summary.push({ slug: 'setup-' + width, ...setupMetrics, serious: setupSerious.map((item) => item.id), connectHref, yolo })
+    if (!setupMetrics.scroll) throw new Error('setup-' + width + ' scrolls sideways')
+    if (setupMetrics.small.length) throw new Error('setup-' + width + ' small targets ' + JSON.stringify(setupMetrics.small))
+    if (setupSerious.length) throw new Error('setup-' + width + ' axe ' + setupSerious.map((item) => item.id + ' ' + item.nodes.map((node) => node.target.join(' ')).join('; ')).join(' | '))
+    if (!setupMetrics.brand) throw new Error('setup-' + width + ' shows a retired brand name')
+    if (setupMetrics.steps !== 3 || setupMetrics.actions.some((count) => count !== 1)) throw new Error('setup-' + width + ' steps ' + setupMetrics.steps + ' actions ' + setupMetrics.actions.join(','))
+    if (setupMetrics.todo !== 3) throw new Error('setup-' + width + ' to-do count ' + setupMetrics.todo)
+    if (!yolo) throw new Error('setup-' + width + ' does not preselect YOLO')
+    if (!connectHref.includes('/auth/login') || !connectHref.includes('source=cursor') || !connectTo.startsWith('/owner/connect-site') || !connectTo.includes('source=cursor')) throw new Error('setup connect href ' + connectHref)
+    const setupZip = await setupPage.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
+    if (setupZip !== '/downloads/affilio.zip') throw new Error('setup zip ' + setupZip)
+    await setupContext.close()
   }
   writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2))
   console.log(JSON.stringify(summary, null, 2))

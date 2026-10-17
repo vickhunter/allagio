@@ -93,6 +93,8 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/makers/", h.Makers)
 		public.GET("/publishers", h.Publishers)
 		public.GET("/publishers/", h.Publishers)
+		public.GET("/publishers/setup", h.PublisherSetup)
+		public.GET("/publishers/setup/", h.PublisherSetup)
 		public.GET("/protocol", h.Protocol)
 		public.GET("/protocol/", h.Protocol)
 		public.Static("/landing-v9", filepath.Join(h.AssetsPath, "landing-v9"))
@@ -137,10 +139,11 @@ func (h *HostedHandler) installCommand() string {
 	return "npm exec --yes --package=" + h.BaseURL + "/downloads/distributoor-setup-0.1.0.tgz -- distributoor-setup --api-url " + h.BaseURL
 }
 
-func (h *HostedHandler) Home(c *gin.Context)       { h.landing(c, "home.html") }
-func (h *HostedHandler) Makers(c *gin.Context)     { h.landing(c, "makers.html") }
-func (h *HostedHandler) Publishers(c *gin.Context) { h.landing(c, "publishers.html") }
-func (h *HostedHandler) Protocol(c *gin.Context)   { h.landing(c, "protocol.html") }
+func (h *HostedHandler) Home(c *gin.Context)           { h.landing(c, "home.html") }
+func (h *HostedHandler) Makers(c *gin.Context)         { h.landing(c, "makers.html") }
+func (h *HostedHandler) Publishers(c *gin.Context)     { h.landing(c, "publishers.html") }
+func (h *HostedHandler) PublisherSetup(c *gin.Context) { h.landing(c, "publishers-setup.html") }
+func (h *HostedHandler) Protocol(c *gin.Context)       { h.landing(c, "protocol.html") }
 
 func (h *HostedHandler) landing(c *gin.Context, name string) {
 	page, err := template.ParseFiles(filepath.Join(h.AssetsPath, name))
