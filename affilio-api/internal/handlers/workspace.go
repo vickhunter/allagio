@@ -100,18 +100,8 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 			file := name
 			public.GET("/assets/"+file, func(c *gin.Context) { c.File(filepath.Join(h.AssetsPath, file)) })
 		}
-		public.GET("/downloads/distributoor-setup-0.1.0.tgz", func(c *gin.Context) {
-			file := filepath.Join(h.DownloadsPath, "distributoor-setup-0.1.0.tgz")
-			if h.DownloadsPath == "" {
-				c.Status(503)
-				return
-			}
-			if _, err := os.Stat(file); err != nil {
-				c.Status(503)
-				return
-			}
-			c.FileAttachment(file, "distributoor-setup-0.1.0.tgz")
-		})
+		public.GET("/downloads/"+installerArchive, h.serveInstaller)
+		public.GET("/downloads/"+legacyInstallerArchive, h.serveInstaller)
 		public.GET("/downloads/affilio.zip", h.DownloadWordPress)
 		public.HEAD("/downloads/affilio.zip", h.DownloadWordPress)
 	}
@@ -133,8 +123,37 @@ func (h *HostedHandler) requireOperator(c *gin.Context) {
 	c.Next()
 }
 
+const (
+	installerArchive       = "offer-rails-0.1.0.tgz"
+	legacyInstallerArchive = "distributoor-setup-0.1.0.tgz"
+)
+
 func (h *HostedHandler) installCommand() string {
-	return "npm exec --yes --package=" + h.BaseURL + "/downloads/distributoor-setup-0.1.0.tgz -- distributoor-setup --api-url " + h.BaseURL
+	return "npx --yes --package=" + h.BaseURL + "/downloads/" + installerArchive + " offer-rails --api-url " + h.BaseURL
+}
+
+func (h *HostedHandler) installerPath() (string, bool) {
+	if h.DownloadsPath == "" {
+		return "", false
+	}
+	primary := filepath.Join(h.DownloadsPath, installerArchive)
+	if _, err := os.Stat(primary); err == nil {
+		return primary, true
+	}
+	legacy := filepath.Join(h.DownloadsPath, legacyInstallerArchive)
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy, true
+	}
+	return "", false
+}
+
+func (h *HostedHandler) serveInstaller(c *gin.Context) {
+	file, ok := h.installerPath()
+	if !ok {
+		c.Status(http.StatusServiceUnavailable)
+		return
+	}
+	c.FileAttachment(file, filepath.Base(file))
 }
 
 func (h *HostedHandler) Home(c *gin.Context)       { h.landing(c, "home.html") }
@@ -148,10 +167,10 @@ func (h *HostedHandler) landing(c *gin.Context, name string) {
 		c.Status(500)
 		return
 	}
-	_, installerErr := os.Stat(filepath.Join(h.DownloadsPath, "distributoor-setup-0.1.0.tgz"))
+	_, installerReady := h.installerPath()
 	_, pluginErr := os.Stat(filepath.Join(h.DownloadsPath, "affilio.zip"))
 	var buf bytes.Buffer
-	if err = page.Execute(&buf, gin.H{"BaseURL": h.BaseURL, "InstallCommand": h.installCommand(), "InstallerReady": h.DownloadsPath != "" && installerErr == nil, "PluginReady": h.DownloadsPath != "" && pluginErr == nil}); err != nil {
+	if err = page.Execute(&buf, gin.H{"BaseURL": h.BaseURL, "InstallCommand": h.installCommand(), "InstallerReady": installerReady, "PluginReady": h.DownloadsPath != "" && pluginErr == nil}); err != nil {
 		c.Abort()
 		return
 	}

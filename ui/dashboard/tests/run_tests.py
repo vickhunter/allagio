@@ -1530,7 +1530,7 @@ def key_setup_shown_once(page, w):
     setup_to_key_step(page); page.wait_for_selector('[data-test=key-step]')
     assert page.input_value('#plugin-key-value') == PK1 and 'Mono' in page.eval_on_selector('#plugin-key-value', 'e=>getComputedStyle(e).fontFamily') or 'mono' in page.eval_on_selector('#plugin-key-value', 'e=>getComputedStyle(e).fontFamily').lower()
     t = ' '.join(page.inner_text('[data-test=key-once]').split())
-    assert "We won't show this key again." in t and 'Affilio › Settings › Plugin key' in t, t
+    assert "We won't show this key again." in t and 'Offer Rails › Settings › Plugin key' in t, t
     assert page.is_disabled('#key-continue') and page.locator('#key-continue.keycap').count() == 1
     assert [x[:2] for x in page.mock.pk_calls()] == [('GET', '/'), ('POST', '/')] and page.mock.pk_calls()[1][2] == {}
     axe(page); no_overflow(page); shot(page, 'v8-key-shown-once', w)
@@ -1616,7 +1616,7 @@ def key_revoke_modal(page, w):
     page.mock.pk_after['revoke'] = 'plugin-key-list-revoked'
     open_settings(page); page.click('[data-key-act=revoke]'); page.wait_for_selector('[data-test=revoke-modal]')
     t = ' '.join(page.inner_text('[data-test=revoke-modal]').split())
-    for want in ["The plugin can't confirm placements any more.", "New boxes won't count as live, or earn, until you paste a new key in Affilio › Settings › Plugin key.",
+    for want in ["The plugin can't confirm placements any more.", "New boxes won't count as live, or earn, until you paste a new key in Offer Rails › Settings › Plugin key.",
                  'boxes already live stay live.']:
         assert want in t.replace('\u2019', "'"), (want, t)
     assert page.evaluate('document.activeElement.id') == 'revoke-no', 'focus starts on Cancel'

@@ -427,7 +427,7 @@ func TestWordPressDownloadZipIsCachedUntilTheFileChanges(t *testing.T) {
 	}
 
 	revised := releasePluginZip(t, func(main []byte) []byte {
-		return bytes.Replace(main, []byte("Version: 0.1.31"), []byte("Version: 0.1.32"), 1)
+		return bytes.Replace(main, []byte("Version: 0.1.32"), []byte("Version: 0.1.33"), 1)
 	})
 	if bytes.Equal(first, revised) {
 		t.Fatal("revised plugin zip matched the first")
@@ -547,5 +547,43 @@ func TestFromSourceSurvivesStrictReferrer(t *testing.T) {
 	var rows int
 	if err = db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM landing_events WHERE name='signin_click' AND source='test'`).Scan(&rows); err != nil || rows != 1 {
 		t.Fatalf("signin_click source=test rows %d %v", rows, err)
+	}
+}
+
+func TestMakersInstallCommandUsesOfferRails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	payload := []byte("offer-rails-installer")
+	if err := os.WriteFile(filepath.Join(dir, installerArchive), payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h := &HostedHandler{
+		BaseURL:       "https://offer-rails.example",
+		AssetsPath:    filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"),
+		DownloadsPath: dir,
+	}
+	r := gin.New()
+	h.Mount(r)
+
+	makers := httptest.NewRecorder()
+	r.ServeHTTP(makers, httptest.NewRequest(http.MethodGet, "/makers", nil))
+	if makers.Code != http.StatusOK {
+		t.Fatalf("makers: %d", makers.Code)
+	}
+	body := makers.Body.String()
+	want := "npx --yes --package=https://offer-rails.example/downloads/" + installerArchive + " offer-rails --api-url https://offer-rails.example"
+	if !strings.Contains(body, want) {
+		t.Fatalf("makers install command missing %q", want)
+	}
+	if strings.Contains(strings.ToLower(body), "distributoor") || strings.Contains(body, "Affilio") {
+		t.Fatal("makers page still shows Distributoor or Affilio")
+	}
+
+	for _, path := range []string{"/downloads/" + installerArchive, "/downloads/" + legacyInstallerArchive} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK || !bytes.Equal(rec.Body.Bytes(), payload) {
+			t.Fatalf("%s: %d %q", path, rec.Code, rec.Body.String())
+		}
 	}
 }

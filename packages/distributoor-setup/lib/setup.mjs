@@ -67,7 +67,7 @@ export async function mergeMCP(root, client, resource) {
   const existing = config.mcpServers.distributoor;
   const expected = client === 'claude' ? { type: 'http', url: resource } : { url: resource };
   if (existing && (existing.url !== resource || existing.command || existing.headers || existing.env || existing.type && existing.type !== 'http')) {
-    throw new Error(`An existing Distributoor connection differs in ${path}. Resolve it before running setup; it has been preserved.`);
+    throw new Error(`An existing Offer Rails connection differs in ${path}. Resolve it before running setup; it has been preserved.`);
   }
   if (!existing) {
     config.mcpServers.distributoor = expected;

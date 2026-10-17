@@ -85,3 +85,12 @@ test('offline CLI prepares a real project without invoking or claiming a connect
   assert.match(stdout, /integration and paid conversion verification are still pending/);
   assert.equal(JSON.parse(await readFile(resolve(root, '.cursor/mcp.json'), 'utf8')).mcpServers.distributoor.url, 'http://127.0.0.1:8086/mcp');
 });
+
+test('package command is offer-rails and keeps the old names', async () => {
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(pkg.name, 'offer-rails');
+  assert.equal(pkg.version, '0.1.0');
+  for (const name of ['offer-rails', 'affilio', 'distributoor', 'distributoor-setup']) {
+    assert.equal(pkg.bin[name], 'bin/setup.mjs');
+  }
+});

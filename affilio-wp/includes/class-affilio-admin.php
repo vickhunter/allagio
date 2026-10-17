@@ -19,8 +19,8 @@ class Affilio_Admin {
 
     public function register_menu() {
         add_menu_page(
-            'Affilio',
-            'Affilio',
+            'Offer Rails',
+            'Offer Rails',
             'manage_options',
             'affilio',
             array($this, 'render_dashboard'),

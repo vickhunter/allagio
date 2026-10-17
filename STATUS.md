@@ -1,3 +1,7 @@
+## October 17 — D-047 Offer Rails names on the installer and plugin
+
+The hosted install command is `npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>`. The setup package name is `offer-rails`. `affilio`, `distributoor`, and `distributoor-setup` still run that same installer. `/downloads/distributoor-setup-0.1.0.tgz` serves the same archive. The WordPress plugin header and readme title say Offer Rails. The folder, text domain, and slug stay `affilio`. Plugin version is 0.1.32. `protocol.html` is in the release asset list. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 16 — `/protocol` is in the production image
 
 `Dockerfile.mvp` copies `affilio-wp/admin/build/protocol.html` into `/app/assets` with the other hosted pages. `/protocol` loads that file at startup; without the copy the route returns 500. A handler test fails when a page template loaded from `AssetsPath` is missing from that copy list.
