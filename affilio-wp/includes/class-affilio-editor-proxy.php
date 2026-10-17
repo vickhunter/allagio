@@ -114,7 +114,7 @@ class Affilio_Editor_Proxy {
 
     private function response($response) {
         if (is_wp_error($response)) {
-            return new WP_Error('affilio_api', 'Affilio is unavailable. Try again shortly.', array('status' => 502));
+            return new WP_Error('affilio_api', 'Offer Rails is unavailable. Try again shortly.', array('status' => 502));
         }
         return new WP_REST_Response($response['data'], $response['code']);
     }

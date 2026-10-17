@@ -190,7 +190,7 @@ class Affilio_API {
         $status = array(
             'state' => 'missing_key',
             'label' => $this->t('Ready to connect', 'Pronto per il collegamento'),
-            'message' => $this->t('Open Affilio settings to connect and find opportunities.', 'Apri le impostazioni Affilio per collegarti e trovare opportunità.'),
+            'message' => $this->t('Open Offer Rails settings to connect and find opportunities.', 'Apri le impostazioni Offer Rails per collegarti e trovare opportunità.'),
             'connected' => false,
             'checked_at' => gmdate('c'),
             'http_code' => 0,
@@ -224,7 +224,7 @@ class Affilio_API {
         if (is_wp_error($probe)) {
             $status['state'] = 'network_error';
             $status['label'] = $this->t('Connection Error', 'Errore di connessione');
-            $status['message'] = $this->t('Cannot reach Affilio API. Check network or API URL.', 'Impossibile raggiungere l\'API di Affilio. Controlla rete o URL API.');
+            $status['message'] = $this->t('Cannot reach the Offer Rails API. Check network or API URL.', 'Impossibile raggiungere l\'API di Offer Rails. Controlla rete o URL API.');
             return $this->store_status($cache_key, $status, 60);
         }
 
@@ -233,7 +233,7 @@ class Affilio_API {
         if ($code >= 200 && $code < 300) {
             $status['state'] = 'connected';
             $status['label'] = $this->t('Connected', 'Connesso');
-            $status['message'] = $this->t('Affilio is connected and ready.', 'Affilio è connesso e pronto.');
+            $status['message'] = $this->t('Offer Rails is connected and ready.', 'Offer Rails è connesso e pronto.');
             $status['connected'] = true;
         } elseif ($code === 401 || $code === 403) {
             $status['state'] = 'invalid_key';
@@ -242,11 +242,11 @@ class Affilio_API {
         } elseif ($code === 404) {
             $status['state'] = 'wrong_api_url';
             $status['label'] = $this->t('Invalid API URL', 'URL API non valido');
-            $status['message'] = $this->t('API URL does not match a valid Affilio backend.', 'L\'URL API non corrisponde a un backend Affilio valido.');
+            $status['message'] = $this->t('API URL does not match a valid Offer Rails backend.', 'L\'URL API non corrisponde a un backend Offer Rails valido.');
         } elseif ($code >= 500) {
             $status['state'] = 'api_error';
             $status['label'] = $this->t('API Error', 'Errore API');
-            $status['message'] = $this->t('Affilio API returned a server error.', 'L\'API di Affilio ha restituito un errore server.');
+            $status['message'] = $this->t('The Offer Rails API returned a server error.', 'L\'API di Offer Rails ha restituito un errore server.');
         } else {
             $status['state'] = 'unknown_error';
             $status['label'] = $this->t('Connection Failed', 'Connessione non riuscita');
@@ -323,8 +323,8 @@ class Affilio_API {
 
     private function refused_url_message() {
         return $this->t(
-            'The API URL is wrong or was refused. Check the address in Settings › Affilio.',
-            'L\'URL API è sbagliato o è stato rifiutato. Controlla l\'indirizzo in Impostazioni › Affilio.'
+            'The API URL is wrong or was refused. Check the address in Settings › Offer Rails.',
+            'L\'URL API è sbagliato o è stato rifiutato. Controlla l\'indirizzo in Impostazioni › Offer Rails.'
         );
     }
 

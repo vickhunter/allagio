@@ -105,7 +105,7 @@ if (count($GLOBALS['http']) !== $http_before_connect) {
 
 class Affilio_QuietAPI {
     public function get_connection_status($force = false) {
-        return array('connected' => true, 'message' => 'Affilio is connected and ready.', 'state' => 'connected', 'label' => 'Connected');
+        return array('connected' => true, 'message' => 'Offer Rails is connected and ready.', 'state' => 'connected', 'label' => 'Connected');
     }
     public function invalidate_status_cache() {}
 }

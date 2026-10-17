@@ -90,7 +90,7 @@ if (!function_exists('add_action')) {
             return $catalog;
         }
         $catalog = array();
-        $path = dirname(__DIR__) . '/languages/affilio-it_IT.po';
+        $path = dirname(__DIR__) . '/languages/affilio-wp-it_IT.po';
         if (!is_file($path)) {
             return $catalog;
         }
@@ -107,7 +107,7 @@ if (!function_exists('add_action')) {
         return $catalog;
     }
     function __($text, $domain = 'default') {
-        if ($domain !== 'affilio') {
+        if ($domain !== 'affilio-wp') {
             return $text;
         }
         $locale = get_user_locale();

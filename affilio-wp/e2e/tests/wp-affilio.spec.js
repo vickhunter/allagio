@@ -39,7 +39,7 @@ test.describe('Affilio WP Admin Flows', () => {
     await loginAsAdmin(page);
     await page.goto('/wp-admin/admin.php?page=affilio-settings');
 
-    await expect(page.locator('h1')).toContainText('Affilio Settings');
+    await expect(page.locator('h1')).toContainText('Offer Rails Settings');
     await expect(page.locator('.affilio-status-pill')).toBeVisible();
     await expect(page.locator('#affilio-onboarding-root')).toBeVisible();
     await page.locator('summary').click();

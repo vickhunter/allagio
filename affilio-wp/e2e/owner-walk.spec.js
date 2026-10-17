@@ -59,7 +59,7 @@ async function handle(req, res) {
   if (demo[pathname] && !pathname.endsWith('.js')) return send(res, 200, demo[pathname], 'text/html; charset=utf-8');
   if (pathname === '/health') return send(res, 200, { ok: true });
   if (pathname === '/owner/api/session') {
-    return send(res, 200, { maker: true, publisher: false, operator: true, email: 'owner@example.com', owner_id: 'owner-1', install_command: 'npx distributoor-setup', mcp_url: 'https://example.test/mcp' });
+    return send(res, 200, { maker: true, publisher: false, operator: true, email: 'owner@example.com', owner_id: 'owner-1', install_command: 'npx offer-rails', mcp_url: 'https://example.test/mcp' });
   }
   if (pathname === '/owner/api/products' && req.method === 'GET') return send(res, 200, { products: state.products });
   if (pathname === '/owner/api/products' && req.method === 'POST') {

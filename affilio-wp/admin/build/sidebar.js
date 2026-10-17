@@ -92,11 +92,11 @@
 
         return createElement(
             PluginSidebar,
-            { name: 'affilio-sidebar', title: 'Affilio' },
+            { name: 'affilio-sidebar', title: 'Offer Rails' },
             createElement('div', { style: { padding: '16px' } },
                 !connected
                     ? createElement('div', { style: { border: '1px solid #dba617', borderLeft: '4px solid #dba617', background: '#fff8e5', padding: '10px', marginBottom: '12px' } },
-                        createElement('strong', null, t('Affilio not connected', 'Affilio non connesso')),
+                        createElement('strong', null, t('Offer Rails not connected', 'Offer Rails non connesso')),
                         createElement('p', { style: muted }, connectionStatus && connectionStatus.message ? connectionStatus.message : t('Configure API key in settings.', 'Configura la chiave API nelle impostazioni.')),
                         createElement('p', { style: { margin: '8px 0 0' } },
                             createElement('a', { className: 'button button-secondary', href: AffilioData.settingsUrl || '/wp-admin/admin.php?page=affilio-settings' }, t('Open settings', 'Apri impostazioni'))

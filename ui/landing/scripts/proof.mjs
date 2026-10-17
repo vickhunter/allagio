@@ -8,7 +8,7 @@ import AxeBuilder from '@axe-core/playwright'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const build = resolve(root, '../../affilio-wp/admin/build')
 const out = resolve(root, '../../affilio-wp/e2e/landing-v9-proof')
-const install = 'npm exec --yes --package=https://offer-rails.example/downloads/distributoor-setup-0.1.0.tgz -- distributoor-setup --api-url https://offer-rails.example'
+const install = 'npx --yes --package=https://offer-rails.example/downloads/offer-rails-0.1.0.tgz offer-rails --api-url https://offer-rails.example'
 
 function page(name) {
   return readFileSync(join(build, name), 'utf8')
@@ -99,7 +99,7 @@ try {
         return {
           scroll,
           small,
-          brand: !/distributoor/i.test(document.body.innerText.replace(/distributoor-setup/gi, '')),
+          brand: !/distributoor|affilio/i.test(document.body.innerText),
           how: document.querySelectorAll('#how').length,
           publishers: document.querySelectorAll('#publishers').length,
           primary: document.querySelectorAll('[data-primary-action]').length,

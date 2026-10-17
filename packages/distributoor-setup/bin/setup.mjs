@@ -10,7 +10,8 @@ try {
     'install-only': { type: 'boolean' }, offline: { type: 'boolean' }, help: { type: 'boolean' }
   } });
   if (values.help) {
-    console.log('distributoor-setup --api-url https://pilot.example.com [--client auto|codex|cursor|claude|skill] [--website https://your-product.com] [--project PATH] [--install-only] [--offline]');
+    console.log('offer-rails --api-url https://pilot.example.com [--client auto|codex|cursor|claude|skill] [--website https://your-product.com] [--project PATH] [--install-only] [--offline]');
+    console.log('affilio, distributoor, and distributoor-setup run this same installer.');
   } else {
     if (!values['api-url']) throw new Error('--api-url is required until a public hosted pilot is available.');
     const api = validateAPI(values['api-url']);
@@ -39,7 +40,7 @@ try {
       await run('codex', [...configuration, 'mcp', 'login', 'distributoor', '--scopes', 'maker', '--oauth-client-registration', 'dcr', '--oauth-resource', resource], root);
       await run('codex', [...configuration, 'Use distributoor-onboard to set up this product. Continue through detection, registration, attribution wiring, tests and assessment; report any remaining owner action.'], root);
     } else if (client === 'claude' && await available('claude')) {
-      await run('claude', ['Use distributoor-onboard to set up this product. Connect the Distributoor MCP server with maker access, then perform integration and verification.'], root);
+      await run('claude', ['Use distributoor-onboard to set up this product. Connect the Offer Rails MCP server with maker access, then perform integration and verification.'], root);
     } else {
       console.log(`Open ${client === 'cursor' ? 'Cursor' : 'your coding agent'} and ask: Use distributoor-onboard to set up this product. Your agent handles the remaining integration using ${resource}.`);
     }
