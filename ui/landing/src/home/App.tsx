@@ -6,6 +6,7 @@ import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { driftChips, example, faq, makerAdvantages, pilotLine, publisherAdvantages } from '@/content'
 import { HeroShader } from './HeroShader'
+import { PostPreview } from '@/components/PostPreview'
 import { HowItWorks } from './HowItWorks'
 import { useSource, withSource } from '@/lib/source'
 
@@ -49,6 +50,17 @@ export function App() {
       </section>
 
       <HowItWorks />
+
+      <section id="post-preview" aria-labelledby="preview-h" className="border-t border-line">
+        <div className="mx-auto max-w-3xl px-5 py-16 md:py-20">
+          <p className="eyebrow">On your post</p>
+          <h2 id="preview-h" className="h-display mt-3 text-3xl sm:text-4xl">See it on a real post.</h2>
+          <p className="mt-4 text-lg leading-relaxed text-t2">Paste a post URL. See where an offer would sit. Nothing is saved.</p>
+          <div className="mt-8">
+            <PostPreview />
+          </div>
+        </div>
+      </section>
 
       <section aria-labelledby="sides-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
