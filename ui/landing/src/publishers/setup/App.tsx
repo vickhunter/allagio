@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PostPreview } from '@/components/PostPreview'
 import { Page } from '@/site/Page'
 import { signInHref, useSource } from '@/lib/source'
 
@@ -43,7 +44,10 @@ export function App() {
         <p className="eyebrow">Publisher setup</p>
         <h1 id="setup-h" className="h-display mt-4 text-[40px] sm:text-6xl">Set up your site.</h1>
         <p className="mt-5 text-lg leading-relaxed text-t2">Three steps. Then Offer Rails can place offers on your posts.</p>
-        <ol className="mt-10 space-y-4">
+        <div className="mt-10">
+          <PostPreview />
+        </div>
+        <ol className="mt-6 space-y-4">
           {steps.map((step, index) => (
             <li key={step.title} className="rounded-2xl border border-line bg-s1 p-5">
               <div className="flex flex-nowrap items-center gap-2">

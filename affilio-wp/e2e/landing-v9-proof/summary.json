@@ -6,6 +6,7 @@
     "brand": true,
     "how": 1,
     "publishers": 1,
+    "preview": 1,
     "primary": 1,
     "shader": 0,
     "hero": "fallback",
@@ -20,6 +21,7 @@
     "brand": true,
     "how": 1,
     "publishers": 0,
+    "preview": 0,
     "primary": 1,
     "shader": 0,
     "hero": "",
@@ -34,6 +36,7 @@
     "brand": true,
     "how": 1,
     "publishers": 0,
+    "preview": 0,
     "primary": 1,
     "shader": 0,
     "hero": "",
@@ -53,6 +56,7 @@
     "scroll": true,
     "small": [],
     "brand": true,
+    "preview": 1,
     "steps": 3,
     "actions": [
       1,
@@ -84,12 +88,45 @@
     "yolo": true
   },
   {
+    "slug": "preview-success-390",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "primary": 1,
+    "live": "polite",
+    "posts": 0
+  },
+  {
+    "slug": "preview-nomatch-390",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "primary": 1,
+    "live": "polite",
+    "posts": 0
+  },
+  {
+    "slug": "preview-error-390",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "primary": 1,
+    "live": "polite",
+    "posts": 0
+  },
+  {
+    "slug": "preview-setup-390",
+    "primary": "Download the plugin",
+    "posts": 1
+  },
+  {
     "slug": "home-1440",
     "scroll": true,
     "small": [],
     "brand": true,
     "how": 1,
     "publishers": 1,
+    "preview": 1,
     "primary": 1,
     "shader": 0,
     "hero": "fallback",
@@ -104,6 +141,7 @@
     "brand": true,
     "how": 1,
     "publishers": 0,
+    "preview": 0,
     "primary": 1,
     "shader": 0,
     "hero": "",
@@ -118,6 +156,7 @@
     "brand": true,
     "how": 1,
     "publishers": 0,
+    "preview": 0,
     "primary": 1,
     "shader": 0,
     "hero": "",
@@ -137,6 +176,7 @@
     "scroll": true,
     "small": [],
     "brand": true,
+    "preview": 1,
     "steps": 3,
     "actions": [
       1,
@@ -166,5 +206,37 @@
     "serious": [],
     "connectHref": "/auth/login?return_to=%2Fowner%2Fconnect-site%3Fsource%3Dcursor&source=cursor",
     "yolo": true
+  },
+  {
+    "slug": "preview-success-1440",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "primary": 1,
+    "live": "polite",
+    "posts": 0
+  },
+  {
+    "slug": "preview-nomatch-1440",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "primary": 1,
+    "live": "polite",
+    "posts": 0
+  },
+  {
+    "slug": "preview-error-1440",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "primary": 1,
+    "live": "polite",
+    "posts": 0
+  },
+  {
+    "slug": "preview-setup-1440",
+    "primary": "Download the plugin",
+    "posts": 1
   }
 ]
