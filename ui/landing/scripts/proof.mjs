@@ -200,6 +200,19 @@ try {
         steps: steps.length,
         actions: steps.map((step) => step.querySelectorAll('[data-step-action]').length),
         todo: (text.match(/To do/g) || []).length,
+        nav: document.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent?.trim() || '',
+        primary: document.querySelectorAll('[data-primary-action]').length,
+        pills: [...document.querySelectorAll('[data-step-status]')].map((el) => {
+          const step = el.closest('li')
+          const label = step.querySelector('[data-step-label]').getBoundingClientRect()
+          const title = step.querySelector('h2').getBoundingClientRect()
+          const box = el.getBoundingClientRect()
+          return {
+            size: parseFloat(getComputedStyle(el).fontSize),
+            sameLine: Math.abs((box.top + box.bottom) / 2 - (label.top + label.bottom) / 2) < 8,
+            aboveTitle: box.bottom <= title.top + 1,
+          }
+        }),
       }
     })
     const setupAxe = await new AxeBuilder({ page: setupPage }).analyze()
@@ -216,6 +229,11 @@ try {
     if (!setupMetrics.brand) throw new Error('setup-' + width + ' shows a retired brand name')
     if (setupMetrics.steps !== 3 || setupMetrics.actions.some((count) => count !== 1)) throw new Error('setup-' + width + ' steps ' + setupMetrics.steps + ' actions ' + setupMetrics.actions.join(','))
     if (setupMetrics.todo !== 3) throw new Error('setup-' + width + ' to-do count ' + setupMetrics.todo)
+    if (setupMetrics.nav !== 'Publishers') throw new Error('setup-' + width + ' nav ' + setupMetrics.nav)
+    if (setupMetrics.primary !== 1) throw new Error('setup-' + width + ' primary count ' + setupMetrics.primary)
+    const primaryName = await setupPage.locator('[data-primary-action]').innerText()
+    if (!primaryName.includes('Download the plugin')) throw new Error('setup-' + width + ' primary ' + primaryName)
+    if (setupMetrics.pills.length !== 3 || setupMetrics.pills.some((pill) => pill.size < 12 || !pill.sameLine || !pill.aboveTitle)) throw new Error('setup-' + width + ' status pills ' + JSON.stringify(setupMetrics.pills))
     if (!yolo) throw new Error('setup-' + width + ' does not preselect YOLO')
     if (!connectHref.includes('/auth/login') || !connectHref.includes('source=cursor') || !connectTo.startsWith('/owner/connect-site') || !connectTo.includes('source=cursor')) throw new Error('setup connect href ' + connectHref)
     const setupZip = await setupPage.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')

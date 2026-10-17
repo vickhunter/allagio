@@ -60,6 +60,25 @@
       1
     ],
     "todo": 3,
+    "nav": "Publishers",
+    "primary": 1,
+    "pills": [
+      {
+        "size": 13,
+        "sameLine": true,
+        "aboveTitle": true
+      },
+      {
+        "size": 13,
+        "sameLine": true,
+        "aboveTitle": true
+      },
+      {
+        "size": 13,
+        "sameLine": true,
+        "aboveTitle": true
+      }
+    ],
     "serious": [],
     "connectHref": "/auth/login?return_to=%2Fowner%2Fconnect-site%3Fsource%3Dcursor&source=cursor",
     "yolo": true
@@ -125,6 +144,25 @@
       1
     ],
     "todo": 3,
+    "nav": "Publishers",
+    "primary": 1,
+    "pills": [
+      {
+        "size": 13,
+        "sameLine": true,
+        "aboveTitle": true
+      },
+      {
+        "size": 13,
+        "sameLine": true,
+        "aboveTitle": true
+      },
+      {
+        "size": 13,
+        "sameLine": true,
+        "aboveTitle": true
+      }
+    ],
     "serious": [],
     "connectHref": "/auth/login?return_to=%2Fowner%2Fconnect-site%3Fsource%3Dcursor&source=cursor",
     "yolo": true

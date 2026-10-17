@@ -20,9 +20,10 @@ export function Header({ page }: { page: PageKey }) {
   const source = useSource()
   const [paused, setPaused] = useState(false)
   useEffect(() => { document.documentElement.dataset.motion = paused ? 'paused' : 'on' }, [paused])
+  const current = page === 'setup' ? 'publishers' : page
   const link = (href: string, label: string, key: PageKey, tone: string) => (
-    <a href={withSource(href, source)} aria-current={page === key ? 'page' : undefined} data-track="nav_click" data-track-to={key}
-      className={`inline-flex min-h-11 min-w-11 items-center rounded-md px-2.5 transition-colors duration-150 sm:px-3 ${tone} ${page === key ? 'bg-s2 font-semibold' : ''}`}>{label}</a>
+    <a href={withSource(href, source)} aria-current={current === key ? 'page' : undefined} data-track="nav_click" data-track-to={key}
+      className={`inline-flex min-h-11 min-w-11 items-center rounded-md px-2.5 transition-colors duration-150 sm:px-3 ${tone} ${current === key ? 'bg-s2 font-semibold' : ''}`}>{label}</a>
   )
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-s0/90 backdrop-blur">
