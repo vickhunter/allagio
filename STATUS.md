@@ -1,3 +1,7 @@
+## October 17 — Publisher setup
+
+“I run a site” on the landing opens `/publishers/setup`. A publisher sign-in returns there too. The page has three steps: download the WordPress plugin from `/downloads/affilio.zip`, connect the site through Google sign-in to `/owner/connect-site` (the source tag stays on that link), and choose Manual, Auto, or YOLO, with YOLO selected. Signed out, each step reads “To do” in a pill beside the step number. The first open step is the one filled button; the others are outlines. Publishers is the current item in the top nav. Nothing new is stored; connect and save use the existing owner sign-in. `/publishers/setup` and `/publishers/setup/` serve `publishers-setup.html`, and that file is copied into the production image.
+
 ## October 16 — `/protocol` is in the production image
 
 `Dockerfile.mvp` copies `affilio-wp/admin/build/protocol.html` into `/app/assets` with the other hosted pages. `/protocol` loads that file at startup; without the copy the route returns 500. A handler test fails when a page template loaded from `AssetsPath` is missing from that copy list.
