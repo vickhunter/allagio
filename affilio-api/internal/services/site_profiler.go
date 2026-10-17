@@ -1,6 +1,10 @@
 package services
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
 
 // SiteProfile is a publisher's topical fingerprint, aggregated from data the
 // demand side already produces: scanned article titles and the categories of
@@ -98,4 +102,112 @@ func RankOffersForProfile(profile SiteProfile, offers []OfferTerms) ([]int, []in
 	}
 	sort.SliceStable(order, func(a, b int) bool { return scores[order[a]] > scores[order[b]] })
 	return order, scores
+}
+
+// RelevanceFloor is the lowest ScoreOfferForProfile that counts as a match.
+// Placement search uses the same bar.
+const RelevanceFloor = 25
+
+// DryRunHit is the top offer for a page, and the slot that offer would use.
+type DryRunHit struct {
+	Index     int
+	Relevance int
+	Reason    string
+	Slot      string
+}
+
+// DryRunMatch scores offers against page text and returns the top offer that
+// clears RelevanceFloor, plus the slot that offer would use. It does not
+// write anything. text is the extracted page text.
+func DryRunMatch(text string, offers []OfferTerms) (DryRunHit, bool) {
+	text = strings.TrimSpace(text)
+	if text == "" || len(offers) == 0 {
+		return DryRunHit{}, false
+	}
+	profile := BuildSiteProfile([]string{text}, nil)
+	bestIdx := -1
+	bestScore := -1
+	for i, offer := range offers {
+		score := ScoreOfferForProfile(profile, offer)
+		if score > bestScore {
+			bestScore = score
+			bestIdx = i
+		}
+	}
+	if bestIdx < 0 || bestScore < RelevanceFloor {
+		return DryRunHit{}, false
+	}
+	return DryRunHit{
+		Index:     bestIdx,
+		Relevance: bestScore,
+		Reason:    fmt.Sprintf("Product topics overlap this content (%d/100 lexical fit); review the product before recommending it.", bestScore),
+		Slot:      matchSlot(text, offers[bestIdx]),
+	}, true
+}
+
+func matchSlot(text string, offer OfferTerms) string {
+	paragraphs := splitPreviewParagraphs(text)
+	if len(paragraphs) < 2 {
+		return slotByLength(text)
+	}
+	focus := map[string]struct{}{}
+	terms := append([]string{offer.Name, offer.Tagline, offer.Category}, offer.Keywords...)
+	terms = append(terms, offer.Tags...)
+	for _, term := range terms {
+		for _, token := range tokenize(term) {
+			focus[token] = struct{}{}
+		}
+	}
+	if len(focus) == 0 {
+		return slotByLength(text)
+	}
+	bestIdx := 0
+	best := -1
+	for i, paragraph := range paragraphs {
+		score := 0
+		for _, token := range tokenize(paragraph) {
+			if _, ok := focus[token]; ok {
+				score++
+			}
+		}
+		if score > best {
+			best = score
+			bestIdx = i
+		}
+	}
+	ratio := float64(bestIdx+1) / float64(len(paragraphs))
+	switch {
+	case ratio <= 0.25:
+		return "after_intro"
+	case ratio <= 0.75:
+		return "mid_article"
+	default:
+		return "before_conclusion"
+	}
+}
+
+func splitPreviewParagraphs(text string) []string {
+	raw := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n\n")
+	out := make([]string, 0, len(raw))
+	for _, paragraph := range raw {
+		trimmed := strings.TrimSpace(paragraph)
+		if trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+func slotByLength(text string) string {
+	words := len(strings.Fields(strings.TrimSpace(text)))
+	switch {
+	case words > 1400:
+		return "mid_article"
+	case words > 700:
+		return "before_conclusion"
+	case words > 250:
+		return "after_intro"
+	default:
+		return "end_of_article"
+	}
 }

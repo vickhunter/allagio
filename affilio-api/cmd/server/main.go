@@ -91,6 +91,11 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok", "site_installation_registration": true, "native_distribution": cfg.PublicBaseURL != ""})
 	}
 	r.GET("/health", health)
+	preview := &handlers.PreviewHandler{
+		DB:      db,
+		Limiter: handlers.NewIPRateLimiter(10, time.Minute),
+	}
+	r.POST("/api/preview", preview.Preview)
 	r.GET("/.well-known/dcp.json", func(c *gin.Context) {
 		mcpURL, mcpTransport := "/v1/mcp", "legacy-http-jsonrpc"
 		if cfg.PublicBaseURL != "" {

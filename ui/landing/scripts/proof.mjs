@@ -108,84 +108,110 @@ async function assertPreviewChrome(page, slug, outDir) {
   return metrics
 }
 
+function offerFollowsBar(index) {
+  const root = document.querySelector('[data-post-preview]')
+  const bars = [...root.querySelectorAll('[data-paragraph]')]
+  const offer = root.querySelector('[data-offer]')
+  if (!offer || bars.length !== 4 || !bars[index]) return false
+  const after = bars[index].compareDocumentPosition(offer) & Node.DOCUMENT_POSITION_FOLLOWING
+  const beforeNext = index === bars.length - 1 || (offer.compareDocumentPosition(bars[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING)
+  return Boolean(after && beforeNext)
+}
+
+async function showPreview(page, origin, route, fixture, width, summary, outDir, posts) {
+  const name = route === '/' ? 'home' : 'setup'
+  const before = posts.count
+  await page.goto(origin + route + '?source=cursor&previewFixture=' + encodeURIComponent(fixture), { waitUntil: 'networkidle' })
+  const field = page.getByLabel('Paste a post URL')
+  if (await field.count() !== 1) throw new Error(name + ' ' + fixture + ' paste field')
+  await field.fill('https://journal.example/start')
+  const button = page.getByRole('button', { name: 'Preview this post' })
+  await button.click()
+  await page.getByText('Reading your post, up to 30s').waitFor({ timeout: 4000 })
+  if (fixture === 'success' || fixture === 'after_intro' || fixture === 'mid_article' || fixture === 'before_conclusion' || fixture === 'end_of_article') {
+    const slot = fixture === 'success' ? ['After the intro', 0] : {
+      after_intro: ['After the intro', 0],
+      mid_article: ['Mid-article', 1],
+      before_conclusion: ['Before the conclusion', 2],
+      end_of_article: ['End of article', 3],
+    }[fixture]
+    await page.getByRole('heading', { name: 'How to start a journal' }).waitFor()
+    await page.getByText('Field Notes', { exact: true }).waitFor()
+    await page.getByText(slot[0], { exact: true }).waitFor()
+    await page.getByText('Sponsored, via Offer Rails', { exact: true }).waitFor()
+    if (!await page.evaluate(offerFollowsBar, slot[1])) throw new Error(fixture + ' offer is not in its slot')
+    const approve = page.getByRole('link', { name: 'Approve your placements' })
+    const href = await approve.getAttribute('href') || ''
+    const back = new URL(href, origin).searchParams.get('return_to') || ''
+    if (!href.includes('/auth/login') || !href.includes('source=cursor') || !back.startsWith('/publishers/setup') || !back.includes('source=cursor')) throw new Error('approve href ' + href)
+    if (await approve.getAttribute('data-primary-action') !== null) throw new Error('approve is a second primary')
+  } else if (fixture === 'nomatch') {
+    await page.getByText('No offer fits this post yet.').waitFor()
+    await page.getByRole('button', { name: 'Try another URL' }).waitFor()
+    if (await page.locator('[data-offer]').count()) throw new Error('no-match rendered an offer')
+  } else {
+    const copy = {
+      400: ["That doesn't look like a post URL.", 'Try one like https://example.com/your-post.'],
+      403: ["We can't open that address.", 'Try a public post.'],
+      422: ['We could not reach that page.', "Check that it's public and try again."],
+      429: ['Too many tries.', 'Wait a minute, then try again.'],
+    }[fixture]
+    await page.getByText(copy[0], { exact: true }).waitFor()
+    await page.getByText(copy[1], { exact: true }).waitFor()
+    const shown = await page.locator('[data-post-preview]').innerText()
+    if (/invalid url|blocked address|fetch failed|rate limit exceeded|\{"error"/.test(shown)) throw new Error(fixture + ' showed raw error JSON')
+    if (fixture === '429') {
+      if (!await button.isDisabled()) throw new Error('429 left the button enabled')
+    } else if (await button.isDisabled()) throw new Error(fixture + ' left the button disabled')
+  }
+  if (await field.inputValue() !== 'https://journal.example/start') throw new Error(fixture + ' cleared the URL')
+  if (posts.count !== before) throw new Error(fixture + ' called /api/preview')
+  if (name === 'setup') {
+    if ((await page.locator('[data-primary-action]').count()) !== 1) throw new Error('setup gained a primary')
+    const primaryName = await page.locator('[data-primary-action]').innerText()
+    if (!primaryName.includes('Download the plugin')) throw new Error('setup primary moved ' + primaryName)
+  }
+  const slug = 'preview-' + name + '-' + fixture + '-' + width
+  const metrics = await assertPreviewChrome(page, slug, outDir)
+  const shot = name === 'home' ? page.locator('#post-preview') : page.locator('[data-post-preview]')
+  await shot.screenshot({ path: join(outDir, slug + '.png') })
+  summary.push({ slug, ...metrics, posts: posts.count })
+}
+
 async function walkPreview(browser, origin, width, summary, outDir) {
   const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' })
   const page = await context.newPage()
-  let posts = 0
+  const posts = { count: 0 }
   page.on('request', (req) => {
-    if (req.method() === 'POST' && new URL(req.url()).pathname === '/api/preview') posts += 1
+    if (req.method() === 'POST' && new URL(req.url()).pathname === '/api/preview') posts.count += 1
   })
   await page.goto(origin + '/?source=cursor&previewFixture=success', { waitUntil: 'networkidle' })
   await page.getByLabel('Paste a post URL').fill('notaurl')
   await page.getByRole('button', { name: 'Preview this post' }).click()
-  await page.getByText('Enter a full post URL, starting with https://.').waitFor()
-  if (posts !== 0) throw new Error('invalid URL called /api/preview')
-  const show = async (fixture) => {
-    const before = posts
-    await page.goto(origin + '/?source=cursor&previewFixture=' + fixture, { waitUntil: 'networkidle' })
-    const field = page.getByLabel('Paste a post URL')
-    if (await field.count() !== 1) throw new Error(fixture + '-' + width + ' paste field')
-    await field.fill('https://journal.example/start')
-    await page.getByRole('button', { name: 'Preview this post' }).click()
-    await page.getByText('Reading your post, up to 30s').waitFor({ timeout: 4000 })
-    if (fixture === 'success') {
-      await page.getByRole('heading', { name: 'How to start a journal' }).waitFor()
-      await page.getByText('Field Notes', { exact: true }).waitFor()
-      await page.getByText('After paragraph 2', { exact: true }).waitFor()
-      await page.getByText('Sponsored, via Offer Rails', { exact: true }).waitFor()
-      const placed = await page.evaluate(() => {
-        const root = document.querySelector('[data-post-preview]')
-        const bars = [...root.querySelectorAll('[data-paragraph]')]
-        const offer = root.querySelector('[data-offer]')
-        if (!offer || bars.length < 3) return false
-        const afterSecond = bars[1].compareDocumentPosition(offer) & Node.DOCUMENT_POSITION_FOLLOWING
-        const beforeThird = offer.compareDocumentPosition(bars[2]) & Node.DOCUMENT_POSITION_FOLLOWING
-        return Boolean(afterSecond && beforeThird)
-      })
-      if (!placed) throw new Error('offer is not after paragraph 2')
-      const approve = page.getByRole('link', { name: 'Approve your placements' })
-      const href = await approve.getAttribute('href') || ''
-      const back = new URL(href, origin).searchParams.get('return_to') || ''
-      if (!href.includes('/auth/login') || !href.includes('source=cursor') || !back.startsWith('/publishers/setup') || !back.includes('source=cursor')) throw new Error('approve href ' + href)
-      if (await approve.getAttribute('data-primary-action') !== null) throw new Error('approve is a second primary')
-    } else if (fixture === 'nomatch') {
-      await page.getByText('No offer fits this post yet.').waitFor()
-      await page.getByRole('button', { name: 'Try another URL' }).waitFor()
-      if (await page.locator('[data-offer]').count()) throw new Error('no-match rendered an offer')
-    } else {
-      await page.getByText('Too many previews just now. Wait a moment and try again.').waitFor()
+  await page.getByText("That doesn't look like a post URL.", { exact: true }).waitFor()
+  await page.getByText('Try one like https://example.com/your-post.', { exact: true }).waitFor()
+  if (posts.count !== 0) throw new Error('invalid URL called /api/preview')
+  for (const route of ['/', '/publishers/setup']) {
+    for (const fixture of ['success', 'nomatch', '400', '403', '422', '429']) {
+      await showPreview(page, origin, route, fixture, width, summary, outDir, posts)
     }
-    if (await field.inputValue() !== 'https://journal.example/start') throw new Error(fixture + ' cleared the URL')
-    if (posts !== before) throw new Error(fixture + ' called /api/preview')
-    const metrics = await assertPreviewChrome(page, 'preview-' + fixture + '-' + width, outDir)
-    await page.locator('#post-preview').screenshot({ path: join(outDir, `preview-${fixture}-${width}.png`) })
-    summary.push({ slug: 'preview-' + fixture + '-' + width, ...metrics, posts })
   }
-  await show('success')
-  await show('nomatch')
-  await show('error')
-  const liveBefore = posts
-  await page.goto(origin + '/?source=cursor', { waitUntil: 'networkidle' })
-  await page.getByLabel('Paste a post URL').fill('https://journal.example/missing')
-  await page.getByRole('button', { name: 'Preview this post' }).click()
-  await page.getByText('We could not reach that page.').waitFor({ timeout: 4000 })
-  if (posts !== liveBefore + 1) throw new Error('missing route did not request /api/preview ' + posts)
-  await assertPreviewChrome(page, 'preview-missing-' + width, outDir)
-  await page.locator('#post-preview').screenshot({ path: join(outDir, `preview-missing-${width}.png`) })
-  const setupBefore = posts
-  await page.goto(origin + '/publishers/setup?source=cursor&previewFixture=success', { waitUntil: 'networkidle' })
-  if (await page.getByLabel('Paste a post URL').count() !== 1) throw new Error('setup paste field')
-  await page.getByLabel('Paste a post URL').fill('https://journal.example/start')
-  await page.getByRole('button', { name: 'Preview this post' }).click()
-  await page.getByRole('heading', { name: 'How to start a journal' }).waitFor()
-  if ((await page.locator('[data-primary-action]').count()) !== 1) throw new Error('setup gained a primary')
-  const primaryName = await page.locator('[data-primary-action]').innerText()
-  if (!primaryName.includes('Download the plugin')) throw new Error('setup primary moved ' + primaryName)
-  if (posts !== setupBefore) throw new Error('setup fixture called /api/preview')
-  if (await page.getByLabel('Paste a post URL').inputValue() !== 'https://journal.example/start') throw new Error('setup cleared the URL')
-  await assertPreviewChrome(page, 'preview-setup-' + width, outDir)
-  await page.locator('[data-post-preview]').screenshot({ path: join(outDir, `preview-setup-${width}.png`) })
-  summary.push({ slug: 'preview-setup-' + width, primary: primaryName.trim(), posts })
+  for (const fixture of ['after_intro', 'mid_article', 'before_conclusion', 'end_of_article']) {
+    await showPreview(page, origin, '/', fixture, width, summary, outDir, posts)
+  }
+  if (width === 390) {
+    const liveBefore = posts.count
+    await page.goto(origin + '/?source=cursor', { waitUntil: 'networkidle' })
+    await page.getByLabel('Paste a post URL').fill('https://journal.example/missing')
+    await page.getByRole('button', { name: 'Preview this post' }).click()
+    await page.getByText('We could not reach that page.', { exact: true }).waitFor({ timeout: 4000 })
+    await page.getByText("Check that it's public and try again.", { exact: true }).waitFor()
+    if (posts.count !== liveBefore + 1) throw new Error('missing route did not request /api/preview ' + posts.count)
+    const shown = await page.locator('[data-post-preview]').innerText()
+    if (/\{"error"|missing/.test(shown)) throw new Error('missing route showed a raw body')
+    await assertPreviewChrome(page, 'preview-missing-' + width, outDir)
+    await page.locator('#post-preview').screenshot({ path: join(outDir, 'preview-missing-' + width + '.png') })
+  }
   await context.close()
 }
 

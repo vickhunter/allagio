@@ -57,7 +57,8 @@ type opportunity struct {
 	PayoutMethod     string  `json:"payout_method"`
 }
 
-const relevanceThreshold = 25
+// relevanceThreshold is the same bar DryRunMatch uses. An offer below it is not a match.
+const relevanceThreshold = services.RelevanceFloor
 
 type opportunitySearch struct {
 	items     []opportunity

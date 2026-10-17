@@ -1,108 +1,61 @@
-import { useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Input } from '@/components/ui/input'
 import { roleReturn, signInHref, useSource } from '@/lib/source'
+import { PreviewStatus, barCount, codeFromStatus, fixtureBody, parsePreview, previewErrorCopy, previewTimeoutMs, rateLimitPauseMs, readPreviewFixture, slotAfterBar, slotLabel } from '@/lib/preview-map.mjs'
 
-// Signed-out preview. The URL stays in the field. POST /api/preview is D-046a and
-// may 404; previewFixture on the page URL is the proof stand-in and does not fetch.
-type Offer = { name: string; url: string; blurb: string }
-type Preview = { title: string; offer: Offer | null; slot: string }
-type Phase = 'idle' | 'loading' | 'invalid' | 'success' | 'nomatch' | 'error'
-type Fixture = '' | 'success' | 'nomatch' | 'error'
+// Signed-out preview. The URL stays in the field. previewFixture skips the network.
+type Offer = { name: string; blurb: string }
+type Preview = { title: string; offer: Offer | null; slot: string | null }
+type Phase = 'idle' | 'loading' | 'success' | 'nomatch' | 'error'
 
 const outlineClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line-strong bg-s0 px-5 text-center font-semibold text-t1 transition-colors duration-150 hover:bg-s2 disabled:text-t1 sm:w-auto'
-const barWidth = ['w-full', 'w-11/12', 'w-4/5', 'w-3/4', 'w-5/6', 'w-2/3']
-const journal: Preview = {
-  title: 'How to start a journal',
-  offer: { name: 'Field Notes', url: 'https://example.com/notes', blurb: 'A pocket notebook for the habit.' },
-  slot: 'after_p2',
+const barWidth = ['w-full', 'w-11/12', 'w-4/5', 'w-3/4']
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function readFixture(): Fixture {
-  if (typeof window === 'undefined') return ''
-  const value = new URLSearchParams(window.location.search).get('previewFixture')
-  if (value === 'success' || value === 'nomatch' || value === 'error') return value
-  return ''
-}
-
-function validPostUrl(value: string) {
-  try {
-    const url = new URL(value.trim())
-    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname.includes('.')
-  } catch {
-    return false
+async function loadPreview(url: string, signal: AbortSignal): Promise<Preview> {
+  const fixture = readPreviewFixture(window.location.search)
+  if (fixture === '400' || fixture === '403' || fixture === '422' || fixture === '429') {
+    await wait(700)
+    throw new PreviewStatus(Number(fixture))
   }
-}
-
-function isOffer(value: unknown): value is Offer {
-  if (!value || typeof value !== 'object') return false
-  const offer = value as Record<string, unknown>
-  return typeof offer.name === 'string' && offer.name.trim() !== '' && typeof offer.url === 'string' && offer.url.trim() !== '' && typeof offer.blurb === 'string' && offer.blurb.trim() !== ''
-}
-
-function isPreview(value: unknown): value is Preview {
-  if (!value || typeof value !== 'object') return false
-  const body = value as Record<string, unknown>
-  if (typeof body.title !== 'string' || body.title.trim() === '') return false
-  if (typeof body.slot !== 'string' || body.slot.trim() === '') return false
-  if (body.offer === null) return true
-  return isOffer(body.offer)
-}
-
-function slotParagraph(slot: string) {
-  const match = /^after_p(\d+)$/.exec(slot)
-  if (!match) return null
-  const n = Number(match[1])
-  if (!Number.isInteger(n) || n < 1) return null
-  return n
-}
-
-function slotWords(slot: string) {
-  const n = slotParagraph(slot)
-  if (!n) return 'In the post'
-  return `After paragraph ${n}`
-}
-
-function explainPreviewError(message: string) {
-  const text = message.toLowerCase()
-  if (text.includes('rate')) return 'Too many previews just now. Wait a moment and try again.'
-  if (text.includes('html')) return 'That page is not an article we can read.'
-  if (text.includes('unreach') || text.includes('failed to fetch') || text.includes('not found') || text.includes('network')) return 'We could not reach that page.'
-  return 'We could not read that page.'
-}
-
-function errorText(body: unknown) {
-  if (!body || typeof body !== 'object' || !('error' in body)) return ''
-  const error = (body as { error: unknown }).error
-  return typeof error === 'string' ? error : ''
-}
-
-async function loadPreview(url: string): Promise<Preview> {
-  const fixture = readFixture()
   if (fixture) {
-    await new Promise((resolve) => setTimeout(resolve, 700))
-    if (fixture === 'error') throw new Error('rate limited')
-    if (fixture === 'nomatch') return { title: journal.title, offer: null, slot: journal.slot }
-    return journal
+    await wait(700)
+    const parsed = parsePreview(fixtureBody(fixture))
+    if (!parsed) throw new PreviewStatus(422)
+    return parsed
   }
-  let response: Response
+  const timeout = new AbortController()
+  const timer = setTimeout(() => timeout.abort(), previewTimeoutMs)
+  const onAbort = () => timeout.abort()
+  signal.addEventListener('abort', onAbort)
   try {
-    response = await fetch('/api/preview', {
+    const response = await fetch('/api/preview', {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify({ url }),
       cache: 'no-store',
+      signal: timeout.signal,
     })
-  } catch {
-    throw new Error('unreachable')
+    const raw = await response.text()
+    let body: unknown = null
+    if (raw) {
+      try { body = JSON.parse(raw) } catch { body = null }
+    }
+    if (!response.ok) throw new PreviewStatus(codeFromStatus(response.status, false))
+    const parsed = parsePreview(body)
+    if (!parsed) throw new PreviewStatus(422)
+    return parsed
+  } catch (err) {
+    if (err instanceof PreviewStatus) throw err
+    const aborted = !!err && typeof err === 'object' && 'name' in err && err.name === 'AbortError'
+    throw new PreviewStatus(codeFromStatus(0, aborted))
+  } finally {
+    clearTimeout(timer)
+    signal.removeEventListener('abort', onAbort)
   }
-  const raw = await response.text()
-  let body: unknown = null
-  if (raw) {
-    try { body = JSON.parse(raw) } catch { body = null }
-  }
-  if (!response.ok) throw new Error(errorText(body) || 'unreachable')
-  if (!isPreview(body)) throw new Error('not HTML')
-  return body
 }
 
 function OfferCard({ offer, label }: { offer: Offer; label: string }) {
@@ -118,15 +71,12 @@ function OfferCard({ offer, label }: { offer: Offer; label: string }) {
 
 function SuccessView({ preview, approveHref }: { preview: Preview; approveHref: string }) {
   if (!preview.offer) return null
-  const after = slotParagraph(preview.slot)
-  const total = after ? Math.min(6, Math.max(4, after + 1)) : 4
-  const at = after && after <= total ? after : total + 1
+  const at = slotAfterBar(preview.slot || '')
   const rows: ReactNode[] = []
-  for (let i = 1; i <= total; i++) {
+  for (let i = 1; i <= barCount; i++) {
     rows.push(<div key={i} data-paragraph aria-hidden="true" className={`h-2.5 rounded-full bg-s2 ${barWidth[i - 1]}`} />)
-    if (i === at) rows.push(<OfferCard key="offer" offer={preview.offer} label={slotWords(preview.slot)} />)
+    if (i === at) rows.push(<OfferCard key="offer" offer={preview.offer} label={slotLabel(preview.slot || '')} />)
   }
-  if (at > total) rows.push(<OfferCard key="offer" offer={preview.offer} label={slotWords(preview.slot)} />)
   return (
     <div>
       <h3 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h3>
@@ -141,43 +91,69 @@ export function PostPreview() {
   const id = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const ticket = useRef(0)
+  const flight = useRef<AbortController | null>(null)
   const [url, setUrl] = useState('')
   const [phase, setPhase] = useState<Phase>('idle')
   const [preview, setPreview] = useState<Preview | null>(null)
-  const [error, setError] = useState('')
+  const [errorCode, setErrorCode] = useState<number | null>(null)
+  const [paused, setPaused] = useState(false)
+  const [pauseNonce, setPauseNonce] = useState(0)
   const approveHref = signInHref(roleReturn('publisher'), source)
+  const copy = errorCode == null ? null : previewErrorCopy(errorCode)
+
+  useEffect(() => {
+    if (!pauseNonce) return
+    const timer = window.setTimeout(() => setPaused(false), rateLimitPauseMs)
+    return () => window.clearTimeout(timer)
+  }, [pauseNonce])
+
+  function stopFlight() {
+    ticket.current += 1
+    flight.current?.abort()
+    flight.current = null
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
+    if (paused || phase === 'loading') return
     const value = url.trim()
-    if (!validPostUrl(value)) {
-      ticket.current += 1
+    let parsedUrl: URL | null = null
+    try { parsedUrl = new URL(value) } catch { parsedUrl = null }
+    if (!parsedUrl || (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') || !parsedUrl.hostname.includes('.')) {
+      stopFlight()
       setPreview(null)
-      setError('')
-      setPhase('invalid')
+      setErrorCode(400)
+      setPhase('error')
       return
     }
-    const mine = ticket.current + 1
-    ticket.current = mine
+    stopFlight()
+    const mine = ticket.current
+    const controller = new AbortController()
+    flight.current = controller
     setPreview(null)
-    setError('')
+    setErrorCode(null)
     setPhase('loading')
     try {
-      const result = await loadPreview(value)
+      const result = await loadPreview(value, controller.signal)
       if (ticket.current !== mine) return
       setPreview(result)
       setPhase(result.offer ? 'success' : 'nomatch')
     } catch (err) {
       if (ticket.current !== mine) return
-      setError(err instanceof Error ? err.message : 'unreachable')
+      const code = err instanceof PreviewStatus ? err.code : 422
+      setErrorCode(code)
       setPhase('error')
+      if (code === 429) {
+        setPaused(true)
+        setPauseNonce((n) => n + 1)
+      }
     }
   }
 
   function tryAnother() {
-    ticket.current += 1
+    stopFlight()
     setPreview(null)
-    setError('')
+    setErrorCode(null)
     setPhase('idle')
     inputRef.current?.focus()
   }
@@ -197,27 +173,22 @@ export function PostPreview() {
           spellCheck={false}
           value={url}
           placeholder="https://example.com/your-post"
-          aria-invalid={phase === 'invalid'}
+          aria-invalid={errorCode === 400}
           aria-describedby={`${id}-status`}
           onChange={(event) => setUrl(event.target.value)}
           className="min-h-12 min-w-0 bg-s0"
         />
-        <button type="submit" disabled={phase === 'loading'} className={outlineClass}>Preview this post</button>
+        <button type="submit" disabled={phase === 'loading' || paused} aria-busy={phase === 'loading'} className={outlineClass}>Preview this post</button>
       </form>
-      <div id={`${id}-status`} role="status" aria-live="polite" aria-atomic="true" aria-busy={phase === 'loading'} className="mt-4 text-[15px] leading-relaxed text-t1">
-        {phase === 'loading' && (
-          <>
-            <p>Reading your post, up to 30s</p>
-            <div aria-hidden="true" className="mt-4 grid gap-2">
-              <div className="h-2.5 w-full rounded-full bg-s2" />
-              <div className="h-2.5 w-11/12 rounded-full bg-s2" />
-              <div className="h-2.5 w-4/5 rounded-full bg-s2" />
-              <div className="h-2.5 w-3/4 rounded-full bg-s2" />
-            </div>
-          </>
+      <div id={`${id}-status`} role="status" aria-live="polite" aria-atomic="true" aria-busy={phase === 'loading'} className="mt-4 min-h-8 break-words text-[15px] leading-relaxed text-t1">
+        {phase === 'loading' && <p>Reading your post, up to 30s</p>}
+        {phase === 'error' && copy && (
+          <div>
+            <p>{copy.message}</p>
+            <p className="mt-1">{copy.next}</p>
+            {errorCode !== 429 && <button type="button" onClick={tryAnother} className={`${outlineClass} mt-4`}>Try another URL</button>}
+          </div>
         )}
-        {phase === 'invalid' && <p>Enter a full post URL, starting with https://.</p>}
-        {phase === 'error' && <p>{explainPreviewError(error)}</p>}
         {phase === 'nomatch' && preview && (
           <div>
             <h3 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h3>
