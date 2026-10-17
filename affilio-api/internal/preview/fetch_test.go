@@ -305,6 +305,27 @@ func TestExtractTitleAndMainText(t *testing.T) {
 	}
 }
 
+func TestTransportSpeaksHTTP1(t *testing.T) {
+	client := (Fetcher{}).client(&pinSet{hosts: map[string]net.IP{}})
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("preview client has no http transport")
+	}
+	if transport.ForceAttemptHTTP2 {
+		t.Fatal("preview transport offers http2")
+	}
+	if _, offered := transport.TLSNextProto["h2"]; offered || len(transport.TLSNextProto) != 0 {
+		t.Fatalf("TLSNextProto = %#v", transport.TLSNextProto)
+	}
+	if transport.TLSClientConfig == nil {
+		t.Fatal("preview transport has no tls config")
+	}
+	got := transport.TLSClientConfig.NextProtos
+	if len(got) != 1 || got[0] != "http/1.1" {
+		t.Fatalf("NextProtos = %v", got)
+	}
+}
+
 func literalHost(ip string) string {
 	if strings.Contains(ip, ":") {
 		return "[" + ip + "]"

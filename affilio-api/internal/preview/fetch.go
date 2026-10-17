@@ -62,39 +62,7 @@ func (f Fetcher) Fetch(ctx context.Context, rawURL string) (Page, error) {
 		return Page{}, ErrInvalidURL
 	}
 
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.Proxy = nil
-	transport.ForceAttemptHTTP2 = false
-	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
-	transport.TLSHandshakeTimeout = fetchTimeout
-	transport.ResponseHeaderTimeout = fetchTimeout
-	transport.DisableKeepAlives = true
-	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
-		host, port, splitErr := net.SplitHostPort(address)
-		if splitErr != nil {
-			return nil, ErrInvalidURL
-		}
-		ip, ok := pins.get(host)
-		if !ok || blockedIP(ip) {
-			return nil, ErrBlocked
-		}
-		target := net.JoinHostPort(ip.String(), port)
-		if f.DialContext != nil {
-			return f.DialContext(ctx, network, target)
-		}
-		return (&net.Dialer{Timeout: fetchTimeout}).DialContext(ctx, network, target)
-	}
-
-	client := &http.Client{
-		Timeout:   fetchTimeout,
-		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= maxRedirects+1 {
-				return ErrFetch
-			}
-			return f.admit(req.Context(), pins, req.URL.String())
-		},
-	}
+	client := f.client(pins)
 	defer client.CloseIdleConnections()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, first.String(), nil)
@@ -131,6 +99,46 @@ func (f Fetcher) Fetch(ctx context.Context, rawURL string) (Page, error) {
 	}
 	title, text := extractPage(string(body))
 	return Page{Title: title, Text: text}, nil
+}
+
+// client speaks HTTP/1.1 on the pinned address. Clearing TLSNextProto only
+// disables the HTTP/2 transport. The cloned client still offers h2, and a
+// server that accepts that offer answers with a preface the HTTP/1 reader
+// rejects. NextProtos keeps the handshake on HTTP/1.1.
+func (f Fetcher) client(pins *pinSet) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	transport.ForceAttemptHTTP2 = false
+	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	transport.TLSClientConfig = &tls.Config{NextProtos: []string{"http/1.1"}}
+	transport.TLSHandshakeTimeout = fetchTimeout
+	transport.ResponseHeaderTimeout = fetchTimeout
+	transport.DisableKeepAlives = true
+	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, port, splitErr := net.SplitHostPort(address)
+		if splitErr != nil {
+			return nil, ErrInvalidURL
+		}
+		ip, ok := pins.get(host)
+		if !ok || blockedIP(ip) {
+			return nil, ErrBlocked
+		}
+		target := net.JoinHostPort(ip.String(), port)
+		if f.DialContext != nil {
+			return f.DialContext(ctx, network, target)
+		}
+		return (&net.Dialer{Timeout: fetchTimeout}).DialContext(ctx, network, target)
+	}
+	return &http.Client{
+		Timeout:   fetchTimeout,
+		Transport: transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= maxRedirects+1 {
+				return ErrFetch
+			}
+			return f.admit(req.Context(), pins, req.URL.String())
+		},
+	}
 }
 
 // screen is the address check Fetch runs before it dials.
