@@ -448,7 +448,7 @@ class ReleaseTests(unittest.TestCase):
             for info in archive.infolist():
                 self.assertEqual(info.date_time, (1980, 1, 1, 0, 0, 0))
         self.assertEqual(len(names), 28)
-        self.assertIn("affilio-wp/languages/affilio-it_IT.mo", names)
+        self.assertIn("affilio-wp/languages/affilio-wp-it_IT.mo", names)
         self.assertTrue(hosted.isdisjoint(Path(name).name for name in names))
         for relative in needed:
             self.assertIn(release.PLUGIN_ROOT + relative, names)

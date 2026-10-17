@@ -82,7 +82,7 @@ class DashboardSettingsA11yTest extends TestCase {
         $this->assertStringContainsString('Chiave salvata (admn…)', $html);
         $this->assertStringContainsString('Chiave salvata (plug…)', $html);
         $this->assertStringNotContainsString('Key saved', $html);
-        $mo = file_get_contents(dirname(__DIR__, 2) . '/languages/affilio-it_IT.mo');
+        $mo = file_get_contents(dirname(__DIR__, 2) . '/languages/affilio-wp-it_IT.mo');
         $this->assertNotFalse($mo);
         $this->assertStringContainsString('Chiave salvata (%s)', $mo);
     }
@@ -154,8 +154,8 @@ class DashboardSettingsA11yTest extends TestCase {
         $this->assertStringNotContainsString('Collegato. Avvia la prima analisi.', $html);
 
         $root = dirname(__DIR__, 2);
-        $po = file_get_contents($root . '/languages/affilio-it_IT.po');
-        $mo = file_get_contents($root . '/languages/affilio-it_IT.mo');
+        $po = file_get_contents($root . '/languages/affilio-wp-it_IT.po');
+        $mo = file_get_contents($root . '/languages/affilio-wp-it_IT.mo');
         $this->assertStringContainsString("msgid \"Start analysis\"\nmsgstr \"Avvia analisi\"\n\nmsgid \"Analysis in progress\"\nmsgstr \"Analisi in corso\"\n\nmsgid \"Analysis complete\"\nmsgstr \"Analisi completata\"", $po);
         $this->assertStringContainsString("msgid \"Your site is connected.\"\nmsgstr \"Il sito è collegato.\"", $po);
         $this->assertStringContainsString('Avvia analisi', $mo);
@@ -227,7 +227,7 @@ class DashboardSettingsA11yTest extends TestCase {
         $this->assertSame('Non connesso.', $i18n['notConnected']);
         $this->assertSame('Collega il sito in Impostazioni.', $i18n['connectSite']);
 
-        $mo = file_get_contents(dirname(__DIR__, 2) . '/languages/affilio-it_IT.mo');
+        $mo = file_get_contents(dirname(__DIR__, 2) . '/languages/affilio-wp-it_IT.mo');
         $this->assertStringContainsString('Connesso', $mo);
         $this->assertStringContainsString('Collega il sito in Impostazioni.', $mo);
     }

@@ -122,10 +122,10 @@ class Affilio_Admin {
                 'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
                 'serviceUrl' => Affilio_API::resolve_base_url(),
                 'copy' => array(
-                    'startAnalysis' => __('Start analysis', 'affilio'),
-                    'connectedStatus' => __('Your site is connected.', 'affilio'),
-                    'analysisInProgress' => __('Analysis in progress', 'affilio'),
-                    'analysisComplete' => __('Analysis complete', 'affilio'),
+                    'startAnalysis' => __('Start analysis', 'affilio-wp'),
+                    'connectedStatus' => __('Your site is connected.', 'affilio-wp'),
+                    'analysisInProgress' => __('Analysis in progress', 'affilio-wp'),
+                    'analysisComplete' => __('Analysis complete', 'affilio-wp'),
                 ),
             ));
             return;
@@ -303,7 +303,7 @@ class Affilio_Admin {
         $default_api_url = Affilio_API::resolve_base_url();
         $override_api_url = esc_attr(get_option('affilio_api_url_override', ''));
         $saved_key = trim((string) get_option('affilio_api_key', ''));
-        $key_hint = $saved_key === '' ? '' : sprintf(__('Key saved (%s)', 'affilio'), Affilio_API::mask_key($saved_key));
+        $key_hint = $saved_key === '' ? '' : sprintf(__('Key saved (%s)', 'affilio-wp'), Affilio_API::mask_key($saved_key));
 
         echo '<div class="wrap affilio-admin-page"><h1>' . esc_html($this->t('Offer Rails Settings', 'Impostazioni Offer Rails')) . '</h1>';
         echo '<div class="affilio-status-row">';
@@ -315,11 +315,11 @@ class Affilio_Admin {
         echo '</div>';
         echo '<div id="affilio-onboarding-root">';
         if (!empty($status['connected'])) {
-            echo '<p data-progress role="status">' . esc_html(__('Your site is connected.', 'affilio')) . '</p>';
+            echo '<p data-progress role="status">' . esc_html(__('Your site is connected.', 'affilio-wp')) . '</p>';
             echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
             wp_nonce_field('affilio_scan_all');
             echo '<input type="hidden" name="action" value="affilio_scan_all" />';
-            echo '<button type="submit" class="button button-primary button-large" data-connect>' . esc_html(__('Start analysis', 'affilio')) . '</button>';
+            echo '<button type="submit" class="button button-primary button-large" data-connect>' . esc_html(__('Start analysis', 'affilio-wp')) . '</button>';
             echo '</form>';
         }
         echo '</div>';
@@ -375,7 +375,7 @@ class Affilio_Admin {
             return;
         }
         $saved_key = trim((string) get_option('affilio_api_key', ''));
-        $key_hint = $saved_key === '' ? '' : ' ' . sprintf(__('Key saved (%s)', 'affilio'), Affilio_API::mask_key($saved_key)) . '.';
+        $key_hint = $saved_key === '' ? '' : ' ' . sprintf(__('Key saved (%s)', 'affilio-wp'), Affilio_API::mask_key($saved_key)) . '.';
         echo '<div class="notice notice-warning"><p><strong>Offer Rails:</strong> ' . esc_html($status['message'] . $key_hint) . ' ';
         echo '<a href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a>.</p></div>';
     }
@@ -478,9 +478,9 @@ class Affilio_Admin {
             'connectionStatus' => $this->api->get_connection_status(),
             'locale' => function_exists('get_user_locale') ? get_user_locale() : get_locale(),
             'i18n' => array(
-                'connected' => __('Connected', 'affilio'),
-                'notConnected' => __('Not connected.', 'affilio'),
-                'connectSite' => __('Connect your site in Settings.', 'affilio'),
+                'connected' => __('Connected', 'affilio-wp'),
+                'notConnected' => __('Not connected.', 'affilio-wp'),
+                'connectSite' => __('Connect your site in Settings.', 'affilio-wp'),
                 'analysisInProgress' => $this->t('Analysis in progress', 'Analisi in corso'),
                 'analysisComplete' => $this->t('Analysis complete', 'Analisi completata'),
                 'scanFailed' => $this->t('Analysis failed. Retry, or send the scan form.', 'Analisi non riuscita. Riprova, oppure invia il modulo di scansione.'),
@@ -494,12 +494,12 @@ class Affilio_Admin {
         echo '<div id="affilio-dashboard-connection" class="affilio-status-row affilio-dashboard-connection" data-connection-status>';
         if (!empty($status['connected'])) {
             $state = $this->connection_state_class(isset($status['state']) ? $status['state'] : 'connected');
-            echo '<span class="affilio-status-pill affilio-status-' . esc_attr($state) . '">' . esc_html(__('Connected', 'affilio')) . '</span>';
+            echo '<span class="affilio-status-pill affilio-status-' . esc_attr($state) . '">' . esc_html(__('Connected', 'affilio-wp')) . '</span>';
             echo '</div>';
             return;
         }
-        echo '<p class="affilio-status-message">' . esc_html(__('Not connected.', 'affilio')) . ' ';
-        echo '<a class="affilio-next-step" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html(__('Connect your site in Settings.', 'affilio')) . '</a>';
+        echo '<p class="affilio-status-message">' . esc_html(__('Not connected.', 'affilio-wp')) . ' ';
+        echo '<a class="affilio-next-step" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html(__('Connect your site in Settings.', 'affilio-wp')) . '</a>';
         echo '</p></div>';
     }
 
@@ -555,7 +555,7 @@ class Affilio_Admin {
 
     private function secret_input($name, $option) {
         $stored = trim((string) get_option($option, ''));
-        $placeholder = $stored === '' ? '' : sprintf(__('Key saved (%s)', 'affilio'), Affilio_API::mask_key($stored));
+        $placeholder = $stored === '' ? '' : sprintf(__('Key saved (%s)', 'affilio-wp'), Affilio_API::mask_key($stored));
         echo '<input type="password" name="' . esc_attr($name) . '" value="" placeholder="' . esc_attr($placeholder) . '" class="regular-text" autocomplete="off" spellcheck="false" />';
     }
 
