@@ -19,8 +19,8 @@ class Affilio_Admin {
 
     public function register_menu() {
         add_menu_page(
-            'Affilio',
-            'Affilio',
+            'Offer Rails',
+            'Offer Rails',
             'manage_options',
             'affilio',
             array($this, 'render_dashboard'),
@@ -82,7 +82,7 @@ class Affilio_Admin {
             $response = $this->api->request($method, $path, $body);
         }
         if (is_wp_error($response)) {
-            return new WP_Error('affilio_api', 'Affilio is unavailable. Try again shortly.', array('status' => 502));
+            return new WP_Error('affilio_api', 'Offer Rails is unavailable. Try again shortly.', array('status' => 502));
         }
         return new WP_REST_Response(isset($response['data']) ? $response['data'] : array(), isset($response['code']) ? (int) $response['code'] : 502);
     }
@@ -169,7 +169,7 @@ class Affilio_Admin {
         echo '<div id="affilio-dashboard-root"></div>';
         if (!$status['connected']) {
             echo '<noscript><div class="affilio-panel affilio-panel-warning">';
-            echo '<h2>Affilio Dashboard</h2>';
+            echo '<h2>Offer Rails Dashboard</h2>';
             echo '<p><strong>' . esc_html($this->t('Not connected.', 'Non connesso.')) . '</strong> ' . esc_html($status['message']) . '</p>';
             echo '<p><a class="button button-primary" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a></p>';
             echo '</div></noscript>';
@@ -210,7 +210,7 @@ class Affilio_Admin {
     }
 
     public function render_distribution() {
-        echo '<div class="wrap affilio-distribution"><h1>Distributoor</h1><p>Relevant recommendations. Approved by you. Tracked from purchase to commission.</p><div id="affilio-distribution-root"></div></div>';
+        echo '<div class="wrap affilio-distribution"><h1>Offer Rails</h1><p>Relevant recommendations. Approved by you. Tracked from purchase to commission.</p><div id="affilio-distribution-root"></div></div>';
     }
 
     public function render_discovery() {
@@ -230,7 +230,7 @@ class Affilio_Admin {
         echo '<div class="wrap affilio-admin-page">';
         if (!$status['connected']) {
             echo '<div class="affilio-panel affilio-panel-warning">';
-            echo '<h2>' . esc_html($this->t('Affilio Analytics', 'Analitiche Affilio')) . '</h2>';
+            echo '<h2>' . esc_html($this->t('Offer Rails Analytics', 'Analitiche Offer Rails')) . '</h2>';
             echo '<p><strong>' . esc_html($this->t('Not connected.', 'Non connesso.')) . '</strong> ' . esc_html($status['message']) . '</p>';
             echo '<p><a class="button button-primary" href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a></p>';
             echo '</div></div>';
@@ -305,7 +305,7 @@ class Affilio_Admin {
         $saved_key = trim((string) get_option('affilio_api_key', ''));
         $key_hint = $saved_key === '' ? '' : sprintf(__('Key saved (%s)', 'affilio'), Affilio_API::mask_key($saved_key));
 
-        echo '<div class="wrap affilio-admin-page"><h1>' . esc_html($this->t('Affilio Settings', 'Impostazioni Affilio')) . '</h1>';
+        echo '<div class="wrap affilio-admin-page"><h1>' . esc_html($this->t('Offer Rails Settings', 'Impostazioni Offer Rails')) . '</h1>';
         echo '<div class="affilio-status-row">';
         echo '<span class="affilio-status-pill affilio-status-' . esc_attr($status['state']) . '">' . esc_html($status['label']) . '</span>';
         echo '<span class="affilio-status-message">' . esc_html($status['message']) . '</span>';
@@ -376,7 +376,7 @@ class Affilio_Admin {
         }
         $saved_key = trim((string) get_option('affilio_api_key', ''));
         $key_hint = $saved_key === '' ? '' : ' ' . sprintf(__('Key saved (%s)', 'affilio'), Affilio_API::mask_key($saved_key)) . '.';
-        echo '<div class="notice notice-warning"><p><strong>Affilio:</strong> ' . esc_html($status['message'] . $key_hint) . ' ';
+        echo '<div class="notice notice-warning"><p><strong>Offer Rails:</strong> ' . esc_html($status['message'] . $key_hint) . ' ';
         echo '<a href="' . esc_url(admin_url('admin.php?page=affilio-settings')) . '">' . esc_html($this->t('Open settings', 'Apri impostazioni')) . '</a>.</p></div>';
     }
 

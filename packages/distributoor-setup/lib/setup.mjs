@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir, lstat, realpath } from 'node:fs/promises';
 import { resolve, dirname, relative, delimiter } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { previousSkillBodies } from './previous-skills.mjs';
 
 export function validateAPI(value) {
   const u = new URL(value);
@@ -67,7 +68,7 @@ export async function mergeMCP(root, client, resource) {
   const existing = config.mcpServers.distributoor;
   const expected = client === 'claude' ? { type: 'http', url: resource } : { url: resource };
   if (existing && (existing.url !== resource || existing.command || existing.headers || existing.env || existing.type && existing.type !== 'http')) {
-    throw new Error(`An existing Distributoor connection differs in ${path}. Resolve it before running setup; it has been preserved.`);
+    throw new Error(`An existing Offer Rails connection differs in ${path}. Resolve it before running setup; it has been preserved.`);
   }
   if (!existing) {
     config.mcpServers.distributoor = expected;
@@ -75,6 +76,18 @@ export async function mergeMCP(root, client, resource) {
     await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
   }
   return path;
+}
+
+const SKILL_CONTEXT_MARKER = '\n\n<!-- distributoor-setup-context -->\n';
+const INSTALLER_CONTEXT = /^## This installation\n\nHosted API: .+\n\nDetected dependencies \(hints to verify\): .+\n\nRequested product URL: .+\n$/;
+
+function acceptsInstalledSkill(existing, source, name) {
+  const index = existing.indexOf(SKILL_CONTEXT_MARKER);
+  if (index === -1) return false;
+  const body = existing.slice(0, index);
+  const context = existing.slice(index + SKILL_CONTEXT_MARKER.length);
+  const canonical = body === source.trim() || body === previousSkillBodies[name];
+  return canonical && INSTALLER_CONTEXT.test(context);
 }
 
 export async function installSkills(root, client, context) {
@@ -85,9 +98,11 @@ export async function installSkills(root, client, context) {
     let source = await readOptional(fileURLToPath(new URL(`../skills/${name}/SKILL.md`, import.meta.url)));
     source ??= await readOptional(fileURLToPath(new URL(`../../../distributoor-plugin/skills/${name}/SKILL.md`, import.meta.url)));
     if (source === null) throw new Error(`Packaged skill ${name} is missing.`);
-    const installed = `${source.trim()}\n\n<!-- distributoor-setup-context -->\n## This installation\n\nHosted API: ${context.api}\n\nDetected dependencies (hints to verify): ${JSON.stringify(context.project)}\n\nRequested product URL: ${JSON.stringify(context.website || 'Infer from project documentation; ask if uncertain.')}\n`;
+    const installed = `${source.trim()}${SKILL_CONTEXT_MARKER}## This installation\n\nHosted API: ${context.api}\n\nDetected dependencies (hints to verify): ${JSON.stringify(context.project)}\n\nRequested product URL: ${JSON.stringify(context.website || 'Infer from project documentation; ask if uncertain.')}\n`;
     const existing = await readOptional(path);
-    if (existing !== null && existing !== installed) throw new Error(`A different skill exists at ${path}; it has been preserved. Review it before updating setup.`);
+    if (existing !== null && existing !== installed && !acceptsInstalledSkill(existing, source, name)) {
+      throw new Error(`A different skill exists at ${path}; it has been preserved. Review it before updating setup.`);
+    }
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, installed, { mode: 0o644 });
     paths.push(path);

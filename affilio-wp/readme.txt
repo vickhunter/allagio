@@ -1,11 +1,15 @@
-=== Affilio ===
+=== Offer Rails ===
 Contributors: affilio
-Stable tag: 0.1.31
+Stable tag: 0.1.32
 License: GPLv2 or later
 
 AI affiliate copilot for WordPress. Connect from Settings, then review recommendations before anything is inserted.
 
 == Changelog ==
+
+= 0.1.32 =
+* The plugin name in WordPress is Offer Rails. The folder, text domain, and update slug stay affilio.
+* Admin screens say Offer Rails in English and Italian. Menu slugs and the affilio/v1 REST namespace stay affilio.
 
 = 0.1.31 =
 * The Dashboard scan can run again after the first analysis. Each request processes one batch in the plugin, and the browser repeats it until the scan is done, even when WP-Cron does not run. Progress stays on the status line, and the button stays "Scan All Posts".

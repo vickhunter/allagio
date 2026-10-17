@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: Affilio
+ * Plugin Name: Offer Rails
  * Description: AI Affiliate Copilot for WordPress.
- * Version: 0.1.31
- * Author: Affilio
+ * Version: 0.1.32
+ * Author: Offer Rails
  * Text Domain: affilio
  * Domain Path: /languages
  */
@@ -17,7 +17,7 @@ if (defined('AFFILIO_LOADED')) {
 }
 define('AFFILIO_LOADED', true);
 
-define('AFFILIO_VERSION', '0.1.31');
+define('AFFILIO_VERSION', '0.1.32');
 
 if (!defined('AFFILIO_PLUGIN_ACK_HEADER')) {
     define('AFFILIO_PLUGIN_ACK_HEADER', 'X-Plugin-Key');

@@ -93,7 +93,7 @@ expect(get_transient($second) === false, 'the previous API URL left a status tra
 $third = 'affilio_cs_' . md5("https://new.example/v1\nkey-two");
 expect(get_transient($third) !== false, 'the current URL and key were not cached');
 
-$refused = 'L\'URL API è sbagliato o è stato rifiutato. Controlla l\'indirizzo in Impostazioni › Affilio.';
+$refused = 'L\'URL API è sbagliato o è stato rifiutato. Controlla l\'indirizzo in Impostazioni › Offer Rails.';
 $starting = 'Il servizio si sta avviando, riprova tra qualche secondo';
 
 $GLOBALS['health_mode'] = 'refused';

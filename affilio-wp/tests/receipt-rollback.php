@@ -130,7 +130,7 @@ check(strpos($log, 'placement_id=' . $placement_id) !== false, 'The error log om
 check(strpos($log, 'post_id=7') !== false, 'The error log omitted the post id: ' . $log);
 check(strpos($log, 'reason=' . $api->reason) !== false, 'The error log omitted the refusal reason: ' . $log);
 $html = notice_html($distribution);
-check(strpos($html, 'The Affilio box is live without a receipt.') !== false, 'The admin notice did not say the box is live without a receipt: ' . $html);
+check(strpos($html, 'The Offer Rails box is live without a receipt.') !== false, 'The admin notice did not say the box is live without a receipt: ' . $html);
 check(strpos($html, $placement_id) !== false && strpos($html, 'post 7') !== false, 'The admin notice omitted the placement or post: ' . $html);
 check(strpos($html, 'notice-error') !== false, 'The live-without-receipt warning was not an error notice.');
 

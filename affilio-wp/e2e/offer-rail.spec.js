@@ -110,7 +110,7 @@ const session = {
   operator: true,
   email: 'owner@example.com',
   owner_id: 'owner-1',
-  install_command: 'npx distributoor-setup',
+  install_command: 'npx offer-rails',
   mcp_url: 'https://example.test/mcp',
 };
 
@@ -284,7 +284,7 @@ function wpEarnings() {
 
 function landing() {
   let html = fs.readFileSync(path.join(build, 'home.html'), 'utf8');
-  html = html.replaceAll('{{.InstallCommand}}', 'npx distributoor-setup');
+  html = html.replaceAll('{{.InstallCommand}}', 'npx offer-rails');
   html = html.replace(/\{\{if \.InstallerReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/g, '$1');
   html = html.replace(/\{\{if \.PluginReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/g, '$1');
   return html;

@@ -156,8 +156,8 @@ func servedPlugin(t *testing.T, h *HostedHandler, payload []byte) []byte {
 			t.Fatal(err)
 		}
 	}
-	if !bytes.Contains(main, []byte("Version: 0.1.31")) {
-		t.Fatal("served zip is missing affilio-wp/affilio.php 0.1.31")
+	if !bytes.Contains(main, []byte("Version: 0.1.32")) {
+		t.Fatal("served zip is missing affilio-wp/affilio.php 0.1.32")
 	}
 	requireValidPluginZip(t, rec.Body.Bytes())
 	home := httptest.NewRecorder()

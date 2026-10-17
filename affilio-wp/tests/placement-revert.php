@@ -335,7 +335,7 @@ check($cli_forbidden === 1, 'CLI exited ' . $cli_forbidden . ' for 403');
 check(strpos(implode("\n", $cli_forbidden_command->lines), $cli_403) !== false, 'CLI omitted the 4xx line');
 check(empty($GLOBALS['options']['affilio_removal_queue']), 'CLI queued a 403');
 
-$admin_401 = 'Chiave API non valida: controlla la chiave in Impostazioni › Affilio.';
+$admin_401 = 'Chiave API non valida: controlla la chiave in Impostazioni › Offer Rails.';
 $cli_401 = 'API: errore 4xx (401): invalid api key. Non riprovo.';
 $GLOBALS['options'] = array();
 $GLOBALS['scheduled'] = array();

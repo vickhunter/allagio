@@ -108,7 +108,7 @@
                 <div class="affilio-rec-list">${cards || empty}</div>
             </div>
             <div class="affilio-panel affilio-panel-info">
-                <p style="margin: 0;">${t('Joining an offer gives your posts a tracked link. Affilio adds the FTC disclosure once per post automatically, and commissions appear under Earnings.', 'Attivando un\'offerta i tuoi articoli ricevono un link tracciato. Affilio aggiunge automaticamente la divulgazione FTC una volta per articolo e le commissioni compaiono in Guadagni.')}</p>
+                <p style="margin: 0;">${t('Joining an offer gives your posts a tracked link. Offer Rails adds the FTC disclosure once per post automatically, and commissions appear under Earnings.', 'Attivando un\'offerta i tuoi articoli ricevono un link tracciato. Offer Rails aggiunge automaticamente la divulgazione FTC una volta per articolo e le commissioni compaiono in Guadagni.')}</p>
             </div>
         `;
         bind(offers || []);
@@ -185,7 +185,7 @@
             root.innerHTML = `
                 <div class="affilio-panel affilio-panel-warning">
                     <h2>${t('Offer Marketplace', 'Marketplace Offerte')}</h2>
-                    <p class="affilio-field-error" role="alert" tabindex="-1">${t('Could not load offers from the Affilio API.', 'Impossibile caricare le offerte dall\'API di Affilio.')}</p>
+                    <p class="affilio-field-error" role="alert" tabindex="-1">${t('Could not load offers from the Offer Rails API.', 'Impossibile caricare le offerte dall\'API di Offer Rails.')}</p>
                     <p><button class="button button-primary" data-primary-action data-retry>${t('Retry', 'Riprova')}</button></p>
                 </div>
             `;

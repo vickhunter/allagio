@@ -8,6 +8,7 @@ from pathlib import Path, PurePosixPath
 import re
 import shutil
 import subprocess
+import tarfile
 import tempfile
 import sys
 import unittest
@@ -414,7 +415,7 @@ class ReleaseTests(unittest.TestCase):
             "landing.js", "landing-scene.js", "landing.css",
             "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt",
             "workspace.js", "workspace.css", "workspace.html",
-            "home.html", "agent-poc.html", "setup-controls.js",
+            "home.html", "agent-poc.html", "protocol.html", "publishers-setup.html", "setup-controls.js",
             "THIRD_PARTY_NOTICES.md", "package.json", "package-lock.json",
         }
         admin = release.ROOT / "affilio-wp/includes/class-affilio-admin.php"
@@ -706,6 +707,37 @@ class ReleaseTests(unittest.TestCase):
                 responses = public_responses() | {path: value}
                 with self.subTest(path=path), patch.object(release, "fetch", side_effect=lambda path, *args: responses[path]), self.assertRaises(release.ReleaseError):
                     release.verify()
+
+    def test_installer_package_is_offer_rails_with_old_command_aliases(self):
+        self.assertEqual(release.INSTALLER, "offer-rails-0.1.0.tgz")
+        self.assertIn("protocol.html", release.ASSETS)
+        self.assertIn("protocol.html", release.TEMPLATE_ASSETS)
+
+        def archive(package):
+            output = io.BytesIO()
+            with tarfile.open(fileobj=output, mode="w:gz") as packed:
+                def add(name, data):
+                    payload = data.encode()
+                    info = tarfile.TarInfo(name)
+                    info.size = len(payload)
+                    packed.addfile(info, io.BytesIO(payload))
+                add("package/package.json", json.dumps(package))
+                add("package/bin/setup.mjs", "#!/usr/bin/env node\n")
+                add("package/lib/setup.mjs", "export {}\n")
+                for skill in release.SKILLS:
+                    add(skill, "# skill\n")
+            return output.getvalue()
+
+        bins = {
+            "offer-rails": "bin/setup.mjs",
+            "affilio": "bin/setup.mjs",
+            "distributoor": "bin/setup.mjs",
+            "distributoor-setup": "bin/setup.mjs",
+        }
+        release.validate_installer(archive({"name": "offer-rails", "version": "0.1.0", "bin": bins}))
+        stale = archive({"name": "@distributoor/setup", "version": "0.1.0", "bin": {"distributoor-setup": "bin/setup.mjs"}})
+        with self.assertRaisesRegex(release.ReleaseError, "Installer package metadata"):
+            release.validate_installer(stale)
 
 
 if __name__ == "__main__":

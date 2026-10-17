@@ -1,9 +1,14 @@
 {
-  "name": "@distributoor/setup",
+  "name": "offer-rails",
   "version": "0.1.0",
-  "description": "Connect your coding agent and let it set up Distributoor in your product.",
+  "description": "Connect your coding agent and let it set up Offer Rails in your product.",
   "type": "module",
-  "bin": { "distributoor-setup": "bin/setup.mjs" },
+  "bin": {
+    "offer-rails": "bin/setup.mjs",
+    "affilio": "bin/setup.mjs",
+    "distributoor": "bin/setup.mjs",
+    "distributoor-setup": "bin/setup.mjs"
+  },
   "engines": { "node": ">=20" },
   "files": ["bin", "lib", "skills", "README.md"],
   "scripts": {

@@ -20,14 +20,15 @@ PROJECT = "cf3a1d9d-d8f8-44bf-94e1-fcb590055ae0"
 ENVIRONMENT = "2534a1db-d231-45ae-868e-680c48b11dfb"
 SERVICE = "c3a5be47-e442-4ff4-8dda-ee808944c233"
 ORIGIN = "https://distributoor-production.up.railway.app"
-INSTALLER = "distributoor-setup-0.1.0.tgz"
+INSTALLER = "offer-rails-0.1.0.tgz"
 CHECKS = {"onboarding", "affilio-api-tests", "mvp-release-package"}
 ASSETS = (
-    "home.html", "workspace.html", "workspace.css", "workspace.js",
+    "home.html", "workspace.html", "protocol.html", "workspace.css", "workspace.js",
     "setup-controls.js", "landing.css", "landing.js",
     "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt",
     "THIRD_PARTY_NOTICES.md",
 )
+TEMPLATE_ASSETS = {"home.html", "workspace.html", "protocol.html"}
 WP_FILES = {
     "affilio-wp/affilio.php",
     "affilio-wp/includes/class-affilio-api.php",
@@ -53,11 +54,11 @@ WP_FILES = {
     "affilio-wp/readme.txt",
 }
 PLUGIN_ROOT = "affilio-wp/"
-PLUGIN_VERSION = "0.1.31"
+PLUGIN_VERSION = "0.1.32"
 TEST_ONLY_PLUGIN_SEAMS = ("affilio_go_utc_date", "affilio_rewrite_requires_wp_rewrite")
 PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
 PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
-HOSTED_BUILD_NAMES = {"home.html", "makers.html", "publishers.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}
+HOSTED_BUILD_NAMES = {"home.html", "makers.html", "publishers.html", "publishers-setup.html", "protocol.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}
 HOSTED_BUILD_PREFIXES = ("workspace", "landing", "package")
 ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
 DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
@@ -761,7 +762,16 @@ def validate_installer(data):
         require(sum(member.size for member in members) <= MAX_DOWNLOAD, "Installer expands beyond the release size limit.")
         require(SKILLS | {"package/bin/setup.mjs", "package/lib/setup.mjs", "package/package.json"} <= set(archive.getnames()), "Installer is missing its command or skills.")
         package = json.load(archive.extractfile("package/package.json"))
-        require(package.get("name") == "@distributoor/setup" and package.get("version") == "0.1.0" and package.get("bin", {}).get("distributoor-setup") == "bin/setup.mjs", "Installer package metadata is incorrect.")
+        bins = package.get("bin") or {}
+        require(
+            package.get("name") == "offer-rails"
+            and package.get("version") == "0.1.0"
+            and bins.get("offer-rails") == "bin/setup.mjs"
+            and bins.get("affilio") == "bin/setup.mjs"
+            and bins.get("distributoor") == "bin/setup.mjs"
+            and bins.get("distributoor-setup") == "bin/setup.mjs",
+            "Installer package metadata is incorrect.",
+        )
 
 
 def validate_bundle(path):
@@ -806,7 +816,7 @@ def verify(origin=ORIGIN):
     require("script-src 'self'" in headers.get("Content-Security-Policy", "") and headers.get("X-Content-Type-Options") == "nosniff", "Public page security headers are missing.")
     require(INSTALLER.encode() in home and b"Download WordPress plugin" in home, "Home is not offering both packaged installation paths.")
     for name in ASSETS:
-        if name not in {"home.html", "workspace.html"}:
+        if name not in TEMPLATE_ASSETS:
             require(bool(get("/assets/" + name)[1]), f"Empty public asset: {name}.")
     validate_plugin(get("/downloads/affilio.zip")[1], origin)
     validate_installer(get("/downloads/" + INSTALLER)[1])

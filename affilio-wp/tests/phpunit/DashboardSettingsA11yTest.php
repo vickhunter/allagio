@@ -310,7 +310,7 @@ class DashboardSettingsA11yTest extends TestCase {
         $GLOBALS['posts'] = $this->published_posts(12);
         $api = new class {
             public function get_connection_status($force = false) {
-                return array('connected' => true, 'message' => 'Affilio is connected and ready.', 'state' => 'connected');
+                return array('connected' => true, 'message' => 'Offer Rails is connected and ready.', 'state' => 'connected');
             }
             public function invalidate_status_cache() {}
             public function request($method, $path, $body = null) {
@@ -384,7 +384,7 @@ class DashboardSettingsA11yTest extends TestCase {
         );
         $api = new class {
             public function get_connection_status($force = false) {
-                return array('connected' => true, 'message' => 'Affilio is connected and ready.', 'state' => 'connected');
+                return array('connected' => true, 'message' => 'Offer Rails is connected and ready.', 'state' => 'connected');
             }
             public function invalidate_status_cache() {}
             public function request($method, $path, $body = null) {
@@ -476,7 +476,7 @@ class DashboardSettingsA11yTest extends TestCase {
             }
             public function get_connection_status($force = false) {
                 if ($this->connected) {
-                    return array('connected' => true, 'message' => 'Affilio is connected and ready.', 'state' => 'connected', 'label' => 'Connected');
+                    return array('connected' => true, 'message' => 'Offer Rails is connected and ready.', 'state' => 'connected', 'label' => 'Connected');
                 }
                 return array('connected' => false, 'message' => 'Configure your API key.', 'state' => 'missing', 'label' => 'Not connected');
             }

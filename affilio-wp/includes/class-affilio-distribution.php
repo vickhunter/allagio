@@ -68,7 +68,7 @@ class Affilio_Distribution {
             'placement_id' => (string) $placement_id,
             'post_id' => (int) $post_id,
             'reason' => (string) $reason,
-            'message' => 'The Affilio box is live without a receipt.',
+            'message' => 'The Offer Rails box is live without a receipt.',
         );
         update_option('affilio_unreceipted_boxes', $notices);
     }
@@ -789,7 +789,7 @@ class Affilio_Distribution {
             if (!is_array($notice)) {
                 continue;
             }
-            $message = isset($notice['message']) ? (string) $notice['message'] : 'The Affilio box is live without a receipt.';
+            $message = isset($notice['message']) ? (string) $notice['message'] : 'The Offer Rails box is live without a receipt.';
             $placement_id = isset($notice['placement_id']) ? (string) $notice['placement_id'] : '';
             $post_id = isset($notice['post_id']) ? (string) $notice['post_id'] : '';
             echo '<div class="notice notice-error"><p>' . esc_html($message) . ' Placement ' . esc_html($placement_id) . ', post ' . esc_html($post_id) . '.</p></div>';
@@ -830,7 +830,7 @@ class Affilio_Distribution {
     public static function admin_client_error_line($code) {
         $code = (int) $code;
         if ($code === 401) {
-            return 'Chiave API non valida: controlla la chiave in Impostazioni › Affilio.';
+            return 'Chiave API non valida: controlla la chiave in Impostazioni › Offer Rails.';
         }
         return 'Errore dall\'API (' . $code . '), non riprovo.';
     }
@@ -1715,7 +1715,7 @@ class Affilio_Distribution {
             $message = self::ack_field($response, 'error');
         }
         if ($message === '') {
-            $message = 'Affilio could not confirm the box change.';
+            $message = 'Offer Rails could not confirm the box change.';
         }
         $this->remember_ack_error($placement_id, $status, $message);
     }
@@ -1820,7 +1820,7 @@ class Affilio_Distribution {
             $notices = array();
         }
         if (!is_string($message) || $message === '') {
-            $message = 'Affilio could not confirm the box change.';
+            $message = 'Offer Rails could not confirm the box change.';
         }
         $notices[] = array(
             'placement_id' => (string) $placement_id,
@@ -1843,7 +1843,7 @@ class Affilio_Distribution {
             if (!is_array($notice)) {
                 continue;
             }
-            $message = isset($notice['message']) ? (string) $notice['message'] : 'Affilio could not confirm the box change.';
+            $message = isset($notice['message']) ? (string) $notice['message'] : 'Offer Rails could not confirm the box change.';
             $placement_id = isset($notice['placement_id']) ? (string) $notice['placement_id'] : '';
             $post_id = isset($notice['post_id']) ? (string) $notice['post_id'] : '';
             echo '<div class="notice notice-error"><p>' . esc_html($message) . ' Placement ' . esc_html($placement_id) . ', post ' . esc_html($post_id) . '.</p></div>';

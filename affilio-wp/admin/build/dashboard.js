@@ -163,14 +163,14 @@
         const message = AffilioData.connectionStatus.message || t('Configure your API key.', 'Configura la tua chiave API.');
         root.innerHTML = connectionStatusHTML() + `
             <div class="affilio-panel affilio-panel-warning">
-                <h2>Affilio Dashboard</h2>
+                <h2>Offer Rails Dashboard</h2>
                 <p><strong>${t('Not connected.', 'Non connesso.')}</strong> ${esc(message)}</p>
                 <p><a class="button button-primary" href="${esc(safeHref(settings))}">${t('Open settings', 'Apri impostazioni')}</a></p>
             </div>
         `;
         return;
     }
-    root.innerHTML = connectionStatusHTML() + `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Loading data...', 'Caricamento dati...')}</p></div>`;
+    root.innerHTML = connectionStatusHTML() + `<div class="affilio-panel"><h2>Offer Rails Dashboard</h2><p>${t('Loading data...', 'Caricamento dati...')}</p></div>`;
 
     const scoreColor = (score) => {
         if (score < 34) return '#d63638';
@@ -349,7 +349,7 @@
     };
 
     const render = (articles, programs, recommendations) => {
-        let html = connectionStatusHTML() + `<div class="affilio-panel"><h2>Affilio Dashboard</h2><p>${t('Review article monetization and manage recommendations.', 'Controlla la monetizzazione degli articoli e gestisci le raccomandazioni.')}</p></div>`;
+        let html = connectionStatusHTML() + `<div class="affilio-panel"><h2>Offer Rails Dashboard</h2><p>${t('Review article monetization and manage recommendations.', 'Controlla la monetizzazione degli articoli e gestisci le raccomandazioni.')}</p></div>`;
         if (!articles.length) {
             html += `<div class="affilio-panel"><p>${t('No articles scanned yet.', 'Nessun articolo ancora scansionato.')}</p></div>`;
         } else {
@@ -646,7 +646,7 @@
                                 confirmOverlay.innerHTML = `
                                     <div class="affilio-confirm-dialog">
                                         <h4>${t('Confirm insertion', 'Conferma inserimento')}</h4>
-                                        <p>${t('Affilio will insert the generated recommendation into', 'Affilio inserirà la raccomandazione generata in')} <strong>${articleTitle}</strong>.</p>
+                                        <p>${t('Offer Rails will insert the generated recommendation into', 'Offer Rails inserirà la raccomandazione generata in')} <strong>${articleTitle}</strong>.</p>
                                         <div class="affilio-confirm-actions">
                                             <button class="button button-primary" data-confirm="yes">${t('Confirm & Insert', 'Conferma e Inserisci')}</button>
                                             <button class="button" data-confirm="no">${t('Cancel', 'Annulla')}</button>
@@ -733,5 +733,5 @@
                 recommendationsResp.recommendations || []
             );
         })
-        .catch(() => { root.innerHTML = connectionStatusHTML() + `<div class="affilio-panel affilio-panel-warning"><h2>Affilio Dashboard</h2><p>${t('Failed to load data.', 'Caricamento dati non riuscito.')}</p></div>`; });
+        .catch(() => { root.innerHTML = connectionStatusHTML() + `<div class="affilio-panel affilio-panel-warning"><h2>Offer Rails Dashboard</h2><p>${t('Failed to load data.', 'Caricamento dati non riuscito.')}</p></div>`; });
 } )();
