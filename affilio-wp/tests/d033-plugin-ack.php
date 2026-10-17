@@ -69,7 +69,7 @@ check(strpos($log, 'affilio plugin ack failed placement_id=' . $placement_id . '
 ob_start();
 $distribution->render_revert_notice();
 $notice = ob_get_clean();
-check(strpos($notice, 'Affilio could not confirm the box change.') !== false, 'admin notice was missing: ' . $notice);
+check(strpos($notice, 'Offer Rails could not confirm the box change.') !== false, 'admin notice was missing: ' . $notice);
 check(strpos($notice, $placement_id) !== false && strpos($notice, '2615') !== false, 'admin notice omitted the placement or post');
 
 echo "Plugin ack re-read, retry, and failure notice passed.\n";

@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { validateAPI, detectProject, checkServer, mergeMCP, installSkills } from '../lib/setup.mjs';
+import { previousSkillBodies } from '../lib/previous-skills.mjs';
 
 const execute = promisify(execFile);
 async function fixture(t) {
@@ -63,6 +64,40 @@ test('skills carry setup context and preserve custom changes', async t => {
   await writeFile(paths[0], `${content}\nUser edits\n`);
   await assert.rejects(installSkills(root, 'skill', context), /preserved/);
   assert.match(await readFile(paths[0], 'utf8'), /User edits/);
+});
+
+test('re-running setup upgrades the previous canonical skill text', async t => {
+  const root = await fixture(t);
+  const context = { api: 'https://pilot.example', project: { frameworks: ['next'], providers: ['stripe'] } };
+  const paths = await installSkills(root, 'skill', context);
+  const marker = '\n\n<!-- distributoor-setup-context -->\n';
+  const titles = {
+    'distributoor-onboard': ['# Distributoor setup', '# Offer Rails setup'],
+    'distributoor-instrument': ['# Distributoor attribution instrumentation', '# Offer Rails attribution instrumentation'],
+    'distributoor-launch': ['# Distributoor offer launch', '# Offer Rails offer launch'],
+  };
+  const oldContext = '## This installation\n\nHosted API: https://old.example\n\nDetected dependencies (hints to verify): {"frameworks":["go"],"providers":[]}\n\nRequested product URL: "https://old.example"\n';
+  for (const path of paths) {
+    const name = path.split('/').at(-2);
+    const previous = previousSkillBodies[name];
+    assert.match(previous, new RegExp(`name: ${name}`));
+    assert.ok(previous.includes(titles[name][0]));
+    await writeFile(path, `${previous}${marker}${oldContext}`);
+  }
+  await installSkills(root, 'skill', { ...context, website: 'https://product.example' });
+  for (const path of paths) {
+    const name = path.split('/').at(-2);
+    const upgraded = await readFile(path, 'utf8');
+    assert.ok(upgraded.includes(titles[name][1]));
+    assert.equal(upgraded.includes(titles[name][0]), false);
+    assert.match(upgraded, new RegExp(`name: ${name}`));
+    assert.match(upgraded, /Hosted API: https:\/\/pilot\.example/);
+    assert.match(upgraded, /https:\/\/product\.example/);
+  }
+  const edited = `${previousSkillBodies['distributoor-onboard']}\n\nEdited by the owner.${marker}${oldContext}`;
+  await writeFile(paths[0], edited);
+  await assert.rejects(installSkills(root, 'skill', context), /preserved/);
+  assert.match(await readFile(paths[0], 'utf8'), /Edited by the owner/);
 });
 
 test('connection preflight rejects unavailable or mismatched OAuth without redirecting', async () => {

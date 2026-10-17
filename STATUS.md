@@ -1,6 +1,6 @@
 ## October 17 — D-047 Offer Rails names on the installer and plugin
 
-The hosted install command is `npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>`. The setup package name is `offer-rails`. `affilio`, `distributoor`, and `distributoor-setup` still run that same installer. `/downloads/distributoor-setup-0.1.0.tgz` serves the same archive. The WordPress plugin header and readme title say Offer Rails. The folder, text domain, and slug stay `affilio`. Plugin version is 0.1.32. `protocol.html` is in the release asset list. `AUTO_MIGRATE` stays off unless it is set to `true`.
+The hosted install command is `npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>`. The setup package name is `offer-rails`. `affilio`, `distributoor`, and `distributoor-setup` still run that same installer. `/downloads/distributoor-setup-0.1.0.tgz` serves the same archive. The WordPress plugin header, readme title, and admin screens say Offer Rails in English and Italian. The folder, text domain, menu slugs, and `affilio/v1` REST namespace stay `affilio`. Installer skill titles and prose say Offer Rails. Skill directory names stay `distributoor-*` and the MCP server key stays `distributoor`. Re-running setup upgrades a skill file that still has the previous canonical text. Plugin version is 0.1.32. `protocol.html` is in the release asset list. `AUTO_MIGRATE` stays off unless it is set to `true`.
 
 ## October 16 — `/protocol` is in the production image
 

@@ -1,13 +1,13 @@
 ---
 name: distributoor-instrument
-description: Wire Distributoor attribution into a product - the ref-capture snippet, passing the click id into Stripe / Lemon Squeezy / Polar checkout, and registering conversion webhooks. Use when a maker needs attribution set up, the ref_param_survives check fails, or conversions are arriving unattributed.
+description: Wire Offer Rails attribution into a product - the ref-capture snippet, passing the click id into Stripe / Lemon Squeezy / Polar checkout, and registering conversion webhooks. Use when a maker needs attribution set up, the ref_param_survives check fails, or conversions are arriving unattributed.
 ---
 
-# Distributoor attribution instrumentation
+# Offer Rails attribution instrumentation
 
 Attribution is a relay: tracked link → `?via=<click_id>` on the landing page →
 persisted client-side → passed into checkout metadata → returned to
-Distributoor by the provider's webhook. You are wiring the middle of that
+Offer Rails by the provider's webhook. You are wiring the middle of that
 relay inside the maker's product.
 
 ## 1. Capture the ref parameter
