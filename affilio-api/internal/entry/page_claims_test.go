@@ -103,6 +103,18 @@ func TestPageClaimsReadClientRenderedPages(t *testing.T) {
 	if reason != PageReasonCommission {
 		t.Fatalf("a src path must not make a bundle into JSON-LD: %q", reason)
 	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<p>For teams < 50, Northwind Ledger is here ></p>"}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+	if reason != "" {
+		t.Fatalf("a comparison sign must not swallow the claim: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<title>For teams < 50</title><meta name=\"description\" content=\"Northwind Ledger\">"}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+	if reason != "" {
+		t.Fatalf("a less-than in the title must not swallow the meta claim: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<script>var x = \"</scripting>\"; var n = 20;</script><p>no number</p>"}, PageClaimInput{CommissionValue: 20})
+	if reason != PageReasonCommission {
+		t.Fatalf("scripting closer must not leak the commission: %q", reason)
+	}
 	for _, body := range []string{
 		`<script type="application/ld+json">{"z":"Ledger","a":"Northwind"}</script>`,
 		`<script type="application/ld+json">{"a":"Northwind","z":"Ledger"}</script>`,

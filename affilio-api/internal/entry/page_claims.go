@@ -132,10 +132,14 @@ func (PageClaimChecker) Check(doc PageDocument, in PageClaimInput) (string, stri
 	return CheckPageClaims(doc, in)
 }
 
-var pageTag = regexp.MustCompile(`<[^>]*>`)
+var (
+	pageTag     = regexp.MustCompile(`</?[A-Za-z][^>\x00]*>`)
+	pageComment = regexp.MustCompile(`<!--[^\x00]*?-->`)
+)
 
 func normalizePage(raw string) string {
 	s := strings.ToLower(raw)
+	s = pageComment.ReplaceAllString(s, " ")
 	s = pageTag.ReplaceAllString(s, " ")
 	s = strings.ReplaceAll(s, "&amp;", "&")
 	s = strings.ReplaceAll(s, "&nbsp;", " ")
@@ -297,18 +301,50 @@ func nextEmbedded(raw, lower string, from int) (embeddedElement, bool) {
 		return embeddedElement{name: name, openTag: raw[start:], start: start, next: len(raw)}, true
 	}
 	openEnd := start + gt + 1
-	closer := "</" + name
-	rel := strings.Index(lower[openEnd:], closer)
-	if rel < 0 {
+	bodyEnd, next := findCloser(lower, openEnd, name)
+	if bodyEnd < 0 {
 		return embeddedElement{name: name, openTag: raw[start:openEnd], body: raw[openEnd:], start: start, next: len(raw)}, true
 	}
-	bodyEnd := openEnd + rel
-	after := bodyEnd + len(closer)
-	next := len(raw)
-	if gt2 := strings.IndexByte(raw[after:], '>'); gt2 >= 0 {
-		next = after + gt2 + 1
-	}
 	return embeddedElement{name: name, openTag: raw[start:openEnd], body: raw[openEnd:bodyEnd], start: start, next: next}, true
+}
+
+// findCloser returns the body end and the index after a real closer.
+// The closer's first byte after the name must be >, /, or whitespace.
+// </scripting> is not a </script> closer. A missing closer returns -1, -1.
+func findCloser(lower string, from int, name string) (int, int) {
+	closer := "</" + name
+	pos := from
+	for pos < len(lower) {
+		rel := strings.Index(lower[pos:], closer)
+		if rel < 0 {
+			return -1, -1
+		}
+		at := pos + rel
+		afterName := at + len(closer)
+		if afterName >= len(lower) {
+			return -1, -1
+		}
+		switch lower[afterName] {
+		case '>', '/', ' ', '\t', '\n', '\r':
+			if end := closerTagEnd(lower, afterName); end > 0 {
+				return at, end
+			}
+		}
+		pos = afterName
+	}
+	return -1, -1
+}
+
+func closerTagEnd(lower string, from int) int {
+	for i := from; i < len(lower); i++ {
+		switch lower[i] {
+		case '>':
+			return i + 1
+		case '<':
+			return -1
+		}
+	}
+	return -1
 }
 
 func asciiLower(raw string) string {
