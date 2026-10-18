@@ -115,6 +115,27 @@ func TestPageClaimsReadClientRenderedPages(t *testing.T) {
 	if reason != PageReasonCommission {
 		t.Fatalf("scripting closer must not leak the commission: %q", reason)
 	}
+	commented := "<!-- <script src=\"a.js\"> --><p>Northwind Ledger</p><script>var n = 20;</script>"
+	reason, _ = checker.Check(PageDocument{OK: true, Body: commented}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+	if reason != "" {
+		t.Fatalf("a script inside a comment must not hide the page: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: commented}, PageClaimInput{CommissionValue: 20})
+	if reason != PageReasonCommission {
+		t.Fatalf("a script inside a comment must not keep the bundle: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<meta name=\"description\" content=\"Northwind Ledger > extra\">"}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+	if reason != "" {
+		t.Fatalf("a greater-than inside a meta value must stay: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<p>Northwind&#160;Ledger</p>"}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+	if reason != "" {
+		t.Fatalf("a character reference must match the card name: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<p>Plans start at &#36;29 a month</p>"}, PageClaimInput{Card: ListingCard{PricingSummary: "Plans start at $29 a month"}, HasCard: true})
+	if reason != "" {
+		t.Fatalf("a numeric character reference must match the price: %q", reason)
+	}
 	for _, body := range []string{
 		`<script type="application/ld+json">{"z":"Ledger","a":"Northwind"}</script>`,
 		`<script type="application/ld+json">{"a":"Northwind","z":"Ledger"}</script>`,
