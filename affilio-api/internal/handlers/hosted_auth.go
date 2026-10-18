@@ -180,6 +180,7 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+	h.writePublicHeaders(c)
 	h.writeLandingNotFound(c)
 }
 

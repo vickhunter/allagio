@@ -69,7 +69,7 @@ export const makerAdvantages = [
   { k: 'money', t: 'We never touch the money', b: 'Stripe handles checkout. Polar, Lemon Squeezy, Paddle, and other payment adapters are coming. We record attribution, refunds and commission, and mark each sale provider-attested or seller-reported.' },
   { k: 'digest', t: 'Every placement, click and refund in one digest', b: 'See where your offer runs. Revoke works, and a monthly cap keeps spend predictable.' },
   { k: 'privacy', t: 'No customer data leaves', b: 'Your agent shares an Offer card (project, category, commission terms). Never customer names, emails or lists. Enforced in code.' },
-  { k: 'swap', t: 'No sales yet? Swap visibility', b: 'Cross-promote with a related site through the same rails. Visibility for visibility, no money involved.' },
+  { k: 'swap', t: 'No sales yet? Traffic trade is coming', b: 'A mention swap with a related site is not live yet. Visibility for visibility, when it is.' },
 ] as const
 
 export const publisherAdvantages = [

@@ -31,6 +31,9 @@ func TestLandingUnknownPathIs404(t *testing.T) {
 			t.Fatalf("missing %s", needle)
 		}
 	}
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("Cache-Control") != "no-store" || !strings.Contains(rec.Header().Get("Content-Security-Policy"), "default-src 'none'") {
+		t.Fatalf("public headers %v", rec.Header())
+	}
 
 	api := httptest.NewRecorder()
 	r.ServeHTTP(api, httptest.NewRequest(http.MethodGet, "/v1/directory/makers", nil))
