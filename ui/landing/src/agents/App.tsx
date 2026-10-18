@@ -1,14 +1,27 @@
 import { useState } from 'react'
-import { agentAccount, agentPrompt, aloneToday, approvalNote, cursorInstallUrl, deployNote, deviceSignIn, deviceSteps, errors, installs, mcpUrl, modes, orderedSteps, rates, signInNote, steps, tools } from '@/agents/facts.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, errors, installs, mcpUrl, modes, orderedSteps, rates, signInNote, tools } from '@/agents/facts.mjs'
 import { Page } from '@/site/Page'
 
 const primaryClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-t1 px-5 font-semibold text-s0 transition-colors duration-150 hover:bg-[rgb(60_66_55)] sm:w-auto'
 const secondaryClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line-strong bg-s1 px-5 font-semibold text-t1 transition-colors duration-150 hover:bg-s2 sm:w-auto'
+const sectionClass = 'mt-6 scroll-mt-48 md:scroll-mt-24'
+
+const toc = [
+  { href: '#agents-hero', label: 'Hero' },
+  { href: '#tell', label: 'Tell your agent' },
+  { href: '#install', label: 'Install' },
+  { href: '#steps', label: 'Steps' },
+  { href: '#device', label: 'Device sign-in' },
+  { href: '#alone', label: 'Alone today' },
+  { href: '#modes', label: 'Modes' },
+  { href: '#tools', label: 'Tools' },
+  { href: '#limits', label: 'Limits' },
+]
 
 function CopyButton({ value, label, statusName, primary }: { value: string; label: string; statusName: string; primary?: boolean }) {
   const [status, setStatus] = useState('')
   return (
-    <div className="mt-4">
+    <div className="mt-3">
       <button
         type="button"
         className={primary ? primaryClass : secondaryClass}
@@ -29,7 +42,7 @@ function CopyButton({ value, label, statusName, primary }: { value: string; labe
           }
         }}
       >{label}</button>
-      <p className="mt-2 min-h-8 text-sm text-t2" role="status" aria-live="polite" data-copy-status={statusName}>{status}</p>
+      <p className="mt-2 min-h-6 text-sm text-t2" role="status" aria-live="polite" data-copy-status={statusName}>{status}</p>
     </div>
   )
 }
@@ -39,7 +52,7 @@ function InstallTabs() {
   const current = installs.find((item) => item.id === active) ?? installs[0]
   return (
     <div className="mt-4">
-      <div role="tablist" aria-label="Install" className="flex max-w-full gap-2 overflow-x-auto"
+      <div role="tablist" aria-label="Install" className="flex flex-wrap gap-2"
         onKeyDown={(event) => {
           const names = ['ArrowRight', 'ArrowLeft']
           if (!names.includes(event.key)) return
@@ -57,164 +70,181 @@ function InstallTabs() {
             id={`install-tab-${item.id}`}
             aria-selected={item.id === active}
             aria-controls={`install-panel-${item.id}`}
-            className={item.id === active ? 'inline-flex min-h-12 shrink-0 items-center rounded-xl border border-line-strong bg-s2 px-4 font-semibold text-t1' : 'inline-flex min-h-12 shrink-0 items-center rounded-xl border border-line bg-s1 px-4 font-semibold text-t2'}
+            className={item.id === active ? 'inline-flex min-h-12 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-line-strong bg-s2 px-4 font-semibold text-t1' : 'inline-flex min-h-12 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border border-line bg-s1 px-4 font-semibold text-t2'}
             onClick={() => setActive(item.id)}
-          >{item.tested ? item.label : `${item.label} · Untested`}</button>
+          >
+            <span>{item.label}</span>
+            {item.tested ? null : <span className="rounded-full bg-s0 px-2 py-0.5 text-[12px] font-semibold text-t2">· untested</span>}
+          </button>
         ))}
       </div>
       <div role="tabpanel" id={`install-panel-${current.id}`} aria-labelledby={`install-tab-${current.id}`} className="mt-4">
         <p className="text-[15px] leading-relaxed text-t1">{current.proof}</p>
-        <pre className="mt-4 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{current.snippet}</pre>
+        <pre className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{current.snippet}</pre>
         <CopyButton value={current.snippet} label={current.id === 'generic' ? 'Copy config' : `Copy ${current.label}`} statusName={current.id === 'generic' ? 'config' : current.id} />
-        {current.id === 'cursor' ? <a className={secondaryClass} href={cursorInstallUrl} data-cursor-install>Add to Cursor</a> : null}
       </div>
     </div>
   )
 }
 
-function GridTable({ caption, columns, rows }: { caption: string; columns: [string, string]; rows: { a: string; b: string }[] }) {
+function DetailLine({ line }: { line: string }) {
+  const jsonAt = line.indexOf('{')
+  if (jsonAt > 0 && line.trimEnd().endsWith('}')) {
+    return (
+      <div>
+        <p className="font-mono text-xs text-t2">{line.slice(0, jsonAt).trim()}</p>
+        <pre className="mt-1 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-xl border border-line bg-s0 p-3 font-mono text-[13px] leading-relaxed text-t1">{line.slice(jsonAt)}</pre>
+      </div>
+    )
+  }
+  return <p className="text-[15px] leading-relaxed text-t2">{line}</p>
+}
+
+function ToolList({ items }: { items: readonly { name: string; soon: boolean; line: string }[] }) {
   return (
-    <div className="mt-4 max-w-full overflow-x-auto rounded-2xl border border-line bg-s1">
-      <table className="w-full table-fixed text-left text-sm">
-        <caption className="sr-only">{caption}</caption>
-        <thead className="bg-s2 text-t1">
-          <tr>
-            <th scope="col" className="w-[38%] px-3 py-3 font-semibold">{columns[0]}</th>
-            <th scope="col" className="px-3 py-3 font-semibold">{columns[1]}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.a} className="border-t border-line align-top">
-              <th scope="row" className="break-words px-3 py-3 font-mono text-[13px] font-medium">{row.a}</th>
-              <td className="break-words px-3 py-3 text-t1">{row.b}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className="mt-2 divide-y divide-line rounded-2xl border border-line bg-s1">
+      {items.map((tool) => (
+        <li key={tool.name} data-tool={tool.name} data-soon={tool.soon ? 'true' : 'false'} className="px-3 py-1 text-[13px] leading-tight">
+          <code className="font-mono font-medium text-t1">{tool.name}</code>
+          {tool.soon ? <span className="ml-2 rounded-full bg-s2 px-2 py-0.5 text-[12px] font-semibold text-t1">Coming soon</span> : null}
+          <span className="text-t2"> {tool.line}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function FactList({ caption, rows }: { caption: string; rows: { a: string; b: string }[] }) {
+  return (
+    <ul className="mt-2 divide-y divide-line rounded-2xl border border-line bg-s1" aria-label={caption}>
+      {rows.map((row) => (
+        <li key={row.a} className="px-3 py-1 text-[13px] leading-tight">
+          <span className="font-mono text-[12px] font-medium text-t1">{row.a}.</span> <span className="text-t2">{row.b}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
 export function App() {
+  const publisherTools = tools.filter((tool) => !tool.maker)
+  const makerTools = tools.filter((tool) => tool.maker)
+  const signup = orderedSteps[0]
   return (
     <Page page="agents">
-      <section aria-labelledby="agents-h" className="mx-auto max-w-3xl px-5 pb-16 pt-12 md:pt-16">
-        <p className="eyebrow">MCP server</p>
-        <h1 id="agents-h" className="h-display mt-4 text-[40px] sm:text-6xl">Find an offer, preview the page, place it.</h1>
-        <p className="mt-5 text-lg leading-relaxed text-t2">Offer Rails is an MCP server. Three steps. A person still approves what gets published. A chat answer is never itself an ad.</p>
-
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">Tell your agent</h2>
-        <pre className="mt-4 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{agentPrompt}</pre>
-        <CopyButton value={agentPrompt} label="Copy prompt" statusName="prompt" />
-
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">Install</h2>
-        <InstallTabs />
-        <p className="mt-4 text-[15px] leading-relaxed text-t2">{signInNote}</p>
-
-        <ol data-agent-steps className="mt-10 space-y-4">
-          {steps.map((step, index) => (
-            <li key={step.title} className="rounded-2xl border border-line bg-s1 p-5">
-              <p className="font-mono text-xs text-t2">Step {index + 1}</p>
-              <h2 className="mt-2 font-display text-2xl font-bold">{step.title}</h2>
-              <p className="mt-2 text-[15px] leading-relaxed text-t2">{step.body}</p>
-            </li>
-          ))}
-        </ol>
-
-        <section data-d063-steps aria-labelledby="d063-steps" className="mt-12 rounded-2xl border border-line bg-s1 p-5">
-          <h2 id="d063-steps" className="font-display text-2xl font-bold">Ordered agent steps</h2>
-          <p className="mt-2 text-[15px] leading-relaxed text-t2">{deployNote}</p>
-          <ol className="mt-6 space-y-5">
-            {orderedSteps.map((step) => (
-              <li key={step.n} className="break-words">
-                <h3 className="font-display text-lg font-bold">{step.n}. {step.title}</h3>
-                <p className="mt-2 text-[15px] leading-relaxed text-t2">{step.body}</p>
-                {(step.details || []).map((line) => <p key={line} className="mt-2 text-[15px] leading-relaxed text-t2">{line}</p>)}
-                {step.n === 5 ? <p className="mt-2 text-[15px] leading-relaxed text-t1">{approvalNote}</p> : null}
-              </li>
+      <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] md:grid-cols-[11rem_minmax(0,1fr)] md:gap-8">
+        <nav id="on-this-page" aria-label="On this page" className="sticky top-32 z-20 min-w-0 border-b border-line bg-s0/95 px-5 py-2 backdrop-blur md:top-20 md:self-start md:border-0 md:bg-transparent md:px-5 md:py-12">
+          <p className="eyebrow mb-3 hidden md:block">On this page</p>
+          <div className="flex min-w-0 gap-2 overflow-x-auto md:flex-col md:overflow-visible">
+            {toc.map((item) => (
+              <a key={item.href} href={item.href} className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-s1 px-3 text-sm font-semibold text-t1 md:w-full md:justify-start md:rounded-lg md:border-0 md:bg-transparent md:px-2">{item.label}</a>
             ))}
-          </ol>
-          <h3 className="mt-8 font-display text-lg font-bold">Device sign-in</h3>
-          <p className="mt-2 break-words text-[15px] leading-relaxed text-t2">{deviceSignIn.intro}</p>
-          <ul className="mt-4 space-y-3">
-            {deviceSignIn.points.map((point) => (
-              <li key={point.text || point.before} className="break-words text-[15px] leading-relaxed text-t2">
-                {point.link ? <>{point.before}<a href={point.link.href} className="inline-flex min-h-11 items-center px-1 underline underline-offset-4">{point.link.label}</a>{point.after}</> : point.text}
-              </li>
-            ))}
-          </ul>
-        </section>
+          </div>
+        </nav>
+        <div className="min-w-0 px-5 pb-16 pt-6 md:pt-12">
+          <section id="agents-hero" aria-labelledby="agents-h" className={sectionClass}>
+            <p className="eyebrow">MCP server</p>
+            <h1 id="agents-h" className="h-display mt-3 text-[40px] sm:text-6xl">Find an offer, preview the page, place it.</h1>
+            <p className="mt-4 text-lg leading-relaxed text-t2">Offer Rails is an MCP server. Three steps. A person still approves what gets published. A chat answer is never itself an ad.</p>
+            <p className="mt-4 break-all font-mono text-[15px] text-t1" data-mcp-url>{mcpUrl}</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-t2">Scopes are publisher and maker. A call with no bearer is 401.</p>
+            <CopyButton value={mcpUrl} label="Copy endpoint" statusName="endpoint" primary />
+          </section>
 
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">What an agent can do alone today</h2>
-        <ul data-alone className="mt-6 space-y-3">
-          {aloneToday.map((item) => (
-            <li key={item.title} className="rounded-2xl border border-line bg-s1 p-5">
-              <h3 className="font-display text-lg font-bold">{item.title}</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-t2">{item.body}</p>
-            </li>
-          ))}
-        </ul>
+          <section id="tell" aria-labelledby="tell-h" className={sectionClass}>
+            <h2 id="tell-h" className="h-display text-2xl sm:text-3xl">Tell your agent</h2>
+            <pre className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{agentPrompt}</pre>
+            <CopyButton value={agentPrompt} label="Copy prompt" statusName="prompt" />
+          </section>
 
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">No-browser account</h2>
-        <p className="mt-3 text-[15px] leading-relaxed text-t2">POST /v1/agent-accounts creates an account with no browser. {agentAccount.rules}</p>
-        <p className="mt-4 font-mono text-xs text-t2">Publisher request</p>
-        <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{agentAccount.publisherRequest}</pre>
-        <p className="mt-4 font-mono text-xs text-t2">Publisher 201</p>
-        <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{agentAccount.publisherResponse}</pre>
-        <p className="mt-4 font-mono text-xs text-t2">Maker request</p>
-        <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{agentAccount.makerRequest}</pre>
-        <p className="mt-4 font-mono text-xs text-t2">Maker 201</p>
-        <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{agentAccount.makerResponse}</pre>
+          <section id="install" aria-labelledby="install-h" className={sectionClass}>
+            <h2 id="install-h" className="h-display text-2xl sm:text-3xl">Install</h2>
+            <InstallTabs />
+            <p className="text-[15px] leading-relaxed text-t2">{signInNote}</p>
+          </section>
 
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">Device code</h2>
-        <ol data-device-steps className="mt-6 space-y-3">
-          {deviceSteps.map((step, index) => (
-            <li key={step.title} className="rounded-2xl border border-line bg-s1 p-5">
-              <p className="font-mono text-xs text-t2">Step {index + 1}</p>
-              <h3 className="mt-2 font-display text-lg font-bold">{step.title}</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-t2">{step.body}</p>
-            </li>
-          ))}
-        </ol>
+          <section id="steps" data-d063-steps aria-labelledby="steps-h" className={sectionClass}>
+            <h2 id="steps-h" className="h-display text-2xl sm:text-3xl">Ordered agent steps</h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-t2">{deployNote}</p>
+            <ol className="mt-4 divide-y divide-line border-y border-line">
+              {orderedSteps.map((step) => (
+                <li key={step.n} className="py-1">
+                  <p className="text-[14px] leading-snug text-t1"><span className="font-semibold">{step.n}. {step.title}.</span> {step.line}</p>
+                  {step.n === 5 ? <p className="text-[15px] leading-relaxed text-t1">{approvalNote}</p> : null}
+                  {step.n === 1 ? (
+                    <details className="mt-1">
+                      <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold">Publisher and maker 201 fields</summary>
+                      <div className="space-y-3 pb-2">
+                        {(signup.details || []).map((line) => <DetailLine key={line} line={line} />)}
+                        <DetailLine line={`Publisher request: ${agentAccount.publisherRequest}`} />
+                        <DetailLine line={`Publisher 201 JSON: ${agentAccount.publisherResponse}`} />
+                        <DetailLine line={`Maker request: ${agentAccount.makerRequest}`} />
+                        <DetailLine line={`Maker 201 JSON: ${agentAccount.makerResponse}`} />
+                        <p className="text-[15px] leading-relaxed text-t2">{agentAccount.rules}</p>
+                      </div>
+                    </details>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </section>
 
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">What happens after the place call</h2>
-        <dl className="mt-6 grid gap-3">
-          {modes.map((mode) => (
-            <div key={mode.name} className="rounded-2xl border border-line bg-s1 p-5">
-              <dt className="font-display text-lg font-bold">{mode.name}</dt>
-              <dd className="mt-2 text-[15px] leading-relaxed text-t2">{mode.body}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="mt-4 text-[15px] leading-relaxed text-t2">Every placement carries approved copy of at most 140 characters, claims only from the offer, one disclosure line, and rel=&quot;sponsored nofollow&quot;.</p>
+          <section id="device" aria-labelledby="device-h" className={sectionClass}>
+            <h2 id="device-h" className="h-display text-2xl sm:text-3xl">Device sign-in</h2>
+            <p className="mt-2 text-[15px] leading-relaxed text-t2">{deviceSignIn.intro}</p>
+            <ul className="mt-3 space-y-2">
+              {deviceSignIn.points.map((point) => (
+                <li key={point.text || point.before} className="break-words text-[14px] leading-snug text-t2">
+                  {point.link ? <>{point.before}<a href={point.link.href} className="inline-flex min-h-11 items-center px-1 underline underline-offset-4">{point.link.label}</a>{point.after}</> : point.text}
+                </li>
+              ))}
+            </ul>
+            <details className="mt-2">
+              <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold">Return path, CSRF, and Origin</summary>
+              <ul className="space-y-2 pb-2">
+                {deviceSignIn.details.map((line) => <li key={line} className="break-words text-[15px] leading-relaxed text-t2">{line}</li>)}
+              </ul>
+            </details>
+          </section>
 
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">MCP endpoint</h2>
-        <p className="mt-3 break-all font-mono text-[15px] text-t1" data-mcp-url>{mcpUrl}</p>
-        <p className="mt-3 text-[15px] leading-relaxed text-t2">Scopes are publisher and maker. A call with no bearer is 401. {signInNote}</p>
-        <CopyButton value={mcpUrl} label="Copy endpoint" statusName="endpoint" primary />
+          <section id="alone" aria-labelledby="alone-h" className={sectionClass}>
+            <h2 id="alone-h" className="h-display text-2xl sm:text-3xl">What an agent can do alone today</h2>
+            <ul data-alone className="mt-3 space-y-2">
+              {aloneToday.map((item) => (
+                <li key={item.title} className="text-[14px] leading-snug text-t2"><span className="font-semibold text-t1">{item.title}.</span> {item.body}</li>
+              ))}
+            </ul>
+          </section>
 
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">Tools</h2>
-        <ul className="mt-4 space-y-3">
-          {tools.map((tool) => (
-            <li key={tool.name} data-tool={tool.name} data-soon={tool.soon ? 'true' : 'false'} className="rounded-2xl border border-line bg-s1 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <code className="font-mono text-[15px] font-medium">{tool.name}</code>
-                {tool.soon ? <span className="inline-flex min-h-11 items-center rounded-full bg-s2 px-3 text-[13px] font-semibold text-t1">Coming soon</span> : null}
-              </div>
-              <p className="mt-2 text-[15px] leading-relaxed text-t2">{tool.line}</p>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-4 text-[15px] leading-relaxed text-t2">A maker grant adds the maker verbs (register_product through submit_offer, and get_earnings).</p>
+          <section id="modes" aria-labelledby="modes-h" className={sectionClass}>
+            <h2 id="modes-h" className="h-display text-2xl sm:text-3xl">What happens after the place call</h2>
+            <dl className="mt-3 space-y-2">
+              {modes.map((mode) => (
+                <div key={mode.name}>
+                  <dt className="font-semibold text-t1">{mode.name}</dt>
+                  <dd className="text-[14px] leading-snug text-t2">{mode.body}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="mt-3 text-[15px] leading-relaxed text-t2">Every placement carries approved copy of at most 140 characters, claims only from the offer, one disclosure line, and rel=&quot;sponsored nofollow&quot;.</p>
+          </section>
 
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">Rate limits</h2>
-        <p className="mt-3 text-[15px] leading-relaxed text-t2">Per client IP. The /mcp body cap is 1 MB. A request whose Origin is not the Offer Rails base URL gets 403 origin not allowed. On 429, wait a minute and do not retry in a loop.</p>
-        <GridTable caption="Rate limits" columns={['Route', 'Limit and over-limit answer']} rows={rates.map((row) => ({ a: row.route, b: `${row.limit}. ${row.over}` }))} />
+          <section id="tools" aria-labelledby="tools-h" className={sectionClass}>
+            <h2 id="tools-h" className="h-display text-2xl sm:text-3xl">Tools</h2>
+            <ToolList items={publisherTools} />
+            <h3 className="mt-4 font-display text-lg font-bold">Maker tools</h3>
+            <ToolList items={makerTools} />
+          </section>
 
-        <h2 className="h-display mt-12 text-2xl sm:text-3xl">Errors agents see</h2>
-        <GridTable caption="Error messages" columns={['When', 'Exact text']} rows={errors.map((row) => ({ a: row.when, b: row.see }))} />
-      </section>
+          <section id="limits" aria-labelledby="limits-h" className={sectionClass}>
+            <h2 id="limits-h" className="h-display text-2xl sm:text-3xl">Rate limits and errors</h2>
+            <p className="mt-2 text-[15px] leading-snug text-t2">Per client IP. The /mcp body cap is 1 MB. A request whose Origin is not the Offer Rails base URL gets 403 origin not allowed. On 429, wait a minute and do not retry in a loop.</p>
+            <FactList caption="Rate limits" rows={rates.map((row) => ({ a: row.route, b: `${row.limit}. ${row.over}` }))} />
+            <h3 className="mt-4 font-display text-lg font-bold">Errors agents see</h3>
+            <FactList caption="Error messages" rows={errors.map((row) => ({ a: row.when, b: row.see }))} />
+          </section>
+        </div>
+      </div>
     </Page>
   )
 }

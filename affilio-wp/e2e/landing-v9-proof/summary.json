@@ -115,7 +115,10 @@
     "small": [],
     "brand": true,
     "forbidden": false,
-    "steps": 3,
+    "steps": 0,
+    "ordered": 11,
+    "height": 6732,
+    "headings": [],
     "soon": [
       "preview_page",
       "get_digest"
@@ -139,7 +142,13 @@
     "serious": [],
     "copiedUrl": "https://offer-rails.onrender.com/mcp",
     "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",
-    "cursorInstall": "https://cursor.com/en/install-mcp?name=offer-rails&config=eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ%3D%3D"
+    "tabLabels": [
+      "Cursor · untested",
+      "Claude Code",
+      "VS Code · untested",
+      "Windsurf · untested",
+      "Generic"
+    ]
   },
   {
     "slug": "preview-home-success-390",
@@ -401,7 +410,10 @@
     "small": [],
     "brand": true,
     "forbidden": false,
-    "steps": 3,
+    "steps": 0,
+    "ordered": 11,
+    "height": 4601,
+    "headings": [],
     "soon": [
       "preview_page",
       "get_digest"
@@ -425,7 +437,13 @@
     "serious": [],
     "copiedUrl": "https://offer-rails.onrender.com/mcp",
     "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",
-    "cursorInstall": "https://cursor.com/en/install-mcp?name=offer-rails&config=eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ%3D%3D"
+    "tabLabels": [
+      "Cursor · untested",
+      "Claude Code",
+      "VS Code · untested",
+      "Windsurf · untested",
+      "Generic"
+    ]
   },
   {
     "slug": "preview-home-success-1440",

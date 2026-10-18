@@ -42,26 +42,38 @@ export const modes = [
 ]
 
 export const tools = [
-  { name: 'preview_revenue', soon: false, line: 'Call preview_revenue before you have an account when you want up to five offers for some text, and it writes nothing.' },
-  { name: 'preview_page', soon: true, line: 'Coming soon. Not on the hosted MCP server yet.' },
-  { name: 'find_opportunities', soon: false, line: 'Call find_opportunities with a site key when you have article text and want up to five offers, or no_match when the fit is weak.' },
-  { name: 'prepare_placement', soon: false, line: 'Call prepare_placement when you have an offer and article copy to propose. It does not publish, and a person still has to approve.' },
-  { name: 'list_agent_tasks', soon: false, line: 'Call list_agent_tasks to resume: pending means a person is still reviewing, and approved means you can commit once.' },
-  { name: 'get_placement', soon: false, line: 'Call get_placement when you need one owned proposal, its terms, whether it is approved, and its receipt.' },
-  { name: 'commit_placement', soon: false, line: 'Call commit_placement after a person approves, while the proposal is unexpired. It returns the link and the text, and it does not publish.' },
-  { name: 'record_placement_receipt', soon: false, line: 'Call record_placement_receipt after the publisher publishes, to record the approved copy, the disclosure, and the tracked link.' },
-  { name: 'undo_placement', soon: false, line: 'Call undo_placement to revoke a placement in the same request.' },
-  { name: 'restore_placement', soon: false, line: 'Call restore_placement only to get a sign-in link. It does not restore the placement.' },
-  { name: 'get_digest', soon: true, line: 'Coming soon. Not on the hosted MCP server yet.' },
-  { name: 'get_balance', soon: false, line: 'Call get_balance when you need the publisher balance. Paid means the owner confirmed receipt.' },
-  { name: 'get_payout_history', soon: false, line: 'Call get_payout_history when you need this site\'s payouts and recent commission entries.' },
+  { name: 'preview_revenue', soon: false, maker: false, line: 'Call preview_revenue before you have an account when you want up to five offers for some text, and it writes nothing.' },
+  { name: 'preview_page', soon: true, maker: false, line: 'Coming soon. Not on the hosted MCP server yet.' },
+  { name: 'find_opportunities', soon: false, maker: false, line: 'Call find_opportunities with a site key when you have article text and want up to five offers, or no_match when the fit is weak.' },
+  { name: 'prepare_placement', soon: false, maker: false, line: 'Call prepare_placement when you have an offer and article copy to propose. It does not publish, and a person still has to approve.' },
+  { name: 'list_agent_tasks', soon: false, maker: false, line: 'Call list_agent_tasks to resume: pending means a person is still reviewing, and approved means you can commit once.' },
+  { name: 'get_placement', soon: false, maker: false, line: 'Call get_placement when you need one owned proposal, its terms, whether it is approved, and its receipt.' },
+  { name: 'commit_placement', soon: false, maker: false, line: 'Call commit_placement after a person approves, while the proposal is unexpired. It returns the link and the text, and it does not publish.' },
+  { name: 'record_placement_receipt', soon: false, maker: false, line: 'Call record_placement_receipt after the publisher publishes, to record the approved copy, the disclosure, and the tracked link.' },
+  { name: 'undo_placement', soon: false, maker: false, line: 'Call undo_placement to revoke a placement in the same request.' },
+  { name: 'restore_placement', soon: false, maker: false, line: 'Call restore_placement only to get a sign-in link. It does not restore the placement.' },
+  { name: 'get_digest', soon: true, maker: false, line: 'Coming soon. Not on the hosted MCP server yet.' },
+  { name: 'get_balance', soon: false, maker: false, line: 'Call get_balance when you need the publisher balance. Paid means the owner confirmed receipt.' },
+  { name: 'get_payout_history', soon: false, maker: false, line: 'Call get_payout_history when you need this site\'s payouts and recent commission entries.' },
+  { name: 'register_maker', soon: false, maker: true, line: 'Call register_maker with an email to create a maker account and receive maker_id and api_key.' },
+  { name: 'register_product', soon: false, maker: true, line: 'Call register_product with a name and a live website URL to add a product.' },
+  { name: 'list_products', soon: false, maker: true, line: 'Call list_products to see this maker\'s products and whether each one is ready.' },
+  { name: 'get_product', soon: false, maker: true, line: 'Call get_product with a product id to read that product.' },
+  { name: 'update_product', soon: false, maker: true, line: 'Call update_product to change the same fields you sent to register_product.' },
+  { name: 'run_assessment', soon: false, maker: true, line: 'Call run_assessment to check a product\'s live pages before an offer can be submitted.' },
+  { name: 'list_assessments', soon: false, maker: true, line: 'Call list_assessments to read a product\'s stored readiness checks, newest first.' },
+  { name: 'create_offer', soon: false, maker: true, line: 'Call create_offer to draft an offer with a percentage or flat commission on the first paid checkout.' },
+  { name: 'list_offers', soon: false, maker: true, line: 'Call list_offers to see this maker\'s offers and the review reason while one is in review.' },
+  { name: 'list_listings', soon: false, maker: true, line: 'Call list_listings to read this maker\'s offer cards and the review reason while one is in review.' },
+  { name: 'get_offer', soon: false, maker: true, line: 'Call get_offer with an offer id to read that offer.' },
+  { name: 'update_offer', soon: false, maker: true, line: 'Call update_offer to change a draft offer\'s terms, or to pause or retire it.' },
+  { name: 'submit_offer', soon: false, maker: true, line: 'Call submit_offer to send a draft once the product is ready. A hosted server holds an untrusted offer in review.' },
+  { name: 'get_earnings', soon: false, maker: true, line: 'Call get_earnings to read clicks, sales, refunds, and commission for each offer.' },
 ]
 
 export const signInNote = 'This server needs a Google sign-in today. These snippets do not include an API key. POST /v1/agent-accounts is the no-browser way to get an account.'
 
 export const agentPrompt = 'Use the Offer Rails MCP server. Sign in with Google when it asks. Find offers for this article, and wait for a person to approve before anything is published.'
-
-export const cursorInstallUrl = 'https://cursor.com/en/install-mcp?name=offer-rails&config=eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ%3D%3D'
 
 export const installs = [
   { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}' },
@@ -79,6 +91,7 @@ export const orderedSteps = [
   {
     n: 1,
     title: 'Signup',
+    line: 'POST /v1/agent-accounts. No key.',
     body: 'POST /v1/agent-accounts. No key. Body: role (publisher or maker), name, email, and domain for a publisher. Optional source.',
     details: [
       'Publisher 201: owner_id, site_id, api_key (send as X-API-Key), key_header X-API-Key, plugin_key (send as X-Plugin-Key), plugin_key_header X-Plugin-Key, agent_only true, human_login false, role publisher. Both keys are shown once.',
@@ -88,51 +101,61 @@ export const orderedSteps = [
   {
     n: 2,
     title: 'Site',
+    line: 'No second call. site_id, the site key, and the plugin key come back from signup.',
     body: 'No second call and no browser session. site_id, the site key, and the plugin key come back from signup.',
   },
   {
     n: 3,
     title: 'Join an offer',
+    line: 'POST /v1/marketplace/offers/:id/join with X-API-Key.',
     body: 'POST /v1/marketplace/offers/:id/join with X-API-Key.',
   },
   {
     n: 4,
     title: 'Find and prepare',
+    line: 'POST /v1/revenue/opportunities with X-API-Key, then POST /v1/placements with X-API-Key.',
     body: 'POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy.',
   },
   {
     n: 5,
     title: 'Approval',
+    line: 'POST /v1/offer-review/placements/:id/approve with X-Admin-Key. A site key cannot approve.',
     body: 'A signed-in owner uses the dashboard. An operator sends POST /v1/offer-review/placements/:id/approve with X-Admin-Key and site_id, owner_email, and evidence. A site key cannot approve. Approving a device code does not approve a placement.',
   },
   {
     n: 6,
     title: 'Commit',
+    line: 'POST /v1/placements/:id/commit with X-API-Key.',
     body: 'POST /v1/placements/:id/commit with X-API-Key.',
   },
   {
     n: 7,
     title: 'Receipt',
+    line: 'POST /v1/placements/:id/receipt with X-API-Key.',
     body: 'POST /v1/placements/:id/receipt with X-API-Key. published_text must contain the approved copy, the disclosure, and /go/<placement_id>.',
   },
   {
     n: 8,
     title: 'Plugin acknowledgement',
+    line: 'POST /v1/placements/:id/plugin-ack with X-Plugin-Key.',
     body: 'POST /v1/placements/:id/plugin-ack with X-Plugin-Key and {"action":"placed","rel_sponsored":true}. X-API-Key, Authorization, and X-Maker-Key are refused.',
   },
   {
     n: 9,
     title: 'Go link and click',
+    line: 'GET /v1/go/<placement_id>. No key.',
     body: 'GET /v1/go/<placement_id>. No key. After the acknowledgement is placed, the response is 302 to the offer landing URL with via set to the click id, and the click is counted. Before that, the same URL is a 302 to the plain landing URL, with no via and no click.',
   },
   {
     n: 10,
     title: 'Sales and refunds',
+    line: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key.',
     body: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key. Send click_id set to the via value from the go link.',
   },
   {
     n: 11,
     title: 'Reporting',
+    line: 'GET /v1/digest and GET /v1/payouts/balance with X-API-Key. GET /v1/maker/digest and GET /v1/maker/earnings with X-Maker-Key.',
     body: 'GET /v1/digest and GET /v1/payouts/balance with X-API-Key. GET /v1/maker/digest and GET /v1/maker/earnings with X-Maker-Key.',
   },
 ]
@@ -140,15 +163,19 @@ export const orderedSteps = [
 export const deviceSignIn = {
   intro: 'This is the human page for a device code. It is separate from the agent-created site above.',
   points: [
-    { text: 'POST /v1/device/code. No key. Returns device_code, user_code, verification_uri (the public origin plus /device), interval 5, and expires_in 300.' },
+    { text: 'POST /v1/device/code with {}. No key. A 200 body has device_code, user_code, verification_uri (the public origin plus /device), interval 5, and expires_in 300.' },
     {
-      before: 'The human opens verification_uri (',
+      before: 'The browser step needs a human sign-in. The human opens verification_uri (',
       link: { href: '/device', label: 'GET /device' },
-      after: '). A signed-out human is redirected to /auth/login?return_to= and then back. The return path may be /device or /device?user_code=<canonical code>. Any other query, a broken percent-escape, a fragment, or an absolute URL is refused.',
+      after: ').',
     },
-    { text: 'The signed-in human posts the form to POST /device with the session cookie, Origin equal to the public origin, the csrf field, user_code, and decision approve or deny. Approve also sends project as site:<id> or offer:<id>, and that project must belong to the session owner. The stored return path is only that canonical /device URL. source, ref, and via are not copied onto it.' },
-    { text: 'The JSON equivalent is POST /v1/device/approve with the owner session, user_code, decision, and on approve scope plus project_id.' },
-    { text: 'The agent polls POST /v1/device/token with device_code. An approval returns access_token, key_header (X-API-Key or X-Maker-Key), and scope. A denial returns access_denied.' },
+    { text: 'The agent polls POST /v1/device/token with device_code. An approval returns access_token, token_type (Bearer), key_header (X-API-Key or X-Maker-Key), scope, and expires_in. A denial returns access_denied.' },
+  ],
+  details: [
+    'grant_type is optional. When it is sent, it is urn:ietf:params:oauth:grant-type:device_code. While you wait, a 400 body has error, interval, and expires_in.',
+    'A signed-out human is redirected to /auth/login?return_to= and then back. The return path may be /device or /device?user_code=<canonical code>. Any other query, a broken percent-escape, a fragment, or an absolute URL is refused.',
+    'The signed-in human posts the form to POST /device with the session cookie, Origin equal to the public origin, the csrf field, user_code, and decision approve or deny. Approve also sends project as site:<id> or offer:<id>, and that project must belong to the session owner. The stored return path is only that canonical /device URL. source, ref, and via are not copied onto it.',
+    'The JSON equivalent is POST /v1/device/approve with the owner session, user_code, decision, and on approve scope plus project_id.',
   ],
 }
 
@@ -176,21 +203,6 @@ export const errors = [
   { when: 'Unknown 409 or 422', see: 'The server text, with a generic fallback' },
   { when: 'Device poll 400', see: 'authorization_pending, slow_down, expired, or access_denied' },
   { when: '429', see: 'The rate-limit text above. Wait a minute. Do not retry in a loop.' },
-]
-
-export const deviceSteps = [
-  {
-    title: 'Ask for a code',
-    body: 'POST /v1/device/code with {}. A 200 body has device_code, user_code, verification_uri, interval, and expires_in.',
-  },
-  {
-    title: 'A human signs in',
-    body: 'The browser step needs a human sign-in. The human opens verification_uri, which is GET /device.',
-  },
-  {
-    title: 'Poll for the key',
-    body: 'POST /v1/device/token with device_code. grant_type is optional. When it is sent, it is urn:ietf:params:oauth:grant-type:device_code. A 200 body has access_token, token_type (Bearer), key_header, scope, and expires_in. While you wait, a 400 body has error, interval, and expires_in.',
-  },
 ]
 
 export const agentAccount = {
@@ -221,18 +233,28 @@ export const aloneToday = [
   },
 ]
 
+function accountLines() {
+  return [
+    `Publisher request: ${agentAccount.publisherRequest}`,
+    `Maker request: ${agentAccount.makerRequest}`,
+    `Publisher 201 JSON: ${agentAccount.publisherResponse}`,
+    `Maker 201 JSON: ${agentAccount.makerResponse}`,
+    agentAccount.rules,
+  ]
+}
+
 export function llmsText() {
   const toolLines = tools.map((tool) => `- ${tool.name}: ${tool.line}`).join('\n')
   const docs = docLinks.map((href) => `- API docs: ${href}`).join('\n')
-  const device = deviceSteps.map((step) => `- ${step.title}. ${step.body}`).join('\n')
   const alone = aloneToday.map((item) => `- ${item.title}. ${item.body}`).join('\n')
   const install = installs.map((item) => `### ${item.label}\n\n${item.snippet}\n\n${item.proof}`).join('\n\n')
   const ordered = orderedSteps.map((step) => {
-    const extra = (step.details || []).map((line) => `   - ${line}`).join('\n')
+    const extra = [...(step.details || []), ...(step.n === 1 ? accountLines() : [])].map((line) => `   - ${line}`).join('\n')
     const note = step.n === 5 ? `\n   ${approvalNote}` : ''
     return `${step.n}. ${step.title}. ${step.body}${extra ? `\n${extra}` : ''}${note}`
   }).join('\n\n')
   const signIn = deviceSignIn.points.map((point) => `- ${point.text || `${point.before}${point.link.label}${point.after}`}`).join('\n')
+  const deviceDetails = deviceSignIn.details.map((line) => `- ${line}`).join('\n')
   return `# Offer Rails
 
 Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article, prepares a disclosed placement, and a person approves it before it is published. A chat answer is never itself an ad.
@@ -249,8 +271,6 @@ ${signInNote}
 
 ${install}
 
-Add to Cursor: ${cursorInstallUrl}
-
 ## Ordered agent steps
 
 ${deployNote}
@@ -263,33 +283,15 @@ ${deviceSignIn.intro}
 
 ${signIn}
 
+${deviceDetails}
+
 ## What an agent can do alone today
 
 ${alone}
 
-## No-browser account
-
-${agentAccount.route}
-
-Publisher request: ${agentAccount.publisherRequest}
-
-Maker request: ${agentAccount.makerRequest}
-
-Publisher 201: ${agentAccount.publisherResponse}
-
-Maker 201: ${agentAccount.makerResponse}
-
-${agentAccount.rules}
-
-## Device code
-
-${device}
-
 ## Tools
 
 ${toolLines}
-
-A maker grant adds the maker verbs (register_product through submit_offer, and get_earnings).
 
 ## Pages
 

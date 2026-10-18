@@ -237,13 +237,14 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   const llmsType = llms.headers.get('content-type') || ''
   const llmsBody = await llms.text()
   if (llms.status !== 200 || !llmsType.includes('text/plain')) throw new Error('llms ' + llms.status + ' ' + llmsType)
-  for (const needle of ['https://offer-rails.onrender.com/mcp', 'find_opportunities', 'preview_page', 'get_digest', '/landing-v9/agents/', 'POST /v1/agent-accounts', 'What an agent can do alone today', 'The browser step needs a human sign-in', 'POST /v1/maker/sales', 'POST /v1/maker/refunds', 'Placing an offer needs approval for now', 'This server needs a Google sign-in today', 'claude mcp add --scope user --transport http offer-rails', '"serverUrl":"https://offer-rails.onrender.com/mcp"', 'cursor.com/en/install-mcp', '## Tell your agent', '## Ordered agent steps', '/docs/modes.md']) {
+  for (const needle of ['https://offer-rails.onrender.com/mcp', 'find_opportunities', 'preview_page', 'get_digest', 'register_product', 'get_earnings', 'list_listings', '/landing-v9/agents/', 'POST /v1/agent-accounts', 'What an agent can do alone today', 'The browser step needs a human sign-in', 'POST /v1/maker/sales', 'POST /v1/maker/refunds', 'Placing an offer needs approval for now', 'This server needs a Google sign-in today', 'claude mcp add --scope user --transport http offer-rails', '"serverUrl":"https://offer-rails.onrender.com/mcp"', '## Tell your agent', '## Ordered agent steps', '/docs/modes.md', 'Publisher request:', 'urn:ietf:params:oauth:grant-type:device_code']) {
     if (!llmsBody.includes(needle)) throw new Error('llms missing ' + needle)
   }
   if (!/GET \/device/.test(llmsBody)) throw new Error('llms does not name GET /device')
   if (!llmsBody.includes('The hosted app gets these steps once the next deploy lands')) throw new Error('llms missing the deploy note')
   if (!llmsBody.includes('Step 5 stays a human or an operator for now.')) throw new Error('llms missing the approval note')
   if (!llmsBody.includes('X-Plugin-Key') || !llmsBody.includes('X-Admin-Key')) throw new Error('llms missing an auth header from the ordered steps')
+  if (llmsBody.includes('cursor.com/en/install-mcp') || llmsBody.includes('## No-browser account') || llmsBody.includes('## Device code') || llmsBody.includes('register_product through submit_offer')) throw new Error('llms still repeats an old section')
   if (/grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i.test(llmsBody.replaceAll('/v1/marketplace/', '/v1/offer-join/'))) throw new Error('llms has forbidden wording')
   const alias = await fetch(origin + '/agents', { redirect: 'manual' })
   const location = alias.headers.get('location') || ''
@@ -267,6 +268,9 @@ async function assertAgents(browser, origin, width, summary, outDir) {
       brand: !/distributoor|affilio/i.test(text),
       forbidden: /grok|marketplace|\blisted\b|github\.com|connector/i.test(text.replaceAll('/v1/marketplace/', '/v1/offer-join/')),
       steps: document.querySelectorAll('[data-agent-steps] > li').length,
+      ordered: document.querySelectorAll('#steps ol > li').length,
+      height: document.documentElement.scrollHeight,
+      headings: ['No-browser account', 'Device code', 'Find offers'].filter((name) => [...document.querySelectorAll('h2, h3')].some((el) => el.textContent.trim() === name)),
       soon: [...document.querySelectorAll('[data-tool][data-soon="true"]')].map((el) => el.getAttribute('data-tool')),
       livePreview: document.querySelector('[data-tool="preview_page"]')?.innerText.includes('Coming soon') && !document.querySelector('[data-tool="find_opportunities"]')?.innerText.includes('Coming soon'),
       modes: ['Manual', 'Auto', 'YOLO'].every((name) => text.includes(name)),
@@ -280,15 +284,29 @@ async function assertAgents(browser, origin, width, summary, outDir) {
       errors: ['invalid payload', 'invalid url', 'blocked address', 'origin not allowed', 'fetch failed', 'authorization_pending', 'isError: true'].every((item) => text.includes(item)),
       alone: document.querySelectorAll('[data-alone] > li').length,
       human: text.includes('The browser step needs a human sign-in'),
-      signup: text.includes('POST /v1/agent-accounts') && text.includes('"key_header":"X-API-Key"') && text.includes('"key_header":"X-Maker-Key"'),
+      signup: text.includes('POST /v1/agent-accounts') && (document.body.textContent || '').includes('"key_header":"X-API-Key"') && (document.body.textContent || '').includes('"key_header":"X-Maker-Key"'),
       deviceLinks: [...document.querySelectorAll('a')].map((el) => el.getAttribute('href') || '').filter((href) => /\/device(?!\/|[-a-z0-9])/.test(href)),
     }
   })
   const axe = await new AxeBuilder({ page }).analyze()
   const serious = axe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
   writeFileSync(join(outDir, `axe-agents-${width}.json`), JSON.stringify({ violations: serious }, null, 2))
-  await page.getByRole('tab', { name: 'Cursor' }).click()
-  const cursorInstall = await page.locator('[data-cursor-install]').getAttribute('href')
+  const tabLabels = []
+  for (const spec of [
+    { name: 'Cursor', untested: true },
+    { name: 'Claude Code', untested: false },
+    { name: 'VS Code', untested: true },
+    { name: 'Windsurf', untested: true },
+    { name: 'Generic', untested: false },
+  ]) {
+    const tab = page.getByRole('tab', { name: spec.name })
+    const label = (await tab.innerText()).replace(/\s+/g, ' ').trim()
+    tabLabels.push(label)
+    if (!label.startsWith(spec.name)) throw new Error('agents-' + width + ' tab lost its name ' + label)
+    if (spec.untested && !label.includes('untested')) throw new Error('agents-' + width + ' tab missing untested badge ' + label)
+    if (!spec.untested && /untested/i.test(label)) throw new Error('agents-' + width + ' tested tab badged ' + label)
+  }
+  if (await page.locator('[data-cursor-install]').count()) throw new Error('agents-' + width + ' still shows the untested Cursor deeplink')
   await page.getByRole('tab', { name: 'Generic' }).click()
   await page.getByRole('button', { name: 'Copy endpoint' }).click()
   await page.locator('[data-copy-status="endpoint"]').getByText('Copied', { exact: true }).waitFor()
@@ -297,12 +315,14 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   await page.locator('[data-copy-status="config"]').getByText('Copied', { exact: true }).waitFor()
   const copiedConfig = await page.evaluate(() => navigator.clipboard.readText())
   await page.screenshot({ path: join(outDir, 'agents-' + width + '.png'), fullPage: true })
-  summary.push({ slug: 'agents-' + width, ...facts, serious: serious.map((item) => item.id), copiedUrl, copiedConfig, cursorInstall })
+  summary.push({ slug: 'agents-' + width, ...facts, serious: serious.map((item) => item.id), copiedUrl, copiedConfig, tabLabels, height: facts.height })
   if (!facts.scroll) throw new Error('agents-' + width + ' scrolls sideways')
   if (facts.small.length) throw new Error('agents-' + width + ' small targets ' + JSON.stringify(facts.small))
   if (serious.length) throw new Error('agents-' + width + ' axe ' + serious.map((item) => item.id + ' ' + item.nodes.map((node) => node.target.join(' ')).join('; ')).join(' | '))
   if (!facts.brand || facts.forbidden) throw new Error('agents-' + width + ' forbidden wording')
-  if (facts.steps !== 3) throw new Error('agents-' + width + ' steps ' + facts.steps)
+  if (facts.steps !== 0 || facts.ordered !== 11) throw new Error('agents-' + width + ' steps ' + facts.steps + ' ordered ' + facts.ordered)
+  if (facts.headings.length) throw new Error('agents-' + width + ' duplicate headings ' + facts.headings.join(','))
+  if (width === 390 && facts.height > 7000) throw new Error('agents-' + width + ' height ' + facts.height)
   if (facts.soon.join(',') !== 'preview_page,get_digest' || !facts.livePreview) throw new Error('agents-' + width + ' soon ' + facts.soon.join(','))
   if (!facts.modes || !facts.stub) throw new Error('agents-' + width + ' modes')
   if (facts.url !== 'https://offer-rails.onrender.com/mcp') throw new Error('agents-' + width + ' url ' + facts.url)
@@ -314,12 +334,15 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   if (facts.deviceLinks.length !== 1 || facts.deviceLinks[0] !== '/device') throw new Error('agents-' + width + ' device link ' + facts.deviceLinks.join(','))
   if (copiedUrl !== 'https://offer-rails.onrender.com/mcp') throw new Error('agents-' + width + ' clipboard url ' + copiedUrl)
   if (copiedConfig !== '{"mcpServers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}') throw new Error('agents-' + width + ' clipboard config ' + copiedConfig)
-  if (!cursorInstall || !cursorInstall.startsWith('https://cursor.com/en/install-mcp?name=offer-rails&config=') || !cursorInstall.includes('eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ')) throw new Error('agents-' + width + ' cursor install ' + cursorInstall)
   const reserved = await page.locator('[data-d063-steps]').innerText()
-  for (const needle of ['1. Signup', '11. Reporting', 'X-Plugin-Key', 'X-Admin-Key', 'X-API-Key', 'X-Maker-Key', 'GET /device', 'The hosted app gets these steps once the next deploy lands', 'Step 5 stays a human or an operator for now.', 'Device sign-in']) {
+  const deviceCopy = await page.locator('#device').innerText()
+  for (const needle of ['1. Signup', '11. Reporting', 'X-Plugin-Key', 'X-Admin-Key', 'X-API-Key', 'X-Maker-Key', 'The hosted app gets these steps once the next deploy lands', 'Step 5 stays a human or an operator for now.']) {
     if (!reserved.includes(needle)) throw new Error('agents-' + width + ' d063 missing ' + needle)
   }
-  if (reserved.includes('not written') || reserved.includes('Reserved')) throw new Error('agents-' + width + ' d063 still reserved')
+  for (const needle of ['Device sign-in', 'GET /device', 'The browser step needs a human sign-in']) {
+    if (!deviceCopy.includes(needle)) throw new Error('agents-' + width + ' device missing ' + needle)
+  }
+  if (reserved.includes('not written') || reserved.includes('Reserved') || reserved.includes('Device sign-in')) throw new Error('agents-' + width + ' d063 still mixed ' + reserved.slice(0, 80))
   const genericPanel = await page.locator('#install-panel-generic').innerText()
   if (!genericPanel.includes('401 no bearer token') || genericPanel.includes('Untested')) throw new Error('agents-' + width + ' generic panel ' + genericPanel)
   await page.getByRole('tab', { name: 'Claude Code' }).click()
@@ -328,6 +351,23 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   await page.getByRole('tab', { name: 'Windsurf' }).click()
   const windsurfPanel = await page.locator('#install-panel-windsurf').innerText()
   if (!windsurfPanel.startsWith('Untested.')) throw new Error('agents-' + width + ' windsurf panel ' + windsurfPanel)
+  await page.locator('#on-this-page a[href="#tell"]').click()
+  const covered = await page.evaluate(() => {
+    const overlaps = (a, b) => a.bottom > b.top + 1 && a.right > b.left + 1 && a.left < b.right - 1 && a.top < b.bottom - 1
+    const header = document.querySelector('header').getBoundingClientRect()
+    const chips = document.querySelector('#on-this-page').getBoundingClientRect()
+    const tell = document.querySelector('#tell').getBoundingClientRect()
+    return {
+      headerBottom: Math.round(header.bottom),
+      chips: { top: Math.round(chips.top), bottom: Math.round(chips.bottom), left: Math.round(chips.left), right: Math.round(chips.right) },
+      tellTop: Math.round(tell.top),
+      overlap: overlaps(header, tell) || overlaps(chips, tell),
+    }
+  })
+  await page.screenshot({ path: join(outDir, 'agents-tell-' + width + '.png') })
+  if (covered.overlap) throw new Error('agents-' + width + ' header covers tell ' + JSON.stringify(covered))
+  await page.locator('#on-this-page a[href="#install"]').click()
+  await page.screenshot({ path: join(outDir, 'agents-install-' + width + '.png') })
   await context.close()
 }
 

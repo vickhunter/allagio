@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { agentAccount, agentPrompt, aloneToday, approvalNote, cursorInstallUrl, deployNote, deviceSteps, docLinks, errors, installs, llmsText, mcpUrl, modes, orderedSteps, pagePath, rates, signInNote, steps, tools } from './facts.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, docLinks, errors, installs, llmsText, mcpUrl, modes, orderedSteps, pagePath, rates, signInNote, steps, tools } from './facts.mjs'
 
 const banned = /grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i
 
@@ -35,7 +35,15 @@ test('llms.txt matches the agent facts', () => {
   assert.match(text, /This server needs a Google sign-in today/)
   assert.match(text, /claude mcp add --scope user --transport http offer-rails/)
   assert.match(text, /"serverUrl":"https:\/\/offer-rails\.onrender\.com\/mcp"/)
-  assert.match(text, new RegExp(cursorInstallUrl.replaceAll('?', '\\?')))
+  assert.equal(text.includes('cursor.com/en/install-mcp'), false)
+  assert.equal(text.includes('## No-browser account'), false)
+  assert.equal(text.includes('## Device code'), false)
+  assert.equal(text.includes('register_product through submit_offer'), false)
+  assert.match(text, /Publisher request:/)
+  assert.match(text, /urn:ietf:params:oauth:grant-type:device_code/)
+  assert.match(text, /register_maker/)
+  assert.match(text, /list_listings/)
+  assert.match(text, /get_earnings/)
   assert.match(text, /## Tell your agent/)
   assert.match(text, /## Ordered agent steps/)
   assert.match(text, /### Device sign-in/)
@@ -57,7 +65,7 @@ test('only page preview and digest are coming soon', () => {
 })
 
 test('public agent copy stays on the documented words', () => {
-  const blob = JSON.stringify({ steps, modes, tools, rates, errors, deviceSteps, agentAccount, aloneToday, installs, signInNote, agentPrompt, orderedSteps })
+  const blob = JSON.stringify({ steps, modes, tools, rates, errors, deviceSignIn, agentAccount, aloneToday, installs, signInNote, agentPrompt, orderedSteps })
   assert.equal(banned.test(withoutOfferJoin(blob)), false)
   assert.equal(banned.test(withoutOfferJoin(llmsText())), false)
   for (const name of ['Manual', 'Auto', 'YOLO']) assert.match(blob, new RegExp(name))
