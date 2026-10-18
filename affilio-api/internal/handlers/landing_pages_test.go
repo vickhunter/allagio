@@ -148,6 +148,8 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 		"/landing-v9//privacy/index.html", "/landing-v9/privacy/./index.html",
 		"/landing-v9//terms/", "/landing-v9/terms//", "/landing-v9/terms/./",
 		"/landing-v9//terms/index.html", "/landing-v9/terms/./index.html",
+		"/landing-v9/../privacy/", "/landing-v9/../privacy/index.html", "/landing-v9/../privacy/index.html/.",
+		"/landing-v9/../terms/", "/landing-v9/../terms/index.html", "/landing-v9/../terms/index.html/.",
 	}
 	for _, path := range noindex {
 		if got := robots(path, http.StatusOK); got != "noindex" {
@@ -169,10 +171,17 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 			t.Fatalf("%s did not serve the page: %s", path, rec.Body.String())
 		}
 		if got := rec.Header().Get("X-Robots-Tag"); got != "noindex" {
-			t.Fatalf("%s X-Robots-Tag %q", path, got)
+			t.Fatalf("%s %d X-Robots-Tag %q", path, rec.Code, got)
 		}
 	}
-	for _, path := range []string{"/landing-v9//agents/", "/landing-v9/agents/./", "/landing-v9/agents/./index.html"} {
+	for _, path := range []string{"/privacy/index.html", "/terms/index.html"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+	}
+	for _, path := range []string{"/landing-v9//agents/", "/landing-v9/agents/./", "/landing-v9/agents/./index.html", "/landing-v9/../agents/index.html/."} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if got := rec.Header().Get("X-Robots-Tag"); got != "" {

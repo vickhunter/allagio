@@ -181,7 +181,8 @@ var LEGAL_PAGES_APPROVED = false
 
 func draftLegalPath(requestPath string) bool {
 	switch path.Clean(requestPath) {
-	case "/privacy", "/terms",
+	case "/privacy", "/privacy/index.html",
+		"/terms", "/terms/index.html",
 		"/landing-v9/privacy", "/landing-v9/privacy/index.html",
 		"/landing-v9/terms", "/landing-v9/terms/index.html":
 		return true
