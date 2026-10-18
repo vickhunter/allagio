@@ -462,6 +462,14 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 			_, _ = io.WriteString(w, `<html><title>Hello</title><body> </body></html>`)
 		case "/script-password":
 			_, _ = io.WriteString(w, `<html><body><script>var x = "</style><input type=\"password\">";</script><main><p>`+strings.Repeat("word ", 90)+`A public note.</p></main></body></html>`)
+		case "/mention-password":
+			_, _ = io.WriteString(w, `<html><body><!-- <input type="password"> --><main><p>A public note about the attribute type="password" and <a href="https://example.com/docs?type=password">this link</a>.</p></main></body></html>`)
+		case "/unprotected-account":
+			_, _ = io.WriteString(w, `<html><body><main><p>This unprotected account publishes notes on protected accounting.</p></main></body></html>`)
+		case "/real-protected":
+			_, _ = io.WriteString(w, `<html><body><main><p>This protected account is not public.</p></main></body></html>`)
+		case "/head-script-wall":
+			_, _ = io.WriteString(w, `<html><head><script>var x = "</head> Log in to continue <input type=\"password\">";</script><title>Notes</title></head><body><main><p>A short public note about ceramic glaze.</p></main></body></html>`)
 		case "/long":
 			_, _ = io.WriteString(w, `<html><head><title>Notes</title></head><body><main><p>`+strings.Repeat("word ", 90)+`This article mentions login once.</p></main></body></html>`)
 		case "/bare":
@@ -493,7 +501,7 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 	if len(dialed) != 1 || dialed[0] != "203.0.113.10:80" {
 		t.Fatalf("html dialed %v", dialed)
 	}
-	for _, path := range []string{"/empty", "/login", "/password", "/login-meta", "/password-meta", "/form-login", "/noscript-login", "/mid-login", "/long-password", "/no-head-empty", "/denied"} {
+	for _, path := range []string{"/empty", "/login", "/password", "/login-meta", "/password-meta", "/form-login", "/noscript-login", "/mid-login", "/long-password", "/no-head-empty", "/denied", "/real-protected"} {
 		if _, err = plain.Fetch(context.Background(), "http://preview.example"+path); !errors.Is(err, ErrUnreadable) {
 			t.Fatalf("%s: %v", path, err)
 		}
@@ -513,6 +521,18 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 	scripted, err := plain.Fetch(context.Background(), "http://preview.example/script-password")
 	if err != nil || !strings.Contains(scripted.Text, "public note") {
 		t.Fatalf("password inside a script: %v %+v", err, scripted)
+	}
+	mentioned, err := plain.Fetch(context.Background(), "http://preview.example/mention-password")
+	if err != nil || !strings.Contains(mentioned.Text, `type="password"`) {
+		t.Fatalf("password mentioned in public text: %v %+v", err, mentioned)
+	}
+	unprotected, err := plain.Fetch(context.Background(), "http://preview.example/unprotected-account")
+	if err != nil || !strings.Contains(unprotected.Text, "unprotected account") || !strings.Contains(unprotected.Text, "protected accounting") {
+		t.Fatalf("protected account without a word boundary: %v %+v", err, unprotected)
+	}
+	headScript, err := plain.Fetch(context.Background(), "http://preview.example/head-script-wall")
+	if err != nil || !strings.Contains(headScript.Text, "A short public note about ceramic glaze.") || strings.Contains(headScript.Text, "Log in") {
+		t.Fatalf("head script containing </head>: %v %+v", err, headScript)
 	}
 	if _, err = plain.Fetch(context.Background(), "http://preview.example/gone"); !errors.Is(err, ErrFetch) {
 		t.Fatalf("html 404: %v", err)

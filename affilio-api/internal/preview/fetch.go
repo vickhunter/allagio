@@ -360,6 +360,7 @@ var (
 
 func extractPage(raw string) (string, string) {
 	raw = commentPattern.ReplaceAllString(raw, " ")
+	raw = stripScriptAndStyle(raw)
 	title := ""
 	if match := titlePattern.FindStringSubmatch(raw); match != nil {
 		title = cleanLine(match[1])
@@ -493,7 +494,8 @@ var (
 	metaPattern        = regexp.MustCompile(`(?i)<meta\b[^>]*>`)
 	attrPattern        = regexp.MustCompile(`(?i)([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))`)
 	passwordPattern    = regexp.MustCompile(`(?i)\btype\s*=\s*['"]?password\b`)
-	loginPhrasePattern = regexp.MustCompile(`(?i)(?:\blog[\s-]?in\b|\bsign[\s-]?in\b|protected account|this account is private|tweets are protected|only subscribers can)`)
+	loginPhrasePattern = regexp.MustCompile(`(?i)(?:\blog[\s-]?in\b|\bsign[\s-]?in\b|\bprotected account\b|this account is private|tweets are protected|only subscribers can)`)
+	elementNamePattern = regexp.MustCompile(`(?i)^</?\s*([a-z0-9]+)`)
 )
 
 func applyMeta(raw, title, text string) (string, string) {
@@ -570,8 +572,7 @@ func firstMeta(metas map[string][]string, key string) string {
 }
 
 func loginWall(raw string) bool {
-	stripped := stripScriptAndStyle(raw)
-	if passwordPattern.MatchString(stripped) {
+	if hasPasswordField(raw) {
 		return true
 	}
 	visible := wallText(raw)
@@ -581,6 +582,30 @@ func loginWall(raw string) bool {
 	return loginPhrase(visible)
 }
 
+// hasPasswordField is true only for an input or textarea whose type is password.
+// The words type="password" in prose, a link, or a comment are not a field.
+func hasPasswordField(raw string) bool {
+	raw = commentPattern.ReplaceAllString(raw, " ")
+	raw = stripScriptAndStyle(raw)
+	for _, tag := range tagPattern.FindAllString(raw, -1) {
+		switch elementName(tag) {
+		case "input", "textarea":
+			if passwordPattern.MatchString(tag) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func elementName(tag string) string {
+	match := elementNamePattern.FindStringSubmatch(tag)
+	if match == nil {
+		return ""
+	}
+	return strings.ToLower(match[1])
+}
+
 func stripScriptAndStyle(raw string) string {
 	raw = scriptPattern.ReplaceAllString(raw, " ")
 	return stylePattern.ReplaceAllString(raw, " ")
@@ -588,12 +613,14 @@ func stripScriptAndStyle(raw string) string {
 
 // wallText keeps nav, header, footer, form, and noscript copy. It drops the
 // head, the title, scripts, and styles, so a title of "Sign in" is not a wall
-// and a string inside a script is not a password field.
+// and a string inside a script is not a password field. Scripts and styles
+// come out before the head is cut, so a head script that contains </head>
+// cannot leak a sign-in phrase into the visible text.
 func wallText(raw string) string {
 	raw = commentPattern.ReplaceAllString(raw, " ")
+	raw = stripScriptAndStyle(raw)
 	raw = headPattern.ReplaceAllString(raw, " ")
 	raw = titlePattern.ReplaceAllString(raw, " ")
-	raw = stripScriptAndStyle(raw)
 	raw = tagPattern.ReplaceAllString(raw, " ")
 	raw = html.UnescapeString(raw)
 	return strings.Join(strings.Fields(raw), " ")
