@@ -1,10 +1,14 @@
+## October 18 — Hosted privacy, terms, agents, and llms.txt
+
+`/privacy`, `/privacy/`, `/terms`, and `/terms/` serve `landing-v9/privacy/index.html` and `landing-v9/terms/index.html` from the UI asset directory as `text/html; charset=utf-8`. Both send `X-Robots-Tag: noindex`. `/agents` and `/agents/` serve `landing-v9/agents/index.html` the same way, without that header. The HTML is sent as built. It is not run through a Go template. `/llms.txt` serves `landing-v9/llms.txt` as `text/plain; charset=utf-8` when that file is in the asset directory. When it is not, `/llms.txt` stays the generated agent instructions, and `/docs/modes.md` still lists the receipt fields. A path with no route is still 404. A missing page file is 404. No new migration. `AUTO_MIGRATE` stays off.
+
 ## October 18 — A committed placement pays a browser click
 
 `GET /v1/go/<placement_id>` adds `via` and counts a paid click when the placement is in `placement_counts_as_live`: `plugin_wait` is `placed`, status is `committed`, the campaign is active, and the offer is listed. The same redirect pays a browser click when the placement is only `approved`. Approval does not store `campaign_id`. The click path was refusing that row, so the redirect dropped `via` and wrote no click. An approved placement inside its window, with a listed offer and an active campaign for that site, now uses that campaign, appends `via`, and increments `paid_clicks`. `plugin_wait` can still be empty. Pending, expired, paused, and killed placements stay on the plain URL. Live now still requires `placed` and `committed`. A click is paid only when its class is `browser`. An empty user agent, curl, HEAD, and prefetch are `unknown`. That hit is stored, the redirect stays the plain landing URL, and `paid_clicks` stays 0. Repeats from the same reader inside 45 seconds are one row, so four unknown hits are one click. A browser request on that same placement still redirects with `via` and increments `paid_clicks`. An early plugin acknowledgement on 252aa64 could store `placed` before commit. Commit leaves that flag, so the row is already live after the receipt. The later acknowledgement is 409 `nothing_to_ack`. It does not have to run again for the go link to pay a browser click. A new acknowledgement before approval is still 409 `not_committed` and does not store `placed`.
 
 `POST /v1/offer-review/placements/:id/approve` records `approved_by` `operator`. The owner session still records `owner`. `matched_rule` stays empty on the operator path, so the digest does not call it a saved policy. Migration `040_operator_approval.sql` allows that value. Apply it before the new binary. `AUTO_MIGRATE` stays off.
 
-`/llms.txt` and `/docs/modes.md` list the receipt body fields `surface_url`, `published_text`, and `evidence`. The agents page is unchanged.
+The generated `/llms.txt` and `/docs/modes.md` list the receipt body fields `surface_url`, `published_text`, and `evidence`. The agents page is unchanged.
 
 ## October 18 — Plugin ack waits until the placement is committed
 

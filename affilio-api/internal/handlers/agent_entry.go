@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +41,9 @@ type AgentEntry struct {
 	// ClaimsCheck is the resolved CLAIMS_CHECK mode. Listing-card reads use it
 	// so a hosted stub reports the not-live claims message.
 	ClaimsCheck string
+	// AssetsPath is the hosted UI directory. When it contains
+	// landing-v9/llms.txt, GET /llms.txt serves that file.
+	AssetsPath string
 }
 
 type entryActor struct {
@@ -1807,6 +1812,17 @@ func (h *AgentEntry) FromSource(c *gin.Context) {
 }
 
 func (h *AgentEntry) LLMs(c *gin.Context) {
+	if h.AssetsPath != "" {
+		body, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", "llms.txt"))
+		if err == nil {
+			c.Data(http.StatusOK, "text/plain; charset=utf-8", body)
+			return
+		}
+		if !os.IsNotExist(err) {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+	}
 	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(llmsBody()))
 }
 

@@ -261,6 +261,7 @@ func main() {
 		PluginOfflineAfter: cfg.PluginOfflineAfter,
 		StatusLimiter:      handlers.NewPlacementPollLimiter(),
 		ClaimsCheck:        cfg.ClaimsCheck,
+		AssetsPath:         cfg.UIAssetsPath,
 	}
 	if hosted != nil {
 		agentEntry.Owner = hosted.RequireOwnerSession
