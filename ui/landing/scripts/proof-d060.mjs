@@ -125,10 +125,16 @@ const base = 'http://127.0.0.1:' + server.address().port
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || '/usr/local/bin/google-chrome', args: ['--disable-gpu'] })
 mkdirSync(shots, { recursive: true })
 
+const axeLines = []
+
 async function check(page, label) {
   const scroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
   if (!scroll) throw new Error(label + ' scrolls sideways')
   const axe = await new AxeBuilder({ page }).analyze()
+  const impacts = ['critical', 'serious', 'moderate', 'minor']
+  const counts = Object.fromEntries(impacts.map((impact) => [impact, axe.violations.filter((item) => item.impact === impact).length]))
+  const rules = axe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical').map((item) => `${item.impact}:${item.id}`)
+  axeLines.push(`${label} ${impacts.map((impact) => impact + '=' + counts[impact]).join(' ')} ${rules.length ? 'rules=' + rules.join(',') : 'rules=none'}`)
   const serious = axe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
   if (serious.length) throw new Error(label + ' axe ' + serious.map((item) => item.id + ' ' + item.nodes.map((node) => node.html.slice(0, 80)).join('; ')).join(' | '))
   const primary = await page.locator('#directory [data-primary-action]').count()
@@ -215,6 +221,7 @@ try {
 
     await page.goto(base + '/publishers/', { waitUntil: 'networkidle' })
     await page.locator('#directory').getByText('No publishers listed yet. Yours can be first.').waitFor()
+    await check(page, 'publishers-empty-' + width)
     await page.goto(base + '/publishers/?directoryFixtures=1', { waitUntil: 'networkidle' })
     await page.locator('#directory').getByRole('heading', { name: 'Publishers on Offer Rails' }).waitFor()
     await page.locator('#directory').getByText('TEST Field Journal').waitFor()
@@ -234,8 +241,18 @@ try {
     const publisherMiss = await page.goto(base + '/publishers/not-a-real-site', { waitUntil: 'networkidle' })
     if (!publisherMiss || publisherMiss.status() !== 404) throw new Error('publisher 404 ' + (publisherMiss && publisherMiss.status()))
     await page.getByRole('heading', { name: 'That page is not on Offer Rails.' }).waitFor()
+    await check(page, 'publishers-404-' + width)
     await context.close()
   }
+  mkdirSync(resolve(repo, 'proof/d060'), { recursive: true })
+  writeFileSync(resolve(repo, 'proof/d060/axe.txt'), [
+    'D-060 axe-core, viewports 390 and 1440.',
+    'Pages this branch changes: /makers, /publishers, member profiles, and the unknown-slug 404.',
+    ...axeLines,
+    '',
+    'serious+critical rules are listed on each line. A line with rules=none has none.',
+    '',
+  ].join('\n'))
 } finally {
   await browser.close()
   server.close()
