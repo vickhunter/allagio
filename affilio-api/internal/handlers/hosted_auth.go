@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -135,14 +136,152 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 		owner.POST("/products/:id/connection", h.Payments.Connect)
 	}
 	public.Any("/mcp", h.MCP)
+	// Gin redirects an extra trailing slash before group middleware, and it
+	// refuses a second /privacy/ route, so /privacy// never reaches headers().
+	// Serve a cleaned /privacy or /terms here. Other routes keep a one-slash redirect.
+	r.RedirectTrailingSlash = false
+	r.NoRoute(func(c *gin.Context) { h.unmatched(c, r) })
+}
+
+func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
+	requestPath := c.Request.URL.Path
+	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+		switch path.Clean(requestPath) {
+		case "/privacy":
+			if h.AssetsPath != "" {
+				h.writePublicHeaders(c)
+				h.Privacy(c)
+				return
+			}
+		case "/terms":
+			if h.AssetsPath != "" {
+				h.writePublicHeaders(c)
+				h.Terms(c)
+				return
+			}
+		}
+	}
+	if redirectTrailingSlash(c, r) {
+		return
+	}
+	// A cleaned draft path that is not a page, such as /docs/../privacy/index.html,
+	// stays a 404. It still sends noindex while the wording is unapproved.
+	if !LEGAL_PAGES_APPROVED && draftLegalPath(requestPath) {
+		c.Header("X-Robots-Tag", "noindex")
+	}
+	c.String(http.StatusNotFound, "404 page not found")
+}
+
+// InstallSlashRedirect turns off Gin's built-in trailing-slash redirect and
+// replaces it. The API process calls this when the hosted handler is not
+// mounted, so /v1/go/<id>/ still 301s with the go-link cache headers.
+func InstallSlashRedirect(r *gin.Engine) {
+	r.RedirectTrailingSlash = false
+	r.NoRoute(func(c *gin.Context) {
+		if redirectTrailingSlash(c, r) {
+			return
+		}
+		c.String(http.StatusNotFound, "404 page not found")
+	})
+}
+
+func redirectTrailingSlash(c *gin.Context, r *gin.Engine) bool {
+	requestPath := c.Request.URL.Path
+	target, ok := trailingSlashTarget(c.Request.Method, requestPath, r)
+	if !ok {
+		return false
+	}
+	if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
+		c.Header("X-Robots-Tag", "noindex")
+	}
+	if target == "/v1/go" || strings.HasPrefix(target, "/v1/go/") {
+		stampGoResponse(c)
+	}
+	if q := c.Request.URL.RawQuery; q != "" {
+		target += "?" + q
+	}
+	status := http.StatusTemporaryRedirect
+	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+		status = http.StatusMovedPermanently
+	}
+	c.Redirect(status, target)
+	return true
+}
+
+func trailingSlashTarget(method, requestPath string, r *gin.Engine) (string, bool) {
+	if len(requestPath) < 2 || !strings.HasPrefix(requestPath, "/") || strings.HasPrefix(requestPath, "//") || !singleSlashPath(requestPath) {
+		return "", false
+	}
+	alt := requestPath + "/"
+	if requestPath[len(requestPath)-1] == '/' {
+		alt = requestPath[:len(requestPath)-1]
+	}
+	if !singleSlashPath(alt) {
+		return "", false
+	}
+	for _, route := range r.Routes() {
+		if route.Method == method && (route.Path == alt || routePatternMatches(route.Path, alt)) {
+			return alt, true
+		}
+	}
+	return "", false
+}
+
+// singleSlashPath accepts /v1/go/<id> and a route that is only registered with
+// one trailing slash. It rejects a protocol-relative target, an empty segment,
+// and a . or .. segment.
+func singleSlashPath(requestPath string) bool {
+	if requestPath == "" || !strings.HasPrefix(requestPath, "/") || strings.HasPrefix(requestPath, "//") {
+		return false
+	}
+	cleaned := path.Clean(requestPath)
+	if requestPath != cleaned && requestPath != cleaned+"/" {
+		return false
+	}
+	for _, seg := range strings.Split(strings.Trim(requestPath, "/"), "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+// routePatternMatches reports whether requestPath fits a Gin route with a
+// :name segment. A catch-all *filepath is not a match: a missing static file
+// re-enters this handler, and treating it as a slash redirect loops.
+func routePatternMatches(pattern, requestPath string) bool {
+	if strings.Contains(pattern, "*") || !strings.Contains(pattern, ":") {
+		return false
+	}
+	patternSegs := strings.Split(strings.Trim(pattern, "/"), "/")
+	requestSegs := strings.Split(strings.Trim(requestPath, "/"), "/")
+	for i, seg := range patternSegs {
+		if i >= len(requestSegs) || requestSegs[i] == "" || requestSegs[i] == "." || requestSegs[i] == ".." {
+			return false
+		}
+		if strings.HasPrefix(seg, ":") {
+			continue
+		}
+		if seg != requestSegs[i] {
+			return false
+		}
+	}
+	return len(patternSegs) == len(requestSegs)
 }
 
 func (h *HostedHandler) headers(c *gin.Context) {
+	h.writePublicHeaders(c)
+	c.Next()
+}
+
+func (h *HostedHandler) writePublicHeaders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Referrer-Policy", "strict-origin")
 	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
-	c.Next()
+	if !LEGAL_PAGES_APPROVED && draftLegalPath(c.Request.URL.Path) {
+		c.Header("X-Robots-Tag", "noindex")
+	}
 }
 
 func (h *HostedHandler) limited(c *gin.Context) bool {
