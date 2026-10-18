@@ -346,14 +346,15 @@ func blockedIP(ip net.IP) bool {
 }
 
 var (
-	titlePattern   = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
-	headPattern    = regexp.MustCompile(`(?is)<head\b[^>]*>.*?</head>`)
-	mainPattern    = regexp.MustCompile(`(?is)<main\b[^>]*>(.*?)</main>`)
-	articlePattern = regexp.MustCompile(`(?is)<article\b[^>]*>(.*?)</article>`)
-	commentPattern = regexp.MustCompile(`(?s)<!--.*?-->`)
-	dropPattern    = regexp.MustCompile(`(?is)<(script|style|noscript|nav|header|footer|form|svg|iframe|template)\b[^>]*>.*?</(script|style|noscript|nav|header|footer|form|svg|iframe|template)>`)
-	breakPattern   = regexp.MustCompile(`(?i)</\s*(p|div|h[1-6]|li|section|article|main|blockquote|tr)\b[^>]*>|<\s*br\s*/?\s*>`)
-	tagPattern     = regexp.MustCompile(`(?s)<[^>]+>`)
+	titlePattern       = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	headPattern        = regexp.MustCompile(`(?is)<head\b[^>]*>.*?</head>`)
+	mainPattern        = regexp.MustCompile(`(?is)<main\b[^>]*>(.*?)</main>`)
+	articlePattern     = regexp.MustCompile(`(?is)<article\b[^>]*>(.*?)</article>`)
+	commentPattern     = regexp.MustCompile(`(?s)<!--.*?-->`)
+	dropPattern        = regexp.MustCompile(`(?is)<(script|style|noscript|nav|header|footer|form|svg|iframe|template)\b[^>]*>.*?</(script|style|noscript|nav|header|footer|form|svg|iframe|template)>`)
+	scriptStylePattern = regexp.MustCompile(`(?is)<(script|style|noscript)\b[^>]*>.*?</(script|style|noscript)>`)
+	breakPattern       = regexp.MustCompile(`(?i)</\s*(p|div|h[1-6]|li|section|article|main|blockquote|tr)\b[^>]*>|<\s*br\s*/?\s*>`)
+	tagPattern         = regexp.MustCompile(`(?s)<[^>]+>`)
 )
 
 func extractPage(raw string) (string, string) {
@@ -442,8 +443,7 @@ func unreadableStatus(kind string, code int) bool {
 func pageFromHTML(raw string) (Page, error) {
 	title, body := extractPage(raw)
 	title, text := applyMeta(raw, title, body)
-	// Word count uses the visible body. A long description must not hide a short login wall.
-	if strings.TrimSpace(text) == "" || loginWall(raw, title, body) {
+	if strings.TrimSpace(text) == "" || loginWall(raw) {
 		return Page{}, ErrUnreadable
 	}
 	if title != "" && !strings.Contains(text, title) {
@@ -567,18 +567,28 @@ func firstMeta(metas map[string][]string, key string) string {
 	return values[0]
 }
 
-func loginWall(raw, title, text string) bool {
-	words := len(strings.Fields(text))
-	if words >= 80 {
-		return false
-	}
-	if passwordPattern.MatchString(raw) {
+func loginWall(raw string) bool {
+	stripped := scriptStylePattern.ReplaceAllString(raw, " ")
+	if passwordPattern.MatchString(stripped) {
 		return true
 	}
-	if words >= 40 {
+	visible := wallText(raw)
+	if len(strings.Fields(visible)) >= 80 {
 		return false
 	}
-	return loginPhrase(title + " " + text)
+	return loginPhrase(visible)
+}
+
+// wallText is the page with scripts and the head removed, and with nav,
+// header, footer, and form copy kept. Those regions are where a sign-in
+// page puts "log in", and a long description must not hide them.
+func wallText(raw string) string {
+	raw = commentPattern.ReplaceAllString(raw, " ")
+	raw = headPattern.ReplaceAllString(raw, " ")
+	raw = scriptStylePattern.ReplaceAllString(raw, " ")
+	raw = tagPattern.ReplaceAllString(raw, " ")
+	raw = html.UnescapeString(raw)
+	return strings.Join(strings.Fields(raw), " ")
 }
 
 func loginPhrase(text string) bool {
