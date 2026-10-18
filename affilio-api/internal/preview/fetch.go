@@ -346,15 +346,16 @@ func blockedIP(ip net.IP) bool {
 }
 
 var (
-	titlePattern       = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
-	headPattern        = regexp.MustCompile(`(?is)<head\b[^>]*>.*?</head>`)
-	mainPattern        = regexp.MustCompile(`(?is)<main\b[^>]*>(.*?)</main>`)
-	articlePattern     = regexp.MustCompile(`(?is)<article\b[^>]*>(.*?)</article>`)
-	commentPattern     = regexp.MustCompile(`(?s)<!--.*?-->`)
-	dropPattern        = regexp.MustCompile(`(?is)<(script|style|noscript|nav|header|footer|form|svg|iframe|template)\b[^>]*>.*?</(script|style|noscript|nav|header|footer|form|svg|iframe|template)>`)
-	scriptStylePattern = regexp.MustCompile(`(?is)<(script|style)\b[^>]*>.*?</(script|style)>`)
-	breakPattern       = regexp.MustCompile(`(?i)</\s*(p|div|h[1-6]|li|section|article|main|blockquote|tr)\b[^>]*>|<\s*br\s*/?\s*>`)
-	tagPattern         = regexp.MustCompile(`(?s)<[^>]+>`)
+	titlePattern   = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	headPattern    = regexp.MustCompile(`(?is)<head\b[^>]*>.*?</head>`)
+	mainPattern    = regexp.MustCompile(`(?is)<main\b[^>]*>(.*?)</main>`)
+	articlePattern = regexp.MustCompile(`(?is)<article\b[^>]*>(.*?)</article>`)
+	commentPattern = regexp.MustCompile(`(?s)<!--.*?-->`)
+	dropPattern    = regexp.MustCompile(`(?is)<(script|style|noscript|nav|header|footer|form|svg|iframe|template)\b[^>]*>.*?</(script|style|noscript|nav|header|footer|form|svg|iframe|template)>`)
+	scriptPattern  = regexp.MustCompile(`(?is)<script\b[^>]*>.*?</script>`)
+	stylePattern   = regexp.MustCompile(`(?is)<style\b[^>]*>.*?</style>`)
+	breakPattern   = regexp.MustCompile(`(?i)</\s*(p|div|h[1-6]|li|section|article|main|blockquote|tr)\b[^>]*>|<\s*br\s*/?\s*>`)
+	tagPattern     = regexp.MustCompile(`(?s)<[^>]+>`)
 )
 
 func extractPage(raw string) (string, string) {
@@ -364,6 +365,7 @@ func extractPage(raw string) (string, string) {
 		title = cleanLine(match[1])
 	}
 	source := headPattern.ReplaceAllString(raw, " ")
+	source = titlePattern.ReplaceAllString(source, " ")
 	if match := mainPattern.FindStringSubmatch(raw); match != nil {
 		source = match[1]
 	} else if match := articlePattern.FindStringSubmatch(raw); match != nil {
@@ -568,7 +570,7 @@ func firstMeta(metas map[string][]string, key string) string {
 }
 
 func loginWall(raw string) bool {
-	stripped := scriptStylePattern.ReplaceAllString(raw, " ")
+	stripped := stripScriptAndStyle(raw)
 	if passwordPattern.MatchString(stripped) {
 		return true
 	}
@@ -579,13 +581,19 @@ func loginWall(raw string) bool {
 	return loginPhrase(visible)
 }
 
-// wallText is the page with scripts and the head removed, and with nav,
-// header, footer, and form copy kept. Those regions are where a sign-in
-// page puts "log in", and a long description must not hide them.
+func stripScriptAndStyle(raw string) string {
+	raw = scriptPattern.ReplaceAllString(raw, " ")
+	return stylePattern.ReplaceAllString(raw, " ")
+}
+
+// wallText keeps nav, header, footer, form, and noscript copy. It drops the
+// head, the title, scripts, and styles, so a title of "Sign in" is not a wall
+// and a string inside a script is not a password field.
 func wallText(raw string) string {
 	raw = commentPattern.ReplaceAllString(raw, " ")
 	raw = headPattern.ReplaceAllString(raw, " ")
-	raw = scriptStylePattern.ReplaceAllString(raw, " ")
+	raw = titlePattern.ReplaceAllString(raw, " ")
+	raw = stripScriptAndStyle(raw)
 	raw = tagPattern.ReplaceAllString(raw, " ")
 	raw = html.UnescapeString(raw)
 	return strings.Join(strings.Fields(raw), " ")
