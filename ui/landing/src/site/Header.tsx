@@ -13,7 +13,7 @@ export const siteCommands: Command[] = [
   { id: 'protocol', label: 'Protocol', href: '/protocol/' },
   { id: 'agents', label: 'MCP and setup', href: '/landing-v9/agents/' },
   { id: 'faq', label: 'Money and FAQ', href: '#faq' },
-  { id: 'join', label: 'Join the pilot', keys: 'j', href: '#join' },
+  { id: 'join', label: 'Join', keys: 'j', href: '#join' },
 ]
 
 // Shared header. One "Pause motion" switch stops every ambient loop on the page (WCAG 2.2.2).

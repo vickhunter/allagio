@@ -7,7 +7,7 @@ import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { example, faq, pilotLine, publisherAdvantages, surfaces } from '@/content'
+import { example, faq, joinLine, painLine, publisherAdvantages, publisherRuns } from '@/content'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
 import { DirectorySection } from '@/directory/Directory'
@@ -30,8 +30,8 @@ export function App() {
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-14 pt-10 md:pt-16 lg:grid-cols-[1fr_1.1fr]">
           <div className="anim-fade">
             <Badge variant="pub">For publishers · {publisherAdvantages.length} advantages</Badge>
-            <h1 id="hero-h" className="h-display mt-5 text-[42px] sm:text-6xl">The right offer,<br className="hidden sm:block" /> travelling to your page.</h1>
-            <p className="mt-5 max-w-lg text-lg leading-relaxed text-t2">A blog, an X account, a shop: the space you already have, earning per sale. Every step lands in one digest you can undo.</p>
+            <h1 id="hero-h" className="h-display mt-5 text-[42px] sm:text-6xl">Earn from more of your posts. Agents find offers that fit them.</h1>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-t2">From the content you already make. {painLine} You pick each step.</p>
             <div className="mt-7"><SignInChoice where="publishers_hero" only="publisher" /></div>
           </div>
           <LivePanel />
@@ -57,8 +57,8 @@ export function App() {
       <section id="how" aria-labelledby="how-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <p className="eyebrow">Where it runs</p>
-          <h2 id="how-h" className="h-display mt-3 text-3xl sm:text-4xl">Start with WordPress. X and Shopify are coming.</h2>
-          <div className="mt-10 grid gap-3 sm:grid-cols-3">{surfaces.map((s) => <div key={s.name} className="rounded-2xl border border-dashed border-line-strong p-5"><p className="font-mono text-xs text-t2">{s.status}</p><h3 className="mt-1 font-display text-lg font-semibold">{s.name}</h3><p className="mt-1 text-sm text-t2">{s.note}</p></div>)}</div>
+          <h2 id="how-h" className="h-display mt-3 text-3xl sm:text-4xl">WordPress is live. The others are planned.</h2>
+          <div className="mt-10 grid gap-3 sm:grid-cols-3">{publisherRuns.map((s) => <div key={s.name} className="rounded-2xl border border-dashed border-line-strong p-5"><p className="font-mono text-xs text-t2">{s.status}</p><h3 className="mt-1 font-display text-lg font-semibold">{s.name}</h3><p className="mt-1 text-sm text-t2">{s.note}</p></div>)}</div>
         </div>
       </section>
 
@@ -70,7 +70,7 @@ export function App() {
           <Accordion tone="pub" items={[faq[3], faq[1], faq[2], faq[4], faq[0]]} />
         </div>
       </section>
-      <JoinSection role="publisher" title="Get on the first train." sub={pilotLine} />
+      <JoinSection role="publisher" title="Get on the first train." sub={joinLine} />
     </Page>
   )
 }

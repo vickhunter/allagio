@@ -39,7 +39,7 @@ export function Footer() {
               <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href="/#how">How it works</a>
               <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/landing-v9/agents/', source)}>MCP and setup</a>
             </nav>
-            <p className="text-t2">Agents do the work. Humans get the results. Drawn and built in Padova.</p>
+            <p className="text-t2">Agents find, match and place. Humans get the results. Drawn and built in Padova.</p>
           </div>
           <div className="flex flex-col items-start gap-3 sm:items-end">
             <Blip say="Next stop: Prato della Valle." />

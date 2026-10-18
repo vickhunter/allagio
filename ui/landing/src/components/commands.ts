@@ -5,5 +5,5 @@ export const commands: Command[] = [
   { id: 'how', label: 'How it works', keys: 'h', href: '#how' },
   { id: 'checks', label: 'The 9 hard checks', href: '#checks' },
   { id: 'pricing', label: 'Pricing and money', href: '#faq' },
-  { id: 'join', label: 'Join the pilot', keys: 'j', href: '#join' },
+  { id: 'join', label: 'Join', keys: 'j', href: '#join' },
 ]

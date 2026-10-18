@@ -504,7 +504,10 @@ try {
       if (metrics.primary !== 1) throw new Error(slug + ' primary count ' + metrics.primary)
       const mcpHrefs = await page.getByRole('link', { name: 'MCP and setup' }).evaluateAll((links) => links.map((link) => link.getAttribute('href') || ''))
       if (!mcpHrefs.length || mcpHrefs.some((href) => !href.includes('/landing-v9/agents/') || !href.includes('source=cursor'))) throw new Error(slug + ' MCP href ' + mcpHrefs.join(','))
-      if (!(await page.getByText('Offer Rails is in an early pilot with a small group of makers and sites.').count())) throw new Error(slug + ' missing the plain pilot line')
+      const positioning = route === '/' ? /Affiliate marketing, evolved for agents/ : route === '/makers' ? /Pay only for sales/ : /Earn from more of your posts/
+      if (!(await page.getByRole('heading', { level: 1, name: positioning }).count())) throw new Error(slug + ' missing the positioning heading')
+      const spoken = await page.locator('body').innerText()
+      if (/\bads\b/i.test(spoken) || /revolution/i.test(spoken) || /\bpilot\b/i.test(spoken) || /every post/i.test(spoken)) throw new Error(slug + ' banned positioning word')
       if (route === '/') {
         if (!(await page.getByRole('heading', { name: 'From a product to a paid sale, in five steps.' }).count())) throw new Error('how it works bento missing')
         const folded = (await page.locator('main').innerText()).toLowerCase()
