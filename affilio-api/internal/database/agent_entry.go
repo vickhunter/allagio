@@ -316,7 +316,7 @@ type AgentAccount struct {
 	MakerID string
 }
 
-func (d *DB) CreateAgentOnlyAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey string) (AgentAccount, error) {
+func (d *DB) CreateAgentOnlyAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix string) (AgentAccount, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return AgentAccount{}, err
@@ -330,9 +330,15 @@ VALUES('https://offer-rails.agent',$1,$2,$3,$4,true,false) RETURNING id`, subjec
 	}
 	switch role {
 	case "publisher":
+		if pluginHash == "" || pluginPrefix == "" {
+			return AgentAccount{}, errors.New("plugin key required")
+		}
 		err = tx.QueryRow(ctx, `INSERT INTO sites(api_key_hash,api_key_prefix,domain,name) VALUES($1,$2,$3,$4) RETURNING id`, siteHash, sitePrefix, domain, name).Scan(&out.SiteID)
 		if err == nil {
 			_, err = tx.Exec(ctx, `UPDATE owners SET site_id=$2 WHERE id=$1`, out.OwnerID, out.SiteID)
+		}
+		if err == nil {
+			_, err = tx.Exec(ctx, `INSERT INTO plugin_keys(key_hash, key_prefix, site_id) VALUES($1,$2,$3)`, pluginHash, pluginPrefix, out.SiteID)
 		}
 	case "maker":
 		err = tx.QueryRow(ctx, `INSERT INTO makers(api_key,email,name) VALUES($1,$2,$3) RETURNING id`, makerKey, email, name).Scan(&out.MakerID)

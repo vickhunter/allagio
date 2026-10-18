@@ -115,6 +115,8 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 	public.POST("/oauth/token", h.Token)
 	public.GET("/auth/login", h.LoginStart)
 	public.GET("/auth/callback", h.LoginCallback)
+	public.GET("/device", h.DevicePage)
+	public.POST("/device", h.ownerSession, h.DeviceDecision)
 	owner := public.Group("/owner", h.ownerSession)
 	owner.GET("", h.Dashboard)
 	owner.POST("/accounts", h.OwnerAccount)
@@ -213,13 +215,17 @@ func (h *HostedHandler) LoginStart(c *gin.Context) {
 	}
 	returnTo := c.DefaultQuery("return_to", "/owner")
 	u, err := url.Parse(returnTo)
-	validPath := u != nil && (u.Path == "/owner" || u.Path == "/owner/products" || u.Path == "/owner/placements" || u.Path == "/owner/earnings" || u.Path == "/owner/settings" || u.Path == "/owner/review" || u.Path == "/owner/connect-site" || u.Path == "/oauth/authorize" || strings.HasPrefix(u.Path, "/owner/placements/") && uuidPattern.MatchString(strings.TrimPrefix(u.Path, "/owner/placements/")))
+	validPath := u != nil && (u.Path == "/owner" || u.Path == "/owner/products" || u.Path == "/owner/placements" || u.Path == "/owner/earnings" || u.Path == "/owner/settings" || u.Path == "/owner/review" || u.Path == "/owner/connect-site" || u.Path == "/oauth/authorize" || deviceSignInReturn(u) || strings.HasPrefix(u.Path, "/owner/placements/") && uuidPattern.MatchString(strings.TrimPrefix(u.Path, "/owner/placements/")))
 	if err != nil || !validPath || u.IsAbs() || u.Host != "" || u.Fragment != "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return
 	}
-	returnTo = mergeAttributionSource(returnTo, c.Query("source"))
-	returnTo = mergeDemoReferral(returnTo, c.Query("ref"), c.Query("via"))
+	if deviceSignInReturn(u) {
+		returnTo = deviceReturnPath(u.Query().Get("user_code"))
+	} else {
+		returnTo = mergeAttributionSource(returnTo, c.Query("source"))
+		returnTo = mergeDemoReferral(returnTo, c.Query("ref"), c.Query("via"))
+	}
 	if len(returnTo) > 8192 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return
