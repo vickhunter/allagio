@@ -102,18 +102,24 @@ function SuggestedCard({ program }: { program: UnverifiedProgram }) {
   )
 }
 
-function SuggestedGroup({ id, heading, programs }: { id: string; heading: string; programs: UnverifiedProgram[] }) {
+function GroupHeading({ level, id, children }: { level: 3 | 4; id: string; children: ReactNode }) {
+  const className = 'font-display text-lg font-bold'
+  if (level === 3) return <h3 id={id} className={className}>{children}</h3>
+  return <h4 id={id} className={className}>{children}</h4>
+}
+
+function SuggestedGroup({ id, heading, programs, level }: { id: string; heading: string; programs: UnverifiedProgram[]; level: 3 | 4 }) {
   if (!programs.length) return null
   return (
     <section aria-labelledby={id} className="mt-5">
-      <h4 id={id} className="font-display text-lg font-bold">{heading}</h4>
+      <GroupHeading level={level} id={id}>{heading}</GroupHeading>
       <p className="mt-1 text-[15px] leading-relaxed text-t1">{suggestedNote}</p>
       {programs.map((program) => <SuggestedCard key={program.program_url} program={program} />)}
     </section>
   )
 }
 
-function GroupsView({ preview, approveHref, statusId }: { preview: PreviewGroups; approveHref: string; statusId: string }) {
+function GroupsView({ preview, approveHref, statusId, titleLevel }: { preview: PreviewGroups; approveHref: string; statusId: string; titleLevel: 2 | 3 }) {
   const at = slotAfterBar(preview.slot || '')
   const offer = preview.verified[0]
   const rows: ReactNode[] = []
@@ -123,22 +129,24 @@ function GroupsView({ preview, approveHref, statusId }: { preview: PreviewGroups
       if (i === at) rows.push(<OfferCard key="offer" offer={offer} label={slotLabel(preview.slot || '')} />)
     }
   }
+  const titleClass = 'break-words font-display text-2xl font-bold tracking-tight'
+  const groupLevel = titleLevel === 2 ? 3 : 4
   return (
     <div>
-      <h3 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h3>
+      {titleLevel === 2 ? <h2 className={titleClass}>{preview.title}</h2> : <h3 className={titleClass}>{preview.title}</h3>}
       {offer && (
         <section aria-labelledby={`${statusId}-verified`} className="mt-4">
-          <h4 id={`${statusId}-verified`} className="font-display text-lg font-bold">Verified partners</h4>
+          <GroupHeading level={groupLevel} id={`${statusId}-verified`}>Verified partners</GroupHeading>
           <div className="mt-3 grid gap-2">{rows}</div>
         </section>
       )}
-      <SuggestedGroup id={`${statusId}-suggested`} heading="Suggested programs" programs={preview.suggested} />
+      <SuggestedGroup id={`${statusId}-suggested`} heading="Suggested programs" programs={preview.suggested} level={groupLevel} />
       {offer && <a href={approveHref} className={`${outlineClass} mt-4`}>Approve your placements</a>}
     </div>
   )
 }
 
-export function PostPreview() {
+export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
   const source = useSource()
   const id = useId()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -149,7 +157,7 @@ export function PostPreview() {
   const [preview, setPreview] = useState<PreviewGroups | null>(null)
   const [errorCode, setErrorCode] = useState<number | null>(null)
   const [readFailure, setReadFailure] = useState<ReadFailure | null>(null)
-  const [noted, setNoted] = useState(false)
+  const [note, setNote] = useState<'saved' | 'failed' | null>(null)
   const [paused, setPaused] = useState(false)
   const [pauseNonce, setPauseNonce] = useState(0)
   const approveHref = signInHref(roleReturn('publisher'), source)
@@ -173,7 +181,7 @@ export function PostPreview() {
     setPreview(null)
     setErrorCode(null)
     setReadFailure(null)
-    setNoted(false)
+    setNote(null)
   }
 
   async function onSubmit(event: FormEvent) {
@@ -231,8 +239,12 @@ export function PostPreview() {
 
   function notify() {
     // TODO: no notify endpoint exists. Keep the intent in this browser until one does.
-    try { storeNotifyIntent(window.localStorage, url.trim()) } catch { /* storage blocked; the confirmation still shows */ }
-    setNoted(true)
+    try {
+      storeNotifyIntent(window.localStorage, url.trim())
+      setNote('saved')
+    } catch {
+      setNote('failed')
+    }
   }
 
   return (
@@ -274,14 +286,15 @@ export function PostPreview() {
             <button type="button" onClick={tryAnother} className={`${outlineClass} mt-4`}>Try another URL</button>
           </div>
         )}
-        {phase === 'ready' && preview?.kind === 'groups' && <GroupsView preview={preview} approveHref={approveHref} statusId={id} />}
+        {phase === 'ready' && preview?.kind === 'groups' && <GroupsView preview={preview} approveHref={approveHref} statusId={id} titleLevel={titleLevel} />}
         {phase === 'ready' && preview?.kind === 'closest' && (
           <div>
-            <h3 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h3>
+            {titleLevel === 2 ? <h2 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h2> : <h3 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h3>}
             <p className="mt-3">{closestLead}</p>
-            <SuggestedGroup id={`${id}-closest`} heading="Closest programs" programs={preview.closest} />
-            <button type="button" onClick={notify} aria-pressed={noted} className={`${outlineClass} mt-4`}>{notifyLabel}</button>
-            {noted && <p className="mt-2">Saved in this browser.</p>}
+            <SuggestedGroup id={`${id}-closest`} heading="Closest programs" programs={preview.closest} level={titleLevel === 2 ? 3 : 4} />
+            <button type="button" onClick={notify} className={`${outlineClass} mt-4`}>{notifyLabel}</button>
+            {note === 'saved' && <p className="mt-2">Saved in this browser.</p>}
+            {note === 'failed' && <p className="mt-2">Couldn't save in this browser.</p>}
             <button type="button" onClick={tryAnother} className={`${outlineClass} mt-4`}>Try another URL</button>
           </div>
         )}

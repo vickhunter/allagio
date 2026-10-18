@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { fixtureBody } from './preview-map.mjs'
-import { adaptPreview, closestLead, groupsFixtureBody, includeUnverifiedFixture, notifyLabel, orderedNames, publicLinksNote, readFailureCopy, readNext, storeNotifyIntent, suggestedNote, unverifiedFixture } from './preview-groups.mjs'
+import { adaptPreview, closestLead, groupsFixtureBody, includeUnverifiedFixture, notifyLabel, notifyLimit, orderedNames, publicLinksNote, readFailureCopy, readNext, readNotifyIntent, storeNotifyIntent, suggestedNote, unverifiedFixture } from './preview-groups.mjs'
 
 function memory() {
   const data = new Map()
@@ -40,7 +40,15 @@ test('defaults an existing offer to verified and leaves the fixture out', () => 
   assert.equal(live.verified[0].name, 'Field Notes')
   assert.equal(live.suggested.length, 0)
   assert.equal(includeUnverifiedFixture(''), false)
-  assert.equal(includeUnverifiedFixture('?previewGroups=1'), true)
+  assert.equal(includeUnverifiedFixture('?previewGroups=1'), false)
+  assert.equal(includeUnverifiedFixture('?previewFixture=groups'), true)
+  const withFlag = adaptPreview({
+    title: 'Notes',
+    text: 'A pocket notebook',
+    offer: { name: 'Field Notes', summary: 'A pocket notebook for the habit.' },
+  }, { includeFixture: includeUnverifiedFixture('?previewGroups=1') })
+  assert.equal(withFlag.suggested.length, 0)
+  assert.equal(withFlag.closest.length, 0)
   const fromApi = adaptPreview({
     title: 'Notes',
     text: 'A pocket notebook',
@@ -58,6 +66,7 @@ test('defaults an existing offer to verified and leaves the fixture out', () => 
 test('names unreadable, private, and empty pages and never calls them no match', () => {
   const cases = [
     [{ title: 'Draft', error: 'fetch failed' }, 'unread', "We couldn't read that page."],
+    [{ result: 'unreadable_or_private', message: 'only public links work' }, 'unread', "We couldn't read that page."],
     [{ title: 'Draft', error: 'blocked address' }, 'private', 'That page is private.'],
     [{ title: 'Draft', text: '', offer: null }, 'empty', 'That page returned no text.'],
   ]
@@ -88,4 +97,28 @@ test('shows closest programs and stores a local notify intent when nothing match
   assert.deepEqual(saved, ['https://journal.example/start'])
   const again = storeNotifyIntent({ getItem: () => JSON.stringify(saved), setItem() {} }, 'https://journal.example/start')
   assert.deepEqual(again, saved)
+})
+
+test('drops go links and tracking params without caring about case, and strips userinfo', () => {
+  const grouped = adaptPreview({
+    title: 'Notes',
+    offers: [
+      { name: 'Outside Co', summary: 'Their own program.', verified: false, program_url: 'https://User:Secret@programs.example/outside?VIA=plugin&UTM_SOURCE=ad&Ref=home' },
+      { name: 'Go', summary: 'A go link.', verified: false, program_url: 'https://user:pass@offer-rails.example/V1/GO/abc' },
+      { name: 'Short', summary: 'A short go link.', verified: false, program_url: 'https://offer-rails.example/Go' },
+    ],
+  })
+  assert.deepEqual(grouped.suggested.map((item) => item.name), ['Outside Co'])
+  assert.equal(grouped.suggested[0].program_url, 'https://programs.example/outside')
+})
+
+test('keeps the newest notify urls and drops the oldest past the cap', () => {
+  const store = memory()
+  for (let i = 0; i < notifyLimit + 5; i += 1) storeNotifyIntent(store, `https://journal.example/${i}`)
+  storeNotifyIntent(store, 'https://journal.example/10')
+  const saved = readNotifyIntent(store)
+  assert.equal(saved.length, notifyLimit)
+  assert.equal(saved[0], 'https://journal.example/5')
+  assert.equal(saved.at(-1), 'https://journal.example/10')
+  assert.equal(saved.filter((url) => url === 'https://journal.example/10').length, 1)
 })
