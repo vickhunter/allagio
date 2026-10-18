@@ -165,6 +165,32 @@ func (h *HostedHandler) serveInstaller(c *gin.Context) {
 	c.FileAttachment(file, filepath.Base(file))
 }
 
+func landingMiss(path string) bool {
+	switch {
+	case strings.HasPrefix(path, "/v1"),
+		strings.HasPrefix(path, "/api"),
+		strings.HasPrefix(path, "/mcp"),
+		strings.HasPrefix(path, "/oauth"),
+		strings.HasPrefix(path, "/.well-known"),
+		strings.HasPrefix(path, "/downloads"),
+		strings.HasPrefix(path, "/assets"),
+		strings.HasPrefix(path, "/landing-v9"):
+		return false
+	default:
+		return true
+	}
+}
+
+func (h *HostedHandler) writeLandingNotFound(c *gin.Context) {
+	body := []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · Page not found</title></head><body><header><a href="/">Offer Rails</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main><h1>That page is not on Offer Rails.</h1><p>The address does not match a page on this site.</p><p><a href="/">Home</a></p><p><a href="/agents">Agents</a></p></main></body></html>`)
+	if h.AssetsPath != "" {
+		if file, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", "not-found", "index.html")); err == nil {
+			body = file
+		}
+	}
+	c.Data(http.StatusNotFound, "text/html; charset=utf-8", body)
+}
+
 func (h *HostedHandler) Home(c *gin.Context)           { h.landing(c, "home.html") }
 func (h *HostedHandler) Makers(c *gin.Context)         { h.landing(c, "makers.html") }
 func (h *HostedHandler) Publishers(c *gin.Context)     { h.landing(c, "publishers.html") }
