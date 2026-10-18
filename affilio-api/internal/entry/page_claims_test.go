@@ -77,6 +77,33 @@ func TestPageClaimsReadClientRenderedPages(t *testing.T) {
 	if reason != PageReasonCommission {
 		t.Fatalf("a script bundle must not satisfy the commission: %q", reason)
 	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<html><body><script>var x = \"</style>\"; var n = 20;</script><p>no number</p></body></html>"}, PageClaimInput{CommissionValue: 20})
+	if reason != PageReasonCommission {
+		t.Fatalf("a fake style closer inside a script must not leak the commission: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<html><body><script>var n = 20;<p>no number</p></body></html>"}, PageClaimInput{CommissionValue: 20})
+	if reason != PageReasonCommission {
+		t.Fatalf("an unclosed script must not supply the commission: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<html><body><script>var t = '<meta content=\"Northwind Ledger\" property=\"og:title\">';</script><div id=\"root\"></div></body></html>"}, in)
+	if reason != PageReasonCard {
+		t.Fatalf("a meta tag inside a script must not satisfy the card: %q", reason)
+	}
+	split := "<html><head><title>Northwind</title><meta name=\"description\" content=\"Ledger software for small publishers.\"></head><body><div id=\"root\"></div></body></html>"
+	reason, _ = checker.Check(PageDocument{OK: true, Body: split}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+	if reason != PageReasonCard {
+		t.Fatalf("a title and the next description must not join into the card name: %q", reason)
+	}
+	for _, body := range []string{
+		`<script type="application/ld+json">{"z":"Ledger","a":"Northwind"}</script>`,
+		`<script type="application/ld+json">{"a":"Northwind","z":"Ledger"}</script>`,
+	} {
+		first, _ := checker.Check(PageDocument{OK: true, Body: body}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+		second, _ := checker.Check(PageDocument{OK: true, Body: body}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+		if first != PageReasonCard || second != first {
+			t.Fatalf("json-ld values joined into the card name: %q then %q", first, second)
+		}
+	}
 }
 
 func clientRenderedNorthwind(price, commission string) string {

@@ -5,6 +5,7 @@ import (
 	"html"
 	"log"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -144,36 +145,42 @@ func normalizePage(raw string) string {
 }
 
 var (
-	pageDrop      = regexp.MustCompile(`(?is)<(script|style|noscript|template)\b[^>]*>.*?</(script|style|noscript|template)>`)
-	pageMeta      = regexp.MustCompile(`(?is)<meta\b[^>]*>`)
-	pageContent   = regexp.MustCompile(`(?i)\bcontent\s*=\s*("([^"]*)"|'([^']*)')`)
-	pageJSONLD    = regexp.MustCompile(`(?is)<script\b[^>]*\btype\s*=\s*["']application/ld\+json[^"']*["'][^>]*>(.*?)</script>`)
-	pageTitleText = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	pageMeta       = regexp.MustCompile(`(?is)<meta\b[^>]*>`)
+	pageContent    = regexp.MustCompile(`(?i)\bcontent\s*=\s*("([^"]*)"|'([^']*)')`)
+	pageTitleText  = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	pageJSONLDType = regexp.MustCompile(`(?i)(?:^|[\s/])type\s*=\s*(?:"application/ld\+json|'application/ld\+json|application/ld\+json\b)`)
 )
 
+// evidenceBreak keeps one extracted fragment from joining the next.
+// A title "Northwind" must not combine with a description that starts
+// "Ledger" into the card name "Northwind Ledger".
+const evidenceBreak = "\x00"
+
 // pageEvidence is the text a claim is compared with. Visible text is not
-// enough for a client-rendered page, so meta and Open Graph content,
-// JSON-LD values, and the extracted text are all included. A broken
-// JSON-LD block is kept as text. Nothing here panics.
+// enough for a client-rendered page, so meta and Open Graph content and
+// JSON-LD values are included as their own fragments. Script, style,
+// noscript, and template elements are removed first, through their own
+// closer or through the end of the document when that closer is missing.
+// A broken JSON-LD block is kept as one fragment. Nothing here panics.
 func pageEvidence(raw string) string {
-	return normalizePage(strings.Join([]string{
-		visiblePageText(raw),
-		metaPageText(raw),
-		jsonLDPageText(raw),
-	}, " "))
+	stripped := stripEmbedded(raw)
+	parts := []string{visiblePageText(stripped)}
+	parts = append(parts, metaParts(stripped)...)
+	parts = append(parts, jsonLDParts(raw)...)
+	return normalizePage(strings.Join(parts, evidenceBreak))
 }
 
-func visiblePageText(raw string) string {
-	return pageDrop.ReplaceAllString(raw, " ")
+func visiblePageText(stripped string) string {
+	stripped = pageTitleText.ReplaceAllString(stripped, " ")
+	return pageMeta.ReplaceAllString(stripped, " ")
 }
 
-func metaPageText(raw string) string {
-	var b strings.Builder
-	if match := pageTitleText.FindStringSubmatch(raw); match != nil {
-		b.WriteString(match[1])
-		b.WriteByte(' ')
+func metaParts(stripped string) []string {
+	var parts []string
+	if match := pageTitleText.FindStringSubmatch(stripped); match != nil {
+		parts = append(parts, match[1])
 	}
-	for _, tag := range pageMeta.FindAllString(raw, -1) {
+	for _, tag := range pageMeta.FindAllString(stripped, -1) {
 		match := pageContent.FindStringSubmatch(tag)
 		if match == nil {
 			continue
@@ -182,16 +189,18 @@ func metaPageText(raw string) string {
 		if content == "" {
 			content = match[3]
 		}
-		b.WriteString(html.UnescapeString(content))
-		b.WriteByte(' ')
+		parts = append(parts, html.UnescapeString(content))
 	}
-	return b.String()
+	return parts
 }
 
-func jsonLDPageText(raw string) string {
-	var b strings.Builder
-	for _, match := range pageJSONLD.FindAllStringSubmatch(raw, -1) {
-		payload := strings.TrimSpace(match[1])
+func jsonLDParts(raw string) []string {
+	var parts []string
+	for _, el := range embeddedElements(raw) {
+		if el.name != "script" || !pageJSONLDType.MatchString(el.openTag) {
+			continue
+		}
+		payload := strings.TrimSpace(el.body)
 		if payload == "" {
 			continue
 		}
@@ -199,32 +208,138 @@ func jsonLDPageText(raw string) string {
 		dec.UseNumber()
 		var value any
 		if err := dec.Decode(&value); err != nil {
-			b.WriteString(html.UnescapeString(payload))
-			b.WriteByte(' ')
+			parts = append(parts, html.UnescapeString(payload))
 			continue
 		}
-		writeJSONValues(&b, value)
+		parts = append(parts, jsonValueParts(value)...)
+	}
+	return parts
+}
+
+func jsonValueParts(value any) []string {
+	switch typed := value.(type) {
+	case string:
+		return []string{typed}
+	case json.Number:
+		return []string{typed.String()}
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		var parts []string
+		for _, key := range keys {
+			parts = append(parts, jsonValueParts(typed[key])...)
+		}
+		return parts
+	case []any:
+		var parts []string
+		for _, child := range typed {
+			parts = append(parts, jsonValueParts(child)...)
+		}
+		return parts
+	default:
+		return nil
+	}
+}
+
+type embeddedElement struct {
+	name    string
+	openTag string
+	body    string
+	start   int
+	next    int
+}
+
+func embeddedElements(raw string) []embeddedElement {
+	lower := strings.ToLower(raw)
+	var found []embeddedElement
+	for i := 0; i < len(raw); {
+		el, ok := nextEmbedded(raw, lower, i)
+		if !ok {
+			break
+		}
+		found = append(found, el)
+		if el.next <= i {
+			break
+		}
+		i = el.next
+	}
+	return found
+}
+
+func stripEmbedded(raw string) string {
+	lower := strings.ToLower(raw)
+	var b strings.Builder
+	for i := 0; i < len(raw); {
+		el, ok := nextEmbedded(raw, lower, i)
+		if !ok {
+			b.WriteString(raw[i:])
+			break
+		}
+		b.WriteString(raw[i:el.start])
+		if el.next <= el.start {
+			break
+		}
+		i = el.next
 	}
 	return b.String()
 }
 
-func writeJSONValues(b *strings.Builder, value any) {
-	switch typed := value.(type) {
-	case string:
-		b.WriteString(typed)
-		b.WriteByte(' ')
-	case json.Number:
-		b.WriteString(typed.String())
-		b.WriteByte(' ')
-	case map[string]any:
-		for _, child := range typed {
-			writeJSONValues(b, child)
-		}
-	case []any:
-		for _, child := range typed {
-			writeJSONValues(b, child)
+func nextEmbedded(raw, lower string, from int) (embeddedElement, bool) {
+	start, name := findEmbeddedOpen(lower, from)
+	if start < 0 {
+		return embeddedElement{}, false
+	}
+	gt := strings.IndexByte(raw[start:], '>')
+	if gt < 0 {
+		return embeddedElement{name: name, openTag: raw[start:], start: start, next: len(raw)}, true
+	}
+	openEnd := start + gt + 1
+	closer := "</" + name
+	rel := strings.Index(lower[openEnd:], closer)
+	if rel < 0 {
+		return embeddedElement{name: name, openTag: raw[start:openEnd], body: raw[openEnd:], start: start, next: len(raw)}, true
+	}
+	bodyEnd := openEnd + rel
+	after := bodyEnd + len(closer)
+	next := len(raw)
+	if gt2 := strings.IndexByte(raw[after:], '>'); gt2 >= 0 {
+		next = after + gt2 + 1
+	}
+	return embeddedElement{name: name, openTag: raw[start:openEnd], body: raw[openEnd:bodyEnd], start: start, next: next}, true
+}
+
+func findEmbeddedOpen(lower string, from int) (int, string) {
+	best := -1
+	bestName := ""
+	for _, name := range []string{"script", "style", "noscript", "template"} {
+		needle := "<" + name
+		pos := from
+		for pos < len(lower) {
+			rel := strings.Index(lower[pos:], needle)
+			if rel < 0 {
+				break
+			}
+			at := pos + rel
+			end := at + len(needle)
+			if end < len(lower) {
+				switch lower[end] {
+				case '>', ' ', '\t', '\n', '\r', '/':
+				default:
+					pos = at + len(needle)
+					continue
+				}
+			}
+			if best < 0 || at < best {
+				best = at
+				bestName = name
+			}
+			break
 		}
 	}
+	return best, bestName
 }
 
 func pageHasPhrase(page, phrase string) bool {
