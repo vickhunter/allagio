@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { DirectoryFailure, fixtureHeaders, getMember, listDirectory, makersUrl, memberRoute, memberUrl, parseItem, parseList, publishersUrl, wantsFixtures } from './client.mjs'
+import { DirectoryFailure, fixtureHeaders, getMember, httpsUrl, listDirectory, logoSrc, makersUrl, memberRoute, memberUrl, parseItem, parseList, publishersUrl, wantsFixtures } from './client.mjs'
 import { fixtureList, fixtureMember, testMakers, testPublishers } from './fixtures.mjs'
 import { agentPrompt, installCommand } from './prompt.mjs'
 
@@ -49,6 +49,16 @@ test('list URLs match the directory contract', () => {
   assert.equal(memberRoute('/makers/vibesales').slug, 'vibesales')
   assert.equal(memberRoute('/publishers/field-journal/').kind, 'publisher')
   assert.equal(memberRoute('/publishers/setup'), null)
+  assert.equal(memberRoute('/makers/%'), null)
+  assert.equal(memberRoute('/publishers/%E0%A4%A'), null)
+  assert.equal(httpsUrl('https://journal.example'), 'https://journal.example')
+  assert.equal(httpsUrl('http://journal.example'), null)
+  assert.equal(httpsUrl('javascript:alert(1)'), null)
+  assert.equal(httpsUrl('data:text/html,hi'), null)
+  assert.equal(logoSrc('https://journal.example/logo.png'), 'https://journal.example/logo.png')
+  assert.equal(logoSrc('/landing-v9/favicon.svg'), '/landing-v9/favicon.svg')
+  assert.equal(logoSrc('//evil.example/a.png'), null)
+  assert.equal(logoSrc('javascript:alert(1)'), null)
   assert.equal(wantsFixtures(), false)
   assert.deepEqual(fixtureHeaders(), {})
 })

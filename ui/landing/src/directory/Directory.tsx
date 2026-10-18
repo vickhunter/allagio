@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useSource, withSource } from '@/lib/source'
-import { getMember, listDirectory, memberRoute, wantsFixtures } from '@/directory/client.mjs'
+import { getMember, httpsUrl, listDirectory, logoSrc, memberRoute, wantsFixtures } from '@/directory/client.mjs'
 import { agentPrompt, installLead, installUrl } from '@/directory/prompt.mjs'
 import type { DirectoryCard, DirectoryKind } from '@/directory/types'
 
@@ -74,7 +74,7 @@ function MemberCard({ kind, item, source }: { kind: DirectoryKind; item: Directo
     <Card data-member className="p-5">
       <a href={profileHref(kind, item.slug, source)} className="flex min-h-11 min-w-0 flex-col gap-3">
         <span className="flex items-start gap-3">
-          <Mark name={item.name} logo={item.logo_url} />
+          <Mark name={item.name} logo={logoSrc(item.logo_url)} />
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2">
               <h3 className="font-display text-lg font-semibold">{item.name}</h3>
@@ -218,12 +218,13 @@ export function DirectoryDetail() {
     )
   }
   const groups = member.kind === 'maker' ? member.categories || [] : member.topics || []
+  const site = httpsUrl(member.url)
   return (
     <Page page={member.kind === 'publisher' ? 'publishers' : 'makers'}>
       <article data-directory-detail className="mx-auto max-w-3xl px-5 py-16 md:py-20">
         <p className="eyebrow">{member.kind === 'maker' ? 'Maker' : 'Publisher'}</p>
         <div className="mt-4 flex items-start gap-4">
-          <Mark name={member.name} logo={member.logo_url} />
+          <Mark name={member.name} logo={logoSrc(member.logo_url)} />
           <div className="min-w-0">
             <h1 className="h-display break-words text-4xl sm:text-5xl">{member.name}</h1>
             {member.verified ? <Badge variant="neutral" className="mt-3">Verified</Badge> : null}
@@ -233,7 +234,7 @@ export function DirectoryDetail() {
         <p className="mt-4 text-sm"><span className="text-t2">Languages </span>{member.languages.join(', ')}</p>
         <p className="mt-1 text-sm"><span className="text-t2">{member.kind === 'maker' ? 'Categories ' : 'Topics '}</span>{groups.join(', ')}</p>
         <p className="mt-1 text-sm">{countLine(member.kind, member)}</p>
-        <p className="mt-4 break-all text-sm"><a className="inline-flex min-h-11 items-center underline underline-offset-4" href={member.url}>{member.url}</a></p>
+        <p className="mt-4 break-all text-sm">{site ? <a className="inline-flex min-h-11 items-center underline underline-offset-4" href={site}>{member.url}</a> : member.url}</p>
       </article>
     </Page>
   )

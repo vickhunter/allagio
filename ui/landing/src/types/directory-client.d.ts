@@ -8,6 +8,8 @@ declare module '@/directory/client.mjs' {
   export function makersUrl(query?: Record<string, string | number | undefined>): string
   export function publishersUrl(query?: Record<string, string | number | undefined>): string
   export function memberUrl(kind: string, slug: string): string
+  export function httpsUrl(value: string | null | undefined): string | null
+  export function logoSrc(value: string | null | undefined): string | null
   export function memberRoute(pathname: string): { kind: 'maker' | 'publisher'; slug: string } | null
   export function listDirectory(kind: 'maker' | 'publisher', query?: Record<string, string | number | undefined>, fetchImpl?: typeof fetch): Promise<{
     items: Array<{

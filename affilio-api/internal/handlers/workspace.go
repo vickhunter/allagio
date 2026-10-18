@@ -190,7 +190,7 @@ func (h *HostedHandler) writeLandingNotFound(c *gin.Context) {
 }
 
 func (h *HostedHandler) directoryProfile(c *gin.Context) {
-	if c.Param("slug") == "setup" {
+	if c.Param("slug") == "setup" && strings.HasPrefix(c.Request.URL.Path, "/publishers/") {
 		h.PublisherSetup(c)
 		return
 	}

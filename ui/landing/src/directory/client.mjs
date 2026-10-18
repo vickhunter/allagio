@@ -52,11 +52,34 @@ export function memberUrl(kind, slug) {
   return '/v1/directory/' + kind + '/' + encodeURIComponent(slug)
 }
 
+export function httpsUrl(value) {
+  if (typeof value !== 'string' || value.length === 0) return null
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:') return null
+    return value
+  } catch {
+    return null
+  }
+}
+
+export function logoSrc(value) {
+  if (typeof value !== 'string' || value.length === 0) return null
+  if (value.startsWith('/') && !value.startsWith('//') && !value.includes('\\')) return value
+  return httpsUrl(value)
+}
+
 export function memberRoute(pathname) {
   const match = String(pathname || '').match(/^\/(makers|publishers)\/([^/]+)\/?$/)
   if (!match) return null
   if (match[1] === 'publishers' && match[2] === 'setup') return null
-  return { kind: match[1] === 'makers' ? 'maker' : 'publisher', slug: decodeURIComponent(match[2]) }
+  let slug
+  try {
+    slug = decodeURIComponent(match[2])
+  } catch {
+    return null
+  }
+  return { kind: match[1] === 'makers' ? 'maker' : 'publisher', slug }
 }
 
 function strings(value) {

@@ -50,6 +50,13 @@ func TestDirectoryUnknownSlugIs404(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Publisher setup") {
 		t.Fatalf("setup %d %s", rec.Code, rec.Body.String())
 	}
+	for _, path := range []string{"/makers/setup", "/makers/setup/"} {
+		makerSetup := httptest.NewRecorder()
+		r.ServeHTTP(makerSetup, httptest.NewRequest(http.MethodGet, path, nil))
+		if makerSetup.Code != http.StatusNotFound || strings.Contains(makerSetup.Body.String(), "Publisher setup") || !strings.Contains(makerSetup.Body.String(), marker) {
+			t.Fatalf("%s %d %s", path, makerSetup.Code, makerSetup.Body.String())
+		}
+	}
 
 	missing := &HostedHandler{AssetsPath: t.TempDir(), BaseURL: "http://127.0.0.1:8080"}
 	plain := gin.New()
