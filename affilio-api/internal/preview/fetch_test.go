@@ -456,6 +456,12 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 			_, _ = io.WriteString(w, `<html><body><main><p>`+strings.Repeat("word ", 90)+`A public note.</p><input type="password"></main></body></html>`)
 		case "/title-signin":
 			_, _ = io.WriteString(w, `<html><head><title>Browser title</title><meta property="og:title" content="Sign in"></head><body><main><p>A short public note about ceramic glaze.</p></main></body></html>`)
+		case "/no-head-title":
+			_, _ = io.WriteString(w, `<html><title>Sign in</title><body><main><p>A short public note about ceramic glaze.</p></main></body></html>`)
+		case "/no-head-empty":
+			_, _ = io.WriteString(w, `<html><title>Hello</title><body> </body></html>`)
+		case "/script-password":
+			_, _ = io.WriteString(w, `<html><body><script>var x = "</style><input type=\"password\">";</script><main><p>`+strings.Repeat("word ", 90)+`A public note.</p></main></body></html>`)
 		case "/long":
 			_, _ = io.WriteString(w, `<html><head><title>Notes</title></head><body><main><p>`+strings.Repeat("word ", 90)+`This article mentions login once.</p></main></body></html>`)
 		case "/bare":
@@ -487,7 +493,7 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 	if len(dialed) != 1 || dialed[0] != "203.0.113.10:80" {
 		t.Fatalf("html dialed %v", dialed)
 	}
-	for _, path := range []string{"/empty", "/login", "/password", "/login-meta", "/password-meta", "/form-login", "/noscript-login", "/mid-login", "/long-password", "/denied"} {
+	for _, path := range []string{"/empty", "/login", "/password", "/login-meta", "/password-meta", "/form-login", "/noscript-login", "/mid-login", "/long-password", "/no-head-empty", "/denied"} {
 		if _, err = plain.Fetch(context.Background(), "http://preview.example"+path); !errors.Is(err, ErrUnreadable) {
 			t.Fatalf("%s: %v", path, err)
 		}
@@ -499,6 +505,14 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 	signIn, err := plain.Fetch(context.Background(), "http://preview.example/title-signin")
 	if err != nil || signIn.Title != "Sign in" || !strings.Contains(signIn.Text, "A short public note about ceramic glaze.") {
 		t.Fatalf("og title sign in: %v %+v", err, signIn)
+	}
+	bareTitle, err := plain.Fetch(context.Background(), "http://preview.example/no-head-title")
+	if err != nil || !strings.Contains(bareTitle.Text, "A short public note about ceramic glaze.") {
+		t.Fatalf("title without a head: %v %+v", err, bareTitle)
+	}
+	scripted, err := plain.Fetch(context.Background(), "http://preview.example/script-password")
+	if err != nil || !strings.Contains(scripted.Text, "public note") {
+		t.Fatalf("password inside a script: %v %+v", err, scripted)
 	}
 	if _, err = plain.Fetch(context.Background(), "http://preview.example/gone"); !errors.Is(err, ErrFetch) {
 		t.Fatalf("html 404: %v", err)
