@@ -579,20 +579,23 @@ func (d *DB) AckPluginPlacement(ctx context.Context, id, siteID, action, reason 
 		if !ok {
 			return false, nil
 		}
-		pending := "plugin_wait='remove'"
+		gate := "plugin_wait='remove'"
 		if action == "placed" || action == "restored" {
-			pending = "plugin_wait IN ('', 'restore')"
+			gate = "status='committed' AND plugin_wait IN ('', 'restore')"
 		}
 		tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
 SET plugin_wait=$4, plugin_wait_at=$3, plugin_contact_at=$3, plugin_failed_reason='', failed_action='', restore_unconfirmed=false
-WHERE id=$1 AND site_id=$2 AND `+pending, id, siteID, at, wait)
+WHERE id=$1 AND site_id=$2 AND `+gate, id, siteID, at, wait)
 		return err == nil && tag.RowsAffected() == 1, err
 	case "failed":
 		tag, err := d.Pool.Exec(ctx, `UPDATE placement_proposals
 SET plugin_failed_reason=$4, plugin_contact_at=$3,
 failed_action=CASE WHEN plugin_wait='remove' THEN 'removed' ELSE 'restored' END,
 restore_unconfirmed=CASE WHEN plugin_wait='remove' THEN false ELSE true END
-WHERE id=$1 AND site_id=$2 AND plugin_wait IN ('', 'restore', 'remove')`, id, siteID, at, reason)
+WHERE id=$1 AND site_id=$2 AND (
+  plugin_wait='remove'
+  OR (status='committed' AND plugin_wait IN ('', 'restore'))
+)`, id, siteID, at, reason)
 		return err == nil && tag.RowsAffected() == 1, err
 	default:
 		return false, nil

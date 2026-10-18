@@ -1510,12 +1510,18 @@ func (h *AgentEntry) PluginAck(c *gin.Context) {
 		writePluginAckForbidden(c, "wrong_site", "This placement is not on this site.", "placement is not on this site")
 		return
 	}
+	wait, _, _, _, _, waitErr := h.DB.PlacementPlugin(c.Request.Context(), placement.ID)
+	if waitErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
+		return
+	}
+	// A pending or approved row is not live. Refuse before rel_sponsored and
+	// one_per_post so the caller sees not_committed rather than a later check.
+	if entry.PluginAckNeedsCommit(req.Action, wait, placement.Status) {
+		writeNamedConflict(c, "not_committed")
+		return
+	}
 	if req.Action == "placed" || req.Action == "restored" {
-		wait, _, _, _, _, waitErr := h.DB.PlacementPlugin(c.Request.Context(), placement.ID)
-		if waitErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "acknowledgement failed"})
-			return
-		}
 		if (wait == "" || wait == "restore") && !req.RelSponsored {
 			writeCheckDenied(c, []string{"rel_sponsored"})
 			return

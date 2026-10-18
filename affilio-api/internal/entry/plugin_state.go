@@ -20,6 +20,25 @@ func VerifiedPluginWait(action string) (string, bool) {
 	}
 }
 
+// PluginAckNeedsCommit reports that this acknowledgement would record an insert
+// or a re-insert. Those are allowed only after the placement is committed.
+// A removal acknowledgement, including a failed removal, stays available after
+// undo, when the placement is revoked and plugin_wait is remove.
+func PluginAckNeedsCommit(action, wait, status string) bool {
+	switch action {
+	case "placed", "restored":
+		return status != "committed"
+	case "failed":
+		if wait == "remove" {
+			return false
+		}
+		if wait == "" || wait == "restore" {
+			return status != "committed"
+		}
+	}
+	return false
+}
+
 // PluginState reports the plugin's view of one placement.
 // A brand-new placement, a restore, and a removal stay pending until the site
 // key acknowledges them. Any of those with no ack after the window is offline.
@@ -59,6 +78,7 @@ func PluginRetryDoc() string {
 		"A committed placement does not expire. The 7-day window applies only to a placement that was prepared and never committed. The offline timer starts when the plugin is asked to act (`plugin_wait_at`), not when the placement is created. A null `plugin_wait_at` stays `pending`.\n\n" +
 		"The plugin refuses a placement locally, before it sends a receipt, with `POST /v1/placements/:id/refuse` and the site `X-API-Key`. The body is `{\"reason\":\"...\"}` and `reason` is required. The placement returns to `pending` with `publication_status` `refused`, the same open state as a refused receipt. The tracked link stays when a receipt already exists. That row no longer counts as the box, so the next prepare on the post returns a new box and does not return 409 `one_per_post`. Calling refuse again returns 200 and says already refused. A missing id is 404. When the update changes no row, the response is the current state: a receipt that landed as publisher_reported stays committed and returns 409 `receipt_recorded`, and does not claim the placement was refused. A receipt that already reported publication stays `committed` and this route returns 409 `receipt_recorded`. A maker key is not accepted.\n\n" +
 		"`POST /v1/placements/:id/plugin-ack` authenticates with `X-Plugin-Key`. `X-API-Key`, a project key, an account key, an agent key, a maker key, and a session receive 403. `action` is `placed`, `removed`, `restored`, or `failed`. The body always includes `rel_sponsored`, the boolean the plugin read from the post. `action: placed` and `action: restored` require `rel_sponsored: true`. Disclosure words do not satisfy it. A false value returns 422 `rel_sponsored` and does not set `placed`. `action: placed` is the first insert and the upgrade ack for a box that is already in the post. `action: restored` is the ack after the plugin puts the block back. `failed` also sends `reason`.\n\n" +
+		"`placed`, `restored`, and a `failed` acknowledgement of an insert or a re-insert return 409 `not_committed` until the placement status is `committed`. Approval alone is not enough. The row is left unchanged. A removal acknowledgement (`removed`, or `failed` while the plugin was asked to remove) stays available after undo. `nothing_to_ack` is only for an action that is not waiting.\n\n" +
 		"A receipt's published text may contain `/go/<placement_id>` or `/v1/go/<placement_id>`. The stored receipt link stays `/v1/go/<placement_id>`. A HEAD check of the offer URL treats 403 and 405 as up. A network error, 404, 410, or 5xx is down. A live `GET /v1/go/<placement_id>` still redirects to the offer URL with the ref and records one click when that probe is down. It does not send the reader to the article.\n\n" +
 		"A bare `/v1/go/<code>` records a hit only when exactly one placement on that campaign counts as live. Zero or two or more redirect to the plain offer URL and record no hit.\n\n" +
 		"Saving setup never overwrites a mode that is already stored. While the claim check is a stub, the response `mode` is `manual` with `approval_reason` `claim_check_unavailable` and `approval_message`, and the stored mode stays `auto` or `yolo`. Pause and resume return `effective_mode`, `approval_reason`, and `approval_message` the same way. Each account-digest project includes `total_items`, the count of every item, while `items` stays capped at 50.\n"

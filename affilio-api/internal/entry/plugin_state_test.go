@@ -5,6 +5,36 @@ import (
 	"time"
 )
 
+func TestPluginAckNeedsCommit(t *testing.T) {
+	cases := []struct {
+		action, wait, status string
+		needs                bool
+	}{
+		{"placed", "", "pending", true},
+		{"placed", "", "approved", true},
+		{"placed", "", "committed", false},
+		{"placed", "remove", "revoked", true},
+		{"restored", "", "pending", true},
+		{"restored", "restore", "approved", true},
+		{"restored", "restore", "committed", false},
+		{"failed", "", "pending", true},
+		{"failed", "", "approved", true},
+		{"failed", "restore", "approved", true},
+		{"failed", "", "committed", false},
+		{"failed", "restore", "committed", false},
+		{"failed", "remove", "revoked", false},
+		{"failed", "remove", "pending", false},
+		{"removed", "", "pending", false},
+		{"removed", "remove", "revoked", false},
+		{"nope", "", "pending", false},
+	}
+	for _, tc := range cases {
+		if got := PluginAckNeedsCommit(tc.action, tc.wait, tc.status); got != tc.needs {
+			t.Fatalf("%s %s %s: got %v", tc.action, tc.wait, tc.status, got)
+		}
+	}
+}
+
 func TestPluginState(t *testing.T) {
 	now := time.Date(2026, 10, 10, 4, 0, 0, 0, time.UTC)
 	window := 10 * time.Minute

@@ -105,6 +105,9 @@ func TestReviewYoloEnforcesCapMinAndIgnoresCaller(t *testing.T) {
 	}
 
 	api.Claims = entry.LiveClaimChecker{}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, ignored); err != nil {
+		t.Fatal(err)
+	}
 	undo, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+ignored+"/revoke", map[string]any{"reason": "undo"}, siteKey)
 	if undo.Code != http.StatusOK {
 		t.Fatalf("undo: %d %s", undo.Code, undo.Body.String())
@@ -195,6 +198,9 @@ VALUES($1,'or_plug',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 		}
 	}
 	pluginKey := issuePluginKey(t, db, siteID, "review-plugin-only")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, ackID); err != nil {
+		t.Fatal(err)
+	}
 	acked, ackBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+ackID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if acked.Code != http.StatusOK || ackBody["plugin_state"] != "placed" {
 		t.Fatalf("site ack: %d %s", acked.Code, acked.Body.String())

@@ -1,3 +1,7 @@
+## October 18 — Plugin ack waits until the placement is committed
+
+`POST /v1/placements/:id/plugin-ack` with `X-Plugin-Key` returns 409 `not_committed` for `placed`, `restored`, and a `failed` insert or re-insert while the placement is still `pending` or `approved`. The row stays as it was: `plugin_wait` is not set to `placed`, and a failure reason is not stored. The same call returns 200 only after the placement is `committed`. A removal acknowledgement still returns 200 while the placement is `revoked` and the plugin was asked to remove, including `failed` with `failed_action` `removed`. An action that is not waiting still returns 409 `nothing_to_ack`. A second committed box on the same post still returns 422 `one_per_post`. No new migration. The agents page is unchanged.
+
 ## October 18 — Agent sites can go live without a browser session
 
 `GET /device` is the device-code page `POST /v1/device/code` already pointed at. A signed-in human approves or denies the user code for a site or offer on their account. Someone who is not signed in is sent to `/auth/login` and back to `/device`. The return path accepts `/device` and one `user_code` query, and nothing else. Approving gives the polling agent a project key. It does not approve a placement.
