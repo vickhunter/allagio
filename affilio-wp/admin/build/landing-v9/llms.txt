@@ -22,7 +22,7 @@ Untested. The Cursor client was not run against the hosted MCP server.
 
 claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp
 
-Checked. Sign in with Google when Claude Code asks. Tested: add and remove. The sign-in step is being fixed.
+Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.
 
 ### VS Code
 

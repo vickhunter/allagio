@@ -141,7 +141,7 @@ export function App() {
             ))}
           </div>
         </nav>
-        <div className="min-w-0 px-5 pb-16 pt-6 md:pt-12">
+        <div className="min-w-0 px-5 pb-8 pt-6 md:pt-12">
           <section id="agents-hero" aria-labelledby="agents-h" className={sectionClass}>
             <p className="eyebrow">MCP server</p>
             <h1 id="agents-h" className="h-display mt-3 text-[40px] sm:text-6xl">Find an offer, preview the page, place it.</h1>

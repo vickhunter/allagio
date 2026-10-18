@@ -117,7 +117,7 @@
     "forbidden": false,
     "steps": 0,
     "ordered": 11,
-    "height": 6963,
+    "height": 6987,
     "headings": [],
     "soon": [
       "preview_page",
@@ -144,7 +144,7 @@
     "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",
     "tabLabels": [
       "Cursor · untested",
-      "Claude Code",
+      "Claude Code · untested",
       "VS Code · untested",
       "Windsurf · untested",
       "Generic"
@@ -412,7 +412,7 @@
     "forbidden": false,
     "steps": 0,
     "ordered": 11,
-    "height": 4764,
+    "height": 4732,
     "headings": [],
     "soon": [
       "preview_page",
@@ -439,7 +439,7 @@
     "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",
     "tabLabels": [
       "Cursor · untested",
-      "Claude Code",
+      "Claude Code · untested",
       "VS Code · untested",
       "Windsurf · untested",
       "Generic"

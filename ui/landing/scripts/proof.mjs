@@ -237,7 +237,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   const llmsType = llms.headers.get('content-type') || ''
   const llmsBody = await llms.text()
   if (llms.status !== 200 || !llmsType.includes('text/plain')) throw new Error('llms ' + llms.status + ' ' + llmsType)
-  for (const needle of ['https://offer-rails.onrender.com/mcp', 'find_opportunities', 'preview_page', 'get_digest', 'register_product', 'get_earnings', 'list_listings', '/landing-v9/agents/', 'POST /v1/agent-accounts', 'What an agent can do alone today', 'The browser step needs a human sign-in', 'POST /v1/maker/sales', 'POST /v1/maker/refunds', 'Placing an offer needs approval for now', 'This server needs a Google sign-in today', 'Keys from /v1/agent-accounts work on the REST API only', 'claude mcp add --scope user --transport http offer-rails', '"serverUrl":"https://offer-rails.onrender.com/mcp"', '## Tell your agent', '## Ordered agent steps', '/docs/modes.md', 'Publisher request:', 'urn:ietf:params:oauth:grant-type:device_code', 'Join returns tracked_link /v1/go/<tracking_code>', '422 claims_from_offer', '10 to 2000 characters', '409 receipt_mismatch', 'Refunds take no click_id', 'Tested: add and remove']) {
+  for (const needle of ['https://offer-rails.onrender.com/mcp', 'find_opportunities', 'preview_page', 'get_digest', 'register_product', 'get_earnings', 'list_listings', '/landing-v9/agents/', 'POST /v1/agent-accounts', 'What an agent can do alone today', 'The browser step needs a human sign-in', 'POST /v1/maker/sales', 'POST /v1/maker/refunds', 'Placing an offer needs approval for now', 'This server needs a Google sign-in today', 'Keys from /v1/agent-accounts work on the REST API only', 'claude mcp add --scope user --transport http offer-rails', '"serverUrl":"https://offer-rails.onrender.com/mcp"', '## Tell your agent', '## Ordered agent steps', '/docs/modes.md', 'Publisher request:', 'urn:ietf:params:oauth:grant-type:device_code', 'Join returns tracked_link /v1/go/<tracking_code>', '422 claims_from_offer', '10 to 2000 characters', '409 receipt_mismatch', 'Refunds take no click_id', 'sign-in to the hosted MCP server is not working yet']) {
     if (!llmsBody.includes(needle)) throw new Error('llms missing ' + needle)
   }
   if (!/GET \/device/.test(llmsBody)) throw new Error('llms does not name GET /device')
@@ -294,7 +294,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   const tabLabels = []
   for (const spec of [
     { name: 'Cursor', untested: true },
-    { name: 'Claude Code', untested: false },
+    { name: 'Claude Code', untested: true },
     { name: 'VS Code', untested: true },
     { name: 'Windsurf', untested: true },
     { name: 'Generic', untested: false },
@@ -347,7 +347,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   if (!genericPanel.includes('401 no bearer token') || genericPanel.includes('Untested')) throw new Error('agents-' + width + ' generic panel ' + genericPanel)
   await page.getByRole('tab', { name: 'Claude Code' }).click()
   const claudePanel = await page.locator('#install-panel-claude').innerText()
-  if (!claudePanel.includes('Sign in with Google when Claude Code asks') || !claudePanel.includes('Tested: add and remove') || !claudePanel.includes('The sign-in step is being fixed') || claudePanel.includes('Needs authentication') || claudePanel.includes('Untested')) throw new Error('agents-' + width + ' claude panel ' + claudePanel)
+  if (!claudePanel.startsWith('Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.') || claudePanel.includes('Needs authentication') || claudePanel.includes('Tested: add and remove')) throw new Error('agents-' + width + ' claude panel ' + claudePanel)
   const pageText = await page.evaluate(() => document.body.textContent || '')
   for (const needle of ['Join returns tracked_link /v1/go/<tracking_code>', 'surface_url must be on the domain you signed up with', '422 claims_from_offer', '10 to 2000 characters', '409 receipt_mismatch', 'Refunds take no click_id', 'amount_refunded_minor or full:true', 'Keys from /v1/agent-accounts work on the REST API only']) {
     if (!pageText.includes(needle)) throw new Error('agents-' + width + ' missing ' + needle)
@@ -370,6 +370,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   })
   await page.screenshot({ path: join(outDir, 'agents-tell-' + width + '.png') })
   if (covered.overlap) throw new Error('agents-' + width + ' header covers tell ' + JSON.stringify(covered))
+  await page.getByRole('tab', { name: 'Claude Code' }).click()
   await page.locator('#on-this-page a[href="#install"]').click()
   await page.screenshot({ path: join(outDir, 'agents-install-' + width + '.png') })
   await context.close()
