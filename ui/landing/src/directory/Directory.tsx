@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useSource, withSource } from '@/lib/source'
 import { getMember, listDirectory, memberRoute, wantsFixtures } from '@/directory/client.mjs'
-import { agentPrompt } from '@/directory/prompt.mjs'
+import { agentPrompt, installLead, installUrl } from '@/directory/prompt.mjs'
 import type { DirectoryCard, DirectoryKind } from '@/directory/types'
 
 type View = 'loading' | 'empty' | 'nomatch' | 'results'
@@ -56,7 +56,7 @@ function AddYours({ source }: { source: string }) {
     <div className="mt-8 max-w-3xl rounded-2xl border border-line bg-s1 p-5">
       <h3 className="font-display text-lg font-semibold">Add your site</h3>
       <p className="mt-2 text-sm leading-relaxed text-t2">Paste this to an agent. It uses the install command from the agents page.</p>
-      <pre className="mt-4 whitespace-pre-wrap break-all rounded-xl border border-line bg-s0 p-4 font-mono text-sm leading-relaxed text-t1">{agentPrompt}</pre>
+      <pre className="mt-4 min-w-0 whitespace-pre-wrap break-normal rounded-xl border border-line bg-s0 p-4 font-mono text-sm leading-relaxed text-t1">{'Add my site to the Offer Rails directory\n'}{installLead}<span className="[overflow-wrap:anywhere]">{installUrl}</span></pre>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button type="button" variant="outline" onClick={() => {
           navigator.clipboard.writeText(agentPrompt).then(() => setCopied(true)).catch(() => setCopied(false))
@@ -137,7 +137,7 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
     <section id="directory" aria-labelledby="directory-h" data-directory-view={view} data-directory-kind={kind} className="border-t border-line">
       <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <h2 id="directory-h" className="h-display text-3xl sm:text-4xl">{kind === 'maker' ? 'Makers on Offer Rails' : 'Publishers on Offer Rails'}</h2>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">Sites that added themselves. Offer Rails does not invent members.</p>
+        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">Sites add themselves through their AI agent. Each one is listed by its owner.</p>
         {preview ? <p className="mt-4 inline-flex min-h-11 items-center rounded-md border border-line-strong bg-s2 px-3 font-mono text-sm text-t1">TEST data</p> : null}
         <form className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end" onSubmit={(event) => { event.preventDefault(); load(draft, '', false) }}>
           <label className="block text-sm font-semibold" htmlFor="directory-q">Search
@@ -152,7 +152,7 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
           <Button type="submit" variant="outline">Search</Button>
         </form>
         {view === 'loading' ? <p className="mt-8 text-t2" role="status">Loading the directory.</p> : null}
-        {view === 'empty' ? <p className="mt-8 text-t1" role="status">No sites are in the directory yet.</p> : null}
+        {view === 'empty' ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers listed yet. Yours can be first.' : 'No publishers listed yet. Yours can be first.'}</p> : null}
         {view === 'nomatch' ? <p className="mt-8 text-t1" role="status">No sites match this search.</p> : null}
         {view === 'results' ? (
           <>

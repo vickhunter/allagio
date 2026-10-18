@@ -48,6 +48,8 @@ declare module '@/directory/client.mjs' {
 }
 
 declare module '@/directory/prompt.mjs' {
+  export const installUrl: string
+  export const installLead: string
   export const installCommand: string
   export const agentPrompt: string
 }

@@ -159,7 +159,26 @@ try {
     await page.locator('#directory').screenshot({ path: join(shots, `d060-makers-list-${width}.png`) })
 
     await page.goto(base + '/makers/', { waitUntil: 'networkidle' })
-    await page.locator('#directory').getByText('No sites are in the directory yet.').waitFor()
+    await page.locator('#directory').getByText('No makers listed yet. Yours can be first.').waitFor()
+    const intact = await page.evaluate(() => {
+      const pre = document.querySelector('#directory pre')
+      if (!pre) return false
+      const whole = (word) => {
+        const walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT)
+        let node
+        while ((node = walker.nextNode())) {
+          const index = node.textContent.indexOf(word)
+          if (index < 0) continue
+          const range = document.createRange()
+          range.setStart(node, index)
+          range.setEnd(node, index + word.length)
+          return range.getClientRects().length === 1
+        }
+        return false
+      }
+      return whole('directory') && whole('transport')
+    })
+    if (!intact) throw new Error('prompt breaks a word at ' + width)
     if (await page.locator('#directory [data-member]').count()) throw new Error('empty makers showed a member')
     const directory = page.locator('#directory')
     await directory.getByRole('button', { name: 'Copy prompt' }).click()
@@ -194,6 +213,8 @@ try {
     await check(page, '404-' + width)
     await page.screenshot({ path: join(shots, `d060-404-${width}.png`), fullPage: true })
 
+    await page.goto(base + '/publishers/', { waitUntil: 'networkidle' })
+    await page.locator('#directory').getByText('No publishers listed yet. Yours can be first.').waitFor()
     await page.goto(base + '/publishers/?directoryFixtures=1', { waitUntil: 'networkidle' })
     await page.locator('#directory').getByRole('heading', { name: 'Publishers on Offer Rails' }).waitFor()
     await page.locator('#directory').getByText('TEST Field Journal').waitFor()
