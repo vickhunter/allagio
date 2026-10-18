@@ -23,7 +23,7 @@ function hosted(name) {
 }
 
 const agentsHtml = hosted('agents/index.html')
-const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html'), '/publishers/setup': page('publishers-setup.html'), '/publishers/setup/': page('publishers-setup.html'), '/protocol': page('protocol.html'), '/protocol/': page('protocol.html'), '/privacy': hosted('privacy/index.html'), '/privacy/': hosted('privacy/index.html'), '/terms': hosted('terms/index.html'), '/terms/': hosted('terms/index.html'), '/landing-v9/agents': agentsHtml, '/landing-v9/agents/': agentsHtml, '/landing-v9/agents/index.html': agentsHtml }
+const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html'), '/publishers/setup': page('publishers-setup.html'), '/publishers/setup/': page('publishers-setup.html'), '/protocol': page('protocol.html'), '/protocol/': page('protocol.html'), '/privacy': hosted('privacy/index.html'), '/privacy/': hosted('privacy/index.html'), '/terms': hosted('terms/index.html'), '/terms/': hosted('terms/index.html'), '/agents': agentsHtml, '/agents/': agentsHtml, '/landing-v9/agents': agentsHtml, '/landing-v9/agents/': agentsHtml, '/landing-v9/agents/index.html': agentsHtml }
 
 function typeFor(file) {
   if (file.endsWith('.css')) return 'text/css; charset=utf-8'
@@ -47,11 +47,6 @@ const server = createServer((req, res) => {
   if (path === '/llms.txt') {
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' })
     res.end(readFileSync(join(build, 'landing-v9/llms.txt')))
-    return
-  }
-  if (path === '/agents' || path === '/agents/') {
-    res.writeHead(302, { location: '/landing-v9/agents/' })
-    res.end()
     return
   }
   if (path === '/auth/login') {
@@ -247,12 +242,14 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   if (llmsBody.includes('cursor.com/en/install-mcp') || llmsBody.includes('## No-browser account') || llmsBody.includes('## Device code') || llmsBody.includes('register_product through submit_offer') || llmsBody.includes('Needs authentication')) throw new Error('llms still repeats an old section')
   if (/grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i.test(llmsBody.replaceAll('/v1/marketplace/', '/v1/offer-join/'))) throw new Error('llms has forbidden wording')
   const alias = await fetch(origin + '/agents', { redirect: 'manual' })
-  const location = alias.headers.get('location') || ''
-  if (alias.status !== 302 || location !== '/landing-v9/agents/') throw new Error('agents alias ' + alias.status + ' ' + location)
+  const aliasBody = await alias.text()
+  if (alias.status !== 200 || aliasBody !== agentsHtml) throw new Error('agents page ' + alias.status)
+  const staticCopy = await fetch(origin + '/landing-v9/agents/')
+  if ((await staticCopy.text()) !== agentsHtml) throw new Error('agents static copy differs from /agents')
   const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] })
   const page = await context.newPage()
   await page.goto(origin + '/agents', { waitUntil: 'networkidle' })
-  if (!page.url().endsWith('/landing-v9/agents/')) throw new Error('alias landed on ' + page.url())
+  if (!page.url().endsWith('/agents')) throw new Error('agents landed on ' + page.url())
   const facts = await page.evaluate(() => {
     const text = document.body.innerText
     const small = [...document.querySelectorAll('a, button')].filter((el) => {

@@ -137,6 +137,29 @@ func TestRepoDraftPagesSendNoindexAndDraftLine(t *testing.T) {
 			t.Fatalf("%s body missing draft line", path)
 		}
 	}
+	agentsBody, err := os.ReadFile(filepath.Join(dir, "landing-v9", "agents", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var served string
+	for _, path := range []string{"/agents", "/agents/", "/landing-v9/agents/"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		if rec.Header().Get("X-Robots-Tag") != "" {
+			t.Fatalf("%s X-Robots-Tag %q", path, rec.Header().Get("X-Robots-Tag"))
+		}
+		if rec.Body.String() != string(agentsBody) {
+			t.Fatalf("%s is not landing-v9/agents/index.html", path)
+		}
+		if served == "" {
+			served = rec.Body.String()
+		} else if rec.Body.String() != served {
+			t.Fatalf("%s body differs from /agents", path)
+		}
+	}
 }
 
 func TestLegalPagesNoindexUntilApproved(t *testing.T) {
