@@ -60,6 +60,36 @@ test('llms.txt matches the agent facts', () => {
   assert.equal(banned.test(withoutOfferJoin(text)), false)
 })
 
+test('ordered steps name the hosted join, prepare, receipt, and sale bodies', () => {
+  const text = llmsText()
+  const step = (n) => orderedSteps.find((item) => item.n === n)
+  for (const n of [3, 4, 7, 10]) {
+    const item = step(n)
+    assert.equal(item.line, item.body)
+    assert.match(text, new RegExp(item.body.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  }
+  assert.match(step(3).body, /List offers with GET \/v1\/marketplace\/offers \(X-API-Key\)/)
+  assert.match(step(3).body, /Join returns tracked_link \/v1\/go\/<tracking_code>/)
+  assert.match(step(4).body, /surface_url must be on the domain you signed up with/)
+  assert.match(step(4).body, /at most 140 characters/)
+  assert.match(step(4).body, /422 claims_from_offer/)
+  assert.match(step(7).body, /surface_url, published_text, and evidence \(10 to 2000 characters\), sent only after commit/)
+  assert.match(step(7).body, /tracked link from commit \(\/v1\/go\/<placement_id>\); otherwise 409 receipt_mismatch/)
+  assert.equal(step(7).body.includes('and /go/<placement_id>'), false)
+  assert.match(step(10).body, /click_id \(the via value\), event_id, object_id, amount_minor, currency, occurred_at optional RFC3339/)
+  assert.match(step(10).body, /amount_refunded_minor or full:true/)
+  assert.match(step(10).body, /Refunds take no click_id/)
+  assert.match(step(10).body, /maker who owns the clicked offer, or the server answers 404/)
+  assert.match(signInNote, /Keys from \/v1\/agent-accounts work on the REST API only\. \/mcp needs the Google sign-in\./)
+  assert.match(text, /Keys from \/v1\/agent-accounts work on the REST API only/)
+  const claude = installs.find((item) => item.id === 'claude')
+  assert.equal(claude.tested, true)
+  assert.equal(claude.proof, 'Checked. Sign in with Google when Claude Code asks. Tested: add and remove. The sign-in step is being fixed.')
+  assert.equal(claude.snippet, 'claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp')
+  assert.equal(text.includes('Needs authentication'), false)
+  assert.equal(JSON.stringify(orderedSteps).includes('Needs authentication'), false)
+})
+
 test('only page preview and digest are coming soon', () => {
   assert.deepEqual(tools.filter((tool) => tool.soon).map((tool) => tool.name), ['preview_page', 'get_digest'])
 })

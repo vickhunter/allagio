@@ -237,14 +237,14 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   const llmsType = llms.headers.get('content-type') || ''
   const llmsBody = await llms.text()
   if (llms.status !== 200 || !llmsType.includes('text/plain')) throw new Error('llms ' + llms.status + ' ' + llmsType)
-  for (const needle of ['https://offer-rails.onrender.com/mcp', 'find_opportunities', 'preview_page', 'get_digest', 'register_product', 'get_earnings', 'list_listings', '/landing-v9/agents/', 'POST /v1/agent-accounts', 'What an agent can do alone today', 'The browser step needs a human sign-in', 'POST /v1/maker/sales', 'POST /v1/maker/refunds', 'Placing an offer needs approval for now', 'This server needs a Google sign-in today', 'claude mcp add --scope user --transport http offer-rails', '"serverUrl":"https://offer-rails.onrender.com/mcp"', '## Tell your agent', '## Ordered agent steps', '/docs/modes.md', 'Publisher request:', 'urn:ietf:params:oauth:grant-type:device_code']) {
+  for (const needle of ['https://offer-rails.onrender.com/mcp', 'find_opportunities', 'preview_page', 'get_digest', 'register_product', 'get_earnings', 'list_listings', '/landing-v9/agents/', 'POST /v1/agent-accounts', 'What an agent can do alone today', 'The browser step needs a human sign-in', 'POST /v1/maker/sales', 'POST /v1/maker/refunds', 'Placing an offer needs approval for now', 'This server needs a Google sign-in today', 'Keys from /v1/agent-accounts work on the REST API only', 'claude mcp add --scope user --transport http offer-rails', '"serverUrl":"https://offer-rails.onrender.com/mcp"', '## Tell your agent', '## Ordered agent steps', '/docs/modes.md', 'Publisher request:', 'urn:ietf:params:oauth:grant-type:device_code', 'Join returns tracked_link /v1/go/<tracking_code>', '422 claims_from_offer', '10 to 2000 characters', '409 receipt_mismatch', 'Refunds take no click_id', 'Tested: add and remove']) {
     if (!llmsBody.includes(needle)) throw new Error('llms missing ' + needle)
   }
   if (!/GET \/device/.test(llmsBody)) throw new Error('llms does not name GET /device')
   if (!llmsBody.includes('The hosted app gets these steps once the next deploy lands')) throw new Error('llms missing the deploy note')
   if (!llmsBody.includes('Step 5 stays a human or an operator for now.')) throw new Error('llms missing the approval note')
   if (!llmsBody.includes('X-Plugin-Key') || !llmsBody.includes('X-Admin-Key')) throw new Error('llms missing an auth header from the ordered steps')
-  if (llmsBody.includes('cursor.com/en/install-mcp') || llmsBody.includes('## No-browser account') || llmsBody.includes('## Device code') || llmsBody.includes('register_product through submit_offer')) throw new Error('llms still repeats an old section')
+  if (llmsBody.includes('cursor.com/en/install-mcp') || llmsBody.includes('## No-browser account') || llmsBody.includes('## Device code') || llmsBody.includes('register_product through submit_offer') || llmsBody.includes('Needs authentication')) throw new Error('llms still repeats an old section')
   if (/grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i.test(llmsBody.replaceAll('/v1/marketplace/', '/v1/offer-join/'))) throw new Error('llms has forbidden wording')
   const alias = await fetch(origin + '/agents', { redirect: 'manual' })
   const location = alias.headers.get('location') || ''
@@ -347,7 +347,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   if (!genericPanel.includes('401 no bearer token') || genericPanel.includes('Untested')) throw new Error('agents-' + width + ' generic panel ' + genericPanel)
   await page.getByRole('tab', { name: 'Claude Code' }).click()
   const claudePanel = await page.locator('#install-panel-claude').innerText()
-  if (!claudePanel.includes('Needs authentication') || claudePanel.includes('Untested')) throw new Error('agents-' + width + ' claude panel ' + claudePanel)
+  if (!claudePanel.includes('Sign in with Google when Claude Code asks') || !claudePanel.includes('Tested: add and remove') || !claudePanel.includes('The sign-in step is being fixed') || claudePanel.includes('Needs authentication') || claudePanel.includes('Untested')) throw new Error('agents-' + width + ' claude panel ' + claudePanel)
   await page.getByRole('tab', { name: 'Windsurf' }).click()
   const windsurfPanel = await page.locator('#install-panel-windsurf').innerText()
   if (!windsurfPanel.startsWith('Untested.')) throw new Error('agents-' + width + ' windsurf panel ' + windsurfPanel)

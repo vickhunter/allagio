@@ -71,13 +71,13 @@ export const tools = [
   { name: 'get_earnings', soon: false, maker: true, line: 'Call get_earnings to read clicks, sales, refunds, and commission for each offer.' },
 ]
 
-export const signInNote = 'This server needs a Google sign-in today. These snippets do not include an API key. POST /v1/agent-accounts is the no-browser way to get an account.'
+export const signInNote = 'This server needs a Google sign-in today. These snippets do not include an API key. POST /v1/agent-accounts is the no-browser way to get an account. Keys from /v1/agent-accounts work on the REST API only. /mcp needs the Google sign-in.'
 
 export const agentPrompt = 'Use the Offer Rails MCP server. Sign in with Google when it asks. Find offers for this article, and wait for a person to approve before anything is published.'
 
 export const installs = [
   { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}' },
-  { id: 'claude', label: 'Claude Code', tested: true, proof: 'Checked. claude mcp add wrote the user config, and claude mcp get reported Needs authentication.', snippet: 'claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp' },
+  { id: 'claude', label: 'Claude Code', tested: true, proof: 'Checked. Sign in with Google when Claude Code asks. Tested: add and remove. The sign-in step is being fixed.', snippet: 'claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp' },
   { id: 'vscode', label: 'VS Code', tested: false, proof: 'Untested. The VS Code client was not run against the hosted MCP server.', snippet: '{"servers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}' },
   { id: 'windsurf', label: 'Windsurf', tested: false, proof: 'Untested. The Windsurf client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"serverUrl":"https://offer-rails.onrender.com/mcp"}}}' },
   { id: 'generic', label: 'Generic', tested: true, proof: 'Checked. JSON-RPC initialize against this URL returned 401 no bearer token.', snippet: mcpConfig },
@@ -107,14 +107,14 @@ export const orderedSteps = [
   {
     n: 3,
     title: 'Join an offer',
-    line: 'POST /v1/marketplace/offers/:id/join with X-API-Key.',
-    body: 'POST /v1/marketplace/offers/:id/join with X-API-Key.',
+    line: 'List offers with GET /v1/marketplace/offers (X-API-Key). POST /v1/marketplace/offers/:id/join with X-API-Key. Join returns tracked_link /v1/go/<tracking_code>.',
+    body: 'List offers with GET /v1/marketplace/offers (X-API-Key). POST /v1/marketplace/offers/:id/join with X-API-Key. Join returns tracked_link /v1/go/<tracking_code>.',
   },
   {
     n: 4,
     title: 'Find and prepare',
-    line: 'POST /v1/revenue/opportunities with X-API-Key, then POST /v1/placements with X-API-Key.',
-    body: 'POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy.',
+    line: 'POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy. surface_url must be on the domain you signed up with. Copy is at most 140 characters and may not add numbers or claims the offer data doesn\'t have (server answers 422 claims_from_offer).',
+    body: 'POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy. surface_url must be on the domain you signed up with. Copy is at most 140 characters and may not add numbers or claims the offer data doesn\'t have (server answers 422 claims_from_offer).',
   },
   {
     n: 5,
@@ -131,8 +131,8 @@ export const orderedSteps = [
   {
     n: 7,
     title: 'Receipt',
-    line: 'POST /v1/placements/:id/receipt with X-API-Key.',
-    body: 'POST /v1/placements/:id/receipt with X-API-Key. published_text must contain the approved copy, the disclosure, and /go/<placement_id>.',
+    line: 'POST /v1/placements/:id/receipt with X-API-Key. The body is surface_url, published_text, and evidence (10 to 2000 characters), sent only after commit. published_text must contain the approved copy, the disclosure, and the tracked link from commit (/v1/go/<placement_id>); otherwise 409 receipt_mismatch.',
+    body: 'POST /v1/placements/:id/receipt with X-API-Key. The body is surface_url, published_text, and evidence (10 to 2000 characters), sent only after commit. published_text must contain the approved copy, the disclosure, and the tracked link from commit (/v1/go/<placement_id>); otherwise 409 receipt_mismatch.',
   },
   {
     n: 8,
@@ -149,8 +149,8 @@ export const orderedSteps = [
   {
     n: 10,
     title: 'Sales and refunds',
-    line: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key.',
-    body: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key. Send click_id set to the via value from the go link.',
+    line: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key. Sale body: click_id (the via value), event_id, object_id, amount_minor, currency, occurred_at optional RFC3339. Refund body: event_id, object_id of the sale, currency, amount_refunded_minor or full:true, occurred_at optional. Refunds take no click_id. The X-Maker-Key must belong to the maker who owns the clicked offer, or the server answers 404.',
+    body: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key. Sale body: click_id (the via value), event_id, object_id, amount_minor, currency, occurred_at optional RFC3339. Refund body: event_id, object_id of the sale, currency, amount_refunded_minor or full:true, occurred_at optional. Refunds take no click_id. The X-Maker-Key must belong to the maker who owns the clicked offer, or the server answers 404.',
   },
   {
     n: 11,
