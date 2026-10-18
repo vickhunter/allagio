@@ -36,6 +36,9 @@ func TestDemoProductSitePassesReadiness(t *testing.T) {
 		if resp.StatusCode != 200 {
 			t.Fatalf("%s: expected 200, got %d", path, resp.StatusCode)
 		}
+		if resp.Header.Get("X-Robots-Tag") != "noindex" || !strings.Contains(string(body), `name="robots" content="noindex"`) {
+			t.Fatalf("%s robots header %q", path, resp.Header.Get("X-Robots-Tag"))
+		}
 		if path == "/demo" && !strings.Contains(strings.ToLower(string(body)), "get started") {
 			t.Fatalf("demo landing needs a get-started call to action: %s", body)
 		}
@@ -67,6 +70,23 @@ func TestDemoProductSitePassesReadiness(t *testing.T) {
 	})
 	if result.Status != "ready" {
 		t.Fatalf("demo must pass readiness, got %s %+v", result.Status, result.Checks)
+	}
+
+	head, err := http.Head(server.URL + "/demo/start")
+	if err != nil {
+		t.Fatal(err)
+	}
+	head.Body.Close()
+	if head.StatusCode != 200 || head.Header.Get("X-Robots-Tag") != "noindex" {
+		t.Fatalf("demo head %d robots %q", head.StatusCode, head.Header.Get("X-Robots-Tag"))
+	}
+	miss, err := http.Get(server.URL + "/demo/not-a-page")
+	if err != nil {
+		t.Fatal(err)
+	}
+	miss.Body.Close()
+	if miss.StatusCode != http.StatusNotFound || miss.Header.Get("X-Robots-Tag") != "noindex" {
+		t.Fatalf("unknown demo %d robots %q", miss.StatusCode, miss.Header.Get("X-Robots-Tag"))
 	}
 }
 

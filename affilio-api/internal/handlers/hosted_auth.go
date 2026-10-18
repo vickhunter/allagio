@@ -176,7 +176,11 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 	if !LEGAL_PAGES_APPROVED && draftLegalPath(requestPath) {
 		c.Header("X-Robots-Tag", "noindex")
 	}
-	c.String(http.StatusNotFound, "404 page not found")
+	if !landingMiss(requestPath) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	h.writeLandingNotFound(c)
 }
 
 // InstallSlashRedirect turns off Gin's built-in trailing-slash redirect and

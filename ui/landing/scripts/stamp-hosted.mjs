@@ -69,4 +69,22 @@ writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publ
 writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html')))
 const agentsFile = resolve(assets, 'agents/index.html')
 writeFileSync(agentsFile, readFileSync(agentsFile, 'utf8').replaceAll('href="/landing-v9/llms.txt"', 'href="/llms.txt"'))
+const missingShell = `<div id="static-landing">
+    <header>
+      <a href="/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Offer Rails</a>
+      <nav aria-label="Main">
+        <a href="/makers/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Makers</a>
+        <a href="/publishers/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Publishers</a>
+        <a href="/protocol/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Protocol</a>
+      </nav>
+      <a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Sign in</a>
+    </header>
+    <main id="main">
+      <h1>That page is not on Offer Rails.</h1>
+      <p>The address does not match a page on this site.</p>
+      <p><a href="/" style="display:inline-flex;min-height:44px;align-items:center">Home</a></p>
+      <p><a href="/agents" style="display:inline-flex;min-height:44px;align-items:center">Agents</a></p>
+    </main>
+  </div>`
+writeFileSync(resolve(assets, 'not-found/index.html'), stamp(resolve(dist, 'not-found/index.html'), missingShell))
 console.log('stamped landing v9 into affilio-wp/admin/build')
