@@ -2,7 +2,7 @@
 
 `POST /oauth/register` accepts `http://localhost`, `http://127.0.0.1`, and `http://[::1]` on any port. An authorization request for one of those callbacks may use a different port than the URI that was registered. The host, path, and query stay the same. Other HTTP hosts still return 400 `invalid_redirect_uri`.
 
-`POST /mcp` accepts the `api_key` from `POST /v1/agent-accounts` as `Authorization: Bearer`. A publisher key is scope `publisher` for that site. A maker key is scope `maker` for that maker. The same bearer works on the loopback routes those tools call. A plugin key and a site key that is not an agent-account key still receive 401. No new migration. The agents page is unchanged.
+`POST /mcp` accepts the `api_key` from `POST /v1/agent-accounts` as `Authorization: Bearer`. A publisher key is scope `publisher` for that site. A maker key is scope `maker` for that maker. The same bearer works on the loopback routes those tools call. A plugin key and a site key that is not an agent-account key still receive 401. A client that registers `http://localhost:<port>/callback`, completes consent, and opens `/mcp` with the access token receives the publisher tools: `preview_revenue`, `find_opportunities`, `prepare_placement`, `list_agent_tasks`, `undo_placement`, `restore_placement`, `get_balance`, and `get_payout_history`. A publisher agent-account key used as the bearer receives that same list. No new migration. The agents page is unchanged.
 
 ## October 18 — Hosted privacy, terms, agents, and llms.txt
 
