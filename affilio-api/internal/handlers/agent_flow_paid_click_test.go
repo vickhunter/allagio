@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 )
@@ -283,6 +284,91 @@ func TestApprovedPlacementGoLinkPays(t *testing.T) {
 		}
 	}
 	if item == nil || item["clicks"] != float64(1) || item["paid_clicks"] != float64(1) || item["live_now"] != false {
+		t.Fatalf("digest item: %v", item)
+	}
+}
+
+// TestTrailingSlashGoLinkPays keeps the paid click when a reader opens the
+// placement link with one extra slash. RedirectTrailingSlash is off, so the
+// unmatched route has to 301 /v1/go/<id>/ onto /v1/go/<id>. The slash itself
+// records nothing. The followed request carries via and increments paid_clicks.
+func TestTrailingSlashGoLinkPays(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	_, r := newD063Router(t, db)
+
+	created, body := postJSON(t, r, http.MethodPost, "/v1/agent-accounts", map[string]any{
+		"role": "publisher", "name": "Slash Go Blog", "email": "slash-go@example.com", "domain": "slash-go.example", "source": "cli",
+	}, nil)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("signup: %d %s", created.Code, created.Body.String())
+	}
+	siteID := body["site_id"].(string)
+	siteKey := map[string]string{"X-API-Key": body["api_key"].(string)}
+	_, offerID := seedListedOffer(t, db, "slash-go-maker", "slash-go-maker@example.com", "Northstar")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET landing_url='https://example.com/buy' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	joined, joinedBody := postJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", map[string]any{}, siteKey)
+	if joined.Code != http.StatusOK || joinedBody["campaign_id"] == "" {
+		t.Fatalf("join: %d %s", joined.Code, joined.Body.String())
+	}
+	contextText := "Northstar devtools reviews every pull request. Northstar finds bugs before merge. This devtools note is about Northstar."
+	prepared, preparedBody := postJSON(t, r, http.MethodPost, "/v1/placements", map[string]any{
+		"offer_id": offerID, "surface_url": "https://slash-go.example/posts/review", "context": contextText,
+		"copy": "We use Northstar to catch bugs before merge.", "post_id": 11, "post_title": "Review notes",
+	}, siteKey)
+	if prepared.Code != http.StatusCreated {
+		t.Fatalf("placement: %d %s", prepared.Code, prepared.Body.String())
+	}
+	placementID := preparedBody["placement"].(map[string]any)["id"].(string)
+	approved, approvedBody := postJSON(t, r, http.MethodPost, "/v1/offer-review/placements/"+placementID+"/approve", map[string]any{
+		"site_id": siteID, "owner_email": "slash-go@example.com", "evidence": "Operator approval for the agent owner.",
+	}, map[string]string{"X-Admin-Key": "test-admin"})
+	if approved.Code != http.StatusOK || approvedBody["status"] != "approved" {
+		t.Fatalf("approve: %d %s", approved.Code, approved.Body.String())
+	}
+
+	miss := httptest.NewRecorder()
+	r.ServeHTTP(miss, httptest.NewRequest(http.MethodGet, "/v1/not-a-route/", nil))
+	if miss.Code != http.StatusNotFound {
+		t.Fatalf("unknown slash: %d %s", miss.Code, miss.Body.String())
+	}
+
+	slash := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+placementID+"/", nil)
+	req.Header.Set("User-Agent", testBrowserUA)
+	r.ServeHTTP(slash, req)
+	loc, err := url.Parse(slash.Header().Get("Location"))
+	if slash.Code != http.StatusMovedPermanently || err != nil || loc.Path != "/v1/go/"+placementID {
+		t.Fatalf("slash go: %d %s", slash.Code, slash.Header().Get("Location"))
+	}
+	var clicks int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks WHERE placement_id=$1`, placementID).Scan(&clicks); err != nil || clicks != 0 {
+		t.Fatalf("slash recorded a click: %d %v", clicks, err)
+	}
+
+	live := hitGo(t, r, http.MethodGet, loc.RequestURI(), testBrowserUA)
+	parsed, err := url.Parse(live.Header().Get("Location"))
+	if live.Code != http.StatusFound || err != nil || parsed.Host != "example.com" || parsed.Query().Get("via") == "" {
+		t.Fatalf("followed go: %d %s", live.Code, live.Header().Get("Location"))
+	}
+	var clickID, class string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT id::text, click_class FROM clicks WHERE placement_id=$1`, placementID).Scan(&clickID, &class); err != nil || clickID != parsed.Query().Get("via") || class != ClickClassBrowser {
+		t.Fatalf("via %s click %s class %s err %v", parsed.Query().Get("via"), clickID, class, err)
+	}
+	digest, digestBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, siteKey)
+	if digest.Code != http.StatusOK {
+		t.Fatalf("digest: %d %s", digest.Code, digest.Body.String())
+	}
+	var item map[string]any
+	for _, raw := range digestBody["items"].([]any) {
+		row, _ := raw.(map[string]any)
+		if row["id"] == placementID {
+			item = row
+		}
+	}
+	if item == nil || item["paid_clicks"] != float64(1) {
 		t.Fatalf("digest item: %v", item)
 	}
 }

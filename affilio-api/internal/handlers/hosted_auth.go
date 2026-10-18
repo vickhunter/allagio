@@ -171,23 +171,57 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 			return
 		}
 	}
+	// A cleaned draft path that is not a page, such as /docs/../privacy/index.html,
+	// stays a 404. It still sends noindex while the wording is unapproved.
+	if !LEGAL_PAGES_APPROVED && draftLegalPath(requestPath) {
+		c.Header("X-Robots-Tag", "noindex")
+	}
 	c.String(http.StatusNotFound, "404 page not found")
 }
 
 func trailingSlashTarget(method, requestPath string, r *gin.Engine) (string, bool) {
-	if len(requestPath) < 2 {
+	if len(requestPath) < 2 || requestPath[0] != '/' {
 		return "", false
 	}
 	alt := requestPath + "/"
 	if requestPath[len(requestPath)-1] == '/' {
 		alt = requestPath[:len(requestPath)-1]
 	}
+	if alt == "" || alt[0] != '/' {
+		return "", false
+	}
 	for _, route := range r.Routes() {
-		if route.Method == method && route.Path == alt {
+		if route.Method == method && (route.Path == alt || routePatternMatches(route.Path, alt)) {
 			return alt, true
 		}
 	}
 	return "", false
+}
+
+// routePatternMatches reports whether requestPath fits a Gin route that has a
+// :name or *name segment. One trailing slash on /v1/go/:code is this case:
+// the registered path is /v1/go/:code, and the request is /v1/go/<id>.
+func routePatternMatches(pattern, requestPath string) bool {
+	if !strings.ContainsAny(pattern, ":*") {
+		return false
+	}
+	patternSegs := strings.Split(strings.Trim(pattern, "/"), "/")
+	requestSegs := strings.Split(strings.Trim(requestPath, "/"), "/")
+	for i, seg := range patternSegs {
+		if strings.HasPrefix(seg, "*") {
+			return i == len(patternSegs)-1
+		}
+		if i >= len(requestSegs) || requestSegs[i] == "" {
+			return false
+		}
+		if strings.HasPrefix(seg, ":") {
+			continue
+		}
+		if seg != requestSegs[i] {
+			return false
+		}
+	}
+	return len(patternSegs) == len(requestSegs)
 }
 
 func (h *HostedHandler) headers(c *gin.Context) {

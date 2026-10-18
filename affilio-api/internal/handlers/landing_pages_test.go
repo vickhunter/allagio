@@ -174,12 +174,24 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 			t.Fatalf("%s %d X-Robots-Tag %q", path, rec.Code, got)
 		}
 	}
-	for _, path := range []string{"/privacy/index.html", "/terms/index.html"} {
+	draftMisses := []string{
+		"/privacy/index.html", "/terms/index.html",
+		"/docs/../privacy/index.html", "/docs/../terms/index.html",
+	}
+	for _, path := range draftMisses {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
 		}
+		if got := rec.Header().Get("X-Robots-Tag"); got != "noindex" {
+			t.Fatalf("%s X-Robots-Tag %q", path, got)
+		}
+	}
+	agentsMiss := httptest.NewRecorder()
+	r.ServeHTTP(agentsMiss, httptest.NewRequest(http.MethodGet, "/docs/../agents/index.html", nil))
+	if agentsMiss.Code != http.StatusNotFound || agentsMiss.Header().Get("X-Robots-Tag") != "" {
+		t.Fatalf("agents miss: %d %q", agentsMiss.Code, agentsMiss.Header().Get("X-Robots-Tag"))
 	}
 	for _, path := range []string{"/landing-v9//agents/", "/landing-v9/agents/./", "/landing-v9/agents/./index.html", "/landing-v9/../agents/index.html/."} {
 		rec := httptest.NewRecorder()
@@ -218,6 +230,13 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if got := rec.Header().Get("X-Robots-Tag"); got != "" {
 			t.Fatalf("approved %s X-Robots-Tag %q", path, got)
+		}
+	}
+	for _, path := range draftMisses {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusNotFound || rec.Header().Get("X-Robots-Tag") != "" {
+			t.Fatalf("approved %s: %d %q", path, rec.Code, rec.Header().Get("X-Robots-Tag"))
 		}
 	}
 }
