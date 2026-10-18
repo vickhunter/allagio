@@ -13,7 +13,8 @@ func TestResolveClaimsCheck(t *testing.T) {
 		{name: "hosted empty", ginMode: "release", raw: "", want: ClaimsStub},
 		{name: "hosted mixed case", ginMode: " Release ", raw: "  ", want: ClaimsStub},
 		{name: "hosted explicit stub", ginMode: "release", raw: " STUB ", want: ClaimsStub},
-		{name: "hosted real", ginMode: "release", raw: "real", fail: true},
+		{name: "hosted real", ginMode: "release", raw: "real", want: ClaimsReal},
+		{name: "hosted real mixed case", ginMode: " Release ", raw: " REAL ", want: ClaimsReal},
 		{name: "hosted off-local", ginMode: "RELEASE", raw: "off-local", fail: true},
 		{name: "local empty", ginMode: "", raw: "", want: ClaimsOffLocal},
 		{name: "debug empty", ginMode: "debug", raw: "", want: ClaimsOffLocal},
@@ -55,8 +56,8 @@ func TestLoadResolvesClaimsCheck(t *testing.T) {
 
 	t.Setenv("CLAIMS_CHECK", "real")
 	cfg = Load()
-	if cfg.ValidateClaims() == nil {
-		t.Fatal("hosted real must refuse to start")
+	if cfg.ClaimsCheck != ClaimsReal || cfg.ValidateClaims() != nil {
+		t.Fatalf("hosted real: %q %v", cfg.ClaimsCheck, cfg.ValidateClaims())
 	}
 
 	t.Setenv("CLAIMS_CHECK", "off-local")

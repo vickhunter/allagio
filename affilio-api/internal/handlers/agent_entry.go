@@ -100,12 +100,12 @@ func (h *AgentEntry) claims() entry.ClaimChecker {
 }
 
 // placementClaims runs the page checker at restore and retry when this
-// process is on CLAIMS_CHECK=real and the decide checker is still the stub.
-// The page is fetched before the transaction. The recorded result is what
-// ClaimsFail reads inside it, so a miss leaves the row unchanged. yolo and
-// auto stay on the stub.
+// process is on CLAIMS_CHECK=real and the decide checker is the stub or the
+// page checker. The page is fetched before the transaction. The recorded
+// result is what ClaimsFail reads inside it, so a miss leaves the row
+// unchanged.
 func (h *AgentEntry) placementClaims(c *gin.Context, offerID string) (entry.ClaimChecker, error) {
-	if !claimsReal(h.ClaimsCheck) || !productionStub(h.Claims) {
+	if !claimsReal(h.ClaimsCheck) || !merchantPageChecker(h.Claims) {
 		return h.claims(), nil
 	}
 	src, err := h.DB.OfferClaimSource(c.Request.Context(), offerID)
@@ -124,12 +124,16 @@ func (h *AgentEntry) placementClaims(c *gin.Context, offerID string) (entry.Clai
 	return entry.RecordedClaimCheck{Err: entry.ClaimMismatch{Reason: reason}}, nil
 }
 
-func productionStub(claims entry.ClaimChecker) bool {
+func merchantPageChecker(claims entry.ClaimChecker) bool {
 	if claims == nil {
 		return true
 	}
-	_, ok := claims.(entry.StubClaimChecker)
-	return ok
+	switch claims.(type) {
+	case entry.StubClaimChecker, entry.PageClaimChecker:
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *AgentEntry) verificationURI() string {

@@ -375,6 +375,9 @@ func TestStubClaimCheckerRefusesPublisherAutoAccept(t *testing.T) {
 	if !strings.Contains(string(mainText), "entry.StubClaimChecker{}") || strings.Contains(string(mainText), "LiveClaimChecker") {
 		t.Fatal("production claim checker is not the stub")
 	}
+	if !strings.Contains(string(mainText), "entry.PageClaimChecker{}") || !strings.Contains(string(mainText), "config.ClaimsReal") {
+		t.Fatal("real mode must wire the page checker")
+	}
 }
 
 func TestProjectKeyCannotAcknowledgePlacement(t *testing.T) {

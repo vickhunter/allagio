@@ -1,6 +1,8 @@
 package entry
 
 import (
+	"encoding/json"
+	"html"
 	"log"
 	"regexp"
 	"strconv"
@@ -64,7 +66,7 @@ func CheckPageClaims(doc PageDocument, in PageClaimInput) (reason, message strin
 	if !doc.OK {
 		return failPage(PageReasonUnreachable)
 	}
-	page := normalizePage(doc.Body)
+	page := pageEvidence(doc.Body)
 	if in.HasCard {
 		card := in.Card
 		if !pageHasPhrase(page, card.Name) || !pageHasPhrase(page, card.Category) || !pageHasPhrase(page, card.Summary) {
@@ -109,6 +111,26 @@ type RecordedClaimCheck struct {
 func (r RecordedClaimCheck) CheckClaims(string, string) error { return r.Err }
 func (RecordedClaimCheck) Real() bool                         { return false }
 
+// PageClaimChecker is the checker used when CLAIMS_CHECK=real. CheckClaims
+// still refuses a number the offer text does not contain, and that refusal
+// is a reason code. Real is true, so yolo and auto can proceed once that
+// copy check passes. Check compares the listing with a merchant document.
+// A miss is a reason code. The hosted default stays the stub until the env
+// is set to real.
+type PageClaimChecker struct{}
+
+func (PageClaimChecker) CheckClaims(copyText, offerData string) error {
+	return StubClaimChecker{}.CheckClaims(copyText, offerData)
+}
+
+func (PageClaimChecker) Real() bool { return true }
+
+// Check compares the listing card, the commission, and the terms with one
+// merchant document. It does not fetch the page.
+func (PageClaimChecker) Check(doc PageDocument, in PageClaimInput) (string, string) {
+	return CheckPageClaims(doc, in)
+}
+
 var pageTag = regexp.MustCompile(`<[^>]*>`)
 
 func normalizePage(raw string) string {
@@ -119,6 +141,90 @@ func normalizePage(raw string) string {
 	s = strings.ReplaceAll(s, "&#39;", "'")
 	s = strings.ReplaceAll(s, "&quot;", "\"")
 	return strings.Join(strings.Fields(s), " ")
+}
+
+var (
+	pageDrop      = regexp.MustCompile(`(?is)<(script|style|noscript|template)\b[^>]*>.*?</(script|style|noscript|template)>`)
+	pageMeta      = regexp.MustCompile(`(?is)<meta\b[^>]*>`)
+	pageContent   = regexp.MustCompile(`(?i)\bcontent\s*=\s*("([^"]*)"|'([^']*)')`)
+	pageJSONLD    = regexp.MustCompile(`(?is)<script\b[^>]*\btype\s*=\s*["']application/ld\+json[^"']*["'][^>]*>(.*?)</script>`)
+	pageTitleText = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+)
+
+// pageEvidence is the text a claim is compared with. Visible text is not
+// enough for a client-rendered page, so meta and Open Graph content,
+// JSON-LD values, and the extracted text are all included. A broken
+// JSON-LD block is kept as text. Nothing here panics.
+func pageEvidence(raw string) string {
+	return normalizePage(strings.Join([]string{
+		visiblePageText(raw),
+		metaPageText(raw),
+		jsonLDPageText(raw),
+	}, " "))
+}
+
+func visiblePageText(raw string) string {
+	return pageDrop.ReplaceAllString(raw, " ")
+}
+
+func metaPageText(raw string) string {
+	var b strings.Builder
+	if match := pageTitleText.FindStringSubmatch(raw); match != nil {
+		b.WriteString(match[1])
+		b.WriteByte(' ')
+	}
+	for _, tag := range pageMeta.FindAllString(raw, -1) {
+		match := pageContent.FindStringSubmatch(tag)
+		if match == nil {
+			continue
+		}
+		content := match[2]
+		if content == "" {
+			content = match[3]
+		}
+		b.WriteString(html.UnescapeString(content))
+		b.WriteByte(' ')
+	}
+	return b.String()
+}
+
+func jsonLDPageText(raw string) string {
+	var b strings.Builder
+	for _, match := range pageJSONLD.FindAllStringSubmatch(raw, -1) {
+		payload := strings.TrimSpace(match[1])
+		if payload == "" {
+			continue
+		}
+		dec := json.NewDecoder(strings.NewReader(payload))
+		dec.UseNumber()
+		var value any
+		if err := dec.Decode(&value); err != nil {
+			b.WriteString(html.UnescapeString(payload))
+			b.WriteByte(' ')
+			continue
+		}
+		writeJSONValues(&b, value)
+	}
+	return b.String()
+}
+
+func writeJSONValues(b *strings.Builder, value any) {
+	switch typed := value.(type) {
+	case string:
+		b.WriteString(typed)
+		b.WriteByte(' ')
+	case json.Number:
+		b.WriteString(typed.String())
+		b.WriteByte(' ')
+	case map[string]any:
+		for _, child := range typed {
+			writeJSONValues(b, child)
+		}
+	case []any:
+		for _, child := range typed {
+			writeJSONValues(b, child)
+		}
+	}
 }
 
 func pageHasPhrase(page, phrase string) bool {

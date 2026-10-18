@@ -73,6 +73,16 @@ func claimsReal(mode string) bool {
 	return strings.EqualFold(strings.TrimSpace(mode), config.ClaimsReal)
 }
 
+// claimsChecker is the decide checker for a resolved CLAIMS_CHECK mode.
+// real uses the page checker. stub, off-local, and an empty mode stay on
+// the stub, which is what a hosted server runs until the env is set to real.
+func claimsChecker(mode string) entry.ClaimChecker {
+	if claimsReal(mode) {
+		return entry.PageClaimChecker{}
+	}
+	return entry.StubClaimChecker{}
+}
+
 // claimsCheckValue is the offer field. stub stays not_checked. real and
 // off-local report passed or failed once a draft has been submitted.
 func claimsCheckValue(mode, status, reviewReason string) string {

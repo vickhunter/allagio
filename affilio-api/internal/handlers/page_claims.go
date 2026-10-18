@@ -75,5 +75,5 @@ func compareOfferClaims(ctx context.Context, db *database.DB, makerID, productID
 		}
 	}
 	page := fetchMerchantPage(ctx, offer.LandingURL)
-	return entry.CheckPageClaims(entry.PageDocument{OK: page.OK, Body: page.Body}, in)
+	return (entry.PageClaimChecker{}).Check(entry.PageDocument{OK: page.OK, Body: page.Body}, in)
 }

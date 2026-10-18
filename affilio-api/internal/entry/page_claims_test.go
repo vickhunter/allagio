@@ -50,6 +50,44 @@ func TestPageClaimsAgainstFixtures(t *testing.T) {
 	}
 }
 
+func TestPageClaimsReadClientRenderedPages(t *testing.T) {
+	card := ListingCard{
+		Name:           "Northwind Ledger",
+		Summary:        "Ledger software for small publishers.",
+		Category:       "software",
+		Features:       []string{"invoices"},
+		PricingSummary: "Plans start at $29 a month",
+	}
+	in := PageClaimInput{Card: card, HasCard: true, Terms: "Northwind Ledger pays 20 percent to publishers.", CommissionValue: 20}
+	page := clientRenderedNorthwind("Plans start at $29 a month", "20")
+	checker := PageClaimChecker{}
+	reason, message := checker.Check(PageDocument{OK: true, Body: page}, in)
+	if reason != "" || message != "" {
+		t.Fatalf("client-rendered page: %q %q", reason, message)
+	}
+	reason, message = checker.Check(PageDocument{OK: true, Body: clientRenderedNorthwind("Plans start at $49 a month", "20")}, in)
+	if reason != PageReasonPrice || message != PageClaimMessage(PageReasonPrice) {
+		t.Fatalf("price miss: %q %q", reason, message)
+	}
+	reason, message = checker.Check(PageDocument{OK: true, Body: "<html><head><script type=\"application/ld+json\">{</script></head><body><div id=\"root\"></div></body></html>"}, in)
+	if reason != PageReasonCard || message != PageClaimMessage(PageReasonCard) {
+		t.Fatalf("broken page: %q %q", reason, message)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<html><body><div id=\"root\"></div><script>var n = 20;</script></body></html>"}, PageClaimInput{CommissionValue: 20})
+	if reason != PageReasonCommission {
+		t.Fatalf("a script bundle must not satisfy the commission: %q", reason)
+	}
+}
+
+func clientRenderedNorthwind(price, commission string) string {
+	return `<!DOCTYPE html><html><head><title>App</title>` +
+		`<meta content="Northwind Ledger" property="og:title">` +
+		`<meta name="og:description" content="Ledger software for small publishers.">` +
+		`<meta name="description" content="Category: software">` +
+		`<script type="application/ld+json">{"name":"Northwind Ledger","featureList":["invoices"],"offers":{"description":"` + price + `","price":` + commission + `}}</script>` +
+		`</head><body><div id="root"></div><script>var bundle = "ignore 99";</script></body></html>`
+}
+
 func TestPageClaimsNumberBoundary(t *testing.T) {
 	doc := PageDocument{OK: true, Body: "<p>The plan is 20.5 and the year is 2020.</p>"}
 	reason, _ := CheckPageClaims(doc, PageClaimInput{CommissionValue: 20})

@@ -174,6 +174,121 @@ func TestRestoreAndRetryUsePageClaims(t *testing.T) {
 	}
 }
 
+func TestRealClaimsInReleaseListsMatchAndHoldsMismatch(t *testing.T) {
+	mode, err := config.ResolveClaimsCheck("release", "real")
+	if err != nil || mode != config.ClaimsReal {
+		t.Fatalf("hosted real: %q %v", mode, err)
+	}
+	if checker := claimsChecker(mode); checker.Real() == false {
+		t.Fatal("release real must wire the live page checker")
+	}
+	if _, ok := claimsChecker(mode).(entry.PageClaimChecker); !ok {
+		t.Fatal("release real must use PageClaimChecker")
+	}
+	if _, ok := claimsChecker(config.ClaimsStub).(entry.StubClaimChecker); !ok || claimsChecker("").Real() {
+		t.Fatal("the hosted default must stay the stub")
+	}
+
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	makerID, makerKey := createTestMaker(t, db)
+	r := newMakerRouterWithClaims(db, mode)
+	matchID, matchOffer := createDraftOffer(t, r, makerKey, "Northwind Ledger", "https://match.example.com", passingTerms("Northwind Ledger", 20), 20)
+	missID, missOffer := createDraftOffer(t, r, makerKey, "Northwind Ledger", "https://miss.example.com", passingTerms("Northwind Ledger", 20), 20)
+	brokenID, brokenOffer := createDraftOffer(t, r, makerKey, "Northwind Ledger", "https://broken.example.com", passingTerms("Northwind Ledger", 20), 20)
+	markProductReady(t, db, matchID)
+	markProductReady(t, db, missID)
+	markProductReady(t, db, brokenID)
+	insertListingCard(t, db, makerID, matchID, northwindCard())
+	insertListingCard(t, db, makerID, missID, northwindCard())
+	insertListingCard(t, db, makerID, brokenID, northwindCard())
+	prev := fetchMerchantPage
+	fetchMerchantPage = func(_ context.Context, got string) merchantPage {
+		switch got {
+		case "https://match.example.com":
+			return merchantPage{OK: true, Body: clientRenderedOffer("Plans start at $29 a month")}
+		case "https://miss.example.com":
+			return merchantPage{OK: true, Body: clientRenderedOffer("Plans start at $49 a month")}
+		case "https://broken.example.com":
+			return merchantPage{OK: true, Body: "<html><head><script type=\"application/ld+json\">{</script></head><body><div id=\"root\"></div></body></html>"}
+		default:
+			return merchantPage{Err: "fixture required"}
+		}
+	}
+	t.Cleanup(func() { fetchMerchantPage = prev })
+
+	listed, listedBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+matchOffer+"/submit", makerKey, nil)
+	if listed.Code != http.StatusOK || listedBody["status"] != "listed" {
+		t.Fatalf("matching client-rendered page: %d %v", listed.Code, listedBody)
+	}
+	requireReview(t, listedBody, nil, nil)
+
+	held, heldBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+missOffer+"/submit", makerKey, nil)
+	if held.Code != http.StatusOK || heldBody["status"] != "submitted" {
+		t.Fatalf("mismatched claim: %d %v", held.Code, heldBody)
+	}
+	requireReview(t, heldBody, reviewReasonClaims, entry.PageClaimMessage(entry.PageReasonPrice))
+
+	broken, brokenBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+brokenOffer+"/submit", makerKey, nil)
+	if broken.Code != http.StatusOK || brokenBody["status"] != "submitted" || brokenBody["review_reason"] != reviewReasonClaims {
+		t.Fatalf("broken page must be held with a reason, not 500: %d %v", broken.Code, brokenBody)
+	}
+}
+
+func clientRenderedOffer(price string) string {
+	return `<!DOCTYPE html><html><head><title>App</title>` +
+		`<meta content="Northwind Ledger" property="og:title">` +
+		`<meta property="og:description" content="Ledger software for small publishers.">` +
+		`<meta name="description" content="Category: software">` +
+		`<script type='application/ld+json'>{"featureList":["invoices"],"offers":{"description":"` + price + `","price":20}}</script>` +
+		`</head><body><div id="root"></div></body></html>`
+}
+
+func TestPageClaimCheckerRestoreHoldsAMiss(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, api, r := newEntryTest(t, db)
+	owner, cookie := testOwnerSession(t, h, "page-live-owner", "page-live-owner@example.com")
+	siteID := createTestSite(t, db, "page-live-key", "page-live.example", "Page")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE owners SET site_id=$2 WHERE id=$1`, owner.ID, siteID); err != nil {
+		t.Fatal(err)
+	}
+	makerID, offerID := seedListedOffer(t, db, "page-live-maker", "page-live-maker@example.com", "Claims Product")
+	var productID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT product_id::text FROM offers WHERE id=$1`, offerID).Scan(&productID); err != nil {
+		t.Fatal(err)
+	}
+	insertListingCard(t, db, makerID, productID, entry.ListingCard{
+		Name: "Claims Product", Summary: "A solid claims product.", Category: "devtools",
+		Features: []string{"exports"}, PricingSummary: "Plans start at $29 a month",
+	})
+	saved, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPut, "/v1/sites/"+siteID+"/mode", map[string]any{"mode": "yolo"})
+	if saved.Code != http.StatusOK {
+		t.Fatalf("mode: %d %s", saved.Code, saved.Body.String())
+	}
+	placementID := insertPlacement(t, db, siteID, offerID, "https://page-live.example/post", "Claims Product is a solid fit.")
+	approved, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true})
+	if approved.Code != http.StatusOK {
+		t.Fatalf("decide: %d %s", approved.Code, approved.Body.String())
+	}
+	undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/revoke", map[string]any{"reason": "undo"}, map[string]string{"X-API-Key": "page-live-key"})
+	if undone.Code != http.StatusOK {
+		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())
+	}
+
+	api.Claims = entry.PageClaimChecker{}
+	api.ClaimsCheck = config.ClaimsReal
+	useMerchantPage(t, "https://example.com", merchantPage{OK: true, Body: merchantFixture(t, "merchant_restore_miss.html")})
+	blocked, blockedBody := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/restore", nil)
+	if blocked.Code != http.StatusUnprocessableEntity || blockedBody["check_id"] != "claims_from_offer" {
+		t.Fatalf("restore claims: %d %s", blocked.Code, blocked.Body.String())
+	}
+	var status string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status FROM placement_proposals WHERE id=$1`, placementID).Scan(&status); err != nil || status != "revoked" {
+		t.Fatalf("restore wrote through a page miss: %s %v", status, err)
+	}
+}
+
 func useMerchantPage(t *testing.T, rawURL string, page merchantPage) {
 	t.Helper()
 	prev := fetchMerchantPage
