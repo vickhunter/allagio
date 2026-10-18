@@ -174,8 +174,21 @@ func (h *HostedHandler) Terms(c *gin.Context)          { h.builtPage(c, "terms")
 func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents") }
 
 // LEGAL_PAGES_APPROVED stays false until the privacy and terms wording is approved.
-// Those two pages send X-Robots-Tag: noindex while it is false.
+// Those pages send X-Robots-Tag: noindex while it is false, including the copies
+// the landing asset directory serves under /landing-v9.
 var LEGAL_PAGES_APPROVED = false
+
+func draftLegalPath(path string) bool {
+	path = strings.TrimSuffix(path, "/")
+	switch path {
+	case "/privacy", "/terms",
+		"/landing-v9/privacy", "/landing-v9/privacy/index.html",
+		"/landing-v9/terms", "/landing-v9/terms/index.html":
+		return true
+	default:
+		return false
+	}
+}
 
 // builtPage serves a Vite page from landing-v9/<name>/index.html. The file
 // is sent as stored. It is not executed as a Go template, because the bundle

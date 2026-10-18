@@ -142,6 +142,9 @@ func (h *HostedHandler) headers(c *gin.Context) {
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Referrer-Policy", "strict-origin")
 	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+	if !LEGAL_PAGES_APPROVED && draftLegalPath(c.Request.URL.Path) {
+		c.Header("X-Robots-Tag", "noindex")
+	}
 	c.Next()
 }
 

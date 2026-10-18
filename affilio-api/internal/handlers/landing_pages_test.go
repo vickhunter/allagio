@@ -125,30 +125,55 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 	writeBuiltPage(t, dir, "agents", "<!doctype html><title>Agents</title>")
 	r := mountBuiltLanding(t, dir)
 
-	robots := func(path string) string {
+	robots := func(path string, status int) string {
 		t.Helper()
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
-		if rec.Code != http.StatusOK {
+		if rec.Code != status {
 			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
 		}
 		return rec.Header().Get("X-Robots-Tag")
 	}
-	for _, path := range []string{"/privacy", "/privacy/", "/terms", "/terms/"} {
-		if got := robots(path); got != "noindex" {
+	noindex := []string{
+		"/privacy", "/privacy/", "/terms", "/terms/",
+		"/landing-v9/privacy/", "/landing-v9/terms/",
+	}
+	redirects := []string{
+		"/landing-v9/privacy", "/landing-v9/privacy/index.html",
+		"/landing-v9/terms", "/landing-v9/terms/index.html",
+	}
+	for _, path := range noindex {
+		if got := robots(path, http.StatusOK); got != "noindex" {
 			t.Fatalf("%s X-Robots-Tag %q", path, got)
 		}
 	}
-	for _, path := range []string{"/agents", "/agents/"} {
-		if got := robots(path); got != "" {
+	for _, path := range redirects {
+		if got := robots(path, http.StatusMovedPermanently); got != "noindex" {
+			t.Fatalf("%s X-Robots-Tag %q", path, got)
+		}
+	}
+	open := []string{"/agents", "/agents/", "/landing-v9/agents/"}
+	for _, path := range open {
+		if got := robots(path, http.StatusOK); got != "" {
+			t.Fatalf("%s X-Robots-Tag %q", path, got)
+		}
+	}
+	openRedirects := []string{"/landing-v9/agents", "/landing-v9/agents/index.html"}
+	for _, path := range openRedirects {
+		if got := robots(path, http.StatusMovedPermanently); got != "" {
 			t.Fatalf("%s X-Robots-Tag %q", path, got)
 		}
 	}
 
 	LEGAL_PAGES_APPROVED = true
 	t.Cleanup(func() { LEGAL_PAGES_APPROVED = false })
-	for _, path := range []string{"/privacy", "/privacy/", "/terms", "/terms/", "/agents", "/agents/"} {
-		if got := robots(path); got != "" {
+	for _, path := range append(noindex, open...) {
+		if got := robots(path, http.StatusOK); got != "" {
+			t.Fatalf("approved %s X-Robots-Tag %q", path, got)
+		}
+	}
+	for _, path := range append(redirects, openRedirects...) {
+		if got := robots(path, http.StatusMovedPermanently); got != "" {
 			t.Fatalf("approved %s X-Robots-Tag %q", path, got)
 		}
 	}
