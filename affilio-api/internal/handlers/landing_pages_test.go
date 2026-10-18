@@ -193,6 +193,13 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 	if agentsMiss.Code != http.StatusNotFound || agentsMiss.Header().Get("X-Robots-Tag") != "" {
 		t.Fatalf("agents miss: %d %q", agentsMiss.Code, agentsMiss.Header().Get("X-Robots-Tag"))
 	}
+	for _, path := range []string{"/landing-v9/no-such", "/landing-v9/no-such/"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("%s: %d location %s", path, rec.Code, rec.Header().Get("Location"))
+		}
+	}
 	for _, path := range []string{"/landing-v9//agents/", "/landing-v9/agents/./", "/landing-v9/agents/./index.html", "/landing-v9/../agents/index.html/."} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))

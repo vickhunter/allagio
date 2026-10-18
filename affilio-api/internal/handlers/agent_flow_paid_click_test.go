@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -342,6 +343,25 @@ func TestTrailingSlashGoLinkPays(t *testing.T) {
 	loc, err := url.Parse(slash.Header().Get("Location"))
 	if slash.Code != http.StatusMovedPermanently || err != nil || loc.Path != "/v1/go/"+placementID {
 		t.Fatalf("slash go: %d %s", slash.Code, slash.Header().Get("Location"))
+	}
+	if slash.Header().Get("Cache-Control") != "no-store" || slash.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
+		t.Fatalf("slash headers cache %q robots %q", slash.Header().Get("Cache-Control"), slash.Header().Get("X-Robots-Tag"))
+	}
+	for _, rawPath := range []string{"//v1/go/" + placementID + "/", "/v1/go/../"} {
+		bad := httptest.NewRecorder()
+		badReq := httptest.NewRequest(http.MethodGet, "/v1/go/"+placementID, nil)
+		badReq.URL.Path = rawPath
+		r.ServeHTTP(bad, badReq)
+		if bad.Code != http.StatusNotFound || strings.HasPrefix(bad.Header().Get("Location"), "//") {
+			t.Fatalf("%s: %d %s", rawPath, bad.Code, bad.Header().Get("Location"))
+		}
+	}
+	commitSlash := httptest.NewRecorder()
+	commitReq := httptest.NewRequest(http.MethodPost, "/v1/placements/"+placementID+"/commit/", nil)
+	r.ServeHTTP(commitSlash, commitReq)
+	commitLoc, err := url.Parse(commitSlash.Header().Get("Location"))
+	if commitSlash.Code != http.StatusTemporaryRedirect || err != nil || commitLoc.Path != "/v1/placements/"+placementID+"/commit" {
+		t.Fatalf("commit slash: %d %s", commitSlash.Code, commitSlash.Header().Get("Location"))
 	}
 	var clicks int
 	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks WHERE placement_id=$1`, placementID).Scan(&clicks); err != nil || clicks != 0 {

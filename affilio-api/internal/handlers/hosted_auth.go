@@ -160,16 +160,23 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 				return
 			}
 		}
-		if target, ok := trailingSlashTarget(c.Request.Method, requestPath, r); ok {
-			if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
-				c.Header("X-Robots-Tag", "noindex")
-			}
-			if q := c.Request.URL.RawQuery; q != "" {
-				target += "?" + q
-			}
-			c.Redirect(http.StatusMovedPermanently, target)
-			return
+	}
+	if target, ok := trailingSlashTarget(c.Request.Method, requestPath, r); ok {
+		if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
+			c.Header("X-Robots-Tag", "noindex")
 		}
+		if target == "/v1/go" || strings.HasPrefix(target, "/v1/go/") {
+			stampGoResponse(c)
+		}
+		if q := c.Request.URL.RawQuery; q != "" {
+			target += "?" + q
+		}
+		status := http.StatusTemporaryRedirect
+		if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+			status = http.StatusMovedPermanently
+		}
+		c.Redirect(status, target)
+		return
 	}
 	// A cleaned draft path that is not a page, such as /docs/../privacy/index.html,
 	// stays a 404. It still sends noindex while the wording is unapproved.
@@ -180,14 +187,14 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 }
 
 func trailingSlashTarget(method, requestPath string, r *gin.Engine) (string, bool) {
-	if len(requestPath) < 2 || requestPath[0] != '/' {
+	if len(requestPath) < 2 || !strings.HasPrefix(requestPath, "/") || strings.HasPrefix(requestPath, "//") {
 		return "", false
 	}
 	alt := requestPath + "/"
 	if requestPath[len(requestPath)-1] == '/' {
 		alt = requestPath[:len(requestPath)-1]
 	}
-	if alt == "" || alt[0] != '/' {
+	if !singleSlashPath(alt) {
 		return "", false
 	}
 	for _, route := range r.Routes() {
@@ -198,20 +205,36 @@ func trailingSlashTarget(method, requestPath string, r *gin.Engine) (string, boo
 	return "", false
 }
 
-// routePatternMatches reports whether requestPath fits a Gin route that has a
-// :name or *name segment. One trailing slash on /v1/go/:code is this case:
-// the registered path is /v1/go/:code, and the request is /v1/go/<id>.
+// singleSlashPath accepts /v1/go/<id> and a route that is only registered with
+// one trailing slash. It rejects a protocol-relative target, an empty segment,
+// and a . or .. segment.
+func singleSlashPath(requestPath string) bool {
+	if requestPath == "" || !strings.HasPrefix(requestPath, "/") || strings.HasPrefix(requestPath, "//") {
+		return false
+	}
+	cleaned := path.Clean(requestPath)
+	if requestPath != cleaned && requestPath != cleaned+"/" {
+		return false
+	}
+	for _, seg := range strings.Split(strings.Trim(requestPath, "/"), "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+// routePatternMatches reports whether requestPath fits a Gin route with a
+// :name segment. A catch-all *filepath is not a match: a missing static file
+// re-enters this handler, and treating it as a slash redirect loops.
 func routePatternMatches(pattern, requestPath string) bool {
-	if !strings.ContainsAny(pattern, ":*") {
+	if strings.Contains(pattern, "*") || !strings.Contains(pattern, ":") {
 		return false
 	}
 	patternSegs := strings.Split(strings.Trim(pattern, "/"), "/")
 	requestSegs := strings.Split(strings.Trim(requestPath, "/"), "/")
 	for i, seg := range patternSegs {
-		if strings.HasPrefix(seg, "*") {
-			return i == len(patternSegs)-1
-		}
-		if i >= len(requestSegs) || requestSegs[i] == "" {
+		if i >= len(requestSegs) || requestSegs[i] == "" || requestSegs[i] == "." || requestSegs[i] == ".." {
 			return false
 		}
 		if strings.HasPrefix(seg, ":") {
