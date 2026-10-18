@@ -45,7 +45,7 @@ export function withSource(href: string, source: string) {
     const url = new URL(href, 'https://offer-rails.example')
     if (url.origin !== 'https://offer-rails.example') return href
     const path = url.pathname
-    const tracked = path === '/' || path.startsWith('/makers') || path.startsWith('/publishers') || path.startsWith('/protocol') || path.startsWith('/privacy') || path.startsWith('/terms') || path.startsWith('/owner') || path.startsWith('/auth/login')
+    const tracked = path === '/' || path.startsWith('/makers') || path.startsWith('/publishers') || path.startsWith('/protocol') || path.startsWith('/privacy') || path.startsWith('/terms') || path.startsWith('/agents') || path.startsWith('/owner') || path.startsWith('/auth/login') || path.startsWith('/landing-v9/agents')
     if (!tracked) return href
     url.searchParams.set('source', source)
     return url.pathname + url.search + url.hash

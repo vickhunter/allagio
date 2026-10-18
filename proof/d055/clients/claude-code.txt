@@ -1,0 +1,19 @@
+command:
+claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp
+claude mcp get offer-rails
+
+claude: /tmp/claude-cli/bin/claude 2.1.302
+
+output of mcp add:
+Added HTTP MCP server offer-rails with URL: https://offer-rails.onrender.com/mcp to user config
+File modified: /home/ubuntu/.claude.json
+
+output of mcp get:
+offer-rails:
+  Scope: User config (available in all your projects)
+  Status: ! Needs authentication
+  Type: http
+  URL: https://offer-rails.onrender.com/mcp
+
+To remove this server, run: claude mcp remove offer-rails -s user
+

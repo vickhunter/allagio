@@ -1,0 +1,2 @@
+command: not run
+output: The cursor binary is not installed on this VM, so the Cursor config was not sent to https://offer-rails.onrender.com/mcp.

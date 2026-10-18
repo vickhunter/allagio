@@ -67,4 +67,6 @@ writeFileSync(resolve(build, 'makers.html'), stamp(resolve(dist, 'makers/index.h
 writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers/index.html')))
 writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publishers/setup/index.html'), setupShell))
 writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html')))
+const agentsFile = resolve(assets, 'agents/index.html')
+writeFileSync(agentsFile, readFileSync(agentsFile, 'utf8').replaceAll('href="/landing-v9/llms.txt"', 'href="/llms.txt"'))
 console.log('stamped landing v9 into affilio-wp/admin/build')
