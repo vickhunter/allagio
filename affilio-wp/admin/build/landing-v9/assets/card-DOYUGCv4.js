@@ -1,0 +1,1 @@
+import{_ as e,i as t,l as n}from"./Page-CL-Pryf-.js";e();var r=n(),i=({className:e,...n})=>(0,r.jsx)(`div`,{className:t(`rounded-2xl border border-line bg-s1 text-t1`,e),...n});export{i as t};
