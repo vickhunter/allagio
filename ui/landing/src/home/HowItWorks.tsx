@@ -63,7 +63,7 @@ export function HowItWorks() {
             <div className="md:w-[42%]">
               <span className="inline-flex size-10 items-center justify-center rounded-xl bg-s2 text-setup"><UserCheck className="size-5" aria-hidden /></span>
               <h3 className="mt-4 font-display text-xl font-bold tracking-tight">Why an AI agent does the matching</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-t2">An agent can read the whole product page and every post on a site, so finding the right post for the right product happens on its own, not by hand. Setup starts with YOLO selected: anything that passes the checks goes live, and undo is one tap. You can switch to Manual or Auto before you save.</p>
+              <p className="mt-2 text-[15px] leading-relaxed text-t2">An agent can read the whole product page and every post on a site, so finding the right post for the right product happens on its own, not by hand. The publisher setup page opens with YOLO selected. After sign-in, the server preselects YOLO for cli, cursor, grok, mcp, and connector, and Manual for every other source. You can switch to Manual or Auto before you save.</p>
               <a href={`${assetBase}how-it-works/`} className="mt-4 inline-flex min-h-11 items-center gap-1 font-semibold text-setup underline underline-offset-4 hover:no-underline">See the animated railway figure <ArrowRight className="size-4" aria-hidden /></a>
             </div>
             <figure className="md:flex-1">

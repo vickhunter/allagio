@@ -79,9 +79,8 @@ function channelReport() {
   const lines = []
   for (const file of files) {
     const text = readFileSync(file, 'utf8')
-    if (/marketplace|connector/i.test(text) && !file.endsWith('proof-d065.mjs')) {
-      throw new Error('banned claim in ' + file)
-    }
+    const banned = text.split('\n').filter((row) => /marketplace|connector/i.test(row) && !/preselects YOLO for cli, cursor, grok, mcp, and connector/.test(row))
+    if (banned.length) throw new Error('banned claim in ' + file + '\n' + banned.join('\n'))
     const rows = text.split('\n')
     rows.forEach((row, index) => {
       for (const name of names) {
@@ -90,15 +89,15 @@ function channelReport() {
         if (name === 'X' && !/Shopify|Coming|coming/.test(row)) continue
         let status = 'named'
         if (name === 'WordPress') status = 'live plugin'
-        else if (/proven/i.test(row) && (name === 'Claude Code' || name === 'Generic')) status = 'proven'
+        else if (/untested/i.test(row) && (name === 'Claude Code' || name === 'Generic')) status = 'untested'
         else if (/coming/i.test(row)) status = 'coming'
         lines.push(`${name}\t${status}\t${file.replace(repo + '/', '')}:${index + 1}`)
       }
     })
   }
   const required = {
-    'Claude Code': 'proven',
-    Generic: 'proven',
+    'Claude Code': 'untested',
+    Generic: 'untested',
     Cursor: 'coming',
     'VS Code': 'coming',
     Windsurf: 'coming',

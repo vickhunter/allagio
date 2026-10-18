@@ -41,7 +41,7 @@ export const feed = [
 ]
 
 export const faq = [
-  { q: 'Do you hold or move the money?', a: 'No. Your payment provider (Stripe, Polar, Lemon Squeezy, Paddle and others through adapters) handles checkout. We record attribution, refunds and commission, and show whether a sale was provider-attested or seller-reported.' },
+  { q: 'Do you hold or move the money?', a: 'No. Stripe handles checkout. Polar, Lemon Squeezy, Paddle, and other payment adapters are coming. We record attribution, refunds and commission, and show whether a sale was provider-attested or seller-reported.' },
   { q: 'What does it cost?', a: 'During the pilot the maker pays a fee of 10% of the publisher commission. On a €24 sale with 10% commission the publisher earns €2.40 and the fee is €0.24.' },
   { q: 'What does my agent share?', a: 'An Offer card (project, category, commission terms) or an Audience card (surface, topic, size bucket). Never customer names, emails or lists. Enforced in code, not policy text.' },
   { q: 'Can I take a placement back?', a: 'Yes. Undo is one tap in the digest. The box leaves the page at the plugin’s next sync (every 5 minutes) plus any page-cache delay, and clicks stop at the link right away.' },
@@ -62,11 +62,11 @@ export const driftChips = [
 export const makerAdvantages = [
   { k: 'pay', t: 'Pay only when a sale is attributed', b: 'No listing fee, no ad budget. During the pilot the fee is 10% of the publisher commission: €0.24 on the €24 notebook example.', big: true },
   { k: 'local', t: 'Your code stays on your machine', b: 'Your agent scans pricing, payments and landing locally. It never reads .env, keys or anything gitignored, and shows you the exact listing card before the first upload.' },
-  { k: 'mcp', t: 'One install, one MCP server', b: 'One install command, pasted as is. Proven: Claude Code and Generic, both MCP over HTTP. Coming: Cursor, VS Code, Windsurf, ChatGPT and Grok.' },
+  { k: 'mcp', t: 'One install, one MCP server', b: 'One install command, pasted as is. Untested: Claude Code and Generic, both MCP over HTTP. Coming: Cursor, VS Code, Windsurf, ChatGPT and Grok.' },
   { k: 'terms', t: 'You set the terms', b: 'Pick the commission and how much control you keep: ask every time, approve within rules, or approve anything that passes the checks.' },
   { k: 'found', t: 'Publishers’ agents find you', b: 'Discovery runs both ways: publisher agents look for offers that match their posts, so you don’t pitch blogs one by one.' },
   { k: 'brand', t: 'Your brand is described honestly', b: 'Copy comes only from your offer data, capped at 140 characters, always labelled and rel="sponsored". Nine hard checks run in every mode.' },
-  { k: 'money', t: 'We never touch the money', b: 'Stripe, Polar, Lemon Squeezy, Paddle and others handle checkout. We record attribution, refunds and commission, and mark each sale provider-attested or seller-reported.' },
+  { k: 'money', t: 'We never touch the money', b: 'Stripe handles checkout. Polar, Lemon Squeezy, Paddle, and other payment adapters are coming. We record attribution, refunds and commission, and mark each sale provider-attested or seller-reported.' },
   { k: 'digest', t: 'Every placement, click and refund in one digest', b: 'See where your offer runs. Revoke works, and a monthly cap keeps spend predictable.' },
   { k: 'privacy', t: 'No customer data leaves', b: 'Your agent shares an Offer card (project, category, commission terms). Never customer names, emails or lists. Enforced in code.' },
   { k: 'swap', t: 'No sales yet? Swap visibility', b: 'Cross-promote with a related site through the same rails. Visibility for visibility, no money involved.' },
