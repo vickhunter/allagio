@@ -1,3 +1,9 @@
+## October 18 — Claude Code can register a localhost callback and call /mcp with an agent key
+
+`POST /oauth/register` accepts `http://localhost`, `http://127.0.0.1`, and `http://[::1]` on any port. An authorization request for one of those callbacks may use a different port than the URI that was registered. The host, path, and query stay the same. Other HTTP hosts still return 400 `invalid_redirect_uri`.
+
+`POST /mcp` accepts the `api_key` from `POST /v1/agent-accounts` as `Authorization: Bearer`. A publisher key is scope `publisher` for that site. A maker key is scope `maker` for that maker. The same bearer works on the loopback routes those tools call. A plugin key and a site key that is not an agent-account key still receive 401. No new migration. The agents page is unchanged.
+
 ## October 18 — Hosted privacy, terms, agents, and llms.txt
 
 `/privacy`, `/privacy/`, `/terms`, and `/terms/` serve `landing-v9/privacy/index.html` and `landing-v9/terms/index.html` from the UI asset directory as `text/html; charset=utf-8`. `LEGAL_PAGES_APPROVED` defaults to false. While it is false, those pages send `X-Robots-Tag: noindex`, and so do `/landing-v9/privacy/` and `/landing-v9/terms/`, including `index.html` and the same paths with extra slashes or a `.` segment. Set it to true after the wording is approved and the header is omitted. `/agents` and `/agents/` serve `landing-v9/agents/index.html` the same way, without that header. The HTML is sent as built. It is not run through a Go template. `/llms.txt` serves `landing-v9/llms.txt` as `text/plain; charset=utf-8` when that file is in the asset directory. When it is not, `/llms.txt` stays the generated agent instructions, and `/docs/modes.md` still lists the receipt fields. A path with no route is still 404. A missing page file is 404. No new migration. `AUTO_MIGRATE` stays off.
