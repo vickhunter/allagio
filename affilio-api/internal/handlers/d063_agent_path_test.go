@@ -29,10 +29,13 @@ func newD063Router(t *testing.T, db *database.DB) (*HostedHandler, *gin.Engine) 
 	api := &AgentEntry{DB: db, BaseURL: h.BaseURL, Owner: h.RequireOwnerSession, Claims: entry.LiveClaimChecker{}}
 	api.Mount(r)
 	placements := &PlacementsHandler{DB: db, Claims: entry.LiveClaimChecker{}}
+	marketplace := &MarketplaceHandler{DB: db}
 	secured := r.Group("/v1", middleware.APIKeyAuth(db, nil))
 	secured.POST("/placements", placements.Prepare)
 	secured.POST("/placements/:id/commit", placements.Commit)
 	secured.POST("/placements/:id/receipt", placements.RecordReceipt)
+	secured.POST("/revenue/opportunities", placements.Find)
+	secured.POST("/marketplace/offers/:id/join", marketplace.JoinOffer)
 	admin := r.Group("/v1/offer-review", middleware.AdminKeyAuth("test-admin", nil))
 	admin.POST("/placements/:id/approve", placements.Approve)
 	redirects := &RedirectsHandler{DB: db, HomeURL: "https://offerrails.example/", IPSaltSecret: "d063-salt"}

@@ -46,6 +46,9 @@ func TestIssuedPluginKeyAcksAndCannotBeReadBack(t *testing.T) {
 	}
 	_, offerID := seedListedOffer(t, db, "plugin-issue-maker", "plugin-issue-maker@example.com", "Plugin Product")
 	placementID := insertPlacement(t, db, siteID, offerID, "https://plugin-issue.example/post", "Plugin Product note.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
 	acked, ackBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "placed", "rel_sponsored": true}, map[string]string{"X-Plugin-Key": raw})
 	if acked.Code != http.StatusOK || ackBody["plugin_state"] != "placed" {
 		t.Fatalf("issued key ack: %d %s", acked.Code, acked.Body.String())
@@ -89,6 +92,9 @@ func TestIssuedPluginKeyAcksAndCannotBeReadBack(t *testing.T) {
 		t.Fatalf("connect key missing: %s", completed.Body.String())
 	}
 	connectPlacement := insertPlacement(t, db, connectSite, offerID, "https://connect-plugin.example/post", "Plugin Product note.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, connectPlacement); err != nil {
+		t.Fatal(err)
+	}
 	connectAck, connectAckBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+connectPlacement+"/plugin-ack", map[string]any{"action": "placed", "rel_sponsored": true}, map[string]string{"X-Plugin-Key": found[1]})
 	if connectAck.Code != http.StatusOK || connectAckBody["plugin_state"] != "placed" {
 		t.Fatalf("connect key ack: %d %s", connectAck.Code, connectAck.Body.String())
@@ -142,6 +148,9 @@ VALUES($1,'or_plug',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 		t.Fatalf("second generate: %d %s", again.Code, again.Body.String())
 	}
 	placementID := insertPlacement(t, db, siteID, offerID, "https://plugin-manage.example/post", "Manage Product note.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
 	acked, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "placed", "rel_sponsored": true}, map[string]string{"X-Plugin-Key": raw})
 	if acked.Code != http.StatusOK {
 		t.Fatalf("generated key ack: %d %s", acked.Code, acked.Body.String())
@@ -152,6 +161,9 @@ VALUES($1,'or_plug',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 	}
 	next := rotatedBody["plugin_key"].(string)
 	secondID := insertPlacement(t, db, siteID, offerID, "https://plugin-manage.example/next", "Manage Product note.")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, secondID); err != nil {
+		t.Fatal(err)
+	}
 	nextAck, nextBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+secondID+"/plugin-ack", map[string]any{"action": "placed", "rel_sponsored": true}, map[string]string{"X-Plugin-Key": next})
 	if nextAck.Code != http.StatusOK || nextBody["plugin_state"] != "placed" {
 		t.Fatalf("rotated key ack: %d %s", nextAck.Code, nextAck.Body.String())
@@ -232,6 +244,9 @@ func TestRestoreAndRetryBlockedWhenClaimsFail(t *testing.T) {
 	approved, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/placements/"+placementID+"/decide", map[string]any{"relevance": 80, "position": "end", "rel_sponsored": true})
 	if approved.Code != http.StatusOK {
 		t.Fatalf("decide: %d %s", approved.Code, approved.Body.String())
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
 	}
 	undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/revoke", map[string]any{"reason": "undo"}, map[string]string{"X-API-Key": "claims-site-key"})
 	if undone.Code != http.StatusOK {

@@ -229,6 +229,9 @@ func TestRelSponsoredComesFromPluginReread(t *testing.T) {
 	if decided.Code != http.StatusOK || decidedBody["approved_by"] != "policy:yolo" {
 		t.Fatalf("decide used disclosure words: %d %s", decided.Code, decided.Body.String())
 	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
 	pluginKey := issuePluginKey(t, db, siteID, "rel-plugin-key")
 	words, wordsBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": false}, pluginKey)
 	if words.Code != http.StatusUnprocessableEntity || wordsBody["check_id"] != "rel_sponsored" {
@@ -402,6 +405,9 @@ VALUES($1,'or_ackk',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 		t.Fatalf("site key ack: %d %s", siteRefused.Code, siteRefused.Body.String())
 	}
 	pluginKey := issuePluginKey(t, db, siteID, "ack-plugin-key")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
 	acked, body := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if acked.Code != http.StatusOK || body["plugin_state"] != "placed" {
 		t.Fatalf("plugin key ack: %d %s", acked.Code, acked.Body.String())
@@ -715,6 +721,9 @@ VALUES($1,'or_cont',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 	}
 
 	deniedID := fresh("https://blog.example/denied")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, deniedID); err != nil {
+		t.Fatal(err)
+	}
 	denied, deniedBody := ack(deniedID, `{"action":"placed","rel_sponsored":false}`, pluginKey)
 	if denied.Code != http.StatusUnprocessableEntity || deniedBody["check_id"] != "rel_sponsored" || waitOf(deniedID) != "" {
 		t.Fatalf("placed without rel: %d %s wait %q", denied.Code, denied.Body.String(), waitOf(deniedID))
@@ -731,7 +740,7 @@ VALUES($1,'or_cont',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 	}
 
 	restoredID := fresh("https://blog.example/restored")
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='restore', plugin_wait_at=NOW() WHERE id=$1`, restoredID); err != nil {
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', plugin_wait='restore', plugin_wait_at=NOW() WHERE id=$1`, restoredID); err != nil {
 		t.Fatal(err)
 	}
 	restored, restoredBody := ack(restoredID, `{"action":"restored","rel_sponsored":true}`, pluginKey)
@@ -740,6 +749,9 @@ VALUES($1,'or_cont',$2,'site',$3,NOW()+INTERVAL '1 hour')`, services.HashAPIKey(
 	}
 
 	failedID := fresh("https://blog.example/failed")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, failedID); err != nil {
+		t.Fatal(err)
+	}
 	failed, failedBody := ack(failedID, `{"action":"failed","rel_sponsored":false,"reason":"re-read failed"}`, pluginKey)
 	if failed.Code != http.StatusOK || failedBody["plugin_state"] != "failed" || failedBody["plugin_failed_reason"] != "re-read failed" || failedBody["failed_action"] != "restored" || waitOf(failedID) != "" {
 		t.Fatalf("failed ack: %d %s wait %q", failed.Code, failed.Body.String(), waitOf(failedID))
