@@ -64,12 +64,93 @@ export const agentPrompt = 'Use the Offer Rails MCP server. Sign in with Google 
 export const cursorInstallUrl = 'https://cursor.com/en/install-mcp?name=offer-rails&config=eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ%3D%3D'
 
 export const installs = [
-  { id: 'cursor', label: 'Cursor', snippet: '{"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}' },
-  { id: 'claude', label: 'Claude Code', snippet: 'claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp' },
-  { id: 'vscode', label: 'VS Code', snippet: '{"servers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}' },
-  { id: 'windsurf', label: 'Windsurf', snippet: '{"mcpServers":{"offer-rails":{"serverUrl":"https://offer-rails.onrender.com/mcp"}}}' },
-  { id: 'generic', label: 'Generic', snippet: mcpConfig },
+  { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}' },
+  { id: 'claude', label: 'Claude Code', tested: true, proof: 'Checked. claude mcp add wrote the user config, and claude mcp get reported Needs authentication.', snippet: 'claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp' },
+  { id: 'vscode', label: 'VS Code', tested: false, proof: 'Untested. The VS Code client was not run against the hosted MCP server.', snippet: '{"servers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}' },
+  { id: 'windsurf', label: 'Windsurf', tested: false, proof: 'Untested. The Windsurf client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"serverUrl":"https://offer-rails.onrender.com/mcp"}}}' },
+  { id: 'generic', label: 'Generic', tested: true, proof: 'Checked. JSON-RPC initialize against this URL returned 401 no bearer token.', snippet: mcpConfig },
 ]
+
+export const deployNote = 'The hosted app gets these steps once the next deploy lands.'
+
+export const approvalNote = 'Step 5 stays a human or an operator for now.'
+
+export const orderedSteps = [
+  {
+    n: 1,
+    title: 'Signup',
+    body: 'POST /v1/agent-accounts. No key. Body: role (publisher or maker), name, email, and domain for a publisher. Optional source.',
+    details: [
+      'Publisher 201: owner_id, site_id, api_key (send as X-API-Key), key_header X-API-Key, plugin_key (send as X-Plugin-Key), plugin_key_header X-Plugin-Key, agent_only true, human_login false, role publisher. Both keys are shown once.',
+      'Maker 201: owner_id, maker_id, api_key (send as X-Maker-Key), key_header X-Maker-Key. No plugin key.',
+    ],
+  },
+  {
+    n: 2,
+    title: 'Site',
+    body: 'No second call and no browser session. site_id, the site key, and the plugin key come back from signup.',
+  },
+  {
+    n: 3,
+    title: 'Join an offer',
+    body: 'POST /v1/marketplace/offers/:id/join with X-API-Key.',
+  },
+  {
+    n: 4,
+    title: 'Find and prepare',
+    body: 'POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy.',
+  },
+  {
+    n: 5,
+    title: 'Approval',
+    body: 'A signed-in owner uses the dashboard. An operator sends POST /v1/offer-review/placements/:id/approve with X-Admin-Key and site_id, owner_email, and evidence. A site key cannot approve. Approving a device code does not approve a placement.',
+  },
+  {
+    n: 6,
+    title: 'Commit',
+    body: 'POST /v1/placements/:id/commit with X-API-Key.',
+  },
+  {
+    n: 7,
+    title: 'Receipt',
+    body: 'POST /v1/placements/:id/receipt with X-API-Key. published_text must contain the approved copy, the disclosure, and /go/<placement_id>.',
+  },
+  {
+    n: 8,
+    title: 'Plugin acknowledgement',
+    body: 'POST /v1/placements/:id/plugin-ack with X-Plugin-Key and {"action":"placed","rel_sponsored":true}. X-API-Key, Authorization, and X-Maker-Key are refused.',
+  },
+  {
+    n: 9,
+    title: 'Go link and click',
+    body: 'GET /v1/go/<placement_id>. No key. After the acknowledgement is placed, the response is 302 to the offer landing URL with via set to the click id, and the click is counted. Before that, the same URL is a 302 to the plain landing URL, with no via and no click.',
+  },
+  {
+    n: 10,
+    title: 'Sales and refunds',
+    body: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key. Send click_id set to the via value from the go link.',
+  },
+  {
+    n: 11,
+    title: 'Reporting',
+    body: 'GET /v1/digest and GET /v1/payouts/balance with X-API-Key. GET /v1/maker/digest and GET /v1/maker/earnings with X-Maker-Key.',
+  },
+]
+
+export const deviceSignIn = {
+  intro: 'This is the human page for a device code. It is separate from the agent-created site above.',
+  points: [
+    { text: 'POST /v1/device/code. No key. Returns device_code, user_code, verification_uri (the public origin plus /device), interval 5, and expires_in 300.' },
+    {
+      before: 'The human opens verification_uri (',
+      link: { href: '/device', label: 'GET /device' },
+      after: '). A signed-out human is redirected to /auth/login?return_to= and then back. The return path may be /device or /device?user_code=<canonical code>. Any other query, a broken percent-escape, a fragment, or an absolute URL is refused.',
+    },
+    { text: 'The signed-in human posts the form to POST /device with the session cookie, Origin equal to the public origin, the csrf field, user_code, and decision approve or deny. Approve also sends project as site:<id> or offer:<id>, and that project must belong to the session owner. The stored return path is only that canonical /device URL. source, ref, and via are not copied onto it.' },
+    { text: 'The JSON equivalent is POST /v1/device/approve with the owner session, user_code, decision, and on approve scope plus project_id.' },
+    { text: 'The agent polls POST /v1/device/token with device_code. An approval returns access_token, key_header (X-API-Key or X-Maker-Key), and scope. A denial returns access_denied.' },
+  ],
+}
 
 export const rates = [
   { route: '/mcp', limit: '240 a minute', over: '429 rate limit exceeded' },
@@ -104,7 +185,7 @@ export const deviceSteps = [
   },
   {
     title: 'A human signs in',
-    body: 'The browser step needs a human sign-in. The code response includes verification_uri. This page does not link it.',
+    body: 'The browser step needs a human sign-in. The human opens verification_uri, which is GET /device.',
   },
   {
     title: 'Poll for the key',
@@ -116,7 +197,7 @@ export const agentAccount = {
   route: 'POST /v1/agent-accounts',
   publisherRequest: '{"role":"publisher","name":"...","email":"...","domain":"...","source":"..."}',
   makerRequest: '{"role":"maker","name":"...","email":"...","source":"..."}',
-  publisherResponse: '{"owner_id":"...","agent_only":true,"human_login":false,"role":"publisher","site_id":"...","api_key":"...","key_header":"X-API-Key"}',
+  publisherResponse: '{"owner_id":"...","agent_only":true,"human_login":false,"role":"publisher","site_id":"...","api_key":"...","key_header":"X-API-Key","plugin_key":"...","plugin_key_header":"X-Plugin-Key"}',
   makerResponse: '{"owner_id":"...","agent_only":true,"human_login":false,"role":"maker","maker_id":"...","api_key":"...","key_header":"X-Maker-Key"}',
   rules: 'role is publisher or maker. name is 1 to 80 characters. email contains @, has no spaces, and is at most 255 characters. A publisher also sends domain: non-empty, no spaces, at most 255 characters. source is optional. An unrecognized source is stored as direct. 400 is invalid payload, or role, name, and email required, or domain required. 409 is {reason, message} with reason account_exists and message An account already exists for this email. 429 is {"error":"rate limit exceeded"}.',
 }
@@ -145,7 +226,13 @@ export function llmsText() {
   const docs = docLinks.map((href) => `- API docs: ${href}`).join('\n')
   const device = deviceSteps.map((step) => `- ${step.title}. ${step.body}`).join('\n')
   const alone = aloneToday.map((item) => `- ${item.title}. ${item.body}`).join('\n')
-  const install = installs.map((item) => `### ${item.label}\n\n${item.snippet}`).join('\n\n')
+  const install = installs.map((item) => `### ${item.label}\n\n${item.snippet}\n\n${item.proof}`).join('\n\n')
+  const ordered = orderedSteps.map((step) => {
+    const extra = (step.details || []).map((line) => `   - ${line}`).join('\n')
+    const note = step.n === 5 ? `\n   ${approvalNote}` : ''
+    return `${step.n}. ${step.title}. ${step.body}${extra ? `\n${extra}` : ''}${note}`
+  }).join('\n\n')
+  const signIn = deviceSignIn.points.map((point) => `- ${point.text || `${point.before}${point.link.label}${point.after}`}`).join('\n')
   return `# Offer Rails
 
 Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article, prepares a disclosed placement, and a person approves it before it is published. A chat answer is never itself an ad.
@@ -166,7 +253,15 @@ Add to Cursor: ${cursorInstallUrl}
 
 ## Ordered agent steps
 
-Reserved. These steps are not written here.
+${deployNote}
+
+${ordered}
+
+### Device sign-in
+
+${deviceSignIn.intro}
+
+${signIn}
 
 ## What an agent can do alone today
 

@@ -6,7 +6,14 @@ declare module '@/agents/facts.mjs' {
   export const signInNote: string
   export const agentPrompt: string
   export const cursorInstallUrl: string
-  export const installs: readonly { id: string; label: string; snippet: string }[]
+  export const installs: readonly { id: string; label: string; snippet: string; tested: boolean; proof: string }[]
+  export const deployNote: string
+  export const approvalNote: string
+  export const orderedSteps: readonly { n: number; title: string; body: string; details?: readonly string[] }[]
+  export const deviceSignIn: {
+    intro: string
+    points: readonly ({ text: string; before?: never; link?: never; after?: never } | { text?: never; before: string; after: string; link: { href: string; label: string } })[]
+  }
   export const docLinks: readonly string[]
   export const steps: readonly { title: string; body: string }[]
   export const modes: readonly { name: string; body: string }[]

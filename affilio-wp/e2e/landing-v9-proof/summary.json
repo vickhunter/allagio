@@ -133,7 +133,9 @@
     "alone": 4,
     "human": true,
     "signup": true,
-    "deviceLinks": [],
+    "deviceLinks": [
+      "/device"
+    ],
     "serious": [],
     "copiedUrl": "https://offer-rails.onrender.com/mcp",
     "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",
@@ -417,7 +419,9 @@
     "alone": 4,
     "human": true,
     "signup": true,
-    "deviceLinks": [],
+    "deviceLinks": [
+      "/device"
+    ],
     "serious": [],
     "copiedUrl": "https://offer-rails.onrender.com/mcp",
     "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",

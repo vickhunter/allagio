@@ -16,27 +16,72 @@ This server needs a Google sign-in today. These snippets do not include an API k
 
 {"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}
 
+Untested. The Cursor client was not run against the hosted MCP server.
+
 ### Claude Code
 
 claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp
+
+Checked. claude mcp add wrote the user config, and claude mcp get reported Needs authentication.
 
 ### VS Code
 
 {"servers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}
 
+Untested. The VS Code client was not run against the hosted MCP server.
+
 ### Windsurf
 
 {"mcpServers":{"offer-rails":{"serverUrl":"https://offer-rails.onrender.com/mcp"}}}
+
+Untested. The Windsurf client was not run against the hosted MCP server.
 
 ### Generic
 
 {"mcpServers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}
 
+Checked. JSON-RPC initialize against this URL returned 401 no bearer token.
+
 Add to Cursor: https://cursor.com/en/install-mcp?name=offer-rails&config=eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ%3D%3D
 
 ## Ordered agent steps
 
-Reserved. These steps are not written here.
+The hosted app gets these steps once the next deploy lands.
+
+1. Signup. POST /v1/agent-accounts. No key. Body: role (publisher or maker), name, email, and domain for a publisher. Optional source.
+   - Publisher 201: owner_id, site_id, api_key (send as X-API-Key), key_header X-API-Key, plugin_key (send as X-Plugin-Key), plugin_key_header X-Plugin-Key, agent_only true, human_login false, role publisher. Both keys are shown once.
+   - Maker 201: owner_id, maker_id, api_key (send as X-Maker-Key), key_header X-Maker-Key. No plugin key.
+
+2. Site. No second call and no browser session. site_id, the site key, and the plugin key come back from signup.
+
+3. Join an offer. POST /v1/marketplace/offers/:id/join with X-API-Key.
+
+4. Find and prepare. POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy.
+
+5. Approval. A signed-in owner uses the dashboard. An operator sends POST /v1/offer-review/placements/:id/approve with X-Admin-Key and site_id, owner_email, and evidence. A site key cannot approve. Approving a device code does not approve a placement.
+   Step 5 stays a human or an operator for now.
+
+6. Commit. POST /v1/placements/:id/commit with X-API-Key.
+
+7. Receipt. POST /v1/placements/:id/receipt with X-API-Key. published_text must contain the approved copy, the disclosure, and /go/<placement_id>.
+
+8. Plugin acknowledgement. POST /v1/placements/:id/plugin-ack with X-Plugin-Key and {"action":"placed","rel_sponsored":true}. X-API-Key, Authorization, and X-Maker-Key are refused.
+
+9. Go link and click. GET /v1/go/<placement_id>. No key. After the acknowledgement is placed, the response is 302 to the offer landing URL with via set to the click id, and the click is counted. Before that, the same URL is a 302 to the plain landing URL, with no via and no click.
+
+10. Sales and refunds. POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key. Send click_id set to the via value from the go link.
+
+11. Reporting. GET /v1/digest and GET /v1/payouts/balance with X-API-Key. GET /v1/maker/digest and GET /v1/maker/earnings with X-Maker-Key.
+
+### Device sign-in
+
+This is the human page for a device code. It is separate from the agent-created site above.
+
+- POST /v1/device/code. No key. Returns device_code, user_code, verification_uri (the public origin plus /device), interval 5, and expires_in 300.
+- The human opens verification_uri (GET /device). A signed-out human is redirected to /auth/login?return_to= and then back. The return path may be /device or /device?user_code=<canonical code>. Any other query, a broken percent-escape, a fragment, or an absolute URL is refused.
+- The signed-in human posts the form to POST /device with the session cookie, Origin equal to the public origin, the csrf field, user_code, and decision approve or deny. Approve also sends project as site:<id> or offer:<id>, and that project must belong to the session owner. The stored return path is only that canonical /device URL. source, ref, and via are not copied onto it.
+- The JSON equivalent is POST /v1/device/approve with the owner session, user_code, decision, and on approve scope plus project_id.
+- The agent polls POST /v1/device/token with device_code. An approval returns access_token, key_header (X-API-Key or X-Maker-Key), and scope. A denial returns access_denied.
 
 ## What an agent can do alone today
 
@@ -53,7 +98,7 @@ Publisher request: {"role":"publisher","name":"...","email":"...","domain":"..."
 
 Maker request: {"role":"maker","name":"...","email":"...","source":"..."}
 
-Publisher 201: {"owner_id":"...","agent_only":true,"human_login":false,"role":"publisher","site_id":"...","api_key":"...","key_header":"X-API-Key"}
+Publisher 201: {"owner_id":"...","agent_only":true,"human_login":false,"role":"publisher","site_id":"...","api_key":"...","key_header":"X-API-Key","plugin_key":"...","plugin_key_header":"X-Plugin-Key"}
 
 Maker 201: {"owner_id":"...","agent_only":true,"human_login":false,"role":"maker","maker_id":"...","api_key":"...","key_header":"X-Maker-Key"}
 
@@ -62,7 +107,7 @@ role is publisher or maker. name is 1 to 80 characters. email contains @, has no
 ## Device code
 
 - Ask for a code. POST /v1/device/code with {}. A 200 body has device_code, user_code, verification_uri, interval, and expires_in.
-- A human signs in. The browser step needs a human sign-in. The code response includes verification_uri. This page does not link it.
+- A human signs in. The browser step needs a human sign-in. The human opens verification_uri, which is GET /device.
 - Poll for the key. POST /v1/device/token with device_code. grant_type is optional. When it is sent, it is urn:ietf:params:oauth:grant-type:device_code. A 200 body has access_token, token_type (Bearer), key_header, scope, and expires_in. While you wait, a 400 body has error, interval, and expires_in.
 
 ## Tools

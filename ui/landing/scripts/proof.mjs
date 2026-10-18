@@ -240,8 +240,11 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   for (const needle of ['https://offer-rails.onrender.com/mcp', 'find_opportunities', 'preview_page', 'get_digest', '/landing-v9/agents/', 'POST /v1/agent-accounts', 'What an agent can do alone today', 'The browser step needs a human sign-in', 'POST /v1/maker/sales', 'POST /v1/maker/refunds', 'Placing an offer needs approval for now', 'This server needs a Google sign-in today', 'claude mcp add --scope user --transport http offer-rails', '"serverUrl":"https://offer-rails.onrender.com/mcp"', 'cursor.com/en/install-mcp', '## Tell your agent', '## Ordered agent steps', '/docs/modes.md']) {
     if (!llmsBody.includes(needle)) throw new Error('llms missing ' + needle)
   }
-  if (/\/device(?!\/|[-a-z0-9])/.test(llmsBody)) throw new Error('llms links a missing device page')
-  if (/grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i.test(llmsBody)) throw new Error('llms has forbidden wording')
+  if (!/GET \/device/.test(llmsBody)) throw new Error('llms does not name GET /device')
+  if (!llmsBody.includes('The hosted app gets these steps once the next deploy lands')) throw new Error('llms missing the deploy note')
+  if (!llmsBody.includes('Step 5 stays a human or an operator for now.')) throw new Error('llms missing the approval note')
+  if (!llmsBody.includes('X-Plugin-Key') || !llmsBody.includes('X-Admin-Key')) throw new Error('llms missing an auth header from the ordered steps')
+  if (/grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i.test(llmsBody.replaceAll('/v1/marketplace/', '/v1/offer-join/'))) throw new Error('llms has forbidden wording')
   const alias = await fetch(origin + '/agents', { redirect: 'manual' })
   const location = alias.headers.get('location') || ''
   if (alias.status !== 302 || location !== '/landing-v9/agents/') throw new Error('agents alias ' + alias.status + ' ' + location)
@@ -262,7 +265,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
       scroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
       small,
       brand: !/distributoor|affilio/i.test(text),
-      forbidden: /grok|marketplace|\blisted\b|github\.com|connector/i.test(text),
+      forbidden: /grok|marketplace|\blisted\b|github\.com|connector/i.test(text.replaceAll('/v1/marketplace/', '/v1/offer-join/')),
       steps: document.querySelectorAll('[data-agent-steps] > li').length,
       soon: [...document.querySelectorAll('[data-tool][data-soon="true"]')].map((el) => el.getAttribute('data-tool')),
       livePreview: document.querySelector('[data-tool="preview_page"]')?.innerText.includes('Coming soon') && !document.querySelector('[data-tool="find_opportunities"]')?.innerText.includes('Coming soon'),
@@ -308,12 +311,23 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   if (facts.tram !== 'none') throw new Error('agents-' + width + ' motion ' + facts.tram)
   if (!facts.rates || !facts.errors) throw new Error('agents-' + width + ' limits or errors')
   if (facts.alone !== 4 || !facts.human || !facts.signup) throw new Error('agents-' + width + ' alone or signup')
-  if (facts.deviceLinks.length) throw new Error('agents-' + width + ' device link ' + facts.deviceLinks.join(','))
+  if (facts.deviceLinks.length !== 1 || facts.deviceLinks[0] !== '/device') throw new Error('agents-' + width + ' device link ' + facts.deviceLinks.join(','))
   if (copiedUrl !== 'https://offer-rails.onrender.com/mcp') throw new Error('agents-' + width + ' clipboard url ' + copiedUrl)
   if (copiedConfig !== '{"mcpServers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}') throw new Error('agents-' + width + ' clipboard config ' + copiedConfig)
   if (!cursorInstall || !cursorInstall.startsWith('https://cursor.com/en/install-mcp?name=offer-rails&config=') || !cursorInstall.includes('eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ')) throw new Error('agents-' + width + ' cursor install ' + cursorInstall)
   const reserved = await page.locator('[data-d063-steps]').innerText()
-  if (!reserved.includes('Reserved') || reserved.includes('Step 1')) throw new Error('agents-' + width + ' d063 spot ' + reserved)
+  for (const needle of ['1. Signup', '11. Reporting', 'X-Plugin-Key', 'X-Admin-Key', 'X-API-Key', 'X-Maker-Key', 'GET /device', 'The hosted app gets these steps once the next deploy lands', 'Step 5 stays a human or an operator for now.', 'Device sign-in']) {
+    if (!reserved.includes(needle)) throw new Error('agents-' + width + ' d063 missing ' + needle)
+  }
+  if (reserved.includes('not written') || reserved.includes('Reserved')) throw new Error('agents-' + width + ' d063 still reserved')
+  const genericPanel = await page.locator('#install-panel-generic').innerText()
+  if (!genericPanel.includes('401 no bearer token') || genericPanel.includes('Untested')) throw new Error('agents-' + width + ' generic panel ' + genericPanel)
+  await page.getByRole('tab', { name: 'Claude Code' }).click()
+  const claudePanel = await page.locator('#install-panel-claude').innerText()
+  if (!claudePanel.includes('Needs authentication') || claudePanel.includes('Untested')) throw new Error('agents-' + width + ' claude panel ' + claudePanel)
+  await page.getByRole('tab', { name: 'Windsurf' }).click()
+  const windsurfPanel = await page.locator('#install-panel-windsurf').innerText()
+  if (!windsurfPanel.startsWith('Untested.')) throw new Error('agents-' + width + ' windsurf panel ' + windsurfPanel)
   await context.close()
 }
 

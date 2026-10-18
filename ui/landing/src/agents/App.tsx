@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { agentAccount, agentPrompt, aloneToday, cursorInstallUrl, deviceSteps, errors, installs, mcpUrl, modes, rates, signInNote, steps, tools } from '@/agents/facts.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, cursorInstallUrl, deployNote, deviceSignIn, deviceSteps, errors, installs, mcpUrl, modes, orderedSteps, rates, signInNote, steps, tools } from '@/agents/facts.mjs'
 import { Page } from '@/site/Page'
 
 const primaryClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-t1 px-5 font-semibold text-s0 transition-colors duration-150 hover:bg-[rgb(60_66_55)] sm:w-auto'
@@ -59,11 +59,12 @@ function InstallTabs() {
             aria-controls={`install-panel-${item.id}`}
             className={item.id === active ? 'inline-flex min-h-12 shrink-0 items-center rounded-xl border border-line-strong bg-s2 px-4 font-semibold text-t1' : 'inline-flex min-h-12 shrink-0 items-center rounded-xl border border-line bg-s1 px-4 font-semibold text-t2'}
             onClick={() => setActive(item.id)}
-          >{item.label}</button>
+          >{item.tested ? item.label : `${item.label} · Untested`}</button>
         ))}
       </div>
       <div role="tabpanel" id={`install-panel-${current.id}`} aria-labelledby={`install-tab-${current.id}`} className="mt-4">
-        <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{current.snippet}</pre>
+        <p className="text-[15px] leading-relaxed text-t1">{current.proof}</p>
+        <pre className="mt-4 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{current.snippet}</pre>
         <CopyButton value={current.snippet} label={current.id === 'generic' ? 'Copy config' : `Copy ${current.label}`} statusName={current.id === 'generic' ? 'config' : current.id} />
         {current.id === 'cursor' ? <a className={secondaryClass} href={cursorInstallUrl} data-cursor-install>Add to Cursor</a> : null}
       </div>
@@ -121,10 +122,28 @@ export function App() {
           ))}
         </ol>
 
-        {/* D-063 ordered agent steps. Do not add steps in this spot. */}
-        <section data-d063-steps aria-labelledby="d063-steps" className="mt-12 rounded-2xl border border-dashed border-line p-5">
+        <section data-d063-steps aria-labelledby="d063-steps" className="mt-12 rounded-2xl border border-line bg-s1 p-5">
           <h2 id="d063-steps" className="font-display text-2xl font-bold">Ordered agent steps</h2>
-          <p className="mt-2 text-[15px] leading-relaxed text-t2">Reserved. These steps are not written on this page.</p>
+          <p className="mt-2 text-[15px] leading-relaxed text-t2">{deployNote}</p>
+          <ol className="mt-6 space-y-5">
+            {orderedSteps.map((step) => (
+              <li key={step.n} className="break-words">
+                <h3 className="font-display text-lg font-bold">{step.n}. {step.title}</h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-t2">{step.body}</p>
+                {(step.details || []).map((line) => <p key={line} className="mt-2 text-[15px] leading-relaxed text-t2">{line}</p>)}
+                {step.n === 5 ? <p className="mt-2 text-[15px] leading-relaxed text-t1">{approvalNote}</p> : null}
+              </li>
+            ))}
+          </ol>
+          <h3 className="mt-8 font-display text-lg font-bold">Device sign-in</h3>
+          <p className="mt-2 break-words text-[15px] leading-relaxed text-t2">{deviceSignIn.intro}</p>
+          <ul className="mt-4 space-y-3">
+            {deviceSignIn.points.map((point) => (
+              <li key={point.text || point.before} className="break-words text-[15px] leading-relaxed text-t2">
+                {point.link ? <>{point.before}<a href={point.link.href} className="inline-flex min-h-11 items-center px-1 underline underline-offset-4">{point.link.label}</a>{point.after}</> : point.text}
+              </li>
+            ))}
+          </ul>
         </section>
 
         <h2 className="h-display mt-12 text-2xl sm:text-3xl">What an agent can do alone today</h2>
