@@ -442,6 +442,10 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 			_, _ = io.WriteString(w, `<html><head><title>Members</title></head><body><main><p>This account is private. Log in to continue.</p></main></body></html>`)
 		case "/password":
 			_, _ = io.WriteString(w, `<html><head><title>Members</title></head><body><main><p>Welcome back.</p><input type="password"></main></body></html>`)
+		case "/login-meta":
+			_, _ = io.WriteString(w, `<html><head><title>Members</title><meta property="og:description" content="`+strings.Repeat("ceramic glaze kiln notes ", 30)+`"></head><body><main><p>Log in to see this post.</p></main></body></html>`)
+		case "/password-meta":
+			_, _ = io.WriteString(w, `<html><head><title>Members</title><meta property="og:description" content="`+strings.Repeat("ceramic glaze kiln notes ", 30)+`"></head><body><main><p>Welcome back.</p><input type="password"></main></body></html>`)
 		case "/long":
 			_, _ = io.WriteString(w, `<html><head><title>Notes</title></head><body><main><p>`+strings.Repeat("word ", 90)+`This article mentions login once.</p></main></body></html>`)
 		case "/bare":
@@ -473,7 +477,7 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 	if len(dialed) != 1 || dialed[0] != "203.0.113.10:80" {
 		t.Fatalf("html dialed %v", dialed)
 	}
-	for _, path := range []string{"/empty", "/login", "/password", "/denied"} {
+	for _, path := range []string{"/empty", "/login", "/password", "/login-meta", "/password-meta", "/denied"} {
 		if _, err = plain.Fetch(context.Background(), "http://preview.example"+path); !errors.Is(err, ErrUnreadable) {
 			t.Fatalf("%s: %v", path, err)
 		}

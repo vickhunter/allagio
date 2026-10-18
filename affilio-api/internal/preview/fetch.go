@@ -440,9 +440,10 @@ func unreadableStatus(kind string, code int) bool {
 }
 
 func pageFromHTML(raw string) (Page, error) {
-	title, text := extractPage(raw)
-	title, text = applyMeta(raw, title, text)
-	if strings.TrimSpace(text) == "" || loginWall(raw, title, text) {
+	title, body := extractPage(raw)
+	title, text := applyMeta(raw, title, body)
+	// Word count uses the visible body. A long description must not hide a short login wall.
+	if strings.TrimSpace(text) == "" || loginWall(raw, title, body) {
 		return Page{}, ErrUnreadable
 	}
 	if title != "" && !strings.Contains(text, title) {

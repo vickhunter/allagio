@@ -381,7 +381,7 @@ func TestPreviewYouTubeOEmbed(t *testing.T) {
 }
 
 func TestPreviewLivePublicXPost(t *testing.T) {
-	if os.Getenv("AFFILIO_LIVE_PREVIEW") == "" {
+	if os.Getenv("AFFILIO_LIVE_PREVIEW") != "1" {
 		t.Skip("set AFFILIO_LIVE_PREVIEW=1 to fetch a real public X post")
 	}
 	db, cleanup := setupTestDB(t)
