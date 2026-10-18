@@ -136,6 +136,18 @@ func TestPageClaimsReadClientRenderedPages(t *testing.T) {
 	if reason != "" {
 		t.Fatalf("a numeric character reference must match the price: %q", reason)
 	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<!-- <script>var n = 20;</script>"}, PageClaimInput{CommissionValue: 20})
+	if reason != PageReasonCommission {
+		t.Fatalf("an unclosed comment must hide the rest of the page: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<!-- <meta content=\"Northwind Ledger\"> --><p>other</p>"}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+	if reason != PageReasonCard {
+		t.Fatalf("a meta tag inside a comment must not count: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<!-- <meta content=\"Nope\"> --><meta content=\"Northwind Ledger\">"}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+	if reason != "" {
+		t.Fatalf("a meta tag after a comment must count: %q", reason)
+	}
 	for _, body := range []string{
 		`<script type="application/ld+json">{"z":"Ledger","a":"Northwind"}</script>`,
 		`<script type="application/ld+json">{"a":"Northwind","z":"Ledger"}</script>`,

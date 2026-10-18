@@ -159,11 +159,32 @@ const evidenceBreak = "\x00"
 // closer or through the end of the document when that closer is missing.
 // A broken JSON-LD block is kept as one fragment. Nothing here panics.
 func pageEvidence(raw string) string {
-	stripped := stripEmbedded(raw)
+	stripped := dropComments(stripEmbedded(raw))
 	parts := []string{visiblePageText(stripped)}
 	parts = append(parts, metaParts(stripped)...)
 	parts = append(parts, jsonLDParts(raw)...)
 	return normalizePage(strings.Join(parts, evidenceBreak))
+}
+
+func dropComments(raw string) string {
+	lower := asciiLower(raw)
+	var b strings.Builder
+	pos := 0
+	for pos < len(raw) {
+		rel := strings.Index(lower[pos:], "<!--")
+		if rel < 0 {
+			b.WriteString(raw[pos:])
+			break
+		}
+		at := pos + rel
+		b.WriteString(raw[pos:at])
+		end := strings.Index(lower[at+4:], "-->")
+		if end < 0 {
+			break
+		}
+		pos = at + 4 + end + 3
+	}
+	return b.String()
 }
 
 func visiblePageText(stripped string) string {
@@ -459,7 +480,7 @@ func nextEmbedded(raw, lower string, from int) (embeddedElement, bool) {
 		if commentAt >= 0 && (start < 0 || commentAt < start) {
 			end := strings.Index(lower[commentAt+4:], "-->")
 			if end < 0 {
-				return embeddedElement{}, false
+				return embeddedElement{name: "comment", start: commentAt, next: len(raw)}, true
 			}
 			from = commentAt + 4 + end + 3
 			continue
