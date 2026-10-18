@@ -1,3 +1,19 @@
+## October 18 — Privacy and terms stay drafts until the wording is approved
+
+`/privacy` and `/terms` open with the line “Draft. This text is not final and has not been approved yet.” That line is in the built HTML, so the response carries it before any script runs. Both documents send `<meta name="robots" content="noindex, nofollow">`. No sitemap lists either path. One file serves each page: `landing-v9/privacy/index.html` and `landing-v9/terms/index.html`. `GET /privacy` and `GET /terms` read those files, and `/landing-v9/privacy/` and `/landing-v9/terms/` are the same files. While `LEGAL_PAGES_APPROVED` is false, those responses send `X-Robots-Tag: noindex`.
+
+## October 18 — Privacy copy, a dark rail mark, and Sign in on a phone
+
+The privacy draft now speaks to a reader. The opening is one sentence. Listing cards still store only the pass or fail signals and the score, and the page says we never store source code, environment files, or secrets. Processors name Anthropic only as a condition: if AI copy generation is turned on, page text sent for that is processed by Anthropic (Claude) to classify and draft copy. Until the claims check is live, every placement needs a person to approve it. A check that is missing or unknown still reads “Not checked yet.” The reviewer-demo line is gone.
+
+The rail mark has a dark-surface variant, `mark-dark.svg`, plus PNG at 512 and 1024. Rails and ties are cream so the mark stays visible on an ink ground. The contact sheet draws that variant on the dark tile. Sign in stays in the header at every width, including 390, with a 44px target.
+
+## October 18 — Privacy, terms, and the rail mark
+
+`/privacy` and `/terms` are draft pages in the landing design. Both show the banner “Draft, not yet approved” and the date 18 October 2026. The operator and the contact address stay the placeholders `[OPERATOR NAME]` and `[CONTACT EMAIL]`. The privacy text follows only what the service sends and stores: article text sent via the agent, placement fields, a public-page preview that stores nothing for a signed-out caller, account records, truncated and hashed click IPs, the named processors, and the rule that a Claude call is named only after production is checked. It does not say that call is on, and it does not say it is off. The terms draft says what makers, publishers, and agents may do, that payments in this pilot are test mode, and that there is no warranty. The footer links both pages. The proof server returns 200 for `/privacy` and `/terms`. That HTML is the file under `landing-v9/privacy/` and `landing-v9/terms/`, and the hosted route serves that same file at `/privacy` and `/terms`.
+
+The square mark under `ui/landing/public/brand/` is the header rail: two lines, four ties, and the maker dot. It is an SVG, plus PNG at 512 and 1024 on a light ground and on a transparent ground, a favicon set, and a wordmark SVG. The header mark itself is unchanged.
+
 ## October 18 — A public post preview reads X, YouTube, and Open Graph
 
 `POST /api/preview` still takes `{"url":"..."}`. An `x.com` or `twitter.com` post, including `mobile.x.com` and `mobile.twitter.com`, is read from `https://publish.twitter.com/oembed?url=<post>` with no API key. That endpoint redirects to `publish.x.com`, and the preview follows it. The tweet text is the blockquote, and the title is that text. A YouTube or `youtu.be` URL is read from `https://www.youtube.com/oembed`. Any other public page is still fetched as HTML. `og:title` wins over the document title when it is present. The text keeps the page body and adds `og:description`, `twitter:description`, the meta description, and `article:tag` when those are not already in the body. The chosen title is included in that text when the body does not already contain it, so a page with no `<main>` or `<article>` still matches on its title. A title with an empty body stays unreadable.

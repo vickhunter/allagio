@@ -5,7 +5,7 @@ import { CommandPalette, type Command } from '@/components/CommandPalette'
 import { track } from '@/lib/track'
 import { signInHref, useSource, withSource } from '@/lib/source'
 
-export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup'
+export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup' | 'legal'
 export const siteCommands: Command[] = [
   { id: 'home', label: 'Home', keys: 'h', href: '/' },
   { id: 'maker', label: 'Makers: every advantage', keys: 'm', href: '/makers/' },
@@ -34,13 +34,13 @@ export function Header({ page }: { page: PageKey }) {
           {link('/publishers/', 'Publishers', 'publishers', 'text-pub hover:bg-pub-soft')}
           {link('/protocol/', 'Protocol', 'protocol', 'text-t1 hover:bg-s2')}
         </nav>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button type="button" onClick={() => { setPaused((p) => !p); track('motion_toggle', { paused: !paused }) }} aria-pressed={paused}
             className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-s1 px-2.5 text-[13px] text-t2 transition-colors duration-150 hover:bg-s2">
             {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}<span className="hidden sm:inline">{paused ? 'Play' : 'Pause'} motion</span><span className="sr-only sm:hidden">{paused ? 'Play' : 'Pause'} motion</span>
           </button>
           <CommandPalette commands={siteCommands.map((command) => ({ ...command, href: command.href.startsWith('#') ? command.href : withSource(command.href, source) }))} />
-          <a href={signInHref('/owner', source)} data-track="nav_cta" className="hidden min-h-11 items-center rounded-lg border border-line-strong bg-s1 px-3 text-[13px] font-semibold transition-colors duration-150 hover:bg-s2 md:inline-flex">Sign in</a>
+          <a href={signInHref('/owner', source)} data-track="nav_cta" className="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-line-strong bg-s1 px-3 text-[13px] font-semibold transition-colors duration-150 hover:bg-s2">Sign in</a>
         </div>
       </div>
     </header>
