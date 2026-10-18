@@ -22,7 +22,8 @@ function hosted(name) {
   return readFileSync(join(build, 'landing-v9', name), 'utf8')
 }
 
-const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html'), '/publishers/setup': page('publishers-setup.html'), '/publishers/setup/': page('publishers-setup.html'), '/protocol': page('protocol.html'), '/protocol/': page('protocol.html'), '/privacy': hosted('privacy/index.html'), '/privacy/': hosted('privacy/index.html'), '/terms': hosted('terms/index.html'), '/terms/': hosted('terms/index.html') }
+const agentsHtml = hosted('agents/index.html')
+const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html'), '/publishers/setup': page('publishers-setup.html'), '/publishers/setup/': page('publishers-setup.html'), '/protocol': page('protocol.html'), '/protocol/': page('protocol.html'), '/privacy': hosted('privacy/index.html'), '/privacy/': hosted('privacy/index.html'), '/terms': hosted('terms/index.html'), '/terms/': hosted('terms/index.html'), '/landing-v9/agents': agentsHtml, '/landing-v9/agents/': agentsHtml, '/landing-v9/agents/index.html': agentsHtml }
 
 function typeFor(file) {
   if (file.endsWith('.css')) return 'text/css; charset=utf-8'
@@ -41,6 +42,16 @@ const server = createServer((req, res) => {
   if (pages[path]) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; img-src 'self'; connect-src 'self'" })
     res.end(pages[path])
+    return
+  }
+  if (path === '/llms.txt') {
+    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' })
+    res.end(readFileSync(join(build, 'landing-v9/llms.txt')))
+    return
+  }
+  if (path === '/agents' || path === '/agents/') {
+    res.writeHead(302, { location: '/landing-v9/agents/' })
+    res.end()
     return
   }
   if (path === '/auth/login') {
@@ -221,6 +232,91 @@ async function walkPreview(browser, origin, width, summary, outDir) {
   await context.close()
 }
 
+async function assertAgents(browser, origin, width, summary, outDir) {
+  const llms = await fetch(origin + '/llms.txt')
+  const llmsType = llms.headers.get('content-type') || ''
+  const llmsBody = await llms.text()
+  if (llms.status !== 200 || !llmsType.includes('text/plain')) throw new Error('llms ' + llms.status + ' ' + llmsType)
+  for (const needle of ['https://offer-rails.onrender.com/mcp', 'find_opportunities', 'preview_page', 'get_digest', '/landing-v9/agents/', 'POST /v1/agent-accounts', 'What an agent can do alone today', 'The browser step needs a human sign-in', 'POST /v1/maker/sales', 'POST /v1/maker/refunds', 'Placing an offer needs approval for now', 'This server needs a Google sign-in today', 'claude mcp add --scope user --transport http offer-rails', '"serverUrl":"https://offer-rails.onrender.com/mcp"', 'cursor.com/en/install-mcp', '## Tell your agent', '## Ordered agent steps', '/docs/modes.md']) {
+    if (!llmsBody.includes(needle)) throw new Error('llms missing ' + needle)
+  }
+  if (/\/device(?!\/|[-a-z0-9])/.test(llmsBody)) throw new Error('llms links a missing device page')
+  if (/grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i.test(llmsBody)) throw new Error('llms has forbidden wording')
+  const alias = await fetch(origin + '/agents', { redirect: 'manual' })
+  const location = alias.headers.get('location') || ''
+  if (alias.status !== 302 || location !== '/landing-v9/agents/') throw new Error('agents alias ' + alias.status + ' ' + location)
+  const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce', permissions: ['clipboard-read', 'clipboard-write'] })
+  const page = await context.newPage()
+  await page.goto(origin + '/agents', { waitUntil: 'networkidle' })
+  if (!page.url().endsWith('/landing-v9/agents/')) throw new Error('alias landed on ' + page.url())
+  const facts = await page.evaluate(() => {
+    const text = document.body.innerText
+    const small = [...document.querySelectorAll('a, button')].filter((el) => {
+      const style = getComputedStyle(el)
+      if (style.display === 'none' || style.visibility === 'hidden') return false
+      const box = el.getBoundingClientRect()
+      if (box.width < 2 || box.height < 2) return false
+      return box.width < 44 || box.height < 44
+    }).map((el) => ({ text: (el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 80), w: Math.round(el.getBoundingClientRect().width), h: Math.round(el.getBoundingClientRect().height) }))
+    return {
+      scroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
+      small,
+      brand: !/distributoor|affilio/i.test(text),
+      forbidden: /grok|marketplace|\blisted\b|github\.com|connector/i.test(text),
+      steps: document.querySelectorAll('[data-agent-steps] > li').length,
+      soon: [...document.querySelectorAll('[data-tool][data-soon="true"]')].map((el) => el.getAttribute('data-tool')),
+      livePreview: document.querySelector('[data-tool="preview_page"]')?.innerText.includes('Coming soon') && !document.querySelector('[data-tool="find_opportunities"]')?.innerText.includes('Coming soon'),
+      modes: ['Manual', 'Auto', 'YOLO'].every((name) => text.includes(name)),
+      stub: text.includes('claim_check_unavailable') && text.includes('Not checked yet'),
+      url: document.querySelector('[data-mcp-url]')?.textContent || '',
+      alternate: document.querySelector('link[rel="alternate"]')?.getAttribute('href') || '',
+      alternateType: document.querySelector('link[rel="alternate"]')?.getAttribute('type') || '',
+      primary: document.querySelectorAll('[data-primary-action]').length,
+      tram: getComputedStyle(document.querySelector('.tram')).animationName,
+      rates: text.includes('rate limit exceeded') && text.includes('preview rate limit exceeded') && text.includes('{"error":"rate limit exceeded"}'),
+      errors: ['invalid payload', 'invalid url', 'blocked address', 'origin not allowed', 'fetch failed', 'authorization_pending', 'isError: true'].every((item) => text.includes(item)),
+      alone: document.querySelectorAll('[data-alone] > li').length,
+      human: text.includes('The browser step needs a human sign-in'),
+      signup: text.includes('POST /v1/agent-accounts') && text.includes('"key_header":"X-API-Key"') && text.includes('"key_header":"X-Maker-Key"'),
+      deviceLinks: [...document.querySelectorAll('a')].map((el) => el.getAttribute('href') || '').filter((href) => /\/device(?!\/|[-a-z0-9])/.test(href)),
+    }
+  })
+  const axe = await new AxeBuilder({ page }).analyze()
+  const serious = axe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
+  writeFileSync(join(outDir, `axe-agents-${width}.json`), JSON.stringify({ violations: serious }, null, 2))
+  await page.getByRole('tab', { name: 'Cursor' }).click()
+  const cursorInstall = await page.locator('[data-cursor-install]').getAttribute('href')
+  await page.getByRole('tab', { name: 'Generic' }).click()
+  await page.getByRole('button', { name: 'Copy endpoint' }).click()
+  await page.locator('[data-copy-status="endpoint"]').getByText('Copied', { exact: true }).waitFor()
+  const copiedUrl = await page.evaluate(() => navigator.clipboard.readText())
+  await page.getByRole('button', { name: 'Copy config' }).click()
+  await page.locator('[data-copy-status="config"]').getByText('Copied', { exact: true }).waitFor()
+  const copiedConfig = await page.evaluate(() => navigator.clipboard.readText())
+  await page.screenshot({ path: join(outDir, 'agents-' + width + '.png'), fullPage: true })
+  summary.push({ slug: 'agents-' + width, ...facts, serious: serious.map((item) => item.id), copiedUrl, copiedConfig, cursorInstall })
+  if (!facts.scroll) throw new Error('agents-' + width + ' scrolls sideways')
+  if (facts.small.length) throw new Error('agents-' + width + ' small targets ' + JSON.stringify(facts.small))
+  if (serious.length) throw new Error('agents-' + width + ' axe ' + serious.map((item) => item.id + ' ' + item.nodes.map((node) => node.target.join(' ')).join('; ')).join(' | '))
+  if (!facts.brand || facts.forbidden) throw new Error('agents-' + width + ' forbidden wording')
+  if (facts.steps !== 3) throw new Error('agents-' + width + ' steps ' + facts.steps)
+  if (facts.soon.join(',') !== 'preview_page,get_digest' || !facts.livePreview) throw new Error('agents-' + width + ' soon ' + facts.soon.join(','))
+  if (!facts.modes || !facts.stub) throw new Error('agents-' + width + ' modes')
+  if (facts.url !== 'https://offer-rails.onrender.com/mcp') throw new Error('agents-' + width + ' url ' + facts.url)
+  if (facts.alternate !== '/llms.txt' || facts.alternateType !== 'text/plain') throw new Error('agents-' + width + ' alternate ' + facts.alternateType + ' ' + facts.alternate)
+  if (facts.primary !== 1) throw new Error('agents-' + width + ' primary ' + facts.primary)
+  if (facts.tram !== 'none') throw new Error('agents-' + width + ' motion ' + facts.tram)
+  if (!facts.rates || !facts.errors) throw new Error('agents-' + width + ' limits or errors')
+  if (facts.alone !== 4 || !facts.human || !facts.signup) throw new Error('agents-' + width + ' alone or signup')
+  if (facts.deviceLinks.length) throw new Error('agents-' + width + ' device link ' + facts.deviceLinks.join(','))
+  if (copiedUrl !== 'https://offer-rails.onrender.com/mcp') throw new Error('agents-' + width + ' clipboard url ' + copiedUrl)
+  if (copiedConfig !== '{"mcpServers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}') throw new Error('agents-' + width + ' clipboard config ' + copiedConfig)
+  if (!cursorInstall || !cursorInstall.startsWith('https://cursor.com/en/install-mcp?name=offer-rails&config=') || !cursorInstall.includes('eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ')) throw new Error('agents-' + width + ' cursor install ' + cursorInstall)
+  const reserved = await page.locator('[data-d063-steps]').innerText()
+  if (!reserved.includes('Reserved') || reserved.includes('Step 1')) throw new Error('agents-' + width + ' d063 spot ' + reserved)
+  await context.close()
+}
+
 await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen))
 const base = 'http://127.0.0.1:' + server.address().port
 mkdirSync(out, { recursive: true })
@@ -291,6 +387,8 @@ try {
       if (route === '/' && metrics.preview !== 1) throw new Error('home preview fields ' + metrics.preview)
       if (route !== '/' && metrics.preview) throw new Error(route + ' preview field leaked')
       if (metrics.primary !== 1) throw new Error(slug + ' primary count ' + metrics.primary)
+      const mcpHrefs = await page.getByRole('link', { name: 'MCP and setup' }).evaluateAll((links) => links.map((link) => link.getAttribute('href') || ''))
+      if (!mcpHrefs.length || mcpHrefs.some((href) => !href.includes('/landing-v9/agents/') || !href.includes('source=cursor'))) throw new Error(slug + ' MCP href ' + mcpHrefs.join(','))
       if (!(await page.getByText('Offer Rails is in an early pilot with a small group of makers and sites.').count())) throw new Error(slug + ' missing the plain pilot line')
       if (route === '/') {
         if (!(await page.getByRole('heading', { name: 'From a product to a paid sale, in five steps.' }).count())) throw new Error('how it works bento missing')
@@ -465,6 +563,7 @@ try {
     const setupZip = await setupPage.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
     if (setupZip !== '/downloads/affilio.zip') throw new Error('setup zip ' + setupZip)
     await setupContext.close()
+    await assertAgents(browser, base, width, summary, out)
     await walkPreview(browser, base, width, summary, out)
   }
   writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2))

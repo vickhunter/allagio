@@ -110,6 +110,36 @@
     "yolo": true
   },
   {
+    "slug": "agents-390",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "forbidden": false,
+    "steps": 3,
+    "soon": [
+      "preview_page",
+      "get_digest"
+    ],
+    "livePreview": true,
+    "modes": true,
+    "stub": true,
+    "url": "https://offer-rails.onrender.com/mcp",
+    "alternate": "/llms.txt",
+    "alternateType": "text/plain",
+    "primary": 1,
+    "tram": "none",
+    "rates": true,
+    "errors": true,
+    "alone": 4,
+    "human": true,
+    "signup": true,
+    "deviceLinks": [],
+    "serious": [],
+    "copiedUrl": "https://offer-rails.onrender.com/mcp",
+    "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",
+    "cursorInstall": "https://cursor.com/en/install-mcp?name=offer-rails&config=eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ%3D%3D"
+  },
+  {
     "slug": "preview-home-success-390",
     "scroll": true,
     "small": [],
@@ -362,6 +392,36 @@
     "serious": [],
     "connectHref": "/auth/login?return_to=%2Fowner%2Fconnect-site%3Fsource%3Dcursor&source=cursor",
     "yolo": true
+  },
+  {
+    "slug": "agents-1440",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "forbidden": false,
+    "steps": 3,
+    "soon": [
+      "preview_page",
+      "get_digest"
+    ],
+    "livePreview": true,
+    "modes": true,
+    "stub": true,
+    "url": "https://offer-rails.onrender.com/mcp",
+    "alternate": "/llms.txt",
+    "alternateType": "text/plain",
+    "primary": 1,
+    "tram": "none",
+    "rates": true,
+    "errors": true,
+    "alone": 4,
+    "human": true,
+    "signup": true,
+    "deviceLinks": [],
+    "serious": [],
+    "copiedUrl": "https://offer-rails.onrender.com/mcp",
+    "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",
+    "cursorInstall": "https://cursor.com/en/install-mcp?name=offer-rails&config=eyJ1cmwiOiJodHRwczovL29mZmVyLXJhaWxzLm9ucmVuZGVyLmNvbS9tY3AifQ%3D%3D"
   },
   {
     "slug": "preview-home-success-1440",
