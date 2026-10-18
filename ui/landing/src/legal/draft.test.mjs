@@ -24,6 +24,10 @@ for (const page of ['privacy', 'terms']) {
   test(page + ' shows the draft line and is not indexed', () => {
     const html = readFileSync(join(landing, page, 'index.html'), 'utf8')
     assert.ok(html.includes(robots), page + ' html is missing the robots meta')
+    assert.ok(html.includes(draftLine), page + ' html is missing the draft line')
+    const built = readFileSync(join(repo, 'affilio-wp/admin/build/landing-v9', page, 'index.html'), 'utf8')
+    assert.ok(built.includes(draftLine), page + ' built html is missing the draft line')
+    assert.ok(built.includes(robots), page + ' built html is missing the robots meta')
     const app = readFileSync(join(landing, 'src', page, 'App.tsx'), 'utf8')
     assert.match(app, /LegalDocument/)
     const copy = readFileSync(join(landing, 'src/legal/copy.ts'), 'utf8')
