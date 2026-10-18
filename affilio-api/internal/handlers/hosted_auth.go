@@ -62,6 +62,13 @@ func ValidatePublicURL(raw string) error {
 }
 
 func loopbackHost(host string) bool { return host == "127.0.0.1" || host == "::1" }
+
+// loopbackRedirectHost is the RFC 8252 loopback set for native-app callbacks:
+// the numeric addresses plus the localhost name. Public base URLs stay on
+// loopbackHost so a hosted origin is still an HTTPS or numeric loopback URL.
+func loopbackRedirectHost(host string) bool {
+	return loopbackHost(host) || strings.EqualFold(host, "localhost")
+}
 func randomToken() (string, error) {
 	var b [32]byte
 	if _, err := rand.Read(b[:]); err != nil {
@@ -455,7 +462,39 @@ func validRedirect(raw string) bool {
 	if err != nil || u.Host == "" || u.User != nil || u.Fragment != "" || len(raw) > 2048 {
 		return false
 	}
-	return u.Scheme == "https" || u.Scheme == "http" && loopbackHost(u.Hostname())
+	return u.Scheme == "https" || u.Scheme == "http" && loopbackRedirectHost(u.Hostname())
+}
+
+// redirectRegistered matches an authorization redirect to a registered URI.
+// HTTPS callbacks match exactly. An http loopback callback may use any port:
+// the registered host, path, and query stay fixed (RFC 8252 section 7.3).
+func redirectRegistered(registered []string, raw string) bool {
+	if slices.Contains(registered, raw) {
+		return true
+	}
+	got, ok := loopbackRedirect(raw)
+	if !ok {
+		return false
+	}
+	for _, item := range registered {
+		want, ok := loopbackRedirect(item)
+		if ok && want == got {
+			return true
+		}
+	}
+	return false
+}
+
+type loopbackRedirectKey struct {
+	host, path, rawQuery string
+}
+
+func loopbackRedirect(raw string) (loopbackRedirectKey, bool) {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "http" || u.Host == "" || u.User != nil || u.Fragment != "" || !loopbackRedirectHost(u.Hostname()) {
+		return loopbackRedirectKey{}, false
+	}
+	return loopbackRedirectKey{host: strings.ToLower(u.Hostname()), path: u.EscapedPath(), rawQuery: u.RawQuery}, true
 }
 
 func (h *HostedHandler) RegisterOAuthClient(c *gin.Context) {
@@ -526,7 +565,7 @@ func (h *HostedHandler) Authorize(c *gin.Context) {
 		return
 	}
 	client, err := h.DB.OAuthClient(c.Request.Context(), c.Query("client_id"))
-	if err != nil || !slices.Contains(client.RedirectURIs, c.Query("redirect_uri")) {
+	if err != nil || !redirectRegistered(client.RedirectURIs, c.Query("redirect_uri")) {
 		c.JSON(400, gin.H{"error": "invalid_client_or_redirect"})
 		return
 	}
