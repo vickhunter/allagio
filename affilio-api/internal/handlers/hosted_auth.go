@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -135,9 +136,66 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 		owner.POST("/products/:id/connection", h.Payments.Connect)
 	}
 	public.Any("/mcp", h.MCP)
+	// Gin redirects an extra trailing slash before group middleware, and it
+	// refuses a second /privacy/ route, so /privacy// never reaches headers().
+	// Serve a cleaned /privacy or /terms here. Other routes keep a one-slash redirect.
+	r.RedirectTrailingSlash = false
+	r.NoRoute(func(c *gin.Context) { h.unmatched(c, r) })
+}
+
+func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
+	requestPath := c.Request.URL.Path
+	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+		switch path.Clean(requestPath) {
+		case "/privacy":
+			if h.AssetsPath != "" {
+				h.writePublicHeaders(c)
+				h.Privacy(c)
+				return
+			}
+		case "/terms":
+			if h.AssetsPath != "" {
+				h.writePublicHeaders(c)
+				h.Terms(c)
+				return
+			}
+		}
+		if target, ok := trailingSlashTarget(c.Request.Method, requestPath, r); ok {
+			if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
+				c.Header("X-Robots-Tag", "noindex")
+			}
+			if q := c.Request.URL.RawQuery; q != "" {
+				target += "?" + q
+			}
+			c.Redirect(http.StatusMovedPermanently, target)
+			return
+		}
+	}
+	c.String(http.StatusNotFound, "404 page not found")
+}
+
+func trailingSlashTarget(method, requestPath string, r *gin.Engine) (string, bool) {
+	if len(requestPath) < 2 {
+		return "", false
+	}
+	alt := requestPath + "/"
+	if requestPath[len(requestPath)-1] == '/' {
+		alt = requestPath[:len(requestPath)-1]
+	}
+	for _, route := range r.Routes() {
+		if route.Method == method && route.Path == alt {
+			return alt, true
+		}
+	}
+	return "", false
 }
 
 func (h *HostedHandler) headers(c *gin.Context) {
+	h.writePublicHeaders(c)
+	c.Next()
+}
+
+func (h *HostedHandler) writePublicHeaders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Referrer-Policy", "strict-origin")
@@ -145,7 +203,6 @@ func (h *HostedHandler) headers(c *gin.Context) {
 	if !LEGAL_PAGES_APPROVED && draftLegalPath(c.Request.URL.Path) {
 		c.Header("X-Robots-Tag", "noindex")
 	}
-	c.Next()
 }
 
 func (h *HostedHandler) limited(c *gin.Context) bool {

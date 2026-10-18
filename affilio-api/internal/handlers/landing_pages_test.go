@@ -135,7 +135,7 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 		return rec.Header().Get("X-Robots-Tag")
 	}
 	noindex := []string{
-		"/privacy", "/privacy/", "/terms", "/terms/",
+		"/privacy", "/privacy/", "/privacy//", "/terms", "/terms/", "/terms//",
 		"/landing-v9/privacy/", "/landing-v9/terms/",
 	}
 	redirects := []string{
