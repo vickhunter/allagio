@@ -3,9 +3,13 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +17,19 @@ import (
 	"affilio-api/internal/services"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/oauth2"
 )
+
+var publisherOfferRailsTools = []string{
+	"preview_revenue",
+	"find_opportunities",
+	"prepare_placement",
+	"list_agent_tasks",
+	"undo_placement",
+	"restore_placement",
+	"get_balance",
+	"get_payout_history",
+}
 
 func TestLoopbackRedirectIgnoresPort(t *testing.T) {
 	registered := []string{"http://localhost:1111/callback?listen=1", "https://example.com/cb"}
@@ -130,8 +146,8 @@ func TestAgentAccountKeyCallsMCP(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	publisherTools := mcpToolNames(t, ctx, server.URL+"/mcp", siteKey)
-	if !publisherTools["find_opportunities"] || !publisherTools["get_balance"] || publisherTools["list_products"] || publisherTools["register_product"] {
-		t.Fatalf("publisher tools: %v", publisherTools)
+	if missing := missingTools(publisherTools, publisherOfferRailsTools); len(missing) > 0 || publisherTools["list_products"] || publisherTools["register_product"] {
+		t.Fatalf("publisher tools missing %v in %v", missing, publisherTools)
 	}
 	found := callMCPTool(t, ctx, server.URL+"/mcp", siteKey, "find_opportunities", map[string]any{"context": "Northstar reviews pull requests before merge."})
 	if found["status"] != "no_match" {
@@ -146,6 +162,88 @@ func TestAgentAccountKeyCallsMCP(t *testing.T) {
 	if _, ok := listed["products"]; !ok {
 		t.Fatalf("list_products: %v", listed)
 	}
+}
+
+func TestLocalhostRegistrationListsTools(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, r, server := hostedTestServer(t, db)
+	siteKey := "d069-publisher-key"
+	createTestSite(t, db, siteKey, "publisher.example.com", "Publisher")
+	o, cookie := testOwnerSession(t, h, "d069-owner", "d069-owner@example.com")
+	claim := ownerForm(t, h, r, cookie, "/owner/accounts", url.Values{"csrf": {o.CSRF}, "role": {"publisher"}, "api_key": {siteKey}})
+	if claim.Code != http.StatusSeeOther {
+		t.Fatalf("claim: %d %s", claim.Code, claim.Body.String())
+	}
+	o, err := h.DB.OwnerSession(context.Background(), services.HashAPIKey(cookie.Value))
+	if err != nil || o.SiteID == "" {
+		t.Fatalf("owner site: %+v %v", o, err)
+	}
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+	redirect := fmt.Sprintf("http://localhost:%d/callback", port)
+	registered, registeredBody := postJSON(t, r, http.MethodPost, "/oauth/register", map[string]any{
+		"client_name": "Claude Code", "redirect_uris": []string{redirect}, "token_endpoint_auth_method": "none",
+	}, nil)
+	clientID, _ := registeredBody["client_id"].(string)
+	if registered.Code != http.StatusCreated || clientID == "" {
+		t.Fatalf("register: %d %s", registered.Code, registered.Body.String())
+	}
+
+	verifier, err := randomToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := url.Values{
+		"client_id": {clientID}, "redirect_uri": {redirect}, "resource": {h.resource()}, "response_type": {"code"},
+		"scope": {"publisher"}, "code_challenge": {oauth2.S256ChallengeFromVerifier(verifier)}, "code_challenge_method": {"S256"}, "state": {"client-state"},
+	}
+	authReq := httptest.NewRequest(http.MethodGet, "/oauth/authorize?"+q.Encode(), nil)
+	authReq.AddCookie(cookie)
+	authRec := httptest.NewRecorder()
+	r.ServeHTTP(authRec, authReq)
+	match := regexp.MustCompile(`name="request_id" value="([^"]+)"`).FindStringSubmatch(authRec.Body.String())
+	if authRec.Code != http.StatusOK || len(match) != 2 {
+		t.Fatalf("authorize: %d %s", authRec.Code, authRec.Body.String())
+	}
+	consent := ownerForm(t, h, r, cookie, "/owner/authorize", url.Values{"csrf": {o.CSRF}, "request_id": {match[1]}})
+	if consent.Code != http.StatusSeeOther {
+		t.Fatalf("consent: %d %s", consent.Code, consent.Body.String())
+	}
+	callback, err := url.Parse(consent.Header().Get("Location"))
+	if err != nil || callback.Scheme != "http" || callback.Hostname() != "localhost" || callback.Port() != strconv.Itoa(port) || callback.Path != "/callback" || callback.Query().Get("code") == "" || callback.Query().Get("state") != "client-state" {
+		t.Fatalf("callback: %s", consent.Header().Get("Location"))
+	}
+	tokenRec, tokens := exchangeTestToken(t, h, r, url.Values{
+		"grant_type": {"authorization_code"}, "code": {callback.Query().Get("code")}, "client_id": {clientID},
+		"redirect_uri": {redirect}, "resource": {h.resource()}, "code_verifier": {verifier},
+	})
+	access, _ := tokens["access_token"].(string)
+	if tokenRec.Code != http.StatusOK || access == "" || tokens["scope"] != "publisher" {
+		t.Fatalf("token: %d %s", tokenRec.Code, tokenRec.Body.String())
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	names := mcpToolNames(t, ctx, server.URL+"/mcp", access)
+	if missing := missingTools(names, publisherOfferRailsTools); len(missing) > 0 || names["register_product"] || names["list_products"] {
+		t.Fatalf("registered client tools missing %v in %v", missing, names)
+	}
+}
+
+func missingTools(got map[string]bool, want []string) []string {
+	var missing []string
+	for _, name := range want {
+		if !got[name] {
+			missing = append(missing, name)
+		}
+	}
+	return missing
 }
 
 func mcpBearerStatus(r http.Handler, token string) int {
