@@ -1,0 +1,1 @@
+import{c as e,l as t}from"./Page-C0JPVaGr.js";import{r as n,t as r}from"./Document-wijox2UW.js";var i=t();function a(){return(0,i.jsx)(r,{title:n.title,lede:n.lede,sections:n.sections,otherHref:`/privacy`,otherLabel:`Read the privacy draft`})}e(`terms`,(0,i.jsx)(a,{}));

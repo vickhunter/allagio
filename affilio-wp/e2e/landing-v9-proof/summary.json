@@ -52,6 +52,28 @@
     "serious": []
   },
   {
+    "slug": "privacy-390",
+    "scroll": true,
+    "small": [],
+    "banner": true,
+    "current": "",
+    "privacy": "/privacy?source=cursor",
+    "terms": "/terms?source=cursor",
+    "primary": 0,
+    "serious": []
+  },
+  {
+    "slug": "terms-390",
+    "scroll": true,
+    "small": [],
+    "banner": true,
+    "current": "",
+    "privacy": "/privacy?source=cursor",
+    "terms": "/terms?source=cursor",
+    "primary": 0,
+    "serious": []
+  },
+  {
     "slug": "setup-390",
     "scroll": true,
     "small": [],
@@ -281,6 +303,28 @@
     "scroll": true,
     "title": "An open way for agents to share offers.",
     "nav": "/protocol/?source=cursor",
+    "serious": []
+  },
+  {
+    "slug": "privacy-1440",
+    "scroll": true,
+    "small": [],
+    "banner": true,
+    "current": "",
+    "privacy": "/privacy?source=cursor",
+    "terms": "/terms?source=cursor",
+    "primary": 0,
+    "serious": []
+  },
+  {
+    "slug": "terms-1440",
+    "scroll": true,
+    "small": [],
+    "banner": true,
+    "current": "",
+    "privacy": "/privacy?source=cursor",
+    "terms": "/terms?source=cursor",
+    "primary": 0,
     "serious": []
   },
   {

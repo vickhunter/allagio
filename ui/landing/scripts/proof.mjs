@@ -1,5 +1,5 @@
 import { createServer } from 'node:http'
-import { readFileSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, readFileSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
@@ -18,12 +18,18 @@ function page(name) {
     .replace(/\{\{if \.PluginReady\}\}([\s\S]*?)\{\{else\}\}[\s\S]*?\{\{end\}\}/g, '$1')
 }
 
-const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html'), '/publishers/setup': page('publishers-setup.html'), '/publishers/setup/': page('publishers-setup.html'), '/protocol': page('protocol.html'), '/protocol/': page('protocol.html') }
+function hosted(name) {
+  return readFileSync(join(build, 'landing-v9', name), 'utf8')
+}
+
+const pages = { '/': page('home.html'), '/makers': page('makers.html'), '/makers/': page('makers.html'), '/publishers': page('publishers.html'), '/publishers/': page('publishers.html'), '/publishers/setup': page('publishers-setup.html'), '/publishers/setup/': page('publishers-setup.html'), '/protocol': page('protocol.html'), '/protocol/': page('protocol.html'), '/privacy': hosted('privacy/index.html'), '/privacy/': hosted('privacy/index.html'), '/terms': hosted('terms/index.html'), '/terms/': hosted('terms/index.html') }
 
 function typeFor(file) {
   if (file.endsWith('.css')) return 'text/css; charset=utf-8'
   if (file.endsWith('.woff2')) return 'font/woff2'
   if (file.endsWith('.svg')) return 'image/svg+xml'
+  if (file.endsWith('.png')) return 'image/png'
+  if (file.endsWith('.ico')) return 'image/x-icon'
   if (file.endsWith('.webp')) return 'image/webp'
   if (file.endsWith('.js')) return 'text/javascript; charset=utf-8'
   return 'application/octet-stream'
@@ -219,6 +225,16 @@ await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen
 const base = 'http://127.0.0.1:' + server.address().port
 mkdirSync(out, { recursive: true })
 
+for (const path of ['/privacy', '/privacy/', '/terms', '/terms/']) {
+  const res = await fetch(base + path)
+  if (res.status !== 200) throw new Error(path + ' status ' + res.status)
+  const type = res.headers.get('content-type') || ''
+  if (!type.includes('text/html')) throw new Error(path + ' type ' + type)
+}
+for (const file of ['mark.svg', 'wordmark.svg', 'favicon.svg', 'favicon.ico', 'favicon-16.png', 'favicon-32.png', 'apple-touch-icon.png', 'mark-light-512.png', 'mark-light-1024.png', 'mark-transparent-512.png', 'mark-transparent-1024.png']) {
+  const res = await fetch(base + '/landing-v9/brand/' + file)
+  if (res.status !== 200) throw new Error('brand ' + file + ' ' + res.status)
+}
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || '/usr/local/bin/google-chrome', args: ['--disable-gpu'] })
 const summary = []
 try {
@@ -325,6 +341,54 @@ try {
     if (!protocolOk.nav.includes('/protocol/') || !protocolOk.nav.includes('source=cursor')) throw new Error('protocol nav ' + protocolOk.nav)
     if (protocolSerious.length) throw new Error('protocol-' + width + ' axe ' + protocolSerious.map((item) => item.id).join(' '))
     await protocolContext.close()
+    for (const legal of ['privacy', 'terms']) {
+      const legalContext = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' })
+      const legalPage = await legalContext.newPage()
+      const response = await legalPage.goto(base + '/' + legal + '?source=cursor', { waitUntil: 'networkidle' })
+      if (!response || response.status() !== 200) throw new Error(legal + ' status ' + (response && response.status()))
+      const text = await legalPage.locator('body').innerText()
+      const banned = /grok|connector|marketplace|\blisted\b|github\.com|distributoor|affilio/i
+      if (banned.test(text)) throw new Error(legal + '-' + width + ' banned copy')
+      const need = legal === 'privacy'
+        ? ['Draft, not yet approved', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', '10 to 12000', 'surface URL', 'not followed', 'signed-out caller', 'frozen copy', 'approved by', 'Listing cards', '.env', '/24', '/48', 'daily salt', 'raw IP is never stored', '30 days', 'Render hosts', 'Neon provides Postgres', 'Cloudflare sits in front of Render', 'Stripe processes payments', 'Anthropic API', 'Claude API key', 'does not say the call is on', 'does not say the call is off', 'no telemetry', 'train models', 'not sold', 'not transferred', 'untrusted data', 'only tighten modes', 'claim_check_unavailable', 'human approve', 'Not checked yet', 'stays on manual']
+        : ['Draft, not yet approved', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', 'A maker may publish an offer', 'sale and a refund', 'does not hold the money', 'approve or refuse', 'until a person approves', 'only tighten an approval mode', 'cannot approve a placement', 'cannot turn YOLO on', 'test mode', 'not a live charge', 'no warranty', 'as is']
+      for (const needle of need) {
+        if (!text.includes(needle)) throw new Error(legal + '-' + width + ' missing ' + needle)
+      }
+      const legalMetrics = await legalPage.evaluate(() => {
+        const banner = document.querySelector('[data-draft-banner]')
+        const box = banner ? banner.getBoundingClientRect() : { width: 0, height: 0 }
+        return {
+          scroll: document.documentElement.scrollWidth <= window.innerWidth + 1,
+          small: [...document.querySelectorAll('a, button')].filter((el) => {
+            const style = getComputedStyle(el)
+            if (style.display === 'none' || style.visibility === 'hidden') return false
+            const target = el.getBoundingClientRect()
+            if (target.width < 2 || target.height < 2) return false
+            return target.width < 44 || target.height < 44
+          }).map((el) => ({ text: (el.innerText || el.getAttribute('aria-label') || '').trim().slice(0, 80), w: Math.round(el.getBoundingClientRect().width), h: Math.round(el.getBoundingClientRect().height) })),
+          banner: box.height >= 24 && box.width > 200,
+          current: document.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent || '',
+          privacy: document.querySelector('nav[aria-label="Footer"] a[href^="/privacy"]')?.getAttribute('href') || '',
+          terms: document.querySelector('nav[aria-label="Footer"] a[href^="/terms"]')?.getAttribute('href') || '',
+          primary: document.querySelectorAll('[data-primary-action]').length,
+        }
+      })
+      const legalAxe = await new AxeBuilder({ page: legalPage }).analyze()
+      const legalSerious = legalAxe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
+      writeFileSync(join(out, `axe-${legal}-${width}.json`), JSON.stringify({ violations: legalSerious }, null, 2))
+      await legalPage.screenshot({ path: join(out, legal + '-' + width + '.png'), fullPage: true })
+      summary.push({ slug: legal + '-' + width, ...legalMetrics, serious: legalSerious.map((item) => item.id) })
+      if (!legalMetrics.scroll) throw new Error(legal + '-' + width + ' scrolls sideways')
+      if (legalMetrics.small.length) throw new Error(legal + '-' + width + ' small targets ' + JSON.stringify(legalMetrics.small))
+      if (!legalMetrics.banner) throw new Error(legal + '-' + width + ' draft banner')
+      if (legalMetrics.current) throw new Error(legal + '-' + width + ' nav current ' + legalMetrics.current)
+      if (!legalMetrics.privacy.startsWith('/privacy') || !legalMetrics.privacy.includes('source=cursor')) throw new Error(legal + ' privacy href ' + legalMetrics.privacy)
+      if (!legalMetrics.terms.startsWith('/terms') || !legalMetrics.terms.includes('source=cursor')) throw new Error(legal + ' terms href ' + legalMetrics.terms)
+      if (legalMetrics.primary !== 0) throw new Error(legal + '-' + width + ' primary count ' + legalMetrics.primary)
+      if (legalSerious.length) throw new Error(legal + '-' + width + ' axe ' + legalSerious.map((item) => item.id + ' ' + item.nodes.map((node) => node.target.join(' ')).join('; ')).join(' | '))
+      await legalContext.close()
+    }
     const setupContext = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 900 }, reducedMotion: 'reduce' })
     const setupPage = await setupContext.newPage()
     await setupPage.goto(base + '/publishers/setup?source=cursor', { waitUntil: 'networkidle' })
@@ -388,6 +452,10 @@ try {
     await walkPreview(browser, base, width, summary, out)
   }
   writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2))
+  mkdirSync('/opt/cursor/artifacts/screenshots', { recursive: true })
+  for (const name of ['privacy-390.png', 'privacy-1440.png', 'terms-390.png', 'terms-1440.png']) {
+    copyFileSync(join(out, name), '/opt/cursor/artifacts/screenshots/' + name)
+  }
   console.log(JSON.stringify(summary, null, 2))
 } finally {
   await browser.close()
