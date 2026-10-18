@@ -169,14 +169,18 @@ func (h *HostedHandler) Makers(c *gin.Context)         { h.landing(c, "makers.ht
 func (h *HostedHandler) Publishers(c *gin.Context)     { h.landing(c, "publishers.html") }
 func (h *HostedHandler) PublisherSetup(c *gin.Context) { h.landing(c, "publishers-setup.html") }
 func (h *HostedHandler) Protocol(c *gin.Context)       { h.landing(c, "protocol.html") }
-func (h *HostedHandler) Privacy(c *gin.Context)        { h.builtPage(c, "privacy", true) }
-func (h *HostedHandler) Terms(c *gin.Context)          { h.builtPage(c, "terms", true) }
-func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents", false) }
+func (h *HostedHandler) Privacy(c *gin.Context)        { h.builtPage(c, "privacy") }
+func (h *HostedHandler) Terms(c *gin.Context)          { h.builtPage(c, "terms") }
+func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents") }
+
+// LEGAL_PAGES_APPROVED stays false until the privacy and terms wording is approved.
+// Those two pages send X-Robots-Tag: noindex while it is false.
+var LEGAL_PAGES_APPROVED = false
 
 // builtPage serves a Vite page from landing-v9/<name>/index.html. The file
 // is sent as stored. It is not executed as a Go template, because the bundle
 // contains template delimiters.
-func (h *HostedHandler) builtPage(c *gin.Context, name string, noindex bool) {
+func (h *HostedHandler) builtPage(c *gin.Context, name string) {
 	body, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", name, "index.html"))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -186,7 +190,7 @@ func (h *HostedHandler) builtPage(c *gin.Context, name string, noindex bool) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-	if noindex {
+	if !LEGAL_PAGES_APPROVED && (name == "privacy" || name == "terms") {
 		c.Header("X-Robots-Tag", "noindex")
 	}
 	c.Data(http.StatusOK, "text/html; charset=utf-8", body)
