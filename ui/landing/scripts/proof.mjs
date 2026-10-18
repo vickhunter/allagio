@@ -136,6 +136,7 @@ async function showPreview(page, origin, route, fixture, width, summary, outDir,
   await page.goto(origin + route + '?source=cursor&previewFixture=' + encodeURIComponent(fixture), { waitUntil: 'networkidle' })
   const field = page.getByLabel('Paste a post URL')
   if (await field.count() !== 1) throw new Error(name + ' ' + fixture + ' paste field')
+  await page.getByText("Public links only. Private posts and accounts can't be read.").waitFor()
   await field.fill('https://journal.example/start')
   const button = page.getByRole('button', { name: 'Preview this post' })
   await button.click()
@@ -158,20 +159,27 @@ async function showPreview(page, origin, route, fixture, width, summary, outDir,
     if (!href.includes('/auth/login') || !href.includes('source=cursor') || !back.startsWith('/publishers/setup') || !back.includes('source=cursor')) throw new Error('approve href ' + href)
     if (await approve.getAttribute('data-primary-action') !== null) throw new Error('approve is a second primary')
   } else if (fixture === 'nomatch') {
-    await page.getByText('No offer fits this post yet.').waitFor()
+    await page.getByText('No program lines up with this post yet.', { exact: true }).waitFor()
+    await page.getByRole('heading', { name: 'Closest programs' }).waitFor()
+    await page.getByRole('button', { name: 'Notify me when a match joins' }).waitFor()
     await page.getByRole('button', { name: 'Try another URL' }).waitFor()
     if (await page.locator('[data-offer]').count()) throw new Error('no-match rendered an offer')
+    const hrefs = await page.locator('[data-post-preview] [data-suggested]').evaluateAll((els) => els.map((el) => el.getAttribute('href') || ''))
+    if (!hrefs.length || hrefs.some((href) => /\/v1\/go|[?&]via=/.test(href))) throw new Error('no-match suggested href ' + hrefs.join(','))
   } else {
     const copy = {
       400: ["That doesn't look like a post URL.", 'Try one like https://example.com/your-post.'],
-      403: ["We can't open that address.", 'Try a public post.'],
-      422: ['We could not reach that page.', "Check that it's public and try again."],
+      403: ['That page is private.', 'Make the post public or paste another link'],
+      422: ["We couldn't read that page.", 'Make the post public or paste another link'],
       429: ['Too many tries.', 'Wait a minute, then try again.'],
     }[fixture]
     await page.getByText(copy[0], { exact: true }).waitFor()
     await page.getByText(copy[1], { exact: true }).waitFor()
     const shown = await page.locator('[data-post-preview]').innerText()
     if (/invalid url|blocked address|fetch failed|rate limit exceeded|\{"error"/.test(shown)) throw new Error(fixture + ' showed raw error JSON')
+    if (fixture === '403' || fixture === '422') {
+      if (/no match/i.test(shown)) throw new Error(fixture + ' said no match')
+    }
     if (fixture === '429') {
       if (!await button.isDisabled()) throw new Error('429 left the button enabled')
     } else if (await button.isDisabled()) throw new Error(fixture + ' left the button disabled')
@@ -216,8 +224,8 @@ async function walkPreview(browser, origin, width, summary, outDir) {
     await page.goto(origin + '/?source=cursor', { waitUntil: 'networkidle' })
     await page.getByLabel('Paste a post URL').fill('https://journal.example/missing')
     await page.getByRole('button', { name: 'Preview this post' }).click()
-    await page.getByText('We could not reach that page.', { exact: true }).waitFor({ timeout: 4000 })
-    await page.getByText("Check that it's public and try again.", { exact: true }).waitFor()
+    await page.getByText("We couldn't read that page.", { exact: true }).waitFor({ timeout: 4000 })
+    await page.getByText('Make the post public or paste another link', { exact: true }).waitFor()
     if (posts.count !== liveBefore + 1) throw new Error('missing route did not request /api/preview ' + posts.count)
     const shown = await page.locator('[data-post-preview]').innerText()
     if (/\{"error"|missing/.test(shown)) throw new Error('missing route showed a raw body')
@@ -225,6 +233,57 @@ async function walkPreview(browser, origin, width, summary, outDir) {
     await page.locator('#post-preview').screenshot({ path: join(outDir, 'preview-missing-' + width + '.png') })
   }
   await context.close()
+}
+
+async function capturePreviewGroups(browser, origin) {
+  const dir = resolve(root, '../../proof/d072b')
+  mkdirSync(dir, { recursive: true })
+  const lines = []
+  const states = [
+    ['unreadable', 'empty', 'That page returned no text.'],
+    ['groups', 'groups', 'Verified partners'],
+    ['nomatch', 'nomatch', 'Notify me when a match joins'],
+  ]
+  for (const width of [390, 1440]) {
+    const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 1200 }, reducedMotion: 'reduce' })
+    const page = await context.newPage()
+    for (const [name, fixture, needle] of states) {
+      await page.goto(origin + '/?previewFixture=' + fixture, { waitUntil: 'networkidle' })
+      await page.getByLabel('Paste a post URL').fill('https://journal.example/start')
+      await page.getByRole('button', { name: 'Preview this post' }).click()
+      await page.getByText(needle, { exact: true }).waitFor()
+      await page.getByText("Public links only. Private posts and accounts can't be read.").waitFor()
+      const shown = await page.locator('[data-post-preview]').innerText()
+      if (name === 'unreadable') {
+        if (/no match/i.test(shown)) throw new Error('unreadable said no match')
+        await page.getByText('Make the post public or paste another link', { exact: true }).waitFor()
+      }
+      if (name === 'groups') {
+        await page.getByRole('heading', { name: 'Suggested programs' }).waitFor()
+        await page.getByText('Unverified', { exact: true }).first().waitFor()
+        await page.getByText("Not on Offer Rails yet. Payouts go through the company's own affiliate program.").waitFor()
+        await page.getByText('Sponsored, via Offer Rails', { exact: true }).waitFor()
+        const hrefs = await page.locator('[data-suggested]').evaluateAll((els) => els.map((el) => el.getAttribute('href') || ''))
+        if (hrefs.length < 2 || hrefs.some((href) => /\/v1\/go|[?&]via=|utm_/.test(href))) throw new Error('groups href ' + hrefs.join(','))
+        if (/commission|earnings/i.test(shown)) throw new Error('groups showed an earnings estimate')
+      }
+      if (name === 'nomatch') {
+        if (await page.locator('[data-offer]').count()) throw new Error('nomatch rendered a verified offer')
+        await page.getByRole('heading', { name: 'Closest programs' }).waitFor()
+        if (/Sponsored, via Offer Rails/.test(shown)) throw new Error('nomatch showed a verified card')
+      }
+      const scroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
+      if (!scroll) throw new Error(name + ' ' + width + ' scrolls sideways')
+      const axe = await new AxeBuilder({ page }).analyze()
+      const serious = axe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
+      const critical = serious.filter((item) => item.impact === 'critical')
+      lines.push(`${name} ${width} serious=${serious.length} critical=${critical.length}${serious.length ? ' ' + serious.map((item) => item.impact + ':' + item.id).join(',') : ''}`)
+      if (serious.length) throw new Error(name + ' ' + width + ' axe ' + serious.map((item) => item.id + ' ' + item.nodes.map((node) => node.target.join(' ')).join('; ')).join(' | '))
+      await page.locator('#post-preview').screenshot({ path: join(dir, name + '-' + width + '.png') })
+    }
+    await context.close()
+  }
+  writeFileSync(join(dir, 'axe.txt'), lines.join('\n') + '\n')
 }
 
 async function assertAgents(browser, origin, width, summary, outDir) {
@@ -622,6 +681,7 @@ try {
     await assertAgents(browser, base, width, summary, out)
     await walkPreview(browser, base, width, summary, out)
   }
+  await capturePreviewGroups(browser, base)
   writeFileSync(join(out, 'summary.json'), JSON.stringify(summary, null, 2))
   mkdirSync('/opt/cursor/artifacts/screenshots', { recursive: true })
   for (const name of ['privacy-390.png', 'privacy-1440.png', 'terms-390.png', 'terms-1440.png']) {

@@ -1,12 +1,12 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { roleReturn, signInHref, useSource } from '@/lib/source'
-import { PreviewStatus, barCount, codeFromStatus, fixtureBody, parsePreview, previewErrorCopy, previewTimeoutMs, rateLimitPauseMs, readPreviewFixture, slotAfterBar, slotLabel } from '@/lib/preview-map.mjs'
+import { PreviewStatus, barCount, codeFromStatus, fixtureBody, previewErrorCopy, previewTimeoutMs, rateLimitPauseMs, readPreviewFixture, slotAfterBar, slotLabel } from '@/lib/preview-map.mjs'
+import { adaptPreview, closestLead, groupsFixtureBody, includeUnverifiedFixture, notifyLabel, publicLinksNote, readFailureCopy, storeNotifyIntent, suggestedNote, type PreviewGroups, type ReadFailure, type UnverifiedProgram, type VerifiedOffer } from '@/lib/preview-groups.mjs'
 
 // Signed-out preview. The URL stays in the field. previewFixture skips the network.
-type Offer = { name: string; blurb: string }
-type Preview = { title: string; offer: Offer | null; slot: string | null }
-type Phase = 'idle' | 'loading' | 'success' | 'nomatch' | 'error'
+type Phase = 'idle' | 'loading' | 'ready' | 'unread' | 'error'
 
 const outlineClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line-strong bg-s0 px-5 text-center font-semibold text-t1 transition-colors duration-150 hover:bg-s2 disabled:text-t1 sm:w-auto'
 const barWidth = ['w-full', 'w-11/12', 'w-4/5', 'w-3/4']
@@ -15,16 +15,38 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function loadPreview(url: string, signal: AbortSignal): Promise<Preview> {
-  const fixture = readPreviewFixture(window.location.search)
+function failureCopy(reason: ReadFailure) {
+  switch (reason) {
+    case 'private':
+      return readFailureCopy('private')
+    case 'unread':
+      return readFailureCopy('unread')
+    case 'empty':
+      return readFailureCopy('empty')
+    default: {
+      const unexpected: never = reason
+      return unexpected
+    }
+  }
+}
+
+async function loadPreview(url: string, signal: AbortSignal): Promise<PreviewGroups> {
+  const search = window.location.search
+  const fixture = readPreviewFixture(search)
+  const includeFixture = includeUnverifiedFixture(search)
   if (fixture === '400' || fixture === '403' || fixture === '422' || fixture === '429') {
     await wait(700)
     throw new PreviewStatus(Number(fixture))
   }
+  if (fixture === 'empty') {
+    await wait(700)
+    return adaptPreview({ title: 'Draft with no text', text: '', offer: null })
+  }
   if (fixture) {
     await wait(700)
-    const parsed = parsePreview(fixtureBody(fixture))
-    if (!parsed) throw new PreviewStatus(422)
+    const body = fixture === 'groups' ? groupsFixtureBody() : fixtureBody(fixture)
+    const parsed = adaptPreview(body, { includeFixture: includeFixture || fixture === 'groups' || fixture === 'nomatch' })
+    if (!parsed.title) throw new PreviewStatus(422)
     return parsed
   }
   const timeout = new AbortController()
@@ -45,8 +67,9 @@ async function loadPreview(url: string, signal: AbortSignal): Promise<Preview> {
       try { body = JSON.parse(raw) } catch { body = null }
     }
     if (!response.ok) throw new PreviewStatus(codeFromStatus(response.status, false))
-    const parsed = parsePreview(body)
-    if (!parsed) throw new PreviewStatus(422)
+    const parsed = adaptPreview(body, { includeFixture })
+    if (parsed.readFailure) return parsed
+    if (!parsed.title) throw new PreviewStatus(422)
     return parsed
   } catch (err) {
     if (err instanceof PreviewStatus) throw err
@@ -58,7 +81,7 @@ async function loadPreview(url: string, signal: AbortSignal): Promise<Preview> {
   }
 }
 
-function OfferCard({ offer, label }: { offer: Offer; label: string }) {
+function OfferCard({ offer, label }: { offer: VerifiedOffer; label: string }) {
   return (
     <div data-offer className="my-1 rounded-xl border-2 border-pub bg-pub-soft p-4">
       <p className="text-[13px] font-semibold text-pub">{label}</p>
@@ -69,19 +92,48 @@ function OfferCard({ offer, label }: { offer: Offer; label: string }) {
   )
 }
 
-function SuccessView({ preview, approveHref }: { preview: Preview; approveHref: string }) {
-  if (!preview.offer) return null
+function SuggestedCard({ program }: { program: UnverifiedProgram }) {
+  return (
+    <a href={program.program_url} data-suggested rel="noreferrer" className="mt-3 block min-h-12 min-w-0 rounded-xl border border-line bg-s0 p-4 text-t1 no-underline">
+      <Badge variant="neutral">Unverified</Badge>
+      <p className="mt-2 break-words font-display text-lg font-bold">{program.name}</p>
+      <p className="mt-1 break-words text-[15px] leading-relaxed">{program.blurb}</p>
+    </a>
+  )
+}
+
+function SuggestedGroup({ id, heading, programs }: { id: string; heading: string; programs: UnverifiedProgram[] }) {
+  if (!programs.length) return null
+  return (
+    <section aria-labelledby={id} className="mt-5">
+      <h4 id={id} className="font-display text-lg font-bold">{heading}</h4>
+      <p className="mt-1 text-[15px] leading-relaxed text-t1">{suggestedNote}</p>
+      {programs.map((program) => <SuggestedCard key={program.program_url} program={program} />)}
+    </section>
+  )
+}
+
+function GroupsView({ preview, approveHref, statusId }: { preview: PreviewGroups; approveHref: string; statusId: string }) {
   const at = slotAfterBar(preview.slot || '')
+  const offer = preview.verified[0]
   const rows: ReactNode[] = []
-  for (let i = 1; i <= barCount; i++) {
-    rows.push(<div key={i} data-paragraph aria-hidden="true" className={`h-2.5 rounded-full bg-s2 ${barWidth[i - 1]}`} />)
-    if (i === at) rows.push(<OfferCard key="offer" offer={preview.offer} label={slotLabel(preview.slot || '')} />)
+  if (offer) {
+    for (let i = 1; i <= barCount; i++) {
+      rows.push(<div key={i} data-paragraph aria-hidden="true" className={`h-2.5 rounded-full bg-s2 ${barWidth[i - 1]}`} />)
+      if (i === at) rows.push(<OfferCard key="offer" offer={offer} label={slotLabel(preview.slot || '')} />)
+    }
   }
   return (
     <div>
       <h3 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h3>
-      <div className="mt-4 grid gap-2">{rows}</div>
-      <a href={approveHref} className={`${outlineClass} mt-4`}>Approve your placements</a>
+      {offer && (
+        <section aria-labelledby={`${statusId}-verified`} className="mt-4">
+          <h4 id={`${statusId}-verified`} className="font-display text-lg font-bold">Verified partners</h4>
+          <div className="mt-3 grid gap-2">{rows}</div>
+        </section>
+      )}
+      <SuggestedGroup id={`${statusId}-suggested`} heading="Suggested programs" programs={preview.suggested} />
+      {offer && <a href={approveHref} className={`${outlineClass} mt-4`}>Approve your placements</a>}
     </div>
   )
 }
@@ -94,12 +146,16 @@ export function PostPreview() {
   const flight = useRef<AbortController | null>(null)
   const [url, setUrl] = useState('')
   const [phase, setPhase] = useState<Phase>('idle')
-  const [preview, setPreview] = useState<Preview | null>(null)
+  const [preview, setPreview] = useState<PreviewGroups | null>(null)
   const [errorCode, setErrorCode] = useState<number | null>(null)
+  const [readFailure, setReadFailure] = useState<ReadFailure | null>(null)
+  const [noted, setNoted] = useState(false)
   const [paused, setPaused] = useState(false)
   const [pauseNonce, setPauseNonce] = useState(0)
   const approveHref = signInHref(roleReturn('publisher'), source)
   const copy = errorCode == null ? null : previewErrorCopy(errorCode)
+  const unread = readFailure ? failureCopy(readFailure) : null
+  const view = phase === 'ready' && preview ? preview.kind : phase
 
   useEffect(() => {
     if (!pauseNonce) return
@@ -113,6 +169,13 @@ export function PostPreview() {
     flight.current = null
   }
 
+  function resetResult() {
+    setPreview(null)
+    setErrorCode(null)
+    setReadFailure(null)
+    setNoted(false)
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (paused || phase === 'loading') return
@@ -121,7 +184,7 @@ export function PostPreview() {
     try { parsedUrl = new URL(value) } catch { parsedUrl = null }
     if (!parsedUrl || (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') || !parsedUrl.hostname.includes('.')) {
       stopFlight()
-      setPreview(null)
+      resetResult()
       setErrorCode(400)
       setPhase('error')
       return
@@ -130,17 +193,26 @@ export function PostPreview() {
     const mine = ticket.current
     const controller = new AbortController()
     flight.current = controller
-    setPreview(null)
-    setErrorCode(null)
+    resetResult()
     setPhase('loading')
     try {
       const result = await loadPreview(value, controller.signal)
       if (ticket.current !== mine) return
       setPreview(result)
-      setPhase(result.offer ? 'success' : 'nomatch')
+      if (result.readFailure) {
+        setReadFailure(result.readFailure)
+        setPhase('unread')
+        return
+      }
+      setPhase('ready')
     } catch (err) {
       if (ticket.current !== mine) return
       const code = err instanceof PreviewStatus ? err.code : 422
+      if (code === 403 || code === 422) {
+        setReadFailure(code === 403 ? 'private' : 'unread')
+        setPhase('unread')
+        return
+      }
       setErrorCode(code)
       setPhase('error')
       if (code === 429) {
@@ -152,14 +224,19 @@ export function PostPreview() {
 
   function tryAnother() {
     stopFlight()
-    setPreview(null)
-    setErrorCode(null)
+    resetResult()
     setPhase('idle')
     inputRef.current?.focus()
   }
 
+  function notify() {
+    // TODO: no notify endpoint exists. Keep the intent in this browser until one does.
+    try { storeNotifyIntent(window.localStorage, url.trim()) } catch { /* storage blocked; the confirmation still shows */ }
+    setNoted(true)
+  }
+
   return (
-    <div data-post-preview data-preview-state={phase} className="min-w-0 max-w-full rounded-2xl border border-line bg-s1 p-5">
+    <div data-post-preview data-preview-state={view} className="min-w-0 max-w-full rounded-2xl border border-line bg-s1 p-5">
       <form noValidate onSubmit={onSubmit} className="grid gap-3">
         <label htmlFor={id} className="text-[15px] font-semibold text-t1">Paste a post URL</label>
         <Input
@@ -174,10 +251,11 @@ export function PostPreview() {
           value={url}
           placeholder="https://example.com/your-post"
           aria-invalid={errorCode === 400}
-          aria-describedby={`${id}-status`}
+          aria-describedby={`${id}-public ${id}-status`}
           onChange={(event) => setUrl(event.target.value)}
           className="min-h-12 min-w-0 bg-s0"
         />
+        <p id={`${id}-public`} className="text-[13px] leading-relaxed text-t2">{publicLinksNote}</p>
         <button type="submit" disabled={phase === 'loading' || paused} aria-busy={phase === 'loading'} className={outlineClass}>Preview this post</button>
       </form>
       <div id={`${id}-status`} role="status" aria-live="polite" aria-atomic="true" aria-busy={phase === 'loading'} className="mt-4 min-h-8 break-words text-[15px] leading-relaxed text-t1">
@@ -189,15 +267,24 @@ export function PostPreview() {
             {errorCode !== 429 && <button type="button" onClick={tryAnother} className={`${outlineClass} mt-4`}>Try another URL</button>}
           </div>
         )}
-        {phase === 'nomatch' && preview && (
-          <div>
-            <h3 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h3>
-            <p className="mt-3">No offer fits this post yet.</p>
-            <p className="mt-1 text-t2">Offer Rails places an offer only when it matches the post.</p>
+        {phase === 'unread' && unread && (
+          <div data-read-failure={readFailure}>
+            <p>{unread.message}</p>
+            <p className="mt-1">{unread.next}</p>
             <button type="button" onClick={tryAnother} className={`${outlineClass} mt-4`}>Try another URL</button>
           </div>
         )}
-        {phase === 'success' && preview?.offer && <SuccessView preview={preview} approveHref={approveHref} />}
+        {phase === 'ready' && preview?.kind === 'groups' && <GroupsView preview={preview} approveHref={approveHref} statusId={id} />}
+        {phase === 'ready' && preview?.kind === 'closest' && (
+          <div>
+            <h3 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h3>
+            <p className="mt-3">{closestLead}</p>
+            <SuggestedGroup id={`${id}-closest`} heading="Closest programs" programs={preview.closest} />
+            <button type="button" onClick={notify} aria-pressed={noted} className={`${outlineClass} mt-4`}>{notifyLabel}</button>
+            {noted && <p className="mt-2">Saved in this browser.</p>}
+            <button type="button" onClick={tryAnother} className={`${outlineClass} mt-4`}>Try another URL</button>
+          </div>
+        )}
       </div>
     </div>
   )
