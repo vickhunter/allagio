@@ -11,6 +11,7 @@ import { example, faq, feed, makerAdvantages, pilotLine, surfaces } from '@/cont
 import { useOfferConfig } from '@/lib/source'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
+import { DirectorySection } from '@/directory/Directory'
 
 // /makers: built from A (bento). Accent: maker terracotta. Every cell is one concrete advantage.
 export function App() {
@@ -38,6 +39,8 @@ export function App() {
           <p className="mt-3 text-[12px] text-t2">Fee: 10% of the publisher commission, paid by the maker during the pilot.</p>
         </Card>
       </section>
+
+      <DirectorySection kind="maker" />
 
       <section aria-labelledby="adv-h" className="mx-auto max-w-6xl px-5 pb-16">
         <h2 id="adv-h" className="sr-only">Every maker advantage</h2>

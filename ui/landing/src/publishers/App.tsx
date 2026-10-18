@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card'
 import { example, faq, pilotLine, publisherAdvantages, surfaces } from '@/content'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
+import { DirectorySection } from '@/directory/Directory'
 
 const stations = [
   { k: 'Listed', d: `${example.product} · ${example.price} · ${example.commission}` },
@@ -36,6 +37,8 @@ export function App() {
           <LivePanel />
         </div>
       </section>
+
+      <DirectorySection kind="publisher" />
 
       <section aria-labelledby="adv-h" className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <p className="eyebrow">Every publisher advantage</p>
