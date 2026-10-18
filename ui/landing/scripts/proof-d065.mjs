@@ -154,6 +154,14 @@ try {
     if (!how.scroll) throw new Error('how-it-works-' + width + ' scrolls sideways')
     const sign = await page.locator('header').getByRole('link', { name: 'Sign in', exact: true }).boundingBox()
     if (!sign || sign.width < 44 || sign.height < 44) throw new Error('how sign-in ' + JSON.stringify(sign))
+    const logo = await page.locator('header .site-logo svg').count()
+    if (!logo) throw new Error('rail logo missing')
+    const hint = await page.locator('[data-corner="hint"]').innerText()
+    if (width < 768) {
+      if (!/tap to step/i.test(hint) || /hover/i.test(hint)) throw new Error('narrow hint ' + hint)
+    } else if (!/hover/i.test(hint) || /tap to step/i.test(hint)) {
+      throw new Error('wide hint ' + hint)
+    }
     const axe = await new AxeBuilder({ page }).analyze()
     const serious = axe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
     if (serious.length) throw new Error('how-it-works-' + width + ' axe ' + serious.map((item) => item.id + ' ' + item.nodes.map((node) => node.target.join(' ')).join('; ')).join(' | '))
