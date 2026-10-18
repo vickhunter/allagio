@@ -55,7 +55,7 @@ export function App() {
         <div className="mx-auto max-w-3xl px-5 py-16 md:py-20">
           <p className="eyebrow">On your post</p>
           <h2 id="preview-h" className="h-display mt-3 text-3xl sm:text-4xl">See it on a real post.</h2>
-          <p className="mt-4 text-lg leading-relaxed text-t2">Paste a post URL. See where an offer would sit. Nothing is saved.</p>
+          <p className="mt-4 text-lg leading-relaxed text-t2">Paste a post URL. See where an offer would sit.</p>
           <div className="mt-8">
             <PostPreview />
           </div>

@@ -26,12 +26,12 @@ export const previewErrors = {
     next: 'Try one like https://example.com/your-post.',
   },
   403: {
-    message: "We can't open that address.",
-    next: 'Try a public post.',
+    message: 'That page is private.',
+    next: 'Make the post public or paste another link',
   },
   422: {
-    message: 'We could not reach that page.',
-    next: "Check that it's public and try again.",
+    message: "We couldn't read that page.",
+    next: 'Make the post public or paste another link',
   },
   429: {
     message: 'Too many tries.',
@@ -73,7 +73,7 @@ export function parsePreview(body) {
   return { title, offer: { name, blurb }, slot }
 }
 
-const fixtureNames = new Set(['success', 'nomatch', '400', '403', '422', '429', ...slots])
+const fixtureNames = new Set(['success', 'nomatch', 'groups', 'empty', '400', '403', '422', '429', ...slots])
 
 export function readPreviewFixture(search) {
   const value = new URLSearchParams(search || '').get('previewFixture') || ''
@@ -98,7 +98,7 @@ export const samplePreview = {
 }
 
 export function fixtureBody(name) {
-  if (name === 'nomatch') return { title: samplePreview.title, offer: null, slot: null }
+  if (name === 'nomatch') return { title: 'Sourdough timing', text: 'A crumb and a starter.', offer: null, slot: null }
   const slot = slots.includes(name) ? name : samplePreview.slot
   return {
     title: samplePreview.title,
