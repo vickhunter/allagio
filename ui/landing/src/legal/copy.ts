@@ -1,4 +1,4 @@
-export const draftBanner = 'Draft, not yet approved'
+export const draftBanner = 'Draft. This text is not final and has not been approved yet.'
 export const updatedLabel = '18 October 2026'
 export const updatedISO = '2026-10-18'
 export const operatorName = '[OPERATOR NAME]'

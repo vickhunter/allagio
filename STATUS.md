@@ -1,3 +1,7 @@
+## October 18 — Privacy and terms stay drafts until the wording is approved
+
+`/privacy` and `/terms` open with the line “Draft. This text is not final and has not been approved yet.” Both documents send `<meta name="robots" content="noindex, nofollow">`. No sitemap lists either path. The hosted Go route still does not exist; when D-070 adds it, that route should send `X-Robots-Tag: noindex` for `/privacy` and `/terms` until the wording is approved.
+
 ## October 18 — Privacy copy, a dark rail mark, and Sign in on a phone
 
 The privacy draft now speaks to a reader. The opening is one sentence. Listing cards still store only the pass or fail signals and the score, and the page says we never store source code, environment files, or secrets. Processors name Anthropic only as a condition: if AI copy generation is turned on, page text sent for that is processed by Anthropic (Claude) to classify and draft copy. Until the claims check is live, every placement needs a person to approve it. A check that is missing or unknown still reads “Not checked yet.” The reviewer-demo line is gone.

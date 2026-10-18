@@ -230,6 +230,8 @@ for (const path of ['/privacy', '/privacy/', '/terms', '/terms/']) {
   if (res.status !== 200) throw new Error(path + ' status ' + res.status)
   const type = res.headers.get('content-type') || ''
   if (!type.includes('text/html')) throw new Error(path + ' type ' + type)
+  const html = await res.text()
+  if (!html.includes('<meta name="robots" content="noindex, nofollow"')) throw new Error(path + ' missing noindex')
 }
 for (const file of ['mark.svg', 'mark-dark.svg', 'wordmark.svg', 'favicon.svg', 'favicon.ico', 'favicon-16.png', 'favicon-32.png', 'apple-touch-icon.png', 'mark-light-512.png', 'mark-light-1024.png', 'mark-transparent-512.png', 'mark-transparent-1024.png', 'mark-dark-512.png', 'mark-dark-1024.png']) {
   const res = await fetch(base + '/landing-v9/brand/' + file)
@@ -357,8 +359,8 @@ try {
       const banned = /grok|connector|marketplace|\blisted\b|github\.com|distributoor|affilio/i
       if (banned.test(text)) throw new Error(legal + '-' + width + ' banned copy')
       const need = legal === 'privacy'
-        ? ['Draft, not yet approved', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', '10 to 12000', 'surface URL', 'not followed', 'signed-out caller', 'frozen copy', 'approved by', 'pass or fail signals', 'We never store source code, environment files or secrets.', '/24', '/48', 'daily salt', 'raw IP is never stored', '30 days', 'Render hosts', 'Neon provides Postgres', 'Cloudflare sits in front of Render', 'Stripe processes payments', 'If AI copy generation is turned on, page text you send is processed by Anthropic (Claude) to classify and draft copy.', 'no telemetry', 'train models', 'not sold', 'not transferred', 'untrusted data', 'only tighten modes', 'Until the claims check is live, every placement needs a person to approve it.', 'Not checked yet']
-        : ['Draft, not yet approved', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', 'A maker may publish an offer', 'sale and a refund', 'does not hold the money', 'approve or refuse', 'until a person approves', 'only tighten an approval mode', 'cannot approve a placement', 'cannot turn YOLO on', 'test mode', 'not a live charge', 'no warranty', 'as is']
+        ? ['Draft. This text is not final and has not been approved yet.', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', '10 to 12000', 'surface URL', 'not followed', 'signed-out caller', 'frozen copy', 'approved by', 'pass or fail signals', 'We never store source code, environment files or secrets.', '/24', '/48', 'daily salt', 'raw IP is never stored', '30 days', 'Render hosts', 'Neon provides Postgres', 'Cloudflare sits in front of Render', 'Stripe processes payments', 'If AI copy generation is turned on, page text you send is processed by Anthropic (Claude) to classify and draft copy.', 'no telemetry', 'train models', 'not sold', 'not transferred', 'untrusted data', 'only tighten modes', 'Until the claims check is live, every placement needs a person to approve it.', 'Not checked yet']
+        : ['Draft. This text is not final and has not been approved yet.', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', 'A maker may publish an offer', 'sale and a refund', 'does not hold the money', 'approve or refuse', 'until a person approves', 'only tighten an approval mode', 'cannot approve a placement', 'cannot turn YOLO on', 'test mode', 'not a live charge', 'no warranty', 'as is']
       for (const needle of need) {
         if (!text.includes(needle)) throw new Error(legal + '-' + width + ' missing ' + needle)
       }
