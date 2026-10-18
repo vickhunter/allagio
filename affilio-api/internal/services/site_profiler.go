@@ -120,29 +120,44 @@ type DryRunHit struct {
 // clears RelevanceFloor, plus the slot that offer would use. It does not
 // write anything. text is the extracted page text.
 func DryRunMatch(text string, offers []OfferTerms) (DryRunHit, bool) {
+	ranked := RankPageOffers(text, offers)
+	if len(ranked) == 0 || ranked[0].Relevance < RelevanceFloor {
+		return DryRunHit{}, false
+	}
+	return ranked[0], true
+}
+
+// RankPageOffers scores every offer against text, highest first. Equal scores
+// keep the original order. Scores below RelevanceFloor stay in the list so a
+// preview can show the closest topics instead of an empty result.
+func RankPageOffers(text string, offers []OfferTerms) []DryRunHit {
 	text = strings.TrimSpace(text)
 	if text == "" || len(offers) == 0 {
-		return DryRunHit{}, false
+		return nil
 	}
 	profile := BuildSiteProfile([]string{text}, nil)
-	bestIdx := -1
-	bestScore := -1
+	order := make([]int, len(offers))
+	scores := make([]int, len(offers))
 	for i, offer := range offers {
-		score := ScoreOfferForProfile(profile, offer)
-		if score > bestScore {
-			bestScore = score
-			bestIdx = i
+		order[i] = i
+		scores[i] = ScoreOfferForProfile(profile, offer)
+	}
+	sort.SliceStable(order, func(a, b int) bool { return scores[order[a]] > scores[order[b]] })
+	out := make([]DryRunHit, len(order))
+	for n, idx := range order {
+		score := scores[idx]
+		reason := fmt.Sprintf("Product topics overlap this content (%d/100 lexical fit); review the product before recommending it.", score)
+		if score < RelevanceFloor {
+			reason = fmt.Sprintf("Closest topic overlap is %d/100. Review the product before recommending it.", score)
+		}
+		out[n] = DryRunHit{
+			Index:     idx,
+			Relevance: score,
+			Reason:    reason,
+			Slot:      matchSlot(text, offers[idx]),
 		}
 	}
-	if bestIdx < 0 || bestScore < RelevanceFloor {
-		return DryRunHit{}, false
-	}
-	return DryRunHit{
-		Index:     bestIdx,
-		Relevance: bestScore,
-		Reason:    fmt.Sprintf("Product topics overlap this content (%d/100 lexical fit); review the product before recommending it.", bestScore),
-		Slot:      matchSlot(text, offers[bestIdx]),
-	}, true
+	return out
 }
 
 func matchSlot(text string, offer OfferTerms) string {

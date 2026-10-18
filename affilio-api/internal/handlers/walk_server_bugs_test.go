@@ -189,8 +189,12 @@ FROM placement_proposals WHERE id=$1 RETURNING id`, first, "InboxPilot is a seco
 	}
 	pluginKey := issuePluginKey(t, db, siteID, "one-box-plugin")
 	acked, ackBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+sibling+"/plugin-ack", map[string]any{"action": "placed", "rel_sponsored": true}, pluginKey)
-	if acked.Code != http.StatusUnprocessableEntity || ackBody["check_id"] != "one_per_post" {
+	if acked.Code != http.StatusConflict || ackBody["reason"] != "not_committed" {
 		t.Fatalf("second place ack: %d %s", acked.Code, acked.Body.String())
+	}
+	var siblingWait string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT status, plugin_wait FROM placement_proposals WHERE id=$1`, sibling).Scan(&siblingStatus, &siblingWait); err != nil || siblingStatus != "approved" || siblingWait != "" {
+		t.Fatalf("ack wrote through an uncommitted sibling: %s %s %v", siblingStatus, siblingWait, err)
 	}
 
 	other, otherBody := doSiteJSON(t, r, http.MethodPost, "/v1/placements", siteKey, map[string]interface{}{

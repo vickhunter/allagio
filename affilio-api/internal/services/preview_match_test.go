@@ -42,3 +42,30 @@ func TestDryRunMatchSlotFollowsTheMatchingParagraph(t *testing.T) {
 		t.Fatalf("hit = %+v", hit)
 	}
 }
+
+func TestRankPageOffersKeepsThreeClosestBelowTheFloor(t *testing.T) {
+	text := "Gardening tips for tomatoes in small gardens and watering herbs."
+	noise := []string{"quilt", "marble", "cipher", "velvet", "orbit", "lantern", "cinder", "plume", "sable", "ivory"}
+	offers := []OfferTerms{
+		{Name: "QuiltNone", Keywords: append([]string{"quilt"}, noise...)},
+		{Name: "GardenLow", Keywords: append([]string{"garden"}, noise...)},
+		{Name: "HerbMid", Keywords: append([]string{"garden", "herb"}, noise...)},
+		{Name: "WaterMost", Keywords: append([]string{"garden", "herb", "water"}, noise...)},
+	}
+	ranked := RankPageOffers(text, offers)
+	if len(ranked) != 4 {
+		t.Fatalf("ranked %d", len(ranked))
+	}
+	if ranked[0].Index != 3 || ranked[1].Index != 2 || ranked[2].Index != 1 || ranked[3].Index != 0 {
+		t.Fatalf("order = %+v", ranked)
+	}
+	if ranked[0].Relevance >= RelevanceFloor || ranked[0].Relevance <= ranked[1].Relevance {
+		t.Fatalf("closest = %+v next %+v", ranked[0], ranked[1])
+	}
+	if !strings.Contains(ranked[0].Reason, "Closest topic overlap") || strings.Contains(strings.ToLower(ranked[0].Reason), "no match") {
+		t.Fatalf("reason = %q", ranked[0].Reason)
+	}
+	if _, ok := DryRunMatch(text, offers); ok {
+		t.Fatal("below-floor page matched")
+	}
+}

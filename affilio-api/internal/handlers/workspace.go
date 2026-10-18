@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -97,6 +98,12 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/publishers/setup/", h.PublisherSetup)
 		public.GET("/protocol", h.Protocol)
 		public.GET("/protocol/", h.Protocol)
+		public.GET("/privacy", h.Privacy)
+		public.GET("/privacy/", h.Privacy)
+		public.GET("/terms", h.Terms)
+		public.GET("/terms/", h.Terms)
+		public.GET("/agents", h.Agents)
+		public.GET("/agents/", h.Agents)
 		public.Static("/landing-v9", filepath.Join(h.AssetsPath, "landing-v9"))
 		for _, name := range []string{"workspace.css", "workspace.js", "setup-controls.js", "landing.css", "landing.js", "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt", "THIRD_PARTY_NOTICES.md"} {
 			file := name
@@ -163,6 +170,45 @@ func (h *HostedHandler) Makers(c *gin.Context)         { h.landing(c, "makers.ht
 func (h *HostedHandler) Publishers(c *gin.Context)     { h.landing(c, "publishers.html") }
 func (h *HostedHandler) PublisherSetup(c *gin.Context) { h.landing(c, "publishers-setup.html") }
 func (h *HostedHandler) Protocol(c *gin.Context)       { h.landing(c, "protocol.html") }
+func (h *HostedHandler) Privacy(c *gin.Context)        { h.builtPage(c, "privacy") }
+func (h *HostedHandler) Terms(c *gin.Context)          { h.builtPage(c, "terms") }
+func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents") }
+
+// LEGAL_PAGES_APPROVED stays false until the privacy and terms wording is approved.
+// Those pages send X-Robots-Tag: noindex while it is false, including the copies
+// the landing asset directory serves under /landing-v9.
+var LEGAL_PAGES_APPROVED = false
+
+func draftLegalPath(requestPath string) bool {
+	switch path.Clean(requestPath) {
+	case "/privacy", "/privacy/index.html",
+		"/terms", "/terms/index.html",
+		"/landing-v9/privacy", "/landing-v9/privacy/index.html",
+		"/landing-v9/terms", "/landing-v9/terms/index.html":
+		return true
+	default:
+		return false
+	}
+}
+
+// builtPage serves a Vite page from landing-v9/<name>/index.html. The file
+// is sent as stored. It is not executed as a Go template, because the bundle
+// contains template delimiters.
+func (h *HostedHandler) builtPage(c *gin.Context, name string) {
+	body, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", name, "index.html"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.NotFound(c.Writer, c.Request)
+			return
+		}
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	if !LEGAL_PAGES_APPROVED && (name == "privacy" || name == "terms") {
+		c.Header("X-Robots-Tag", "noindex")
+	}
+	c.Data(http.StatusOK, "text/html; charset=utf-8", body)
+}
 
 func (h *HostedHandler) landing(c *gin.Context, name string) {
 	page, err := template.ParseFiles(filepath.Join(h.AssetsPath, name))

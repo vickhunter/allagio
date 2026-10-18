@@ -305,6 +305,9 @@ func TestPluginPlacementState(t *testing.T) {
 	if digestState() != "pending" {
 		t.Fatal("a brand-new placement should be pending")
 	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
 	firstAck, firstBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": true}, pluginKey)
 	if firstAck.Code != http.StatusOK || firstBody["plugin_state"] != "placed" || digestState() != "placed" {
 		t.Fatalf("first ack: %d %s", firstAck.Code, firstAck.Body.String())
@@ -343,7 +346,7 @@ func TestPluginPlacementState(t *testing.T) {
 	}
 
 	second := insertPlacement(t, db, siteID, offerID, "https://plugin.example/again", "Honest note about the product.")
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='approved', approved_at=NOW(), approved_by_kind='policy:yolo' WHERE id=$1`, second); err != nil {
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', approved_at=NOW(), approved_by_kind='policy:yolo' WHERE id=$1`, second); err != nil {
 		t.Fatal(err)
 	}
 	undone, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/revoke", map[string]any{"reason": "undo"}, siteKey)
@@ -548,6 +551,9 @@ func TestEveryHardCheckReturns422(t *testing.T) {
 	relApproved, _ := decide(relID, map[string]any{"relevance": 80, "position": "end", "rel_sponsored": false})
 	if relApproved.Code != http.StatusOK {
 		t.Fatalf("disclosure words do not fail rel_sponsored: %d %s", relApproved.Code, relApproved.Body.String())
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, relID); err != nil {
+		t.Fatal(err)
 	}
 	relRec, relBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+relID+"/plugin-ack", map[string]any{"action": "restored", "rel_sponsored": false}, pluginKey)
 	expect(relRec, relBody, "rel_sponsored")
@@ -787,6 +793,9 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	stopped()
 
 	second := approve("https://fail.example/restored")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, second); err != nil {
+		t.Fatal(err)
+	}
 	undone, _ = postJSON(t, r, http.MethodPost, "/v1/placements/"+second+"/revoke", map[string]any{"reason": "undo"}, siteKey)
 	if undone.Code != http.StatusOK {
 		t.Fatalf("second undo: %d %s", undone.Code, undone.Body.String())
@@ -827,7 +836,7 @@ func TestPluginFailureAndRetry(t *testing.T) {
 	}
 
 	hidden := approve("https://fail.example/hidden")
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET approved_at=$2, created_at=$2, plugin_wait='' WHERE id=$1`, hidden, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)); err != nil {
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', approved_at=$2, created_at=$2, plugin_wait='' WHERE id=$1`, hidden, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)); err != nil {
 		t.Fatal(err)
 	}
 	opened, _ := serveOwner(t, r, h, cookie, owner.CSRF, http.MethodPost, "/v1/events", map[string]any{"kind": "digest_opened"})
@@ -1552,6 +1561,9 @@ func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 	for _, doc := range []string{llms, modes} {
 		if !strings.Contains(doc, "POST /v1/placements/:id/retry") || !strings.Contains(doc, "not_failed") {
 			t.Fatal("docs drifted on plugin retry")
+		}
+		if !strings.Contains(doc, "`POST /v1/placements/:id/receipt`") || !strings.Contains(doc, "`surface_url`") || !strings.Contains(doc, "`evidence`") || !strings.Contains(doc, "`published_text`") {
+			t.Fatal("docs drifted on the receipt fields")
 		}
 		if !strings.Contains(doc, "A 409 returns `reason` and `message`") || !strings.Contains(doc, "A 422 returns `check_id` and `check_text`") {
 			t.Fatal("docs drifted on the 409 and 422 body shapes")

@@ -16,7 +16,7 @@ The owner workspace creates and edits products and offers, runs readiness checks
 
 - `/mcp`: official Go MCP SDK v1.0.0, Streamable HTTP with JSON responses and stateless requests; tested using its HTTP client. The supported wire protocol is 2025-06-18; this does not claim conformance with the 2026 protocol revision.
 - Discovery: `/.well-known/oauth-protected-resource/mcp` and `/.well-known/oauth-authorization-server`.
-- Dynamic registration: `/oauth/register`. Public clients use exact HTTPS or numeric loopback redirect URIs and S256 PKCE.
+- Dynamic registration: `/oauth/register`. Public clients use exact HTTPS redirect URIs, or `http://127.0.0.1`, `http://[::1]`, and `http://localhost` on any port (RFC 8252). An authorization request may use a different port than the registered loopback URI. S256 PKCE.
 - `/oauth/authorize` requires owner consent. Codes are hashed, expire after five minutes and can be exchanged once. Resource parameters must match the canonical `/mcp` URL.
 - Opaque access tokens expire after one hour. Refresh tokens rotate, last at most seven days and revoke the grant on reuse. Tokens and browser session secrets are stored as SHA-256 hashes; issuer tokens are never forwarded to tools.
 - Verified OIDC issuer + subject establishes identity. Email must be verified. A verified email links an existing maker that no owner already holds. It does not link a publisher site.
