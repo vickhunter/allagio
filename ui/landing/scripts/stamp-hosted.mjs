@@ -87,4 +87,5 @@ const missingShell = `<div id="static-landing">
     </main>
   </div>`
 writeFileSync(resolve(assets, 'not-found/index.html'), stamp(resolve(dist, 'not-found/index.html'), missingShell))
+writeFileSync(resolve(assets, 'profile/index.html'), stamp(resolve(dist, 'profile/index.html'), missingShell))
 console.log('stamped landing v9 into affilio-wp/admin/build')
