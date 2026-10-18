@@ -68,12 +68,36 @@ func TestDevicePageSendsSignedOutHumansToSignIn(t *testing.T) {
 	if login.Code != http.StatusFound || !strings.Contains(login.Header().Get("Location"), "https://identity.example/authorize") {
 		t.Fatalf("login accepted the device return: %d %s", login.Code, login.Body.String())
 	}
-	for _, raw := range []string{"/device?user_code=not-a-code", "/device?user_code=ABCD-EFGH&next=https://evil.example", "https://evil.example"} {
+	for _, raw := range []string{"/device?user_code=not-a-code", "/device?user_code=ABCD-EFGH&next=https://evil.example", "https://evil.example", "/device?next=%ZZ", "/device?user_code=ABCD-EFGH&next=%ZZ"} {
 		bad := httptest.NewRecorder()
 		r.ServeHTTP(bad, httptest.NewRequest(http.MethodGet, "/auth/login?return_to="+url.QueryEscape(raw), nil))
 		if bad.Code != http.StatusBadRequest {
 			t.Fatalf("return %s: %d %s", raw, bad.Code, bad.Body.String())
 		}
+	}
+	sourced := httptest.NewRecorder()
+	r.ServeHTTP(sourced, httptest.NewRequest(http.MethodGet, "/auth/login?return_to=%2Fdevice&source=cli&ref=partner&via=click", nil))
+	if sourced.Code != http.StatusFound || !strings.Contains(sourced.Header().Get("Location"), "https://identity.example/authorize") {
+		t.Fatalf("device login with source: %d %s", sourced.Code, sourced.Body.String())
+	}
+	rows, err := db.Pool.Query(context.Background(), `SELECT return_to FROM owner_login_attempts`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	seen := 0
+	for rows.Next() {
+		var stored string
+		if err = rows.Scan(&stored); err != nil {
+			t.Fatal(err)
+		}
+		seen++
+		if stored != "/device" && stored != "/device?user_code=ABCD-EFGH" {
+			t.Fatalf("stored device return %s", stored)
+		}
+	}
+	if err = rows.Err(); err != nil || seen == 0 {
+		t.Fatalf("stored returns %d %v", seen, err)
 	}
 
 	owner, cookie := testOwnerSession(t, h, "device-page-owner", "device-page@example.com")

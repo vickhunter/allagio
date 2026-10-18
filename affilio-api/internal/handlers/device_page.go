@@ -16,15 +16,18 @@ import (
 )
 
 func deviceSignInReturn(u *url.URL) bool {
-	if u == nil || u.Path != "/device" || u.RawPath != "" {
+	if u == nil || u.Path != "/device" || u.RawPath != "" || u.Fragment != "" || u.Host != "" || u.IsAbs() {
 		return false
 	}
-	q := u.Query()
-	if len(q) == 0 {
+	if u.RawQuery == "" {
 		return true
 	}
+	q, err := url.ParseQuery(u.RawQuery)
+	if err != nil || len(q) != 1 {
+		return false
+	}
 	codes := q["user_code"]
-	if len(q) != 1 || len(codes) != 1 {
+	if len(codes) != 1 {
 		return false
 	}
 	if codes[0] == "" {

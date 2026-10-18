@@ -323,8 +323,12 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 		pluginPrefix = services.KeyPrefix(pluginKey)
 	}
 	account, err := h.DB.CreateAgentOnlyAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey, pluginHash, pluginPrefix)
-	if err != nil {
+	if isUniqueViolation(err) {
 		writeNamedConflict(c, "account_exists")
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "account creation failed"})
 		return
 	}
 	resp := gin.H{"owner_id": account.OwnerID, "agent_only": true, "human_login": false, "role": req.Role}

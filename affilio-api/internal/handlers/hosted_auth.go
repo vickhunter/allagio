@@ -220,8 +220,12 @@ func (h *HostedHandler) LoginStart(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return
 	}
-	returnTo = mergeAttributionSource(returnTo, c.Query("source"))
-	returnTo = mergeDemoReferral(returnTo, c.Query("ref"), c.Query("via"))
+	if deviceSignInReturn(u) {
+		returnTo = deviceReturnPath(u.Query().Get("user_code"))
+	} else {
+		returnTo = mergeAttributionSource(returnTo, c.Query("source"))
+		returnTo = mergeDemoReferral(returnTo, c.Query("ref"), c.Query("via"))
+	}
 	if len(returnTo) > 8192 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return
