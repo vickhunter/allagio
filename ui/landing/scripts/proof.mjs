@@ -231,10 +231,15 @@ for (const path of ['/privacy', '/privacy/', '/terms', '/terms/']) {
   const type = res.headers.get('content-type') || ''
   if (!type.includes('text/html')) throw new Error(path + ' type ' + type)
 }
-for (const file of ['mark.svg', 'wordmark.svg', 'favicon.svg', 'favicon.ico', 'favicon-16.png', 'favicon-32.png', 'apple-touch-icon.png', 'mark-light-512.png', 'mark-light-1024.png', 'mark-transparent-512.png', 'mark-transparent-1024.png']) {
+for (const file of ['mark.svg', 'mark-dark.svg', 'wordmark.svg', 'favicon.svg', 'favicon.ico', 'favicon-16.png', 'favicon-32.png', 'apple-touch-icon.png', 'mark-light-512.png', 'mark-light-1024.png', 'mark-transparent-512.png', 'mark-transparent-1024.png', 'mark-dark-512.png', 'mark-dark-1024.png']) {
   const res = await fetch(base + '/landing-v9/brand/' + file)
   if (res.status !== 200) throw new Error('brand ' + file + ' ' + res.status)
 }
+async function assertHeaderSignIn(page, slug) {
+  const box = await page.locator('header').getByRole('link', { name: 'Sign in', exact: true }).boundingBox()
+  if (!box || box.width < 44 || box.height < 44) throw new Error(slug + ' header Sign in ' + JSON.stringify(box))
+}
+
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || '/usr/local/bin/google-chrome', args: ['--disable-gpu'] })
 const summary = []
 try {
@@ -273,6 +278,7 @@ try {
       const signHref = await signIn.getAttribute('href')
       const zip = await page.getByRole('link', { name: 'Download WordPress plugin' }).first().getAttribute('href')
       summary.push({ slug, ...metrics, serious: serious.map((item) => item.id), signHref, zip })
+      await assertHeaderSignIn(page, slug)
       if (!metrics.brand) throw new Error(slug + ' still shows the old brand name')
       if (!metrics.scroll) throw new Error(slug + ' scrolls sideways')
       if (metrics.small.length) throw new Error(slug + ' small targets ' + JSON.stringify(metrics.small))
@@ -336,6 +342,7 @@ try {
     const protocolSerious = protocolAxe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
     await protocolPage.screenshot({ path: join(out, 'protocol-' + width + '.png'), fullPage: true })
     summary.push({ slug: 'protocol-' + width, ...protocolOk, serious: protocolSerious.map((item) => item.id) })
+    await assertHeaderSignIn(protocolPage, 'protocol-' + width)
     if (!protocolOk.scroll) throw new Error('protocol-' + width + ' scrolls sideways')
     if (protocolOk.title !== 'An open way for agents to share offers.') throw new Error('protocol heading ' + protocolOk.title)
     if (!protocolOk.nav.includes('/protocol/') || !protocolOk.nav.includes('source=cursor')) throw new Error('protocol nav ' + protocolOk.nav)
@@ -350,10 +357,15 @@ try {
       const banned = /grok|connector|marketplace|\blisted\b|github\.com|distributoor|affilio/i
       if (banned.test(text)) throw new Error(legal + '-' + width + ' banned copy')
       const need = legal === 'privacy'
-        ? ['Draft, not yet approved', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', '10 to 12000', 'surface URL', 'not followed', 'signed-out caller', 'frozen copy', 'approved by', 'Listing cards', '.env', '/24', '/48', 'daily salt', 'raw IP is never stored', '30 days', 'Render hosts', 'Neon provides Postgres', 'Cloudflare sits in front of Render', 'Stripe processes payments', 'Anthropic API', 'Claude API key', 'does not say the call is on', 'does not say the call is off', 'no telemetry', 'train models', 'not sold', 'not transferred', 'untrusted data', 'only tighten modes', 'claim_check_unavailable', 'human approve', 'Not checked yet', 'stays on manual']
+        ? ['Draft, not yet approved', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', '10 to 12000', 'surface URL', 'not followed', 'signed-out caller', 'frozen copy', 'approved by', 'pass or fail signals', 'We never store source code, environment files or secrets.', '/24', '/48', 'daily salt', 'raw IP is never stored', '30 days', 'Render hosts', 'Neon provides Postgres', 'Cloudflare sits in front of Render', 'Stripe processes payments', 'If AI copy generation is turned on, page text you send is processed by Anthropic (Claude) to classify and draft copy.', 'no telemetry', 'train models', 'not sold', 'not transferred', 'untrusted data', 'only tighten modes', 'Until the claims check is live, every placement needs a person to approve it.', 'Not checked yet']
         : ['Draft, not yet approved', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', 'A maker may publish an offer', 'sale and a refund', 'does not hold the money', 'approve or refuse', 'until a person approves', 'only tighten an approval mode', 'cannot approve a placement', 'cannot turn YOLO on', 'test mode', 'not a live charge', 'no warranty', 'as is']
       for (const needle of need) {
         if (!text.includes(needle)) throw new Error(legal + '-' + width + ' missing ' + needle)
+      }
+      if (legal === 'privacy') {
+        for (const dropped of ['does not add practices', 'claim_check_unavailable', 'reviewer demo account', 'does not say the call is on', '.env files']) {
+          if (text.includes(dropped)) throw new Error(legal + '-' + width + ' still says ' + dropped)
+        }
       }
       const legalMetrics = await legalPage.evaluate(() => {
         const banner = document.querySelector('[data-draft-banner]')
@@ -379,6 +391,7 @@ try {
       writeFileSync(join(out, `axe-${legal}-${width}.json`), JSON.stringify({ violations: legalSerious }, null, 2))
       await legalPage.screenshot({ path: join(out, legal + '-' + width + '.png'), fullPage: true })
       summary.push({ slug: legal + '-' + width, ...legalMetrics, serious: legalSerious.map((item) => item.id) })
+      await assertHeaderSignIn(legalPage, legal + '-' + width)
       if (!legalMetrics.scroll) throw new Error(legal + '-' + width + ' scrolls sideways')
       if (legalMetrics.small.length) throw new Error(legal + '-' + width + ' small targets ' + JSON.stringify(legalMetrics.small))
       if (!legalMetrics.banner) throw new Error(legal + '-' + width + ' draft banner')
@@ -432,6 +445,7 @@ try {
     const connectTo = new URL(connectHref, base).searchParams.get('return_to') || ''
     const yolo = await setupPage.getByRole('radio', { name: /YOLO/ }).isChecked()
     summary.push({ slug: 'setup-' + width, ...setupMetrics, serious: setupSerious.map((item) => item.id), connectHref, yolo })
+    await assertHeaderSignIn(setupPage, 'setup-' + width)
     if (!setupMetrics.scroll) throw new Error('setup-' + width + ' scrolls sideways')
     if (setupMetrics.small.length) throw new Error('setup-' + width + ' small targets ' + JSON.stringify(setupMetrics.small))
     if (setupSerious.length) throw new Error('setup-' + width + ' axe ' + setupSerious.map((item) => item.id + ' ' + item.nodes.map((node) => node.target.join(' ')).join('; ')).join(' | '))

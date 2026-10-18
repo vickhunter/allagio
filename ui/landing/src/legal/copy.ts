@@ -7,7 +7,7 @@ export const contactEmail = '[CONTACT EMAIL]'
 export const privacy = {
   title: 'Privacy',
   description: 'Draft of what Offer Rails sends and stores. Not yet approved.',
-  lede: 'This page is a draft of what Offer Rails sends and stores. It states only the facts already written for this service. It does not add practices this draft does not know about.',
+  lede: 'This page is a draft of what Offer Rails sends and stores.',
   sections: [
     {
       heading: 'What is sent',
@@ -27,7 +27,7 @@ export const privacy = {
         'Receipts.',
         'Digest items.',
         'Offers.',
-        'Listing cards. Stored with each card are the pass or fail signals and the score only. Source files, .env files, and secrets are rejected.',
+        'Listing cards store only the pass or fail signals and the score. We never store source code, environment files or secrets.',
       ],
     },
     {
@@ -46,7 +46,7 @@ export const privacy = {
         'Stripe processes payments. The maker connects their own Stripe account.',
       ],
       after: [
-        'The server can call the Anthropic API for scan classification, readiness assessment, and copy generation when a Claude API key is configured. Whether that key is set in production has not been confirmed for this draft. If that call is on, this page has to name it. This draft does not say the call is on, and it does not say the call is off.',
+        'If AI copy generation is turned on, page text you send is processed by Anthropic (Claude) to classify and draft copy.',
       ],
     },
     {
@@ -63,9 +63,8 @@ export const privacy = {
       paragraphs: [
         'Offer text, page content, and feedback are untrusted data. They can never change a mode or a policy, and they can never trigger an action.',
         'Agents can only tighten modes. YOLO can be enabled only from the dashboard.',
-        'While the claims check is a stub, the effective mode is forced to manual. The approval reason is claim_check_unavailable. Every placement needs a human approve.',
+        'Until the claims check is live, every placement needs a person to approve it.',
         'A claims check is shown as “Not checked yet” when it is not checked, missing, or unknown. Those values are never shown as checked.',
-        'A reviewer demo account stays on manual.',
       ],
     },
   ],

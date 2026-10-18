@@ -30,11 +30,16 @@ const ink = '#232720'
 const cream = '#F7F7EF'
 const maker = '#C64F38'
 
-const rails = `<g fill="none" stroke="${ink}" stroke-linecap="square">
+function railsMark(stroke) {
+  return `<g fill="none" stroke="${stroke}" stroke-linecap="square">
     <path d="M2.6 12.6h26.8M2.6 19.4h26.8" stroke-width="2.35"/>
     <path d="M5.9 9.3v13.4M12.6 9.3v13.4M19.4 9.3v13.4M26.1 9.3v13.4" stroke-width="1.8" stroke-opacity="0.72"/>
     <circle cx="20.5" cy="16" r="4.5" fill="${maker}" stroke="${cream}" stroke-width="1.8"/>
   </g>`
+}
+
+const rails = railsMark(ink)
+const railsDark = railsMark(cream)
 
 function svgDoc(inner, size = 32) {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -98,8 +103,10 @@ function wordmark() {
 
 mkdirSync(out, { recursive: true })
 const transparent = svgDoc(rails)
+const dark = svgDoc(railsDark)
 const light = svgDoc(`<rect width="32" height="32" fill="${cream}"/>\n  ${rails}`)
 writeFileSync(resolve(out, 'mark.svg'), transparent)
+writeFileSync(resolve(out, 'mark-dark.svg'), dark)
 writeFileSync(resolve(out, 'favicon.svg'), light)
 writeFileSync(resolve(root, 'public/favicon.svg'), light)
 writeFileSync(resolve(out, 'wordmark.svg'), wordmark())
@@ -107,6 +114,8 @@ writeFileSync(resolve(out, 'wordmark.svg'), wordmark())
 const sizes = [
   ['mark-transparent-512.png', transparent, 512],
   ['mark-transparent-1024.png', transparent, 1024],
+  ['mark-dark-512.png', dark, 512],
+  ['mark-dark-1024.png', dark, 1024],
   ['mark-light-512.png', light, 512],
   ['mark-light-1024.png', light, 1024],
   ['favicon-16.png', light, 16],
@@ -135,11 +144,11 @@ const sheet = `<?xml version="1.0" encoding="UTF-8"?>
   <rect x="108" y="100" width="72" height="72" fill="${cream}" stroke="#dde0d3"/>
   <g transform="translate(112 104) scale(2)">${rails}</g>
   <text x="40" y="214" fill="${ink}" font-family="Inter" font-size="14" font-weight="600">512 on light</text>
-  <text x="616" y="214" fill="${cream}" font-family="Inter" font-size="14" font-weight="600">512 transparent, on ink</text>
+  <text x="616" y="214" fill="${cream}" font-family="Inter" font-size="14" font-weight="600">512 on dark</text>
   <rect x="36" y="228" width="520" height="520" fill="${cream}" stroke="#dde0d3"/>
   <g transform="translate(40 232) scale(16)">${rails}</g>
   <rect x="576" y="196" width="552" height="568" fill="${ink}"/>
-  <g transform="translate(596 232) scale(16)">${rails}</g>
+  <g transform="translate(596 232) scale(16)">${railsDark}</g>
   <g transform="translate(40 800)">${lockup.inner}</g>
 </svg>`
 const sheetPng = new Resvg(sheet, {
