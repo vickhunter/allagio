@@ -6,6 +6,7 @@ package preview
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"html"
 	"io"
@@ -33,6 +34,14 @@ var (
 	ErrBlocked = errors.New("blocked address")
 	// ErrFetch is a page that could not be read as HTML.
 	ErrFetch = errors.New("fetch failed")
+	// ErrUnreadable is a private post, a login wall, or a page with no text.
+	ErrUnreadable = errors.New("unreadable or private")
+)
+
+const (
+	kindHTML    = "html"
+	kindTwitter = "twitter"
+	kindYouTube = "youtube"
 )
 
 // Page is the title and visible text of a public HTML page.
@@ -42,35 +51,45 @@ type Page struct {
 }
 
 // Fetcher GETs one public page. A zero Fetcher uses the process resolver and dialer.
+// TLSClientConfig is for tests that terminate TLS locally. Leave it nil so the
+// live client keeps verifying certificates.
 type Fetcher struct {
-	LookupIP    func(ctx context.Context, host string) ([]net.IP, error)
-	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
+	LookupIP        func(ctx context.Context, host string) ([]net.IP, error)
+	DialContext     func(ctx context.Context, network, address string) (net.Conn, error)
+	TLSClientConfig *tls.Config
 }
 
 // Fetch downloads rawURL and returns its title and main text.
-// It does not log the URL or the body.
+// An X or Twitter post is read from the public oEmbed endpoint. A YouTube
+// URL is read from YouTube's oEmbed endpoint. Any other URL is the HTML page,
+// including its Open Graph and description tags. It does not log the URL or the body.
 func (f Fetcher) Fetch(ctx context.Context, rawURL string) (Page, error) {
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 
-	pins := &pinSet{hosts: map[string]net.IP{}}
-	if err := f.admit(ctx, pins, rawURL); err != nil {
+	pageURL, err := parsePublicURL(rawURL)
+	if err != nil {
 		return Page{}, err
 	}
-	first, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil {
-		return Page{}, ErrInvalidURL
+	target, kind := embedTarget(pageURL)
+	pins := &pinSet{hosts: map[string]net.IP{}}
+	if err = f.admit(ctx, pins, target); err != nil {
+		return Page{}, err
 	}
 
 	client := f.client(pins)
 	defer client.CloseIdleConnections()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, first.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return Page{}, ErrInvalidURL
 	}
 	req.Header.Set("User-Agent", "OfferRails-Preview/1.0")
-	req.Header.Set("Accept", "text/html")
+	if kind == kindHTML {
+		req.Header.Set("Accept", "text/html")
+	} else {
+		req.Header.Set("Accept", "application/json")
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -81,24 +100,32 @@ func (f Fetcher) Fetch(ctx context.Context, rawURL string) (Page, error) {
 		return Page{}, classify(err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return Page{}, ErrFetch
+	if unreadableStatus(kind, resp.StatusCode) {
+		return Page{}, ErrUnreadable
 	}
-	if !htmlContent(resp.Header.Get("Content-Type")) {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return Page{}, ErrFetch
 	}
 	if resp.ContentLength > maxBody {
 		return Page{}, ErrFetch
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
-	if err != nil {
+	if err != nil || len(body) > maxBody {
 		return Page{}, ErrFetch
 	}
-	if len(body) > maxBody {
+	if kind == kindHTML {
+		if !htmlContent(resp.Header.Get("Content-Type")) {
+			return Page{}, ErrFetch
+		}
+		return pageFromHTML(string(body))
+	}
+	if !jsonContent(resp.Header.Get("Content-Type")) {
+		if htmlContent(resp.Header.Get("Content-Type")) {
+			return Page{}, ErrUnreadable
+		}
 		return Page{}, ErrFetch
 	}
-	title, text := extractPage(string(body))
-	return Page{Title: title, Text: text}, nil
+	return pageFromOEmbed(kind, body)
 }
 
 // client speaks HTTP/1.1 on the pinned address. Clearing TLSNextProto only
@@ -110,7 +137,12 @@ func (f Fetcher) client(pins *pinSet) *http.Client {
 	transport.Proxy = nil
 	transport.ForceAttemptHTTP2 = false
 	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
-	transport.TLSClientConfig = &tls.Config{NextProtos: []string{"http/1.1"}}
+	tlsConfig := &tls.Config{NextProtos: []string{"http/1.1"}}
+	if f.TLSClientConfig != nil {
+		tlsConfig = f.TLSClientConfig.Clone()
+	}
+	tlsConfig.NextProtos = []string{"http/1.1"}
+	transport.TLSClientConfig = tlsConfig
 	transport.TLSHandshakeTimeout = fetchTimeout
 	transport.ResponseHeaderTimeout = fetchTimeout
 	transport.DisableKeepAlives = true
@@ -143,11 +175,14 @@ func (f Fetcher) client(pins *pinSet) *http.Client {
 
 // screen is the address check Fetch runs before it dials.
 func (f Fetcher) screen(ctx context.Context, rawURL string) error {
+	if _, err := parsePublicURL(rawURL); err != nil {
+		return err
+	}
 	return f.admit(ctx, &pinSet{hosts: map[string]net.IP{}}, rawURL)
 }
 
 func (f Fetcher) admit(ctx context.Context, pins *pinSet, rawURL string) error {
-	parsed, err := parsePublicURL(rawURL)
+	parsed, err := parseFetchURL(rawURL)
 	if err != nil {
 		return err
 	}
@@ -161,7 +196,15 @@ func (f Fetcher) admit(ctx context.Context, pins *pinSet, rawURL string) error {
 
 func parsePublicURL(raw string) (*url.URL, error) {
 	raw = strings.TrimSpace(raw)
-	if raw == "" || len(raw) > maxURLBytes || strings.ContainsAny(raw, "\r\n\t \\") {
+	if len(raw) > maxURLBytes {
+		return nil, ErrInvalidURL
+	}
+	return parseFetchURL(raw)
+}
+
+func parseFetchURL(raw string) (*url.URL, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || len(raw) > 8192 || strings.ContainsAny(raw, "\r\n\t \\") {
 		return nil, ErrInvalidURL
 	}
 	parsed, err := url.Parse(raw)
@@ -229,12 +272,20 @@ func classify(err error) error {
 	if errors.Is(err, ErrInvalidURL) {
 		return ErrInvalidURL
 	}
+	if errors.Is(err, ErrUnreadable) {
+		return ErrUnreadable
+	}
 	return ErrFetch
 }
 
 func htmlContent(header string) bool {
 	media, _, err := mime.ParseMediaType(header)
 	return err == nil && strings.EqualFold(media, "text/html")
+}
+
+func jsonContent(header string) bool {
+	media, _, err := mime.ParseMediaType(header)
+	return err == nil && strings.EqualFold(media, "application/json")
 }
 
 type pinSet struct {
@@ -296,6 +347,7 @@ func blockedIP(ip net.IP) bool {
 
 var (
 	titlePattern   = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
+	headPattern    = regexp.MustCompile(`(?is)<head\b[^>]*>.*?</head>`)
 	mainPattern    = regexp.MustCompile(`(?is)<main\b[^>]*>(.*?)</main>`)
 	articlePattern = regexp.MustCompile(`(?is)<article\b[^>]*>(.*?)</article>`)
 	commentPattern = regexp.MustCompile(`(?s)<!--.*?-->`)
@@ -310,7 +362,7 @@ func extractPage(raw string) (string, string) {
 	if match := titlePattern.FindStringSubmatch(raw); match != nil {
 		title = cleanLine(match[1])
 	}
-	source := raw
+	source := headPattern.ReplaceAllString(raw, " ")
 	if match := mainPattern.FindStringSubmatch(raw); match != nil {
 		source = match[1]
 	} else if match := articlePattern.FindStringSubmatch(raw); match != nil {
@@ -356,4 +408,175 @@ func normalizeParagraphs(raw string) string {
 		text = string(runes[:20000])
 	}
 	return text
+}
+
+func embedTarget(page *url.URL) (string, string) {
+	host := page.Hostname()
+	switch {
+	case hostIs(host, "twitter.com", "x.com"):
+		return "https://publish.twitter.com/oembed?url=" + url.QueryEscape(page.String()), kindTwitter
+	case hostIs(host, "youtube.com", "youtu.be"):
+		return "https://www.youtube.com/oembed?format=json&url=" + url.QueryEscape(page.String()), kindYouTube
+	default:
+		return page.String(), kindHTML
+	}
+}
+
+func hostIs(host string, names ...string) bool {
+	host = hostKey(host)
+	for _, name := range names {
+		if host == name || strings.HasSuffix(host, "."+name) {
+			return true
+		}
+	}
+	return false
+}
+
+func unreadableStatus(kind string, code int) bool {
+	if code == http.StatusUnauthorized || code == http.StatusForbidden {
+		return true
+	}
+	return kind != kindHTML && code == http.StatusNotFound
+}
+
+func pageFromHTML(raw string) (Page, error) {
+	title, text := extractPage(raw)
+	title, text = applyMeta(raw, title, text)
+	if strings.TrimSpace(text) == "" || loginWall(raw, title, text) {
+		return Page{}, ErrUnreadable
+	}
+	return Page{Title: title, Text: text}, nil
+}
+
+func pageFromOEmbed(kind string, body []byte) (Page, error) {
+	var doc struct {
+		Title      string `json:"title"`
+		AuthorName string `json:"author_name"`
+		HTML       string `json:"html"`
+	}
+	if err := json.Unmarshal(body, &doc); err != nil {
+		return Page{}, ErrFetch
+	}
+	if kind == kindYouTube {
+		title := cleanLine(doc.Title)
+		text := strings.TrimSpace(title + "\n\n" + cleanLine(doc.AuthorName))
+		if title == "" || strings.TrimSpace(text) == "" {
+			return Page{}, ErrUnreadable
+		}
+		return Page{Title: title, Text: text}, nil
+	}
+	_, text := extractPage(doc.HTML)
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return Page{}, ErrUnreadable
+	}
+	title := cleanLine(doc.Title)
+	if title == "" {
+		title = text
+		if i := strings.Index(title, "\n"); i >= 0 {
+			title = strings.TrimSpace(title[:i])
+		}
+	}
+	if title == "" {
+		title = cleanLine(doc.AuthorName)
+	}
+	return Page{Title: title, Text: text}, nil
+}
+
+var (
+	metaPattern        = regexp.MustCompile(`(?i)<meta\b[^>]*>`)
+	attrPattern        = regexp.MustCompile(`(?i)([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))`)
+	passwordPattern    = regexp.MustCompile(`(?i)\btype\s*=\s*['"]?password\b`)
+	loginPhrasePattern = regexp.MustCompile(`(?i)(?:\blog[\s-]?in\b|\bsign[\s-]?in\b|protected account|this account is private|tweets are protected|only subscribers can)`)
+)
+
+func applyMeta(raw, title, text string) (string, string) {
+	metas := readMeta(raw)
+	if og := firstMeta(metas, "og:title"); og != "" {
+		title = og
+	} else if title == "" {
+		if tw := firstMeta(metas, "twitter:title"); tw != "" {
+			title = tw
+		}
+	}
+	var extra []string
+	seen := map[string]struct{}{}
+	for _, key := range []string{"og:description", "twitter:description", "description"} {
+		value := firstMeta(metas, key)
+		if value == "" || strings.Contains(text, value) {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		extra = append(extra, value)
+	}
+	if tags := metas["article:tag"]; len(tags) > 0 {
+		joined := strings.Join(tags, " ")
+		if _, ok := seen[joined]; !ok && !strings.Contains(text, joined) {
+			extra = append(extra, joined)
+		}
+	}
+	if len(extra) == 0 {
+		return title, text
+	}
+	block := strings.Join(extra, "\n\n")
+	if strings.TrimSpace(text) == "" {
+		return title, block
+	}
+	return title, text + "\n\n" + block
+}
+
+func readMeta(raw string) map[string][]string {
+	out := map[string][]string{}
+	for _, tag := range metaPattern.FindAllString(raw, -1) {
+		attrs := map[string]string{}
+		for _, match := range attrPattern.FindAllStringSubmatch(tag, -1) {
+			value := match[3]
+			if value == "" {
+				value = match[4]
+			}
+			if value == "" {
+				value = match[5]
+			}
+			attrs[strings.ToLower(match[1])] = strings.Join(strings.Fields(html.UnescapeString(value)), " ")
+		}
+		key := attrs["property"]
+		if key == "" {
+			key = attrs["name"]
+		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		if key == "" || attrs["content"] == "" {
+			continue
+		}
+		out[key] = append(out[key], attrs["content"])
+	}
+	return out
+}
+
+func firstMeta(metas map[string][]string, key string) string {
+	values := metas[key]
+	if len(values) == 0 {
+		return ""
+	}
+	return values[0]
+}
+
+func loginWall(raw, title, text string) bool {
+	words := len(strings.Fields(text))
+	if words >= 80 {
+		return false
+	}
+	if passwordPattern.MatchString(raw) {
+		return true
+	}
+	if words >= 40 {
+		return false
+	}
+	return loginPhrase(title + " " + text)
+}
+
+func loginPhrase(text string) bool {
+	return loginPhrasePattern.MatchString(text)
 }
