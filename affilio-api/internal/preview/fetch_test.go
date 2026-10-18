@@ -444,6 +444,8 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 			_, _ = io.WriteString(w, `<html><head><title>Members</title></head><body><main><p>Welcome back.</p><input type="password"></main></body></html>`)
 		case "/long":
 			_, _ = io.WriteString(w, `<html><head><title>Notes</title></head><body><main><p>`+strings.Repeat("word ", 90)+`This article mentions login once.</p></main></body></html>`)
+		case "/bare":
+			_, _ = io.WriteString(w, `<html><head><title>InboxPilot email inbox</title></head><body><p>A short public note.</p></body></html>`)
 		case "/gone":
 			http.NotFound(w, r)
 		case "/denied":
@@ -486,6 +488,10 @@ func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
 	evil, err := plain.Fetch(context.Background(), "http://twitter.com.evil.com/og")
 	if err != nil || evil.Title != "OG Title" {
 		t.Fatalf("lookalike host: %v %+v", err, evil)
+	}
+	bare, err := plain.Fetch(context.Background(), "http://preview.example/bare")
+	if err != nil || !strings.Contains(bare.Text, "InboxPilot email inbox") || !strings.Contains(bare.Text, "A short public note.") {
+		t.Fatalf("title was dropped from the match text: %v %+v", err, bare)
 	}
 }
 

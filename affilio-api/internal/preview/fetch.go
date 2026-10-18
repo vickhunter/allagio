@@ -445,6 +445,9 @@ func pageFromHTML(raw string) (Page, error) {
 	if strings.TrimSpace(text) == "" || loginWall(raw, title, text) {
 		return Page{}, ErrUnreadable
 	}
+	if title != "" && !strings.Contains(text, title) {
+		text = strings.TrimSpace(text + " " + title)
+	}
 	return Page{Title: title, Text: text}, nil
 }
 
