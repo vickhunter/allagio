@@ -311,9 +311,10 @@ WHERE key_hash=$1 AND scope='offer' AND revoked_at IS NULL AND expires_at>NOW()`
 }
 
 type AgentAccount struct {
-	OwnerID string
-	SiteID  string
-	MakerID string
+	OwnerID           string
+	SiteID            string
+	MakerID           string
+	VerificationToken string
 }
 
 func (d *DB) CreateAgentOnlyAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix string) (AgentAccount, error) {
@@ -333,7 +334,11 @@ VALUES('https://offer-rails.agent',$1,$2,$3,$4,true,false) RETURNING id`, subjec
 		if pluginHash == "" || pluginPrefix == "" {
 			return AgentAccount{}, errors.New("plugin key required")
 		}
-		err = tx.QueryRow(ctx, `INSERT INTO sites(api_key_hash,api_key_prefix,domain,name) VALUES($1,$2,$3,$4) RETURNING id`, siteHash, sitePrefix, domain, name).Scan(&out.SiteID)
+		out.VerificationToken, err = newVerificationToken()
+		if err != nil {
+			return AgentAccount{}, err
+		}
+		err = tx.QueryRow(ctx, `INSERT INTO sites(api_key_hash,api_key_prefix,domain,name,verification_token) VALUES($1,$2,$3,$4,$5) RETURNING id`, siteHash, sitePrefix, domain, name, out.VerificationToken).Scan(&out.SiteID)
 		if err == nil {
 			_, err = tx.Exec(ctx, `UPDATE owners SET site_id=$2 WHERE id=$1`, out.OwnerID, out.SiteID)
 		}

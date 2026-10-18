@@ -338,6 +338,9 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 		resp["key_header"] = "X-API-Key"
 		resp["plugin_key"] = pluginKey
 		resp["plugin_key_header"] = "X-Plugin-Key"
+		resp["verification_token"] = account.VerificationToken
+		resp["verified"] = false
+		resp["verified_at"] = nil
 	} else {
 		resp["maker_id"] = account.MakerID
 		resp["api_key"] = makerKey

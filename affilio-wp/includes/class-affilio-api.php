@@ -130,6 +130,25 @@ class Affilio_API {
         return 'affilio_cs_' . md5($this->base_url . "\n" . $this->current_api_key());
     }
 
+    public function refresh_verification_token() {
+        if (trim((string) get_option('affilio_api_key', '')) === '') {
+            delete_option('affilio_verification_token');
+            return;
+        }
+        $response = $this->request('GET', '/sites/current');
+        if (is_wp_error($response) || !is_array($response) || (int) $response['code'] !== 200 || !is_array($response['data'])) {
+            return;
+        }
+        if (!isset($response['data']['verification_token']) || !is_string($response['data']['verification_token'])) {
+            return;
+        }
+        $token = trim($response['data']['verification_token']);
+        if ($token === '') {
+            return;
+        }
+        update_option('affilio_verification_token', $token, false);
+    }
+
     public function invalidate_status_cache() {
         $index = get_option('affilio_status_cache_keys', array());
         if (is_array($index)) {

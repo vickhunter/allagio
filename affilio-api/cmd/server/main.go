@@ -280,6 +280,9 @@ func main() {
 
 	secured := v1.Group("/")
 	secured.Use(middleware.APIKeyAuth(db, audit, oauthResources...))
+	secured.GET("/sites/current", sites.Current)
+	secured.GET("/sites/:id", sites.Get)
+	secured.POST("/sites/:id/verify", sites.Verify)
 	if hosted != nil {
 		secured.GET("/sites/owner-connection", hosted.SiteConnectionStatus)
 		secured.POST("/sites/owner-connection", hosted.StartSiteConnection)

@@ -1,3 +1,13 @@
+## October 18 — Domain verification for a site
+
+A site from `POST /v1/agent-accounts` or `POST /v1/sites/register` starts unverified. The response includes `verification_token`, `verified: false`, and `verified_at: null`. A maker account does not. `GET /v1/sites/current` and `GET /v1/sites/:id` (the site key, and `:id` must be that site) return the same fields. An older site with an empty token receives one on that read.
+
+`POST /v1/sites/:id/verify` fetches `https://<domain>/.well-known/offer-rails.txt` and, if that file does not contain the token on its own line, `https://<domain>/` for `<meta name="offer-rails-verification" content="<token>">`. The fetch is the public-page client: HTTP/1.1, 5 second timeout, 2 MB cap, and the same address checks. A redirect to another host is not proof. A match stores `verified_at`. A miss is 422 `verification_missing`. A fetch that cannot be read is 422 `verification_unreachable`. Neither response is a 500, and neither includes a resolved address.
+
+Duplicate signups for one domain stay allowed. Only one of those sites can be verified. A later verify, including the same site, is 409 `domain_verified` and does not fetch again. Placements still wait for the operator. `verified_at` is recorded for D-062, which is what will skip that approval for a verified domain. Migration `040_d063b_domain_verification.sql` adds `verification_token` and `verified_at`. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
+The WordPress plugin serves `/.well-known/offer-rails.txt` as `text/plain` once `affilio_api_key` and `affilio_verification_token` are both set. Connect stores the token from registration, and a settings save reads `GET /v1/sites/current`. A failed read keeps the stored token. Clearing the site key removes it. `llms.txt` and the agents page are unchanged.
+
 ## October 18 — Agent sites can go live without a browser session
 
 `GET /device` is the device-code page `POST /v1/device/code` already pointed at. A signed-in human approves or denies the user code for a site or offer on their account. Someone who is not signed in is sent to `/auth/login` and back to `/device`. The return path accepts `/device` and one `user_code` query, and nothing else. Approving gives the polling agent a project key. It does not approve a placement.

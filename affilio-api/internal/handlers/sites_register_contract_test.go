@@ -35,6 +35,18 @@ func pluginRegisterFixture(t *testing.T) []byte {
 	return payload
 }
 
+func decodeRegister(t *testing.T, raw []byte) (string, string) {
+	t.Helper()
+	var created struct {
+		SiteID string `json:"site_id"`
+		APIKey string `json:"api_key"`
+	}
+	if err := json.Unmarshal(raw, &created); err != nil {
+		t.Fatalf("register response: %s", raw)
+	}
+	return created.SiteID, created.APIKey
+}
+
 func registerRaw(t *testing.T, r http.Handler, payload []byte) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
@@ -55,12 +67,12 @@ func TestSitesRegisterAcceptsPluginContract(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("plugin payload rejected: %d %s", rec.Code, rec.Body.String())
 	}
-	var created map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil || created["site_id"] == "" || created["api_key"] == "" {
+	createdID, createdKey := decodeRegister(t, rec.Body.Bytes())
+	if createdID == "" || createdKey == "" {
 		t.Fatalf("plugin registration response: %s", rec.Body.String())
 	}
 	var domain, name, row string
-	if err := db.Pool.QueryRow(context.Background(), `SELECT domain, COALESCE(name,''), row_to_json(sites)::text FROM sites WHERE id=$1`, created["site_id"]).Scan(&domain, &name, &row); err != nil {
+	if err := db.Pool.QueryRow(context.Background(), `SELECT domain, COALESCE(name,''), row_to_json(sites)::text FROM sites WHERE id=$1`, createdID).Scan(&domain, &name, &row); err != nil {
 		t.Fatal(err)
 	}
 	if domain != "blog.example" || name != "" {
@@ -75,11 +87,8 @@ func TestSitesRegisterAcceptsPluginContract(t *testing.T) {
 	if extraRec.Code != http.StatusOK {
 		t.Fatalf("extra fields rejected: %d %s", extraRec.Code, extraRec.Body.String())
 	}
-	var extraCreated map[string]string
-	if err := json.Unmarshal(extraRec.Body.Bytes(), &extraCreated); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Pool.QueryRow(context.Background(), `SELECT domain, COALESCE(name,''), row_to_json(sites)::text FROM sites WHERE id=$1`, extraCreated["site_id"]).Scan(&domain, &name, &row); err != nil {
+	extraID, _ := decodeRegister(t, extraRec.Body.Bytes())
+	if err := db.Pool.QueryRow(context.Background(), `SELECT domain, COALESCE(name,''), row_to_json(sites)::text FROM sites WHERE id=$1`, extraID).Scan(&domain, &name, &row); err != nil {
 		t.Fatal(err)
 	}
 	if domain != "blog.example" || name != "" || strings.Contains(row, "owner@example.com") || strings.Contains(row, "Ada") {
@@ -90,11 +99,8 @@ func TestSitesRegisterAcceptsPluginContract(t *testing.T) {
 	if wwwRec.Code != http.StatusOK {
 		t.Fatalf("www host rejected: %d %s", wwwRec.Code, wwwRec.Body.String())
 	}
-	var wwwCreated map[string]string
-	if err := json.Unmarshal(wwwRec.Body.Bytes(), &wwwCreated); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Pool.QueryRow(context.Background(), `SELECT domain FROM sites WHERE id=$1`, wwwCreated["site_id"]).Scan(&domain); err != nil {
+	wwwID, _ := decodeRegister(t, wwwRec.Body.Bytes())
+	if err := db.Pool.QueryRow(context.Background(), `SELECT domain FROM sites WHERE id=$1`, wwwID).Scan(&domain); err != nil {
 		t.Fatal(err)
 	}
 	if domain != "www.blog.example" {
@@ -118,11 +124,8 @@ func TestSitesRegisterAcceptsPluginContract(t *testing.T) {
 	if legacy.Code != http.StatusOK {
 		t.Fatalf("legacy domain body rejected: %d %s", legacy.Code, legacy.Body.String())
 	}
-	var legacyCreated map[string]string
-	if err := json.Unmarshal(legacy.Body.Bytes(), &legacyCreated); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Pool.QueryRow(context.Background(), `SELECT domain, COALESCE(name,'') FROM sites WHERE id=$1`, legacyCreated["site_id"]).Scan(&domain, &name); err != nil {
+	legacyID, _ := decodeRegister(t, legacy.Body.Bytes())
+	if err := db.Pool.QueryRow(context.Background(), `SELECT domain, COALESCE(name,'') FROM sites WHERE id=$1`, legacyID).Scan(&domain, &name); err != nil {
 		t.Fatal(err)
 	}
 	if domain != "blog.example" || name != "Legacy Blog" {
@@ -151,12 +154,9 @@ func TestSitesRegisterStoresPluginVersionOnlyWhenColumnExists(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("plugin payload rejected after column add: %d %s", rec.Code, rec.Body.String())
 	}
-	var created map[string]string
-	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
-		t.Fatal(err)
-	}
+	createdID, _ := decodeRegister(t, rec.Body.Bytes())
 	var version string
-	if err := db.Pool.QueryRow(context.Background(), `SELECT COALESCE(plugin_version,'') FROM sites WHERE id=$1`, created["site_id"]).Scan(&version); err != nil {
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COALESCE(plugin_version,'') FROM sites WHERE id=$1`, createdID).Scan(&version); err != nil {
 		t.Fatal(err)
 	}
 	if version != "0.1.33" {
