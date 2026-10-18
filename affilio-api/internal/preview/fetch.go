@@ -352,7 +352,7 @@ var (
 	articlePattern     = regexp.MustCompile(`(?is)<article\b[^>]*>(.*?)</article>`)
 	commentPattern     = regexp.MustCompile(`(?s)<!--.*?-->`)
 	dropPattern        = regexp.MustCompile(`(?is)<(script|style|noscript|nav|header|footer|form|svg|iframe|template)\b[^>]*>.*?</(script|style|noscript|nav|header|footer|form|svg|iframe|template)>`)
-	scriptStylePattern = regexp.MustCompile(`(?is)<(script|style|noscript)\b[^>]*>.*?</(script|style|noscript)>`)
+	scriptStylePattern = regexp.MustCompile(`(?is)<(script|style)\b[^>]*>.*?</(script|style)>`)
 	breakPattern       = regexp.MustCompile(`(?i)</\s*(p|div|h[1-6]|li|section|article|main|blockquote|tr)\b[^>]*>|<\s*br\s*/?\s*>`)
 	tagPattern         = regexp.MustCompile(`(?s)<[^>]+>`)
 )
