@@ -274,6 +274,67 @@ func TestDomainVerificationMetaAndUnreachable(t *testing.T) {
 	}
 }
 
+func TestDomainVerificationCanonicalHost(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	var mu sync.Mutex
+	body := ""
+	page := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		if r.Host != "alias.example" && r.Host != "alias.example:443" {
+			http.Error(w, "wrong host", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(page.Close)
+	var dialed []string
+	r := newVerifyRouter(db, verificationFetcher(page, &dialed, func(host string) ([]net.IP, error) {
+		if host == "alias.example" {
+			return []net.IP{net.ParseIP("203.0.113.50")}, nil
+		}
+		return nil, errBlockedDial
+	}))
+	first, firstBody := postJSON(t, r, http.MethodPost, "/v1/agent-accounts", map[string]any{
+		"role": "publisher", "name": "Alias Blog", "email": "alias-blog@example.com", "domain": "alias.example.",
+	}, nil)
+	token, _ := firstBody["verification_token"].(string)
+	firstID, _ := firstBody["site_id"].(string)
+	firstKey, _ := firstBody["api_key"].(string)
+	if first.Code != http.StatusCreated || token == "" {
+		t.Fatalf("register: %d %s", first.Code, first.Body.String())
+	}
+	var storedHost string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT domain FROM sites WHERE id=$1`, firstID).Scan(&storedHost); err != nil || storedHost != "alias.example." {
+		t.Fatalf("stored domain %q %v", storedHost, err)
+	}
+	mu.Lock()
+	body = token + "\n"
+	mu.Unlock()
+	verified, verifiedBody := postJSON(t, r, http.MethodPost, "/v1/sites/"+firstID+"/verify", map[string]any{}, map[string]string{"X-API-Key": firstKey})
+	if verified.Code != http.StatusOK || verifiedBody["verified"] != true {
+		t.Fatalf("dotted host: %d %s dialed %v", verified.Code, verified.Body.String(), dialed)
+	}
+	for _, address := range dialed {
+		if !strings.HasSuffix(address, ":443") {
+			t.Fatalf("canonical fetch dialed %v", dialed)
+		}
+	}
+	second, secondBody := postJSON(t, r, http.MethodPost, "/v1/sites/register", map[string]any{"domain": "alias.example:443"}, nil)
+	secondID, _ := secondBody["site_id"].(string)
+	secondKey, _ := secondBody["api_key"].(string)
+	if second.Code != http.StatusOK || secondID == firstID {
+		t.Fatalf("second register: %d %s", second.Code, second.Body.String())
+	}
+	dials := len(dialed)
+	conflict, conflictBody := postJSON(t, r, http.MethodPost, "/v1/sites/"+secondID+"/verify", map[string]any{}, map[string]string{"X-API-Key": secondKey})
+	if conflict.Code != http.StatusConflict || conflictBody["reason"] != "domain_verified" || len(dialed) != dials {
+		t.Fatalf("port 443 alias: %d %s", conflict.Code, conflict.Body.String())
+	}
+}
+
 func TestVerificationTokenMatchers(t *testing.T) {
 	token := "abc123token"
 	if !fileProves(preview.Document{ContentType: "text/plain", Body: []byte("note\n" + token + "\n")}, token) {

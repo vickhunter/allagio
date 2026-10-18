@@ -313,6 +313,10 @@ func TestFetchDocumentReadsPlainTextAndRefusesCrossHost(t *testing.T) {
 			_, _ = io.WriteString(w, "token-line\n")
 		case "/away":
 			http.Redirect(w, r, "http://other.example/token", http.StatusFound)
+		case "/scheme":
+			http.Redirect(w, r, "https://preview.example/.well-known/offer-rails.txt", http.StatusFound)
+		case "/port":
+			http.Redirect(w, r, "http://preview.example:443/token", http.StatusFound)
 		case "/same":
 			http.Redirect(w, r, "http://preview.example/.well-known/offer-rails.txt", http.StatusFound)
 		case "/token":
@@ -353,6 +357,16 @@ func TestFetchDocumentReadsPlainTextAndRefusesCrossHost(t *testing.T) {
 		if strings.HasPrefix(address, "203.0.113.88") {
 			t.Fatalf("cross-host redirect was dialed: %v", dialed)
 		}
+	}
+	dialed = nil
+	_, err = f.FetchDocument(context.Background(), "http://preview.example/scheme")
+	if !errors.Is(err, ErrFetch) || strings.Contains(strings.Join(dialed, ","), ":443") {
+		t.Fatalf("scheme change: %v dialed %v", err, dialed)
+	}
+	dialed = nil
+	_, err = f.FetchDocument(context.Background(), "http://preview.example/port")
+	if !errors.Is(err, ErrFetch) || strings.Contains(strings.Join(dialed, ","), ":443") {
+		t.Fatalf("port change: %v dialed %v", err, dialed)
 	}
 	dialed = nil
 	doc, err = f.FetchDocument(context.Background(), "http://preview.example/same")

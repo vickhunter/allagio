@@ -84,7 +84,12 @@ func (h *SitesHandler) Verify(c *gin.Context) {
 			return
 		}
 	}
-	verified, err := h.DB.DomainVerified(c.Request.Context(), rec.Domain)
+	host, err := canonicalVerificationHost(rec.Domain)
+	if err != nil {
+		writeVerifyResult(c, http.StatusUnprocessableEntity, "verification_unreachable", "The domain could not be checked for the verification file or home page.")
+		return
+	}
+	verified, err := h.DB.DomainVerified(c.Request.Context(), host)
 	if err != nil {
 		log.Printf("sites.verify domain lookup failed site_id=%s", siteID)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "lookup failed"})
@@ -94,7 +99,7 @@ func (h *SitesHandler) Verify(c *gin.Context) {
 		writeVerifyResult(c, http.StatusConflict, "domain_verified", "This domain is already verified.")
 		return
 	}
-	wellKnown, home, err := siteVerificationURLs(rec.Domain)
+	wellKnown, home, err := siteVerificationURLs(host)
 	if err != nil {
 		writeVerifyResult(c, http.StatusUnprocessableEntity, "verification_unreachable", "The domain could not be checked for the verification file or home page.")
 		return
@@ -119,7 +124,7 @@ func (h *SitesHandler) Verify(c *gin.Context) {
 		writeVerifyResult(c, http.StatusUnprocessableEntity, "verification_unreachable", "The domain could not be checked for the verification file or home page.")
 		return
 	}
-	at, err := h.DB.MarkSiteVerified(c.Request.Context(), siteID)
+	at, err := h.DB.MarkSiteVerified(c.Request.Context(), siteID, host)
 	if errors.Is(err, pgx.ErrNoRows) || isUniqueViolation(err) {
 		writeVerifyResult(c, http.StatusConflict, "domain_verified", "This domain is already verified.")
 		return
@@ -151,18 +156,35 @@ func verificationJSON(rec database.SiteVerification) gin.H {
 	return body
 }
 
-func siteVerificationURLs(domain string) (string, string, error) {
-	domain = strings.TrimSpace(domain)
+func canonicalVerificationHost(domain string) (string, error) {
+	domain = strings.TrimSpace(strings.ToLower(domain))
 	if domain == "" || strings.ContainsAny(domain, "/\\?#@") || strings.Contains(domain, "..") {
-		return "", "", preview.ErrInvalidURL
+		return "", preview.ErrInvalidURL
 	}
-	host := domain
+	host, port := domain, ""
 	if strings.Contains(domain, ":") {
-		name, port, err := net.SplitHostPort(domain)
-		if err != nil || name == "" || port == "" {
-			return "", "", preview.ErrInvalidURL
+		name, parsedPort, err := net.SplitHostPort(domain)
+		if err != nil || name == "" || parsedPort == "" {
+			return "", preview.ErrInvalidURL
 		}
-		host = net.JoinHostPort(name, port)
+		host, port = name, parsedPort
+	}
+	host = strings.Trim(host, ".")
+	if host == "" {
+		return "", preview.ErrInvalidURL
+	}
+	if port == "443" {
+		port = ""
+	}
+	if port == "" {
+		return host, nil
+	}
+	return net.JoinHostPort(host, port), nil
+}
+
+func siteVerificationURLs(host string) (string, string, error) {
+	if host == "" || strings.ContainsAny(host, "/\\?#@") {
+		return "", "", preview.ErrInvalidURL
 	}
 	wellKnown := url.URL{Scheme: "https", Host: host, Path: "/.well-known/offer-rails.txt"}
 	home := url.URL{Scheme: "https", Host: host, Path: "/"}

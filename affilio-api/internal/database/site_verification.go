@@ -51,28 +51,29 @@ func (d *DB) EnsureSiteVerificationToken(ctx context.Context, siteID string) (st
 	return stored, err
 }
 
-func (d *DB) DomainVerified(ctx context.Context, domain string) (bool, error) {
+func (d *DB) DomainVerified(ctx context.Context, host string) (bool, error) {
 	var verified bool
 	err := d.Pool.QueryRow(ctx, `SELECT EXISTS (
-		SELECT 1 FROM sites WHERE lower(domain)=lower($1) AND verified_at IS NOT NULL
-	)`, domain).Scan(&verified)
+		SELECT 1 FROM sites WHERE verification_host=$1 AND verification_host<>'' AND verified_at IS NOT NULL
+	)`, host).Scan(&verified)
 	return verified, err
 }
 
 // MarkSiteVerified sets verified_at when this site is still unverified and no
-// other site on the domain is verified. A miss is pgx.ErrNoRows.
-func (d *DB) MarkSiteVerified(ctx context.Context, siteID string) (time.Time, error) {
+// other site on the canonical host is verified. A miss is pgx.ErrNoRows.
+func (d *DB) MarkSiteVerified(ctx context.Context, siteID, host string) (time.Time, error) {
 	var at time.Time
 	err := d.Pool.QueryRow(ctx, `
 UPDATE sites AS s
-SET verified_at = NOW()
+SET verified_at = NOW(), verification_host = $2
 WHERE s.id = $1
   AND s.verified_at IS NULL
+  AND $2 <> ''
   AND NOT EXISTS (
     SELECT 1 FROM sites other
-    WHERE lower(other.domain) = lower(s.domain)
+    WHERE other.verification_host = $2
       AND other.verified_at IS NOT NULL
   )
-RETURNING s.verified_at`, siteID).Scan(&at)
+RETURNING s.verified_at`, siteID, host).Scan(&at)
 	return at, err
 }

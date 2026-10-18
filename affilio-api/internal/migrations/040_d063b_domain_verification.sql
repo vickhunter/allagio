@@ -5,7 +5,8 @@
 
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS verification_token TEXT NOT NULL DEFAULT '';
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ;
+ALTER TABLE sites ADD COLUMN IF NOT EXISTS verification_host TEXT NOT NULL DEFAULT '';
 
 CREATE UNIQUE INDEX IF NOT EXISTS sites_one_verified_domain
-    ON sites (lower(domain))
-    WHERE verified_at IS NOT NULL;
+    ON sites (verification_host)
+    WHERE verified_at IS NOT NULL AND verification_host <> '';

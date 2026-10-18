@@ -1,6 +1,6 @@
 ## October 18 — Domain verification for a site
 
-A site from `POST /v1/agent-accounts` or `POST /v1/sites/register` starts unverified. The response includes `verification_token`, `verified: false`, and `verified_at: null`. A maker account does not. `GET /v1/sites/current` and `GET /v1/sites/:id` (the site key, and `:id` must be that site) return the same fields. An older site with an empty token receives one on that read.
+A site from `POST /v1/agent-accounts` or `POST /v1/sites/register` starts unverified. The host used for the check drops a trailing dot and an explicit port 443, so `example.com`, `example.com.`, and `example.com:443` are one domain. The response includes `verification_token`, `verified: false`, and `verified_at: null`. A maker account does not. `GET /v1/sites/current` and `GET /v1/sites/:id` (the site key, and `:id` must be that site) return the same fields. An older site with an empty token receives one on that read.
 
 `POST /v1/sites/:id/verify` fetches `https://<domain>/.well-known/offer-rails.txt` and, if that file does not contain the token on its own line, `https://<domain>/` for `<meta name="offer-rails-verification" content="<token>">`. The fetch is the public-page client: HTTP/1.1, 5 second timeout, 2 MB cap, and the same address checks. A redirect to another host is not proof. A match stores `verified_at`. A miss is 422 `verification_missing`. A fetch that cannot be read is 422 `verification_unreachable`. Neither response is a 500, and neither includes a resolved address.
 

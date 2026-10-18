@@ -110,8 +110,8 @@ func (f Fetcher) Fetch(ctx context.Context, rawURL string) (Page, error) {
 }
 
 // FetchDocument downloads rawURL and returns the response body.
-// A redirect onto a different host is refused, so the body is from the
-// host that was asked. It does not log the URL or the body.
+// A redirect that changes host, scheme, or port is refused, so the body is
+// from the origin that was asked. It does not log the URL or the body.
 func (f Fetcher) FetchDocument(ctx context.Context, rawURL string) (Document, error) {
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
@@ -125,7 +125,7 @@ func (f Fetcher) FetchDocument(ctx context.Context, rawURL string) (Document, er
 		return Document{}, ErrInvalidURL
 	}
 
-	client := f.clientFor(pins, first.Hostname())
+	client := f.clientFor(pins, first)
 	defer client.CloseIdleConnections()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, first.String(), nil)
@@ -166,10 +166,10 @@ func (f Fetcher) FetchDocument(ctx context.Context, rawURL string) (Document, er
 // server that accepts that offer answers with a preface the HTTP/1 reader
 // rejects. NextProtos keeps the handshake on HTTP/1.1.
 func (f Fetcher) client(pins *pinSet) *http.Client {
-	return f.clientFor(pins, "")
+	return f.clientFor(pins, nil)
 }
 
-func (f Fetcher) clientFor(pins *pinSet, originHost string) *http.Client {
+func (f Fetcher) clientFor(pins *pinSet, origin *url.URL) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	transport.ForceAttemptHTTP2 = false
@@ -207,7 +207,7 @@ func (f Fetcher) clientFor(pins *pinSet, originHost string) *http.Client {
 			if len(via) >= maxRedirects+1 {
 				return ErrFetch
 			}
-			if originHost != "" && hostKey(req.URL.Hostname()) != hostKey(originHost) {
+			if origin != nil && !sameDocumentOrigin(origin, req.URL) {
 				return ErrFetch
 			}
 			return f.admit(req.Context(), pins, req.URL.String())
@@ -330,6 +330,29 @@ func (p *pinSet) get(host string) (net.IP, bool) {
 		return nil, false
 	}
 	return append(net.IP(nil), ip...), true
+}
+
+func sameDocumentOrigin(origin, next *url.URL) bool {
+	if origin == nil || next == nil {
+		return false
+	}
+	if !strings.EqualFold(origin.Scheme, next.Scheme) {
+		return false
+	}
+	if hostKey(origin.Hostname()) != hostKey(next.Hostname()) {
+		return false
+	}
+	return originPort(origin) == originPort(next)
+}
+
+func originPort(parsed *url.URL) string {
+	if port := parsed.Port(); port != "" {
+		return port
+	}
+	if strings.EqualFold(parsed.Scheme, "https") {
+		return "443"
+	}
+	return "80"
 }
 
 func hostKey(host string) string {
