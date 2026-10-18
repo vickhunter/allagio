@@ -248,6 +248,30 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 	}
 }
 
+func TestSlashRedirectWithoutHostedMount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/v1/go/:code", func(c *gin.Context) {
+		stampGoResponse(c)
+		c.Status(http.StatusFound)
+	})
+	InstallSlashRedirect(r)
+
+	slash := httptest.NewRecorder()
+	r.ServeHTTP(slash, httptest.NewRequest(http.MethodGet, "/v1/go/abc/", nil))
+	if slash.Code != http.StatusMovedPermanently || slash.Header().Get("Location") != "/v1/go/abc" {
+		t.Fatalf("slash: %d %s", slash.Code, slash.Header().Get("Location"))
+	}
+	if slash.Header().Get("Cache-Control") != "no-store" || slash.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
+		t.Fatalf("headers cache %q robots %q", slash.Header().Get("Cache-Control"), slash.Header().Get("X-Robots-Tag"))
+	}
+	miss := httptest.NewRecorder()
+	r.ServeHTTP(miss, httptest.NewRequest(http.MethodGet, "/landing-v9/no-such", nil))
+	if miss.Code != http.StatusNotFound {
+		t.Fatalf("miss: %d %s", miss.Code, miss.Header().Get("Location"))
+	}
+}
+
 func TestBuiltLandingPagesMissingFilesStay404(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "landing-v9"), 0o755); err != nil {

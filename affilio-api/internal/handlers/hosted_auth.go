@@ -161,21 +161,7 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 			}
 		}
 	}
-	if target, ok := trailingSlashTarget(c.Request.Method, requestPath, r); ok {
-		if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
-			c.Header("X-Robots-Tag", "noindex")
-		}
-		if target == "/v1/go" || strings.HasPrefix(target, "/v1/go/") {
-			stampGoResponse(c)
-		}
-		if q := c.Request.URL.RawQuery; q != "" {
-			target += "?" + q
-		}
-		status := http.StatusTemporaryRedirect
-		if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
-			status = http.StatusMovedPermanently
-		}
-		c.Redirect(status, target)
+	if redirectTrailingSlash(c, r) {
 		return
 	}
 	// A cleaned draft path that is not a page, such as /docs/../privacy/index.html,
@@ -184,6 +170,42 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 		c.Header("X-Robots-Tag", "noindex")
 	}
 	c.String(http.StatusNotFound, "404 page not found")
+}
+
+// InstallSlashRedirect turns off Gin's built-in trailing-slash redirect and
+// replaces it. The API process calls this when the hosted handler is not
+// mounted, so /v1/go/<id>/ still 301s with the go-link cache headers.
+func InstallSlashRedirect(r *gin.Engine) {
+	r.RedirectTrailingSlash = false
+	r.NoRoute(func(c *gin.Context) {
+		if redirectTrailingSlash(c, r) {
+			return
+		}
+		c.String(http.StatusNotFound, "404 page not found")
+	})
+}
+
+func redirectTrailingSlash(c *gin.Context, r *gin.Engine) bool {
+	requestPath := c.Request.URL.Path
+	target, ok := trailingSlashTarget(c.Request.Method, requestPath, r)
+	if !ok {
+		return false
+	}
+	if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
+		c.Header("X-Robots-Tag", "noindex")
+	}
+	if target == "/v1/go" || strings.HasPrefix(target, "/v1/go/") {
+		stampGoResponse(c)
+	}
+	if q := c.Request.URL.RawQuery; q != "" {
+		target += "?" + q
+	}
+	status := http.StatusTemporaryRedirect
+	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+		status = http.StatusMovedPermanently
+	}
+	c.Redirect(status, target)
+	return true
 }
 
 func trailingSlashTarget(method, requestPath string, r *gin.Engine) (string, bool) {
