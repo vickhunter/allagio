@@ -110,8 +110,55 @@ func TestBuiltLandingPagesAndLLMsTxt(t *testing.T) {
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("unknown path: %d %s", missing.Code, missing.Body.String())
 	}
-	if !strings.Contains(missing.Body.String(), "404 page not found") {
+	if !strings.Contains(missing.Body.String(), "That page is not on Offer Rails.") {
 		t.Fatalf("unknown path body %q", missing.Body.String())
+	}
+}
+
+func TestRepoDraftPagesSendNoindexAndDraftLine(t *testing.T) {
+	const draftLine = "Draft. This text is not final and has not been approved yet."
+	dir := "../../../affilio-wp/admin/build"
+	for _, name := range []string{"privacy", "terms"} {
+		if _, err := os.Stat(filepath.Join(dir, "landing-v9", name, "index.html")); err != nil {
+			t.Fatalf("built %s page: %v", name, err)
+		}
+	}
+	r := mountBuiltLanding(t, dir)
+	for _, path := range []string{"/privacy", "/privacy/", "/terms", "/terms/", "/landing-v9/privacy/", "/landing-v9/terms/"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		if rec.Header().Get("X-Robots-Tag") != "noindex" {
+			t.Fatalf("%s X-Robots-Tag %q", path, rec.Header().Get("X-Robots-Tag"))
+		}
+		if !strings.Contains(rec.Body.String(), draftLine) {
+			t.Fatalf("%s body missing draft line", path)
+		}
+	}
+	agentsBody, err := os.ReadFile(filepath.Join(dir, "landing-v9", "agents", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var served string
+	for _, path := range []string{"/agents", "/agents/", "/landing-v9/agents/"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		if rec.Header().Get("X-Robots-Tag") != "" {
+			t.Fatalf("%s X-Robots-Tag %q", path, rec.Header().Get("X-Robots-Tag"))
+		}
+		if rec.Body.String() != string(agentsBody) {
+			t.Fatalf("%s is not landing-v9/agents/index.html", path)
+		}
+		if served == "" {
+			served = rec.Body.String()
+		} else if rec.Body.String() != served {
+			t.Fatalf("%s body differs from /agents", path)
+		}
 	}
 }
 

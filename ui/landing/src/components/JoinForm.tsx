@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { track } from '@/lib/track'
-import { roleReturn, signInHref, useOfferConfig, useSource } from '@/lib/source'
+import { roleReturn, signInHref, useOfferConfig, useSource, withSource } from '@/lib/source'
 
 type Role = 'maker' | 'publisher' | 'both'
 
@@ -26,7 +26,7 @@ export function JoinForm({ role: initial = 'both', cta = 'Sign in with Google', 
         <Button variant="solid" asChild>
           <a href={href} data-track="join_submit" data-track-role={role} data-track-cta={cta}>{cta}</a>
         </Button>
-        <a href={signInHref('/owner/settings', source)} data-track="secondary_click" data-track-to="settings" className="inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline">MCP and setup</a>
+        <a href={withSource('/landing-v9/agents/', source)} data-track="secondary_click" data-track-to="agents" className="inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline">MCP and setup</a>
       </div>
       {install ? (
         <div className="rounded-xl border border-line bg-s0 p-3">

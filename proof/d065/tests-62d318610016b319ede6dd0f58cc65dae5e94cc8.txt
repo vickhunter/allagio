@@ -1,0 +1,33 @@
+Tested commit 62d318610016b319ede6dd0f58cc65dae5e94cc8 on cursor/d065-honest-site-edfe.
+Go test counts from `go test ./... -json`: pass 544, fail 0, skip 7.
+Landing `node --test`: pass 3, fail 0, skip 0.
+`npm run build`: ok.
+
+--- go test ./... ---
+?   	affilio-api/cmd/distributoor	[no test files]
+?   	affilio-api/cmd/distributoor-mcp	[no test files]
+?   	affilio-api/cmd/server	[no test files]
+ok  	affilio-api/internal/config	0.002s
+ok  	affilio-api/internal/database	0.002s
+ok  	affilio-api/internal/dcp	0.007s
+ok  	affilio-api/internal/entry	0.002s
+?   	affilio-api/internal/middleware	[no test files]
+ok  	affilio-api/internal/handlers	44.458s
+ok  	affilio-api/internal/migrations	0.017s
+ok  	affilio-api/internal/preview	0.016s
+ok  	affilio-api/internal/services	0.111s
+ok  	affilio-api/internal/services/providers	0.002s
+
+--- ui/landing node --test ---
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 45.809494
+
+--- npm run build (tail) ---
+✓ built in 758ms
+stamped landing v9 into affilio-wp/admin/build

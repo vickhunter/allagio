@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card'
 import { example, faq, pilotLine, publisherAdvantages, surfaces } from '@/content'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
+import { DirectorySection } from '@/directory/Directory'
 
 const stations = [
   { k: 'Listed', d: `${example.product} · ${example.price} · ${example.commission}` },
@@ -37,6 +38,8 @@ export function App() {
         </div>
       </section>
 
+      <DirectorySection kind="publisher" />
+
       <section aria-labelledby="adv-h" className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <p className="eyebrow">Every publisher advantage</p>
         <h2 id="adv-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">{featured.t}. {featured.b}</h2>
@@ -54,7 +57,7 @@ export function App() {
       <section id="how" aria-labelledby="how-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <p className="eyebrow">Where it runs</p>
-          <h2 id="how-h" className="h-display mt-3 text-3xl sm:text-4xl">Start with WordPress. X and Shopify next.</h2>
+          <h2 id="how-h" className="h-display mt-3 text-3xl sm:text-4xl">Start with WordPress. X and Shopify are coming.</h2>
           <div className="mt-10 grid gap-3 sm:grid-cols-3">{surfaces.map((s) => <div key={s.name} className="rounded-2xl border border-dashed border-line-strong p-5"><p className="font-mono text-xs text-t2">{s.status}</p><h3 className="mt-1 font-display text-lg font-semibold">{s.name}</h3><p className="mt-1 text-sm text-t2">{s.note}</p></div>)}</div>
         </div>
       </section>

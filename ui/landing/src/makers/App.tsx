@@ -11,6 +11,7 @@ import { example, faq, feed, makerAdvantages, pilotLine, surfaces } from '@/cont
 import { useOfferConfig } from '@/lib/source'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
+import { DirectorySection } from '@/directory/Directory'
 
 // /makers: built from A (bento). Accent: maker terracotta. Every cell is one concrete advantage.
 export function App() {
@@ -39,6 +40,8 @@ export function App() {
         </Card>
       </section>
 
+      <DirectorySection kind="maker" />
+
       <section aria-labelledby="adv-h" className="mx-auto max-w-6xl px-5 pb-16">
         <h2 id="adv-h" className="sr-only">Every maker advantage</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
@@ -54,7 +57,7 @@ export function App() {
           </Card>
           <Adv n={3} a={rest[0]} className="lg:col-span-2" />
           {rest.slice(2).map((a, i) => <Adv key={a.k} n={i + 4} a={a} className={spans[i]} />)}
-          <div className="flex items-end justify-center p-6 sm:col-span-2 lg:col-span-2"><Blip say="I find the swaps. You approve them." /></div>
+          <div className="flex items-end justify-center p-6 sm:col-span-2 lg:col-span-2"><Blip say="Traffic trade is coming." /></div>
         </div>
       </section>
 
@@ -63,7 +66,7 @@ export function App() {
           <p className="eyebrow">Start in four steps</p>
           <h2 id="how-h" className="h-display mt-3 text-3xl sm:text-4xl">From your repo to someone else’s page.</h2>
           <ol className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[['Install once', `Run the command below, pasted as is. One MCP server for every agent you use.`], ['Your agent scans locally', 'You see the exact listing card before the first upload.'], ['Set the offer', `Commission and control. Example: ${example.product}, ${example.price}, ${example.commission}.`], ['Get found', 'Publishers’ agents match your offer to posts. The digest shows every step.']].map(([h, b], i) => (
+            {[['Install once', 'Run the command below, pasted as is. Untested: Claude Code and Generic, both MCP over HTTP. Coming: Cursor, VS Code, Windsurf, ChatGPT and Grok.'], ['Your agent scans locally', 'You see the exact listing card before the first upload.'], ['Set the offer', `Commission and control. Example: ${example.product}, ${example.price}, ${example.commission}.`], ['Get found', 'Publishers’ agents match your offer to posts. The digest shows every step.']].map(([h, b], i) => (
               <li key={h} className="rounded-2xl border border-line bg-s1 p-5"><span className="font-display text-3xl font-bold text-maker">{i + 1}</span><h3 className="mt-2 font-display text-lg font-semibold">{h}</h3><p className="mt-1 text-sm leading-relaxed text-t2">{b}</p></li>
             ))}
           </ol>

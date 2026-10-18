@@ -1,0 +1,22 @@
+D-060 axe-core, viewports 390 and 1440.
+Pages this branch changes: /makers, /publishers, member profiles, and the unknown-slug 404.
+makers-list-390 critical=0 serious=0 moderate=0 minor=0 rules=none
+makers-empty-390 critical=0 serious=0 moderate=0 minor=0 rules=none
+makers-filter-390 critical=0 serious=0 moderate=0 minor=0 rules=none
+makers-profile-390 critical=0 serious=0 moderate=0 minor=0 rules=none
+404-390 critical=0 serious=0 moderate=0 minor=0 rules=none
+publishers-empty-390 critical=0 serious=0 moderate=0 minor=0 rules=none
+publishers-list-390 critical=0 serious=0 moderate=0 minor=0 rules=none
+publishers-profile-390 critical=0 serious=0 moderate=0 minor=0 rules=none
+publishers-404-390 critical=0 serious=0 moderate=0 minor=0 rules=none
+makers-list-1440 critical=0 serious=0 moderate=0 minor=0 rules=none
+makers-empty-1440 critical=0 serious=0 moderate=0 minor=0 rules=none
+makers-filter-1440 critical=0 serious=0 moderate=0 minor=0 rules=none
+makers-profile-1440 critical=0 serious=0 moderate=0 minor=0 rules=none
+404-1440 critical=0 serious=0 moderate=0 minor=0 rules=none
+publishers-empty-1440 critical=0 serious=0 moderate=0 minor=0 rules=none
+publishers-list-1440 critical=0 serious=0 moderate=0 minor=0 rules=none
+publishers-profile-1440 critical=0 serious=0 moderate=0 minor=0 rules=none
+publishers-404-1440 critical=0 serious=0 moderate=0 minor=0 rules=none
+
+serious+critical rules are listed on each line. A line with rules=none has none.

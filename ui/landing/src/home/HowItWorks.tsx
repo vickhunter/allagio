@@ -8,7 +8,7 @@ import { example } from '@/content'
 const steps = [
   { n: 1, icon: Package, tone: 'maker', title: 'A maker adds a product', body: `They describe what they sell and set a commission, for example ${example.commission} of each sale.` },
   { n: 2, icon: Bot, tone: 'setup', title: 'An agent checks the fit', body: 'It reads the product and the publisher’s posts, finds a post where the product really fits, and runs the checks.' },
-  { n: 3, icon: PanelTop, tone: 'pub', title: 'One labelled box in a matching post', body: 'The publisher approves it. Their site then shows one offer box, clearly marked as sponsored, inside that post.' },
+  { n: 3, icon: PanelTop, tone: 'pub', title: 'One labelled box in a matching post', body: 'Their site shows one offer box, clearly marked as sponsored, inside that post.' },
   { n: 4, icon: ShoppingCart, tone: 'pub', title: 'A reader buys', body: 'A reader clicks the box and buys the product on the maker’s own site.' },
   { n: 5, icon: Coins, tone: 'maker', title: 'The sale is credited', body: `The sale is linked to that post. The publisher earns the commission. The maker pays only when a sale happens: on ${example.price}, ${example.publisher} goes to the publisher.` },
 ] as const
@@ -63,12 +63,12 @@ export function HowItWorks() {
             <div className="md:w-[42%]">
               <span className="inline-flex size-10 items-center justify-center rounded-xl bg-s2 text-setup"><UserCheck className="size-5" aria-hidden /></span>
               <h3 className="mt-4 font-display text-xl font-bold tracking-tight">Why an AI agent does the matching</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-t2">An agent can read the whole product page and every post on a site, so finding the right post for the right product happens on its own, not by hand. People stay in charge: nothing goes live until the publisher approves it, and either side can switch it off.</p>
+              <p className="mt-2 text-[15px] leading-relaxed text-t2">An agent can read the whole product page and every post on a site, so finding the right post for the right product happens on its own, not by hand. The publisher setup page opens with YOLO selected. After sign-in, the server preselects YOLO for cli, cursor, grok, mcp, and connector, and Manual for every other source. You can switch to Manual or Auto before you save.</p>
               <a href={`${assetBase}how-it-works/`} className="mt-4 inline-flex min-h-11 items-center gap-1 font-semibold text-setup underline underline-offset-4 hover:no-underline">See the animated railway figure <ArrowRight className="size-4" aria-hidden /></a>
             </div>
             <figure className="md:flex-1">
               <img src={`${assetBase}how-it-works/railway.webp`} width={1200} height={643} loading="lazy" decoding="async" className="h-auto w-full rounded-xl border border-line"
-                alt="Model railway diagram: an offer card leaves the maker's dock, passes a gate with three check pins, and lands in a tray that stands for the blog post; two dials show what each side earns." />
+                alt="Model railway diagram: an offer card leaves the maker's dock, passes a gate, and lands in a tray that stands for the blog post; two dials show what each side earns." />
               <figcaption className="mt-2 text-[13px] text-t2">The offer rides the rail: checked at the gate, placed in the post, earnings sent back to both sides.</figcaption>
             </figure>
           </li>
