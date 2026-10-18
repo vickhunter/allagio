@@ -2,11 +2,14 @@ package preview
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -323,6 +326,166 @@ func TestTransportSpeaksHTTP1(t *testing.T) {
 	got := transport.TLSClientConfig.NextProtos
 	if len(got) != 1 || got[0] != "http/1.1" {
 		t.Fatalf("NextProtos = %v", got)
+	}
+}
+
+func TestSocialHostsChooseTheOEmbedEndpoint(t *testing.T) {
+	cases := []struct {
+		raw  string
+		kind string
+		host string
+	}{
+		{"https://twitter.com/jack/status/20", kindTwitter, "publish.twitter.com"},
+		{"https://x.com/jack/status/20", kindTwitter, "publish.twitter.com"},
+		{"https://mobile.twitter.com/jack/status/20", kindTwitter, "publish.twitter.com"},
+		{"https://Mobile.X.com/jack/status/20", kindTwitter, "publish.twitter.com"},
+		{"https://www.youtube.com/watch?v=dQw4w9WgXcQ", kindYouTube, "www.youtube.com"},
+		{"https://youtu.be/dQw4w9WgXcQ", kindYouTube, "www.youtube.com"},
+		{"https://m.youtube.com/watch?v=abc", kindYouTube, "www.youtube.com"},
+		{"https://music.youtube.com/watch?v=abc", kindYouTube, "www.youtube.com"},
+		{"https://nottwitter.com/jack/status/20", kindHTML, "nottwitter.com"},
+		{"https://twitter.com.evil.com/jack/status/20", kindHTML, "twitter.com.evil.com"},
+		{"http://example.com/post", kindHTML, "example.com"},
+	}
+	for _, tc := range cases {
+		parsed, err := parsePublicURL(tc.raw)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.raw, err)
+		}
+		target, kind := embedTarget(parsed)
+		if kind != tc.kind {
+			t.Fatalf("%s kind = %s", tc.raw, kind)
+		}
+		got, err := url.Parse(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Hostname() != tc.host {
+			t.Fatalf("%s host = %s", tc.raw, got.Hostname())
+		}
+		if kind != kindHTML && got.Query().Get("url") != parsed.String() {
+			t.Fatalf("%s oembed url = %s", tc.raw, got.Query().Get("url"))
+		}
+	}
+}
+
+func TestFetchXPostFixtureYouTubeAndUnreadablePages(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/x_post_oembed.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dialed []string
+	tlsPage := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Host {
+		case "publish.twitter.com":
+			if strings.Contains(r.URL.Query().Get("url"), "/status/404") {
+				http.NotFound(w, r)
+				return
+			}
+			http.Redirect(w, r, "https://publish.x.com/oembed?"+r.URL.RawQuery, http.StatusMovedPermanently)
+		case "publish.x.com":
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			_, _ = w.Write(fixture)
+		case "www.youtube.com":
+			if r.URL.Query().Get("format") != "json" {
+				t.Errorf("youtube format = %q", r.URL.Query().Get("format"))
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"title":"Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)","author_name":"Rick Astley","html":"<iframe></iframe>"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(tlsPage.Close)
+	secure := Fetcher{
+		LookupIP:        func(context.Context, string) ([]net.IP, error) { return []net.IP{net.ParseIP("203.0.113.10")}, nil },
+		DialContext:     dialPage(tlsPage, &dialed),
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	dialed = nil
+	got, err := secure.Fetch(context.Background(), "https://twitter.com/jack/status/20")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Title != "just setting up my twttr" || !strings.Contains(got.Text, "just setting up my twttr") {
+		t.Fatalf("x post = %+v", got)
+	}
+	if strings.Contains(got.Text, "widgets.js") {
+		t.Fatalf("x post kept the widget script: %q", got.Text)
+	}
+	if len(dialed) != 2 || !strings.HasSuffix(dialed[0], ":443") {
+		t.Fatalf("x dialed %v", dialed)
+	}
+
+	dialed = nil
+	if _, err = secure.Fetch(context.Background(), "https://x.com/jack/status/404"); !errors.Is(err, ErrUnreadable) {
+		t.Fatalf("private oembed: %v", err)
+	}
+
+	dialed = nil
+	video, err := secure.Fetch(context.Background(), "https://youtu.be/dQw4w9WgXcQ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if video.Title != "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)" || !strings.Contains(video.Text, "Rick Astley") {
+		t.Fatalf("youtube = %+v", video)
+	}
+
+	htmlPage := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		switch r.URL.Path {
+		case "/og":
+			_, _ = io.WriteString(w, `<html><head><title>Browser title</title><meta property="og:title" content="OG Title"><meta property="og:description" content="A kiln for ceramic glaze tests."><meta name="description" content="A kiln for ceramic glaze tests."><meta property="article:tag" content="ceramics"></head><body><main><p>Visible kiln notes.</p></main></body></html>`)
+		case "/empty":
+			_, _ = io.WriteString(w, `<html><head><title>Empty</title></head><body> </body></html>`)
+		case "/login":
+			_, _ = io.WriteString(w, `<html><head><title>Members</title></head><body><main><p>This account is private. Log in to continue.</p></main></body></html>`)
+		case "/password":
+			_, _ = io.WriteString(w, `<html><head><title>Members</title></head><body><main><p>Welcome back.</p><input type="password"></main></body></html>`)
+		case "/long":
+			_, _ = io.WriteString(w, `<html><head><title>Notes</title></head><body><main><p>`+strings.Repeat("word ", 90)+`This article mentions login once.</p></main></body></html>`)
+		case "/gone":
+			http.NotFound(w, r)
+		case "/denied":
+			http.Error(w, "no", http.StatusForbidden)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(htmlPage.Close)
+	plain := Fetcher{
+		LookupIP:    func(context.Context, string) ([]net.IP, error) { return []net.IP{net.ParseIP("203.0.113.10")}, nil },
+		DialContext: dialPage(htmlPage, &dialed),
+	}
+	dialed = nil
+	og, err := plain.Fetch(context.Background(), "http://nottwitter.com/og")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if og.Title != "OG Title" || !strings.Contains(og.Text, "Visible kiln notes.") || !strings.Contains(og.Text, "A kiln for ceramic glaze tests.") || !strings.Contains(og.Text, "ceramics") {
+		t.Fatalf("og = %+v", og)
+	}
+	if strings.Count(og.Text, "A kiln for ceramic glaze tests.") != 1 {
+		t.Fatalf("description repeated: %q", og.Text)
+	}
+	if len(dialed) != 1 || dialed[0] != "203.0.113.10:80" {
+		t.Fatalf("html dialed %v", dialed)
+	}
+	for _, path := range []string{"/empty", "/login", "/password", "/denied"} {
+		if _, err = plain.Fetch(context.Background(), "http://preview.example"+path); !errors.Is(err, ErrUnreadable) {
+			t.Fatalf("%s: %v", path, err)
+		}
+	}
+	long, err := plain.Fetch(context.Background(), "http://preview.example/long")
+	if err != nil || !strings.Contains(long.Text, "login") {
+		t.Fatalf("long article: %v %+v", err, long)
+	}
+	if _, err = plain.Fetch(context.Background(), "http://preview.example/gone"); !errors.Is(err, ErrFetch) {
+		t.Fatalf("html 404: %v", err)
+	}
+	evil, err := plain.Fetch(context.Background(), "http://twitter.com.evil.com/og")
+	if err != nil || evil.Title != "OG Title" {
+		t.Fatalf("lookalike host: %v %+v", err, evil)
 	}
 }
 

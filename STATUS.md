@@ -1,3 +1,11 @@
+## October 18 — A public post preview reads X, YouTube, and Open Graph
+
+`POST /api/preview` still takes `{"url":"..."}`. An `x.com` or `twitter.com` post, including `mobile.x.com` and `mobile.twitter.com`, is read from `https://publish.twitter.com/oembed?url=<post>` with no API key. That endpoint redirects to `publish.x.com`, and the preview follows it. The tweet text is the blockquote, and the title is that text. A YouTube or `youtu.be` URL is read from `https://www.youtube.com/oembed`. Any other public page is still fetched as HTML. `og:title` wins over the document title when it is present. The text keeps the page body and adds `og:description`, `twitter:description`, the meta description, and `article:tag` when those are not already in the body.
+
+A private oEmbed response (401, 403, or 404), an HTML 401 or 403, a login wall, or a page with no text returns 200 `{"result":"unreadable_or_private","message":"only public links work"}`. That body does not say no match. A normal HTML 404 is still 422 `fetch failed`. A bad URL is still 400 and a blocked address is still 403.
+
+When the page is readable, listed eligible offers are scored the same way as before, with the same 25-point bar. A score at or above 25 returns that one offer. When none clear the bar and at least one eligible offer exists, the response keeps the closest offer in `offer` and returns the top three (or every eligible offer, when fewer than three exist) in `offers`. Each of those cards, and the response, has `low_confidence` true. The slot is the slot of the closest offer. An empty catalog still returns a null offer. Nothing is stored. The landing card still reads a single `offer` and does not yet show `low_confidence`, the extra offers, or the unreadable message. No new migration. `AUTO_MIGRATE` stays off.
+
 ## October 18 — Claude Code can register a localhost callback and call /mcp with an agent key
 
 `POST /oauth/register` accepts `http://localhost`, `http://127.0.0.1`, and `http://[::1]` on any port. An authorization request for one of those callbacks may use a different port than the URI that was registered. The host, path, and query stay the same. Other HTTP hosts still return 400 `invalid_redirect_uri`.
