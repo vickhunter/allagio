@@ -1562,6 +1562,9 @@ func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
 		if !strings.Contains(doc, "POST /v1/placements/:id/retry") || !strings.Contains(doc, "not_failed") {
 			t.Fatal("docs drifted on plugin retry")
 		}
+		if !strings.Contains(doc, "`POST /v1/placements/:id/receipt`") || !strings.Contains(doc, "`surface_url`") || !strings.Contains(doc, "`evidence`") || !strings.Contains(doc, "`published_text`") {
+			t.Fatal("docs drifted on the receipt fields")
+		}
 		if !strings.Contains(doc, "A 409 returns `reason` and `message`") || !strings.Contains(doc, "A 422 returns `check_id` and `check_text`") {
 			t.Fatal("docs drifted on the 409 and 422 body shapes")
 		}

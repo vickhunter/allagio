@@ -227,8 +227,11 @@ func (d *DB) ListPlacements(ctx context.Context, siteID string) ([]Placement, er
 }
 
 func (d *DB) ApprovePlacement(ctx context.Context, id, siteID, ownerEmail, evidence string) (bool, error) {
+	// Offer-review is an operator, not the site owner. The owner session
+	// records approved_by_kind owner. matched_rule stays empty so the digest
+	// does not describe this as a saved policy.
 	res, err := d.Pool.Exec(ctx, `UPDATE placement_proposals pp SET status='approved',approved_at=NOW(),approval_evidence=$4,
-approved_by_kind='owner', matched_rule='owner_evidence',
+approved_by_kind='operator', matched_rule='',
 policy_version=COALESCE((SELECT version FROM approval_policies WHERE site_id=pp.site_id),0)
  FROM offers o JOIN products p ON p.id=o.product_id JOIN makers m ON m.id=p.maker_id
  WHERE pp.id=$1 AND pp.site_id=$2 AND pp.offer_id=o.id AND pp.status='pending' AND pp.expires_at>NOW()

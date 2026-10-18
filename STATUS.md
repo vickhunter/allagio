@@ -1,3 +1,11 @@
+## October 18 — A committed placement pays a browser click
+
+`GET /v1/go/<placement_id>` adds `via` and counts a paid click when the placement is in `placement_counts_as_live`: `plugin_wait` is `placed`, status is `committed`, the campaign is active, and the offer is listed. A click is paid only when its class is `browser`. An empty user agent, curl, HEAD, and prefetch are `unknown`. That hit is stored, the redirect stays the plain landing URL, and `paid_clicks` stays 0. Repeats from the same reader inside 45 seconds are one row, so four unknown hits are one click. A browser request on that same placement still redirects with `via` and increments `paid_clicks`. An early plugin acknowledgement on 252aa64 could store `placed` before commit. Commit leaves that flag, so the row is already live after the receipt. The later acknowledgement is 409 `nothing_to_ack`. It does not have to run again for the go link to pay a browser click. A new acknowledgement before approval is still 409 `not_committed` and does not store `placed`.
+
+`POST /v1/offer-review/placements/:id/approve` records `approved_by` `operator`. The owner session still records `owner`. `matched_rule` stays empty on the operator path, so the digest does not call it a saved policy. Migration `040_operator_approval.sql` allows that value. Apply it before the new binary. `AUTO_MIGRATE` stays off.
+
+`/llms.txt` and `/docs/modes.md` list the receipt body fields `surface_url`, `published_text`, and `evidence`. The agents page is unchanged.
+
 ## October 18 — Plugin ack waits until the placement is committed
 
 `POST /v1/placements/:id/plugin-ack` with `X-Plugin-Key` returns 409 `not_committed` for `placed`, `restored`, and a `failed` insert or re-insert while the placement is still `pending` or `approved`. The row stays as it was: `plugin_wait` is not set to `placed`, and a failure reason is not stored. The same call returns 200 only after the placement is `committed`. A removal acknowledgement still returns 200 while the placement is `revoked` and the plugin was asked to remove, including `failed` with `failed_action` `removed`. An action that is not waiting still returns 409 `nothing_to_ack`. A second committed box on the same post still returns 422 `one_per_post`. No new migration. The agents page is unchanged.
