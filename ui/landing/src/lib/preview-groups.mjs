@@ -10,6 +10,7 @@ export const suggestedNote = "Not on Offer Rails yet. Payouts go through the com
 export const closestLead = 'No program lines up with this post yet.'
 export const notifyLabel = 'Notify me when a match joins'
 export const notifyStorageKey = 'offer-rails.preview.notify'
+export const notifyLimit = 20
 export const readNext = 'Make the post public or paste another link'
 
 // TODO: no notify endpoint exists. Callers store the URL locally and do not contact the server.
@@ -65,6 +66,8 @@ export function readFailureCopy(reason) {
 
 export function classifyReadFailure(body) {
   if (!body || typeof body !== 'object') return null
+  const result = typeof body.result === 'string' ? body.result.toLowerCase() : ''
+  if (result === 'unreadable_or_private') return 'unread'
   if (body.text === '') return 'empty'
   const reason = typeof body.reason === 'string' ? body.reason.toLowerCase() : ''
   if (reason === 'empty' || reason.includes('empty text') || reason.includes('no text')) return 'empty'
@@ -77,9 +80,7 @@ export function classifyReadFailure(body) {
 }
 
 export function includeUnverifiedFixture(search) {
-  const params = new URLSearchParams(search || '')
-  if (params.get('previewGroups') === '1') return true
-  const fixture = params.get('previewFixture') || ''
+  const fixture = new URLSearchParams(search || '').get('previewFixture') || ''
   return fixture === 'groups' || fixture === 'nomatch'
 }
 
@@ -105,11 +106,14 @@ function programUrl(value) {
   let parsed
   try { parsed = new URL(raw) } catch { return '' }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return ''
-  if (parsed.pathname === '/go' || parsed.pathname.startsWith('/go/') || parsed.pathname.includes('/v1/go')) return ''
+  parsed.username = ''
+  parsed.password = ''
+  const path = parsed.pathname.toLowerCase()
+  if (path === '/go' || path.startsWith('/go/') || path.includes('/v1/go')) return ''
   parsed.hash = ''
-  parsed.searchParams.delete('via')
   for (const key of [...parsed.searchParams.keys()]) {
-    if (key === 'ref' || key === 'source' || key.startsWith('utm_')) parsed.searchParams.delete(key)
+    const name = key.toLowerCase()
+    if (name === 'via' || name === 'ref' || name === 'source' || name.startsWith('utm_')) parsed.searchParams.delete(key)
   }
   return parsed.search ? parsed.toString() : `${parsed.origin}${parsed.pathname}`
 }
@@ -220,8 +224,9 @@ export function readNotifyIntent(storage) {
 export function storeNotifyIntent(storage, url) {
   // TODO: no notify endpoint exists. This writes the post URL in this browser and does not call a server.
   const value = textOf(url)
-  const urls = readNotifyIntent(storage)
-  if (value && !urls.includes(value)) urls.push(value)
-  storage.setItem(notifyStorageKey, JSON.stringify(urls))
-  return urls
+  const urls = readNotifyIntent(storage).filter((item) => item !== value)
+  if (value) urls.push(value)
+  const capped = urls.slice(-notifyLimit)
+  storage.setItem(notifyStorageKey, JSON.stringify(capped))
+  return capped
 }

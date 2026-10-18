@@ -4,6 +4,7 @@ declare module '@/lib/preview-groups.mjs' {
   export const closestLead: string
   export const notifyLabel: string
   export const notifyStorageKey: string
+  export const notifyLimit: number
   export const readNext: string
   export type ReadFailure = 'private' | 'unread' | 'empty'
   export type VerifiedOffer = { verified: true; name: string; blurb: string }
