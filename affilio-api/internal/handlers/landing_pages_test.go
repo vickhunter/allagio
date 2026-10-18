@@ -115,6 +115,45 @@ func TestBuiltLandingPagesAndLLMsTxt(t *testing.T) {
 	}
 }
 
+func TestLegalPagesNoindexUntilApproved(t *testing.T) {
+	if LEGAL_PAGES_APPROVED {
+		t.Fatal("LEGAL_PAGES_APPROVED defaults to false")
+	}
+	dir := t.TempDir()
+	writeBuiltPage(t, dir, "privacy", "<!doctype html><title>Privacy</title>")
+	writeBuiltPage(t, dir, "terms", "<!doctype html><title>Terms</title>")
+	writeBuiltPage(t, dir, "agents", "<!doctype html><title>Agents</title>")
+	r := mountBuiltLanding(t, dir)
+
+	robots := func(path string) string {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		return rec.Header().Get("X-Robots-Tag")
+	}
+	for _, path := range []string{"/privacy", "/privacy/", "/terms", "/terms/"} {
+		if got := robots(path); got != "noindex" {
+			t.Fatalf("%s X-Robots-Tag %q", path, got)
+		}
+	}
+	for _, path := range []string{"/agents", "/agents/"} {
+		if got := robots(path); got != "" {
+			t.Fatalf("%s X-Robots-Tag %q", path, got)
+		}
+	}
+
+	LEGAL_PAGES_APPROVED = true
+	t.Cleanup(func() { LEGAL_PAGES_APPROVED = false })
+	for _, path := range []string{"/privacy", "/privacy/", "/terms", "/terms/", "/agents", "/agents/"} {
+		if got := robots(path); got != "" {
+			t.Fatalf("approved %s X-Robots-Tag %q", path, got)
+		}
+	}
+}
+
 func TestBuiltLandingPagesMissingFilesStay404(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "landing-v9"), 0o755); err != nil {
