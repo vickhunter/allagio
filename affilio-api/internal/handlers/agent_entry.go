@@ -310,7 +310,19 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "account creation failed"})
 		return
 	}
-	account, err := h.DB.CreateAgentOnlyAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey)
+	pluginKey := ""
+	pluginHash := ""
+	pluginPrefix := ""
+	if req.Role == "publisher" {
+		pluginKey, err = generateAPIKey()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "account creation failed"})
+			return
+		}
+		pluginHash = services.HashAPIKey(pluginKey)
+		pluginPrefix = services.KeyPrefix(pluginKey)
+	}
+	account, err := h.DB.CreateAgentOnlyAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey, pluginHash, pluginPrefix)
 	if err != nil {
 		writeNamedConflict(c, "account_exists")
 		return
@@ -320,6 +332,8 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 		resp["site_id"] = account.SiteID
 		resp["api_key"] = siteKey
 		resp["key_header"] = "X-API-Key"
+		resp["plugin_key"] = pluginKey
+		resp["plugin_key_header"] = "X-Plugin-Key"
 	} else {
 		resp["maker_id"] = account.MakerID
 		resp["api_key"] = makerKey
