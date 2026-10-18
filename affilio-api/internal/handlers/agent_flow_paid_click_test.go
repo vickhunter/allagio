@@ -347,7 +347,7 @@ func TestTrailingSlashGoLinkPays(t *testing.T) {
 	if slash.Header().Get("Cache-Control") != "no-store" || slash.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
 		t.Fatalf("slash headers cache %q robots %q", slash.Header().Get("Cache-Control"), slash.Header().Get("X-Robots-Tag"))
 	}
-	for _, rawPath := range []string{"//v1/go/" + placementID + "/", "/v1/go/../"} {
+	for _, rawPath := range []string{"//v1/go/" + placementID + "/", "/v1/go/../", "/v1/go/" + placementID + "//"} {
 		bad := httptest.NewRecorder()
 		badReq := httptest.NewRequest(http.MethodGet, "/v1/go/"+placementID, nil)
 		badReq.URL.Path = rawPath

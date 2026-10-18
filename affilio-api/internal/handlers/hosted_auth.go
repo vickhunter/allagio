@@ -209,7 +209,7 @@ func redirectTrailingSlash(c *gin.Context, r *gin.Engine) bool {
 }
 
 func trailingSlashTarget(method, requestPath string, r *gin.Engine) (string, bool) {
-	if len(requestPath) < 2 || !strings.HasPrefix(requestPath, "/") || strings.HasPrefix(requestPath, "//") {
+	if len(requestPath) < 2 || !strings.HasPrefix(requestPath, "/") || strings.HasPrefix(requestPath, "//") || !singleSlashPath(requestPath) {
 		return "", false
 	}
 	alt := requestPath + "/"
