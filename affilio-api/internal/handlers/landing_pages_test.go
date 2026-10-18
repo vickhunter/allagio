@@ -142,6 +142,13 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 		"/landing-v9/privacy", "/landing-v9/privacy/index.html",
 		"/landing-v9/terms", "/landing-v9/terms/index.html",
 	}
+	// Extra slashes and dot segments still resolve to the draft pages.
+	dirty := []string{
+		"/landing-v9//privacy/", "/landing-v9/privacy//", "/landing-v9/privacy/./",
+		"/landing-v9//privacy/index.html", "/landing-v9/privacy/./index.html",
+		"/landing-v9//terms/", "/landing-v9/terms//", "/landing-v9/terms/./",
+		"/landing-v9//terms/index.html", "/landing-v9/terms/./index.html",
+	}
 	for _, path := range noindex {
 		if got := robots(path, http.StatusOK); got != "noindex" {
 			t.Fatalf("%s X-Robots-Tag %q", path, got)
@@ -149,6 +156,26 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 	}
 	for _, path := range redirects {
 		if got := robots(path, http.StatusMovedPermanently); got != "noindex" {
+			t.Fatalf("%s X-Robots-Tag %q", path, got)
+		}
+	}
+	for _, path := range dirty {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK && rec.Code != http.StatusMovedPermanently {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
+		}
+		if rec.Code == http.StatusOK && !strings.Contains(rec.Body.String(), "<title>") {
+			t.Fatalf("%s did not serve the page: %s", path, rec.Body.String())
+		}
+		if got := rec.Header().Get("X-Robots-Tag"); got != "noindex" {
+			t.Fatalf("%s X-Robots-Tag %q", path, got)
+		}
+	}
+	for _, path := range []string{"/landing-v9//agents/", "/landing-v9/agents/./", "/landing-v9/agents/./index.html"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if got := rec.Header().Get("X-Robots-Tag"); got != "" {
 			t.Fatalf("%s X-Robots-Tag %q", path, got)
 		}
 	}
@@ -174,6 +201,13 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 	}
 	for _, path := range append(redirects, openRedirects...) {
 		if got := robots(path, http.StatusMovedPermanently); got != "" {
+			t.Fatalf("approved %s X-Robots-Tag %q", path, got)
+		}
+	}
+	for _, path := range dirty {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if got := rec.Header().Get("X-Robots-Tag"); got != "" {
 			t.Fatalf("approved %s X-Robots-Tag %q", path, got)
 		}
 	}

@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -178,9 +179,8 @@ func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents"
 // the landing asset directory serves under /landing-v9.
 var LEGAL_PAGES_APPROVED = false
 
-func draftLegalPath(path string) bool {
-	path = strings.TrimSuffix(path, "/")
-	switch path {
+func draftLegalPath(requestPath string) bool {
+	switch path.Clean(requestPath) {
 	case "/privacy", "/terms",
 		"/landing-v9/privacy", "/landing-v9/privacy/index.html",
 		"/landing-v9/terms", "/landing-v9/terms/index.html":
