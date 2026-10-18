@@ -148,7 +148,7 @@ var (
 	pageMeta       = regexp.MustCompile(`(?is)<meta\b[^>]*>`)
 	pageContent    = regexp.MustCompile(`(?i)\bcontent\s*=\s*("([^"]*)"|'([^']*)')`)
 	pageTitleText  = regexp.MustCompile(`(?is)<title[^>]*>(.*?)</title>`)
-	pageJSONLDType = regexp.MustCompile(`(?i)(?:^|[\s/])type\s*=\s*(?:"application/ld\+json|'application/ld\+json|application/ld\+json\b)`)
+	pageJSONLDType = regexp.MustCompile(`(?i)(?:^|\s)type\s*=\s*(?:"application/ld\+json"|'application/ld\+json'|application/ld\+json(?:[\s>]|$))`)
 )
 
 // evidenceBreak keeps one extracted fragment from joining the next.
@@ -253,7 +253,7 @@ type embeddedElement struct {
 }
 
 func embeddedElements(raw string) []embeddedElement {
-	lower := strings.ToLower(raw)
+	lower := asciiLower(raw)
 	var found []embeddedElement
 	for i := 0; i < len(raw); {
 		el, ok := nextEmbedded(raw, lower, i)
@@ -270,7 +270,7 @@ func embeddedElements(raw string) []embeddedElement {
 }
 
 func stripEmbedded(raw string) string {
-	lower := strings.ToLower(raw)
+	lower := asciiLower(raw)
 	var b strings.Builder
 	for i := 0; i < len(raw); {
 		el, ok := nextEmbedded(raw, lower, i)
@@ -309,6 +309,19 @@ func nextEmbedded(raw, lower string, from int) (embeddedElement, bool) {
 		next = after + gt2 + 1
 	}
 	return embeddedElement{name: name, openTag: raw[start:openEnd], body: raw[openEnd:bodyEnd], start: start, next: next}, true
+}
+
+func asciiLower(raw string) string {
+	var b strings.Builder
+	b.Grow(len(raw))
+	for i := 0; i < len(raw); i++ {
+		c := raw[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }
 
 func findEmbeddedOpen(lower string, from int) (int, string) {

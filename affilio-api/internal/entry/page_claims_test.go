@@ -3,6 +3,7 @@ package entry
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -93,6 +94,14 @@ func TestPageClaimsReadClientRenderedPages(t *testing.T) {
 	reason, _ = checker.Check(PageDocument{OK: true, Body: split}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
 	if reason != PageReasonCard {
 		t.Fatalf("a title and the next description must not join into the card name: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: strings.Repeat("İ", 40) + "<script>var n = 99;</script><meta name=\"description\" content=\"Publishers earn 20 percent.\">"}, PageClaimInput{CommissionValue: 20})
+	if reason != "" {
+		t.Fatalf("unicode before a script: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: "<script src=\"/type=application/ld+json\">var n = 20;</script>"}, PageClaimInput{CommissionValue: 20})
+	if reason != PageReasonCommission {
+		t.Fatalf("a src path must not make a bundle into JSON-LD: %q", reason)
 	}
 	for _, body := range []string{
 		`<script type="application/ld+json">{"z":"Ledger","a":"Northwind"}</script>`,
