@@ -113,7 +113,7 @@ export const orderedSteps = [
   {
     n: 4,
     title: 'Find and prepare',
-    line: 'POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy. surface_url must be on the domain you signed up with. Copy is at most 140 characters and may not add numbers or claims the offer data doesn\'t have (server answers 422 claims_from_offer).',
+    line: 'POST /v1/revenue/opportunities with X-API-Key, then POST /v1/placements with X-API-Key.',
     body: 'POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy. surface_url must be on the domain you signed up with. Copy is at most 140 characters and may not add numbers or claims the offer data doesn\'t have (server answers 422 claims_from_offer).',
   },
   {
@@ -131,7 +131,7 @@ export const orderedSteps = [
   {
     n: 7,
     title: 'Receipt',
-    line: 'POST /v1/placements/:id/receipt with X-API-Key. The body is surface_url, published_text, and evidence (10 to 2000 characters), sent only after commit. published_text must contain the approved copy, the disclosure, and the tracked link from commit (/v1/go/<placement_id>); otherwise 409 receipt_mismatch.',
+    line: 'POST /v1/placements/:id/receipt with X-API-Key.',
     body: 'POST /v1/placements/:id/receipt with X-API-Key. The body is surface_url, published_text, and evidence (10 to 2000 characters), sent only after commit. published_text must contain the approved copy, the disclosure, and the tracked link from commit (/v1/go/<placement_id>); otherwise 409 receipt_mismatch.',
   },
   {
@@ -149,7 +149,7 @@ export const orderedSteps = [
   {
     n: 10,
     title: 'Sales and refunds',
-    line: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key. Sale body: click_id (the via value), event_id, object_id, amount_minor, currency, occurred_at optional RFC3339. Refund body: event_id, object_id of the sale, currency, amount_refunded_minor or full:true, occurred_at optional. Refunds take no click_id. The X-Maker-Key must belong to the maker who owns the clicked offer, or the server answers 404.',
+    line: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key.',
     body: 'POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key. Sale body: click_id (the via value), event_id, object_id, amount_minor, currency, occurred_at optional RFC3339. Refund body: event_id, object_id of the sale, currency, amount_refunded_minor or full:true, occurred_at optional. Refunds take no click_id. The X-Maker-Key must belong to the maker who owns the clicked offer, or the server answers 404.',
   },
   {

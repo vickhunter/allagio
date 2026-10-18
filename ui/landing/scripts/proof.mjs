@@ -348,6 +348,10 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   await page.getByRole('tab', { name: 'Claude Code' }).click()
   const claudePanel = await page.locator('#install-panel-claude').innerText()
   if (!claudePanel.includes('Sign in with Google when Claude Code asks') || !claudePanel.includes('Tested: add and remove') || !claudePanel.includes('The sign-in step is being fixed') || claudePanel.includes('Needs authentication') || claudePanel.includes('Untested')) throw new Error('agents-' + width + ' claude panel ' + claudePanel)
+  const pageText = await page.evaluate(() => document.body.textContent || '')
+  for (const needle of ['Join returns tracked_link /v1/go/<tracking_code>', 'surface_url must be on the domain you signed up with', '422 claims_from_offer', '10 to 2000 characters', '409 receipt_mismatch', 'Refunds take no click_id', 'amount_refunded_minor or full:true', 'Keys from /v1/agent-accounts work on the REST API only']) {
+    if (!pageText.includes(needle)) throw new Error('agents-' + width + ' missing ' + needle)
+  }
   await page.getByRole('tab', { name: 'Windsurf' }).click()
   const windsurfPanel = await page.locator('#install-panel-windsurf').innerText()
   if (!windsurfPanel.startsWith('Untested.')) throw new Error('agents-' + width + ' windsurf panel ' + windsurfPanel)

@@ -171,6 +171,12 @@ export function App() {
                 <li key={step.n} className="py-1">
                   <p className="text-[14px] leading-snug text-t1"><span className="font-semibold">{step.n}. {step.title}.</span> {step.line}</p>
                   {step.n === 5 ? <p className="text-[15px] leading-relaxed text-t1">{approvalNote}</p> : null}
+                  {step.n === 4 || step.n === 7 || step.n === 10 ? (
+                    <details className="mt-1">
+                      <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold">What the server expects</summary>
+                      <p className="pb-2 text-[15px] leading-relaxed text-t2">{step.body}</p>
+                    </details>
+                  ) : null}
                   {step.n === 1 ? (
                     <details className="mt-1">
                       <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold">Publisher and maker 201 fields</summary>

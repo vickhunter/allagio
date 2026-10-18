@@ -63,10 +63,10 @@ test('llms.txt matches the agent facts', () => {
 test('ordered steps name the hosted join, prepare, receipt, and sale bodies', () => {
   const text = llmsText()
   const step = (n) => orderedSteps.find((item) => item.n === n)
+  assert.equal(step(3).line, step(3).body)
+  for (const n of [4, 7, 10]) assert.equal(step(n).line === step(n).body, false)
   for (const n of [3, 4, 7, 10]) {
-    const item = step(n)
-    assert.equal(item.line, item.body)
-    assert.match(text, new RegExp(item.body.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    assert.match(text, new RegExp(step(n).body.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
   }
   assert.match(step(3).body, /List offers with GET \/v1\/marketplace\/offers \(X-API-Key\)/)
   assert.match(step(3).body, /Join returns tracked_link \/v1\/go\/<tracking_code>/)
