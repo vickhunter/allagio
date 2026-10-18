@@ -234,7 +234,7 @@ export function DirectoryDetail() {
         <p className="mt-4 text-sm"><span className="text-t2">Languages </span>{member.languages.join(', ')}</p>
         <p className="mt-1 text-sm"><span className="text-t2">{member.kind === 'maker' ? 'Categories ' : 'Topics '}</span>{groups.join(', ')}</p>
         <p className="mt-1 text-sm">{countLine(member.kind, member)}</p>
-        <p className="mt-4 break-all text-sm">{site ? <a className="inline-flex min-h-11 items-center underline underline-offset-4" href={site}>{member.url}</a> : member.url}</p>
+        {site ? <p className="mt-4 break-all text-sm"><a className="inline-flex min-h-11 items-center underline underline-offset-4" href={site}>{site}</a></p> : null}
       </article>
     </Page>
   )

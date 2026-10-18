@@ -52,20 +52,30 @@ export function memberUrl(kind, slug) {
   return '/v1/directory/' + kind + '/' + encodeURIComponent(slug)
 }
 
+const CONTROL = /[\u0000-\u001F\u007F]/
+
 export function httpsUrl(value) {
-  if (typeof value !== 'string' || value.length === 0) return null
+  if (typeof value !== 'string' || value.length === 0 || CONTROL.test(value)) return null
   try {
     const url = new URL(value)
-    if (url.protocol !== 'https:') return null
-    return value
+    if (url.protocol !== 'https:' || url.username || url.password) return null
+    return url.href
   } catch {
     return null
   }
 }
 
 export function logoSrc(value) {
-  if (typeof value !== 'string' || value.length === 0) return null
-  if (value.startsWith('/') && !value.startsWith('//') && !value.includes('\\')) return value
+  if (typeof value !== 'string' || value.length === 0 || CONTROL.test(value)) return null
+  if (value.startsWith('/') && !value.startsWith('//') && !value.includes('\\')) {
+    try {
+      const resolved = new URL(value, 'https://offer-rails.local')
+      if (resolved.origin !== 'https://offer-rails.local' || resolved.username || resolved.password) return null
+      return value
+    } catch {
+      return null
+    }
+  }
   return httpsUrl(value)
 }
 
