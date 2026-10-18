@@ -205,3 +205,84 @@ func TestPrematurePlacedStillPays(t *testing.T) {
 		t.Fatalf("paid clicks %d %v", paid, err)
 	}
 }
+
+// TestApprovedPlacementGoLinkPays is the hosted Site Keeper case. After
+// approval, and before commit or plugin-ack, the tracked go link carried no
+// via and paid_clicks stayed 0. The click writer required a stored campaign
+// and status committed, so the redirect sent the reader to the plain URL.
+func TestApprovedPlacementGoLinkPays(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	_, r := newD063Router(t, db)
+
+	created, body := postJSON(t, r, http.MethodPost, "/v1/agent-accounts", map[string]any{
+		"role": "publisher", "name": "Approved Go Blog", "email": "approved-go@example.com", "domain": "approved-go.example", "source": "cli",
+	}, nil)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("signup: %d %s", created.Code, created.Body.String())
+	}
+	siteID := body["site_id"].(string)
+	siteKey := map[string]string{"X-API-Key": body["api_key"].(string)}
+	_, offerID := seedListedOffer(t, db, "approved-go-maker", "approved-go-maker@example.com", "Northstar")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET landing_url='https://example.com/buy' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	joined, joinedBody := postJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", map[string]any{}, siteKey)
+	if joined.Code != http.StatusOK || joinedBody["campaign_id"] == "" {
+		t.Fatalf("join: %d %s", joined.Code, joined.Body.String())
+	}
+	contextText := "Northstar devtools reviews every pull request. Northstar finds bugs before merge. This devtools note is about Northstar."
+	prepared, preparedBody := postJSON(t, r, http.MethodPost, "/v1/placements", map[string]any{
+		"offer_id": offerID, "surface_url": "https://approved-go.example/posts/review", "context": contextText,
+		"copy": "We use Northstar to catch bugs before merge.", "post_id": 9, "post_title": "Review notes",
+	}, siteKey)
+	if prepared.Code != http.StatusCreated {
+		t.Fatalf("placement: %d %s", prepared.Code, prepared.Body.String())
+	}
+	placementID := preparedBody["placement"].(map[string]any)["id"].(string)
+
+	pending := hitGo(t, r, http.MethodGet, "/v1/go/"+placementID, testBrowserUA)
+	if pending.Code != http.StatusFound || pending.Header().Get("Location") != "https://example.com/buy" {
+		t.Fatalf("pending go: %d %s", pending.Code, pending.Header().Get("Location"))
+	}
+	var clicks int
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COUNT(*) FROM clicks WHERE placement_id=$1`, placementID).Scan(&clicks); err != nil || clicks != 0 {
+		t.Fatalf("pending clicks %d %v", clicks, err)
+	}
+
+	approved, approvedBody := postJSON(t, r, http.MethodPost, "/v1/offer-review/placements/"+placementID+"/approve", map[string]any{
+		"site_id": siteID, "owner_email": "approved-go@example.com", "evidence": "Operator approval for the agent owner.",
+	}, map[string]string{"X-Admin-Key": "test-admin"})
+	if approved.Code != http.StatusOK || approvedBody["status"] != "approved" {
+		t.Fatalf("approve: %d %s", approved.Code, approved.Body.String())
+	}
+	var campaignMissing bool
+	if err := db.Pool.QueryRow(context.Background(), `SELECT campaign_id IS NULL FROM placement_proposals WHERE id=$1 AND status='approved'`, placementID).Scan(&campaignMissing); err != nil || !campaignMissing {
+		t.Fatalf("approval stored a campaign: null=%v %v", campaignMissing, err)
+	}
+
+	live := hitGo(t, r, http.MethodGet, "/v1/go/"+placementID, testBrowserUA)
+	parsed, err := url.Parse(live.Header().Get("Location"))
+	if live.Code != http.StatusFound || err != nil || parsed.Host != "example.com" || parsed.Query().Get("via") == "" {
+		t.Fatalf("approved go: %d %s", live.Code, live.Header().Get("Location"))
+	}
+	var clickID, class string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT id::text, click_class FROM clicks WHERE placement_id=$1`, placementID).Scan(&clickID, &class); err != nil || clickID != parsed.Query().Get("via") || class != ClickClassBrowser {
+		t.Fatalf("via %s click %s class %s err %v", parsed.Query().Get("via"), clickID, class, err)
+	}
+
+	digest, digestBody := postJSON(t, r, http.MethodGet, "/v1/digest", nil, siteKey)
+	if digest.Code != http.StatusOK {
+		t.Fatalf("digest: %d %s", digest.Code, digest.Body.String())
+	}
+	var item map[string]any
+	for _, raw := range digestBody["items"].([]any) {
+		row, _ := raw.(map[string]any)
+		if row["id"] == placementID {
+			item = row
+		}
+	}
+	if item == nil || item["clicks"] != float64(1) || item["paid_clicks"] != float64(1) || item["live_now"] != false {
+		t.Fatalf("digest item: %v", item)
+	}
+}
