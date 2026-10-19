@@ -18,7 +18,7 @@ export function JoinForm({ role: initial = 'both', cta = 'Sign in with Google', 
         {(['maker', 'publisher', 'both'] as Role[]).map((r) => (
           <label key={r} className="inline-flex min-h-11 min-w-11 cursor-pointer items-center rounded-lg border border-line-strong bg-s1 px-3 text-sm has-[:checked]:border-t1 has-[:checked]:font-semibold has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-setup">
             <input type="radio" className="sr-only" name="or-role" checked={role === r} onChange={() => { setRole(r); track('role_pick', { role: r }) }} />
-            {r === 'maker' ? 'Sell something' : r === 'publisher' ? 'Monetize my space' : 'Both'}
+            {r === 'maker' ? 'Sell something' : r === 'publisher' ? 'Earn from my posts' : 'Both'}
           </label>
         ))}
       </fieldset>

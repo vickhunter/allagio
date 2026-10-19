@@ -86,10 +86,12 @@ function channelReport() {
       for (const name of names) {
         const hit = name === 'X' ? /\bX\b/.test(row) : row.includes(name)
         if (!hit) continue
-        if (name === 'X' && !/Shopify|Coming|coming/.test(row)) continue
+        if (name === 'X' && !/Shopify|Coming|coming|Planned|planned/.test(row)) continue
         let status = 'named'
         if (name === 'WordPress') status = 'live plugin'
         else if (/untested/i.test(row) && (name === 'Claude Code' || name === 'Generic')) status = 'untested'
+        else if (/planned/i.test(row)) status = 'planned'
+        else if (/later/i.test(row)) status = 'later'
         else if (/coming/i.test(row)) status = 'coming'
         lines.push(`${name}\t${status}\t${file.replace(repo + '/', '')}:${index + 1}`)
       }
@@ -103,9 +105,9 @@ function channelReport() {
     Windsurf: 'coming',
     ChatGPT: 'coming',
     Grok: 'coming',
-    Shopify: 'coming',
-    'Traffic trade': 'coming',
-    X: 'coming',
+    Shopify: 'planned',
+    'Traffic trade': 'later',
+    X: 'planned',
   }
   for (const [name, status] of Object.entries(required)) {
     if (!lines.some((line) => line.startsWith(name + '\t' + status + '\t'))) throw new Error('missing ' + status + ' ' + name)

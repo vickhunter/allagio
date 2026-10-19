@@ -12,7 +12,7 @@ const meta = `<meta name="or-install" content="{{if .InstallerReady}}{{.InstallC
 const shell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
-      <h1>Someone has the product. Someone has the space.</h1>
+      <h1>Affiliate marketing, evolved for agents.</h1>
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
       <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
       <p><a href="/downloads/affilio.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
