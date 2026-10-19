@@ -71,6 +71,15 @@ func TestClaimCheckHookBlocks(t *testing.T) {
 	if stub.Allowed || !stub.NeedsOwner || stub.Reason != ClaimCheckReason || stub.Message != ClaimCheckMessage {
 		t.Fatalf("stub should hold automatic go-live: %+v", stub)
 	}
+	live := EvaluatePlacement(ModeYolo, AutoRules{}, passingFacts(), PageClaimChecker{})
+	if !live.Allowed || live.ApprovedBy != "policy:yolo" {
+		t.Fatalf("page checker should allow yolo when the copy passes: %+v", live)
+	}
+	err := (PageClaimChecker{}).CheckClaims("Save 90% today on this product.", "the offer pays 20")
+	var mismatch ClaimMismatch
+	if !errors.As(err, &mismatch) || mismatch.Reason != ClaimReasonNumberNotInOffer || mismatch.Claim != "90%" {
+		t.Fatalf("page checker number miss: %v", err)
+	}
 }
 
 func TestAutoPolicyAndYolo(t *testing.T) {

@@ -121,7 +121,10 @@ FROM products WHERE id=$1`, offer.ProductID).Scan(&product.MakerID, &product.Nam
 	}
 	product.ID = offer.ProductID
 	if claimsReal(h.ClaimsCheck) {
-		reason, message := compareOfferClaims(c.Request.Context(), h.DB, product.MakerID, product.ID, *offer)
+		reason, message, err := compareOfferClaims(c.Request.Context(), h.DB, product.MakerID, product.ID, *offer)
+		if err != nil {
+			return "", "", false, err
+		}
 		if reason == entry.PageReasonUnreachable {
 			return reviewReasonHead, reviewHeadMessage, true, nil
 		}

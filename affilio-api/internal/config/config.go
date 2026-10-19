@@ -52,8 +52,8 @@ type Config struct {
 const (
 	// ClaimsStub holds every untrusted offer in review. It is the hosted default.
 	ClaimsStub = "stub"
-	// ClaimsReal runs the page checker on local and dev. A hosted server refuses
-	// it and stays on stub.
+	// ClaimsReal runs the page checker. A hosted server accepts it when
+	// CLAIMS_CHECK is set to real. An empty value on a hosted server stays stub.
 	ClaimsReal = "real"
 	// ClaimsOffLocal keeps today's four listing checks. Local and dev only.
 	ClaimsOffLocal = "off-local"
@@ -115,9 +115,9 @@ func Hosted(ginMode string) bool {
 }
 
 // ResolveClaimsCheck applies CLAIMS_CHECK. An empty value is stub on a hosted
-// server and off-local everywhere else. off-local and real are refused when
-// GIN_MODE=release. Local real compares the listing card with the merchant page.
-// The hosted default stays stub.
+// server and off-local everywhere else. off-local is refused when
+// GIN_MODE=release. real is allowed on a hosted server and compares the
+// listing card with the merchant page. The hosted default stays stub.
 func ResolveClaimsCheck(ginMode, raw string) (string, error) {
 	mode := strings.ToLower(strings.TrimSpace(raw))
 	hosted := Hosted(ginMode)
@@ -135,9 +135,6 @@ func ResolveClaimsCheck(ginMode, raw string) (string, error) {
 		}
 		return ClaimsOffLocal, nil
 	case ClaimsReal:
-		if hosted {
-			return "", errors.New("CLAIMS_CHECK=real is not allowed while GIN_MODE=release. The hosted default stays stub")
-		}
 		return ClaimsReal, nil
 	default:
 		return "", errors.New("CLAIMS_CHECK must be stub, real, or off-local")
@@ -145,7 +142,7 @@ func ResolveClaimsCheck(ginMode, raw string) (string, error) {
 }
 
 // ValidateClaims refuses to boot when CLAIMS_CHECK is unknown or when a hosted
-// server asks for real or off-local.
+// server asks for off-local.
 func (c Config) ValidateClaims() error {
 	return c.claimsCheckErr
 }
