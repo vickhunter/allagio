@@ -658,6 +658,7 @@ SELECT r.id,
 FROM recommendations r
 JOIN articles a ON a.id = r.article_id
 LEFT JOIN clicks c ON c.recommendation_id = r.id
+    AND c.click_class <> 'test'
     AND ($2 = 0 OR c.clicked_at >= NOW() - ($2 * INTERVAL '1 day'))
 LEFT JOIN affiliate_programs ap ON ap.id = r.program_id
 LEFT JOIN user_programs up ON up.id = r.user_program_id
@@ -685,11 +686,11 @@ func (d *DB) GetClickSummary(ctx context.Context, siteID string, days int) (*Cli
 	}
 	row := d.Pool.QueryRow(ctx, `
 SELECT
-    COUNT(c.id) AS total_clicks,
+    COUNT(c.id) FILTER (WHERE c.click_class <> 'test') AS total_clicks,
     COUNT(DISTINCT c.article_id) AS unique_articles,
     COUNT(DISTINCT c.recommendation_id) AS unique_recommendations,
-    COUNT(c.id) FILTER (WHERE c.click_class = 'browser') AS paid_clicks,
-    COUNT(c.id) FILTER (WHERE c.click_class = 'browser') AS browser_clicks,
+    COUNT(c.id) FILTER (WHERE c.click_class = 'browser' AND NOT EXISTS (SELECT 1 FROM sites demo_site WHERE demo_site.id = c.site_id AND demo_site.demo)) AS paid_clicks,
+    COUNT(c.id) FILTER (WHERE c.click_class = 'browser' AND NOT EXISTS (SELECT 1 FROM sites demo_site WHERE demo_site.id = c.site_id AND demo_site.demo)) AS browser_clicks,
     COUNT(c.id) FILTER (WHERE c.click_class = 'verified_agent') AS verified_agent_clicks,
     COUNT(c.id) FILTER (WHERE c.click_class = 'declared_agent') AS declared_agent_clicks,
     COUNT(c.id) FILTER (WHERE c.click_class = 'unknown') AS unknown_clicks

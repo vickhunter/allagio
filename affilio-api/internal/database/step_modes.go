@@ -293,6 +293,14 @@ func (d *DB) FulfillBatchPayout(ctx context.Context, siteID, currency, makerID, 
 	if err = lockMoney(ctx, tx); err != nil {
 		return "", false, err
 	}
+	var demo bool
+	err = tx.QueryRow(ctx, `SELECT demo FROM sites WHERE id=$1`, siteID).Scan(&demo)
+	if errors.Is(err, pgx.ErrNoRows) || demo {
+		return "", false, tx.Commit(ctx)
+	}
+	if err != nil {
+		return "", false, err
+	}
 	var amount float64
 	err = tx.QueryRow(ctx, `
 SELECT COALESCE(SUM(le.amount),0)
@@ -301,7 +309,8 @@ JOIN conversions cv ON cv.id=le.conversion_id
 JOIN offers o ON o.id=cv.offer_id
 JOIN products p ON p.id=o.product_id
 WHERE le.status='cleared' AND le.payout_id IS NULL AND le.site_id=$1
-  AND le.currency=$2 AND p.maker_id=$3 AND cv.payment_mode=$4`, siteID, currency, makerID, paymentMode).Scan(&amount)
+  AND le.currency=$2 AND p.maker_id=$3 AND cv.payment_mode=$4
+  AND NOT EXISTS (SELECT 1 FROM clicks cl WHERE cl.id = cv.click_id AND cl.click_class = 'test')`, siteID, currency, makerID, paymentMode).Scan(&amount)
 	if err != nil {
 		return "", false, err
 	}
@@ -324,6 +333,7 @@ AND conversion_id IN (
   JOIN offers o ON o.id=cv.offer_id
   JOIN products p ON p.id=o.product_id
   WHERE p.maker_id=$4 AND cv.payment_mode=$5
+  AND NOT EXISTS (SELECT 1 FROM clicks cl WHERE cl.id = cv.click_id AND cl.click_class = 'test')
 )`, payoutID, siteID, currency, makerID, paymentMode)
 	if err != nil {
 		return "", false, err

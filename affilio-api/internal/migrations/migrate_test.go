@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"context"
+	"io/fs"
 	"net/url"
 	"os"
 	"strings"
@@ -141,9 +142,13 @@ func TestMigrationHistoryAndConcurrentStartup(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	names, err := fs.Glob(files, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
 	var count int
-	if err = pool.QueryRow(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil || count != 42 {
-		t.Fatalf("history: %d %v", count, err)
+	if err = pool.QueryRow(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil || count != len(names) {
+		t.Fatalf("history: %d, embedded %d, err %v", count, len(names), err)
 	}
 	for _, col := range []struct{ table, column string }{
 		{"clicks", "clicked_at"},

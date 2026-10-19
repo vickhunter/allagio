@@ -38,6 +38,11 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 	code := strings.TrimSpace(c.Param("code"))
 	req := captureGoRequest(c)
 	scrubGoRequest(c.Request)
+	// /v1/go/demo is the sample link on the demo post. It redirects and records nothing.
+	if code == demoGoCode {
+		c.Redirect(http.StatusFound, h.offerRailsHome())
+		return
+	}
 	if uuidPattern.MatchString(code) {
 		h.goPlacement(c, code, req)
 		return
@@ -193,6 +198,9 @@ func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req g
 		return
 	}
 	class := ClassifyClick(c.Request.Method, reader.userAgent, c.Request.Header)
+	if link.Demo {
+		class = ClickClassTest
+	}
 	if !PaidClick(class) {
 		h.finishPlacementRedirect(c, link, placementID, reader, class, plain, "unpaid:"+placementID)
 		return
@@ -216,11 +224,14 @@ func (h *RedirectsHandler) goRecommendation(c *gin.Context, recommendationID str
 	}
 	reader := h.recommendationReader(c, rec.SiteID, req)
 	class := ClassifyClick(c.Request.Method, reader.userAgent, c.Request.Header)
+	if rec.Demo {
+		class = ClickClassTest
+	}
 	if h.RateLimiter != nil && !h.RateLimiter.Allow("recommendation:"+recommendationID) {
 		c.Redirect(http.StatusFound, rec.Destination)
 		return true
 	}
-	if AttributableClick(class) {
+	if AttributableClick(class) || class == ClickClassTest {
 		if _, err := h.recordRecommendationHit(c, rec, recommendationID, reader, class); err != nil {
 			logGo("redirects.go recommendation click failed id=%s err=%v", recommendationID, err)
 		}

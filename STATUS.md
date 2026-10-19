@@ -1,3 +1,11 @@
+## October 19 — Demo operator view, demo digest, and test go links
+
+`GET /demo/operator` is a read-only operator screen. It needs no API key and no Google sign-in. It shows a pending placement on the demo site and an approved placement with `approved_by` `operator`. The Approve button posts back to `POST /demo/operator`, which changes nothing. Approval of a real placement stays on `POST /v1/offer-review/placements/:id/approve` with `X-Admin-Key`, or on the signed-in owner page.
+
+`GET /demo/digest` is the paid-click digest for sites with `sites.demo` set. It shows `clicks`, `paid_clicks`, and `approved_by` for those placements only. A site that is not demo is not on this page.
+
+`GET /demo/post` is a sample post. Its sponsored link is the demo site's approved go link, or `/v1/go/demo` when that placement is not there. `/v1/go/demo` redirects and records nothing. A go link for a demo site stores `click_class` `test`. A test click is not a paid click. It is left out of `/v1/digest` click totals, click summaries, payout batches, and sale ledger rows. A sale reported against a test click or a demo site is not billed. Migration `043_demo_test_clicks.sql` adds `sites.demo` (default false) and allows `click_class` `test`. It does not rewrite existing rows. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 19 — H-FARM demo copy and nav
 
 The agents page and llms.txt say the hosted app uses the ordered steps. The demo nav keeps each label whole and keeps a 44px tap target. Agents sits in the landing header next to Protocol, on the wide row and the wrapped row below it. The home matching section uses the same three publisher choices: ask every time, approve within your rules, or approve anything that passes the nine checks. The makers directory talks about adding a product. Its Agents link still opens /agents.

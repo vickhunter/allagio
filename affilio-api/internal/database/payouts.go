@@ -168,6 +168,8 @@ SELECT le.site_id, le.currency, p.maker_id,cv.payment_mode, SUM(le.amount)
 FROM ledger_entries le JOIN conversions cv ON cv.id=le.conversion_id
 JOIN offers o ON o.id=cv.offer_id JOIN products p ON p.id=o.product_id
 WHERE le.status='cleared' AND le.payout_id IS NULL AND le.site_id IS NOT NULL AND ($2 OR cv.payment_mode<>'test')
+AND NOT EXISTS (SELECT 1 FROM sites demo_site WHERE demo_site.id = le.site_id AND demo_site.demo)
+AND NOT EXISTS (SELECT 1 FROM clicks cl WHERE cl.id = cv.click_id AND cl.click_class = 'test')
 GROUP BY le.site_id, le.currency,p.maker_id,cv.payment_mode
 HAVING SUM(le.amount) >= $1`, minPayout, includeTest)
 	if err != nil {
@@ -218,7 +220,14 @@ RETURNING id, site_id, amount, currency, COALESCE(method,''), COALESCE(provider_
 		if _, err := tx.Exec(ctx, `
 UPDATE ledger_entries SET payout_id=$1
 WHERE site_id=$2 AND currency=$3 AND status='cleared' AND payout_id IS NULL
-AND conversion_id IN (SELECT cv.id FROM conversions cv JOIN offers o ON o.id=cv.offer_id JOIN products p ON p.id=o.product_id WHERE p.maker_id=$4 AND cv.payment_mode=$5)`, payout.ID, item.siteID, item.currency, item.makerID, item.mode); err != nil {
+AND NOT EXISTS (SELECT 1 FROM sites demo_site WHERE demo_site.id = ledger_entries.site_id AND demo_site.demo)
+AND conversion_id IN (
+  SELECT cv.id FROM conversions cv
+  JOIN offers o ON o.id=cv.offer_id
+  JOIN products p ON p.id=o.product_id
+  WHERE p.maker_id=$4 AND cv.payment_mode=$5
+  AND NOT EXISTS (SELECT 1 FROM clicks cl WHERE cl.id = cv.click_id AND cl.click_class = 'test')
+)`, payout.ID, item.siteID, item.currency, item.makerID, item.mode); err != nil {
 			return nil, err
 		}
 		payouts = append(payouts, payout)
@@ -279,6 +288,8 @@ JOIN products p ON p.id = o.product_id
 LEFT JOIN (
     SELECT cam.offer_id, COUNT(*) AS clicks
     FROM clicks c JOIN campaigns cam ON cam.id = c.campaign_id
+    WHERE c.click_class <> 'test'
+      AND NOT EXISTS (SELECT 1 FROM sites demo_site WHERE demo_site.id = c.site_id AND demo_site.demo)
     GROUP BY cam.offer_id
 ) cl ON cl.offer_id = o.id
 LEFT JOIN (
