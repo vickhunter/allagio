@@ -45,7 +45,7 @@ export function App() {
         <h1 id="setup-h" className="h-display mt-4 text-[40px] sm:text-6xl">Set up your site.</h1>
         <p className="mt-5 text-lg leading-relaxed text-t2">Three steps. Then Offer Rails can place offers on your posts.</p>
         <div className="mt-10">
-          <PostPreview />
+          <PostPreview titleLevel={2} />
         </div>
         <ol className="mt-6 space-y-4">
           {steps.map((step, index) => (

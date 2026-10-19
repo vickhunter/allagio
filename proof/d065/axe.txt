@@ -1,0 +1,19 @@
+D-065 axe-core, viewports 390 and 1440.
+Pages this branch changes: /, /makers, /publishers, /publishers/setup, /protocol, /landing-v9/how-it-works/, and the branded 404.
+
+/ 390 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/ 1440 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/makers 390 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/makers 1440 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/publishers 390 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/publishers 1440 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/publishers/setup 390 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/publishers/setup 1440 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/protocol 390 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/protocol 1440 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/landing-v9/how-it-works/ 390 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/landing-v9/how-it-works/ 1440 status=200 critical=0 serious=0 moderate=0 minor=0 rules=none
+/not-a-real-landing-page 390 status=404 critical=0 serious=0 moderate=0 minor=0 rules=none
+/not-a-real-landing-page 1440 status=404 critical=0 serious=0 moderate=0 minor=0 rules=none
+
+serious=0 critical=0

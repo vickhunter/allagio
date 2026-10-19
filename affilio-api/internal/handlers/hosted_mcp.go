@@ -83,7 +83,11 @@ func (h *HostedHandler) MCPTransport() http.Handler {
 		return s
 	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
 	verify := func(ctx context.Context, token string, r *http.Request) (*auth.TokenInfo, error) {
-		g, err := h.DB.AgentToken(ctx, services.HashAPIKey(token), h.resource())
+		hash := services.HashAPIKey(token)
+		g, err := h.DB.AgentToken(ctx, hash, h.resource())
+		if err != nil {
+			g, err = h.DB.AgentAccountBearer(ctx, hash, token, h.resource())
+		}
 		if err != nil {
 			return nil, auth.ErrInvalidToken
 		}

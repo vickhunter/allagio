@@ -4,7 +4,7 @@ import { Accordion } from '@/site/Accordion'
 import { Checks, JoinSection } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
-import { driftChips, example, faq, makerAdvantages, pilotLine, publisherAdvantages } from '@/content'
+import { driftChips, example, faq, joinLine, makerAdvantages, publisherAdvantages, publisherRuns } from '@/content'
 import { HeroShader } from './HeroShader'
 import { PostPreview } from '@/components/PostPreview'
 import { HowItWorks } from './HowItWorks'
@@ -19,17 +19,25 @@ export function App() {
         <HeroShader />
         <div className="mx-auto grid max-w-6xl gap-10 px-5 pb-14 pt-10 md:pt-16 lg:grid-cols-[1fr_300px] lg:gap-6">
           <div className="anim-fade">
-            <p className="eyebrow">Issue 01 · Agent-native distribution · WordPress first</p>
+            <p className="eyebrow">Issue 01 · Affiliate marketing, agent-native</p>
             <h1 id="hero-h" className="h-display mt-5 text-[42px] sm:text-7xl lg:text-[84px]">
-              Someone has the product. Someone has the{' '}
-              <span className="relative inline-block whitespace-nowrap">space.
+              Affiliate marketing, evolved for{' '}
+              <span className="relative inline-block whitespace-nowrap">agents.
                 <svg className="scribble absolute -bottom-2 left-0 h-[0.22em] w-full overflow-visible sm:-bottom-3" viewBox="0 0 200 20" preserveAspectRatio="none" aria-hidden="true">
                   <path pathLength={1} d="M3 13 C 40 6, 80 5, 118 9 S 176 14, 197 6" fill="none" stroke="rgb(var(--rgb-setup))" strokeWidth="4.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
                 </svg>
               </span>
             </h1>
             <div className="mt-8 grid gap-6 border-t border-t1 pt-6 md:grid-cols-[1.1fr_1fr] md:items-start">
-              <p className="text-lg leading-relaxed text-t2">Offer Rails is the protocol between them. Agents find the match, check it, place it and keep the record. You keep the switch.</p>
+              <div>
+                <p className="text-lg leading-relaxed text-t2">Makers pay only for sales. Publishers earn from more of their posts. Agents find, match and place.</p>
+                <p className="mt-3 font-semibold text-t1">No paying for clicks or space. Only for results.</p>
+                <ol className="mt-4 list-decimal space-y-2 pl-5 text-[15px] leading-relaxed text-t1">
+                  <li>Paying for space. The bill is for clicks or a slot, whether or not anyone buys.</li>
+                  <li>Affiliate marketing pays per sale. Finding partners, matching an offer to content, and placing it are still slow.</li>
+                  <li>Agents do the finding, the matching and the placing.</li>
+                </ol>
+              </div>
               <div>
                 <p className="mb-3 text-[13px] font-semibold text-t2">Sign in. Which one are you?</p>
                 <SignInChoice where="hero" />
@@ -42,10 +50,19 @@ export function App() {
         <div className="mx-auto max-w-6xl px-5 pb-16">
           <p className="eyebrow mb-3">Pick your side. Each page lists every advantage.</p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <SideLink href={withSource('/makers/', source)} tone="maker" n="A" title="I sell something." text="List a referral offer once. Publishers’ agents bring it to the right posts. Pay only on attributed sales." cta={`All ${makerAdvantages.length} maker advantages`} />
-            <SideLink id="publishers" href={withSource('/publishers/', source)} tone="pub" n="B" title="I have space." text="One honest, labelled box per post, chosen by relevance. Earn per sale or swap visibility." cta={`All ${publisherAdvantages.length} publisher advantages`} />
+            <SideLink href={withSource('/makers/', source)} tone="maker" n="A" title="I sell something." text="Publishers’ agents find you. You pay only for sales." cta={`All ${makerAdvantages.length} maker advantages`} />
+            <SideLink id="publishers" href={withSource('/publishers/', source)} tone="pub" n="B" title="I publish." text="Earn from more of your posts. Agents find offers that fit the content you already make." cta={`All ${publisherAdvantages.length} publisher advantages`} />
           </div>
           <p className="mt-3 text-[13px] text-t2">Both? One account does both. Press <kbd className="font-mono">M</kbd> or <kbd className="font-mono">P</kbd>.</p>
+          <p className="eyebrow mb-3 mt-8">Where it runs</p>
+          <ul className="grid gap-2 sm:grid-cols-3">
+            {publisherRuns.map((item) => (
+              <li key={item.name} className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-s1 px-4 py-2 text-sm">
+                <span className="font-semibold">{item.name}</span>
+                <span className="text-t2">{item.status}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -55,7 +72,7 @@ export function App() {
         <div className="mx-auto max-w-3xl px-5 py-16 md:py-20">
           <p className="eyebrow">On your post</p>
           <h2 id="preview-h" className="h-display mt-3 text-3xl sm:text-4xl">See it on a real post.</h2>
-          <p className="mt-4 text-lg leading-relaxed text-t2">Paste a post URL. See where an offer would sit. Nothing is saved.</p>
+          <p className="mt-4 text-lg leading-relaxed text-t2">Paste a post URL. See where an offer would sit.</p>
           <div className="mt-8">
             <PostPreview />
           </div>
@@ -82,7 +99,7 @@ export function App() {
         </div>
       </section>
 
-      <JoinSection title="Not sure which side? Pick both." sub={pilotLine} />
+      <JoinSection title="Not sure which side? Pick both." sub={joinLine} />
     </Page>
   )
 }

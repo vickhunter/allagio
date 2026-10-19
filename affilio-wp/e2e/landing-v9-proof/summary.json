@@ -52,6 +52,28 @@
     "serious": []
   },
   {
+    "slug": "privacy-390",
+    "scroll": true,
+    "small": [],
+    "banner": true,
+    "current": "",
+    "privacy": "/privacy?source=cursor",
+    "terms": "/terms?source=cursor",
+    "primary": 0,
+    "serious": []
+  },
+  {
+    "slug": "terms-390",
+    "scroll": true,
+    "small": [],
+    "banner": true,
+    "current": "",
+    "privacy": "/privacy?source=cursor",
+    "terms": "/terms?source=cursor",
+    "primary": 0,
+    "serious": []
+  },
+  {
     "slug": "setup-390",
     "scroll": true,
     "small": [],
@@ -86,6 +108,47 @@
     "serious": [],
     "connectHref": "/auth/login?return_to=%2Fowner%2Fconnect-site%3Fsource%3Dcursor&source=cursor",
     "yolo": true
+  },
+  {
+    "slug": "agents-390",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "forbidden": false,
+    "steps": 0,
+    "ordered": 11,
+    "height": 6987,
+    "headings": [],
+    "soon": [
+      "preview_page",
+      "get_digest"
+    ],
+    "livePreview": true,
+    "modes": true,
+    "stub": true,
+    "url": "https://offer-rails.onrender.com/mcp",
+    "alternate": "/llms.txt",
+    "alternateType": "text/plain",
+    "primary": 1,
+    "tram": "none",
+    "rates": true,
+    "errors": true,
+    "alone": 4,
+    "human": true,
+    "signup": true,
+    "deviceLinks": [
+      "/device"
+    ],
+    "serious": [],
+    "copiedUrl": "https://offer-rails.onrender.com/mcp",
+    "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",
+    "tabLabels": [
+      "Cursor · untested",
+      "Claude Code · untested",
+      "VS Code · untested",
+      "Windsurf · untested",
+      "Generic"
+    ]
   },
   {
     "slug": "preview-home-success-390",
@@ -284,6 +347,28 @@
     "serious": []
   },
   {
+    "slug": "privacy-1440",
+    "scroll": true,
+    "small": [],
+    "banner": true,
+    "current": "",
+    "privacy": "/privacy?source=cursor",
+    "terms": "/terms?source=cursor",
+    "primary": 0,
+    "serious": []
+  },
+  {
+    "slug": "terms-1440",
+    "scroll": true,
+    "small": [],
+    "banner": true,
+    "current": "",
+    "privacy": "/privacy?source=cursor",
+    "terms": "/terms?source=cursor",
+    "primary": 0,
+    "serious": []
+  },
+  {
     "slug": "setup-1440",
     "scroll": true,
     "small": [],
@@ -318,6 +403,47 @@
     "serious": [],
     "connectHref": "/auth/login?return_to=%2Fowner%2Fconnect-site%3Fsource%3Dcursor&source=cursor",
     "yolo": true
+  },
+  {
+    "slug": "agents-1440",
+    "scroll": true,
+    "small": [],
+    "brand": true,
+    "forbidden": false,
+    "steps": 0,
+    "ordered": 11,
+    "height": 4732,
+    "headings": [],
+    "soon": [
+      "preview_page",
+      "get_digest"
+    ],
+    "livePreview": true,
+    "modes": true,
+    "stub": true,
+    "url": "https://offer-rails.onrender.com/mcp",
+    "alternate": "/llms.txt",
+    "alternateType": "text/plain",
+    "primary": 1,
+    "tram": "none",
+    "rates": true,
+    "errors": true,
+    "alone": 4,
+    "human": true,
+    "signup": true,
+    "deviceLinks": [
+      "/device"
+    ],
+    "serious": [],
+    "copiedUrl": "https://offer-rails.onrender.com/mcp",
+    "copiedConfig": "{\"mcpServers\":{\"offer-rails\":{\"type\":\"http\",\"url\":\"https://offer-rails.onrender.com/mcp\"}}}",
+    "tabLabels": [
+      "Cursor · untested",
+      "Claude Code · untested",
+      "VS Code · untested",
+      "Windsurf · untested",
+      "Generic"
+    ]
   },
   {
     "slug": "preview-home-success-1440",

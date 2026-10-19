@@ -91,13 +91,43 @@ type CampaignLink struct {
 	SiteDomain        string
 }
 
+// approvedGoLinkSQL is an approved placement the go link can pay before commit.
+// Commit is what stores campaign_id. Until then the active campaign for this
+// offer and site is the click's campaign. plugin_wait does not have to be placed.
+const approvedGoLinkSQL = `pp.status = 'approved'
+ AND pp.expires_at > NOW()
+ AND NOT pp.restore_unconfirmed
+ AND COALESCE(pp.plugin_wait, '') IN ('', 'placed')
+ AND o.status = 'listed'
+ AND EXISTS (
+   SELECT 1 FROM campaigns c
+   WHERE c.offer_id = pp.offer_id AND c.site_id = pp.site_id AND c.status = 'active'
+     AND (pp.campaign_id IS NULL OR pp.campaign_id = c.id)
+ )
+ AND NOT EXISTS (
+   SELECT 1 FROM approval_policies pol
+   WHERE pol.site_id = pp.site_id AND pol.kill_switch
+ )
+ AND NOT EXISTS (
+   SELECT 1 FROM approval_policies pol
+   WHERE pol.offer_id = pp.offer_id AND pol.kill_switch
+ )`
+
 // PlacementRedirectSQL is the placement go-link lookup. CountsAsLive is the
-// shared placement_counts_as_live predicate. A hit is recorded only when it
-// is true.
+// shared placement_counts_as_live predicate, or an approved placement that
+// approvedGoLinkSQL accepts. A hit is recorded only when it is true.
 const PlacementRedirectSQL = `SELECT pp.site_id::text, s.domain, pp.post_url,
        (o.status = 'listed'), o.landing_url, COALESCE(NULLIF(o.ref_param,''),'via'),
-       pp.campaign_id::text, o.program_id,
-       EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)
+       COALESCE(pp.campaign_id, (
+         SELECT c.id FROM campaigns c
+         WHERE c.offer_id = pp.offer_id AND c.site_id = pp.site_id AND c.status = 'active'
+           AND (pp.campaign_id IS NULL OR pp.campaign_id = c.id)
+         LIMIT 1
+       ))::text, o.program_id,
+       (
+         EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)
+         OR (` + approvedGoLinkSQL + `)
+       )
 FROM placement_proposals pp
 JOIN sites s ON s.id = pp.site_id
 JOIN offers o ON o.id = pp.offer_id
@@ -240,13 +270,9 @@ func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string
 	defer func() { _ = tx.Rollback(ctx) }()
 	var snapshot []byte
 	if placementID != "" {
-		var status string
-		err = tx.QueryRow(ctx, `SELECT status,terms_snapshot FROM placement_proposals WHERE id=$1 AND campaign_id=$2 FOR SHARE`, placementID, campaignID).Scan(&status, &snapshot)
+		snapshot, err = placementClickSnapshot(ctx, tx, placementID, campaignID)
 		if err != nil {
 			return "", err
-		}
-		if status != "committed" {
-			return "", ErrPlacementAuthority
 		}
 	}
 	var id string
@@ -263,6 +289,51 @@ func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string
 		return "", err
 	}
 	return id, tx.Commit(ctx)
+}
+
+// placementClickSnapshot locks the placement and returns its terms when this
+// campaign may record the hit. A committed row must already store that
+// campaign. An approved row often has no campaign_id yet; the active campaign
+// for its offer and site is enough. Anything else is ErrPlacementAuthority.
+func placementClickSnapshot(ctx context.Context, tx pgx.Tx, placementID, campaignID string) ([]byte, error) {
+	var status string
+	var snapshot []byte
+	err := tx.QueryRow(ctx, `SELECT pp.status, pp.terms_snapshot
+FROM placement_proposals pp
+WHERE pp.id=$1
+  AND (
+    (pp.status = 'committed' AND pp.campaign_id = $2::uuid)
+    OR (
+      pp.status = 'approved'
+      AND pp.expires_at > NOW()
+      AND NOT pp.restore_unconfirmed
+      AND COALESCE(pp.plugin_wait, '') IN ('', 'placed')
+      AND (pp.campaign_id IS NULL OR pp.campaign_id = $2::uuid)
+      AND EXISTS (
+        SELECT 1 FROM campaigns c
+        WHERE c.id = $2::uuid AND c.offer_id = pp.offer_id AND c.site_id = pp.site_id AND c.status = 'active'
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM approval_policies pol
+        WHERE pol.site_id = pp.site_id AND pol.kill_switch
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM approval_policies pol
+        WHERE pol.offer_id = pp.offer_id AND pol.kill_switch
+      )
+    )
+  )
+FOR SHARE OF pp`, placementID, campaignID).Scan(&status, &snapshot)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPlacementAuthority
+		}
+		return nil, err
+	}
+	if status != "committed" && status != "approved" {
+		return nil, ErrPlacementAuthority
+	}
+	return snapshot, nil
 }
 
 // InsertWebhookEvent stores the raw event for replay and acts as the

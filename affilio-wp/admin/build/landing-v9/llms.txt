@@ -1,0 +1,136 @@
+# Offer Rails
+
+Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article, prepares a disclosed placement, and a person approves it before it is published. A chat answer is never itself an ad.
+
+MCP server: https://offer-rails.onrender.com/mcp
+
+## Tell your agent
+
+Use the Offer Rails MCP server. Sign in with Google when it asks. Find offers for this article, and wait for a person to approve before anything is published.
+
+## Install
+
+This server needs a Google sign-in today. These snippets do not include an API key. POST /v1/agent-accounts is the no-browser way to get an account. Keys from /v1/agent-accounts work on the REST API only. /mcp needs the Google sign-in.
+
+### Cursor
+
+{"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}
+
+Untested. The Cursor client was not run against the hosted MCP server.
+
+### Claude Code
+
+claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp
+
+Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.
+
+### VS Code
+
+{"servers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}
+
+Untested. The VS Code client was not run against the hosted MCP server.
+
+### Windsurf
+
+{"mcpServers":{"offer-rails":{"serverUrl":"https://offer-rails.onrender.com/mcp"}}}
+
+Untested. The Windsurf client was not run against the hosted MCP server.
+
+### Generic
+
+{"mcpServers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}
+
+Checked. JSON-RPC initialize against this URL returned 401 no bearer token.
+
+## Ordered agent steps
+
+The hosted app gets these steps once the next deploy lands.
+
+1. Signup. POST /v1/agent-accounts. No key. Body: role (publisher or maker), name, email, and domain for a publisher. Optional source.
+   - Publisher 201: owner_id, site_id, api_key (send as X-API-Key), key_header X-API-Key, plugin_key (send as X-Plugin-Key), plugin_key_header X-Plugin-Key, agent_only true, human_login false, role publisher. Both keys are shown once.
+   - Maker 201: owner_id, maker_id, api_key (send as X-Maker-Key), key_header X-Maker-Key. No plugin key.
+   - Publisher request: {"role":"publisher","name":"...","email":"...","domain":"...","source":"..."}
+   - Maker request: {"role":"maker","name":"...","email":"...","source":"..."}
+   - Publisher 201 JSON: {"owner_id":"...","agent_only":true,"human_login":false,"role":"publisher","site_id":"...","api_key":"...","key_header":"X-API-Key","plugin_key":"...","plugin_key_header":"X-Plugin-Key"}
+   - Maker 201 JSON: {"owner_id":"...","agent_only":true,"human_login":false,"role":"maker","maker_id":"...","api_key":"...","key_header":"X-Maker-Key"}
+   - role is publisher or maker. name is 1 to 80 characters. email contains @, has no spaces, and is at most 255 characters. A publisher also sends domain: non-empty, no spaces, at most 255 characters. source is optional. An unrecognized source is stored as direct. 400 is invalid payload, or role, name, and email required, or domain required. 409 is {reason, message} with reason account_exists and message An account already exists for this email. 429 is {"error":"rate limit exceeded"}.
+
+2. Site. No second call and no browser session. site_id, the site key, and the plugin key come back from signup.
+
+3. Join an offer. List offers with GET /v1/marketplace/offers (X-API-Key). POST /v1/marketplace/offers/:id/join with X-API-Key. Join returns tracked_link /v1/go/<tracking_code>.
+
+4. Find and prepare. POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy. surface_url must be on the domain you signed up with. Copy is at most 140 characters and may not add numbers or claims the offer data doesn't have (server answers 422 claims_from_offer).
+
+5. Approval. A signed-in owner uses the dashboard. An operator sends POST /v1/offer-review/placements/:id/approve with X-Admin-Key and site_id, owner_email, and evidence. A site key cannot approve. Approving a device code does not approve a placement.
+   Step 5 stays a human or an operator for now.
+
+6. Commit. POST /v1/placements/:id/commit with X-API-Key.
+
+7. Receipt. POST /v1/placements/:id/receipt with X-API-Key. The body is surface_url, published_text, and evidence (10 to 2000 characters), sent only after commit. published_text must contain the approved copy, the disclosure, and the tracked link from commit (/v1/go/<placement_id>); otherwise 409 receipt_mismatch.
+
+8. Plugin acknowledgement. POST /v1/placements/:id/plugin-ack with X-Plugin-Key and {"action":"placed","rel_sponsored":true}. X-API-Key, Authorization, and X-Maker-Key are refused.
+
+9. Go link and click. GET /v1/go/<placement_id>. No key. After the acknowledgement is placed, the response is 302 to the offer landing URL with via set to the click id, and the click is counted. Before that, the same URL is a 302 to the plain landing URL, with no via and no click.
+
+10. Sales and refunds. POST /v1/maker/sales and POST /v1/maker/refunds with X-Maker-Key. Sale body: click_id (the via value), event_id, object_id, amount_minor, currency, occurred_at optional RFC3339. Refund body: event_id, object_id of the sale, currency, amount_refunded_minor or full:true, occurred_at optional. Refunds take no click_id. The X-Maker-Key must belong to the maker who owns the clicked offer, or the server answers 404.
+
+11. Reporting. GET /v1/digest and GET /v1/payouts/balance with X-API-Key. GET /v1/maker/digest and GET /v1/maker/earnings with X-Maker-Key.
+
+### Device sign-in
+
+This is the human page for a device code. It is separate from the agent-created site above.
+
+- POST /v1/device/code with {}. No key. A 200 body has device_code, user_code, verification_uri (the public origin plus /device), interval 5, and expires_in 300.
+- The browser step needs a human sign-in. The human opens verification_uri (GET /device).
+- The agent polls POST /v1/device/token with device_code. An approval returns access_token, token_type (Bearer), key_header (X-API-Key or X-Maker-Key), scope, and expires_in. A denial returns access_denied.
+
+- grant_type is optional. When it is sent, it is urn:ietf:params:oauth:grant-type:device_code. While you wait, a 400 body has error, interval, and expires_in.
+- A signed-out human is redirected to /auth/login?return_to= and then back. The return path may be /device or /device?user_code=<canonical code>. Any other query, a broken percent-escape, a fragment, or an absolute URL is refused.
+- The signed-in human posts the form to POST /device with the session cookie, Origin equal to the public origin, the csrf field, user_code, and decision approve or deny. Approve also sends project as site:<id> or offer:<id>, and that project must belong to the session owner. The stored return path is only that canonical /device URL. source, ref, and via are not copied onto it.
+- The JSON equivalent is POST /v1/device/approve with the owner session, user_code, decision, and on approve scope plus project_id.
+
+## What an agent can do alone today
+
+- Discovery. POST /v1/revenue/opportunities takes a site key. POST /v1/revenue/preview takes no key. Both take context of 10 to 12000 characters. The preview writes nothing.
+- Matching on English pages. POST /api/preview takes {"url":"..."} and scores the fetched page text by lexical token overlap. The tokenizer drops English stopwords and strips the English suffixes ing, ed, and s. It writes nothing.
+- Recording a sale and a refund. A maker key records a sale at POST /v1/maker/sales and a refund at POST /v1/maker/refunds.
+- Placing an offer. Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. No agent tool can approve it.
+
+## Tools
+
+- preview_revenue: Call preview_revenue before you have an account when you want up to five offers for some text, and it writes nothing.
+- preview_page: Coming soon. Not on the hosted MCP server yet.
+- find_opportunities: Call find_opportunities with a site key when you have article text and want up to five offers, or no_match when the fit is weak.
+- prepare_placement: Call prepare_placement when you have an offer and article copy to propose. It does not publish, and a person still has to approve.
+- list_agent_tasks: Call list_agent_tasks to resume: pending means a person is still reviewing, and approved means you can commit once.
+- get_placement: Call get_placement when you need one owned proposal, its terms, whether it is approved, and its receipt.
+- commit_placement: Call commit_placement after a person approves, while the proposal is unexpired. It returns the link and the text, and it does not publish.
+- record_placement_receipt: Call record_placement_receipt after the publisher publishes, to record the approved copy, the disclosure, and the tracked link.
+- undo_placement: Call undo_placement to revoke a placement in the same request.
+- restore_placement: Call restore_placement only to get a sign-in link. It does not restore the placement.
+- get_digest: Coming soon. Not on the hosted MCP server yet.
+- get_balance: Call get_balance when you need the publisher balance. Paid means the owner confirmed receipt.
+- get_payout_history: Call get_payout_history when you need this site's payouts and recent commission entries.
+- register_maker: Call register_maker with an email to create a maker account and receive maker_id and api_key.
+- register_product: Call register_product with a name and a live website URL to add a product.
+- list_products: Call list_products to see this maker's products and whether each one is ready.
+- get_product: Call get_product with a product id to read that product.
+- update_product: Call update_product to change the same fields you sent to register_product.
+- run_assessment: Call run_assessment to check a product's live pages before an offer can be submitted.
+- list_assessments: Call list_assessments to read a product's stored readiness checks, newest first.
+- create_offer: Call create_offer to draft an offer with a percentage or flat commission on the first paid checkout.
+- list_offers: Call list_offers to see this maker's offers and the review reason while one is in review.
+- list_listings: Call list_listings to read this maker's offer cards and the review reason while one is in review.
+- get_offer: Call get_offer with an offer id to read that offer.
+- update_offer: Call update_offer to change a draft offer's terms, or to pause or retire it.
+- submit_offer: Call submit_offer to send a draft once the product is ready. A hosted server holds an untrusted offer in review.
+- get_earnings: Call get_earnings to read clicks, sales, refunds, and commission for each offer.
+
+## Pages
+
+- Agents page: /landing-v9/agents/
+- API docs: /docs/device-login.md
+- API docs: /docs/settings.md
+- API docs: /docs/listing-card.md
+- API docs: /docs/modes.md
+- API docs: /docs/account.md

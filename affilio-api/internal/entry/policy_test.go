@@ -215,7 +215,7 @@ func TestHardCheckCatalogIsTheOnlyList(t *testing.T) {
 func TestRestoreRefusalsAreTheOnlyList(t *testing.T) {
 	want := []string{
 		"window_expired", "paused", "not_failed", "device_used", "account_exists",
-		"not_approvable", "not_undone", "nothing_to_ack", "offer_ineligible", "offer_unavailable",
+		"not_approvable", "not_undone", "not_committed", "nothing_to_ack", "offer_ineligible", "offer_unavailable",
 		"placement_unavailable", "receipt_mismatch", "receipt_recorded", "publisher_missing", "restore_refused",
 		"one_per_post",
 	}

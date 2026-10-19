@@ -376,6 +376,7 @@ var RestoreRefusals = []RestoreRefusal{
 	{Reason: "account_exists", Text: "An account already exists for this email."},
 	{Reason: "not_approvable", Text: "The placement cannot be approved."},
 	{Reason: "not_undone", Text: "The placement was not undone."},
+	{Reason: "not_committed", Text: "The placement is not committed."},
 	{Reason: "nothing_to_ack", Text: "There is nothing to acknowledge."},
 	{Reason: "offer_ineligible", Text: "The offer is not eligible for this content."},
 	{Reason: "offer_unavailable", Text: "The offer is unavailable."},

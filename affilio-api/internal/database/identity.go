@@ -274,6 +274,39 @@ AND (g.maker_id IS NULL OR EXISTS(SELECT 1 FROM makers WHERE id=g.maker_id AND s
 	return scope, tx.Commit(ctx)
 }
 
+// AgentAccountBearer accepts the api_key returned by POST /v1/agent-accounts.
+// A publisher key is scope publisher for that site. A maker key is scope maker
+// for that maker. Plugin keys and ordinary site keys are not grants.
+func (d *DB) AgentAccountBearer(ctx context.Context, keyHash, rawKey, resource string) (*AgentGrant, error) {
+	if keyHash == "" || rawKey == "" {
+		return nil, errors.New("missing agent account key")
+	}
+	var siteID string
+	err := d.Pool.QueryRow(ctx, `
+SELECT s.id::text
+FROM sites s
+JOIN owners o ON o.site_id = s.id AND o.agent_only
+WHERE s.api_key_hash = $1
+LIMIT 1`, keyHash).Scan(&siteID)
+	if err == nil {
+		return &AgentGrant{ClientName: "agent account", Resource: resource, Scope: "publisher", SiteID: siteID, ExpiresAt: time.Now().Add(time.Hour)}, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	var makerID string
+	err = d.Pool.QueryRow(ctx, `
+SELECT m.id::text
+FROM makers m
+JOIN owners o ON o.maker_id = m.id AND o.agent_only
+WHERE m.status = 'active' AND (m.api_key = $1 OR m.api_key_previous = $1)
+LIMIT 1`, rawKey).Scan(&makerID)
+	if err != nil {
+		return nil, err
+	}
+	return &AgentGrant{ClientName: "agent account", Resource: resource, Scope: "maker", MakerID: makerID, ExpiresAt: time.Now().Add(time.Hour)}, nil
+}
+
 func (d *DB) AgentToken(ctx context.Context, hash, resource string) (*AgentGrant, error) {
 	var g AgentGrant
 	err := d.Pool.QueryRow(ctx, `SELECT g.id,g.client_id,c.name,g.resource,g.scope,COALESCE(g.site_id::text,''),COALESCE(g.maker_id::text,''),LEAST(t.expires_at,g.expires_at)

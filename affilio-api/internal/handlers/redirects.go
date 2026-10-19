@@ -162,9 +162,12 @@ func appendRefParam(landingURL, refParam, clickID string) string {
 }
 
 // goPlacement is GET /v1/go/<placement_id>. A known placement answers 302. A
-// ref is attached and a hit is recorded only when placement_counts_as_live
-// is true. An unknown id is an HTML 404 with no Location, so the request
-// port stays on the page the reader opened.
+// ref is attached and a hit is recorded when CountsAsLive is true: the
+// placement is in placement_counts_as_live, or it is approved, still inside
+// its window, and the site has an active campaign for the listed offer.
+// Approval does not store campaign_id; the lookup uses that campaign. An
+// unknown id is an HTML 404 with no Location, so the request port stays on
+// the page the reader opened.
 func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req goRequest) {
 	link, err := h.DB.LookupPlacementRedirect(c.Request.Context(), placementID)
 	if err != nil {

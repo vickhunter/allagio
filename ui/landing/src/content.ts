@@ -1,8 +1,9 @@
 // Real product facts only (shared/business/design/offer-rails.md). No invented metrics.
 export const brand = 'Offer Rails'
-export const tagline = 'Distribution your agents can negotiate.'
-export const pitch = 'Makers list what they sell with a referral offer. Publishers place it in their own content. Agents on both sides do the discovery and the matchmaking. One account can be both.'
-export const pilotLine = 'Offer Rails is in an early pilot with a small group of makers and sites. We start with WordPress sites. One account can both list products and publish offers.'
+export const tagline = 'Affiliate marketing, evolved for agents.'
+export const pitch = 'Makers pay only for sales. Publishers earn from more of their posts. Agents find, match and place.'
+export const joinLine = 'One account can list a product and place offers. WordPress is live today.'
+export const painLine = 'Agents do the slow part: finding partners, matching them to content, and placing the offer.'
 
 export const example = { product: 'Hand-bound notebook', price: '€24.00', commission: '10%', publisher: '€2.40', maker: '€21.60' }
 
@@ -24,10 +25,19 @@ export const modes = [
   { name: 'Approve anything that passes the checks', note: 'Your agent decides. You get a digest with one-tap undo.' },
 ]
 
-export const surfaces = [
-  { name: 'WordPress', status: 'First', note: 'Plugin places one sponsored box in the matching section of a post.' },
-  { name: 'X', status: 'Next', note: 'Share links and posts you approve. Posting stays with you.' },
-  { name: 'Shopify', status: 'Then', note: 'Storefront space for products that fit your shop.' },
+export const publisherRuns = [
+  { name: 'WordPress', status: 'Live', note: 'The plugin places one labelled box in a post that fits.' },
+  { name: 'X', status: 'Planned', note: 'Share links you approve. Posting stays with you. Not live yet.' },
+  { name: 'Newsletter', status: 'Planned', note: 'Not live yet.' },
+  { name: 'YouTube', status: 'Planned', note: 'Not live yet.' },
+  { name: 'Instagram', status: 'Planned', note: 'Not live yet.' },
+  { name: 'TikTok', status: 'Planned', note: 'Not live yet.' },
+]
+
+export const makerRuns = [
+  { name: 'WordPress', status: 'Live', note: 'The plugin places one labelled box in a post that fits.' },
+  { name: 'Shopify', status: 'Planned', note: 'A shop can list products that fit. Not live yet.' },
+  { name: 'X', status: 'Planned', note: 'Share links you approve. Posting stays with you. Not live yet.' },
 ]
 
 export const feed = [
@@ -37,15 +47,14 @@ export const feed = [
   { kind: 'placed', who: 'pub', text: 'Placed after the intro', meta: 'sponsored link' },
   { kind: 'clicked', who: 'pub', text: 'Reader clicked the go link', meta: 'no cookies' },
   { kind: 'earned', who: 'pub', text: 'Commission recorded', meta: 'publisher €2.40' },
-  { kind: 'exchange', who: 'agent', text: 'Cross-promo: 2 sites swap a mention', meta: 'visibility for visibility' },
 ]
 
 export const faq = [
-  { q: 'Do you hold or move the money?', a: 'No. Your payment provider (Stripe, Polar, Lemon Squeezy, Paddle and others through adapters) handles checkout. We record attribution, refunds and commission, and show whether a sale was provider-attested or seller-reported.' },
-  { q: 'What does it cost?', a: 'During the pilot the maker pays a fee of 10% of the publisher commission. On a €24 sale with 10% commission the publisher earns €2.40 and the fee is €0.24.' },
-  { q: 'What does my agent share?', a: 'An Offer card (project, category, commission terms) or an Audience card (surface, topic, size bucket). Never customer names, emails or lists. Enforced in code, not policy text.' },
+  { q: 'Do you hold or move the money?', a: 'No. Stripe handles checkout. Polar, Lemon Squeezy, and other payment adapters are coming. We record attribution, refunds and commission, and show whether a sale was provider-attested or seller-reported.' },
+  { q: 'What does it cost?', a: 'You earn per sale: €2.40 on a €24 sale at 10%. The maker pays a separate fee of 10% of that commission: €0.24 on this example.' },
+  { q: 'What does my agent share?', a: 'An offer card: the project, the category and the commission terms. Never customer names, emails or lists. Enforced in code, not policy text.' },
   { q: 'Can I take a placement back?', a: 'Yes. Undo is one tap in the digest. The box leaves the page at the plugin’s next sync (every 5 minutes) plus any page-cache delay, and clicks stop at the link right away.' },
-  { q: 'What if I have no sales yet?', a: 'Swap visibility. Two sites with overlapping topics can cross-promote each other through the same rails, no money involved.' },
+  { q: 'What if I have no sales yet?', a: 'Later: Traffic trade. Two sites with overlapping topics could mention each other, no money involved. That is not live yet.' },
 ]
 
 // Drifting hero chips: the real example only (same facts as feed/example). No invented products or metrics.
@@ -55,31 +64,30 @@ export const driftChips = [
   { who: 'agent', label: 'Checked', text: '9 of 9 hard checks passed' },
   { who: 'pub', label: 'Placed', text: 'After the intro · rel="sponsored"' },
   { who: 'pub', label: 'Earned', text: 'Publisher €2.40 · maker €21.60' },
-  { who: 'agent', label: 'Swap', text: '2 sites trade a mention' },
 ] as const
 
 // Deep-dive advantages. Every line traces to the product spec facts above.
 export const makerAdvantages = [
-  { k: 'pay', t: 'Pay only when a sale is attributed', b: 'No listing fee, no ad budget. During the pilot the fee is 10% of the publisher commission: €0.24 on the €24 notebook example.', big: true },
+  { k: 'found', t: 'Publishers’ agents find you', b: 'You don’t pitch blogs one by one. Their agents look for offers that match their posts.', big: true },
+  { k: 'pay', t: 'Pay only when a sale is attributed', b: 'No listing fee. No paying for clicks. The fee is 10% of the publisher commission: €0.24 on the €24 notebook example.' },
+  { k: 'mcp', t: 'One install, one MCP server', b: 'One install command, pasted as is. Untested: Claude Code and Generic, both MCP over HTTP. Coming: Cursor, VS Code, Windsurf, ChatGPT and Grok.' },
   { k: 'local', t: 'Your code stays on your machine', b: 'Your agent scans pricing, payments and landing locally. It never reads .env, keys or anything gitignored, and shows you the exact listing card before the first upload.' },
-  { k: 'mcp', t: 'One install, every agent', b: 'One install command, pasted as is. One MCP server with the same tools in Cursor, Claude, ChatGPT and Grok.' },
   { k: 'terms', t: 'You set the terms', b: 'Pick the commission and how much control you keep: ask every time, approve within rules, or approve anything that passes the checks.' },
-  { k: 'found', t: 'Publishers’ agents find you', b: 'Discovery runs both ways: publisher agents look for offers that match their posts, so you don’t pitch blogs one by one.' },
   { k: 'brand', t: 'Your brand is described honestly', b: 'Copy comes only from your offer data, capped at 140 characters, always labelled and rel="sponsored". Nine hard checks run in every mode.' },
-  { k: 'money', t: 'We never touch the money', b: 'Stripe, Polar, Lemon Squeezy, Paddle and others handle checkout. We record attribution, refunds and commission, and mark each sale provider-attested or seller-reported.' },
-  { k: 'digest', t: 'Every placement, click and refund in one digest', b: 'See where your offer runs. Revoke works, and a monthly cap keeps spend predictable.' },
-  { k: 'privacy', t: 'No customer data leaves', b: 'Your agent shares an Offer card (project, category, commission terms). Never customer names, emails or lists. Enforced in code.' },
-  { k: 'swap', t: 'No sales yet? Swap visibility', b: 'Cross-promote with a related site through the same rails. Visibility for visibility, no money involved.' },
+  { k: 'money', t: 'We never touch the money', b: 'Stripe handles checkout. Polar, Lemon Squeezy, and other payment adapters are coming. We record attribution, refunds and commission, and mark each sale provider-attested or seller-reported.' },
+  { k: 'digest', t: 'Placements, clicks and refunds in one digest', b: 'See where your offer runs. Revoke works, and a monthly cap keeps spend predictable.' },
+  { k: 'privacy', t: 'No customer data leaves', b: 'Your agent shares an offer card: the project, the category and the commission terms. Never customer names, emails or lists. Enforced in code.' },
+  { k: 'swap', t: 'No sales yet? Traffic trade is coming', b: 'A mention swap with a related site is not live yet. Visibility for visibility, when it is.' },
 ] as const
 
 export const publisherAdvantages = [
-  { k: 'free', t: 'You earn per sale', b: 'The pilot fee is paid by the maker. You earn per sale: €2.40 on a €24 sale at 10%.', big: true },
-  { k: 'one', t: 'One honest box per post', b: 'At most one offer per post, placed in the matching section, labelled and rel="sponsored". Never a wall of ads.' },
-  { k: 'fit', t: 'Only offers that fit', b: 'An offer needs a relevance score of 25 or higher and must be live before it can be placed.' },
-  { k: 'switch', t: 'You hold the switch', b: 'Ask every time, approve within your rules (categories, minimum relevance, positions, a 30-day cap), or approve anything that passes the checks.' },
+  { k: 'free', t: 'You earn per sale: €2.40 on a €24 sale at 10%', b: 'From the content you already make. You pick each step.', big: true },
+  { k: 'one', t: 'One honest box per post', b: 'At most one offer in a post that fits, placed in the matching section, labelled and rel="sponsored".' },
+  { k: 'fit', t: 'Only offers that fit', b: 'An offer needs a relevance score of 25 or higher and must be live before it can be placed. Some posts get no offer.' },
+  { k: 'switch', t: 'You pick each step', b: 'Ask every time, approve within your rules (categories, minimum relevance, positions, a 30-day cap), or approve anything that passes the checks.' },
   { k: 'stricter', t: 'Agents can only tighten', b: 'Your agent can make settings stricter. Loosening a mode needs you, signed in.' },
   { k: 'undo', t: 'Undo in one tap', b: 'Clicks stop at the link right away; the box leaves the page at the plugin’s next sync (every 5 minutes) plus any page-cache delay.' },
-  { k: 'readers', t: 'Readers aren’t tracked by cookies', b: 'The go link records the click without cookies. Your Audience card shares surface, topic and a size bucket, never subscriber lists.' },
-  { k: 'surfaces', t: 'The space you already have', b: 'WordPress first (plugin), then X (you approve every post; posting stays with you), then Shopify storefronts.' },
-  { k: 'swap', t: 'No sale nearby? Trade traffic', b: 'Swap a mention with a related site through the same rails. Visibility for visibility.' },
+  { k: 'readers', t: 'Readers aren’t tracked by cookies', b: 'The go link records the click without cookies. No subscriber list is shared.' },
+  { k: 'surfaces', t: 'The content you already make', b: 'WordPress is live, with the plugin. X, newsletter, YouTube, Instagram and TikTok are planned. Posting stays with you.' },
+  { k: 'swap', t: 'No sale nearby? Traffic trade is coming', b: 'A mention swap with a related site is not live yet. Visibility for visibility, when it is.' },
 ] as const

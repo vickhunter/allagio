@@ -1,0 +1,33 @@
+Tested commit 98ddcd3915005a38ca82ce4f6c2e651377b5fe37 on cursor/d060-directory-edfe.
+Go test counts from `go test ./... -json`: pass 544, fail 0, skip 7.
+Landing `node --test`: pass 7, fail 0, skip 0.
+`npm run build`: ok.
+
+--- go test ./... ---
+?   	affilio-api/cmd/distributoor	[no test files]
+?   	affilio-api/cmd/distributoor-mcp	[no test files]
+?   	affilio-api/cmd/server	[no test files]
+ok  	affilio-api/internal/config	(cached)
+ok  	affilio-api/internal/database	(cached)
+ok  	affilio-api/internal/dcp	(cached)
+ok  	affilio-api/internal/entry	(cached)
+?   	affilio-api/internal/middleware	[no test files]
+ok  	affilio-api/internal/migrations	(cached)
+ok  	affilio-api/internal/preview	(cached)
+ok  	affilio-api/internal/services/providers	(cached)
+ok  	affilio-api/internal/services	(cached)
+ok  	affilio-api/internal/handlers	43.013s
+
+--- ui/landing node --test ---
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 53.078607
+
+--- npm run build (tail) ---
+✓ built in 1.24s
+stamped landing v9 into affilio-wp/admin/build
