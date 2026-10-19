@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { DirectoryFailure, fixtureHeaders, getMember, httpsUrl, listDirectory, logoSrc, makersUrl, memberRoute, memberUrl, parseItem, parseList, publishersUrl, wantsFixtures } from './client.mjs'
 import { fixtureList, fixtureMember, testMakers, testPublishers } from './fixtures.mjs'
-import { agentPrompt, installCommand } from './prompt.mjs'
+import { agentPrompt, installCommand, makerPrompt } from './prompt.mjs'
 
 const maker = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -114,7 +114,9 @@ test('fixtures are TEST data and are not imported by the page', () => {
     assert.equal(source.includes('TEST Vibe'), false)
   }
   assert.match(agentPrompt, /Add my site to the Offer Rails directory/)
+  assert.match(makerPrompt, /Add my product to the Offer Rails directory/)
   assert.equal(agentPrompt.includes(installCommand), true)
+  assert.equal(makerPrompt.includes(installCommand), true)
   assert.match(installCommand, /claude mcp add/)
   assert.doesNotMatch(agentPrompt, /connector|marketplace|github\.com/i)
 })

@@ -299,6 +299,9 @@ func TestDemoPagesAreReadableAndKeepReferralParams(t *testing.T) {
 	if !strings.Contains(string(homeBody), `aria-label="Demo"`) || !strings.Contains(string(homeBody), `class="demo-nav"`) {
 		t.Fatal("demo home must name its navigation Demo")
 	}
+	if !strings.Contains(string(homeBody), "white-space:nowrap") || strings.Contains(string(homeBody), "max-width:45px") {
+		t.Fatal("demo nav must keep each label intact")
+	}
 	signed, err := http.Get(server.URL + "/demo/start?ref=camp&via=post2615")
 	if err != nil {
 		t.Fatal(err)
