@@ -1,0 +1,23 @@
+code head: 915889d362d9f91032a1adf6df0eb307953a33d6
+short: 915889d
+
+landing (ui/landing, node --test):
+tests 23
+pass 23
+fail 0
+skipped 0
+
+go test ./... -count=1
+GOTOOLCHAIN=go1.23.0
+AFFILIO_TEST_DATABASE_URL=postgresql://affilio:password@localhost:5433/affilio_test
+postgres: 17.11 (Ubuntu 17.11-1.pgdg24.04+2)
+
+TZ=UTC: pass 595, fail 0, skip 8
+TZ=Europe/Rome: pass 595, fail 0, skip 8
+
+axe serious+critical: 0
+pages: / /makers /publishers /agents /demo
+viewports: 390 and 1440
+
+rendered banned-word grep: 0
+pattern: \b(?:ads?|pilot)\b | fully automatic | revolutionary
