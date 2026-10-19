@@ -116,7 +116,7 @@ const approvedGoLinkSQL = `pp.status = 'approved'
 // PlacementRedirectSQL is the placement go-link lookup. CountsAsLive is the
 // shared placement_counts_as_live predicate, or an approved placement that
 // approvedGoLinkSQL accepts. A hit is recorded only when it is true.
-const PlacementRedirectSQL = `SELECT pp.site_id::text, s.domain, pp.post_url,
+const PlacementRedirectSQL = `SELECT pp.site_id::text, s.domain, s.demo, pp.post_url,
        (o.status = 'listed'), o.landing_url, COALESCE(NULLIF(o.ref_param,''),'via'),
        COALESCE(pp.campaign_id, (
          SELECT c.id FROM campaigns c
@@ -139,6 +139,7 @@ type PlacementRedirect struct {
 	Found        bool
 	SiteID       string
 	SiteDomain   string
+	Demo         bool
 	PostURL      string
 	OfferListed  bool
 	LandingURL   string
@@ -152,7 +153,7 @@ func (d *DB) LookupPlacementRedirect(ctx context.Context, placementID string) (P
 	var out PlacementRedirect
 	var campaignID *string
 	err := d.Pool.QueryRow(ctx, PlacementRedirectSQL, placementID).Scan(
-		&out.SiteID, &out.SiteDomain, &out.PostURL, &out.OfferListed, &out.LandingURL, &out.RefParam,
+		&out.SiteID, &out.SiteDomain, &out.Demo, &out.PostURL, &out.OfferListed, &out.LandingURL, &out.RefParam,
 		&campaignID, &out.ProgramID, &out.CountsAsLive)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return PlacementRedirect{}, nil
@@ -167,6 +168,17 @@ func (d *DB) LookupPlacementRedirect(ctx context.Context, placementID string) (P
 	return out, nil
 }
 
+// storedClickClass keeps a known class and stores anything else as unknown.
+// test is a demo-site hit. It is not a paid click.
+func storedClickClass(class string) string {
+	switch class {
+	case "verified_agent", "declared_agent", "browser", "unknown", "test":
+		return class
+	default:
+		return "unknown"
+	}
+}
+
 // RecentPlacementClick returns a hit from the same reader hash and user agent
 // on this site and placement inside the dedup window. An empty hash is not a
 // reader, so it never matches. An empty id means there is no recent hit.
@@ -174,9 +186,7 @@ func (d *DB) RecentPlacementClick(ctx context.Context, siteID, placementID, ipHa
 	if ipHash == "" {
 		return "", nil
 	}
-	if clickClass != "verified_agent" && clickClass != "declared_agent" && clickClass != "browser" && clickClass != "unknown" {
-		clickClass = "unknown"
-	}
+	clickClass = storedClickClass(clickClass)
 	var id string
 	err := d.Pool.QueryRow(ctx, `SELECT id::text FROM clicks
 WHERE site_id=$1 AND placement_id=$2 AND ip_hash=$3 AND COALESCE(user_agent,'')=$4 AND click_class=$6
@@ -276,9 +286,7 @@ func (d *DB) InsertPlacementClick(ctx context.Context, campaignID, siteID string
 		}
 	}
 	var id string
-	if clickClass != "verified_agent" && clickClass != "declared_agent" && clickClass != "browser" && clickClass != "unknown" {
-		clickClass = "unknown"
-	}
+	clickClass = storedClickClass(clickClass)
 	err = tx.QueryRow(ctx, `INSERT INTO clicks(site_id,campaign_id,program_id,ip_hash,user_agent,referrer,terms_snapshot,placement_id,click_class,clicked_at)
  SELECT $1,$2,$3,$4,$5,$6,COALESCE($7::jsonb,jsonb_build_object(
  'product_id',o.product_id,'commission_type',o.commission_type,'commission_value_minor',(o.commission_value*100)::bigint,
@@ -453,20 +461,27 @@ ORDER BY cv.created_at DESC LIMIT 1`, objectID, clickID, currency, amount).Scan(
 	var commissionValueMinor int64
 	var refundWindowDays int
 	var clickedAt time.Time
+	var clickClass string
+	var siteDemo bool
 	err = tx.QueryRow(ctx, `
 SELECT cam.id, cam.site_id, cam.offer_id,
  COALESCE(cl.terms_snapshot->>'commission_type',o.commission_type),
  COALESCE((cl.terms_snapshot->>'commission_value_minor')::bigint,(o.commission_value*100)::bigint),
- COALESCE((cl.terms_snapshot->>'refund_window_days')::int,o.refund_window_days), cl.clicked_at
+ COALESCE((cl.terms_snapshot->>'refund_window_days')::int,o.refund_window_days), cl.clicked_at,
+ cl.click_class, EXISTS (SELECT 1 FROM sites s WHERE s.id = cam.site_id AND s.demo)
 FROM clicks cl
 JOIN campaigns cam ON cam.id = cl.campaign_id
 JOIN offers o ON o.id = cam.offer_id
-WHERE cl.id=$1 AND ($2='' OR o.product_id::text=$2)`, clickID, productID).Scan(&out.CampaignID, &out.SiteID, &out.OfferID, &commissionType, &commissionValueMinor, &refundWindowDays, &clickedAt)
+WHERE cl.id=$1 AND ($2='' OR o.product_id::text=$2)`, clickID, productID).Scan(&out.CampaignID, &out.SiteID, &out.OfferID, &commissionType, &commissionValueMinor, &refundWindowDays, &clickedAt, &clickClass, &siteDemo)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrClickNotFound
 		}
 		return nil, err
+	}
+	// A test click, and any click on a demo site, is not a sale we can bill.
+	if clickClass == "test" || siteDemo {
+		return nil, ErrClickNotFound
 	}
 	if provider == ProviderSellerReport {
 		var stored string
@@ -774,22 +789,25 @@ type RecommendationRedirect struct {
 	ArticleID   string
 	ProgramID   *string
 	Destination string
+	Demo        bool
 }
 
 func (d *DB) LookupRecommendationRedirect(ctx context.Context, recommendationID string) (RecommendationRedirect, error) {
 	var out RecommendationRedirect
 	err := d.Pool.QueryRow(ctx, `
 SELECT a.site_id::text, a.id::text, r.program_id::text,
-       COALESCE(saa.affiliate_link, upl.affiliate_link, ap.referral_url, ap.signup_url, ap.website_url, '')
+       COALESCE(saa.affiliate_link, upl.affiliate_link, ap.referral_url, ap.signup_url, ap.website_url, ''),
+       COALESCE(s.demo, false)
 FROM recommendations r
 JOIN articles a ON a.id = r.article_id
+JOIN sites s ON s.id = a.site_id
 LEFT JOIN affiliate_programs ap ON ap.id = r.program_id
 LEFT JOIN site_affiliate_accounts saa ON saa.program_id = r.program_id AND saa.site_id = a.site_id
 LEFT JOIN user_programs up ON up.id = r.user_program_id
 LEFT JOIN LATERAL (
     SELECT affiliate_link FROM user_program_links WHERE user_program_id = up.id ORDER BY created_at DESC LIMIT 1
 ) upl ON true
-WHERE r.id=$1`, recommendationID).Scan(&out.SiteID, &out.ArticleID, &out.ProgramID, &out.Destination)
+WHERE r.id=$1`, recommendationID).Scan(&out.SiteID, &out.ArticleID, &out.ProgramID, &out.Destination, &out.Demo)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RecommendationRedirect{}, nil
 	}
@@ -807,9 +825,7 @@ func (d *DB) RecentRecommendationClick(ctx context.Context, siteID, recommendati
 	if ipHash == "" {
 		return "", nil
 	}
-	if clickClass != "verified_agent" && clickClass != "declared_agent" && clickClass != "browser" && clickClass != "unknown" {
-		clickClass = "unknown"
-	}
+	clickClass = storedClickClass(clickClass)
 	var id string
 	err := d.Pool.QueryRow(ctx, `SELECT id::text FROM clicks
 WHERE site_id=$1 AND recommendation_id=$2 AND ip_hash=$3 AND COALESCE(user_agent,'')=$4 AND click_class=$5
@@ -822,9 +838,7 @@ ORDER BY clicked_at DESC LIMIT 1`, siteID, recommendationID, ipHash, userAgent, 
 }
 
 func (d *DB) InsertRecommendationClick(ctx context.Context, siteID, articleID, recommendationID string, programID *string, ipHash, userAgent, referrer, clickClass string) (string, error) {
-	if clickClass != "verified_agent" && clickClass != "declared_agent" && clickClass != "browser" && clickClass != "unknown" {
-		clickClass = "unknown"
-	}
+	clickClass = storedClickClass(clickClass)
 	var id string
 	err := d.Pool.QueryRow(ctx, `INSERT INTO clicks (site_id, article_id, recommendation_id, program_id, user_agent, referrer, ip_hash, click_class, clicked_at)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id::text`,

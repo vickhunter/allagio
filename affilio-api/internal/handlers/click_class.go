@@ -10,6 +10,8 @@ const (
 	ClickClassDeclaredAgent = "declared_agent"
 	ClickClassBrowser       = "browser"
 	ClickClassUnknown       = "unknown"
+	// ClickClassTest is a hit on a demo site. It is stored and it is not paid.
+	ClickClassTest = "test"
 )
 
 // aiCrawlerMarkers are known AI fetchers. A hit from one of these is a
@@ -98,8 +100,8 @@ func looksLikeBrowser(ua string) bool {
 	return containsMarker(ua, browserEngineTokens)
 }
 
-// PaidClick is the pay-per-click rule: a browser click counts, and the other
-// three classes do not.
+// PaidClick is the pay-per-click rule: a browser click counts.
+// verified_agent, declared_agent, unknown, and test do not.
 func PaidClick(class string) bool {
 	return class == ClickClassBrowser
 }

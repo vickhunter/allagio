@@ -69,6 +69,7 @@ Run migrations in this exact order, before the new binary starts. `033_click_cla
 40. `internal/migrations/040_operator_approval.sql`
 41. `internal/migrations/041_d063b_domain_verification.sql`
 42. `internal/migrations/042_d062_step_modes.sql`
+43. `internal/migrations/043_demo_test_clicks.sql`
 
 Notes:
 - `002_seed_programs.sql` uses upsert semantics on `slug`.
@@ -83,6 +84,7 @@ Notes:
 - `040_operator_approval.sql` allows `approved_by_kind` `operator` on a placement. Apply it before the new binary: `POST /v1/offer-review/placements/:id/approve` writes that value and fails while the old check is still in place. An owner session still records `owner`. Leave `AUTO_MIGRATE` off in production.
 - `041_d063b_domain_verification.sql` adds `sites.verification_token`, `sites.verified_at`, and `sites.verification_host`. Apply it by hand before domain verification. Existing sites stay unverified. `AUTO_MIGRATE` stays off unless it is set to `true`.
 - `042_d062_step_modes.sql` adds `agent_step_modes` and `agent_step_approvals`. Apply it by hand before step modes are read or written. A missing row means every step is auto. The script does not rewrite existing rows. It is safe to run more than once. Leave `AUTO_MIGRATE` off in production.
+- `043_demo_test_clicks.sql` adds `sites.demo` (default false) and allows `clicks.click_class` `test`. Apply it by hand before a binary that records demo go links. Existing sites stay non-demo. Existing clicks keep their class. It is safe to run more than once. Leave `AUTO_MIGRATE` off in production.
 
 ## Build and Release
 1. Build image:

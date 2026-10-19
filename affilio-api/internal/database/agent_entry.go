@@ -1050,8 +1050,8 @@ func (d *DB) DigestPlacements(ctx context.Context, siteID string, since time.Tim
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, copy, COALESCE(approved_at, created_at),
 plugin_wait, plugin_wait_at, plugin_contact_at, plugin_failed_reason, failed_action, `+PlacementCountsAsLiveSQL+`, COALESCE(matched_rule,''),
 `+digestPostTitleSQL+`, `+digestSurfaceSQL+`, `+digestPositionSQL+`, COALESCE(NULLIF(link_text,''), copy), COALESCE(NULLIF(label,''), reason),
-(SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id),
-(SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id AND click_class = 'browser'),
+(SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id AND clicks.click_class <> 'test'),
+(SELECT COUNT(*) FROM clicks WHERE clicks.placement_id = placement_proposals.id AND clicks.click_class = 'browser' AND NOT EXISTS (SELECT 1 FROM sites demo_site WHERE demo_site.id = clicks.site_id AND demo_site.demo)),
 COALESCE(approved_by_kind,''), COALESCE(policy_version,0), COALESCE(undone_by_user::text,'')
 FROM placement_proposals
 WHERE `+digestPlacementWhere+`
@@ -1079,8 +1079,8 @@ ORDER BY COALESCE(approved_at, created_at) DESC LIMIT $3`, siteID, since, limit)
 // The placement copy is not the title.
 const digestOfferColumns = `o.id::text, p.name,
 (o.updated_at AT TIME ZONE current_setting('TimeZone')),
-(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id),
-(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id AND c.click_class = 'browser'),
+(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id AND c.click_class <> 'test'),
+(SELECT COUNT(*) FROM clicks c JOIN campaigns cam ON cam.id=c.campaign_id WHERE cam.offer_id=o.id AND c.click_class = 'browser' AND NOT EXISTS (SELECT 1 FROM sites demo_site WHERE demo_site.id = c.site_id AND demo_site.demo)),
 o.status,
 CASE WHEN place.id IS NOT NULL
   THEN COALESCE(NULLIF(place.receipt->>'post_title', ''), NULLIF(place.post_title, ''), '')
