@@ -72,10 +72,11 @@ func demoFlag() string {
 }
 
 func demoDocument(title, description, body string) []byte {
-	return []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>` + html.EscapeString(title) + `</title><meta name="description" content="` + html.EscapeString(description) + `">` + demoStyle + `</head><body><main>` + body + `</main></body></html>`)
+	return []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>` + html.EscapeString(title) + `</title><meta name="description" content="` + html.EscapeString(description) + `">` + demoStyle + `</head><body><main>` + body + `</main></body></html>`)
 }
 
 func (h *HostedHandler) writeDemo(c *gin.Context, page string) {
+	c.Header("X-Robots-Tag", "noindex")
 	checkout := ""
 	if raw := strings.TrimSpace(h.DemoCheckoutURL); raw != "" {
 		checkout = `<p><a href="` + html.EscapeString(raw) + `">Checkout</a></p>`

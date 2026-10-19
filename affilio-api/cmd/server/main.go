@@ -261,6 +261,7 @@ func main() {
 		PluginOfflineAfter: cfg.PluginOfflineAfter,
 		StatusLimiter:      handlers.NewPlacementPollLimiter(),
 		ClaimsCheck:        cfg.ClaimsCheck,
+		AssetsPath:         cfg.UIAssetsPath,
 	}
 	if hosted != nil {
 		agentEntry.Owner = hosted.RequireOwnerSession
@@ -402,6 +403,9 @@ func main() {
 		payoutAdmin.POST("/:id/mark-paid", payouts.MarkPaid)
 	}
 
+	if hosted == nil {
+		handlers.InstallSlashRedirect(r)
+	}
 	log.Printf("Affilio API listening on %s", net.JoinHostPort(cfg.Host, cfg.Port))
 	if err := r.Run(net.JoinHostPort(cfg.Host, cfg.Port)); err != nil {
 		log.Fatalf("server error: %v", err)

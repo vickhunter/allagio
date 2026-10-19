@@ -34,12 +34,15 @@ type previewOfferCard struct {
 	CommissionType     string  `json:"commission_type"`
 	CommissionValue    float64 `json:"commission_value"`
 	CommissionCurrency string  `json:"commission_currency"`
+	LowConfidence      bool    `json:"low_confidence,omitempty"`
 }
 
 type previewResponse struct {
-	Title string            `json:"title"`
-	Offer *previewOfferCard `json:"offer"`
-	Slot  *string           `json:"slot"`
+	Title         string             `json:"title"`
+	Offer         *previewOfferCard  `json:"offer"`
+	Offers        []previewOfferCard `json:"offers,omitempty"`
+	Slot          *string            `json:"slot"`
+	LowConfidence bool               `json:"low_confidence,omitempty"`
 }
 
 func (h *PreviewHandler) Preview(c *gin.Context) {
@@ -60,14 +63,10 @@ func (h *PreviewHandler) Preview(c *gin.Context) {
 		writePreviewFetchError(c, err)
 		return
 	}
-	card, slot, err := h.matchPage(c, page.Text)
+	out, err := h.matchPage(c, page.Title, page.Text)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "preview failed"})
 		return
-	}
-	out := previewResponse{Title: page.Title, Offer: card}
-	if card != nil {
-		out.Slot = &slot
 	}
 	c.JSON(http.StatusOK, out)
 }
@@ -106,22 +105,28 @@ func writePreviewFetchError(c *gin.Context, err error) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid url"})
 	case errors.Is(err, preview.ErrBlocked):
 		c.JSON(http.StatusForbidden, gin.H{"error": "blocked address"})
+	case errors.Is(err, preview.ErrUnreadable):
+		c.JSON(http.StatusOK, gin.H{
+			"result":  "unreadable_or_private",
+			"message": "only public links work",
+		})
 	default:
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "fetch failed"})
 	}
 }
 
-func (h *PreviewHandler) matchPage(c *gin.Context, text string) (*previewOfferCard, string, error) {
+func (h *PreviewHandler) matchPage(c *gin.Context, title, text string) (previewResponse, error) {
+	out := previewResponse{Title: title}
 	if h.DB == nil {
-		return nil, "", errors.New("no database")
+		return out, errors.New("no database")
 	}
 	offers, err := h.DB.ListMarketplaceOffers(c.Request.Context(), "00000000-0000-0000-0000-000000000000")
 	if err != nil {
-		return nil, "", err
+		return out, err
 	}
 	eligible, err := h.DB.EligibleRevenueOfferIDs(c.Request.Context(), false)
 	if err != nil {
-		return nil, "", err
+		return out, err
 	}
 	terms := make([]services.OfferTerms, 0, len(offers))
 	cards := make([]previewOfferCard, 0, len(offers))
@@ -147,12 +152,39 @@ func (h *PreviewHandler) matchPage(c *gin.Context, text string) (*previewOfferCa
 			CommissionCurrency: offer.CommissionCurrency,
 		})
 	}
-	hit, ok := services.DryRunMatch(text, terms)
-	if !ok {
-		return nil, "", nil
+	ranked := services.RankPageOffers(text, terms)
+	if len(ranked) == 0 {
+		return out, nil
 	}
+	if ranked[0].Relevance >= services.RelevanceFloor {
+		card := previewCard(cards, ranked[0])
+		slot := ranked[0].Slot
+		out.Offer = &card
+		out.Slot = &slot
+		return out, nil
+	}
+	n := 3
+	if len(ranked) < n {
+		n = len(ranked)
+	}
+	closest := make([]previewOfferCard, 0, n)
+	for _, hit := range ranked[:n] {
+		card := previewCard(cards, hit)
+		card.LowConfidence = true
+		closest = append(closest, card)
+	}
+	top := closest[0]
+	slot := ranked[0].Slot
+	out.Offer = &top
+	out.Offers = closest
+	out.Slot = &slot
+	out.LowConfidence = true
+	return out, nil
+}
+
+func previewCard(cards []previewOfferCard, hit services.DryRunHit) previewOfferCard {
 	card := cards[hit.Index]
 	card.Relevance = hit.Relevance
 	card.Reason = hit.Reason
-	return &card, hit.Slot, nil
+	return card
 }

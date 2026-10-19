@@ -127,6 +127,9 @@ func TestRestoreAndRetryUsePageClaims(t *testing.T) {
 	if approved.Code != http.StatusOK {
 		t.Fatalf("decide: %d %s", approved.Code, approved.Body.String())
 	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed' WHERE id=$1`, placementID); err != nil {
+		t.Fatal(err)
+	}
 	undone, _ := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/revoke", map[string]any{"reason": "undo"}, map[string]string{"X-API-Key": "page-site-key"})
 	if undone.Code != http.StatusOK {
 		t.Fatalf("undo: %d %s", undone.Code, undone.Body.String())

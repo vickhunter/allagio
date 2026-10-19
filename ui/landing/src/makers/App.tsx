@@ -7,10 +7,11 @@ import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { example, faq, feed, makerAdvantages, pilotLine, surfaces } from '@/content'
+import { example, faq, feed, joinLine, makerAdvantages, makerRuns, painLine } from '@/content'
 import { useOfferConfig } from '@/lib/source'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
+import { DirectorySection } from '@/directory/Directory'
 
 // /makers: built from A (bento). Accent: maker terracotta. Every cell is one concrete advantage.
 export function App() {
@@ -23,8 +24,8 @@ export function App() {
       <section aria-labelledby="hero-h" className="mx-auto grid max-w-6xl gap-8 px-5 pb-10 pt-10 md:grid-cols-[1.3fr_1fr] md:items-end md:pt-16">
         <div className="anim-fade">
           <Badge variant="maker">For makers · {makerAdvantages.length} advantages</Badge>
-          <h1 id="hero-h" className="h-display mt-4 text-[42px] sm:text-6xl lg:text-7xl">Sell anywhere<br />there’s space.</h1>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-t2">List what you sell with a referral offer. Publishers’ agents place it in posts that fit. You pay only when a sale is attributed.</p>
+          <h1 id="hero-h" className="h-display mt-4 text-[42px] sm:text-6xl lg:text-7xl">Pay only for sales. Agents put your product in content that fits.</h1>
+          <p className="mt-5 max-w-xl text-lg leading-relaxed text-t2">Publishers’ agents find you, so you don’t pitch blogs one by one. {painLine}</p>
           <div className="mt-7"><SignInChoice where="makers_hero" only="maker" /></div>
         </div>
         <Card className="anim-fade p-5 [animation-delay:150ms]">
@@ -33,11 +34,13 @@ export function App() {
           <dl className="mt-4 grid grid-cols-3 gap-3 font-mono tabular">
             <div><dt className="text-[11px] uppercase text-t2">You keep</dt><dd className="text-2xl font-medium text-maker">{example.maker}</dd></div>
             <div><dt className="text-[11px] uppercase text-t2">Publisher</dt><dd className="text-2xl font-medium text-pub">{example.publisher}</dd></div>
-            <div><dt className="text-[11px] uppercase text-t2">Pilot fee</dt><dd className="text-2xl font-medium">€0.24</dd></div>
+            <div><dt className="text-[11px] uppercase text-t2">Fee</dt><dd className="text-2xl font-medium">€0.24</dd></div>
           </dl>
-          <p className="mt-3 text-[12px] text-t2">Fee: 10% of the publisher commission, paid by the maker during the pilot.</p>
+          <p className="mt-3 text-[12px] text-t2">Fee: 10% of the publisher commission, paid by the maker.</p>
         </Card>
       </section>
+
+      <DirectorySection kind="maker" />
 
       <section aria-labelledby="adv-h" className="mx-auto max-w-6xl px-5 pb-16">
         <h2 id="adv-h" className="sr-only">Every maker advantage</h2>
@@ -54,7 +57,7 @@ export function App() {
           </Card>
           <Adv n={3} a={rest[0]} className="lg:col-span-2" />
           {rest.slice(2).map((a, i) => <Adv key={a.k} n={i + 4} a={a} className={spans[i]} />)}
-          <div className="flex items-end justify-center p-6 sm:col-span-2 lg:col-span-2"><Blip say="I find the swaps. You approve them." /></div>
+          <div className="flex items-end justify-center p-6 sm:col-span-2 lg:col-span-2"><Blip say="Publishers’ agents find you." /></div>
         </div>
       </section>
 
@@ -63,12 +66,12 @@ export function App() {
           <p className="eyebrow">Start in four steps</p>
           <h2 id="how-h" className="h-display mt-3 text-3xl sm:text-4xl">From your repo to someone else’s page.</h2>
           <ol className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[['Install once', `Run the command below, pasted as is. One MCP server for every agent you use.`], ['Your agent scans locally', 'You see the exact listing card before the first upload.'], ['Set the offer', `Commission and control. Example: ${example.product}, ${example.price}, ${example.commission}.`], ['Get found', 'Publishers’ agents match your offer to posts. The digest shows every step.']].map(([h, b], i) => (
+            {[['Install once', 'Run the command below, pasted as is. Untested: Claude Code and Generic, both MCP over HTTP. Coming: Cursor, VS Code, Windsurf, ChatGPT and Grok.'], ['Your agent scans locally', 'You see the exact listing card before the first upload.'], ['Set the offer', `Commission and control. Example: ${example.product}, ${example.price}, ${example.commission}.`], ['Get found', 'Publishers’ agents match your offer to posts that fit. The digest shows each step you picked.']].map(([h, b], i) => (
               <li key={h} className="rounded-2xl border border-line bg-s1 p-5"><span className="font-display text-3xl font-bold text-maker">{i + 1}</span><h3 className="mt-2 font-display text-lg font-semibold">{h}</h3><p className="mt-1 text-sm leading-relaxed text-t2">{b}</p></li>
             ))}
           </ol>
           <h3 className="mt-12 font-display text-lg font-semibold">Where your offer can run</h3>
-          <ol className="mt-4 grid gap-3 sm:grid-cols-3">{surfaces.map((s) => <li key={s.name} className="rounded-xl border border-dashed border-line-strong p-4"><div className="flex items-center justify-between"><strong className="font-display">{s.name}</strong><Badge variant={s.status === 'First' ? 'maker' : 'neutral'}>{s.status}</Badge></div><p className="mt-2 text-sm text-t2">{s.note}</p></li>)}</ol>
+          <ol className="mt-4 grid gap-3 sm:grid-cols-3">{makerRuns.map((s) => <li key={s.name} className="rounded-xl border border-dashed border-line-strong p-4"><div className="flex items-center justify-between"><strong className="font-display">{s.name}</strong><Badge variant={s.status === 'Live' ? 'maker' : 'neutral'}>{s.status}</Badge></div><p className="mt-2 text-sm text-t2">{s.note}</p></li>)}</ol>
         </div>
       </section>
 
@@ -80,7 +83,7 @@ export function App() {
           <Accordion tone="maker" items={[faq[1], faq[0], faq[2], faq[4]]} />
         </div>
       </section>
-      <JoinSection role="maker" title="Put your product on the rails." sub={pilotLine} />
+      <JoinSection role="maker" title="Put your product on the rails." sub={joinLine} />
     </Page>
   )
 }

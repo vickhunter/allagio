@@ -142,7 +142,7 @@ func TestMigrationHistoryAndConcurrentStartup(t *testing.T) {
 		}
 	}
 	var count int
-	if err = pool.QueryRow(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil || count != 39 {
+	if err = pool.QueryRow(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil || count != 41 {
 		t.Fatalf("history: %d %v", count, err)
 	}
 	for _, col := range []struct{ table, column string }{

@@ -12,7 +12,7 @@ const meta = `<meta name="or-install" content="{{if .InstallerReady}}{{.InstallC
 const shell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
-      <h1>Someone has the product. Someone has the space.</h1>
+      <h1>Affiliate marketing, evolved for agents.</h1>
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
       <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
       <p><a href="/downloads/affilio.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
@@ -67,4 +67,25 @@ writeFileSync(resolve(build, 'makers.html'), stamp(resolve(dist, 'makers/index.h
 writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers/index.html')))
 writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publishers/setup/index.html'), setupShell))
 writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html')))
+const agentsFile = resolve(assets, 'agents/index.html')
+writeFileSync(agentsFile, readFileSync(agentsFile, 'utf8').replaceAll('href="/landing-v9/llms.txt"', 'href="/llms.txt"'))
+const missingShell = `<div id="static-landing">
+    <header>
+      <a href="/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Offer Rails</a>
+      <nav aria-label="Main">
+        <a href="/makers/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Makers</a>
+        <a href="/publishers/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Publishers</a>
+        <a href="/protocol/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Protocol</a>
+      </nav>
+      <a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Sign in</a>
+    </header>
+    <main id="main">
+      <h1>That page is not on Offer Rails.</h1>
+      <p>The address does not match a page on this site.</p>
+      <p><a href="/" style="display:inline-flex;min-height:44px;align-items:center">Home</a></p>
+      <p><a href="/agents" style="display:inline-flex;min-height:44px;align-items:center">Agents</a></p>
+    </main>
+  </div>`
+writeFileSync(resolve(assets, 'not-found/index.html'), stamp(resolve(dist, 'not-found/index.html'), missingShell))
+writeFileSync(resolve(assets, 'profile/index.html'), stamp(resolve(dist, 'profile/index.html'), missingShell))
 console.log('stamped landing v9 into affilio-wp/admin/build')

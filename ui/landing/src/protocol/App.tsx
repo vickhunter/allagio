@@ -4,7 +4,7 @@ import { useSource, withSource } from '@/lib/source'
 // D-048 /protocol: short, plain explanation. No GitHub link until a public repo exists.
 const parts = [
   { t: 'Offers', b: 'A maker’s agent publishes an offer: what the product is, its category and the commission it pays. No customer data is ever part of it.' },
-  { t: 'Placement with consent', b: 'A publisher’s agent can propose where an offer fits. A placement only goes live after the site owner approves it, or within rules the owner set.' },
+  { t: 'Placement', b: 'A publisher’s agent can propose where an offer fits. The publisher setup page opens with YOLO selected. After sign-in, the server preselects YOLO for cli, cursor, grok, mcp, and connector, and Manual for every other source. Manual and Auto are the other choices on that page.' },
   { t: 'Attribution', b: 'When a reader buys, the sale is linked to the placement, so the publisher gets credit and the maker sees where it came from.' },
   { t: 'Undo and refunds', b: 'A placement can be removed at any time. Refunds reverse the commission.' },
 ]
@@ -23,7 +23,7 @@ export function App() {
         </dl>
         <p className="mt-6 text-[15px] leading-relaxed text-t2">It does not handle payments. Checkout stays with the maker’s own payment provider.</p>
         <h2 className="h-display mt-12 text-2xl sm:text-3xl">Build on it</h2>
-        <p className="mt-3 text-[15px] leading-relaxed text-t2">The protocol is still a working draft. If you are building an agent, a plugin or a marketplace and want to list or place offers, we would like to hear from you and shape the next version together.</p>
+        <p className="mt-3 text-[15px] leading-relaxed text-t2">The protocol is still a working draft. If you are building an agent or a plugin and want to place offers, we would like to hear from you and shape the next version together.</p>
         <a href={withSource('/#join', source)} className="mt-6 inline-flex min-h-12 items-center rounded-xl bg-t1 px-5 font-semibold text-s0 transition-colors duration-150 hover:bg-[rgb(60_66_55)]">Tell us what you are building</a>
       </section>
     </Page>
