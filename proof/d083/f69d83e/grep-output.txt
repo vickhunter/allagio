@@ -1,0 +1,17 @@
+grep of rendered public pages (/, /makers, /publishers, /agents, /terms, /privacy at 390 and 1440)
+pattern: /\bads?\b|fully automatic|\bpilot\b/i on document.body.innerText
+hits: 0
+
+axe serious+critical:
+home-390 serious+critical 0
+makers-390 serious+critical 0
+publishers-390 serious+critical 0
+agents-390 serious+critical 0
+terms-390 serious+critical 0
+privacy-390 serious+critical 0
+home-1440 serious+critical 0
+makers-1440 serious+critical 0
+publishers-1440 serious+critical 0
+agents-1440 serious+critical 0
+terms-1440 serious+critical 0
+privacy-1440 serious+critical 0

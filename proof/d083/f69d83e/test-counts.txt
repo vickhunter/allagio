@@ -1,0 +1,14 @@
+Code commit: f69d83e0ca54870c661d0a03636a4ed9dc5c4bec
+
+Landing: node --test src/lib/*.test.mjs
+tests 12, pass 12, fail 0, skipped 0
+
+Go: GOTOOLCHAIN=go1.23.0 go test ./... -count=1
+Postgres 17.11 (Ubuntu 17.11-1.pgdg24.04+2)
+AFFILIO_TEST_DATABASE_URL=postgresql://affilio:password@localhost:5433/affilio_test
+
+TZ=UTC: pass 577, fail 0, skip 8
+TZ=Europe/Rome: pass 577, fail 0, skip 8
+
+Axe serious+critical: 0 on /, /makers, /publishers, /agents, /terms, /privacy at 390 and 1440.
+Rendered-page grep hits: 0
