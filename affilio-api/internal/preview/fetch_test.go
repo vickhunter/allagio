@@ -308,6 +308,89 @@ func TestExtractTitleAndMainText(t *testing.T) {
 	}
 }
 
+func TestFetchDocumentReadsPlainTextAndRefusesCrossHost(t *testing.T) {
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/offer-rails.txt":
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = io.WriteString(w, "token-line\n")
+		case "/away":
+			http.Redirect(w, r, "http://other.example/token", http.StatusFound)
+		case "/scheme":
+			http.Redirect(w, r, "https://preview.example/.well-known/offer-rails.txt", http.StatusFound)
+		case "/port":
+			http.Redirect(w, r, "http://preview.example:443/token", http.StatusFound)
+		case "/same":
+			http.Redirect(w, r, "http://preview.example/.well-known/offer-rails.txt", http.StatusFound)
+		case "/token":
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = io.WriteString(w, "stolen\n")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(page.Close)
+	var dialed []string
+	f := Fetcher{
+		LookupIP: func(_ context.Context, host string) ([]net.IP, error) {
+			switch host {
+			case "preview.example":
+				return []net.IP{net.ParseIP("203.0.113.10")}, nil
+			case "other.example":
+				return []net.IP{net.ParseIP("203.0.113.88")}, nil
+			default:
+				return nil, errors.New("nxdomain")
+			}
+		},
+		DialContext: dialPage(page, &dialed),
+	}
+	doc, err := f.FetchDocument(context.Background(), "http://preview.example/.well-known/offer-rails.txt")
+	if err != nil || string(doc.Body) != "token-line\n" || !strings.Contains(doc.ContentType, "text/plain") {
+		t.Fatalf("document: %v %q %q", err, doc.ContentType, doc.Body)
+	}
+	if len(dialed) != 1 || dialed[0] != "203.0.113.10:80" {
+		t.Fatalf("dialed %v", dialed)
+	}
+	dialed = nil
+	_, err = f.FetchDocument(context.Background(), "http://preview.example/away")
+	if !errors.Is(err, ErrFetch) {
+		t.Fatalf("cross-host redirect: %v", err)
+	}
+	for _, address := range dialed {
+		if strings.HasPrefix(address, "203.0.113.88") {
+			t.Fatalf("cross-host redirect was dialed: %v", dialed)
+		}
+	}
+	dialed = nil
+	_, err = f.FetchDocument(context.Background(), "http://preview.example/scheme")
+	if !errors.Is(err, ErrFetch) || strings.Contains(strings.Join(dialed, ","), ":443") {
+		t.Fatalf("scheme change: %v dialed %v", err, dialed)
+	}
+	dialed = nil
+	_, err = f.FetchDocument(context.Background(), "http://preview.example/port")
+	if !errors.Is(err, ErrFetch) || strings.Contains(strings.Join(dialed, ","), ":443") {
+		t.Fatalf("port change: %v dialed %v", err, dialed)
+	}
+	dialed = nil
+	doc, err = f.FetchDocument(context.Background(), "http://preview.example/same")
+	if err != nil || string(doc.Body) != "token-line\n" {
+		t.Fatalf("same-host redirect: %v %q dialed %v", err, doc.Body, dialed)
+	}
+
+	blocked := Fetcher{
+		LookupIP: func(context.Context, string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		},
+		DialContext: func(context.Context, string, string) (net.Conn, error) {
+			t.Fatal("blocked address was dialed")
+			return nil, errors.New("dialed")
+		},
+	}
+	if _, err := blocked.FetchDocument(context.Background(), "http://preview.example/secret"); !errors.Is(err, ErrBlocked) {
+		t.Fatalf("blocked: %v", err)
+	}
+}
+
 func TestTransportSpeaksHTTP1(t *testing.T) {
 	client := (Fetcher{}).client(&pinSet{hosts: map[string]net.IP{}})
 	transport, ok := client.Transport.(*http.Transport)

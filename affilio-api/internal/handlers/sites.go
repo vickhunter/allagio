@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/preview"
 	"affilio-api/internal/services"
 
 	"github.com/jackc/pgx/v5"
@@ -26,6 +27,7 @@ type SitesHandler struct {
 	AdminAPIKey     string
 	RegisterLimiter *IPRateLimiter
 	Audit           *services.AuditLogger
+	Fetch           preview.Fetcher
 }
 
 type siteRegisterRequest struct {
@@ -165,7 +167,19 @@ func (h *SitesHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register site"})
 		return
 	}
-	body := gin.H{"api_key": apiKey, "site_id": siteID}
+	token, err := h.DB.EnsureSiteVerificationToken(c.Request.Context(), siteID)
+	if err != nil {
+		log.Printf("sites.register verification token failed domain=%s err=%v", req.Domain, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register site"})
+		return
+	}
+	body := gin.H{
+		"api_key":            apiKey,
+		"site_id":            siteID,
+		"verification_token": token,
+		"verified":           false,
+		"verified_at":        nil,
+	}
 	pluginKey, issued, err := mintPluginKey(c.Request.Context(), h.DB, siteID)
 	if err != nil {
 		log.Printf("sites.register plugin key failed domain=%s err=%v", req.Domain, err)

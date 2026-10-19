@@ -115,6 +115,7 @@ function affilio_init() {
     add_filter('the_content', array('Affilio_Go', 'rewrite_legacy_links'));
     add_filter('robots_txt', array('Affilio_Go', 'robots_txt'), 10, 2);
     add_filter('wpfc_exclude_current_page', array('Affilio_Go', 'exclude_cache'));
+    add_action('parse_request', array('Affilio_Go', 'maybe_serve_verification'), 0);
     add_action('parse_request', array('Affilio_Go', 'mark_go_request_uncacheable'));
     // Priority 0 runs before redirect_canonical (template_redirect priority 10).
     add_action('template_redirect', array(new Affilio_Go(), 'handle'), 0);
