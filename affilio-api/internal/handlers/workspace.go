@@ -55,7 +55,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	})
 	products := &ProductsHandler{DB: h.DB}
 	offers := &OffersHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}
-	placements := &PlacementsHandler{DB: h.DB, RequireVerifiedConnection: true}
+	placements := &PlacementsHandler{DB: h.DB, RequireVerifiedConnection: true, Claims: claimsChecker(h.ClaimsCheck)}
 	payouts := &PayoutsHandler{DB: h.DB}
 	maker := api.Group("", h.requireMaker)
 	maker.GET("/products", products.List)

@@ -180,7 +180,11 @@ func main() {
 	}
 
 	marketplace := &handlers.MarketplaceHandler{DB: db}
-	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != "", Claims: entry.StubClaimChecker{}}
+	claims := entry.ClaimChecker(entry.StubClaimChecker{})
+	if cfg.ClaimsCheck == config.ClaimsReal {
+		claims = entry.PageClaimChecker{}
+	}
+	placements := &handlers.PlacementsHandler{DB: db, RequireVerifiedConnection: cfg.PublicBaseURL != "", Claims: claims}
 	payouts := &handlers.PayoutsHandler{DB: db}
 	redirects := &handlers.RedirectsHandler{
 		DB:           db,
@@ -255,7 +259,7 @@ func main() {
 	agentEntry := &handlers.AgentEntry{
 		DB:                 db,
 		BaseURL:            strings.TrimRight(cfg.PublicBaseURL, "/"),
-		Claims:             entry.StubClaimChecker{},
+		Claims:             claims,
 		AccountLimiter:     handlers.NewIPRateLimiter(8, time.Minute),
 		DeviceLimiter:      handlers.NewIPRateLimiter(30, time.Minute),
 		PluginOfflineAfter: cfg.PluginOfflineAfter,

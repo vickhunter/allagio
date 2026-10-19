@@ -40,8 +40,10 @@ type merchantCacheEntry struct {
 
 var merchantCache sync.Map
 
-// liveMerchantPage uses the cached HEAD probe (10 minutes, 1.5s timeout) and
-// the readiness GET (10s timeout, 512 KiB cap). A HEAD miss does not GET.
+// liveMerchantPage reads the merchant page through the readiness fetcher
+// (10s timeout, 512 KiB cap, public addresses only). A private, loopback,
+// or link-local host is not dialed. A miss is an unreachable page, not a 500.
+// Results are reused for 10 minutes.
 func liveMerchantPage(ctx context.Context, rawURL string) merchantPage {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
@@ -52,28 +54,31 @@ func liveMerchantPage(ctx context.Context, rawURL string) merchantPage {
 		if time.Since(saved.at) < 10*time.Minute {
 			return saved.page
 		}
+		merchantCache.Delete(rawURL)
 	}
-	page := merchantPage{}
-	if probeLanding(rawURL) {
-		body, _, ok := (&services.ReadinessEngine{}).FetchPublicPage(ctx, rawURL)
-		page = merchantPage{OK: ok, Body: body}
-	}
+	body, _, ok := (&services.ReadinessEngine{}).FetchPublicPage(ctx, rawURL)
+	page := merchantPage{OK: ok, Body: body}
 	merchantCache.Store(rawURL, merchantCacheEntry{page: page, at: time.Now()})
 	return page
 }
 
-func compareOfferClaims(ctx context.Context, db *database.DB, makerID, productID string, offer database.Offer) (string, string) {
+func compareOfferClaims(ctx context.Context, db *database.DB, makerID, productID string, offer database.Offer) (string, string, error) {
 	in := entry.PageClaimInput{Terms: offer.Terms, CommissionValue: offer.CommissionValue}
 	if db != nil && makerID != "" && productID != "" {
 		raw, err := db.LatestListingCardJSON(ctx, makerID, productID)
-		if err == nil && len(raw) > 0 {
+		if err != nil {
+			return "", "", err
+		}
+		if len(raw) > 0 {
 			var card entry.ListingCard
-			if json.Unmarshal(raw, &card) == nil {
-				in.Card = card
-				in.HasCard = true
+			if err := json.Unmarshal(raw, &card); err != nil {
+				return "", "", err
 			}
+			in.Card = card
+			in.HasCard = true
 		}
 	}
 	page := fetchMerchantPage(ctx, offer.LandingURL)
-	return entry.CheckPageClaims(entry.PageDocument{OK: page.OK, Body: page.Body}, in)
+	reason, message := (entry.PageClaimChecker{}).Check(entry.PageDocument{OK: page.OK, Body: page.Body}, in)
+	return reason, message, nil
 }
