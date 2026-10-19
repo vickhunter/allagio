@@ -83,7 +83,7 @@ export const installs = [
   { id: 'generic', label: 'Generic', tested: true, proof: 'Checked. JSON-RPC initialize against this URL returned 401 no bearer token.', snippet: mcpConfig },
 ]
 
-export const deployNote = 'The hosted app gets these steps once the next deploy lands.'
+export const deployNote = 'The hosted app uses these steps.'
 
 export const approvalNote = 'Step 5 stays a human or an operator for now.'
 

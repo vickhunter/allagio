@@ -44,7 +44,7 @@ Checked. JSON-RPC initialize against this URL returned 401 no bearer token.
 
 ## Ordered agent steps
 
-The hosted app gets these steps once the next deploy lands.
+The hosted app uses these steps.
 
 1. Signup. POST /v1/agent-accounts. No key. Body: role (publisher or maker), name, email, and domain for a publisher. Optional source.
    - Publisher 201: owner_id, site_id, api_key (send as X-API-Key), key_header X-API-Key, plugin_key (send as X-Plugin-Key), plugin_key_header X-Plugin-Key, agent_only true, human_login false, role publisher. Both keys are shown once.
