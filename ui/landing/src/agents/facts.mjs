@@ -257,7 +257,7 @@ export function llmsText() {
   const deviceDetails = deviceSignIn.details.map((line) => `- ${line}`).join('\n')
   return `# Offer Rails
 
-Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article, prepares a disclosed placement, and a person approves it before it is published. A chat answer is never itself an ad.
+Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article, prepares a disclosed placement, and a person approves it before it is published. A chat answer is never a paid placement.
 
 MCP server: ${mcpUrl}
 

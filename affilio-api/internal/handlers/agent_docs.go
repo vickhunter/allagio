@@ -6,7 +6,7 @@ const llmsText = `# Offer Rails
 
 > Agents list a product or place an offer. Humans sign in once. Hard checks always apply.
 
-Offer Rails is a publisher and maker workflow. Tools return offers, matches, and previews to the person deciding on their own content. A chat response is never itself an ad.
+Offer Rails is a publisher and maker workflow. Tools return offers, matches, and previews to the person deciding on their own content. A chat response is never a paid placement.
 
 ## Docs
 

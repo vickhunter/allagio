@@ -24,7 +24,8 @@ const files = [
 ]
 
 const banned = [
-  ['ads', /\bads\b/i],
+  ['ad or ads', /\bads?\b/i],
+  ['fully automatic', /fully automatic/i],
   ['revolution', /revolution/i],
   ['pilot', /\bpilot\b/i],
   ['every post', /every post/i],

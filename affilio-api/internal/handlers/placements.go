@@ -236,7 +236,7 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		writeNamedConflict(c, "offer_unavailable")
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"placement": p, "next_action": "Owner reviews exact copy, disclosure, surface and terms; pilot operator records their approval."})
+	c.JSON(http.StatusCreated, gin.H{"placement": p, "next_action": "Owner reviews exact copy, disclosure, surface and terms; an operator records their approval."})
 }
 
 func (h *PlacementsHandler) Get(c *gin.Context) {

@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { roleReturn, signInHref, useSource } from '@/lib/source'
 import { PreviewStatus, barCount, codeFromStatus, fixtureBody, previewErrorCopy, previewTimeoutMs, rateLimitPauseMs, readPreviewFixture, slotAfterBar, slotLabel } from '@/lib/preview-map.mjs'
-import { adaptPreview, closestLead, groupsFixtureBody, includeUnverifiedFixture, notifyLabel, publicLinksNote, readFailureCopy, storeNotifyIntent, suggestedNote, type PreviewGroups, type ReadFailure, type UnverifiedProgram, type VerifiedOffer } from '@/lib/preview-groups.mjs'
+import { adaptPreview, closestLead, groupsFixtureBody, includeUnverifiedFixture, notifyLabel, publicLinksNote, readFailureCopy, readNotifyIntent, storeNotifyIntent, suggestedNote, type PreviewGroups, type ReadFailure, type UnverifiedProgram, type VerifiedOffer } from '@/lib/preview-groups.mjs'
 
 // Signed-out preview. The URL stays in the field. previewFixture skips the network.
 type Phase = 'idle' | 'loading' | 'ready' | 'unread' | 'error'
@@ -240,8 +240,9 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
   function notify() {
     // TODO: no notify endpoint exists. Keep the intent in this browser until one does.
     try {
-      storeNotifyIntent(window.localStorage, url.trim())
-      setNote('saved')
+      const before = readNotifyIntent(window.localStorage)
+      const after = storeNotifyIntent(window.localStorage, url.trim())
+      if (JSON.stringify(before) !== JSON.stringify(after)) setNote('saved')
     } catch {
       setNote('failed')
     }

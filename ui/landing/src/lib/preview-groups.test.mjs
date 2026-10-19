@@ -106,10 +106,30 @@ test('drops go links and tracking params without caring about case, and strips u
       { name: 'Outside Co', summary: 'Their own program.', verified: false, program_url: 'https://User:Secret@programs.example/outside?VIA=plugin&UTM_SOURCE=ad&Ref=home' },
       { name: 'Go', summary: 'A go link.', verified: false, program_url: 'https://user:pass@offer-rails.example/V1/GO/abc' },
       { name: 'Short', summary: 'A short go link.', verified: false, program_url: 'https://offer-rails.example/Go' },
+      { name: 'Exact', summary: 'The go path itself.', verified: false, program_url: 'https://offer-rails.example/v1/go' },
+      { name: 'Nested', summary: 'A go path later in the URL.', verified: false, program_url: 'https://docs.example/guides/v1/go/abc' },
+      { name: 'Golden', summary: 'A path that only shares letters with a go link.', verified: false, program_url: 'https://programs.example/v1/golden' },
+      { name: 'Goodies', summary: 'Another path that only shares letters.', verified: false, program_url: 'https://archive.example/v1/goodies' },
     ],
   })
-  assert.deepEqual(grouped.suggested.map((item) => item.name), ['Outside Co'])
+  assert.deepEqual(grouped.suggested.map((item) => item.name), ['Outside Co', 'Golden', 'Goodies'])
   assert.equal(grouped.suggested[0].program_url, 'https://programs.example/outside')
+  assert.equal(grouped.suggested[1].program_url, 'https://programs.example/v1/golden')
+  assert.equal(grouped.suggested[2].program_url, 'https://archive.example/v1/goodies')
+})
+
+test('dedupes notify urls ignoring case and a trailing slash, and a blank field changes nothing', () => {
+  const store = memory()
+  storeNotifyIntent(store, 'https://Journal.example/Start')
+  const again = storeNotifyIntent(store, 'https://journal.example/start/')
+  assert.deepEqual(again, ['https://journal.example/start/'])
+  assert.equal(readNotifyIntent(store).length, 1)
+  const blank = storeNotifyIntent(store, '   ')
+  assert.deepEqual(blank, again)
+  assert.equal(store.getItem('offer-rails.preview.notify'), JSON.stringify(again))
+  const same = storeNotifyIntent(store, 'https://journal.example/start/')
+  assert.deepEqual(same, again)
+  assert.equal(store.getItem('offer-rails.preview.notify'), JSON.stringify(again))
 })
 
 test('keeps the newest notify urls and drops the oldest past the cap', () => {

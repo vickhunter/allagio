@@ -88,6 +88,14 @@ function textOf(value) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function isV1GoSegment(path) {
+  return /(?:^|\/)v1\/go(?:\/|$)/.test(path)
+}
+
+function notifyKey(url) {
+  return textOf(url).replace(/\/+$/, '').toLowerCase()
+}
+
 function topicTokens(text) {
   return new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 3))
 }
@@ -109,7 +117,7 @@ function programUrl(value) {
   parsed.username = ''
   parsed.password = ''
   const path = parsed.pathname.toLowerCase()
-  if (path === '/go' || path.startsWith('/go/') || path.includes('/v1/go')) return ''
+  if (path === '/go' || path.startsWith('/go/') || isV1GoSegment(path)) return ''
   parsed.hash = ''
   for (const key of [...parsed.searchParams.keys()]) {
     const name = key.toLowerCase()
@@ -223,10 +231,13 @@ export function readNotifyIntent(storage) {
 
 export function storeNotifyIntent(storage, url) {
   // TODO: no notify endpoint exists. This writes the post URL in this browser and does not call a server.
+  const previous = readNotifyIntent(storage)
   const value = textOf(url)
-  const urls = readNotifyIntent(storage).filter((item) => item !== value)
-  if (value) urls.push(value)
+  if (!value) return previous
+  const key = notifyKey(value)
+  const urls = previous.filter((item) => notifyKey(item) !== key)
+  urls.push(value)
   const capped = urls.slice(-notifyLimit)
-  storage.setItem(notifyStorageKey, JSON.stringify(capped))
+  if (JSON.stringify(capped) !== JSON.stringify(previous)) storage.setItem(notifyStorageKey, JSON.stringify(capped))
   return capped
 }

@@ -68,7 +68,7 @@ export const driftChips = [
 
 // Deep-dive advantages. Every line traces to the product spec facts above.
 export const makerAdvantages = [
-  { k: 'found', t: 'Publishers’ agents find you', b: 'You don’t pitch blogs one by one. Their agents look for offers that match their posts.', big: true },
+  { k: 'found', t: 'Publishers’ agents find you', b: 'You don’t pitch blogs one by one. Their agents look for offers that match their posts.' },
   { k: 'pay', t: 'Pay only when a sale is attributed', b: 'No listing fee. No paying for clicks. The fee is 10% of the publisher commission: €0.24 on the €24 notebook example.' },
   { k: 'mcp', t: 'One install, one MCP server', b: 'One install command, pasted as is. Untested: Claude Code and Generic, both MCP over HTTP. Coming: Cursor, VS Code, Windsurf, ChatGPT and Grok.' },
   { k: 'local', t: 'Your code stays on your machine', b: 'Your agent scans pricing, payments and landing locally. It never reads .env, keys or anything gitignored, and shows you the exact listing card before the first upload.' },
@@ -81,7 +81,7 @@ export const makerAdvantages = [
 ] as const
 
 export const publisherAdvantages = [
-  { k: 'free', t: 'You earn per sale: €2.40 on a €24 sale at 10%', b: 'From the content you already make. You pick each step.', big: true },
+  { k: 'free', t: 'You earn per sale: €2.40 on a €24 sale at 10%', b: 'From the content you already make. You pick each step.' },
   { k: 'one', t: 'One honest box per post', b: 'At most one offer in a post that fits, placed in the matching section, labelled and rel="sponsored".' },
   { k: 'fit', t: 'Only offers that fit', b: 'An offer needs a relevance score of 25 or higher and must be live before it can be placed. Some posts get no offer.' },
   { k: 'switch', t: 'You pick each step', b: 'Ask every time, approve within your rules (categories, minimum relevance, positions, a 30-day cap), or approve anything that passes the checks.' },
