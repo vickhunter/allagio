@@ -144,6 +144,21 @@ func TestPageClaimsReadClientRenderedPages(t *testing.T) {
 	if reason != "" {
 		t.Fatalf("a numeric character reference must match the price: %q", reason)
 	}
+	once := `<meta property="og:description" content="Plans start at &#36;29 a month">`
+	reason, _ = checker.Check(PageDocument{OK: true, Body: once}, PageClaimInput{Card: ListingCard{PricingSummary: "Plans start at $29 a month"}, HasCard: true})
+	if reason != "" {
+		t.Fatalf("once-encoded og:description must match the price: %q", reason)
+	}
+	for _, body := range []string{
+		`<meta property="og:description" content="Plans start at &#38;#36;29 a month">`,
+		`<meta property="og:description" content="Plans start at &amp;#36;29 a month">`,
+		`<meta name="description" content="Plans start at &#38;#36;29 a month">`,
+	} {
+		reason, _ = checker.Check(PageDocument{OK: true, Body: body}, PageClaimInput{Card: ListingCard{PricingSummary: "Plans start at $29 a month"}, HasCard: true})
+		if reason != PageReasonPrice {
+			t.Fatalf("twice-encoded meta must not match the price: %q body %s", reason, body)
+		}
+	}
 	reason, _ = checker.Check(PageDocument{OK: true, Body: "<!-- <script>var n = 20;</script>"}, PageClaimInput{CommissionValue: 20})
 	if reason != PageReasonCommission {
 		t.Fatalf("an unclosed comment must hide the rest of the page: %q", reason)

@@ -3,11 +3,14 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -32,6 +35,152 @@ func TestReadinessPublicTransportRejectsPrivateDestinations(t *testing.T) {
 	}
 	if client.Transport.(*http.Transport).Proxy != nil {
 		t.Fatal("public probes must not bypass destination checks through an environment proxy")
+	}
+}
+
+func TestPublicProbeAddressesBlocksSharedRanges(t *testing.T) {
+	blocked := []string{
+		"100.64.0.1",
+		"100.127.255.254",
+		"127.0.0.1",
+		"127.255.255.255",
+		"::1",
+		"10.0.0.1",
+		"10.255.255.255",
+		"172.16.0.1",
+		"172.31.255.255",
+		"192.168.1.1",
+		"fc00::1",
+		"fd00::1",
+		"169.254.169.254",
+		"169.254.0.1",
+		"fe80::1",
+		"224.0.0.1",
+		"239.255.255.255",
+		"ff00::1",
+		"ff02::1",
+		"0.0.0.0",
+		"::",
+		"::ffff:127.0.0.1",
+		"::ffff:10.1.2.3",
+		"::ffff:172.16.5.5",
+		"::ffff:192.168.0.1",
+		"::ffff:169.254.169.254",
+		"::ffff:100.64.1.1",
+		"::ffff:224.0.0.1",
+		"::ffff:0.0.0.0",
+	}
+	for _, ip := range blocked {
+		if _, err := publicProbeAddresses(context.Background(), ip); err == nil {
+			t.Fatalf("%s was allowed", ip)
+		}
+	}
+	for _, ip := range []string{"8.8.8.8", "1.1.1.1", "100.63.255.255", "100.128.0.1", "203.0.113.10", "::ffff:8.8.8.8", "2001:4860:4860::8888"} {
+		got, err := publicProbeAddresses(context.Background(), ip)
+		if err != nil || len(got) != 1 {
+			t.Fatalf("public %s: %v %+v", ip, err, got)
+		}
+	}
+	e := &ReadinessEngine{LookupIPAddr: func(context.Context, string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("100.64.0.1")}}, nil
+	}}
+	if _, err := e.resolvePublic(context.Background(), "cgnat.example"); err == nil {
+		t.Fatal("dns answer in 100.64.0.0/10 was allowed")
+	}
+	e.LookupIPAddr = func(context.Context, string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("203.0.113.10")}, {IP: net.ParseIP("127.0.0.1")}}, nil
+	}
+	if _, err := e.resolvePublic(context.Background(), "mixed.example"); err == nil {
+		t.Fatal("a public answer mixed with loopback was allowed")
+	}
+}
+
+func TestFetchPublicPageRejectsRedirectToLoopback(t *testing.T) {
+	var hits atomic.Int32
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := &http.Server{Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		hits.Add(1)
+	})}
+	go func() { _ = secret.Serve(ln) }()
+	t.Cleanup(func() { _ = secret.Close() })
+
+	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://"+ln.Addr().String()+"/secret", http.StatusFound)
+	}))
+	t.Cleanup(page.Close)
+
+	var dialed []string
+	e := &ReadinessEngine{
+		Client: &http.Client{Timeout: 2 * time.Second},
+		LookupIPAddr: func(_ context.Context, host string) ([]net.IPAddr, error) {
+			if ip := net.ParseIP(host); ip != nil {
+				return []net.IPAddr{{IP: ip}}, nil
+			}
+			return []net.IPAddr{{IP: net.ParseIP("203.0.113.10")}}, nil
+		},
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			dialed = append(dialed, address)
+			host, _, splitErr := net.SplitHostPort(address)
+			if splitErr != nil {
+				return nil, splitErr
+			}
+			if blockedProbeIP(net.ParseIP(host)) {
+				return nil, errors.New("dialed blocked " + address)
+			}
+			return (&net.Dialer{}).DialContext(ctx, network, page.Listener.Addr().String())
+		},
+	}
+	if _, _, ok := e.FetchPublicPage(context.Background(), "http://public.example/start"); ok || hits.Load() != 0 {
+		t.Fatalf("redirect to loopback was fetched: ok=%v hits=%d dialed=%v", ok, hits.Load(), dialed)
+	}
+	for _, address := range dialed {
+		host, _, _ := net.SplitHostPort(address)
+		if blockedProbeIP(net.ParseIP(host)) {
+			t.Fatalf("dialed blocked address %s", address)
+		}
+	}
+}
+
+func TestFetchPublicPageRejectsDNSRebindToLoopback(t *testing.T) {
+	var hits atomic.Int32
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := &http.Server{Handler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		hits.Add(1)
+	})}
+	go func() { _ = secret.Serve(ln) }()
+	t.Cleanup(func() { _ = secret.Close() })
+
+	var lookups atomic.Int32
+	var dialed []string
+	e := &ReadinessEngine{
+		Client: &http.Client{Timeout: 2 * time.Second},
+		LookupIPAddr: func(context.Context, string) ([]net.IPAddr, error) {
+			if lookups.Add(1) == 1 {
+				return []net.IPAddr{{IP: net.ParseIP("203.0.113.10")}}, nil
+			}
+			return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil
+		},
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			dialed = append(dialed, address)
+			host, _, splitErr := net.SplitHostPort(address)
+			if splitErr != nil {
+				return nil, splitErr
+			}
+			if blockedProbeIP(net.ParseIP(host)) {
+				return (&net.Dialer{}).DialContext(ctx, network, ln.Addr().String())
+			}
+			return nil, errors.New("unexpected dial " + address)
+		},
+	}
+	raw := fmt.Sprintf("http://rebind.example:%d/page", ln.Addr().(*net.TCPAddr).Port)
+	if _, _, ok := e.FetchPublicPage(context.Background(), raw); ok || hits.Load() != 0 || lookups.Load() < 2 {
+		t.Fatalf("rebind ok=%v hits=%d lookups=%d dialed=%v", ok, hits.Load(), lookups.Load(), dialed)
 	}
 }
 

@@ -203,7 +203,9 @@ func metaParts(stripped string) []string {
 		if !ok {
 			continue
 		}
-		parts = append(parts, html.UnescapeString(content))
+		// normalizePage decodes this once. Decoding here as well would turn
+		// &#38;#36;29 or &amp;#36;29 into $29.
+		parts = append(parts, content)
 	}
 	return parts
 }

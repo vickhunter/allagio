@@ -28,6 +28,9 @@ type ReadinessEngine struct {
 	APIVersion string
 	// AllowPrivateHosts permits probing loopback/private addresses (tests only).
 	AllowPrivateHosts bool
+	// LookupIPAddr and DialContext are test seams. Production leaves them nil.
+	LookupIPAddr func(context.Context, string) ([]net.IPAddr, error)
+	DialContext  func(context.Context, string, string) (net.Conn, error)
 	// PublicBaseURL is the only extra origin readiness may probe when it is not a public host.
 	// Behavior is covered by TestReadinessAllowsOnlyTheConfiguredPublicOrigin.
 	PublicBaseURL string
@@ -161,7 +164,7 @@ func (e *ReadinessEngine) httpClient() *http.Client {
 		if e.publicOriginHost(host) {
 			return (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, address)
 		}
-		return dialPublicProbe(ctx, network, address)
+		return e.dialPublic(ctx, network, address)
 	}
 	client.Transport = transport
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
@@ -174,37 +177,91 @@ func (e *ReadinessEngine) httpClient() *http.Client {
 }
 
 func dialPublicProbe(ctx context.Context, network, address string) (net.Conn, error) {
+	return (&ReadinessEngine{}).dialPublic(ctx, network, address)
+}
+
+func (e *ReadinessEngine) dialPublic(ctx context.Context, network, address string) (net.Conn, error) {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
 	}
-	addresses, err := publicProbeAddresses(ctx, host)
+	addresses, err := e.resolvePublic(ctx, host)
 	if err != nil {
 		return nil, err
 	}
-	dialer := net.Dialer{Timeout: 10 * time.Second}
-	for _, address := range addresses {
-		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(address.IP.String(), port))
+	var dialErr error
+	for _, resolved := range addresses {
+		target := net.JoinHostPort(resolved.IP.String(), port)
+		var conn net.Conn
+		if e != nil && e.DialContext != nil {
+			conn, dialErr = e.DialContext(ctx, network, target)
+		} else {
+			conn, dialErr = (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, target)
+		}
 		if dialErr == nil {
 			return conn, nil
 		}
-		err = dialErr
 	}
-	return nil, err
+	if dialErr == nil {
+		dialErr = errors.New("host did not resolve")
+	}
+	return nil, dialErr
 }
 
 func publicProbeAddresses(ctx context.Context, host string) ([]net.IPAddr, error) {
-	addresses, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	return (&ReadinessEngine{}).resolvePublic(ctx, host)
+}
+
+func (e *ReadinessEngine) resolvePublic(ctx context.Context, host string) ([]net.IPAddr, error) {
+	host = strings.Trim(host, "[]")
+	if ip := net.ParseIP(host); ip != nil {
+		if blockedProbeIP(ip) {
+			return nil, errors.New("host resolves to a private address")
+		}
+		return []net.IPAddr{{IP: ip}}, nil
+	}
+	lookup := net.DefaultResolver.LookupIPAddr
+	if e != nil && e.LookupIPAddr != nil {
+		lookup = e.LookupIPAddr
+	}
+	addresses, err := lookup(ctx, host)
 	if err != nil || len(addresses) == 0 {
 		return nil, errors.New("host did not resolve")
 	}
 	for _, address := range addresses {
-		ip := address.IP
-		if !ip.IsGlobalUnicast() || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		if blockedProbeIP(address.IP) {
 			return nil, errors.New("host resolves to a private address")
 		}
 	}
 	return addresses, nil
+}
+
+var probeCGNAT = mustProbeCIDR("100.64.0.0/10")
+
+func mustProbeCIDR(cidr string) *net.IPNet {
+	_, network, err := net.ParseCIDR(cidr)
+	if err != nil {
+		panic(err)
+	}
+	return network
+}
+
+// blockedProbeIP matches the preview fetcher. IPv4-mapped IPv6 is judged as IPv4.
+// The carrier-grade NAT range is not covered by net.IP.IsPrivate.
+func blockedProbeIP(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+	}
+	if !ip.IsGlobalUnicast() || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
+		return true
+	}
+	if v4 := ip.To4(); v4 != nil && probeCGNAT.Contains(v4) {
+		return true
+	}
+	return false
 }
 
 // FetchPublicPage GETs a public page with the readiness timeout and the
@@ -253,7 +310,7 @@ func (e *ReadinessEngine) hostAllowed(ctx context.Context, rawURL string) error 
 	if err != nil || parsed.Hostname() == "" || parsed.User != nil || parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return errors.New("invalid url")
 	}
-	_, err = publicProbeAddresses(ctx, parsed.Hostname())
+	_, err = e.resolvePublic(ctx, parsed.Hostname())
 	return err
 }
 
