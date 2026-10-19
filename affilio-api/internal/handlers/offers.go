@@ -242,7 +242,12 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 		return
 	}
-	if reason, message, failed := failedListingCheck(c.Request.Context(), h.DB, h.ClaimsCheck, *offer, *product, listed); failed {
+	reason, message, failed, err := failedListingCheck(c.Request.Context(), h.DB, h.ClaimsCheck, *offer, *product, listed)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
+		return
+	}
+	if failed {
 		if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 			return

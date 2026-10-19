@@ -32,35 +32,40 @@ const (
 )
 
 // failedListingCheck is the server gate for an untrusted maker. The order is
-// claims, the cached HEAD check, minimum relevance, then the cap. A trusted
-// maker does not use this gate. real replaces the numeric stub with the page
-// checker. stub and off-local keep the numeric stub.
-func failedListingCheck(ctx context.Context, db *database.DB, mode string, offer database.Offer, product database.Product, listed int) (string, string, bool) {
+// claims, reachability, minimum relevance, then the cap. A trusted maker does
+// not use this gate. real replaces the numeric stub with the page checker.
+// stub and off-local keep the numeric stub and the HEAD probe.
+func failedListingCheck(ctx context.Context, db *database.DB, mode string, offer database.Offer, product database.Product, listed int) (string, string, bool, error) {
 	if claimsReal(mode) {
-		reason, message := compareOfferClaims(ctx, db, product.MakerID, product.ID, offer)
+		reason, message, err := compareOfferClaims(ctx, db, product.MakerID, product.ID, offer)
+		if err != nil {
+			return "", "", false, err
+		}
 		if reason == entry.PageReasonUnreachable {
-			return reviewReasonHead, reviewHeadMessage, true
+			return reviewReasonHead, reviewHeadMessage, true, nil
 		}
 		if reason != "" {
-			return reviewReasonClaims, message, true
+			return reviewReasonClaims, message, true, nil
 		}
 	} else {
 		claims := entry.StubClaimChecker{}
 		if claims.CheckClaims(offer.Terms, offerFacts(offer, product)) != nil {
-			return reviewReasonClaims, reviewClaimsMessage, true
+			return reviewReasonClaims, reviewClaimsMessage, true, nil
 		}
-	}
-	if !landingReachable(offer.LandingURL) {
-		return reviewReasonHead, reviewHeadMessage, true
+		// The numeric stub and off-local still use the HEAD probe. real already
+		// reported an unreachable page and does not send this request.
+		if !landingReachable(offer.LandingURL) {
+			return reviewReasonHead, reviewHeadMessage, true, nil
+		}
 	}
 	score := services.ScorePlacement(offer.Terms, product.Name, product.PrimaryCategory, offer.LandingURL)
 	if score < listingMinRelevance {
-		return reviewReasonRelevance, reviewRelevanceMessage, true
+		return reviewReasonRelevance, reviewRelevanceMessage, true, nil
 	}
 	if listed >= listingCap {
-		return reviewReasonCaps, reviewCapsMessage, true
+		return reviewReasonCaps, reviewCapsMessage, true, nil
 	}
-	return "", "", false
+	return "", "", false, nil
 }
 
 // claimsHeld is true only for stub. Empty and off-local run the four checks.
@@ -114,7 +119,10 @@ func listingReview(ctx context.Context, db *database.DB, mode string, offer data
 	if claimsHeld(mode) {
 		return reviewReasonClaims, reviewClaimsNotLive
 	}
-	reason, message, failed := failedListingCheck(ctx, db, mode, offer, product, listed)
+	reason, message, failed, err := failedListingCheck(ctx, db, mode, offer, product, listed)
+	if err != nil {
+		return reviewReasonClaims, reviewClaimsMessage
+	}
 	if !failed {
 		return "", ""
 	}

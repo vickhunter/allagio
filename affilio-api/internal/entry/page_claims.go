@@ -157,7 +157,8 @@ const evidenceBreak = "\x00"
 // JSON-LD values are included as their own fragments. Script, style,
 // noscript, and template elements are removed first, through their own
 // closer or through the end of the document when that closer is missing.
-// A broken JSON-LD block is kept as one fragment. Nothing here panics.
+// A JSON-LD block that does not parse is skipped. It is not page text, so a
+// script cannot invent a claim. Nothing here panics.
 func pageEvidence(raw string) string {
 	stripped := dropComments(stripEmbedded(raw))
 	parts := []string{visiblePageText(stripped)}
@@ -386,7 +387,6 @@ func jsonLDParts(raw string) []string {
 		dec.UseNumber()
 		var value any
 		if err := dec.Decode(&value); err != nil {
-			parts = append(parts, html.UnescapeString(payload))
 			continue
 		}
 		parts = append(parts, jsonValueParts(value)...)

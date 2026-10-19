@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,6 +15,53 @@ import (
 	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
 )
+
+func TestLiveMerchantPageDoesNotDialPrivateHosts(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hits atomic.Int32
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<p>Northwind Ledger pays 20 percent.</p>`))
+	})}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	page := liveMerchantPage(context.Background(), "http://"+ln.Addr().String()+"/secret")
+	if page.OK || page.Body != "" || hits.Load() != 0 {
+		t.Fatalf("private merchant page was fetched: %+v hits=%d", page, hits.Load())
+	}
+}
+
+func TestRealClaimsUnreadableCardDoesNotList(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	makerID, makerKey := createTestMaker(t, db)
+	r := newMakerRouterWithClaims(db, config.ClaimsReal)
+	productID, offerID := createDraftOffer(t, r, makerKey, "Northwind Ledger", "https://northwind.example.com", passingTerms("Northwind Ledger", 20), 20)
+	markProductReady(t, db, productID)
+	_, err := db.InsertListingCard(context.Background(), database.ListingCardRow{
+		MakerID: makerID, ProductID: productID, Card: []byte(`[]`),
+		Signals: []byte(`[{"name":"payments","pass":true}]`), Score: 80,
+		PaymentsCheck: "pass", OfferLinkHealth: "ok",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	useMerchantPage(t, "https://northwind.example.com", merchantPage{OK: true, Body: merchantFixture(t, "merchant_match.html")})
+
+	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
+	if rec.Code != http.StatusInternalServerError || body["status"] == "listed" {
+		t.Fatalf("unreadable card must not list: %d %v", rec.Code, body)
+	}
+	_, got := doJSON(t, r, http.MethodGet, "/v1/maker/offers/"+offerID, makerKey, nil)
+	if got["status"] != "draft" {
+		t.Fatalf("offer left draft: %v", got)
+	}
+}
 
 func TestMerchantFetchUsesFixturesInTests(t *testing.T) {
 	page := fetchMerchantPage(context.Background(), "http://127.0.0.1:1/merchant")

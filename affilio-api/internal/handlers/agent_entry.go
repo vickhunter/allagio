@@ -117,12 +117,15 @@ func (h *AgentEntry) placementClaims(c *gin.Context, offerID string) (entry.Clai
 	if err != nil {
 		return nil, err
 	}
-	reason, _ := compareOfferClaims(c.Request.Context(), h.DB, src.MakerID, src.ProductID, database.Offer{
+	reason, _, err := compareOfferClaims(c.Request.Context(), h.DB, src.MakerID, src.ProductID, database.Offer{
 		LandingURL:      src.LandingURL,
 		Terms:           src.Terms,
 		CommissionType:  src.CommissionType,
 		CommissionValue: src.CommissionValue,
 	})
+	if err != nil {
+		return nil, err
+	}
 	if reason == "" {
 		return entry.RecordedClaimCheck{}, nil
 	}

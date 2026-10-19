@@ -74,6 +74,14 @@ func TestPageClaimsReadClientRenderedPages(t *testing.T) {
 	if reason != PageReasonCard || message != PageClaimMessage(PageReasonCard) {
 		t.Fatalf("broken page: %q %q", reason, message)
 	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: `<html><body><script type="application/ld+json">var n = 20;</script><div id="root"></div></body></html>`}, PageClaimInput{CommissionValue: 20})
+	if reason != PageReasonCommission {
+		t.Fatalf("invalid JSON-LD must not supply the commission: %q", reason)
+	}
+	reason, _ = checker.Check(PageDocument{OK: true, Body: `<html><body><script type="application/ld+json">Northwind Ledger</script><div id="root"></div></body></html>`}, PageClaimInput{Card: ListingCard{Name: "Northwind Ledger"}, HasCard: true})
+	if reason != PageReasonCard {
+		t.Fatalf("invalid JSON-LD must not supply the card name: %q", reason)
+	}
 	reason, _ = checker.Check(PageDocument{OK: true, Body: "<html><body><div id=\"root\"></div><script>var n = 20;</script></body></html>"}, PageClaimInput{CommissionValue: 20})
 	if reason != PageReasonCommission {
 		t.Fatalf("a script bundle must not satisfy the commission: %q", reason)
