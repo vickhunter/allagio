@@ -295,7 +295,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
     if (!llmsBody.includes(needle)) throw new Error('llms missing ' + needle)
   }
   if (!/GET \/device/.test(llmsBody)) throw new Error('llms does not name GET /device')
-  if (!llmsBody.includes('The hosted app gets these steps once the next deploy lands')) throw new Error('llms missing the deploy note')
+  if (!llmsBody.includes('The hosted app uses these steps.')) throw new Error('llms missing the deploy note')
   if (!llmsBody.includes('Step 5 stays a human or an operator for now.')) throw new Error('llms missing the approval note')
   if (!llmsBody.includes('X-Plugin-Key') || !llmsBody.includes('X-Admin-Key')) throw new Error('llms missing an auth header from the ordered steps')
   if (llmsBody.includes('cursor.com/en/install-mcp') || llmsBody.includes('## No-browser account') || llmsBody.includes('## Device code') || llmsBody.includes('register_product through submit_offer') || llmsBody.includes('Needs authentication')) throw new Error('llms still repeats an old section')
@@ -392,7 +392,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
   if (copiedConfig !== '{"mcpServers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}') throw new Error('agents-' + width + ' clipboard config ' + copiedConfig)
   const reserved = await page.locator('[data-d063-steps]').innerText()
   const deviceCopy = await page.locator('#device').innerText()
-  for (const needle of ['1. Signup', '11. Reporting', 'X-Plugin-Key', 'X-Admin-Key', 'X-API-Key', 'X-Maker-Key', 'The hosted app gets these steps once the next deploy lands', 'Step 5 stays a human or an operator for now.']) {
+  for (const needle of ['1. Signup', '11. Reporting', 'X-Plugin-Key', 'X-Admin-Key', 'X-API-Key', 'X-Maker-Key', 'The hosted app uses these steps.', 'Step 5 stays a human or an operator for now.']) {
     if (!reserved.includes(needle)) throw new Error('agents-' + width + ' d063 missing ' + needle)
   }
   for (const needle of ['Device sign-in', 'GET /device', 'The browser step needs a human sign-in']) {

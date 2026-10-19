@@ -30,10 +30,11 @@ export function Header({ page }: { page: PageKey }) {
     <header className="sticky top-0 z-30 border-b border-line bg-s0/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-2.5 sm:px-5">
         <Logo />
-        <nav aria-label="Main" className="order-last flex w-full gap-0.5 text-sm sm:order-none sm:w-auto">
+        <nav aria-label="Main" className="order-last flex w-full flex-wrap gap-0.5 text-sm sm:order-none sm:w-auto">
           {link('/makers/', 'Makers', 'makers', 'text-maker hover:bg-maker-soft')}
           {link('/publishers/', 'Publishers', 'publishers', 'text-pub hover:bg-pub-soft')}
           {link('/protocol/', 'Protocol', 'protocol', 'text-t1 hover:bg-s2')}
+          {link('/agents', 'Agents', 'agents', 'text-t1 hover:bg-s2')}
         </nav>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button type="button" onClick={() => { setPaused((p) => !p); track('motion_toggle', { paused: !paused }) }} aria-pressed={paused}

@@ -54,4 +54,5 @@ declare module '@/directory/prompt.mjs' {
   export const installLead: string
   export const installCommand: string
   export const agentPrompt: string
+  export const makerPrompt: string
 }

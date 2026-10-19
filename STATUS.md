@@ -1,3 +1,7 @@
+## October 19 — H-FARM demo copy and nav
+
+The agents page and llms.txt say the hosted app uses the ordered steps. The demo nav keeps each label whole and keeps a 44px tap target. Agents sits in the landing header next to Protocol, on the wide row and the wrapped row below it. The home matching section uses the same three publisher choices: ask every time, approve within your rules, or approve anything that passes the nine checks. The makers directory talks about adding a product. Its Agents link still opens /agents.
+
 ## October 19 — Per-step auto, ask, or off
 
 Each agent step is `site_signup`, `offer_match`, `placement_publish`, `link_change`, or `payout`. The owner sets each one to `auto`, `ask`, or `off`. A missing row is `auto`. Human approval applies only where the owner chose `ask`. `off` does not run the step: the API and MCP answer `reason` `step_off` and a message that names the step.
