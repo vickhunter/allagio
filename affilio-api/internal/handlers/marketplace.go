@@ -92,6 +92,10 @@ func (h *MarketplaceHandler) JoinOffer(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "offer is not listed", "status": offer.Status})
 		return
 	}
+	siteID := siteIDFrom(c)
+	if holdStep(c, h.DB, database.StepLinkChange, ownerForSite(c, h.DB, siteID), siteID, map[string]any{"offer_id": offer.ID}) {
+		return
+	}
 	code, err := generateTrackingCode()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tracking code"})

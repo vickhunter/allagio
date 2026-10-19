@@ -122,7 +122,16 @@ func (h *PayoutsHandler) MarkPaid(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "valid payout id and payment reference required"})
 		return
 	}
-	updated, err := h.DB.MarkPayoutPaid(c.Request.Context(), c.Param("id"), strings.TrimSpace(req.ProviderReference))
+	var siteID string
+	if err := h.DB.Pool.QueryRow(c.Request.Context(), `SELECT COALESCE(site_id::text,'') FROM payouts WHERE id=$1`, c.Param("id")).Scan(&siteID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no pending payout with that id"})
+		return
+	}
+	ref := strings.TrimSpace(req.ProviderReference)
+	if holdStep(c, h.DB, database.StepPayout, ownerForSite(c, h.DB, siteID), siteID, map[string]any{"action": "mark_paid", "payout_id": c.Param("id"), "provider_reference": ref}) {
+		return
+	}
+	updated, err := h.DB.MarkPayoutPaid(c.Request.Context(), c.Param("id"), ref)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to mark payout paid"})
 		return
@@ -203,7 +212,11 @@ func (h *PayoutsHandler) ConfirmReceived(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payout id"})
 		return
 	}
-	updated, err := h.DB.ConfirmPayoutReceived(c.Request.Context(), siteIDFrom(c), c.Param("id"))
+	siteID := siteIDFrom(c)
+	if holdStep(c, h.DB, database.StepPayout, ownerForSite(c, h.DB, siteID), siteID, map[string]any{"action": "confirm_received", "payout_id": c.Param("id")}) {
+		return
+	}
+	updated, err := h.DB.ConfirmPayoutReceived(c.Request.Context(), siteID, c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "confirmation failed"})
 		return
