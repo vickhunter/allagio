@@ -96,13 +96,13 @@ export const terms = {
     {
       heading: 'Test-mode payments',
       paragraphs: [
-        'Payments in this pilot run in test mode. A test-mode payment is not a live charge. When a maker connects Stripe, Stripe is the payment processor. Nothing in this draft authorizes a live charge.',
+        'Payments in this draft service run in test mode. A test-mode payment is not a live charge. When a maker connects Stripe, Stripe is the payment processor. Nothing in this draft authorizes a live charge.',
       ],
     },
     {
       heading: 'No warranty',
       paragraphs: [
-        'The service is a pilot draft. It is provided as is. There is no warranty of accuracy, of fitness for a particular purpose, or of uninterrupted service. Scores, copy, and placements can be wrong. You may stop using the service at any time.',
+        'The service is an early draft. It is provided as is. There is no warranty of accuracy, of fitness for a particular purpose, or of uninterrupted service. Scores, copy, and placements can be wrong. You may stop using the service at any time.',
       ],
     },
   ],

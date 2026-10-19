@@ -91,7 +91,7 @@ func (s *StripeAPI) Verify(ctx context.Context, key, priceID, endpointID, webhoo
 		return StripeConnectionCheck{}, errors.New("Stripe test mode only. Live keys are not accepted.")
 	}
 	if !strings.HasPrefix(account.ID, "acct_") || price.ID != priceID || !price.Active || price.Type != "one_time" || price.UnitAmount <= 0 || !slices.Contains([]string{"usd", "eur", "gbp"}, price.Currency) || endpoint.ID != endpointID || endpoint.URL != webhookURL || endpoint.Status != "enabled" {
-		return StripeConnectionCheck{}, errors.New("Stripe price, account or webhook configuration is not ready for the pilot")
+		return StripeConnectionCheck{}, errors.New("Stripe price, account or webhook configuration is not ready")
 	}
 	for _, event := range []string{"checkout.session.completed", "checkout.session.async_payment_succeeded", "charge.refunded"} {
 		if !slices.Contains(endpoint.Events, event) && !slices.Contains(endpoint.Events, "*") {

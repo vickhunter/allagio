@@ -101,7 +101,7 @@ function Adv({ n, a, className }: { n: number; a: { t: string; b: string }; clas
 // From A: the digest plays once, per view. side_toggle switches what you are looking at.
 function DigestDemo() {
   const [side, setSide] = useState<'maker' | 'pub'>('maker')
-  const items = side === 'maker' ? feed.filter((f) => f.kind !== 'exchange') : feed.filter((f) => ['matched', 'checks', 'placed', 'clicked', 'earned'].includes(f.kind))
+  const items = side === 'maker' ? feed : feed.filter((f) => ['matched', 'checks', 'placed', 'clicked', 'earned'].includes(f.kind))
   const [n, setN] = useState(items.length)
   useEffect(() => {
     if (reducedMotion()) { setN(items.length); return }

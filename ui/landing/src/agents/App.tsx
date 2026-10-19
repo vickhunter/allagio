@@ -145,7 +145,7 @@ export function App() {
           <section id="agents-hero" aria-labelledby="agents-h" className={sectionClass}>
             <p className="eyebrow">MCP server</p>
             <h1 id="agents-h" className="h-display mt-3 text-[40px] sm:text-6xl">Find an offer, preview the page, place it.</h1>
-            <p className="mt-4 text-lg leading-relaxed text-t2">Offer Rails is an MCP server. Three steps. A person still approves what gets published. A chat answer is never itself an ad.</p>
+            <p className="mt-4 text-lg leading-relaxed text-t2">Offer Rails is an MCP server. Three steps. A person still approves what gets published. A chat answer is never a paid placement.</p>
             <p className="mt-4 break-all font-mono text-[15px] text-t1" data-mcp-url>{mcpUrl}</p>
             <p className="mt-2 text-[15px] leading-relaxed text-t2">Scopes are publisher and maker. A call with no bearer is 401.</p>
             <CopyButton value={mcpUrl} label="Copy endpoint" statusName="endpoint" primary />

@@ -1,3 +1,7 @@
+## October 19 — Public copy drops ad, ads, and pilot
+
+Public pages no longer use the words ad, ads, or pilot, and they do not say fully automatic. A chat answer is a paid placement, not a denial that uses those words. The terms draft still says payments run in test mode and that the service is an early draft. Nothing new is claimed. The paste-a-URL card drops a go link only when `/v1/go` is its own path, keeps a blank notify field quiet when the saved list does not change, and treats a notify URL with different case or a trailing slash as the same URL. The unused advantage flag and the unused digest exchange filter are gone.
+
 ## October 18 — Domain verification for a site
 
 A site from `POST /v1/agent-accounts` or `POST /v1/sites/register` starts unverified. The host used for the check drops a trailing dot and an explicit port 443, so `example.com`, `example.com.`, and `example.com:443` are one domain. The response includes `verification_token`, `verified: false`, and `verified_at: null`. A maker account does not. `GET /v1/sites/current` and `GET /v1/sites/:id` (the site key, and `:id` must be that site) return the same fields. An older site with an empty token receives one on that read.
