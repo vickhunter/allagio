@@ -1,3 +1,15 @@
+## October 19 — Per-step auto, ask, or off
+
+Each agent step is `site_signup`, `offer_match`, `placement_publish`, `link_change`, or `payout`. The owner sets each one to `auto`, `ask`, or `off`. A missing row is `auto`. Human approval applies only where the owner chose `ask`. `off` does not run the step: the API and MCP answer `reason` `step_off` and a message that names the step.
+
+`GET` and `PUT /v1/step-modes` read and set the modes for the signed-in owner or the site key. MCP tools `get_step_modes` and `set_step_modes` call that API. `ask` for signup, match, link change, and payout is a row on the offer-review queue (`step_approvals`), released by `POST /v1/offer-review/steps/:id/approve`. Placement publish reuses the pending placement and `POST /v1/offer-review/placements/:id/approve`. Switching publish from `ask` to `auto` leaves a placement that is already waiting; the next one publishes on its own.
+
+A first signup, with no owner for that email and no site key, stays `auto`. Registering with a site key uses that site's `site_signup` mode. Another agent account for an email that already has an owner uses the strictest `site_signup` mode among those owners. `off` wins over `ask`.
+
+The owner dashboard uses the same payout gate. `POST /owner/payouts/:id/confirm-received` does not stamp receipt when payout is `off` or `ask`. `off` returns `step_off` and the dashboard shows that message instead of the confirm button. `ask` queues the approval. Creating a publisher account from `POST /owner/accounts` uses the same `site_signup` gate. Commit of an already approved placement stays available while publish is `ask`; `off` still does not create the tracked link.
+
+An unverified domain forces `ask` on placement publish. `off` still does not run. Auto publish also waits while the claims check is not live. When the domain is verified and the claims check is live, auto approves and commits that placement. Migration `042_d062_step_modes.sql` is additive and idempotent. It does not backfill. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 19 — Public copy drops ad, ads, and pilot
 
 Public pages no longer use the words ad, ads, or pilot, and they do not say fully automatic. A chat answer is a paid placement, not a denial that uses those words. The terms draft still says payments run in test mode and that the service is an early draft. Nothing new is claimed. The paste-a-URL card drops a go link only when `/v1/go` is its own path, keeps a blank notify field quiet when the saved list does not change, and treats a notify URL with different case or a trailing slash as the same URL. The unused advantage flag and the unused digest exchange filter are gone.

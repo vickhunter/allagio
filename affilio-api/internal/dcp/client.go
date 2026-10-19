@@ -94,9 +94,16 @@ func (c *Client) request(method, path string, payload interface{}, authHeader, a
 		}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		message, _ := out["error"].(string)
+		reason, _ := out["reason"].(string)
+		message, _ := out["message"].(string)
+		if message == "" {
+			message, _ = out["error"].(string)
+		}
 		if message == "" {
 			message = fmt.Sprintf("request failed with status %d", resp.StatusCode)
+		}
+		if reason != "" {
+			return out, fmt.Errorf("%s: %s (%d)", reason, message, resp.StatusCode)
 		}
 		return out, fmt.Errorf("%s (%d)", message, resp.StatusCode)
 	}

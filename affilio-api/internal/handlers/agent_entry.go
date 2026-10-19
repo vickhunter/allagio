@@ -60,6 +60,9 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.POST("/v1/device/token", h.DeviceToken)
 	r.POST("/v1/device/approve", h.ApproveDevice)
 	r.POST("/v1/agent-accounts", h.CreateAgentAccount)
+	r.GET("/v1/step-modes", h.GetStepModes)
+	r.PUT("/v1/step-modes", h.PutStepModes)
+	r.GET("/v1/step-approvals/:id", h.GetStepApproval)
 	r.GET("/v1/setup/settings", h.GetSetup)
 	r.PUT("/v1/setup/settings", h.PutSetup)
 	r.GET("/v1/sites/:id/mode", h.GetSiteMode)
@@ -305,6 +308,21 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 	}
 	if req.Role == "publisher" && (req.Domain == "" || strings.Contains(req.Domain, " ") || len(req.Domain) > 255) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "domain required"})
+		return
+	}
+	owners, lookupErr := h.DB.OwnersByEmail(c.Request.Context(), req.Email)
+	if lookupErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "account creation failed"})
+		return
+	}
+	gateOwner, gateSite, gateMode, gateErr := signupGate(c, h.DB, owners)
+	if gateErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "account creation failed"})
+		return
+	}
+	if gateMode != "" && holdStep(c, h.DB, database.StepSiteSignup, gateOwner, gateSite, map[string]any{
+		"kind": "agent_account", "role": req.Role, "name": req.Name, "email": strings.ToLower(req.Email), "domain": strings.ToLower(req.Domain), "source": req.Source,
+	}) {
 		return
 	}
 	subject, err := randomToken()

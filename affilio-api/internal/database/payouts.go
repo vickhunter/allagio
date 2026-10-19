@@ -193,8 +193,21 @@ HAVING SUM(le.amount) >= $1`, minPayout, includeTest)
 
 	payouts := []Payout{}
 	for _, item := range dues {
+		mode, err := PayoutMode(ctx, tx, item.siteID)
+		if err != nil {
+			return nil, err
+		}
+		if mode == ModeOff {
+			continue
+		}
+		if mode == ModeAsk {
+			if err = QueuePayoutBatch(ctx, tx, item.siteID, item.currency, item.makerID, item.mode, item.amount); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		var payout Payout
-		err := tx.QueryRow(ctx, `
+		err = tx.QueryRow(ctx, `
 INSERT INTO payouts (site_id, amount, currency, method, status,maker_id,payment_mode)
 VALUES ($1,$2,$3,'manual','pending',$4,$5)
 RETURNING id, site_id, amount, currency, COALESCE(method,''), COALESCE(provider_reference,''), status, (created_at `+sessionWallAsInstant+`), (paid_at `+sessionWallAsInstant+`),maker_id,payment_mode,received_at`,

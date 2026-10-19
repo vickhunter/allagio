@@ -38,6 +38,11 @@ func (h *OfferReviewHandler) Queue(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load queue"})
 		return
 	}
+	steps, err := h.DB.ListPendingStepApprovals(c.Request.Context(), limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load queue"})
+		return
+	}
 	queue := make([]gin.H, 0, len(items))
 	for _, item := range items {
 		queue = append(queue, gin.H{
@@ -61,7 +66,11 @@ func (h *OfferReviewHandler) Queue(c *gin.Context) {
 			"submitted_at":         item.Offer.UpdatedAt.Format(time.RFC3339),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"queue": queue})
+	waiting := make([]gin.H, 0, len(steps))
+	for _, step := range steps {
+		waiting = append(waiting, approvalView(step))
+	}
+	c.JSON(http.StatusOK, gin.H{"queue": queue, "step_approvals": waiting})
 }
 
 func (h *OfferReviewHandler) Approve(c *gin.Context) {

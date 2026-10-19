@@ -389,6 +389,7 @@ func main() {
 	{
 		offerAdmin.GET("/queue", offerReview.Queue)
 		offerAdmin.POST("/placements/:id/approve", placements.Approve)
+		offerAdmin.POST("/steps/:id/approve", offerReview.ApproveStep)
 		offerAdmin.POST("/agent-access/sites/:site_id", placements.CreateAgentAccess)
 		offerAdmin.POST("/agent-access/:id/revoke", placements.RevokeAgentAccess)
 		offerAdmin.POST("/products/:id/connection", connections.Create)

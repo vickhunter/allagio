@@ -739,7 +739,11 @@ func (h *HostedHandler) ConfirmReceived(c *gin.Context) {
 		c.Status(404)
 		return
 	}
-	ok, err := h.DB.ConfirmPayoutReceived(c.Request.Context(), ownerFrom(c).SiteID, c.Param("id"))
+	owner := ownerFrom(c)
+	if h.holdDashboardStep(c, database.StepPayout, owner.ID, owner.SiteID, map[string]any{"action": "confirm_received", "payout_id": c.Param("id")}) {
+		return
+	}
+	ok, err := h.DB.ConfirmPayoutReceived(c.Request.Context(), owner.SiteID, c.Param("id"))
 	if err != nil {
 		c.Status(500)
 		return
@@ -785,6 +789,11 @@ func (h *HostedHandler) OwnerAccount(c *gin.Context) {
 		domain := normalizeDomain(c.PostForm("domain"))
 		if role == "publisher" && !validDomain(domain) {
 			c.JSON(400, gin.H{"error": "valid publisher domain required"})
+			return
+		}
+		if role == "publisher" && h.holdDashboardStep(c, database.StepSiteSignup, o.ID, o.SiteID, map[string]any{
+			"kind": "owner_account", "role": "publisher", "domain": domain, "owner_id": o.ID, "name": o.Name,
+		}) {
 			return
 		}
 		key, err := randomToken()
@@ -961,10 +970,23 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 			return
 		}
 		body.WriteString(`<h2>Payments</h2>`)
+		payoutModes, err := h.DB.LoadStepModes(c.Request.Context(), o.ID, o.SiteID)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+		payoutMode := payoutModes.Get(database.StepPayout)
 		for _, p := range payouts {
 			fmt.Fprintf(&body, `<section>%.2f %s · %s · %s`, p.Amount, template.HTMLEscapeString(p.Currency), template.HTMLEscapeString(p.Mode), template.HTMLEscapeString(p.Status))
 			if p.Status == "paid" && p.ReceivedAt == nil && p.Mode == "live" {
-				fmt.Fprintf(&body, `<form method="post" action="/owner/payouts/%s/confirm-received"><input type="hidden" name="csrf" value="%s"><button>Confirm funds arrived</button></form>`, p.ID, csrf)
+				if payoutMode == database.ModeOff {
+					fmt.Fprintf(&body, `<p>%s</p><p data-reason="step_off">step_off</p>`, template.HTMLEscapeString(stepOffMessage(database.StepPayout)))
+				} else {
+					fmt.Fprintf(&body, `<form method="post" action="/owner/payouts/%s/confirm-received"><input type="hidden" name="csrf" value="%s"><button>Confirm funds arrived</button></form>`, p.ID, csrf)
+					if payoutMode == database.ModeAsk {
+						fmt.Fprintf(&body, `<p>%s</p>`, template.HTMLEscapeString(stepAskMessage(database.StepPayout)))
+					}
+				}
 			}
 			if p.ReceivedAt != nil {
 				body.WriteString(`<p>You confirmed receipt.</p>`)

@@ -129,6 +129,9 @@ func (h *SitesHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name too long"})
 		return
 	}
+	if h.holdRegister(c, req) {
+		return
+	}
 	apiKey := req.InstallationKey
 	var err error
 	if apiKey != "" {

@@ -32,6 +32,13 @@ func hostedTools(g *database.AgentGrant) []dcp.Tool {
 			}
 		}
 	}
+	if g.MakerID != "" || g.SiteID != "" {
+		for _, t := range dcp.PublisherTools {
+			if t.Name == "get_step_modes" || t.Name == "set_step_modes" {
+				tools = append(tools, t)
+			}
+		}
+	}
 	return tools
 }
 

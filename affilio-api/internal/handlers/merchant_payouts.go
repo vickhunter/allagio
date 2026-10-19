@@ -3,6 +3,7 @@ package handlers
 import (
 	"strings"
 
+	"affilio-api/internal/database"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,7 +25,17 @@ func (h *HostedHandler) ReportMerchantPayment(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Confirm payment was sent and enter its payment reference."})
 		return
 	}
-	ok, err := h.DB.ReportMerchantPayment(c.Request.Context(), ownerFrom(c).MakerID, c.Param("id"), req.Reference)
+	owner := ownerFrom(c)
+	var siteID string
+	if err := h.DB.Pool.QueryRow(c.Request.Context(), `SELECT COALESCE(site_id::text,'') FROM payouts WHERE id=$1 AND maker_id=$2`, c.Param("id"), owner.MakerID).Scan(&siteID); err != nil {
+		c.JSON(409, gin.H{"error": "A pending live payout owned by your account is required."})
+		return
+	}
+	ref := strings.TrimSpace(req.Reference)
+	if holdStep(c, h.DB, database.StepPayout, owner.ID, siteID, map[string]any{"action": "report_payment", "payout_id": c.Param("id"), "maker_id": owner.MakerID, "reference": ref}) {
+		return
+	}
+	ok, err := h.DB.ReportMerchantPayment(c.Request.Context(), owner.MakerID, c.Param("id"), ref)
 	if err != nil {
 		c.Status(500)
 		return
@@ -53,7 +64,11 @@ func (h *HostedHandler) SavePayoutProfile(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "Payment instructions must be at most 2000 characters."})
 		return
 	}
-	if err := h.DB.SavePayoutInstructions(c.Request.Context(), ownerFrom(c).SiteID, req.Instructions); err != nil {
+	owner := ownerFrom(c)
+	if holdStep(c, h.DB, database.StepPayout, owner.ID, owner.SiteID, map[string]any{"action": "save_profile", "instructions": req.Instructions}) {
+		return
+	}
+	if err := h.DB.SavePayoutInstructions(c.Request.Context(), owner.SiteID, req.Instructions); err != nil {
 		c.Status(500)
 		return
 	}

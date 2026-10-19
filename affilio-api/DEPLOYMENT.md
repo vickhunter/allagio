@@ -68,6 +68,7 @@ Run migrations in this exact order, before the new binary starts. `033_click_cla
 39. `internal/migrations/039_landing_events.sql`
 40. `internal/migrations/040_operator_approval.sql`
 41. `internal/migrations/041_d063b_domain_verification.sql`
+42. `internal/migrations/042_d062_step_modes.sql`
 
 Notes:
 - `002_seed_programs.sql` uses upsert semantics on `slug`.
@@ -81,6 +82,7 @@ Notes:
 - `039_landing_events.sql` creates `landing_events` for `POST /api/events`. Apply it by hand before conversion events are recorded. The landing pages and the zip download keep working before it is applied. Locally the event rate limit uses the socket address (`TRUSTED_PROXIES` empty). Render sets `RENDER=true`; the limit then uses the rightmost `X-Forwarded-For` address Render appends, not the caller-supplied left side and not the proxy socket. Set `TRUSTED_PLATFORM` only when a dedicated client-IP header should be the key instead. Leave `AUTO_MIGRATE` off in production.
 - `040_operator_approval.sql` allows `approved_by_kind` `operator` on a placement. Apply it before the new binary: `POST /v1/offer-review/placements/:id/approve` writes that value and fails while the old check is still in place. An owner session still records `owner`. Leave `AUTO_MIGRATE` off in production.
 - `041_d063b_domain_verification.sql` adds `sites.verification_token`, `sites.verified_at`, and `sites.verification_host`. Apply it by hand before domain verification. Existing sites stay unverified. `AUTO_MIGRATE` stays off unless it is set to `true`.
+- `042_d062_step_modes.sql` adds `agent_step_modes` and `agent_step_approvals`. Apply it by hand before step modes are read or written. A missing row means every step is auto. The script does not rewrite existing rows. It is safe to run more than once. Leave `AUTO_MIGRATE` off in production.
 
 ## Build and Release
 1. Build image:

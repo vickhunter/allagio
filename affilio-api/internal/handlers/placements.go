@@ -122,6 +122,11 @@ func (h *PlacementsHandler) Find(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "context must contain 10–12000 characters"})
 		return
 	}
+	if siteID := siteIDFrom(c); siteID != "" {
+		if holdStep(c, h.DB, database.StepOfferMatch, ownerForSite(c, h.DB, siteID), siteID, map[string]any{"context": req.Context, "surface_url": req.SurfaceURL}) {
+			return
+		}
+	}
 	out, err := h.opportunities(c, req.Context)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "opportunity search failed"})
@@ -183,6 +188,16 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "publisher lookup failed"})
 		return
 	}
+	ownerID := ownerForSite(c, h.DB, site.ID)
+	modes, err := h.DB.LoadStepModes(c.Request.Context(), ownerID, site.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
+		return
+	}
+	if modes.Get(database.StepPlacementPublish) == database.ModeOff {
+		c.JSON(http.StatusForbidden, stepBody(database.StepPlacementPublish, "step_off", stepOffMessage(database.StepPlacementPublish)))
+		return
+	}
 	if problem := surfaceURLProblem(req.SurfaceURL, site.Domain); problem != "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": problem})
 		return
@@ -193,9 +208,11 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		return
 	}
 	reason := ""
+	score := 0
 	for _, o := range matched.items {
 		if o.OfferID == req.OfferID {
 			reason = o.Reason
+			score = o.Relevance
 			break
 		}
 	}
@@ -236,7 +253,52 @@ func (h *PlacementsHandler) Prepare(c *gin.Context) {
 		writeNamedConflict(c, "offer_unavailable")
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"placement": p, "next_action": "Owner reviews exact copy, disclosure, surface and terms; an operator records their approval."})
+	h.finishPublish(c, ownerID, site.ID, p, score)
+}
+
+// finishPublish leaves an ask on the operator queue. Auto approves and commits
+// when the domain is verified and the claims check is live. A later mode change
+// does not release a placement that is already waiting.
+func (h *PlacementsHandler) finishPublish(c *gin.Context, ownerID, siteID string, p *database.Placement, score int) {
+	verified, err := h.DB.SiteVerified(c.Request.Context(), siteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
+		return
+	}
+	modes, err := h.DB.LoadStepModes(c.Request.Context(), ownerID, siteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
+		return
+	}
+	choice := choosePublish(modes.Get(database.StepPlacementPublish), verified, h.claims().Real())
+	if choice.Effective != database.ModeAuto {
+		body := stepBody(database.StepPlacementPublish, choice.Reason, choice.Message)
+		body["placement"] = p
+		body["status"] = "awaiting_approval"
+		body["next_action"] = placementWaitingAction
+		c.JSON(http.StatusCreated, body)
+		return
+	}
+	updated, err := h.DB.RecordPolicyApproval(c.Request.Context(), p.ID, siteID, ownerID, "policy:auto", "hard_checks", 0, score, "")
+	if err != nil || !updated {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "approval failed"})
+		return
+	}
+	code, err := generateTrackingCode()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "link generation failed"})
+		return
+	}
+	committed, err := h.DB.CommitPlacement(c.Request.Context(), siteID, p.ID, code, h.claims())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "commit failed"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{
+		"placement":   committed,
+		"status":      "published",
+		"next_action": "Use the publisher's existing publishing tool for approved copy, tracked link and disclosure, then record the receipt.",
+	})
 }
 
 func (h *PlacementsHandler) Get(c *gin.Context) {
@@ -351,6 +413,18 @@ func (h *PlacementsHandler) Commit(c *gin.Context) {
 		return
 	}
 	if !h.requireLinkedPublisher(c) {
+		return
+	}
+	siteID := siteIDFrom(c)
+	modes, err := h.DB.LoadStepModes(c.Request.Context(), ownerForSite(c, h.DB, siteID), siteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
+		return
+	}
+	// Ask already left this placement pending until a person approved it.
+	// Commit is that release. Off still never creates the tracked link.
+	if modes.Get(database.StepPlacementPublish) == database.ModeOff {
+		c.JSON(http.StatusForbidden, stepBody(database.StepPlacementPublish, "step_off", stepOffMessage(database.StepPlacementPublish)))
 		return
 	}
 	code, err := generateTrackingCode()
