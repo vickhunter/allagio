@@ -29,17 +29,20 @@ func TestSitesInstallationRegistrationRetries(t *testing.T) {
 	if first.Code != 200 || retry.Code != 200 {
 		t.Fatalf("registration failed: %d %d", first.Code, retry.Code)
 	}
-	var one, two map[string]string
+	var one, two struct {
+		SiteID string `json:"site_id"`
+		APIKey string `json:"api_key"`
+	}
 	if err := json.Unmarshal(first.Body.Bytes(), &one); err != nil {
 		t.Fatal(err)
 	}
 	if err := json.Unmarshal(retry.Body.Bytes(), &two); err != nil {
 		t.Fatal(err)
 	}
-	if one["site_id"] != two["site_id"] || two["api_key"] != key {
+	if one.SiteID != two.SiteID || two.APIKey != key {
 		t.Fatal("retry created another site or changed its credential")
 	}
-	site, err := db.GetSiteByID(context.Background(), one["site_id"])
+	site, err := db.GetSiteByID(context.Background(), one.SiteID)
 	if err != nil || site.APIKeyHash != services.HashAPIKey(key) {
 		t.Fatal("installation key was not hashed")
 	}

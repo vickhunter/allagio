@@ -91,6 +91,12 @@ class Affilio_Onboarding {
                 update_option('affilio_api_key', (string) $response['data']['api_key'], false);
                 update_option('affilio_site_id', $response['data']['site_id'], false);
                 $this->store_issued_plugin_key($response['data']);
+                if (isset($response['data']['verification_token']) && is_string($response['data']['verification_token']) && trim($response['data']['verification_token']) !== '') {
+                    update_option('affilio_verification_token', trim($response['data']['verification_token']), false);
+                }
+            }
+            if (method_exists($this->api, 'refresh_verification_token')) {
+                $this->api->refresh_verification_token();
             }
             $this->api->invalidate_status_cache();
             $connection = $this->api->get_connection_status(true);

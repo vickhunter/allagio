@@ -384,7 +384,51 @@ class Affilio_Go {
         return self::safe_redirect_location($fallback);
     }
 
+    public static function request_path() {
+        $uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
+        $path = parse_url($uri, PHP_URL_PATH);
+        if (!is_string($path) || $path === '') {
+            $path = $uri;
+        }
+        $decoded = rawurldecode($path);
+        if (strpos($decoded, "\0") !== false) {
+            return '';
+        }
+        return $decoded;
+    }
+
+    public static function is_verification_request() {
+        return (bool) preg_match('#/\.well-known/offer-rails\.txt/?$#', self::request_path());
+    }
+
+    public static function verification_body() {
+        if (!self::is_verification_request()) {
+            return '';
+        }
+        $key = function_exists('get_option') ? trim((string) get_option('affilio_api_key', '')) : '';
+        $token = function_exists('get_option') ? trim((string) get_option('affilio_verification_token', '')) : '';
+        if ($key === '' || $token === '') {
+            return '';
+        }
+        return $token;
+    }
+
+    public static function maybe_serve_verification($wp = null) {
+        $token = self::verification_body();
+        if ($token === '') {
+            return;
+        }
+        if (!headers_sent()) {
+            header('Content-Type: text/plain; charset=utf-8');
+            header('Cache-Control: no-store');
+            header('X-Robots-Tag: noindex, nofollow');
+        }
+        echo $token . "\n";
+        exit;
+    }
+
     public function handle() {
+        self::maybe_serve_verification();
         $id = self::current_id();
         if ($id === '') {
             return;

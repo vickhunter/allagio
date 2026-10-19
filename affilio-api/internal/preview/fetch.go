@@ -50,6 +50,13 @@ type Page struct {
 	Text  string
 }
 
+// Document is the raw body of one public response.
+type Document struct {
+	Body        []byte
+	ContentType string
+	FinalURL    string
+}
+
 // Fetcher GETs one public page. A zero Fetcher uses the process resolver and dialer.
 // TLSClientConfig is for tests that terminate TLS locally. Leave it nil so the
 // live client keeps verifying certificates.
@@ -128,11 +135,67 @@ func (f Fetcher) Fetch(ctx context.Context, rawURL string) (Page, error) {
 	return pageFromOEmbed(kind, body)
 }
 
+// FetchDocument downloads rawURL and returns the response body.
+// A redirect that changes host, scheme, or port is refused, so the body is
+// from the origin that was asked. It does not log the URL or the body.
+func (f Fetcher) FetchDocument(ctx context.Context, rawURL string) (Document, error) {
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
+
+	pins := &pinSet{hosts: map[string]net.IP{}}
+	if err := f.admit(ctx, pins, rawURL); err != nil {
+		return Document{}, err
+	}
+	first, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return Document{}, ErrInvalidURL
+	}
+
+	client := f.clientFor(pins, first)
+	defer client.CloseIdleConnections()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, first.String(), nil)
+	if err != nil {
+		return Document{}, ErrInvalidURL
+	}
+	req.Header.Set("User-Agent", "OfferRails-Verify/1.0")
+	req.Header.Set("Accept", "text/plain, text/html;q=0.9")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 512))
+			resp.Body.Close()
+		}
+		return Document{}, classify(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return Document{}, ErrFetch
+	}
+	if resp.ContentLength > maxBody {
+		return Document{}, ErrFetch
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
+	if err != nil || len(body) > maxBody {
+		return Document{}, ErrFetch
+	}
+	finalURL := ""
+	if resp.Request != nil && resp.Request.URL != nil {
+		finalURL = resp.Request.URL.String()
+	}
+	return Document{Body: body, ContentType: resp.Header.Get("Content-Type"), FinalURL: finalURL}, nil
+}
+
 // client speaks HTTP/1.1 on the pinned address. Clearing TLSNextProto only
 // disables the HTTP/2 transport. The cloned client still offers h2, and a
 // server that accepts that offer answers with a preface the HTTP/1 reader
 // rejects. NextProtos keeps the handshake on HTTP/1.1.
 func (f Fetcher) client(pins *pinSet) *http.Client {
+	return f.clientFor(pins, nil)
+}
+
+func (f Fetcher) clientFor(pins *pinSet, origin *url.URL) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	transport.ForceAttemptHTTP2 = false
@@ -166,6 +229,9 @@ func (f Fetcher) client(pins *pinSet) *http.Client {
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= maxRedirects+1 {
+				return ErrFetch
+			}
+			if origin != nil && !sameDocumentOrigin(origin, req.URL) {
 				return ErrFetch
 			}
 			return f.admit(req.Context(), pins, req.URL.String())
@@ -307,6 +373,29 @@ func (p *pinSet) get(host string) (net.IP, bool) {
 		return nil, false
 	}
 	return append(net.IP(nil), ip...), true
+}
+
+func sameDocumentOrigin(origin, next *url.URL) bool {
+	if origin == nil || next == nil {
+		return false
+	}
+	if !strings.EqualFold(origin.Scheme, next.Scheme) {
+		return false
+	}
+	if hostKey(origin.Hostname()) != hostKey(next.Hostname()) {
+		return false
+	}
+	return originPort(origin) == originPort(next)
+}
+
+func originPort(parsed *url.URL) string {
+	if port := parsed.Port(); port != "" {
+		return port
+	}
+	if strings.EqualFold(parsed.Scheme, "https") {
+		return "443"
+	}
+	return "80"
 }
 
 func hostKey(host string) string {

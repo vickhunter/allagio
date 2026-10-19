@@ -290,6 +290,11 @@ class Affilio_Admin {
                 }
                 $this->keep_or_replace_secret('affilio_admin_api_key', 'affilio_admin_api_key');
             }
+            if (trim((string) get_option('affilio_api_key', '')) === '') {
+                delete_option('affilio_verification_token');
+            } elseif (method_exists($this->api, 'refresh_verification_token')) {
+                $this->api->refresh_verification_token();
+            }
             $this->api->invalidate_status_cache();
             $this->api->get_connection_status(true);
             if ($url_error !== '') {
