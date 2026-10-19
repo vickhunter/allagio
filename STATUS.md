@@ -6,6 +6,8 @@ Each agent step is `site_signup`, `offer_match`, `placement_publish`, `link_chan
 
 A first signup, with no owner for that email and no site key, stays `auto`. Registering with a site key uses that site's `site_signup` mode. Another agent account for an email that already has an owner uses the strictest `site_signup` mode among those owners. `off` wins over `ask`.
 
+The owner dashboard uses the same payout gate. `POST /owner/payouts/:id/confirm-received` does not stamp receipt when payout is `off` or `ask`. `off` returns `step_off` and the dashboard shows that message instead of the confirm button. `ask` queues the approval. Creating a publisher account from `POST /owner/accounts` uses the same `site_signup` gate. Commit of an already approved placement stays available while publish is `ask`; `off` still does not create the tracked link.
+
 An unverified domain forces `ask` on placement publish. `off` still does not run. Auto publish also waits while the claims check is not live. When the domain is verified and the claims check is live, auto approves and commits that placement. Migration `042_d062_step_modes.sql` is additive and idempotent. It does not backfill. `AUTO_MIGRATE` stays off unless it is set to `true`.
 
 ## October 19 — Public copy drops ad, ads, and pilot

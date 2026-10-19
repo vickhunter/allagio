@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"html/template"
 	"net/http"
 	"strings"
 
@@ -135,6 +136,42 @@ func signupGate(c *gin.Context, db *database.DB, owners []database.OwnerRef) (ow
 		}
 	}
 	return ownerID, siteID, mode, nil
+}
+
+// holdDashboardStep applies the same ask and off decision as holdStep.
+// A JSON client gets that JSON body. A dashboard form gets the owner page,
+// with the reason visible, and ask is still stored on the approval queue.
+func (h *HostedHandler) holdDashboardStep(c *gin.Context, step, ownerID, siteID string, payload map[string]any) bool {
+	if strings.Contains(strings.ToLower(c.GetHeader("Content-Type")), "application/json") {
+		return holdStep(c, h.DB, step, ownerID, siteID, payload)
+	}
+	modes, err := h.DB.LoadStepModes(c.Request.Context(), ownerID, siteID)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return true
+	}
+	switch modes.Get(step) {
+	case database.ModeOff:
+		c.Status(http.StatusForbidden)
+		h.render(c, "This step is off", stepOffMessage(step), template.HTML(`<p data-reason="step_off">step_off</p>`))
+		return true
+	case database.ModeAsk:
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			return true
+		}
+		id, err := h.DB.InsertStepApproval(c.Request.Context(), step, ownerID, siteID, raw)
+		if err != nil {
+			c.Status(http.StatusInternalServerError)
+			return true
+		}
+		c.Status(http.StatusAccepted)
+		h.render(c, "Waiting for approval", stepAskMessage(step), template.HTML(`<p data-reason="step_ask">step_ask</p><p data-approval-id="`+template.HTMLEscapeString(id)+`"></p>`))
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *SitesHandler) holdRegister(c *gin.Context, req siteRegisterRequest) bool {

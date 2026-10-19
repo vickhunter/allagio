@@ -415,6 +415,18 @@ func (h *PlacementsHandler) Commit(c *gin.Context) {
 	if !h.requireLinkedPublisher(c) {
 		return
 	}
+	siteID := siteIDFrom(c)
+	modes, err := h.DB.LoadStepModes(c.Request.Context(), ownerForSite(c, h.DB, siteID), siteID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
+		return
+	}
+	// Ask already left this placement pending until a person approved it.
+	// Commit is that release. Off still never creates the tracked link.
+	if modes.Get(database.StepPlacementPublish) == database.ModeOff {
+		c.JSON(http.StatusForbidden, stepBody(database.StepPlacementPublish, "step_off", stepOffMessage(database.StepPlacementPublish)))
+		return
+	}
 	code, err := generateTrackingCode()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "link generation failed"})

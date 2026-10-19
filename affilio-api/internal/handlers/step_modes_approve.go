@@ -64,6 +64,9 @@ func approveSignup(c *gin.Context, db *database.DB, payload map[string]any) (map
 	if kind == "agent_account" {
 		return approveAgentAccount(c, db, payload)
 	}
+	if kind == "owner_account" {
+		return approveOwnerAccount(c, db, payload)
+	}
 	domain, _ := payload["domain"].(string)
 	name, _ := payload["name"].(string)
 	apiKey, err := generateAPIKey()
@@ -87,6 +90,31 @@ func approveSignup(c *gin.Context, db *database.DB, payload map[string]any) (map
 		body["plugin_key"] = pluginKey
 	}
 	return body, nil
+}
+
+func approveOwnerAccount(c *gin.Context, db *database.DB, payload map[string]any) (map[string]any, error) {
+	ownerID, _ := payload["owner_id"].(string)
+	domain, _ := payload["domain"].(string)
+	if ownerID == "" || domain == "" {
+		return nil, errors.New("owner account payload incomplete")
+	}
+	var owner database.Owner
+	err := db.Pool.QueryRow(c.Request.Context(), `SELECT id::text, email, name FROM owners WHERE id=$1`, ownerID).Scan(&owner.ID, &owner.Email, &owner.Name)
+	if err != nil {
+		return nil, err
+	}
+	key, err := randomToken()
+	if err != nil {
+		return nil, err
+	}
+	if err = db.CreateOwnerAccount(c.Request.Context(), &owner, "publisher", domain, services.HashAPIKey(key), services.KeyPrefix(key)); err != nil {
+		return nil, err
+	}
+	var siteID string
+	if err = db.Pool.QueryRow(c.Request.Context(), `SELECT COALESCE(site_id::text,'') FROM owners WHERE id=$1`, ownerID).Scan(&siteID); err != nil {
+		return nil, err
+	}
+	return map[string]any{"site_id": siteID, "owner_id": ownerID}, nil
 }
 
 func approveAgentAccount(c *gin.Context, db *database.DB, payload map[string]any) (map[string]any, error) {

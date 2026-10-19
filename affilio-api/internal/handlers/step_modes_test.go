@@ -35,7 +35,12 @@ func newStepModeRouter(db *database.DB, claims entry.ClaimChecker) (*HostedHandl
 	admin.POST("/offer-review/steps/:id/approve", review.ApproveStep)
 	admin.POST("/payout-batches/run", payouts.RunBatch)
 	admin.POST("/payout-batches/:id/mark-paid", payouts.MarkPaid)
-	h.mountWorkspace(r.Group(""), r.Group("/owner", h.RequireOwnerSession))
+	owner := r.Group("/owner", h.RequireOwnerSession)
+	owner.GET("", h.Dashboard)
+	owner.POST("/accounts", h.OwnerAccount)
+	owner.POST("/placements/:id/approve", h.ApprovePlacement)
+	owner.POST("/payouts/:id/confirm-received", h.requirePublisher, h.ConfirmReceived)
+	h.mountWorkspace(r.Group(""), owner)
 	return h, r
 }
 
