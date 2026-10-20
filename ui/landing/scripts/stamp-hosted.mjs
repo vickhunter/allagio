@@ -40,7 +40,7 @@ const setupShell = `<div id="static-landing">
         <li>
           <h2>Choose the approval mode</h2>
           <p>To do</p>
-          <p>YOLO is selected.</p>
+          <p>Manual is selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on.</p>
           <p><a data-step-action href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Save this mode</a></p>
         </li>
       </ol>

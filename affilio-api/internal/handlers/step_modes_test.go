@@ -126,12 +126,12 @@ func TestStepModesDefaultToAuto(t *testing.T) {
 	defer cleanup()
 	_, r := newStepModeRouter(db, entry.LiveClaimChecker{})
 	_, siteID, key := signupPublisher(t, r, "modes-default@example.com", "modes-default.example")
-	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes`) != 0 {
-		t.Fatal("a missing setting was stored")
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes WHERE site_id=$1 AND placement_publish='ask'`, siteID) != 1 {
+		t.Fatal("a new site did not store placement publish ask")
 	}
 	rec, body := postJSON(t, r, http.MethodGet, "/v1/step-modes", nil, map[string]string{"X-API-Key": key})
 	modes := modeMap(t, body)
-	if rec.Code != http.StatusOK || body["site_id"] != siteID || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["placement_publish"] != "auto" || modes["link_change"] != "auto" || modes["payout"] != "auto" {
+	if rec.Code != http.StatusOK || body["site_id"] != siteID || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["placement_publish"] != "ask" || modes["link_change"] != "auto" || modes["payout"] != "auto" {
 		t.Fatalf("defaults: %d %s", rec.Code, rec.Body.String())
 	}
 	if body["placement_publish_effective"] != "ask" || body["placement_publish_reason"] != "domain_unverified" {

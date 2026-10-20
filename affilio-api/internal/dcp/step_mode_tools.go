@@ -3,6 +3,8 @@ package dcp
 import (
 	"fmt"
 	"net/http"
+
+	"affilio-api/internal/entry"
 )
 
 func init() {
@@ -12,7 +14,7 @@ func init() {
 var stepModeTools = []Tool{
 	{
 		Name:        "get_step_modes",
-		Description: "Read this owner or site's step modes. Each of site_signup, offer_match, placement_publish, link_change, and payout is auto, ask, or off. A missing setting is auto.",
+		Description: "Read this owner or site's step modes. Each of site_signup, offer_match, placement_publish, link_change, and payout is auto, ask, or off. " + entry.NewSitePublishDefault + " A site with no saved row still reads every step as auto.",
 		InputSchema: schema(nil, map[string]interface{}{}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			return callStepModes(c, http.MethodGet, nil)

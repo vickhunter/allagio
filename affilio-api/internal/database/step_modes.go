@@ -19,7 +19,9 @@ const (
 	ModeOff              = "off"
 )
 
-// StepModes is the owner's choice for each agent step. Empty means auto.
+// StepModes is the owner's choice for each agent step.
+// An empty field on a missing row reads as auto, which is what sites created
+// before D-088 still do. A new site stores placement publish as ask.
 type StepModes struct {
 	SiteSignup       string
 	OfferMatch       string
@@ -104,6 +106,8 @@ func stepScopeKey(ownerID, siteID string) (string, bool) {
 
 // LoadStepModes returns the saved modes for this owner and site.
 // A site row wins over an owner-wide row. No row means every step is auto.
+// New site creation writes placement publish as ask, so a missing row is only
+// a site that never received that write.
 func (d *DB) LoadStepModes(ctx context.Context, ownerID, siteID string) (StepModes, error) {
 	if ownerID == "" && siteID == "" {
 		return StepModes{}.filled(), nil
@@ -126,6 +130,30 @@ LIMIT 1`, ownerID, siteID).Scan(&m.SiteSignup, &m.OfferMatch, &m.PlacementPublis
 		return StepModes{}, err
 	}
 	return m.filled(), nil
+}
+
+// seedNewSitePublishAsk stores placement publish as ask for a site that was
+// just created. The other steps stay auto. An existing row is left alone, and
+// an owner-wide row is left alone, so a site that already chose its modes
+// keeps them. A missing row still reads as auto.
+func seedNewSitePublishAsk(ctx context.Context, tx pgx.Tx, ownerID, siteID string) error {
+	if siteID == "" {
+		return errors.New("site required")
+	}
+	key, ok := stepScopeKey(ownerID, siteID)
+	if !ok {
+		return errors.New("site required")
+	}
+	_, err := tx.Exec(ctx, `
+INSERT INTO agent_step_modes(scope_key, owner_id, site_id, site_signup, offer_match, placement_publish, link_change, payout)
+SELECT $1, NULLIF($2,'')::uuid, $3::uuid, 'auto', 'auto', 'ask', 'auto', 'auto'
+WHERE NOT EXISTS (
+  SELECT 1 FROM agent_step_modes
+  WHERE scope_key = $1
+     OR (NULLIF($2,'') IS NOT NULL AND owner_id = NULLIF($2,'')::uuid AND site_id IS NULL)
+)
+ON CONFLICT (scope_key) DO NOTHING`, key, ownerID, siteID)
+	return err
 }
 
 // SaveStepModes upserts one owner/site row. It does not rewrite other rows.

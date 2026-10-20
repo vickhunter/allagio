@@ -16,6 +16,11 @@ const ClaimCheckReason = "claim_check_unavailable"
 // ClaimCheckMessage is the sentence returned with ClaimCheckReason.
 const ClaimCheckMessage = "Automatic approval is off until claim checks are live."
 
+// NewSitePublishDefault is the plain-language default for a new publisher site.
+// It does not flip when claim checks are live. A site with no step-mode row
+// still reads as auto.
+const NewSitePublishDefault = "A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on."
+
 // YoloAfterFirstReason is why a saved yolo site still answers manual
 // until its first approved placement.
 const YoloAfterFirstReason = "yolo_after_first_placement"

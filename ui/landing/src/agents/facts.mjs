@@ -45,7 +45,7 @@ export const tools = [
   { name: 'preview_revenue', soon: false, maker: false, line: 'Call preview_revenue before you have an account when you want up to five offers for some text, and it writes nothing.' },
   { name: 'preview_page', soon: true, maker: false, line: 'Coming soon. Not on the hosted MCP server yet.' },
   { name: 'find_opportunities', soon: false, maker: false, line: 'Call find_opportunities with a site key when you have article text and want up to five offers, or no_match when the fit is weak.' },
-  { name: 'prepare_placement', soon: false, maker: false, line: 'Call prepare_placement when you have an offer and article copy to propose. It does not publish, and a person still has to approve.' },
+  { name: 'prepare_placement', soon: false, maker: false, line: 'Call prepare_placement when you have an offer and article copy to propose. It does not publish, and a person still has to approve. A held proposal is HTTP 201 with status awaiting_approval and hold_reason, and no error key.' },
   { name: 'list_agent_tasks', soon: false, maker: false, line: 'Call list_agent_tasks to resume: pending means a person is still reviewing, and approved means you can commit once.' },
   { name: 'get_placement', soon: false, maker: false, line: 'Call get_placement when you need one owned proposal, its terms, whether it is approved, and its receipt.' },
   { name: 'commit_placement', soon: false, maker: false, line: 'Call commit_placement after a person approves, while the proposal is unexpired. It returns the link and the text, and it does not publish.' },
@@ -114,7 +114,7 @@ export const orderedSteps = [
     n: 4,
     title: 'Find and prepare',
     line: 'POST /v1/revenue/opportunities with X-API-Key, then POST /v1/placements with X-API-Key.',
-    body: 'POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy. surface_url must be on the domain you signed up with. Copy is at most 140 characters and may not add numbers or claims the offer data doesn\'t have (server answers 422 claims_from_offer).',
+    body: 'POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy. surface_url must be on the domain you signed up with. Copy is at most 140 characters and may not add numbers or claims the offer data doesn\'t have (server answers 422 claims_from_offer). A created placement that waits is HTTP 201 with status awaiting_approval and hold_reason. hold_reason is domain_unverified, step_ask, or claim_check_unavailable. That body has reason and message, and it has no error key. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on. A new publisher site stores placement publish as ask, so the hold_reason is step_ask once the domain is verified. A person can set that step to auto later. A site from before this default that never saved a step mode still reads as auto. A placement that publishes is HTTP 201 with status published. An ask that queues signup, match, link change, or payout is HTTP 202 with the same status and hold_reason and no error key.',
   },
   {
     n: 5,

@@ -4,7 +4,7 @@ import { useSource, withSource } from '@/lib/source'
 // D-048 /protocol: short, plain explanation. No GitHub link until a public repo exists.
 const parts = [
   { t: 'Offers', b: 'A maker’s agent publishes an offer: what the product is, its category and the commission it pays. No customer data is ever part of it.' },
-  { t: 'Placement', b: 'A publisher’s agent can propose where an offer fits. The publisher setup page opens with YOLO selected. After sign-in, the server preselects YOLO for cli, cursor, grok, mcp, and connector, and Manual for every other source. Manual and Auto are the other choices on that page.' },
+  { t: 'Placement', b: 'A publisher’s agent can propose where an offer fits. The publisher setup page opens with Manual selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on. After sign-in, the server preselects YOLO for cli, cursor, grok, mcp, and connector, and Manual for every other source. Auto and YOLO are the other choices on that page.' },
   { t: 'Attribution', b: 'When a reader buys, the sale is linked to the placement, so the publisher gets credit and the maker sees where it came from.' },
   { t: 'Undo and refunds', b: 'A placement can be removed at any time. Refunds reverse the commission.' },
 ]

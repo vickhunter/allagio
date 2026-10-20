@@ -107,7 +107,7 @@
     ],
     "serious": [],
     "connectHref": "/auth/login?return_to=%2Fowner%2Fconnect-site%3Fsource%3Dcursor&source=cursor",
-    "yolo": true
+    "manual": true
   },
   {
     "slug": "agents-390",
@@ -117,7 +117,7 @@
     "forbidden": false,
     "steps": 0,
     "ordered": 11,
-    "height": 6987,
+    "height": 7011,
     "headings": [],
     "soon": [
       "preview_page",
@@ -402,7 +402,7 @@
     ],
     "serious": [],
     "connectHref": "/auth/login?return_to=%2Fowner%2Fconnect-site%3Fsource%3Dcursor&source=cursor",
-    "yolo": true
+    "manual": true
   },
   {
     "slug": "agents-1440",

@@ -1,3 +1,11 @@
+## October 20 — New sites wait for a person before a placement is published
+
+A new publisher site stores `placement_publish` as `ask`. The other steps stay `auto`. A created placement is HTTP 201 with `status` `awaiting_approval` and `hold_reason` `step_ask` once the domain is verified. An unverified domain still uses `domain_unverified`. A site with no `agent_step_modes` row still reads every step as `auto`, which is the read for a site created before this change. Registering that site again does not add a row. Saving a mode, including `auto`, is left as stored.
+
+The starting choice does not flip when `CLAIMS_CHECK=real` is on. A person sets placement publish to `auto` when they want a verified site to publish without a confirm. While claim checks are not live, a stored `auto` still waits with `claim_check_unavailable`.
+
+The old default was `auto` in three places: the `placement_publish` column default in `042_d062_step_modes.sql`, `LoadStepModes` when no row exists, and the `get_step_modes` tool text ("A missing setting is auto"). The setup screen preselected YOLO. It now opens with Manual selected. Migration `044_d088_new_site_publish_ask.sql` sets the column default to `ask` and does not rewrite existing rows. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 20 — Health commit, held placement body, domain proof
 
 `GET /health` and `GET /v1/health` include `commit`. `RENDER_GIT_COMMIT` wins, then `RAILWAY_GIT_COMMIT_SHA`, then the SHA baked with `-X affilio-api/internal/version.commit`. Both Dockerfiles take `GIT_COMMIT` (default `unknown`).

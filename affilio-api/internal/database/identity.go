@@ -142,6 +142,9 @@ func (d *DB) CreateOwnerAccount(ctx context.Context, o *Owner, role, domain, key
 		if err == nil {
 			_, err = tx.Exec(ctx, `UPDATE owners SET site_id=$2 WHERE id=$1`, o.ID, id)
 		}
+		if err == nil {
+			err = seedNewSitePublishAsk(ctx, tx, o.ID, id)
+		}
 	case "maker":
 		if makerID != "" {
 			return errors.New("maker account already linked")
