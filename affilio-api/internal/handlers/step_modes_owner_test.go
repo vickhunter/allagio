@@ -152,7 +152,7 @@ func TestOwnerMatchPublishAndCommitOffAndAsk(t *testing.T) {
 	if askedPublish.Code != http.StatusCreated || placement["status"] != "pending" || placementID == "" {
 		t.Fatalf("publish ask: %d %s", askedPublish.Code, askedPublish.Body.String())
 	}
-	requireHold(t, askedPublishBody, "step_ask")
+	requireHold(t, askedPublishBody, "domain_unverified")
 	approved := ownerForm(t, h, r, cookie, "/owner/placements/"+placementID+"/approve", url.Values{"csrf": {owner.CSRF}})
 	if approved.Code != http.StatusSeeOther {
 		t.Fatalf("owner approve: %d %s", approved.Code, approved.Body.String())
