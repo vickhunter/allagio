@@ -159,7 +159,7 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 - `GET /offer-review/flagged-conversions`, `POST /offer-review/conversions/:id/clear-flag` — Fraud flag review
 
 **Unauthenticated:**
-- `GET /health` — Health check
+- `GET /health` — Health check. JSON includes `commit` (RENDER_GIT_COMMIT, then RAILWAY_GIT_COMMIT_SHA, then the build-time SHA, else `unknown`)
 - `POST /v1/sites/register` — Site registration (rate limited: 8 req/min per IP)
 - `POST /v1/makers/register` — Maker registration (rate limited: 8 req/min per IP)
 - `GET /v1/go/:code` — Tracked redirect link (rate limited: 120 req/min per IP)
