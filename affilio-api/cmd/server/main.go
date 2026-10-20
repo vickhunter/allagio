@@ -17,6 +17,7 @@ import (
 	"affilio-api/internal/middleware"
 	"affilio-api/internal/migrations"
 	"affilio-api/internal/services"
+	"affilio-api/internal/version"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,6 +39,17 @@ func localSession(cfg config.Config) bool {
 		log.Fatal("OFFER_RAILS_CI_SESSION only listens on localhost")
 	}
 	return false
+}
+
+func healthHandler(native bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status":                         "ok",
+			"site_installation_registration": true,
+			"native_distribution":            native,
+			"commit":                         version.Commit(),
+		})
+	}
 }
 
 func main() {
@@ -87,9 +99,7 @@ func main() {
 		}
 		r.GET("/pilot", func(c *gin.Context) { c.File(cfg.POCReportPath) })
 	}
-	health := func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok", "site_installation_registration": true, "native_distribution": cfg.PublicBaseURL != ""})
-	}
+	health := healthHandler(cfg.PublicBaseURL != "")
 	r.GET("/health", health)
 	preview := &handlers.PreviewHandler{
 		DB:      db,
