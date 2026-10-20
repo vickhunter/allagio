@@ -1,3 +1,13 @@
+## October 20 — Health commit, held placement body, domain proof
+
+`GET /health` and `GET /v1/health` include `commit`. `RENDER_GIT_COMMIT` wins, then `RAILWAY_GIT_COMMIT_SHA`, then the SHA baked with `-X affilio-api/internal/version.commit`. Both Dockerfiles take `GIT_COMMIT` (default `unknown`).
+
+A created placement that waits is still HTTP 201. The body has `status` `awaiting_approval` and `hold_reason` (`domain_unverified`, `step_ask`, or `claim_check_unavailable`). It has `reason` and `message`, and it has no `error` key. The same shape is HTTP 202 when signup, match, link change, or payout is queued. A step that is off stays HTTP 403 and still includes `error`. `llms.txt` says this. There is no OpenAPI file.
+
+`TestDomainVerificationTokenServedThenConflict` serves the token from an httptest server, expects 200 `verified`, then 409 `domain_verified` with no second fetch. `docs/verify-domain-howto.md` is the hosted proof for a domain the operator controls.
+
+`CLAIMS_CHECK=real` is unchanged and stays off unless the env is set. It does not call a model. See the pull request for the fetch, the env vars, and the cost.
+
 ## October 19 — Demo operator view, demo digest, and test go links
 
 `GET /demo/operator` is a read-only operator screen. It needs no API key and no Google sign-in. It shows a pending placement on the demo site and an approved placement with `approved_by` `operator`. The Approve button posts back to `POST /demo/operator`, which changes nothing. Approval of a real placement stays on `POST /v1/offer-review/placements/:id/approve` with `X-Admin-Key`, or on the signed-in owner page.

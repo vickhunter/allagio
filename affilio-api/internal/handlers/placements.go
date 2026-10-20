@@ -272,9 +272,8 @@ func (h *PlacementsHandler) finishPublish(c *gin.Context, ownerID, siteID string
 	}
 	choice := choosePublish(modes.Get(database.StepPlacementPublish), verified, h.claims().Real())
 	if choice.Effective != database.ModeAuto {
-		body := stepBody(database.StepPlacementPublish, choice.Reason, choice.Message)
+		body := heldResponse(database.StepPlacementPublish, choice.Reason, choice.Message)
 		body["placement"] = p
-		body["status"] = "awaiting_approval"
 		body["next_action"] = placementWaitingAction
 		c.JSON(http.StatusCreated, body)
 		return

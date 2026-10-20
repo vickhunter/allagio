@@ -12,7 +12,7 @@ Create a Render web service from this repo and point it at `Dockerfile.mvp`. Ren
 
 A [free web service](https://render.com/docs/free) spins down after 15 minutes without inbound traffic and takes about a minute to spin back up. Browsers see a Render loading page during that minute. A spun-down `/robots.txt` is a disallow-all response and does not wake the service. Free Render Postgres expires 30 days after creation, so this path does not use it.
 
-Clients and agents must call `GET /health` before any other request. If the connection fails, times out, or returns a non-JSON loading page, wait and retry with backoff (for example 5s, 10s, 20s, 40s) for about two minutes. That wait is the cold start. It is not a failed deploy.
+Clients and agents must call `GET /health` before any other request. The JSON includes `commit`: `RENDER_GIT_COMMIT`, then `RAILWAY_GIT_COMMIT_SHA`, then the SHA from the image build arg `GIT_COMMIT`, then `unknown`. If the connection fails, times out, or returns a non-JSON loading page, wait and retry with backoff (for example 5s, 10s, 20s, 40s) for about two minutes. That wait is the cold start. It is not a failed deploy.
 
 Set the Render health check path to `/health`.
 

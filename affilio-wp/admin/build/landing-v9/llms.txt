@@ -59,7 +59,7 @@ The hosted app uses these steps.
 
 3. Join an offer. List offers with GET /v1/marketplace/offers (X-API-Key). POST /v1/marketplace/offers/:id/join with X-API-Key. Join returns tracked_link /v1/go/<tracking_code>.
 
-4. Find and prepare. POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy. surface_url must be on the domain you signed up with. Copy is at most 140 characters and may not add numbers or claims the offer data doesn't have (server answers 422 claims_from_offer).
+4. Find and prepare. POST /v1/revenue/opportunities with X-API-Key and context. Then POST /v1/placements with X-API-Key, offer_id, surface_url, context, and copy. surface_url must be on the domain you signed up with. Copy is at most 140 characters and may not add numbers or claims the offer data doesn't have (server answers 422 claims_from_offer). A created placement that waits is HTTP 201 with status awaiting_approval and hold_reason. hold_reason is domain_unverified, step_ask, or claim_check_unavailable. That body has reason and message, and it has no error key. A placement that publishes is HTTP 201 with status published. An ask that queues signup, match, link change, or payout is HTTP 202 with the same status and hold_reason and no error key.
 
 5. Approval. A signed-in owner uses the dashboard. An operator sends POST /v1/offer-review/placements/:id/approve with X-Admin-Key and site_id, owner_email, and evidence. A site key cannot approve. Approving a device code does not approve a placement.
    Step 5 stays a human or an operator for now.
@@ -101,7 +101,7 @@ This is the human page for a device code. It is separate from the agent-created 
 - preview_revenue: Call preview_revenue before you have an account when you want up to five offers for some text, and it writes nothing.
 - preview_page: Coming soon. Not on the hosted MCP server yet.
 - find_opportunities: Call find_opportunities with a site key when you have article text and want up to five offers, or no_match when the fit is weak.
-- prepare_placement: Call prepare_placement when you have an offer and article copy to propose. It does not publish, and a person still has to approve.
+- prepare_placement: Call prepare_placement when you have an offer and article copy to propose. It does not publish, and a person still has to approve. A held proposal is HTTP 201 with status awaiting_approval and hold_reason, and no error key.
 - list_agent_tasks: Call list_agent_tasks to resume: pending means a person is still reviewing, and approved means you can commit once.
 - get_placement: Call get_placement when you need one owned proposal, its terms, whether it is approved, and its receipt.
 - commit_placement: Call commit_placement after a person approves, while the proposal is unexpired. It returns the link and the text, and it does not publish.

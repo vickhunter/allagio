@@ -81,8 +81,24 @@ func choosePublish(stored string, verified, claimsReal bool) publishChoice {
 	return publishChoice{Effective: database.ModeAuto}
 }
 
+func stepFields(step, reason, message string) gin.H {
+	return gin.H{"reason": reason, "step": step, "message": message}
+}
+
+// stepBody is a refusal. error repeats message for clients that only read error.
 func stepBody(step, reason, message string) gin.H {
-	return gin.H{"reason": reason, "step": step, "message": message, "error": message}
+	body := stepFields(step, reason, message)
+	body["error"] = message
+	return body
+}
+
+// heldResponse is a created or queued hold. The request succeeded, so the
+// body has status and hold_reason and no error key.
+func heldResponse(step, reason, message string) gin.H {
+	body := stepFields(step, reason, message)
+	body["status"] = "awaiting_approval"
+	body["hold_reason"] = reason
+	return body
 }
 
 // holdStep stops the handler when the step is ask or off.
@@ -108,8 +124,7 @@ func holdStep(c *gin.Context, db *database.DB, step, ownerID, siteID string, pay
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
 			return true
 		}
-		body := stepBody(step, "step_ask", stepAskMessage(step))
-		body["status"] = "awaiting_approval"
+		body := heldResponse(step, "step_ask", stepAskMessage(step))
 		body["approval_id"] = id
 		c.JSON(http.StatusAccepted, body)
 		return true
