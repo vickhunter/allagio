@@ -345,6 +345,9 @@ VALUES('https://offer-rails.agent',$1,$2,$3,$4,true,false) RETURNING id`, subjec
 		if err == nil {
 			_, err = tx.Exec(ctx, `INSERT INTO plugin_keys(key_hash, key_prefix, site_id) VALUES($1,$2,$3)`, pluginHash, pluginPrefix, out.SiteID)
 		}
+		if err == nil {
+			err = seedNewSitePublishAsk(ctx, tx, out.OwnerID, out.SiteID)
+		}
 	case "maker":
 		err = tx.QueryRow(ctx, `INSERT INTO makers(api_key,email,name) VALUES($1,$2,$3) RETURNING id`, makerKey, email, name).Scan(&out.MakerID)
 		if err == nil {

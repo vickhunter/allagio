@@ -286,16 +286,48 @@ func (d *DB) SaveSitePluginVersion(ctx context.Context, siteID, version string) 
 }
 
 func (d *DB) CreateSite(ctx context.Context, keyHash, keyPrefix, domain, name string) (string, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
 	var id string
-	err := d.Pool.QueryRow(ctx, `INSERT INTO sites (api_key_hash, api_key_prefix, domain, name) VALUES ($1,$2,$3,$4) RETURNING id`, keyHash, keyPrefix, domain, name).Scan(&id)
-	return id, err
+	err = tx.QueryRow(ctx, `INSERT INTO sites (api_key_hash, api_key_prefix, domain, name) VALUES ($1,$2,$3,$4) RETURNING id`, keyHash, keyPrefix, domain, name).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	if err = seedNewSitePublishAsk(ctx, tx, "", id); err != nil {
+		return "", err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 func (d *DB) RegisterInstallation(ctx context.Context, keyHash, keyPrefix, domain, name string) (string, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
 	var id string
-	err := d.Pool.QueryRow(ctx, `INSERT INTO sites (api_key_hash, api_key_prefix, domain, name) VALUES ($1,$2,$3,$4)
-ON CONFLICT (api_key_hash) DO UPDATE SET domain=sites.domain WHERE sites.domain=EXCLUDED.domain RETURNING id`, keyHash, keyPrefix, domain, name).Scan(&id)
-	return id, err
+	var created bool
+	err = tx.QueryRow(ctx, `INSERT INTO sites (api_key_hash, api_key_prefix, domain, name) VALUES ($1,$2,$3,$4)
+ON CONFLICT (api_key_hash) DO UPDATE SET domain=sites.domain WHERE sites.domain=EXCLUDED.domain
+RETURNING id, (xmax = 0)`, keyHash, keyPrefix, domain, name).Scan(&id, &created)
+	if err != nil {
+		return "", err
+	}
+	if created {
+		if err = seedNewSitePublishAsk(ctx, tx, "", id); err != nil {
+			return "", err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 func (d *DB) RotateSiteAPIKey(ctx context.Context, siteID, newKeyHash, newKeyPrefix string, gracePeriod time.Duration) error {

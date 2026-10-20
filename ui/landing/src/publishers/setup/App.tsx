@@ -29,13 +29,13 @@ function StatusPill({ status }: { status: StepStatus }) {
 // The first open step is the one filled action. Connect and save use the existing owner sign-in.
 export function App() {
   const source = useSource()
-  const [mode, setMode] = useState<ModeId>('yolo')
+  const [mode, setMode] = useState<ModeId>('manual')
   const connectHref = signInHref('/owner/connect-site', source)
   const saveHref = signInHref('/owner', source)
   const steps: { title: string; body: string; href: string; action: string; status: StepStatus; track: Record<string, string>; extra?: 'mode' }[] = [
     { title: 'Install the plugin', body: 'Upload it in WordPress and turn it on.', href: '/downloads/affilio.zip', action: 'Download the plugin', status: 'todo', track: { 'data-track': 'zip_download' } },
     { title: 'Connect your site', body: 'Sign in with Google, then link the site where you installed the plugin.', href: connectHref, action: 'Connect your site', status: 'todo', track: { 'data-track': 'cta_click', 'data-track-cta': 'connect_site', 'data-track-kind': 'sign_in_click' } },
-    { title: 'Choose the approval mode', body: 'YOLO is selected. Sign in to save it on your account.', href: saveHref, action: 'Save this mode', status: 'todo', track: { 'data-track': 'cta_click', 'data-track-cta': 'save_mode', 'data-track-kind': 'sign_in_click' }, extra: 'mode' },
+    { title: 'Choose the approval mode', body: 'Manual is selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on. Sign in to save it on your account.', href: saveHref, action: 'Save this mode', status: 'todo', track: { 'data-track': 'cta_click', 'data-track-cta': 'save_mode', 'data-track-kind': 'sign_in_click' }, extra: 'mode' },
   ]
   const primary = steps.findIndex((step) => step.status === 'todo')
   return (

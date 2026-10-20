@@ -60,8 +60,10 @@ type publishChoice struct {
 }
 
 // publishChoice picks the placement publish mode. Off never runs.
-// An unverified domain forces ask over auto. A claims checker that is not
-// live also holds an auto placement.
+// An unverified domain forces ask over auto. A stored ask waits for a person.
+// A claims checker that is not live also holds an auto placement.
+// An empty stored value is the pre-D-088 read (auto). New sites store ask,
+// and that stored ask does not flip when claim checks are live.
 func choosePublish(stored string, verified, claimsReal bool) publishChoice {
 	if stored == "" {
 		stored = database.ModeAuto
