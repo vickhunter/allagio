@@ -179,9 +179,10 @@ func TestSiteSignupAskAndOff(t *testing.T) {
 
 	putStepModes(t, r, key, map[string]any{"site_signup": "ask"})
 	asked, askedBody := postJSON(t, r, http.MethodPost, "/v1/sites/register", map[string]any{"domain": "signup-ask.example", "name": "Ask"}, map[string]string{"X-API-Key": key})
-	if asked.Code != http.StatusAccepted || askedBody["reason"] != "step_ask" || askedBody["approval_id"] == "" || countRows(t, db, `SELECT COUNT(*) FROM sites WHERE domain='signup-ask.example'`) != 0 {
+	if asked.Code != http.StatusAccepted || askedBody["approval_id"] == "" || countRows(t, db, `SELECT COUNT(*) FROM sites WHERE domain='signup-ask.example'`) != 0 {
 		t.Fatalf("ask register: %d %s", asked.Code, asked.Body.String())
 	}
+	requireHold(t, askedBody, "step_ask")
 	queue, queueBody := postJSON(t, r, http.MethodGet, "/v1/offer-review/queue", nil, map[string]string{"X-Admin-Key": "test-admin"})
 	waiting, _ := queueBody["step_approvals"].([]any)
 	if queue.Code != http.StatusOK || len(waiting) != 1 {
@@ -220,9 +221,10 @@ func TestOfferMatchAskAndOff(t *testing.T) {
 
 	putStepModes(t, r, key, map[string]any{"offer_match": "ask"})
 	asked, askedBody := postJSON(t, r, http.MethodPost, "/v1/revenue/opportunities", payload, map[string]string{"X-API-Key": key})
-	if asked.Code != http.StatusAccepted || askedBody["reason"] != "step_ask" || askedBody["opportunities"] != nil {
+	if asked.Code != http.StatusAccepted || askedBody["opportunities"] != nil {
 		t.Fatalf("ask match: %d %s", asked.Code, asked.Body.String())
 	}
+	requireHold(t, askedBody, "step_ask")
 	approved := approveStep(t, r, askedBody["approval_id"].(string))
 	found, _ := approved["result"].(map[string]any)["opportunities"].([]any)
 	if len(found) == 0 || found[0].(map[string]any)["offer_id"] != offerID {
@@ -297,24 +299,27 @@ func TestPlacementPublishModesDomainAndClaims(t *testing.T) {
 	putStepModes(t, live, key, map[string]any{"placement_publish": "auto"})
 	unverified, unverifiedBody := preparePlacement(t, live, key, offerID, surface, 2)
 	placement := placementBody(t, unverifiedBody)
-	if unverified.Code != http.StatusCreated || unverifiedBody["status"] != "awaiting_approval" || unverifiedBody["reason"] != "domain_unverified" || placement["status"] != "pending" || !strings.Contains(unverifiedBody["next_action"].(string), "operator") {
+	if unverified.Code != http.StatusCreated || placement["status"] != "pending" || !strings.Contains(unverifiedBody["next_action"].(string), "operator") {
 		t.Fatalf("unverified: %d %s", unverified.Code, unverified.Body.String())
 	}
+	requireHold(t, unverifiedBody, "domain_unverified")
 
 	verifySite(t, db, siteID, "publish-gate.example")
 	putStepModes(t, live, key, map[string]any{"placement_publish": "ask"})
 	asked, askedBody := preparePlacement(t, live, key, offerID, "https://publish-gate.example/posts/asked", 3)
 	askedPlacement := placementBody(t, askedBody)
-	if asked.Code != http.StatusCreated || askedBody["reason"] != "step_ask" || askedPlacement["status"] != "pending" || askedPlacement["approved_by"] != nil && askedPlacement["approved_by"] != "" {
+	if asked.Code != http.StatusCreated || askedPlacement["status"] != "pending" || askedPlacement["approved_by"] != nil && askedPlacement["approved_by"] != "" {
 		t.Fatalf("ask publish: %d %s", asked.Code, asked.Body.String())
 	}
+	requireHold(t, askedBody, "step_ask")
 
 	_, stub := newStepModeRouter(db, entry.StubClaimChecker{})
 	putStepModes(t, stub, key, map[string]any{"placement_publish": "auto"})
 	held, heldBody := preparePlacement(t, stub, key, offerID, "https://publish-gate.example/posts/claims", 4)
-	if held.Code != http.StatusCreated || heldBody["reason"] != "claim_check_unavailable" || heldBody["message"] != "Automatic approval is off until claim checks are live." || placementBody(t, heldBody)["status"] != "pending" {
+	if held.Code != http.StatusCreated || heldBody["message"] != "Automatic approval is off until claim checks are live." || placementBody(t, heldBody)["status"] != "pending" {
 		t.Fatalf("claims hold: %d %s", held.Code, held.Body.String())
 	}
+	requireHold(t, heldBody, "claim_check_unavailable")
 
 	published, publishedBody := preparePlacement(t, live, key, offerID, "https://publish-gate.example/posts/live", 5)
 	livePlacement := placementBody(t, publishedBody)
@@ -338,9 +343,10 @@ func TestAskToAutoPublishesOnlyTheNextPlacement(t *testing.T) {
 	}
 	waiting, waitingBody := preparePlacement(t, r, key, offerID, "https://release-next.example/posts/waiting", 7)
 	waitingID := placementBody(t, waitingBody)["id"].(string)
-	if waiting.Code != http.StatusCreated || waitingBody["status"] != "awaiting_approval" || waitingBody["reason"] != "step_ask" {
+	if waiting.Code != http.StatusCreated {
 		t.Fatalf("waiting publish: %d %s", waiting.Code, waiting.Body.String())
 	}
+	requireHold(t, waitingBody, "step_ask")
 
 	putStepModes(t, r, key, map[string]any{"placement_publish": "auto"})
 	var still string

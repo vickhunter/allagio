@@ -130,9 +130,10 @@ func TestOwnerMatchPublishAndCommitOffAndAsk(t *testing.T) {
 	putOwnerModes(t, r, h, cookie, owner.CSRF, map[string]any{"offer_match": "ask", "placement_publish": "ask"})
 	askedMatch := ownerJSON(t, h, r, cookie, owner.CSRF, http.MethodPost, "/owner/api/opportunities", map[string]any{"context": stepArticle("CodeLens")})
 	var askedMatchBody map[string]any
-	if err := json.Unmarshal(askedMatch.Body.Bytes(), &askedMatchBody); err != nil || askedMatch.Code != http.StatusAccepted || askedMatchBody["reason"] != "step_ask" {
+	if err := json.Unmarshal(askedMatch.Body.Bytes(), &askedMatchBody); err != nil || askedMatch.Code != http.StatusAccepted {
 		t.Fatalf("match ask: %d %s", askedMatch.Code, askedMatch.Body.String())
 	}
+	requireHold(t, askedMatchBody, "step_ask")
 	matched := approveStep(t, r, askedMatchBody["approval_id"].(string))
 	found, _ := matched["result"].(map[string]any)["opportunities"].([]any)
 	if len(found) == 0 || found[0].(map[string]any)["offer_id"] != offerID {
@@ -148,9 +149,10 @@ func TestOwnerMatchPublishAndCommitOffAndAsk(t *testing.T) {
 	}
 	placement, _ := askedPublishBody["placement"].(map[string]any)
 	placementID, _ := placement["id"].(string)
-	if askedPublish.Code != http.StatusCreated || askedPublishBody["status"] != "awaiting_approval" || placement["status"] != "pending" || placementID == "" {
+	if askedPublish.Code != http.StatusCreated || placement["status"] != "pending" || placementID == "" {
 		t.Fatalf("publish ask: %d %s", askedPublish.Code, askedPublish.Body.String())
 	}
+	requireHold(t, askedPublishBody, "step_ask")
 	approved := ownerForm(t, h, r, cookie, "/owner/placements/"+placementID+"/approve", url.Values{"csrf": {owner.CSRF}})
 	if approved.Code != http.StatusSeeOther {
 		t.Fatalf("owner approve: %d %s", approved.Code, approved.Body.String())

@@ -27,7 +27,7 @@ var RevenueTools = []Tool{
 	},
 	{
 		Name:        "prepare_placement",
-		Description: "Prepare exact copy and mandatory disclosure for a publisher's HTTPS article. Creates an expiring proposal; requires separate owner approval before commit. Does not publish.",
+		Description: "Prepare exact copy and mandatory disclosure for a publisher's HTTPS article. Creates an expiring proposal; requires separate owner approval before commit. Does not publish. A held proposal is HTTP 201 with status awaiting_approval and hold_reason, and no error key.",
 		InputSchema: schema([]string{"offer_id", "surface_url", "context", "copy"}, map[string]interface{}{
 			"offer_id": str("Eligible offer ID"), "surface_url": str("HTTPS article on the publisher's registered domain"), "context": str("Article content used to check relevance"), "copy": str("Proposed recommendation, without invented product claims")}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {

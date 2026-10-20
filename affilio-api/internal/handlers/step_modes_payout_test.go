@@ -33,9 +33,10 @@ func TestLinkChangeAskAndOff(t *testing.T) {
 
 	putStepModes(t, r, key, map[string]any{"link_change": "ask"})
 	asked, askedBody := postJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerB+"/join", nil, map[string]string{"X-API-Key": key})
-	if asked.Code != http.StatusAccepted || askedBody["reason"] != "step_ask" || countRows(t, db, `SELECT COUNT(*) FROM campaigns WHERE site_id=$1 AND offer_id=$2`, siteID, offerB) != 0 {
+	if asked.Code != http.StatusAccepted || countRows(t, db, `SELECT COUNT(*) FROM campaigns WHERE site_id=$1 AND offer_id=$2`, siteID, offerB) != 0 {
 		t.Fatalf("ask join: %d %s", asked.Code, asked.Body.String())
 	}
+	requireHold(t, askedBody, "step_ask")
 	approved := approveStep(t, r, askedBody["approval_id"].(string))
 	if approved["result"].(map[string]any)["tracking_code"] == "" || countRows(t, db, `SELECT COUNT(*) FROM campaigns WHERE site_id=$1 AND offer_id=$2`, siteID, offerB) != 1 {
 		t.Fatalf("approved join: %v", approved)
@@ -92,9 +93,10 @@ func TestPayoutActionsAskAndOff(t *testing.T) {
 
 	putStepModes(t, r, key, map[string]any{"payout": "ask"})
 	askConfirm, askConfirmBody := postJSON(t, r, http.MethodPost, "/v1/payouts/"+paidOff+"/confirm-received", nil, headers)
-	if askConfirm.Code != http.StatusAccepted || askConfirmBody["reason"] != "step_ask" || countRows(t, db, `SELECT COUNT(*) FROM payouts WHERE id=$1 AND received_at IS NULL`, paidOff) != 1 {
+	if askConfirm.Code != http.StatusAccepted || countRows(t, db, `SELECT COUNT(*) FROM payouts WHERE id=$1 AND received_at IS NULL`, paidOff) != 1 {
 		t.Fatalf("ask confirm: %d %s", askConfirm.Code, askConfirm.Body.String())
 	}
+	requireHold(t, askConfirmBody, "step_ask")
 	if approveStep(t, r, askConfirmBody["approval_id"].(string))["result"].(map[string]any)["status"] != "received" || countRows(t, db, `SELECT COUNT(*) FROM payouts WHERE id=$1 AND received_at IS NOT NULL`, paidOff) != 1 {
 		t.Fatal("approved confirm did not stamp receipt")
 	}
@@ -102,6 +104,7 @@ func TestPayoutActionsAskAndOff(t *testing.T) {
 	if askPaid.Code != http.StatusAccepted || countRows(t, db, `SELECT COUNT(*) FROM payouts WHERE id=$1 AND status='pending'`, pendingOff) != 1 {
 		t.Fatalf("ask mark paid: %d %s", askPaid.Code, askPaid.Body.String())
 	}
+	requireHold(t, askPaidBody, "step_ask")
 	if approveStep(t, r, askPaidBody["approval_id"].(string))["result"].(map[string]any)["status"] != "paid" || countRows(t, db, `SELECT COUNT(*) FROM payouts WHERE id=$1 AND status='paid' AND provider_reference='ask-ref'`, pendingOff) != 1 {
 		t.Fatal("approved mark paid did not pay")
 	}
@@ -109,6 +112,7 @@ func TestPayoutActionsAskAndOff(t *testing.T) {
 	if askProfile.Code != http.StatusAccepted || countRows(t, db, `SELECT COUNT(*) FROM sites WHERE id=$1 AND payout_instructions=''`, siteID) != 1 {
 		t.Fatalf("ask profile: %d %s", askProfile.Code, askProfile.Body.String())
 	}
+	requireHold(t, askProfileBody, "step_ask")
 	if approveStep(t, r, askProfileBody["approval_id"].(string))["result"].(map[string]any)["saved"] != true || countRows(t, db, `SELECT COUNT(*) FROM sites WHERE id=$1 AND payout_instructions='wire to ask'`, siteID) != 1 {
 		t.Fatal("approved profile did not save")
 	}
@@ -117,6 +121,7 @@ func TestPayoutActionsAskAndOff(t *testing.T) {
 	if askReport.Code != http.StatusAccepted || countRows(t, db, `SELECT COUNT(*) FROM payouts WHERE id=$1 AND status='pending'`, reportPayout) != 1 {
 		t.Fatalf("ask report: %d %s", askReport.Code, askReport.Body.String())
 	}
+	requireHold(t, askReportBody, "step_ask")
 	if approveStep(t, r, askReportBody["approval_id"].(string))["result"].(map[string]any)["status"] != "payment_reported" || countRows(t, db, `SELECT COUNT(*) FROM payouts WHERE id=$1 AND status='paid' AND provider_reference='ask-pay'`, reportPayout) != 1 {
 		t.Fatal("approved report did not pay")
 	}
