@@ -36,7 +36,7 @@ test('one tracking link counts human clicks from email, X and a blog, with no ad
   assert.deepEqual(makerView.body.rows[0]?.clicks, outcome.body.rows[0]?.clicks, 'both sides see the same aggregate');
 
   const snapshot = await publisher.client.deal(deal.deal!);
-  assert.equal(snapshot.body.obligations.find((o) => o.id === 'place')?.state, 'verified', 'the first human click proves the placement');
+  assert.equal(snapshot.body.obligations?.find((o) => o.id === 'place')?.state, 'verified', 'the first human click proves the placement');
 
   const text = JSON.stringify([outcome, snapshot]);
   for (const leak of ['Mozilla', 'Twitterbot', 't.co', 'blog.example', 'curl']) assert.ok(!text.includes(leak), `no ${leak} in what agents see`);

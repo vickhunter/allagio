@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { message, messageHash, OrpProtocolError, termsHash, verifyMessage, type Message, type MessageByType } from '../src/index.ts';
+import { message, messageHash, OrpProtocolError, termsHash, verifyMessage, type Discovery, type Message, type MessageByType, type ReputationAttestation } from '../src/index.ts';
 import { activeAffiliateDeal, affiliateTerms, click, post, publisherSpaces, swapCounterTerms, swapTerms, UA, world } from './fixture.ts';
 
 const isDeal = (m: Message): m is MessageByType['deal'] => m.type === 'deal';
@@ -23,13 +23,13 @@ test('swap: ask, firm offer, counter, escalation to a person, consent, receipts 
   const terms = swapTerms();
   const offered = (await publisher.client.send(publisher.client.build('offer', { terms, terms_hash: termsHash(terms) }, { to: maker.party, re: ask.id }))) as MessageByType['deal'];
   assert.equal(offered.body.state, 'proposed');
-  assert.deepEqual(offered.body.bound.map((b) => [b.party, b.authority.type]), [[publisher.party, 'mandate']], 'an offer binds its sender on delivery');
+  assert.deepEqual(offered.body.bound?.map((b) => [b.party, b.authority.type]), [[publisher.party, 'mandate']], 'an offer binds its sender on delivery');
   const dealId = offered.deal!;
 
   const counterTerms = swapCounterTerms();
   const countered = (await maker.client.send(maker.client.build('counter', { terms: counterTerms, terms_hash: termsHash(counterTerms) }, { deal: dealId }))) as MessageByType['deal'];
   assert.equal(countered.body.round, 2);
-  assert.deepEqual(countered.body.bound.map((b) => b.party), [maker.party], 'a counter clears earlier bindings and binds its sender');
+  assert.deepEqual(countered.body.bound?.map((b) => b.party), [maker.party], 'a counter clears earlier bindings and binds its sender');
 
   await rejects(publisher.client.send(publisher.client.build('accept', { terms_hash: termsHash(terms) }, { deal: dealId })), 'terms_mismatch');
 
@@ -59,7 +59,7 @@ test('swap: ask, firm offer, counter, escalation to a person, consent, receipts 
 
   const active = (await publisher.client.deal(dealId)).body;
   assert.equal(active.state, 'active');
-  assert.deepEqual(active.bound.map((b) => b.authority.type).sort(), ['consent', 'mandate']);
+  assert.deepEqual(active.bound?.map((b) => b.authority.type).sort(), ['consent', 'mandate']);
   const mention = active.tracking?.find((t) => t.obligation === 'mention');
   assert.ok(mention?.code, 'the counter asked for a code, so the link comes with one');
   assert.equal(active.spaces?.[0]?.id, 'sp_news_1');
@@ -67,7 +67,7 @@ test('swap: ask, firm offer, counter, escalation to a person, consent, receipts 
   const proofUrl = 'https://x.com/acmenotes/status/1848100000000000000';
   await post(w.origin, '/orp-test/web', { url: proofUrl, status: 200, body: `<p>Reposted https://x.com/indiestackweekly/status/1848000000000000000</p>` });
   const executed = (await maker.client.send(maker.client.build('execute', { obligation: 'repost', proof_url: proofUrl }, { deal: dealId }))) as MessageByType['deal'];
-  assert.equal(executed.body.obligations.find((o) => o.id === 'repost')?.state, 'verified', 'a repost has no click: the proof URL is the receipt');
+  assert.equal(executed.body.obligations?.find((o) => o.id === 'repost')?.state, 'verified', 'a repost has no click: the proof URL is the receipt');
   const receipt = (await maker.client.inbox()).messages.find((m): m is MessageByType['receipt'] => m.type === 'receipt' && m.body.obligation === 'repost');
   assert.equal(receipt?.body.method, 'proof_url');
 
@@ -75,7 +75,7 @@ test('swap: ask, firm offer, counter, escalation to a person, consent, receipts 
 
   await click(mention!.link, { 'user-agent': UA.mailApp });
   const done = (await maker.client.deal(dealId)).body;
-  assert.equal(done.obligations.find((o) => o.id === 'mention')?.state, 'verified');
+  assert.equal(done.obligations?.find((o) => o.id === 'mention')?.state, 'verified');
   assert.equal(done.state, 'completed', 'a swap with every obligation verified completes');
 });
 
@@ -193,15 +193,15 @@ test('the chain: prev is the hash of my previous message in the deal', async (t)
 test('a signing host signs every message with a key from its discovery document', async (t) => {
   const w = await world({ sign: true });
   t.after(w.close);
-  const discovery = await (await fetch(`${w.origin}/.well-known/orp.json`)).json();
-  const keys = discovery.keys as Array<{ kid: string }>;
+  const discovery = (await (await fetch(`${w.origin}/.well-known/orp.json`)).json()) as Discovery;
+  const keys = discovery.keys ?? [];
   const agent = await w.join();
   const results = (await agent.client.send(agent.client.build('discover', { want: 'offers' }))) as MessageByType['results'];
   const verified = verifyMessage(results, (kid) => keys.find((k) => k.kid === kid) as never);
   assert.deepEqual(verified, { ok: true, kid: keys[0]!.kid });
   const tampered = { ...results, ts: '2020-01-01T00:00:00Z' };
   assert.equal(verifyMessage(tampered, (kid) => keys.find((k) => k.kid === kid) as never).ok, false);
-  assert.ok(discovery.conformance.levels.includes('L3'));
+  assert.ok(discovery.conformance?.levels?.includes('L3'));
 });
 
 test('disputes and reputation: only verified outcomes count, and a lost dispute costs', async (t) => {
@@ -221,10 +221,10 @@ test('disputes and reputation: only verified outcomes count, and a lost dispute 
   await post(w.origin, `/orp-test/disputes/${opened.body.dispute}/resolve`, { outcome: 'upheld', remedy: 'redo', note: 'No repost found.' });
   assert.equal((await publisher.client.deal(proposed.deal!)).body.state, 'active');
 
-  const rep = (await maker.client.send(maker.client.build('reputation', { subject: publisher.party }))) as MessageByType['reputation'];
-  assert.equal(rep.body.algorithm, 'orp-rep-1');
-  assert.equal(rep.body.score, null, 'too little evidence for a score');
-  assert.equal(rep.body.components?.disputes_lost, 1);
+  const rep = ((await maker.client.send(maker.client.build('reputation', { subject: publisher.party }))) as MessageByType['reputation']).body as ReputationAttestation;
+  assert.equal(rep.algorithm, 'orp-rep-1');
+  assert.equal(rep.score, null, 'too little evidence for a score');
+  assert.equal(rep.components?.disputes_lost, 1);
 });
 
 test('a standing offer can be withdrawn; open deals keep their terms', async (t) => {

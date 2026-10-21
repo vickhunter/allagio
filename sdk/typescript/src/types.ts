@@ -145,12 +145,22 @@ export type Platform =
     )
   | ExtName;
 /**
- * A hint for discovery. The obligations are what bind.
+ * A hint for discovery; the obligations are what bind. affiliate: paid per conversion on a tracked link. sponsored: paid per deal or placement. swap: space for space. traffic_swap: tracked clicks for tracked clicks. link_exchange: links on each other's pages. repost: a repost, retweet or quote. comment: a comment or comment space. cross_sell: one product offered to another's customers, including upsells at checkout or upgrade. data: aggregate data exchange. partnership: anything longer-running.
  *
  * This interface was referenced by `OrpSchemas`'s JSON-Schema
  * via the `definition` "DealKind".
  */
-export type DealKind = 'affiliate' | 'sponsored' | 'swap' | 'repost' | 'comment' | 'traffic' | 'data' | 'partnership';
+export type DealKind =
+  | 'affiliate'
+  | 'sponsored'
+  | 'swap'
+  | 'traffic_swap'
+  | 'link_exchange'
+  | 'repost'
+  | 'comment'
+  | 'cross_sell'
+  | 'data'
+  | 'partnership';
 /**
  * link: human clicks on the deal's tracking link. proof_url: a public URL the verifier fetched. platform_check: the platform's public interface (oEmbed, public API, feed, archive). attestation: the counterparty confirms. witness: a host-controlled observer, such as a seed inbox. provider: a payment provider event.
  *
@@ -417,6 +427,32 @@ export interface Money {
   currency: string;
 }
 /**
+ * The mode of each step. A missing step uses the default: ask, except revoke, which is auto.
+ *
+ * This interface was referenced by `OrpSchemas`'s JSON-Schema
+ * via the `definition` "Steps".
+ */
+export interface Steps {
+  list?: StepMode;
+  negotiate?: StepMode;
+  accept?: StepMode;
+  execute?: StepMode;
+  amend?: StepMode;
+  settle?: StepMode;
+  share?: StepMode;
+  revoke?: StepMode;
+}
+/**
+ * The software acting for the party. Never a person.
+ *
+ * This interface was referenced by `OrpSchemas`'s JSON-Schema
+ * via the `definition` "Agent".
+ */
+export interface Agent {
+  name: string;
+  version?: string;
+}
+/**
  * The label readers see next to the placement, in the reader's language.
  *
  * This interface was referenced by `OrpSchemas`'s JSON-Schema
@@ -517,6 +553,10 @@ export interface Content {
    * Must carry the deal's tracking code.
    */
   code?: boolean;
+  /**
+   * Link straight to the destination instead of the tracking link, as in a link exchange. The link must carry rel="sponsored" or rel="nofollow". Proven by proof_url and rechecked while keep lasts; clicks are not counted.
+   */
+  direct?: boolean;
   brief?: string;
   /**
    * Exact text, when the counterparty fixes it.
@@ -546,6 +586,10 @@ export interface PlaceObligation {
   content?: Content;
   destination?: Url;
   count?: number;
+  /**
+   * Done once the tracking link has counted this many human clicks, as in a traffic swap. Without it, the first human click proves the placement.
+   */
+  clicks?: number;
   due?: Deadline;
   keep?: Duration;
   proof: ProofList;
@@ -761,7 +805,10 @@ export interface Fit {
 export interface Trust {
   reputation?: number | null;
   completed_deals?: number;
-  verified?: ('domain' | 'dns' | 'platform_oauth' | 'bio_token' | 'challenge_post')[];
+  /**
+   * person: a person has claimed the party (passkey or signed-in session), with no identity disclosed. The others prove control of a space.
+   */
+  verified?: ('person' | 'domain' | 'dns' | 'platform_oauth' | 'bio_token' | 'challenge_post')[];
   /**
    * @maxItems 3
    */
@@ -806,13 +853,7 @@ export interface Envelope {
   deal?: LocalId;
   re?: MessageId;
   body: object;
-  /**
-   * The software acting for the party. Never a person.
-   */
-  agent?: {
-    name: string;
-    version?: string;
-  };
+  agent?: Agent;
   prev?: Hash;
   /**
    * Detached compact JWS (RFC 7515 Appendix F) over the JCS form of the envelope without sig.
@@ -908,6 +949,10 @@ export interface Result {
   fit: Fit;
   trust?: Trust;
   pool?: string;
+  /**
+   * One or two sentences an agent can show its person as is, such as 'You can monetize this post: ... Want to test it?'. Says what the person would do and what they get. No personal data.
+   */
+  pitch?: string;
 }
 /**
  * This interface was referenced by `OrpSchemas`'s JSON-Schema
@@ -1104,8 +1149,23 @@ export interface ReceiptBody {
    * What the check saw at url.
    */
   found?: {
+    /**
+     * The tracking link is on the page.
+     */
     link?: boolean;
     code?: boolean;
+    /**
+     * A direct link to the destination is on the page.
+     */
+    destination?: boolean;
+    /**
+     * That direct link carries rel="sponsored" or rel="nofollow".
+     */
+    rel?: boolean;
+    /**
+     * Human clicks counted when a clicks target was met.
+     */
+    clicks?: number;
     disclosure?: boolean;
     target?: boolean;
     content?: boolean;
@@ -1113,6 +1173,7 @@ export interface ReceiptBody {
   reason?:
     | 'not_found'
     | 'link_missing'
+    | 'rel_missing'
     | 'disclosure_missing'
     | 'content_mismatch'
     | 'removed'
@@ -1326,6 +1387,8 @@ export interface Discovery {
   name?: string;
   description?: string;
   endpoint?: UrlOrPath;
+  suggest?: UrlOrPath;
+  join?: UrlOrPath;
   mcp?: {
     url: UrlOrPath;
     transport: 'streamable-http' | 'legacy-http-jsonrpc';
@@ -1344,7 +1407,6 @@ export interface Discovery {
      * Agents authenticate with Authorization: Bearer <key>.
      */
     bearer?: boolean;
-    signup?: UrlOrPath;
     oauth_metadata?: UrlOrPath;
     docs?: UrlOrPath;
   };
@@ -1393,16 +1455,7 @@ export interface Discovery {
  * via the `definition` "Constraints".
  */
 export interface Constraints {
-  steps: {
-    list?: StepMode;
-    negotiate?: StepMode;
-    accept?: StepMode;
-    execute?: StepMode;
-    amend?: StepMode;
-    settle?: StepMode;
-    share?: StepMode;
-    revoke?: StepMode;
-  };
+  steps: Steps;
   /**
    * Caps on money the owner pays. A deal that would cross one escalates with over_budget. Pay per click or per conversion counts at its cap; with no cap it always escalates.
    */
@@ -1481,6 +1534,88 @@ export interface InboxPage {
    */
   messages: Message[];
   next: string;
+}
+/**
+ * POST to the discovery document's suggest URL with no credentials. Any agent that writes for someone (a post, a thread, a newsletter) sends what it is writing and gets deals its person could take now. The host uses the text in memory to match, then forgets it: it never stores, logs, shares or trains on it.
+ *
+ * This interface was referenced by `OrpSchemas`'s JSON-Schema
+ * via the `definition` "SuggestRequest".
+ */
+export interface SuggestRequest {
+  /**
+   * The draft, or a short summary of it. Leave out names, emails and anything personal.
+   */
+  text: string;
+  platform?: Platform;
+  space_kind?: SpaceKind;
+  /**
+   * earn: get paid (affiliate, sponsored, cross_sell). grow: get readers or reach (swap, traffic_swap, link_exchange, repost). Both when absent.
+   *
+   * @minItems 1
+   */
+  want?: ('earn' | 'grow')[];
+  kinds?: DealKind[];
+  /**
+   * Language for the pitch.
+   */
+  lang?: string;
+  limit?: number;
+}
+/**
+ * Standing offers the person could take now, or open spaces that trade with posts like this one, best first, each with a pitch to show as is. Taking an offer: POST join once (no account), then send accept with the offer id and terms_hash. Taking a space: join, then send a directed offer to the space's party.
+ *
+ * This interface was referenced by `OrpSchemas`'s JSON-Schema
+ * via the `definition` "SuggestResponse".
+ */
+export interface SuggestResponse {
+  /**
+   * @maxItems 5
+   */
+  items: Result[];
+  empty_reason?: 'no_match' | 'below_threshold' | 'filtered';
+  join: UrlOrPath;
+}
+/**
+ * POST to the discovery document's join URL with no credentials. There is no field for an email, phone, name, password or website, and a host must not ask for one: the party is pseudonymous from the start. An empty object is a complete request.
+ *
+ * This interface was referenced by `OrpSchemas`'s JSON-Schema
+ * via the `definition` "JoinRequest".
+ */
+export interface JoinRequest {
+  agent?: Agent;
+  /**
+   * Optional Ed25519 public key (JWK). Once set, every message from this party must be signed with it.
+   */
+  key?: {
+    kty: 'OKP';
+    crv: 'Ed25519';
+    x: string;
+    kid: string;
+    alg?: 'EdDSA';
+    use?: 'sig';
+  };
+}
+/**
+ * A new pseudonymous party, usable at once. Until a person sets limits, every step that binds asks: the agent gets a waiting.url to show its person, who approves with one tap. The claim URL lets that person make the party theirs (a passkey, no email), set limits and get paid.
+ *
+ * This interface was referenced by `OrpSchemas`'s JSON-Schema
+ * via the `definition` "JoinResponse".
+ */
+export interface JoinResponse {
+  party: PartyId;
+  /**
+   * Bearer token for this party. Shown once; keep it like a password.
+   */
+  token: string;
+  claim: Url;
+  steps?: Steps;
+  limits?: {
+    /**
+     * Most deals open at once before a person claims the party.
+     */
+    open_deals?: number;
+    messages_per_minute?: number;
+  };
 }
 
 export type Message =

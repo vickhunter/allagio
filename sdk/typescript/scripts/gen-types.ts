@@ -10,6 +10,7 @@ const schemaRoot = join(here, '..', '..', '..', 'schema', '0.3');
 const target = join(here, '..', 'src', 'types.ts');
 
 export const CORE_TYPES = ['hello', 'discover', 'results', 'ask', 'offer', 'counter', 'accept', 'decline', 'deal', 'execute', 'receipt', 'outcome', 'revoke', 'consent', 'dispute', 'reputation', 'error'] as const;
+export const HTTP_SCHEMAS = ['inbox', 'suggest-request', 'suggest-response', 'join-request', 'join-response'] as const;
 
 type Json = { [key: string]: unknown };
 const read = (path: string): Json => JSON.parse(readFileSync(path, 'utf8')) as Json;
@@ -27,8 +28,10 @@ function requiredOnly(node: unknown): boolean {
   });
 }
 
+// Every file's $defs land in one namespace (addDefs rejects duplicates), so a
+// ref to any file's $defs entry is a local ref in the combined schema.
 function localRef(value: string): Json {
-  const local = value.match(/^(?:\.\.\/|)defs\.schema\.json#\/\$defs\/(\w+)$/) ?? value.match(/^#\/\$defs\/(\w+)$/);
+  const local = value.match(/^(?:(?:\.\.\/)?(?:[a-z]+\/)?[a-z-]+\.schema\.json)?#\/\$defs\/(\w+)$/);
   if (local) return { $ref: `#/$defs/${local[1]}` };
   if (value === '../envelope.schema.json' || value === 'envelope.schema.json') return { $ref: '#/$defs/Envelope' };
   if (value === '../message.schema.json') return { tsType: 'Message' };
@@ -75,7 +78,7 @@ export async function generate(): Promise<string> {
     addDefs(defs, bodyDefs as Json);
     defs[titleOf(type)] = rewrite(message);
   }
-  for (const file of ['discovery.schema.json', 'constraints.schema.json', 'http/inbox.schema.json']) {
+  for (const file of ['discovery.schema.json', 'constraints.schema.json', ...HTTP_SCHEMAS.map((name) => `http/${name}.schema.json`)]) {
     const { $defs: localDefs, ...schema } = read(join(schemaRoot, file));
     addDefs(defs, localDefs as Json);
     defs[schema.title as string] = rewrite(schema);
