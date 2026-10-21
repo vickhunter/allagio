@@ -221,10 +221,17 @@ func (h *AgentEntry) stepActor(c *gin.Context) (ownerID, siteID string, ok bool)
 	if c.GetHeader("X-API-Key") == "" && c.GetHeader("X-Maker-Key") == "" {
 		if fields := strings.Fields(c.GetHeader("Authorization")); len(fields) == 2 && strings.EqualFold(fields[0], "Bearer") {
 			token := fields[1]
-			grant, err := h.DB.AgentAccountBearer(c.Request.Context(), services.HashAPIKey(token), token, "")
+			hash := services.HashAPIKey(token)
+			grant, err := h.DB.AgentJoinToken(c.Request.Context(), hash, h.mcpResource(c))
+			if err != nil {
+				grant, err = h.DB.AgentAccountBearer(c.Request.Context(), hash, token, "")
+			}
 			if err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired bearer token"})
 				return "", "", false
+			}
+			if grant.OwnerID != "" {
+				return grant.OwnerID, grant.SiteID, true
 			}
 			if grant.SiteID != "" {
 				return ownerForSite(c, h.DB, grant.SiteID), grant.SiteID, true

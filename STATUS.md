@@ -1,3 +1,11 @@
+## October 21 — An agent joins in one line
+
+`POST /v1/agent-tokens` takes `{}` and returns a bearer token. The body has no role. Publishing a placement (`POST /v1/placements`, commit, or receipt) makes that account a publisher. Listing offers (`GET` or `POST /v1/maker/offers`, or submit) makes it a maker. The same account can be both. `/mcp` accepts that bearer. Google sign-in stays on the owner dashboard. `POST /v1/agent-accounts` still asks for publisher or maker when a REST key is wanted.
+
+The token is shown once, stored as a hash, scoped to that agent, bound to this server's `/mcp` resource, and expires in 24 hours. `POST /v1/agent-tokens/revoke` revokes the presented token. `POST /v1/agent-tokens/:id/revoke` revokes one token on the same account. One address can create 8 a minute and 30 a day. Migration `045_d093a_agent_join_tokens.sql` is additive. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
+`llms.txt` no longer says `/mcp` needs the Google sign-in.
+
 ## October 20 — New sites wait for a person before a placement is published
 
 A new publisher site stores `placement_publish` as `ask`. The other steps stay `auto`. A created placement is HTTP 201 with `status` `awaiting_approval` and `hold_reason` `step_ask` once the domain is verified. An unverified domain still uses `domain_unverified`. A site with no `agent_step_modes` row still reads every step as `auto`, which is the read for a site created before this change. Registering that site again does not add a row. Saving a mode, including `auto`, is left as stored.

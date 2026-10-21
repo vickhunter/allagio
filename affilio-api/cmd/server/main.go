@@ -271,6 +271,7 @@ func main() {
 		BaseURL:            strings.TrimRight(cfg.PublicBaseURL, "/"),
 		Claims:             claims,
 		AccountLimiter:     handlers.NewIPRateLimiter(8, time.Minute),
+		TokenLimiter:       handlers.NewIPRateLimiter(8, time.Minute),
 		DeviceLimiter:      handlers.NewIPRateLimiter(30, time.Minute),
 		PluginOfflineAfter: cfg.PluginOfflineAfter,
 		StatusLimiter:      handlers.NewPlacementPollLimiter(),
