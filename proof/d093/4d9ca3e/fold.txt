@@ -1,0 +1,2 @@
+390: copy top 572 bottom 616 header 113 viewport 844
+1440: copy top 606 bottom 650 header 65 viewport 900
