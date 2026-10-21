@@ -2,8 +2,9 @@ import { ArrowRight } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
 import { Runs } from '@/components/Runs'
+import { JoinForm } from '@/components/JoinForm'
 import { joinHeading } from '@/components/join-prompt.mjs'
-import { Checks, JoinSection } from '@/site/bits'
+import { Checks } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { driftChips, example, faq, joinLine, makerAdvantages, publisherAdvantages } from '@/content'
@@ -30,6 +31,13 @@ export function App() {
                 </svg>
               </span>
             </h1>
+            <div className="mt-6 max-w-xl">
+              <h2 id="join-h" className="font-display text-2xl font-bold leading-tight tracking-tight sm:text-3xl">{joinHeading}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-t2">{joinLine}</p>
+              <div className="mt-4">
+                <JoinForm />
+              </div>
+            </div>
             <div className="mt-8 grid gap-6 border-t border-t1 pt-6 md:grid-cols-[1.1fr_1fr] md:items-start">
               <div>
                 <p className="text-lg leading-relaxed text-t2">Makers pay only for sales. Publishers earn from more of their posts. Agents find, match and place.</p>
@@ -94,7 +102,6 @@ export function App() {
         </div>
       </section>
 
-      <JoinSection title={joinHeading} sub={joinLine} />
     </Page>
   )
 }
