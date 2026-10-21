@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { splitSurfaces, surfaces } from './surfaces.mjs'
+import { orderedSurfaces, surfaceStatus, surfaces } from './surfaces.mjs'
 
-test('where it runs leads with live surfaces from one list', () => {
-  const publishers = splitSurfaces('publisher')
-  assert.deepEqual(publishers.live.map((item) => item.state), ['Live'])
-  assert.deepEqual(publishers.live.map((item) => item.name), ['WordPress'])
-  assert.deepEqual(publishers.planned.map((item) => item.name), ['X', 'Newsletter', 'YouTube', 'Instagram', 'TikTok'])
-  assert.ok(publishers.planned.every((item) => item.state === 'Planned'))
-  const makers = splitSurfaces('maker')
-  assert.deepEqual(makers.live.map((item) => item.name), ['WordPress'])
-  assert.deepEqual(makers.planned.map((item) => item.name), ['X', 'Shopify'])
+test('a surface is verified end to end only when both checks passed', () => {
+  assert.equal(surfaceStatus({ adapterTests: true, e2e: true }), 'Verified end to end')
+  assert.equal(surfaceStatus({ adapterTests: true, e2e: false }), 'In testing')
+  assert.equal(surfaceStatus({ adapterTests: false, e2e: true }), 'In testing')
+  assert.ok(surfaces.every((item) => item.adapterTests === false && item.e2e === false))
+  assert.ok(surfaces.every((item) => item.date === '2026-10-21'))
+  const publishers = orderedSurfaces('publisher')
+  assert.deepEqual(publishers.map((item) => item.name), ['WordPress', 'X', 'Newsletter', 'YouTube', 'Instagram', 'TikTok'])
+  assert.ok(publishers.every((item) => surfaceStatus(item) === 'In testing'))
+  const makers = orderedSurfaces('maker')
+  assert.deepEqual(makers.map((item) => item.name), ['WordPress', 'X', 'Shopify'])
   assert.equal(new Set(surfaces.map((item) => item.name)).size, surfaces.length)
+  assert.equal(JSON.stringify(surfaces).includes('Planned'), false)
 })

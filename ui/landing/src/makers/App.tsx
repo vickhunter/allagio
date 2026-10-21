@@ -8,6 +8,7 @@ import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { runsLead, runsTitle } from '@/surfaces.mjs'
 import { example, faq, feed, joinLine, makerAdvantages, painLine } from '@/content'
 import { useOfferConfig } from '@/lib/source'
 import { reducedMotion } from '@/lib/utils'
@@ -71,7 +72,8 @@ export function App() {
               <li key={h} className="rounded-2xl border border-line bg-s1 p-5"><span className="font-display text-3xl font-bold text-maker">{i + 1}</span><h3 className="mt-2 font-display text-lg font-semibold">{h}</h3><p className="mt-1 text-sm leading-relaxed text-t2">{b}</p></li>
             ))}
           </ol>
-          <h3 className="mt-12 font-display text-lg font-semibold">Where your offer can run</h3>
+          <h3 className="mt-12 font-display text-lg font-semibold">{runsTitle}</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-t2">{runsLead}</p>
           <div className="mt-4"><Runs audience="maker" notes /></div>
         </div>
       </section>
