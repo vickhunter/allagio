@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var publicCopyBanned = regexp.MustCompile(`(?i)\bads?\b|fully automatic|\bpilot\b`)
+var publicCopyBanned = regexp.MustCompile(`(?i)\bads?\b|fully automatic|\bpilot\b|\brevolutionary\b|best-converting`)
 
 func publicCopyHits(text string) []string {
 	var hits []string

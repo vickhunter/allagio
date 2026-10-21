@@ -1,6 +1,10 @@
+## October 21 — Vision on the landing
+
+The home page states the direction: any agent, on any platform, for more traffic, engagement, clients, or income. While a person writes, the agent can suggest a matching offer. That suggestion is Coming. Affiliate links wait for a person to approve and are not labelled Verified end to end. Link swaps, cross-sells, upsells, and reposts are Coming. `/you` is limits, approvals, and an example receipt. It is not a signup form. The hero join line tells the agent to join with `POST /v1/agent-tokens` and send the bearer. `/llms.txt` says the same. There is no sign-in link in that join.
+
 ## October 21 — Agent-first join
 
-The home hero asks a person to give an agent the line “Connect my site to Offer Rails”, with one Copy button and a link to llms.txt. Under that line: “Your agent will send you one sign-in link to finish.” Sign in, the install command, MCP setup, and the WordPress plugin sit under “Set it up yourself”. The page does not pick maker or publisher. One Offer Rails link counts clicks wherever it is shared. Each surface is “Verified end to end” only when both adapterTests and e2e are true. Both are false today, including WordPress, so each surface says “In testing”. There is no adapters registry yet, so that list is the stand-in until D-092.
+The home hero asks a person to give an agent one line, with one Copy button and a link to llms.txt. Sign in, the install command, MCP setup, and the WordPress plugin sit under “Set it up yourself”. The page does not pick maker or publisher, and it does not say the agent will send a sign-in link. The agent joins with POST /v1/agent-tokens and a bearer. One Offer Rails link counts clicks wherever it is shared. Each surface is “Verified end to end” only when both adapterTests and e2e are true. Both are false today, including WordPress, so each surface says “In testing”. There is no adapters registry yet, so that list is the stand-in until D-092.
 
 ## October 21 — Placement publish asks when nothing is saved
 

@@ -1,10 +1,8 @@
 import { createElement, useState } from 'react'
 
-export const joinPrompt = 'Connect my site to Offer Rails'
+export const joinPrompt = 'Join with POST /v1/agent-tokens and send the bearer. No Google sign-in.'
 export const joinLead = 'Give your agent this line to start'
 export const joinHeading = `Tell your agent: ${joinPrompt}`
-// Remove when D-093a lands. Until then a person still finishes with one sign-in link.
-export const joinSignInNote = 'Your agent will send you one sign-in link to finish.'
 
 export function JoinPrompt() {
   const [copied, setCopied] = useState(false)

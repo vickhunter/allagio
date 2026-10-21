@@ -5,7 +5,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const banned = /\bads?\b|fully automatic|\bpilot\b/gi
+const banned = /\bads?\b|fully automatic|\bpilot\b|\brevolutionary\b|best-converting/gi
 
 function filesUnder(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -38,7 +38,7 @@ function visibleHits(text) {
   return hits
 }
 
-test('rendered public landing copy has no ad, ads, fully automatic, or pilot', () => {
+test('rendered public landing copy has no ad, ads, fully automatic, pilot, revolutionary, or best-converting', () => {
   const hits = []
   for (const path of filesUnder(root)) {
     const text = readFileSync(path, 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')

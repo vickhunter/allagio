@@ -7,7 +7,11 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const files = [
   'src/home/App.tsx',
+  'src/home/Vision.tsx',
   'src/home/HowItWorks.tsx',
+  'src/vision.mjs',
+  'src/you/App.tsx',
+  'you/index.html',
   'src/makers/App.tsx',
   'src/publishers/App.tsx',
   'src/content.ts',
