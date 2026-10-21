@@ -55,7 +55,8 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 // form and /v1/go/<placement_id> follow the go-link rules forever. Readers
 // never see a 4xx or a 5xx. ?placement= delegates to goPlacement. Without it,
 // a hit is recorded only when exactly one placement on this campaign is
-// clickable. A committed placement counts before plugin-ack. Anything else
+// clickable: live, approved and still inside its window, or committed
+// before plugin-ack. Anything else
 // is a 302 to the plain offer URL with no hit. An offer that is not live
 // redirects to the site home, and an unknown code redirects to the Offer
 // Rails home. A rate limit is that untracked 302, never a 429.

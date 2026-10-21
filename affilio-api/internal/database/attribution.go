@@ -283,8 +283,8 @@ func (d *DB) InsertCampaignClick(ctx context.Context, campaignID, siteID string,
 
 // LivePlacementForCampaign returns the placement id only when exactly one
 // placement on this campaign is clickable. That is PlacementClickSQL: live,
-// approved, or committed without plugin-ack. Zero or two or more return an
-// empty id so the bare code redirects with no hit.
+// approved and still inside its window, or committed before plugin-ack.
+// Zero or two or more return an empty id so the bare code redirects with no hit.
 func (d *DB) LivePlacementForCampaign(ctx context.Context, campaignID string) (string, error) {
 	var id string
 	err := d.Pool.QueryRow(ctx, `SELECT COALESCE(CASE WHEN COUNT(*) = 1 THEN MIN(pp.id::text) ELSE '' END, '')
