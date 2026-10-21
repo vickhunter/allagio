@@ -1,0 +1,34 @@
+{
+  "shots": [
+    {
+      "width": 390,
+      "height": 844,
+      "copy": {
+        "x": 20,
+        "y": 572.234375,
+        "width": 74.140625,
+        "height": 44
+      },
+      "header": {
+        "bottom": 113
+      },
+      "file": "/workspace/proof/d093/10774b9/hero-390.png"
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "copy": {
+        "x": 164,
+        "y": 606.09375,
+        "width": 74.140625,
+        "height": 44
+      },
+      "header": {
+        "bottom": 65
+      },
+      "file": "/workspace/proof/d093/10774b9/hero-1440.png"
+    }
+  ],
+  "axeHits": [],
+  "bannedHits": []
+}
