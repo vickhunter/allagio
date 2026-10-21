@@ -73,7 +73,6 @@
       {
         "obligation": "place",
         "link": "https://hub.example/go/Zr8Kq2Lw",
-        "code": "ACME30",
         "destination": "https://acmenotes.example/pricing",
         "status": "live"
       }

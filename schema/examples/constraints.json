@@ -17,7 +17,8 @@
     "per_month": {
       "amount_minor": 100000,
       "currency": "EUR"
-    }
+    },
+    "max_rate_bps": 3000
   },
   "approve_over": {
     "amount_minor": 50000,

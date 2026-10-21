@@ -1,0 +1,31 @@
+{
+  "name": "@offerrails/orp",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Reference TypeScript SDK for the Offer Rails Protocol (ORP) 0.3: types generated from the schemas, validation, hashing, signing, a client, a tiny in-memory host and an example agent.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "gen": "node scripts/gen-types.ts",
+    "check:types": "node scripts/gen-types.ts --check",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "example": "node examples/agent.ts",
+    "host": "node examples/host.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "json-schema-to-typescript": "^16.0.0",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.18"
+  }
+}

@@ -368,9 +368,9 @@
         "per": { "type": "string", "enum": ["deal", "placement", "click", "conversion"] },
         "amount": { "$ref": "#/$defs/Money" },
         "rate_bps": { "type": "integer", "minimum": 1, "maximum": 10000, "description": "Share of the sale in basis points, for per conversion." },
-        "cap": { "$ref": "#/$defs/Money" },
-        "window": { "$ref": "#/$defs/Duration" },
-        "after": { "$ref": "#/$defs/ObligationId" },
+        "cap": { "$ref": "#/$defs/Money", "description": "The most this obligation can cost over the whole deal." },
+        "window": { "$ref": "#/$defs/Duration", "description": "For per conversion: how long after a counted click a sale still counts." },
+        "after": { "$ref": "#/$defs/ObligationId", "description": "The obligation this pay is tied to. Per deal or placement: paid once it is verified. Per click or conversion: counted on its tracking link only. Absent: every tracking link in the deal." },
         "due": { "$ref": "#/$defs/Deadline" },
         "rail": { "type": "string", "pattern": "^[a-z0-9_.-]{2,40}$", "description": "stripe, lemonsqueezy, polar, manual, or an extension name." },
         "proof": { "$ref": "#/$defs/ProofList" }
