@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Ajv2020, type ErrorObject, type ValidateFunction } from 'ajv/dist/2020.js';
 import formats from 'ajv-formats';
-import type { Constraints, Discovery, InboxPage, Message } from './types.ts';
+import type { Constraints, Discovery, InboxPage, JoinRequest, JoinResponse, Message, SuggestRequest, SuggestResponse } from './types.ts';
 
 export const SCHEMA_BASE = 'https://offerrails.com/orp/schema/0.3/';
 export const SCHEMA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'schema', '0.3');
@@ -31,6 +31,10 @@ const validators = {
   discovery: compiled('discovery.schema.json'),
   constraints: compiled('constraints.schema.json'),
   inbox: compiled('http/inbox.schema.json'),
+  suggestRequest: compiled('http/suggest-request.schema.json'),
+  suggestResponse: compiled('http/suggest-response.schema.json'),
+  joinRequest: compiled('http/join-request.schema.json'),
+  joinResponse: compiled('http/join-response.schema.json'),
 };
 
 export type SchemaName = keyof typeof validators;
@@ -55,6 +59,10 @@ export const checkMessage = (value: unknown) => check<Message>('message', value)
 export const checkDiscovery = (value: unknown) => check<Discovery>('discovery', value);
 export const checkConstraints = (value: unknown) => check<Constraints>('constraints', value);
 export const checkInbox = (value: unknown) => check<InboxPage>('inbox', value);
+export const checkSuggestRequest = (value: unknown) => check<SuggestRequest>('suggestRequest', value);
+export const checkSuggestResponse = (value: unknown) => check<SuggestResponse>('suggestResponse', value);
+export const checkJoinRequest = (value: unknown) => check<JoinRequest>('joinRequest', value);
+export const checkJoinResponse = (value: unknown) => check<JoinResponse>('joinResponse', value);
 
 export function assertMessage(value: unknown): Message {
   const result = checkMessage(value);

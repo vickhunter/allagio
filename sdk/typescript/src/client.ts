@@ -1,6 +1,6 @@
 import { message, type CoreType, type EnvelopeFields, type MessageByType } from './message.ts';
-import { checkDiscovery, checkInbox, checkMessage } from './validate.ts';
-import type { Discovery, InboxPage, Message, PartyId } from './types.ts';
+import { checkDiscovery, checkInbox, checkJoinResponse, checkMessage, checkSuggestResponse, type Checked } from './validate.ts';
+import type { Discovery, InboxPage, JoinRequest, JoinResponse, Message, PartyId, SuggestRequest, SuggestResponse } from './types.ts';
 
 export interface ClientOptions {
   endpoint: string;
@@ -34,6 +34,27 @@ export function resolveUrl(origin: string, value: string): string {
   return new URL(value, origin).toString();
 }
 
+// POST with no credentials to suggest or join. Errors come back as ORP error messages.
+async function postOpen<T>(url: string, body: unknown, check: (value: unknown) => Checked<T>, fetcher: typeof fetch): Promise<T> {
+  const response = await fetcher(url, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify(body) });
+  const reply: unknown = await response.json();
+  if (!response.ok) {
+    const error = checkMessage(reply);
+    if (error.ok && error.value.type === 'error') throw new OrpProtocolError(error.value, response.status);
+    throw new Error(`HTTP ${response.status} from ${url}`);
+  }
+  const checked = check(reply);
+  if (!checked.ok) throw new Error(`invalid reply from ${url}: ${checked.problems.map((p) => `${p.path} ${p.message}`).join('; ')}`);
+  return checked.value;
+}
+
+/** Deals a person could take now for what their agent is writing. No account, no credentials. */
+export async function suggest(origin: string, request: SuggestRequest, fetcher: typeof fetch = fetch): Promise<SuggestResponse> {
+  const discovery = await fetchDiscovery(origin, fetcher);
+  if (!discovery.suggest) throw new Error('this host does not offer suggestions');
+  return postOpen(resolveUrl(origin, discovery.suggest), request, checkSuggestResponse, fetcher);
+}
+
 export class OrpClient {
   party?: PartyId;
   private readonly options: ClientOptions;
@@ -49,6 +70,16 @@ export class OrpClient {
     const client = new OrpClient({ endpoint: resolveUrl(origin, discovery.endpoint), token, agent });
     await client.hello();
     return client;
+  }
+
+  /** Get a pseudonymous party with no email, name or website, and a client for it. Give `joined.claim` to your person. */
+  static async join(origin: string, request: JoinRequest = {}, fetcher: typeof fetch = fetch): Promise<{ client: OrpClient; joined: JoinResponse }> {
+    const discovery = await fetchDiscovery(origin, fetcher);
+    if (!discovery.join || !discovery.endpoint) throw new Error('this host has no join endpoint');
+    const joined = await postOpen(resolveUrl(origin, discovery.join), request, checkJoinResponse, fetcher);
+    const client = new OrpClient({ endpoint: resolveUrl(origin, discovery.endpoint), token: joined.token, party: joined.party, fetch: fetcher, ...(request.agent ? { agent: request.agent } : {}) });
+    await client.hello();
+    return { client, joined };
   }
 
   private get fetcher(): typeof fetch {

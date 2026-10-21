@@ -15,8 +15,10 @@ import type {
   EscalationReason,
   Hash,
   InboxPage,
+  JoinResponse,
   Message,
   Money,
+  Obligation,
   ObligationId,
   OutcomeRow,
   PartyId,
@@ -26,17 +28,20 @@ import type {
   Role,
   Space,
   Step,
+  SuggestResponse,
   Terms,
   Tracking,
+  Trust,
   Waiting,
 } from './types.ts';
 import { decide, DEFAULT_STEPS, durationMs, isPay } from './constraints.ts';
 import { hashJson, messageHash, termsHash } from './hash.ts';
 import { MCP_PROTOCOL_VERSION, ORP_TOOLS, orpCapability } from './mcp.ts';
 import { message, now as nowIso, ORP_VERSION, type CoreType, type MessageByType } from './message.ts';
+import { benefits, GROW_KINDS, isPlace, isRepost, pitchOffer, pitchSpace, sides } from './pitch.ts';
 import { score, type RepEvent } from './reputation.ts';
 import { generateSigningKey, signMessage, verifyMessage, type SigningKey } from './sign.ts';
-import { checkMessage } from './validate.ts';
+import { checkJoinRequest, checkMessage, checkSuggestRequest } from './validate.ts';
 
 export interface HostOptions {
   origin: string;
@@ -45,6 +50,8 @@ export interface HostOptions {
   sign?: boolean;
   web?: (url: string) => Promise<{ status: number; body: string }>;
   clock?: () => Date;
+  /** Requests per minute per client address for the unauthenticated endpoints. */
+  limits?: { suggest?: number; join?: number };
 }
 
 export interface Reply {
@@ -53,6 +60,7 @@ export interface Reply {
 }
 
 type ObligationState = 'pending' | 'claimed' | 'verified' | 'failed' | 'revoked' | 'waived';
+type Found = NonNullable<ReceiptBody['found']>;
 
 interface PartyRecord {
   id: PartyId;
@@ -65,6 +73,9 @@ interface PartyRecord {
   sent: number[];
   events: RepEvent[];
   completed: number;
+  /** A person has made the party theirs. Parties from join start unclaimed. */
+  claimed: boolean;
+  agent?: string;
 }
 
 interface Escalation {
@@ -105,7 +116,7 @@ interface DealRecord {
   bound: Array<{ party: PartyId; authority: Authority; at: string }>;
   waiting?: Escalation;
   tracking: Tracking[];
-  obligations: Array<{ id: ObligationId; state: ObligationState; due?: string; receipt?: string }>;
+  obligations: Array<{ id: ObligationId; state: ObligationState; due?: string; receipt?: string; proofUrl?: string; verifiedAt?: string }>;
   spaces: string[];
   activatedAt?: string;
   clicks: Map<ObligationId, Required<ClickCounts>>;
@@ -157,7 +168,12 @@ const PREVIEW_AGENTS = /twitterbot|facebookexternalhit|facebot|slackbot|linkedin
 const BOT_AGENTS = /bot\b|crawler|spider|curl\/|wget\/|python-requests|go-http-client|headlesschrome|httpclient|okhttp|axios\/|node-fetch|^node$|^undici/i;
 const MAX_SKEW_MS = 15 * 60_000;
 const RATE_PER_MINUTE = 120;
+const UNCLAIMED_OPEN_DEALS = 3;
+const KEEP_RECHECK_MS = 30 * 86_400_000;
 const PLACE_LIKE = new Set(['place', 'repost', 'comment']);
+const OPEN_STATES: DealState[] = ['proposed', 'awaiting', 'active', 'disputed'];
+// Spaces that hold something a person writes. Suggestions are for those.
+const CONTENT_KINDS = new Set(['web.article', 'web.page', 'newsletter.issue', 'newsletter.dedicated', 'social.post', 'social.reply', 'social.repost', 'video.description', 'video.segment', 'video.comment', 'audio.segment', 'audio.notes', 'community.post', 'community.comment']);
 
 const randomId = (prefix: string, bytes = 9) => `${prefix}_${randomBytes(bytes).toString('base64url')}`;
 const emptyClicks = (): Required<ClickCounts> => ({ human: 0, bot: 0, preview: 0, test: 0 });
@@ -172,6 +188,69 @@ export function classifyClick(method: string, headers: Record<string, string | s
   if (BOT_AGENTS.test(agent)) return 'bot';
   return 'human';
 }
+
+const STOP_WORDS = new Set('the and for with your you this that from are was but not all can our out get how what why who into about more than just have has its one two three four five six seven eight nine ten top best new use using will them they their there here also very most'.split(' '));
+
+/** Lowercase words of three or more letters, plurals folded, common words dropped. */
+export function wordsOf(text: string): Set<string> {
+  const words = text.toLowerCase().match(/[a-z0-9]{3,}/g) ?? [];
+  return new Set(words.filter((w) => !STOP_WORDS.has(w)).map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)));
+}
+
+const matches = (words: Set<string>, text: string) => {
+  const target = wordsOf(text);
+  return [...words].filter((w) => target.has(w));
+};
+
+function offerText(terms: Terms): string {
+  const briefs = terms.obligations.flatMap((o) => (isPlace(o) && o.content?.brief ? [o.content.brief] : []));
+  return [terms.title, ...(terms.categories ?? []), ...briefs].join(' ');
+}
+
+function anchorsIn(html: string): Array<{ href: string; rel: string }> {
+  const attr = (tag: string, name: string) => tag.match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'))?.slice(1).find((v) => v !== undefined) ?? '';
+  return (html.match(/<a\b[^>]*>/gi) ?? []).map((tag) => ({ href: attr(tag, 'href'), rel: attr(tag, 'rel') }));
+}
+
+function sameTarget(href: string, destination: string): boolean {
+  try {
+    const [a, b] = [new URL(href), new URL(destination)];
+    const key = (u: URL) => `${u.hostname.replace(/^www\./, '')}${u.pathname.replace(/\/$/, '')}`;
+    return key(a) === key(b);
+  } catch {
+    return false;
+  }
+}
+
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+function htmlPage(title: string, body: string): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)}</title></head><body><main>${body}</main></body></html>`;
+}
+
+const STEP_WORDS: Record<Step, string> = {
+  list: 'lists this offer',
+  negotiate: 'sends this offer',
+  accept: 'takes this deal',
+  execute: 'does the work',
+  amend: 'changes the terms',
+  settle: 'settles payment',
+  share: 'shares stats',
+  revoke: 'ends the deal',
+};
+
+const REASON_WORDS: Record<EscalationReason, string> = {
+  step_ask: 'this step needs your approval',
+  over_budget: 'it is over the budget you set',
+  over_threshold: 'it is worth more than your approval limit',
+  new_counterparty: 'you have not dealt with them before',
+  low_reputation: 'their reputation is below your minimum',
+  category_outside: 'it is outside the categories you allow',
+  space_outside: 'it uses a space you did not allow',
+  kind_outside: 'it is a kind of deal you did not allow',
+  duration_over: 'it runs longer than you allow',
+  mandate_expired: 'your standing instructions have expired',
+};
 
 export class OrpHost {
   readonly origin: string;
@@ -188,6 +267,9 @@ export class OrpHost {
   private readonly disputes = new Map<string, DisputeRecord>();
   private readonly seen = new Map<string, { hash: Hash; reply: Reply }>();
   private readonly fakeWeb = new Map<string, { status: number; body: string }>();
+  private readonly claims = new Map<string, PartyId>();
+  private readonly sessions = new Map<string, string | undefined>();
+  private readonly perAddress = new Map<string, number[]>();
 
   constructor(options: HostOptions) {
     this.options = options;
@@ -207,10 +289,13 @@ export class OrpHost {
 
   // ---- parties (account setup is host-specific; ORP does not standardise it)
 
-  createParty(input: { constraints?: Constraints; spaces?: Space[]; jwk?: JsonWebKey } = {}): { party: PartyId; token: string } {
+  createParty(input: { constraints?: Constraints; spaces?: Space[]; jwk?: JsonWebKey; claimed?: boolean; agent?: string } = {}): { party: PartyId; token: string } {
     const id: PartyId = `orp:${new URL(this.origin).host}/${randomId('p', 12)}`;
     const token = randomBytes(24).toString('base64url');
-    this.parties.set(id, { id, token, constraints: input.constraints, spaces: input.spaces ?? [], jwk: input.jwk, inbox: [], chain: new Map(), sent: [], events: [], completed: 0 });
+    this.parties.set(id, {
+      id, token, constraints: input.constraints, spaces: input.spaces ?? [], jwk: input.jwk, inbox: [], chain: new Map(), sent: [], events: [], completed: 0,
+      claimed: input.claimed ?? true, ...(input.agent ? { agent: input.agent } : {}),
+    });
     this.tokens.set(token, id);
     return { party: id, token };
   }
@@ -232,6 +317,8 @@ export class OrpHost {
       name: this.options.name ?? 'ORP reference host',
       description: 'In-memory reference host from the ORP TypeScript SDK. Test use only.',
       endpoint: this.endpoint,
+      suggest: `${this.endpoint}/suggest`,
+      join: `${this.endpoint}/join`,
       mcp: { url: `${this.origin}/mcp`, transport: 'streamable-http', auth: ['bearer'], binding: true, tools: ORP_TOOLS.map((tool) => tool.name) },
       auth: { bearer: true },
       tracking: { links: true, codes: true, base: `${this.origin}/go/` },
@@ -348,7 +435,7 @@ export class OrpHost {
   }
 
   private escalate(party: PartyId, step: Step, reasons: EscalationReason[], hash: Hash, link: { deal?: string; offer?: string }): Escalation {
-    const escalation: Escalation = { id: randomId('esc', 6), party, step, reasons, termsHash: hash, since: this.ts(), ...link };
+    const escalation: Escalation = { id: randomId('esc', 12), party, step, reasons, termsHash: hash, since: this.ts(), ...link };
     this.escalations.set(escalation.id, escalation);
     return escalation;
   }
@@ -363,8 +450,17 @@ export class OrpHost {
     if (new Set(ids).size !== ids.length) throw new OrpError('invalid_message', 'obligation ids must be unique', { field: '/body/terms/obligations' });
     for (const o of terms.obligations) {
       if (!['place', 'repost', 'comment', 'pay', 'credit', 'share'].includes(o.action)) throw new OrpError('unsupported_type', `unknown obligation action ${o.action}`, { field: '/body/terms/obligations' });
+      if (isRepost(o) && !o.quote && terms.obligations.some((pay) => isPay(pay) && pay.by !== o.by)) {
+        throw new OrpError('invalid_message', 'a paid repost must be a quote, so it can carry the disclosure label', { field: '/body/terms/obligations' });
+      }
     }
     return hash;
+  }
+
+  private checkOpenDeals(party: PartyRecord): void {
+    if (party.claimed) return;
+    const open = [...this.deals.values()].filter((d) => (d.offerer === party.id || d.acceptor === party.id) && OPEN_STATES.includes(d.state)).length;
+    if (open >= UNCLAIMED_OPEN_DEALS) throw new OrpError('forbidden', `an unclaimed party can have ${UNCLAIMED_OPEN_DEALS} open deals; ask your person to claim it with the claim url from join`);
   }
 
   // ---- lifecycle
@@ -386,9 +482,9 @@ export class OrpHost {
       return { id: o.id, state: 'pending' as ObligationState, ...(due ? { due } : {}) };
     });
     for (const o of deal.terms.obligations) {
-      const content = 'content' in o ? (o.content as { link?: boolean; code?: boolean } | undefined) : undefined;
+      const content = 'content' in o ? (o.content as { link?: boolean; code?: boolean; direct?: boolean } | undefined) : undefined;
       const destination = 'destination' in o && typeof o.destination === 'string' ? o.destination : undefined;
-      if (!destination || (o.action !== 'place' && !(o.action === 'comment' && content?.link))) continue;
+      if (!destination || content?.direct || (o.action !== 'place' && !(o.action === 'comment' && content?.link))) continue;
       const code = randomBytes(6).toString('base64url');
       this.links.set(code, { deal: deal.id, obligation: o.id, destination });
       deal.tracking.push({ obligation: o.id, link: `${this.origin}/go/${code}`, ...(content?.code ? { code } : {}), destination, status: 'live' });
@@ -413,9 +509,11 @@ export class OrpHost {
     this.party(subject).events.push({ counterparty, counterpartyScore: this.reputationOf(counterparty), outcome, method, at: this.clock() });
   }
 
-  private receipt(deal: DealRecord, obligation: ObligationId, body: Omit<ReceiptBody, 'obligation' | 'at'>, re?: string): void {
+  // A verified obligation only changes again when a recheck finds the work
+  // gone before keep ran out.
+  private receipt(deal: DealRecord, obligation: ObligationId, body: Omit<ReceiptBody, 'obligation' | 'at'>, re?: string, recheck = false): void {
     const record = deal.obligations.find((o) => o.id === obligation);
-    if (!record || record.state === 'verified' || record.state === 'revoked') return;
+    if (!record || record.state === 'revoked' || (record.state === 'verified' && !recheck)) return;
     const doer = this.obligor(deal, obligation);
     const other = doer === deal.offerer ? deal.acceptor : deal.offerer;
     const full: ReceiptBody = { obligation, at: this.ts(), ...body };
@@ -428,6 +526,7 @@ export class OrpHost {
     record.receipt = firstId;
     if (body.result === 'verified') {
       record.state = 'verified';
+      record.verifiedAt = full.at;
       this.recordEvent(doer, other, 'verified', body.method);
     } else if (body.result === 'failed') {
       record.state = 'failed';
@@ -443,6 +542,30 @@ export class OrpHost {
     return { status: 0, body: '' };
   }
 
+  // What a public page proves about one obligation. A direct link must carry
+  // rel="sponsored" or rel="nofollow": exchanges are for readers, not rankings.
+  // A plain repost cannot show a label; a quote must.
+  private inspect(deal: DealRecord, spec: Obligation, html: string): { found: Found; result: ReceiptBody['result']; reason?: ReceiptBody['reason'] } {
+    const found: Found = {};
+    const tracking = deal.tracking.find((t) => t.obligation === spec.id);
+    const direct = isPlace(spec) && spec.content?.direct === true;
+    if ('target' in spec && typeof spec.target === 'string') found.target = html.includes(spec.target);
+    if (direct && isPlace(spec) && spec.destination) {
+      const anchor = anchorsIn(html).find((a) => sameTarget(a.href, spec.destination!));
+      found.destination = Boolean(anchor);
+      if (anchor) found.rel = /\b(sponsored|nofollow)\b/i.test(anchor.rel);
+    }
+    if (tracking) found.link = html.includes(tracking.link);
+    if (tracking?.code) found.code = html.includes(tracking.code);
+    if (deal.terms.disclosure) found.disclosure = html.toLowerCase().includes(deal.terms.disclosure.label.toLowerCase());
+    const core = spec.action === 'repost' || (spec.action === 'comment' && found.target !== undefined) ? found.target : direct ? found.destination : (found.link ?? found.code);
+    if (!core) return { found, result: 'failed', reason: spec.action === 'repost' ? 'not_found' : 'link_missing' };
+    if (direct && found.rel === false) return { found, result: 'partial', reason: 'rel_missing' };
+    const labelled = spec.action !== 'repost' || (isRepost(spec) && spec.quote === true);
+    if (labelled && found.disclosure === false) return { found, result: 'partial', reason: 'disclosure_missing' };
+    return { found, result: 'verified' };
+  }
+
   private async verifyProof(deal: DealRecord, obligation: ObligationId, proofUrl: string, re: string): Promise<void> {
     const spec = deal.terms.obligations.find((o) => o.id === obligation)!;
     const page = await this.fetchPublic(proofUrl);
@@ -451,20 +574,40 @@ export class OrpHost {
       this.receipt(deal, obligation, { result: 'failed', method: 'proof_url', url: proofUrl, reason: page.status === 404 || page.status === 410 ? 'not_found' : 'unreachable' }, re);
       return;
     }
-    const text = page.body;
-    const tracking = deal.tracking.find((t) => t.obligation === obligation);
-    const found: NonNullable<ReceiptBody['found']> = {};
-    if ('target' in spec && typeof spec.target === 'string') found.target = text.includes(spec.target);
-    if (tracking) found.link = text.includes(tracking.link);
-    if (tracking?.code) found.code = text.includes(tracking.code);
-    if (deal.terms.disclosure) found.disclosure = text.toLowerCase().includes(deal.terms.disclosure.label.toLowerCase());
-    const core = spec.action === 'repost' || spec.action === 'comment' && found.target !== undefined ? found.target : found.link ?? found.code;
-    if (!core) {
-      this.receipt(deal, obligation, { result: 'failed', method: 'proof_url', url: proofUrl, found, reason: spec.action === 'repost' ? 'not_found' : 'link_missing' }, re);
-    } else if (found.disclosure === false && spec.action !== 'repost') {
-      this.receipt(deal, obligation, { result: 'partial', method: 'proof_url', url: proofUrl, found, reason: 'disclosure_missing' }, re);
-    } else {
-      this.receipt(deal, obligation, { result: 'verified', method: 'proof_url', url: proofUrl, found }, re);
+    const { found, result, reason } = this.inspect(deal, spec, page.body);
+    deal.obligations.find((o) => o.id === obligation)!.proofUrl = proofUrl;
+    const keep = 'keep' in spec && typeof spec.keep === 'string' ? durationMs(spec.keep) : 0;
+    const nextCheck = result === 'verified' && keep ? new Date(this.clock().getTime() + Math.min(keep, KEEP_RECHECK_MS)).toISOString().replace(/\.\d{3}Z$/, 'Z') : undefined;
+    this.receipt(deal, obligation, { result, method: 'proof_url', url: proofUrl, found, ...(reason ? { reason } : {}), ...(nextCheck ? { next_check: nextCheck } : {}) }, re);
+  }
+
+  /** Look again at verified proof URLs whose keep has not run out. Work taken down early fails. */
+  async recheck(dealId: string): Promise<void> {
+    const deal = this.deals.get(dealId);
+    if (!deal) throw new OrpError('not_found', 'no such deal');
+    for (const record of deal.obligations) {
+      const spec = deal.terms.obligations.find((o) => o.id === record.id);
+      if (!spec || record.state !== 'verified' || !record.proofUrl || !record.verifiedAt) continue;
+      const keep = 'keep' in spec && typeof spec.keep === 'string' ? durationMs(spec.keep) : 0;
+      if (this.clock().getTime() > Date.parse(record.verifiedAt) + keep) continue;
+      const page = await this.fetchPublic(record.proofUrl);
+      if (page.status === 0) continue;
+      const still = page.status === 200 ? this.inspect(deal, spec, page.body) : undefined;
+      if (still?.result === 'verified') continue;
+      this.receipt(deal, record.id, { result: 'failed', method: 'proof_url', url: record.proofUrl, ...(still ? { found: still.found } : {}), reason: 'removed' }, undefined, true);
+    }
+  }
+
+  // Obligations past due fail. The host runs this whenever it touches a deal.
+  private sweep(deal: DealRecord): void {
+    if (deal.state !== 'active') return;
+    const now = this.clock().getTime();
+    for (const record of deal.obligations) {
+      if ((record.state !== 'pending' && record.state !== 'claimed') || !record.due || Date.parse(record.due) > now) continue;
+      const spec = deal.terms.obligations.find((o) => o.id === record.id)!;
+      const method = ('proof' in spec && Array.isArray(spec.proof) ? (spec.proof[0] as ProofMethod | undefined) : undefined) ?? 'attestation';
+      const clicks = isPlace(spec) && spec.clicks ? deal.clicks.get(record.id)?.human : undefined;
+      this.receipt(deal, record.id, { result: 'failed', method, reason: 'too_late', ...(clicks !== undefined ? { found: { link: clicks > 0, clicks } } : {}) });
     }
   }
 
@@ -524,6 +667,7 @@ export class OrpHost {
   private deal(party: PartyRecord, id: string | undefined): DealRecord {
     const deal = id ? this.deals.get(id) : undefined;
     if (!deal || !this.roleOf(deal, party.id)) throw new OrpError('not_found', 'no such deal for this party', { field: '/deal' });
+    this.sweep(deal);
     return deal;
   }
 
@@ -576,27 +720,17 @@ export class OrpHost {
 
   private discover(party: PartyRecord, msg: MessageByType['discover']): MessageByType['results'] {
     const { want, query, context, filters = {}, limit = 10 } = msg.body;
-    const words = new Set(`${query ?? ''} ${context?.text ?? ''}`.toLowerCase().match(/[a-z0-9]{3,}/g) ?? []);
+    const words = wordsOf(`${query ?? ''} ${context?.text ?? ''}`);
     const items: Result[] = [];
     if (want === 'offers') {
       for (const offer of this.offers.values()) {
-        if (!offer.listed || offer.revoked || offer.offerer === party.id) continue;
-        if (offer.expires && Date.parse(offer.expires) < this.clock().getTime()) continue;
+        if (!this.open(offer) || offer.offerer === party.id) continue;
         if (filters.kinds && (!offer.terms.kind || !filters.kinds.includes(offer.terms.kind))) continue;
         if (filters.categories && !(offer.terms.categories ?? []).some((c) => filters.categories!.some((f) => c === f || c.startsWith(`${f}.`)))) continue;
-        const reputation = this.reputationOf(offer.offerer);
-        if (filters.min_reputation !== undefined && (reputation ?? 0) < filters.min_reputation) continue;
-        const text = `${offer.terms.title} ${(offer.terms.categories ?? []).join(' ')}`.toLowerCase();
-        const hits = [...words].filter((w) => text.includes(w));
-        const fit = Math.min(100, 40 + 15 * hits.length);
-        const evidence = offer.terms.obligations.flatMap((o) => ('destination' in o && typeof o.destination === 'string' ? [o.destination] : []));
-        items.push({
-          offer: { id: offer.id, terms: offer.terms, terms_hash: offer.hash, ...(offer.expires ? { expires: offer.expires } : {}) },
-          party: offer.offerer,
-          fit: { score: fit, reasons: [hits.length ? `Matches ${hits.slice(0, 5).join(', ')}.` : 'Open standing offer.'], ...(evidence.length ? { evidence: evidence.slice(0, 5) } : {}) },
-          trust: { reputation, completed_deals: this.party(offer.offerer).completed },
-          pool: 'public',
-        });
+        const trust = this.trustOf(offer.offerer);
+        if (filters.min_reputation !== undefined && (trust.reputation ?? 0) < filters.min_reputation) continue;
+        const hits = matches(words, offerText(offer.terms));
+        items.push({ ...this.offerResult(offer, hits), trust, pool: 'public' });
       }
     } else {
       for (const other of this.parties.values()) {
@@ -605,13 +739,150 @@ export class OrpHost {
           if (filters.space_kinds && !filters.space_kinds.includes(space.kind)) continue;
           if (filters.kinds && !(space.accepts ?? []).some((k) => filters.kinds!.includes(k))) continue;
           const { locator: _hidden, ...listed } = space;
-          items.push({ space: listed, party: other.id, fit: { score: 50, reasons: [`Accepts ${(space.accepts ?? ['deals']).join(', ')}.`] }, trust: { reputation: this.reputationOf(other.id), completed_deals: other.completed } });
+          items.push({ space: listed, party: other.id, fit: { score: 50, reasons: [`Accepts ${(space.accepts ?? ['deals']).join(', ')}.`] }, trust: this.trustOf(other.id) });
         }
       }
     }
     items.sort((a, b) => b.fit.score - a.fit.score);
     const page = items.slice(0, limit);
     return this.hostMessage('results', party.id, { items: page, ...(page.length ? {} : { empty_reason: 'no_match' as const }) }, { re: msg.id });
+  }
+
+  private open(offer: OfferRecord): boolean {
+    if (!offer.listed || offer.revoked) return false;
+    if (offer.expires && Date.parse(offer.expires) < this.clock().getTime()) return false;
+    return !(offer.limit && offer.opened >= offer.limit);
+  }
+
+  private trustOf(id: PartyId): Trust {
+    const party = this.party(id);
+    return { reputation: this.reputationOf(id), completed_deals: party.completed, ...(party.claimed ? { verified: ['person' as const] } : {}) };
+  }
+
+  private offerResult(offer: OfferRecord, hits: string[]): Result {
+    const evidence = offer.terms.obligations.flatMap((o) => ('destination' in o && typeof o.destination === 'string' ? [o.destination] : []));
+    return {
+      offer: { id: offer.id, terms: offer.terms, terms_hash: offer.hash, ...(offer.expires ? { expires: offer.expires } : {}) },
+      party: offer.offerer,
+      fit: { score: Math.min(100, 40 + 15 * hits.length), reasons: [hits.length ? `Matches ${hits.slice(0, 5).join(', ')}.` : 'Open standing offer.'], ...(evidence.length ? { evidence: evidence.slice(0, 5) } : {}) },
+      trust: this.trustOf(offer.offerer),
+    };
+  }
+
+  private allow(bucket: 'suggest' | 'join', address: string): boolean {
+    const perMinute = this.options.limits?.[bucket] ?? (bucket === 'join' ? 10 : 60);
+    const key = `${bucket}|${address}`;
+    const now = this.clock().getTime();
+    const recent = (this.perAddress.get(key) ?? []).filter((t) => t > now - 60_000);
+    const ok = recent.length < perMinute;
+    if (ok) recent.push(now);
+    this.perAddress.set(key, recent);
+    return ok;
+  }
+
+  private httpError(code: string, text: string, extra: Record<string, unknown> = {}): [number, MessageByType['error']] {
+    return [STATUS[code] ?? 400, this.hostMessage('error', undefined, { code, message: text, ...extra } as MessageByType['error']['body'])];
+  }
+
+  /**
+   * One call for any agent that writes for someone: deals its person could
+   * take now, each with a pitch. No credentials. The text is matched here and
+   * dropped: it is never stored, logged or shown to anyone else.
+   */
+  suggest(raw: unknown, address = 'local'): [number, SuggestResponse | MessageByType['error']] {
+    if (!this.allow('suggest', address)) return this.httpError('rate_limited', 'too many suggestions from this address', { retry_after: 60, retryable: true });
+    const checked = checkSuggestRequest(raw);
+    if (!checked.ok) return this.httpError('invalid_message', checked.problems.slice(0, 3).map((p) => `${p.path} ${p.message}`).join('; '), { field: checked.problems[0]?.path });
+    const { text, space_kind: kind, want = ['earn', 'grow'], kinds, limit = 3 } = checked.value;
+    const words = wordsOf(text);
+    const items: Result[] = [];
+    for (const offer of this.offers.values()) {
+      if (!this.open(offer)) continue;
+      if (kinds && (!offer.terms.kind || !kinds.includes(offer.terms.kind))) continue;
+      if (![...benefits(offer.terms)].some((b) => want.includes(b))) continue;
+      const allowed = offer.terms.obligations.flatMap((o) => (o.by === 'acceptor' && isPlace(o) && o.space?.kinds ? [o.space.kinds] : []));
+      if (allowed.some((spaceKinds) => (kind ? !spaceKinds.includes(kind) : !spaceKinds.some((k) => CONTENT_KINDS.has(k))))) continue;
+      const hits = matches(words, offerText(offer.terms));
+      if (hits.length) items.push({ ...this.offerResult(offer, hits), pitch: pitchOffer(offer.terms) });
+    }
+    if (want.includes('grow')) {
+      for (const other of this.parties.values()) {
+        for (const space of other.spaces) {
+          if (!(space.accepts ?? []).some((k) => GROW_KINDS.includes(k) && (!kinds || kinds.includes(k)))) continue;
+          const hits = matches(words, `${space.title ?? ''} ${(space.topics ?? []).join(' ')}`);
+          if (!hits.length) continue;
+          const { locator: _hidden, ...listed } = space;
+          items.push({ space: listed, party: other.id, fit: { score: Math.min(100, 30 + 15 * hits.length), reasons: [`Trades with posts about ${hits.slice(0, 3).join(', ')}.`] }, trust: this.trustOf(other.id), pitch: pitchSpace(space) });
+        }
+      }
+    }
+    items.sort((a, b) => b.fit.score - a.fit.score);
+    const page = items.slice(0, limit);
+    return [200, { items: page, ...(page.length ? {} : { empty_reason: 'no_match' as const }), join: `${this.endpoint}/join` }];
+  }
+
+  /**
+   * A pseudonymous party and token, with no account, email, name or website.
+   * Until a person claims it, every step that binds waits for their tap.
+   */
+  join(raw: unknown, address = 'local'): [number, JoinResponse | MessageByType['error']] {
+    if (!this.allow('join', address)) return this.httpError('rate_limited', 'too many joins from this address', { retry_after: 60, retryable: true });
+    const input = raw ?? {};
+    const checked = checkJoinRequest(input);
+    if (!checked.ok) {
+      const extra = input && typeof input === 'object' && !Array.isArray(input) ? Object.keys(input).filter((key) => key !== 'agent' && key !== 'key') : [];
+      if (extra.length) return this.httpError('invalid_message', `join asks for nothing personal: remove ${extra.join(', ')}`, { field: `/${extra[0]}` });
+      return this.httpError('invalid_message', checked.problems.slice(0, 3).map((p) => `${p.path} ${p.message}`).join('; '), { field: checked.problems[0]?.path });
+    }
+    const { agent, key } = checked.value;
+    const { party, token } = this.createParty({ claimed: false, ...(key ? { jwk: key as JsonWebKey } : {}), ...(agent ? { agent: agent.name } : {}) });
+    const secret = randomBytes(24).toString('base64url');
+    this.claims.set(secret, party);
+    return [200, { party, token, claim: `${this.origin}/claim/${secret}`, steps: { ...DEFAULT_STEPS }, limits: { open_deals: UNCLAIMED_OPEN_DEALS, messages_per_minute: RATE_PER_MINUTE } }];
+  }
+
+  /** A person makes the party theirs (in production: a passkey, no email) and may set limits. */
+  claim(secret: string, constraints?: Constraints): PartyId {
+    const id = this.claims.get(secret);
+    if (!id) throw new OrpError('not_found', 'no such claim');
+    const party = this.party(id);
+    party.claimed = true;
+    if (constraints) party.constraints = constraints;
+    this.claims.delete(secret);
+    return id;
+  }
+
+  /** The page behind waiting.url: what the person is asked, in words. No sign-in to read it. */
+  approvalPage(id: string): [number, string] {
+    const escalation = this.escalations.get(id);
+    if (!escalation) return [404, htmlPage('Nothing to approve', '<h1>Nothing to approve</h1><p>This request was already decided, or it does not exist.</p>')];
+    const deal = escalation.deal ? this.deals.get(escalation.deal) : undefined;
+    const terms = deal?.terms ?? this.offers.get(escalation.offer ?? '')?.terms;
+    if (!terms) return [404, htmlPage('Nothing to approve', '<h1>Nothing to approve</h1>')];
+    const role: Role = deal ? this.roleOf(deal, escalation.party)! : 'offerer';
+    const { you, get } = sides(terms, role);
+    const agent = this.parties.get(escalation.party)?.agent;
+    const items = (lines: string[]) => `<ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`;
+    const body = [
+      `<h1>${escapeHtml(terms.title)}</h1>`,
+      `<p>Your agent${agent ? ` (${escapeHtml(agent)})` : ''} is waiting for you before it ${STEP_WORDS[escalation.step]}, because ${escalation.reasons.map((r) => REASON_WORDS[r]).join(', and ')}.</p>`,
+      you.length ? `<h2>You would</h2>${items(you)}` : '',
+      get.length ? `<h2>You get</h2>${items(get)}` : '',
+      terms.disclosure ? `<p>Readers see the label &ldquo;${escapeHtml(terms.disclosure.label)}&rdquo;.</p>` : '',
+      `<form method="post" action="/approve/${escapeHtml(id)}"><button name="decision" value="approved">Approve with a passkey</button> <button name="decision" value="refused">Refuse</button></form>`,
+      `<p>No account, email or password. Approving records your consent to these exact terms (${escapeHtml(escalation.termsHash)}).</p>`,
+    ];
+    return [200, htmlPage(`Approve: ${terms.title}`, body.join(''))];
+  }
+
+  claimPage(secret: string): [number, string] {
+    if (!this.claims.has(secret)) return [404, htmlPage('Already claimed', '<h1>Already claimed</h1><p>This link was used, or it does not exist.</p>')];
+    return [200, htmlPage('Make these deals yours', [
+      '<h1>Make these deals yours</h1>',
+      '<p>Create a passkey on this device. You get one place to approve deals, set limits (budget, categories, brand rules) and choose how you get paid.</p>',
+      `<form method="post" action="/claim/${escapeHtml(secret)}"><button>Create a passkey</button></form>`,
+      '<p>No email, no password.</p>',
+    ].join(''))];
   }
 
   private offer(party: PartyRecord, msg: MessageByType['offer']): Reply {
@@ -626,6 +897,7 @@ export class OrpHost {
       return { status: 200, body: this.listing(offer, msg.id) };
     }
     if (msg.to === party.id || !this.parties.has(msg.to)) throw new OrpError('not_found', 'no such party', { field: '/to' });
+    this.checkOpenDeals(party);
     const decision = this.judge(party.id, 'negotiate', 'offerer', terms, msg.to);
     const deal: DealRecord = {
       id: randomId('deal', 6), state: 'proposed', offerer: party.id, acceptor: msg.to, terms, hash, round: 1, bound: [], tracking: [], obligations: [], spaces: [], clicks: new Map(), conversions: new Map(), updated: this.ts(),
@@ -683,6 +955,7 @@ export class OrpHost {
       if (offer.limit && offer.opened >= offer.limit) throw new OrpError('state_conflict', 'the offer is full');
       if (offer.offerer === party.id) throw new OrpError('forbidden', 'you cannot accept your own offer');
       if (msg.body.terms_hash !== offer.hash) throw new OrpError('terms_mismatch', 'terms_hash does not match the offer', { field: '/body/terms_hash' });
+      this.checkOpenDeals(party);
       deal = {
         id: randomId('deal', 6), state: 'proposed', offerer: offer.offerer, acceptor: party.id, offer: offer.id, terms: offer.terms, hash: offer.hash, round: 1,
         bound: [{ party: offer.offerer, authority: offer.authority, at: this.ts() }], tracking: [], obligations: [], spaces: [], clicks: new Map(), conversions: new Map(), updated: this.ts(),
@@ -805,6 +1078,7 @@ export class OrpHost {
     if (!party) return this.receiveError('unauthorized', 'a valid bearer token is required');
     const deal = this.deals.get(id);
     if (!deal || !this.roleOf(deal, party)) return this.receiveError('not_found', 'no such deal for this party', party);
+    this.sweep(deal);
     return { status: 200, body: this.snapshot(deal, party) };
   }
 
@@ -813,6 +1087,7 @@ export class OrpHost {
     if (!party) return this.receiveError('unauthorized', 'a valid bearer token is required');
     const deal = this.deals.get(id);
     if (!deal || !this.roleOf(deal, party)) return this.receiveError('not_found', 'no such deal for this party', party);
+    this.sweep(deal);
     return { status: 200, body: this.outcome(deal, party) };
   }
 
@@ -864,6 +1139,7 @@ export class OrpHost {
     const link = this.links.get(code);
     if (!link) return { status: 302, location: `${this.origin}/` };
     const deal = this.deals.get(link.deal);
+    if (deal) this.sweep(deal);
     const tracking = deal?.tracking.find((t) => t.obligation === link.obligation);
     if (!deal || !tracking || tracking.status !== 'live' || !['active', 'disputed', 'completed'].includes(deal.state)) {
       return { status: 302, location: link.destination };
@@ -876,8 +1152,11 @@ export class OrpHost {
       const record = deal.obligations.find((o) => o.id === link.obligation);
       const spec = deal.terms.obligations.find((o) => o.id === link.obligation);
       const proofs = spec && 'proof' in spec ? (spec.proof as string[] | undefined) : undefined;
-      if (record && (record.state === 'pending' || record.state === 'claimed') && proofs?.includes('link')) {
-        this.receipt(deal, link.obligation, { result: 'verified', method: 'link', found: { link: true } });
+      // Without a clicks target the first human click proves the placement;
+      // a traffic swap is done when its target is reached.
+      const target = spec && isPlace(spec) && spec.clicks ? spec.clicks : 1;
+      if (record && (record.state === 'pending' || record.state === 'claimed') && proofs?.includes('link') && counts.human >= target) {
+        this.receipt(deal, link.obligation, { result: 'verified', method: 'link', found: { link: true, ...(target > 1 ? { clicks: counts.human } : {}) } });
       }
     }
     const target = new URL(link.destination);
@@ -891,6 +1170,8 @@ export class OrpHost {
     const escalation = this.escalations.get(id);
     if (!escalation) throw new OrpError('not_found', 'no such escalation');
     this.escalations.delete(id);
+    // The first passkey approval also claims an unclaimed party: one tap.
+    if (assurance === 'passkey') this.party(escalation.party).claimed = true;
     const consentId = randomId('cns', 6);
     const body = { consent: consentId, escalation: escalation.id, party: escalation.party, decision, step: escalation.step, terms_hash: escalation.termsHash, reasons: escalation.reasons, assurance, at: this.ts() };
     if (escalation.offer) {
@@ -978,8 +1259,18 @@ export class OrpHost {
       res.writeHead(status, { ...(body === undefined ? {} : { 'content-type': 'application/json' }), 'cache-control': 'no-store', ...headers });
       res.end(body === undefined ? undefined : JSON.stringify(body));
     };
+    const html = (status: number, page: string) => {
+      res.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex' });
+      res.end(page);
+    };
+    const address = req.socket.remoteAddress ?? 'unknown';
     try {
       const path = url.pathname;
+      const open = path === '/.well-known/orp.json' || path === '/orp/suggest' || path === '/orp/join';
+      if (open) res.setHeader('access-control-allow-origin', '*');
+      if (req.method === 'OPTIONS' && open) return send(204, undefined, { 'access-control-allow-methods': 'GET, POST', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' });
+      if (req.method === 'POST' && path === '/orp/suggest') return send(...this.suggest(await readJson(req), address));
+      if (req.method === 'POST' && path === '/orp/join') return send(...this.join(await readJson(req), address));
       if ((req.method === 'GET' || req.method === 'HEAD') && path.startsWith('/go/')) {
         const { location } = this.click(decodeURIComponent(path.slice(4)), req.method, req.headers, url.searchParams);
         res.writeHead(302, { location, 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex' });
@@ -1002,13 +1293,18 @@ export class OrpHost {
         const reply = dealPath[2] ? this.readOutcome(token, dealPath[1]!) : this.readDeal(token, dealPath[1]!);
         return send(reply.status, reply.body);
       }
-      if (req.method === 'POST' && path === '/mcp') return send(...(await this.mcp(token, await readJson(req))));
-      if (req.method === 'GET' && path.startsWith('/approve/')) {
-        res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' });
-        res.end('The owner approves or refuses here, signed in to the host. This reference host has no owner sign-in; tests use the /orp-test harness.\n');
-        return;
+      if (req.method === 'POST' && path === '/mcp') {
+        const session = typeof req.headers['mcp-session-id'] === 'string' ? req.headers['mcp-session-id'] : undefined;
+        return send(...(await this.mcp(token, session, address, await readJson(req))));
       }
-      if (this.options.harness && path.startsWith('/orp-test/') && req.method === 'POST') return send(...this.harness(path, ((await readJson(req)) ?? {}) as Record<string, unknown>));
+      const approve = path.match(/^\/approve\/([\w-]{3,64})$/);
+      if (approve && req.method === 'GET') return html(...this.approvalPage(approve[1]!));
+      const claim = path.match(/^\/claim\/([\w-]{20,64})$/);
+      if (claim && req.method === 'GET') return html(...this.claimPage(claim[1]!));
+      if ((approve || claim) && req.method === 'POST') {
+        return html(501, htmlPage('Passkeys needed', '<h1>Not in the reference host</h1><p>A real host checks a passkey here (WebAuthn with user verification) before it records consent or a claim. The reference host has no passkeys; its tests use the /orp-test harness.</p>'));
+      }
+      if (this.options.harness && path.startsWith('/orp-test/') && req.method === 'POST') return send(...(await this.harness(path, ((await readJson(req)) ?? {}) as Record<string, unknown>)));
       send(404, { error: 'not_found' });
     } catch (error) {
       if (error instanceof OrpError) return send(STATUS[error.code] ?? 400, { error: error.code, message: error.message });
@@ -1017,8 +1313,15 @@ export class OrpHost {
     }
   }
 
-  private harness(path: string, input: Record<string, unknown>): [number, unknown] {
+  private async harness(path: string, input: Record<string, unknown>): Promise<[number, unknown]> {
     if (path === '/orp-test/parties') return [200, this.createParty(input as { constraints?: Constraints; spaces?: Space[]; jwk?: JsonWebKey })];
+    const claimMatch = path.match(/^\/orp-test\/claims\/([\w-]+)$/);
+    if (claimMatch) return [200, { party: this.claim(claimMatch[1]!, input.constraints as Constraints | undefined), claimed: true }];
+    const recheckMatch = path.match(/^\/orp-test\/recheck\/([\w-]+)$/);
+    if (recheckMatch) {
+      await this.recheck(recheckMatch[1]!);
+      return [200, { ok: true }];
+    }
     const decideMatch = path.match(/^\/orp-test\/escalations\/([\w-]+)\/decide$/);
     if (decideMatch) return [200, this.decideEscalation(decideMatch[1]!, input.decision as 'approved' | 'refused', input.assurance as 'session' | undefined)];
     if (path === '/orp-test/conversions') return [200, { recorded: this.recordConversion(String(input.code), input.amount as { amount_minor: number; currency: string }, Boolean(input.refund)) }];
@@ -1039,15 +1342,23 @@ export class OrpHost {
     return [404, { error: 'not_found' }];
   }
 
-  private async mcp(token: string | undefined, request: unknown): Promise<[number, unknown?]> {
+  // MCP clients cannot change their own headers mid-conversation, so orp_join
+  // binds the new party to the Mcp-Session-Id. A bearer token, when sent, wins.
+  private async mcp(bearer: string | undefined, session: string | undefined, address: string, request: unknown): Promise<[number, unknown?, Record<string, string>?]> {
     const rpc = (request ?? {}) as { jsonrpc?: string; id?: string | number; method?: string; params?: Record<string, unknown> };
-    const result = (value: unknown): [number, unknown] => [200, { jsonrpc: '2.0', id: rpc.id ?? null, result: value }];
+    const result = (value: unknown, headers?: Record<string, string>): [number, unknown, Record<string, string>?] => [200, { jsonrpc: '2.0', id: rpc.id ?? null, result: value }, headers];
     const failure = (code: number, text: string): [number, unknown] => [200, { jsonrpc: '2.0', id: rpc.id ?? null, error: { code, message: text } }];
+    const tool = (body: unknown, isError: boolean) => result({ content: [{ type: 'text', text: JSON.stringify(body) }], structuredContent: body, isError });
     if (rpc.jsonrpc !== '2.0' || typeof rpc.method !== 'string') return failure(-32600, 'invalid request');
+    if (session !== undefined && rpc.method !== 'initialize' && !this.sessions.has(session)) return [404, { jsonrpc: '2.0', id: rpc.id ?? null, error: { code: -32001, message: 'unknown session' } }];
     if (rpc.id === undefined) return [202];
+    const token = bearer ?? (session ? this.sessions.get(session) : undefined);
     switch (rpc.method) {
-      case 'initialize':
-        return result({ protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: {}, experimental: orpCapability(`${this.origin}/.well-known/orp.json`) }, serverInfo: { name: 'orp-reference-host', version: '0.3.0' } });
+      case 'initialize': {
+        const id = randomBytes(16).toString('base64url');
+        this.sessions.set(id, undefined);
+        return result({ protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: {}, experimental: orpCapability(`${this.origin}/.well-known/orp.json`) }, serverInfo: { name: 'orp-reference-host', version: '0.3.0' } }, { 'mcp-session-id': id });
+      }
       case 'ping':
         return result({});
       case 'tools/list':
@@ -1055,14 +1366,22 @@ export class OrpHost {
       case 'tools/call': {
         const name = rpc.params?.name;
         const args = (rpc.params?.arguments ?? {}) as Record<string, unknown>;
+        if (name === 'orp_suggest') {
+          const [status, body] = this.suggest(args, address);
+          return tool(body, status !== 200);
+        }
+        if (name === 'orp_join') {
+          const [status, body] = this.join(args, address);
+          if (status === 200 && session && 'token' in body) this.sessions.set(session, body.token);
+          return tool(body, status !== 200);
+        }
         let reply: Reply;
         if (name === 'orp_send') reply = await this.receive(token, args.message);
         else if (name === 'orp_inbox') reply = this.inbox(token, typeof args.after === 'string' ? args.after : undefined);
         else if (name === 'orp_deal') reply = this.readDeal(token, String(args.deal ?? ''));
         else return failure(-32602, `unknown tool ${String(name)}`);
         const content = reply.body ?? { delivered: true };
-        const isError = 'type' in content && content.type === 'error';
-        return result({ content: [{ type: 'text', text: JSON.stringify(content) }], structuredContent: content, isError });
+        return tool(content, 'type' in content && content.type === 'error');
       }
       default:
         return failure(-32601, `method ${rpc.method} not found`);

@@ -13,9 +13,16 @@ export function exampleFiles(dir: string): string[] {
   return readdirSync(join(EXAMPLES, dir)).filter((name) => name.endsWith('.json')).sort().map((name) => join(dir, name));
 }
 
-export const affiliateTerms = (): Terms => structuredClone(readExample<MessageByType['offer']>('messages/03-offer-standing.json').body.terms);
-export const swapTerms = (): Terms => structuredClone(readExample<MessageByType['offer']>('messages/11-offer-directed.json').body.terms);
+const offerTerms = (name: string) => (): Terms => structuredClone(readExample<MessageByType['offer']>(`messages/${name}.json`).body.terms);
+export const affiliateTerms = offerTerms('03-offer-standing');
+export const swapTerms = offerTerms('11-offer-directed');
 export const swapCounterTerms = (): Terms => structuredClone(readExample<MessageByType['counter']>('messages/12-counter.json').body.terms);
+export const trafficSwapTerms = offerTerms('31-offer-traffic-swap');
+export const linkExchangeTerms = offerTerms('32-offer-link-exchange');
+export const crossSellTerms = offerTerms('33-offer-cross-sell');
+export const paidRepostTerms = offerTerms('34-offer-paid-repost');
+
+export const DRAFT = 'Five note-taking apps I use to run a one-person software business, and how I keep my notes in sync.';
 
 export const UA = {
   mailApp: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148',
@@ -29,7 +36,16 @@ export const UA = {
 export const publisherSpaces: Space[] = [
   { id: 'sp_news_1', kind: 'newsletter.issue', platform: 'newsletter', title: 'Indie Stack Weekly', locator: 'https://indiestackweekly.example/archive', accepts: ['affiliate', 'swap', 'sponsored'] },
   { id: 'sp_x_1', kind: 'social.post', platform: 'x', title: '@indiestackweekly', locator: 'https://x.com/indiestackweekly', accepts: ['swap', 'repost'] },
+  { id: 'sp_app_1', kind: 'app.slot', platform: 'web', title: 'Checkout thank-you page', locator: 'https://indiestackweekly.example/thanks', accepts: ['cross_sell'] },
 ];
+
+/** A maker that lists the example affiliate offer, with nobody on the other side yet. */
+export async function listedAffiliateOffer(w: Awaited<ReturnType<typeof world>>) {
+  const maker = await w.join({ steps: { list: 'auto' }, budget: { max_rate_bps: 3000 } }, [], 'maker-agent');
+  const terms = affiliateTerms();
+  const listing = (await maker.client.send(maker.client.build('offer', { terms, terms_hash: termsHash(terms) }))) as MessageByType['offer'];
+  return { maker, listing };
+}
 
 export async function world(options: Omit<HostOptions, 'origin'> = {}) {
   const started = await startHost({ harness: true, ...options });

@@ -1,10 +1,40 @@
-// The ORP MCP binding: three generic tools carry every message. Consent is
-// never a tool; a person approves through the host, not through an agent.
+// The ORP MCP binding. orp_suggest and orp_join need no credentials, so any
+// writing agent can offer a deal mid-task. Three generic tools carry every
+// message. Consent is never a tool; a person approves through the host.
 import { SCHEMA_BASE } from './validate.ts';
 
 export const MCP_PROTOCOL_VERSION = '2025-06-18';
 
 export const ORP_TOOLS = [
+  {
+    name: 'orp_suggest',
+    title: 'Suggest deals for what you are writing',
+    description:
+      'Call this while you write a post, thread, newsletter or video description for someone. Send the draft or a short summary; get up to five deals they could take now (affiliate, sponsored, cross-sell, swaps, link exchanges, reposts), each with a pitch to show them as is, such as "You can monetize this post ... Want to test it?". No account needed. Leave out names, emails and anything personal; the host does not keep the text.',
+    inputSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['text'],
+      properties: {
+        text: { type: 'string', minLength: 1, maxLength: 4000, description: 'The draft, or a short summary of it.' },
+        platform: { type: 'string', description: 'Where it will be published, such as web, x, newsletter, youtube, linkedin.' },
+        space_kind: { type: 'string', description: 'Such as web.article, social.post, newsletter.issue.' },
+        want: { type: 'array', items: { type: 'string', enum: ['earn', 'grow'] }, description: 'earn: get paid. grow: get readers. Both when absent.' },
+        kinds: { type: 'array', items: { type: 'string' } },
+        lang: { type: 'string' },
+        limit: { type: 'integer', minimum: 1, maximum: 5 },
+      },
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+  },
+  {
+    name: 'orp_join',
+    title: 'Join to take a deal',
+    description:
+      'Get a pseudonymous party for your person with no email, signup or website. Call it once, when they say yes to a suggestion. This MCP session then acts as that party. Every step that binds them waits for their one-tap approval at a url you show them. Give them the claim url; keep the token out of posts and messages.',
+    inputSchema: { type: 'object', additionalProperties: false, properties: { agent: { type: 'object', properties: { name: { type: 'string' }, version: { type: 'string' } }, required: ['name'] } } },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  },
   {
     name: 'orp_send',
     title: 'Send an ORP message',

@@ -30,7 +30,7 @@
         "transport": { "type": "string", "enum": ["streamable-http", "legacy-http-jsonrpc"] },
         "auth": { "type": "array", "uniqueItems": true, "items": { "type": "string", "enum": ["bearer", "oauth"] } },
         "tools": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_]{1,64}$" } },
-        "binding": { "type": "boolean", "description": "True when the MCP server exposes the ORP binding tools (orp_send, orp_inbox, orp_deal)." }
+        "binding": { "type": "boolean", "description": "True when the MCP server exposes the ORP binding tools: orp_suggest and orp_join (no credentials), and orp_send, orp_inbox and orp_deal." }
       }
     },
     "auth": {

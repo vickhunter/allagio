@@ -1398,7 +1398,7 @@ export interface Discovery {
      */
     tools?: string[];
     /**
-     * True when the MCP server exposes the ORP binding tools (orp_send, orp_inbox, orp_deal).
+     * True when the MCP server exposes the ORP binding tools: orp_suggest and orp_join (no credentials), and orp_send, orp_inbox and orp_deal.
      */
     binding?: boolean;
   };
