@@ -7,20 +7,7 @@
   "additionalProperties": false,
   "required": ["steps"],
   "properties": {
-    "steps": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "list": { "$ref": "defs.schema.json#/$defs/StepMode" },
-        "negotiate": { "$ref": "defs.schema.json#/$defs/StepMode" },
-        "accept": { "$ref": "defs.schema.json#/$defs/StepMode" },
-        "execute": { "$ref": "defs.schema.json#/$defs/StepMode" },
-        "amend": { "$ref": "defs.schema.json#/$defs/StepMode" },
-        "settle": { "$ref": "defs.schema.json#/$defs/StepMode" },
-        "share": { "$ref": "defs.schema.json#/$defs/StepMode" },
-        "revoke": { "$ref": "defs.schema.json#/$defs/StepMode" }
-      }
-    },
+    "steps": { "$ref": "defs.schema.json#/$defs/Steps" },
     "budget": {
       "description": "Caps on money the owner pays. A deal that would cross one escalates with over_budget. Pay per click or per conversion counts at its cap; with no cap it always escalates.",
       "type": "object",

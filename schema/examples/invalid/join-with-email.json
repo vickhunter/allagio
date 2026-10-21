@@ -1,0 +1,11 @@
+{
+  "why": "Joining takes no email, phone, name or website. There is no field for one.",
+  "schema": "join-request",
+  "path": "",
+  "instance": {
+    "agent": {
+      "name": "writer-assistant"
+    },
+    "email": "writer@example.com"
+  }
+}

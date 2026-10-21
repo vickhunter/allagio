@@ -33,7 +33,8 @@
         "party": { "$ref": "../defs.schema.json#/$defs/PartyId" },
         "fit": { "$ref": "../defs.schema.json#/$defs/Fit" },
         "trust": { "$ref": "../defs.schema.json#/$defs/Trust" },
-        "pool": { "type": "string", "pattern": "^[a-z0-9_-]{1,40}$" }
+        "pool": { "type": "string", "pattern": "^[a-z0-9_-]{1,40}$" },
+        "pitch": { "type": "string", "minLength": 1, "maxLength": 280, "description": "One or two sentences an agent can show its person as is, such as 'You can monetize this post: ... Want to test it?'. Says what the person would do and what they get. No personal data." }
       },
       "oneOf": [{ "required": ["offer"] }, { "required": ["space"] }]
     },

@@ -1,0 +1,52 @@
+{
+  "orp": "0.3",
+  "type": "offer",
+  "id": "m_mkr_0013",
+  "ts": "2026-10-24T12:00:00Z",
+  "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+  "body": {
+    "terms": {
+      "title": "Quote our launch post with your take: EUR 15 per verified repost",
+      "kind": "repost",
+      "categories": [
+        "software.productivity"
+      ],
+      "disclosure": {
+        "label": "Paid partnership",
+        "lang": "en"
+      },
+      "obligations": [
+        {
+          "id": "repost",
+          "by": "acceptor",
+          "action": "repost",
+          "target": "https://x.com/acmenotes/status/1848200000000000000",
+          "quote": true,
+          "due": "P3D",
+          "keep": "P7D",
+          "proof": [
+            "platform_check",
+            "proof_url"
+          ]
+        },
+        {
+          "id": "fee",
+          "by": "offerer",
+          "action": "pay",
+          "per": "deal",
+          "amount": {
+            "amount_minor": 1500,
+            "currency": "EUR"
+          },
+          "after": "repost",
+          "rail": "stripe",
+          "proof": [
+            "provider"
+          ]
+        }
+      ]
+    },
+    "limit": 20,
+    "expires": "2026-11-01T00:00:00Z"
+  }
+}

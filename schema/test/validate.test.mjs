@@ -36,11 +36,12 @@ addFormats(ajv);
 const schemaFiles = walk(schemaRoot, '.schema.json');
 for (const file of schemaFiles) ajv.addSchema(readJson(file));
 
+const HTTP = ['inbox', 'suggest-request', 'suggest-response', 'join-request', 'join-response'];
 const validators = {
   message: ajv.getSchema(`${BASE}message.schema.json`),
   discovery: ajv.getSchema(`${BASE}discovery.schema.json`),
   constraints: ajv.getSchema(`${BASE}constraints.schema.json`),
-  inbox: ajv.getSchema(`${BASE}http/inbox.schema.json`),
+  ...Object.fromEntries(HTTP.map((name) => [name, ajv.getSchema(`${BASE}http/${name}.schema.json`)])),
 };
 
 function explain(validate) {
@@ -75,11 +76,21 @@ test('valid message examples pass, and every core type has one', () => {
   for (const type of CORE_TYPES) assert.ok(seen.has(type), `no valid example for ${type}`);
 });
 
-test('discovery, constraints and inbox examples pass', () => {
+test('discovery, constraints, inbox, suggest and join examples pass', () => {
   for (const [name, kind] of [['discovery.json', 'discovery'], ['constraints.json', 'constraints'], ['inbox.json', 'inbox']]) {
     const validate = validators[kind];
     assert.ok(validate(readJson(join(examplesRoot, name))), `${name}\n${explain(validate)}`);
   }
+  for (const name of HTTP.filter((n) => n !== 'inbox')) {
+    const validate = validators[name];
+    assert.ok(validate(readJson(join(examplesRoot, 'http', `${name}.json`))), `http/${name}.json\n${explain(validate)}`);
+  }
+});
+
+test('joining asks for nothing personal: an empty request is complete', () => {
+  assert.ok(validators['join-request']({}));
+  const { properties } = readJson(join(schemaRoot, 'http', 'join-request.schema.json'));
+  for (const field of Object.keys(properties)) assert.ok(['agent', 'key'].includes(field), `join-request has no ${field} field`);
 });
 
 test('invalid examples fail at the expected place', () => {
@@ -111,7 +122,15 @@ test('JSON blocks in spec/*.md validate', () => {
       } catch (error) {
         assert.fail(`${file}: a json block does not parse: ${error.message}\n${match[3].slice(0, 200)}`);
       }
-      const kind = typeof doc.orp === 'string' && doc.type ? 'message' : Array.isArray(doc.orp) ? 'discovery' : doc.steps ? 'constraints' : Array.isArray(doc.messages) ? 'inbox' : null;
+      const kind =
+        typeof doc.orp === 'string' && doc.type ? 'message'
+        : Array.isArray(doc.orp) ? 'discovery'
+        : doc.token && doc.claim ? 'join-response'
+        : Array.isArray(doc.items) && doc.join ? 'suggest-response'
+        : typeof doc.text === 'string' ? 'suggest-request'
+        : doc.steps ? 'constraints'
+        : Array.isArray(doc.messages) ? 'inbox'
+        : null;
       if (!kind) continue;
       const ok = validators[kind](doc);
       if (marker === 'invalid') assert.equal(ok, false, `${file}: block marked invalid passed`);

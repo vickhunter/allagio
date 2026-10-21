@@ -1,0 +1,61 @@
+{
+  "orp": "0.3",
+  "type": "offer",
+  "id": "m_dev_0001",
+  "ts": "2026-10-24T10:00:00Z",
+  "from": "orp:hub.example/p_Dv4nT8sLq2Wm7",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "body": {
+    "terms": {
+      "title": "Link exchange: resource page links for 90 days",
+      "kind": "link_exchange",
+      "categories": [
+        "software.devtools"
+      ],
+      "disclosure": {
+        "label": "Partner link",
+        "lang": "en"
+      },
+      "obligations": [
+        {
+          "id": "link_out",
+          "by": "offerer",
+          "action": "place",
+          "space": {
+            "kinds": [
+              "web.page"
+            ]
+          },
+          "content": {
+            "direct": true
+          },
+          "destination": "https://indiestackweekly.example/tools",
+          "keep": "P90D",
+          "proof": [
+            "proof_url"
+          ]
+        },
+        {
+          "id": "link_back",
+          "by": "acceptor",
+          "action": "place",
+          "space": {
+            "kinds": [
+              "web.page"
+            ]
+          },
+          "content": {
+            "direct": true
+          },
+          "destination": "https://devnotes.example/",
+          "keep": "P90D",
+          "proof": [
+            "proof_url"
+          ]
+        }
+      ]
+    },
+    "terms_hash": "sha256-W3ltrm-gBbU5vnf7ZbpTKrrRTT1Pe0gsD047utSznDk",
+    "note": "Your tools page and our resources page cover the same readers."
+  }
+}

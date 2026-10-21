@@ -16,16 +16,7 @@
     "deal": { "$ref": "defs.schema.json#/$defs/LocalId" },
     "re": { "$ref": "defs.schema.json#/$defs/MessageId" },
     "body": { "type": "object", "additionalProperties": true },
-    "agent": {
-      "description": "The software acting for the party. Never a person.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["name"],
-      "properties": {
-        "name": { "type": "string", "pattern": "^[A-Za-z0-9_. -]{1,64}$" },
-        "version": { "type": "string", "maxLength": 32 }
-      }
-    },
+    "agent": { "$ref": "defs.schema.json#/$defs/Agent" },
     "prev": { "$ref": "defs.schema.json#/$defs/Hash" },
     "sig": {
       "description": "Detached compact JWS (RFC 7515 Appendix F) over the JCS form of the envelope without sig.",

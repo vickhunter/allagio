@@ -19,6 +19,8 @@
     "name": { "type": "string", "minLength": 1, "maxLength": 80 },
     "description": { "type": "string", "maxLength": 500 },
     "endpoint": { "$ref": "#/$defs/UrlOrPath", "description": "The HTTP binding: POST messages here. Required for Level 1 and up." },
+    "suggest": { "$ref": "#/$defs/UrlOrPath", "description": "POST a draft here with no credentials to get deals a person could take now. Required for Level 1 and up." },
+    "join": { "$ref": "#/$defs/UrlOrPath", "description": "POST here with no credentials and no personal data to get a party id and token. Required for Level 1 and up." },
     "mcp": {
       "type": "object",
       "additionalProperties": false,
@@ -36,7 +38,6 @@
       "additionalProperties": false,
       "properties": {
         "bearer": { "type": "boolean", "description": "Agents authenticate with Authorization: Bearer <key>." },
-        "signup": { "$ref": "#/$defs/UrlOrPath", "description": "Where an agent gets a key without a browser." },
         "oauth_metadata": { "$ref": "#/$defs/UrlOrPath" },
         "docs": { "$ref": "#/$defs/UrlOrPath" }
       }

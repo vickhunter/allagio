@@ -135,9 +135,9 @@
     },
     "DealKind": {
       "title": "DealKind",
-      "description": "A hint for discovery. The obligations are what bind.",
+      "description": "A hint for discovery; the obligations are what bind. affiliate: paid per conversion on a tracked link. sponsored: paid per deal or placement. swap: space for space. traffic_swap: tracked clicks for tracked clicks. link_exchange: links on each other's pages. repost: a repost, retweet or quote. comment: a comment or comment space. cross_sell: one product offered to another's customers, including upsells at checkout or upgrade. data: aggregate data exchange. partnership: anything longer-running.",
       "type": "string",
-      "enum": ["affiliate", "sponsored", "swap", "repost", "comment", "traffic", "data", "partnership"]
+      "enum": ["affiliate", "sponsored", "swap", "traffic_swap", "link_exchange", "repost", "comment", "cross_sell", "data", "partnership"]
     },
     "ProofMethod": {
       "title": "ProofMethod",
@@ -157,6 +157,33 @@
       "title": "StepMode",
       "type": "string",
       "enum": ["auto", "ask", "off"]
+    },
+    "Steps": {
+      "title": "Steps",
+      "description": "The mode of each step. A missing step uses the default: ask, except revoke, which is auto.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "list": { "$ref": "#/$defs/StepMode" },
+        "negotiate": { "$ref": "#/$defs/StepMode" },
+        "accept": { "$ref": "#/$defs/StepMode" },
+        "execute": { "$ref": "#/$defs/StepMode" },
+        "amend": { "$ref": "#/$defs/StepMode" },
+        "settle": { "$ref": "#/$defs/StepMode" },
+        "share": { "$ref": "#/$defs/StepMode" },
+        "revoke": { "$ref": "#/$defs/StepMode" }
+      }
+    },
+    "Agent": {
+      "title": "Agent",
+      "description": "The software acting for the party. Never a person.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_. -]{1,64}$" },
+        "version": { "type": "string", "maxLength": 32 }
+      }
     },
     "EscalationReason": {
       "title": "EscalationReason",
@@ -280,6 +307,7 @@
       "properties": {
         "link": { "type": "boolean", "description": "Must carry the deal's tracking link." },
         "code": { "type": "boolean", "description": "Must carry the deal's tracking code." },
+        "direct": { "type": "boolean", "description": "Link straight to the destination instead of the tracking link, as in a link exchange. The link must carry rel=\"sponsored\" or rel=\"nofollow\". Proven by proof_url and rechecked while keep lasts; clicks are not counted." },
         "brief": { "type": "string", "minLength": 1, "maxLength": 1000 },
         "copy": { "type": "string", "minLength": 1, "maxLength": 2000, "description": "Exact text, when the counterparty fixes it." },
         "max_chars": { "type": "integer", "minimum": 1, "maximum": 100000 },
@@ -315,6 +343,7 @@
         "content": { "$ref": "#/$defs/Content" },
         "destination": { "$ref": "#/$defs/Url" },
         "count": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "clicks": { "type": "integer", "minimum": 1, "maximum": 10000000, "description": "Done once the tracking link has counted this many human clicks, as in a traffic swap. Without it, the first human click proves the placement." },
         "due": { "$ref": "#/$defs/Deadline" },
         "keep": { "$ref": "#/$defs/Duration" },
         "proof": { "$ref": "#/$defs/ProofList" }
@@ -532,7 +561,7 @@
       "properties": {
         "reputation": { "type": ["integer", "null"], "minimum": 0, "maximum": 1000 },
         "completed_deals": { "type": "integer", "minimum": 0 },
-        "verified": { "type": "array", "uniqueItems": true, "items": { "type": "string", "enum": ["domain", "dns", "platform_oauth", "bio_token", "challenge_post"] } },
+        "verified": { "type": "array", "uniqueItems": true, "items": { "type": "string", "enum": ["person", "domain", "dns", "platform_oauth", "bio_token", "challenge_post"] }, "description": "person: a person has claimed the party (passkey or signed-in session), with no identity disclosed. The others prove control of a space." },
         "path": { "type": "array", "maxItems": 3, "items": { "type": "string", "minLength": 1, "maxLength": 200 } }
       }
     },

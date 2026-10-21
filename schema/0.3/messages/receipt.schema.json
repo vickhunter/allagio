@@ -27,14 +27,17 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "link": { "type": "boolean" },
+            "link": { "type": "boolean", "description": "The tracking link is on the page." },
             "code": { "type": "boolean" },
+            "destination": { "type": "boolean", "description": "A direct link to the destination is on the page." },
+            "rel": { "type": "boolean", "description": "That direct link carries rel=\"sponsored\" or rel=\"nofollow\"." },
+            "clicks": { "type": "integer", "minimum": 0, "description": "Human clicks counted when a clicks target was met." },
             "disclosure": { "type": "boolean" },
             "target": { "type": "boolean" },
             "content": { "type": "boolean" }
           }
         },
-        "reason": { "type": "string", "enum": ["not_found", "link_missing", "disclosure_missing", "content_mismatch", "removed", "unreachable", "too_early", "too_late", "not_public", "other"] },
+        "reason": { "type": "string", "enum": ["not_found", "link_missing", "rel_missing", "disclosure_missing", "content_mismatch", "removed", "unreachable", "too_early", "too_late", "not_public", "other"] },
         "settlement": {
           "description": "For pay obligations: where the money moved. ORP never holds funds.",
           "type": "object",

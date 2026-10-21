@@ -1,0 +1,19 @@
+{
+  "orp": "0.3",
+  "type": "receipt",
+  "id": "m_host_0016",
+  "ts": "2026-11-12T17:40:00Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+  "deal": "deal_trf_3Hn8",
+  "body": {
+    "obligation": "send_back",
+    "result": "verified",
+    "method": "link",
+    "at": "2026-11-12T17:39:51Z",
+    "found": {
+      "link": true,
+      "clicks": 500
+    }
+  }
+}

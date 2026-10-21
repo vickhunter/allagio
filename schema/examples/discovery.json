@@ -6,6 +6,8 @@
   "name": "Hub Example",
   "description": "An example ORP host.",
   "endpoint": "https://hub.example/orp",
+  "suggest": "https://hub.example/orp/suggest",
+  "join": "https://hub.example/orp/join",
   "mcp": {
     "url": "https://hub.example/mcp",
     "transport": "streamable-http",
@@ -15,6 +17,8 @@
     ],
     "binding": true,
     "tools": [
+      "orp_suggest",
+      "orp_join",
       "orp_send",
       "orp_inbox",
       "orp_deal"
@@ -22,7 +26,6 @@
   },
   "auth": {
     "bearer": true,
-    "signup": "https://hub.example/orp/signup",
     "oauth_metadata": "https://hub.example/.well-known/oauth-protected-resource/mcp"
   },
   "tracking": {
@@ -82,9 +85,9 @@
   },
   "keys": [
     {
+      "kty": "OKP",
       "crv": "Ed25519",
       "x": "kdyMDwk4CBcDCgiyPImPfJuJr-2QdJ7l72X-4lztu1o",
-      "kty": "OKP",
       "kid": "host-2026-10",
       "alg": "EdDSA",
       "use": "sig"

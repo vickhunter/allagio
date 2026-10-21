@@ -69,10 +69,12 @@
           "reputation": 858,
           "completed_deals": 48,
           "verified": [
+            "person",
             "domain"
           ]
         },
-        "pool": "public"
+        "pool": "public",
+        "pitch": "Acme Notes pays 30% of first-year revenue for readers who subscribe through your link."
       }
     ]
   }

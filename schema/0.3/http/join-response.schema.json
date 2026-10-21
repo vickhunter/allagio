@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/http/join-response.schema.json",
+  "title": "JoinResponse",
+  "description": "A new pseudonymous party, usable at once. Until a person sets limits, every step that binds asks: the agent gets a waiting.url to show its person, who approves with one tap. The claim URL lets that person make the party theirs (a passkey, no email), set limits and get paid.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["party", "token", "claim"],
+  "properties": {
+    "party": { "$ref": "../defs.schema.json#/$defs/PartyId" },
+    "token": { "type": "string", "minLength": 20, "maxLength": 200, "description": "Bearer token for this party. Shown once; keep it like a password." },
+    "claim": { "$ref": "../defs.schema.json#/$defs/Url", "description": "Give this to your person, never to a counterparty." },
+    "steps": { "$ref": "../defs.schema.json#/$defs/Steps", "description": "The modes in force until a person sets limits." },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "open_deals": { "type": "integer", "minimum": 0, "description": "Most deals open at once before a person claims the party." },
+        "messages_per_minute": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
