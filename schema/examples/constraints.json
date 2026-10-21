@@ -1,0 +1,63 @@
+{
+  "steps": {
+    "list": "ask",
+    "negotiate": "auto",
+    "accept": "auto",
+    "execute": "auto",
+    "amend": "ask",
+    "settle": "ask",
+    "share": "off",
+    "revoke": "auto"
+  },
+  "budget": {
+    "per_deal": {
+      "amount_minor": 30000,
+      "currency": "EUR"
+    },
+    "per_month": {
+      "amount_minor": 100000,
+      "currency": "EUR"
+    }
+  },
+  "approve_over": {
+    "amount_minor": 50000,
+    "currency": "EUR"
+  },
+  "kinds": [
+    "affiliate",
+    "sponsored",
+    "swap",
+    "repost"
+  ],
+  "categories": {
+    "allow": [
+      "software",
+      "business"
+    ],
+    "deny": [
+      "gambling",
+      "finance.crypto"
+    ]
+  },
+  "spaces": {
+    "allow": [
+      "sp_news_1",
+      "sp_x_1"
+    ]
+  },
+  "counterparties": {
+    "min_reputation": 400,
+    "new": "ask"
+  },
+  "brand": {
+    "must_not_include": [
+      "guaranteed income"
+    ],
+    "disclosure": {
+      "label": "Partner mention",
+      "lang": "en"
+    }
+  },
+  "max_duration": "P90D",
+  "expires": "2027-06-30T00:00:00Z"
+}

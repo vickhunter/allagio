@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/messages/offer.schema.json",
+  "title": "OfferMessage",
+  "description": "Proposed terms. With to, it is directed: the host opens a deal and answers with a deal snapshot. Without to, it is a standing offer: the host lists it in discovery and answers with the offer as listed, id and terms_hash filled in. Anyone may accept a standing offer without negotiating.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body"],
+  "properties": {
+    "type": { "const": "offer" },
+    "body": { "$ref": "#/$defs/OfferBody" }
+  },
+  "$defs": {
+    "OfferBody": {
+      "title": "OfferBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terms"],
+      "properties": {
+        "id": { "$ref": "../defs.schema.json#/$defs/LocalId", "description": "Set by the host on a listed standing offer." },
+        "terms": { "$ref": "../defs.schema.json#/$defs/Terms" },
+        "terms_hash": { "$ref": "../defs.schema.json#/$defs/Hash", "description": "Optional from agents. When present the host checks it and refuses a mismatch with terms_mismatch." },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100000, "description": "Standing offers only: the most deals it may open." },
+        "note": { "$ref": "../defs.schema.json#/$defs/Text" },
+        "expires": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+      }
+    }
+  }
+}

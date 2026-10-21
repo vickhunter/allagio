@@ -1,0 +1,123 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import Ajv2020 from 'ajv/dist/2020.js';
+import addFormats from 'ajv-formats';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const schemaRoot = join(here, '..', '0.3');
+const examplesRoot = join(here, '..', 'examples');
+const specRoot = join(here, '..', '..', 'spec');
+const BASE = 'https://offerrails.com/orp/schema/0.3/';
+
+const CORE_TYPES = ['hello', 'discover', 'results', 'ask', 'offer', 'counter', 'accept', 'decline', 'deal', 'execute', 'receipt', 'outcome', 'revoke', 'consent', 'dispute', 'reputation', 'error'];
+
+function walk(dir, suffix) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) return walk(path, suffix);
+    return entry.name.endsWith(suffix) ? [path] : [];
+  });
+}
+
+const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
+
+const warnings = [];
+const ajv = new Ajv2020({
+  allErrors: true,
+  strict: true,
+  strictRequired: false,
+  logger: { log() {}, warn: (...args) => warnings.push(args.join(' ')), error: (...args) => warnings.push(args.join(' ')) },
+});
+addFormats(ajv);
+
+const schemaFiles = walk(schemaRoot, '.schema.json');
+for (const file of schemaFiles) ajv.addSchema(readJson(file));
+
+const validators = {
+  message: ajv.getSchema(`${BASE}message.schema.json`),
+  discovery: ajv.getSchema(`${BASE}discovery.schema.json`),
+  constraints: ajv.getSchema(`${BASE}constraints.schema.json`),
+  inbox: ajv.getSchema(`${BASE}http/inbox.schema.json`),
+};
+
+function explain(validate) {
+  return JSON.stringify(validate.errors?.slice(0, 5), null, 2);
+}
+
+test('every schema compiles in strict mode without warnings', () => {
+  for (const file of schemaFiles) {
+    const { $id } = readJson(file);
+    assert.ok($id?.startsWith(BASE), `${file} has $id under ${BASE}`);
+    assert.ok(ajv.getSchema($id), `${file} compiles`);
+  }
+  assert.deepEqual(warnings, []);
+});
+
+test('every core message type has its own schema', () => {
+  for (const type of CORE_TYPES) {
+    const schema = readJson(join(schemaRoot, 'messages', `${type}.schema.json`));
+    assert.equal(schema.properties.type.const, type);
+  }
+  const declared = readJson(join(schemaRoot, 'defs.schema.json')).$defs.MessageType.anyOf[0].enum;
+  assert.deepEqual([...declared].sort(), [...CORE_TYPES].sort());
+});
+
+test('valid message examples pass, and every core type has one', () => {
+  const seen = new Set();
+  for (const file of walk(join(examplesRoot, 'messages'), '.json')) {
+    const message = readJson(file);
+    assert.ok(validators.message(message), `${file}\n${explain(validators.message)}`);
+    seen.add(message.type);
+  }
+  for (const type of CORE_TYPES) assert.ok(seen.has(type), `no valid example for ${type}`);
+});
+
+test('discovery, constraints and inbox examples pass', () => {
+  for (const [name, kind] of [['discovery.json', 'discovery'], ['constraints.json', 'constraints'], ['inbox.json', 'inbox']]) {
+    const validate = validators[kind];
+    assert.ok(validate(readJson(join(examplesRoot, name))), `${name}\n${explain(validate)}`);
+  }
+});
+
+test('invalid examples fail at the expected place', () => {
+  const files = walk(join(examplesRoot, 'invalid'), '.json');
+  assert.ok(files.length >= 10);
+  for (const file of files) {
+    const { why, schema, path, instance } = readJson(file);
+    const validate = validators[schema];
+    assert.ok(why && validate, `${file} names why and a known schema`);
+    assert.equal(validate(instance), false, `${file} should fail: ${why}`);
+    const paths = validate.errors.map((error) => error.instancePath);
+    assert.ok(paths.some((p) => p === path || p.startsWith(`${path}/`)), `${file} failed elsewhere: ${paths.join(', ')}`);
+  }
+});
+
+// Every ```json block in the spec that looks like an ORP document must be valid.
+// A block preceded by <!-- orp:invalid --> must be invalid instead.
+test('JSON blocks in spec/*.md validate', () => {
+  if (!existsSync(specRoot)) return;
+  let checked = 0;
+  for (const file of walk(specRoot, '.md')) {
+    const text = readFileSync(file, 'utf8');
+    for (const match of text.matchAll(/(<!-- orp:(invalid|skip) -->\s*)?```json\n([\s\S]*?)```/g)) {
+      const marker = match[2];
+      if (marker === 'skip') continue;
+      let doc;
+      try {
+        doc = JSON.parse(match[3]);
+      } catch (error) {
+        assert.fail(`${file}: a json block does not parse: ${error.message}\n${match[3].slice(0, 200)}`);
+      }
+      const kind = typeof doc.orp === 'string' && doc.type ? 'message' : Array.isArray(doc.orp) ? 'discovery' : doc.steps ? 'constraints' : Array.isArray(doc.messages) ? 'inbox' : null;
+      if (!kind) continue;
+      const ok = validators[kind](doc);
+      if (marker === 'invalid') assert.equal(ok, false, `${file}: block marked invalid passed`);
+      else assert.ok(ok, `${file}: ${kind} block fails\n${match[3].slice(0, 300)}\n${explain(validators[kind])}`);
+      checked += 1;
+    }
+  }
+  assert.ok(checked > 0, 'the spec has json examples');
+});

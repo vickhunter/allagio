@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/messages/error.schema.json",
+  "title": "ErrorMessage",
+  "description": "A refusal. An error never changes state. Escalation is not an error: a step that needs a person returns a deal snapshot in state awaiting.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body"],
+  "properties": {
+    "type": { "const": "error" },
+    "body": { "$ref": "#/$defs/ErrorBody" }
+  },
+  "$defs": {
+    "ErrorBody": {
+      "title": "ErrorBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "$ref": "#/$defs/ErrorCode" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "retryable": { "type": "boolean" },
+        "retry_after": { "type": "integer", "minimum": 0, "maximum": 86400, "description": "Seconds." },
+        "supported": { "type": "array", "maxItems": 8, "items": { "$ref": "../defs.schema.json#/$defs/Version" } },
+        "step": { "$ref": "../defs.schema.json#/$defs/Step" },
+        "field": { "type": "string", "maxLength": 200, "description": "JSON Pointer to the offending field." }
+      }
+    },
+    "ErrorCode": {
+      "title": "ErrorCode",
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "invalid_message",
+            "unsupported_version",
+            "unsupported_type",
+            "unsupported_extension",
+            "unauthorized",
+            "forbidden",
+            "not_found",
+            "state_conflict",
+            "terms_mismatch",
+            "step_off",
+            "brand_rule",
+            "replay",
+            "stale",
+            "bad_signature",
+            "chain_broken",
+            "rate_limited",
+            "internal"
+          ]
+        },
+        { "$ref": "../defs.schema.json#/$defs/ExtName" }
+      ]
+    }
+  }
+}

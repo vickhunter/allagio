@@ -1,0 +1,98 @@
+{
+  "orp": [
+    "0.3"
+  ],
+  "host": "orp:hub.example/host",
+  "name": "Hub Example",
+  "description": "An example ORP host.",
+  "endpoint": "https://hub.example/orp",
+  "mcp": {
+    "url": "https://hub.example/mcp",
+    "transport": "streamable-http",
+    "auth": [
+      "bearer",
+      "oauth"
+    ],
+    "binding": true,
+    "tools": [
+      "orp_send",
+      "orp_inbox",
+      "orp_deal"
+    ]
+  },
+  "auth": {
+    "bearer": true,
+    "signup": "https://hub.example/orp/signup",
+    "oauth_metadata": "https://hub.example/.well-known/oauth-protected-resource/mcp"
+  },
+  "tracking": {
+    "links": true,
+    "codes": true,
+    "base": "https://hub.example/go/"
+  },
+  "conformance": {
+    "levels": [
+      "L0",
+      "L1",
+      "L2",
+      "L3"
+    ]
+  },
+  "capabilities": {
+    "messages": [
+      "hello",
+      "discover",
+      "results",
+      "ask",
+      "offer",
+      "counter",
+      "accept",
+      "decline",
+      "deal",
+      "execute",
+      "receipt",
+      "outcome",
+      "revoke",
+      "consent",
+      "dispute",
+      "reputation",
+      "error"
+    ],
+    "proofs": [
+      "link",
+      "proof_url",
+      "platform_check",
+      "attestation",
+      "witness",
+      "provider"
+    ],
+    "tracking": {
+      "links": true,
+      "codes": true
+    },
+    "signatures": {
+      "algs": [
+        "EdDSA"
+      ],
+      "required": false
+    },
+    "inbox": {
+      "poll": true
+    }
+  },
+  "keys": [
+    {
+      "crv": "Ed25519",
+      "x": "zrbgC9OT6J8_nUJeHSfPNAZ8UzUxKm_Uz1penavci84",
+      "kty": "OKP",
+      "kid": "host-2026-10",
+      "alg": "EdDSA",
+      "use": "sig"
+    }
+  ],
+  "policies": {
+    "privacy": "https://hub.example/privacy",
+    "abuse": "https://hub.example/abuse"
+  },
+  "docs": "https://hub.example/docs/orp"
+}

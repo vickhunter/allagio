@@ -1,0 +1,91 @@
+{
+  "orp": "0.3",
+  "type": "deal",
+  "id": "m_host_0006",
+  "ts": "2026-10-21T11:30:01Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "deal": "deal_swp_4KfP",
+  "re": "m_pub_0005",
+  "body": {
+    "state": "awaiting",
+    "offerer": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+    "acceptor": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+    "terms": {
+      "title": "Newsletter mention for a launch repost",
+      "kind": "swap",
+      "categories": [
+        "software.productivity"
+      ],
+      "disclosure": {
+        "label": "Partner mention",
+        "lang": "en"
+      },
+      "obligations": [
+        {
+          "id": "mention",
+          "by": "offerer",
+          "action": "place",
+          "space": {
+            "kinds": [
+              "newsletter.issue"
+            ]
+          },
+          "content": {
+            "link": true,
+            "brief": "One paragraph on why Acme Notes suits solo founders.",
+            "max_chars": 600,
+            "code": true
+          },
+          "destination": "https://acmenotes.example/",
+          "due": "P14D",
+          "proof": [
+            "link",
+            "witness",
+            "attestation"
+          ]
+        },
+        {
+          "id": "repost",
+          "by": "acceptor",
+          "action": "repost",
+          "target": "https://x.com/indiestackweekly/status/1848000000000000000",
+          "space": {
+            "kinds": [
+              "social.repost"
+            ]
+          },
+          "due": "P7D",
+          "keep": "P14D",
+          "proof": [
+            "platform_check",
+            "proof_url",
+            "attestation"
+          ]
+        }
+      ]
+    },
+    "terms_hash": "sha256-XqlxlRGWPLFRQGlZNLpnwIpj-F1xr7UK1Pilom6pvCk",
+    "round": 2,
+    "bound": [
+      {
+        "party": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+        "authority": {
+          "type": "mandate"
+        },
+        "at": "2026-10-21T11:20:01Z"
+      }
+    ],
+    "updated": "2026-10-21T11:30:01Z",
+    "waiting": {
+      "party": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+      "step": "accept",
+      "since": "2026-10-21T11:30:01Z",
+      "escalation": "esc_7Rk2",
+      "reasons": [
+        "new_counterparty"
+      ],
+      "url": "https://hub.example/approve/esc_7Rk2"
+    }
+  }
+}

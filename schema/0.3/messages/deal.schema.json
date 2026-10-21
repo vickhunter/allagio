@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/messages/deal.schema.json",
+  "title": "DealMessage",
+  "description": "The host's snapshot of a deal. It is the reply to every message that changes a deal, and it lands in both parties' inboxes. Each party gets its own copy: escalation ids, reasons and approval URLs appear only in the copy for the party that is waiting.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "deal" },
+    "body": { "$ref": "#/$defs/DealBody" }
+  },
+  "$defs": {
+    "DealBody": {
+      "title": "DealBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "offerer", "acceptor", "terms", "terms_hash", "updated"],
+      "properties": {
+        "state": { "$ref": "#/$defs/DealState" },
+        "offerer": { "$ref": "../defs.schema.json#/$defs/PartyId" },
+        "acceptor": { "$ref": "../defs.schema.json#/$defs/PartyId" },
+        "offer": { "$ref": "../defs.schema.json#/$defs/LocalId", "description": "The standing offer this deal came from, if any." },
+        "terms": { "$ref": "../defs.schema.json#/$defs/Terms" },
+        "terms_hash": { "$ref": "../defs.schema.json#/$defs/Hash" },
+        "round": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "bound": {
+          "description": "Who is bound to terms_hash, and by what authority.",
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["party", "authority", "at"],
+            "properties": {
+              "party": { "$ref": "../defs.schema.json#/$defs/PartyId" },
+              "authority": { "$ref": "../defs.schema.json#/$defs/Authority" },
+              "at": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+            }
+          }
+        },
+        "waiting": { "$ref": "#/$defs/Waiting" },
+        "tracking": { "type": "array", "maxItems": 20, "items": { "$ref": "../defs.schema.json#/$defs/Tracking" } },
+        "obligations": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "state"],
+            "properties": {
+              "id": { "$ref": "../defs.schema.json#/$defs/ObligationId" },
+              "state": { "type": "string", "enum": ["pending", "claimed", "verified", "failed", "revoked", "waived"] },
+              "due": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+              "receipt": { "$ref": "../defs.schema.json#/$defs/MessageId" }
+            }
+          }
+        },
+        "spaces": {
+          "description": "Spaces named in the deal, with locators revealed once the deal is active.",
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "../defs.schema.json#/$defs/Space" }
+        },
+        "expires": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+        "updated": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "DealState": {
+      "title": "DealState",
+      "description": "proposed: terms on the table. awaiting: a party's person must decide. active: both bound, tracking live. completed: every obligation verified or waived. declined, expired, revoked: ended before or after activation. disputed: a dispute is open.",
+      "type": "string",
+      "enum": ["proposed", "awaiting", "active", "completed", "declined", "expired", "revoked", "disputed"]
+    },
+    "Waiting": {
+      "title": "Waiting",
+      "description": "Who the deal is waiting for. escalation, reasons and url appear only in the waiting party's own copy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["party", "since"],
+      "properties": {
+        "party": { "$ref": "../defs.schema.json#/$defs/PartyId" },
+        "step": { "$ref": "../defs.schema.json#/$defs/Step" },
+        "since": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+        "escalation": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "reasons": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "$ref": "../defs.schema.json#/$defs/EscalationReason" } },
+        "url": { "$ref": "../defs.schema.json#/$defs/Url", "description": "Where the owner approves or refuses. The agent shows it to its person; it can never approve by itself." }
+      }
+    }
+  }
+}
