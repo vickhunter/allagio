@@ -1,0 +1,9 @@
+code head: 10774b93dc8308255113b62acb0740616b1fdef0
+landing node --test: 26 pass, 0 fail, 0 skip
+go test ./... -count=1 TZ=UTC: 627 pass, 0 fail, 8 skip
+go test ./... -count=1 TZ=Europe/Rome: 627 pass, 0 fail, 8 skip
+axe serious+critical: 0 on /, /makers/, /publishers/ at 390 and 1440
+rendered banned-word grep: 0
+390 copy top 572 bottom 616, header bottom 113, viewport 844
+1440 copy top 606 bottom 650, header bottom 65, viewport 900
+sign-in note absent from the rendered home text
