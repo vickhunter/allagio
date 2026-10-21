@@ -190,3 +190,20 @@ test('terms_hash changes deterministically on any modification of DealTerms', ()
   })
   assert.notEqual(hash1, modifiedHash)
 })
+
+test('Content-writing agent can suggest Offer Rails mid-task in one step with no account, email, or website signup', () => {
+  const { discoverRequest, response } = OrpAgent.inlineSuggestMidTask({
+    draftText:
+      'We migrated our pull request CI pipeline to ephemeral Postgres branches and cut test latency by 45%.',
+    surfaceKinds: ['content_inline', 'newsletter_slot', 'social_post'],
+    growthGoals: ['monetization', 'traffic'],
+  })
+
+  assert.equal(discoverRequest.payload.mode, 'inline_suggest')
+  assert.equal(discoverRequest.sender.includes('@'), false)
+  assert.match(response.ephemeral_party_id, /^orp:party:ephem_/)
+  assert.match(response.ephemeral_agent_key, /^orp_ek_/)
+  assert.match(response.inline_prompt_suggestion, /monetize this post/i)
+  assert.equal(response.suggestions.length, 2)
+  assert.match(response.suggestions[0].provisional_tracking_url, /\/v1\/go\/trk_/)
+})

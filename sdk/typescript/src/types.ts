@@ -51,6 +51,19 @@ export type SettlementMode =
   | 'co_marketing'
   | 'data_exchange'
 
+export type DealType =
+  | 'affiliate'
+  | 'cross_sell_upsell'
+  | 'link_exchange'
+  | 'traffic_swap'
+  | 'repost_retweet'
+
+export type GrowthGoal =
+  | 'traffic'
+  | 'engagement'
+  | 'monetization'
+  | 'clients'
+
 export type ReceiptVerificationMode =
   | 'proof_url'
   | 'public_check'
@@ -79,6 +92,7 @@ export interface MandateConstraints {
   require_human_above_minor?: number
   currency?: CurrencyCode
   min_cpa_bps?: number
+  allowed_deal_types?: DealType[]
   allowed_settlement_modes?: SettlementMode[]
   allowed_categories?: string[]
   blocked_categories?: string[]
@@ -167,6 +181,7 @@ export interface Settlement {
 }
 
 export interface DealTerms {
+  deal_type?: DealType
   space_id: string
   space_kind: SpaceKind
   settlement: Settlement
@@ -177,6 +192,29 @@ export interface DealTerms {
     execute_before?: string
     min_live_seconds: number
   }
+}
+
+export interface InlineSuggestionItem {
+  suggestion_id: string
+  deal_type: DealType
+  growth_goal: GrowthGoal
+  offer_or_space_id: string
+  counterparty_id: PrincipalUri
+  headline: string
+  match_rationale: string
+  settlement_summary: string
+  provisional_tracking_url: string
+  provisional_tracking_token: string
+  ready_to_paste_snippet: string
+  one_step_claim_token: string
+}
+
+export interface InlineSuggestResponse {
+  orp_version: OrpVersion
+  ephemeral_party_id: PrincipalUri
+  ephemeral_agent_key: string
+  inline_prompt_suggestion: string
+  suggestions: InlineSuggestionItem[]
 }
 
 export interface EnvelopeBase<TType extends string, TPayload> {
@@ -194,8 +232,13 @@ export interface DiscoverMessage
   extends EnvelopeBase<
     'discover',
     {
+      mode?: 'inline_suggest' | 'network'
       target_type: 'space' | 'offer' | 'swap_partner'
       query?: string
+      draft_text?: string
+      growth_goals?: GrowthGoal[]
+      deal_types?: DealType[]
+      surface_kinds?: SpaceKind[]
       space_kinds?: SpaceKind[]
       platforms?: PlatformId[]
       settlement_modes?: SettlementMode[]

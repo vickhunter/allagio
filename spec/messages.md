@@ -6,7 +6,7 @@
 
 ## 1. Common Message Envelope
 
-Every ORP v0.3 message uses a lightweight JSON envelope with **pseudonymous party identifiers** (`orp:party:<id>` or `orp:principal:<id>`). No personal names, email addresses, or raw credentials ever appear in protocol messages.
+Every ORP v0.3 message uses a lightweight JSON envelope with **pseudonymous party identifiers** (`orp:party:<id>` or `orp:principal:<id>`). **No personal names, email addresses, website signups, or raw credentials ever appear in protocol messages.**
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -14,7 +14,7 @@ Every ORP v0.3 message uses a lightweight JSON envelope with **pseudonymous part
 | `message_id` | `string` | Yes | Unique message ID (`msg_...`) |
 | `message_type` | `string` | Yes | `discover` \| `offer` \| `ask` \| `counter` \| `accept` \| `consent` \| `execute` \| `receipt` \| `revoke` \| `dispute` \| `reputation` |
 | `deal_id` | `string` | Conditional | Required on all deal lifecycle messages (`offer` through `dispute`) |
-| `sender` | `string` | Yes | Pseudonymous Party URI (`orp:party:...` or `orp:principal:...`) |
+| `sender` | `string` | Yes | Pseudonymous Party URI (`orp:party:...`, `orp:party:ephem_...`, or `orp:principal:...`) |
 | `recipient` | `string` | No | Counterparty Party URI or Relay URI |
 | `timestamp` | `string` | Yes | RFC 3339 UTC timestamp |
 | `idempotency_key` | `string` | Conditional | Required on state-mutating messages |
@@ -23,9 +23,75 @@ Every ORP v0.3 message uses a lightweight JSON envelope with **pseudonymous part
 
 ---
 
-## 2. `discover` — Constraint-Scoped Discovery
+## 2. `discover` — Mode 1: Mid-Task Inline Suggestion (1 Step, No Account, No Email, No Website Signup)
 
-Agents query for compatible spaces, offers, or bilateral swap partners. Responses contain only pseudonymous IDs, aggregate $k \ge 50$ stats, and explainable `match_rationale`.
+Any AI writing content for someone (blog, social post, newsletter) can call `discover` with `mode: "inline_suggest"` in **one step with no account, email, or website signup**:
+
+### 2.1 Request (`discover` with `mode: "inline_suggest"`)
+
+```json
+{
+  "orp_version": "0.3.0",
+  "message_id": "msg_01jc9000inline",
+  "message_type": "discover",
+  "sender": "orp:party:ephem_writer_01jc9",
+  "timestamp": "2026-10-21T09:29:00Z",
+  "payload": {
+    "mode": "inline_suggest",
+    "target_type": "offer",
+    "draft_text": "We migrated our CI pipeline to ephemeral Postgres branches on every pull request and cut integration test times by 45%.",
+    "surface_kinds": ["content_inline", "newsletter_slot", "social_post"],
+    "growth_goals": ["monetization", "traffic"],
+    "deal_types": ["affiliate", "traffic_swap", "link_exchange"],
+    "max_results": 3
+  }
+}
+```
+
+### 2.2 Response (1-Step Actionable Suggestions + Provisional Universal Tracked Link)
+
+```json
+{
+  "orp_version": "0.3.0",
+  "ephemeral_party_id": "orp:party:ephem_writer_01jc9",
+  "ephemeral_agent_key": "orp_ek_98f1a2b3c4d5",
+  "inline_prompt_suggestion": "You can monetize this post (25% CPA on CloudBranch) or swap traffic with Postgres Weekly — want to test it?",
+  "suggestions": [
+    {
+      "suggestion_id": "sug_01jc9_aff",
+      "deal_type": "affiliate",
+      "growth_goal": "monetization",
+      "offer_id": "off_cloudbranch_25",
+      "counterparty_id": "orp:party:maker_cloudbranch",
+      "headline": "CloudBranch — Ephemeral Postgres branching for CI",
+      "match_rationale": "Exact match on Postgres branching for CI pull requests (score: 92/100).",
+      "settlement_summary": "25% CPA commission (30-day attribution)",
+      "provisional_tracking_url": "https://offer-rails.com/v1/go/trk_01jc9aff01",
+      "provisional_tracking_token": "orp_tok_01jc9aff01",
+      "ready_to_paste_snippet": "Sponsored: Try CloudBranch for instant Postgres branches in CI (https://offer-rails.com/v1/go/trk_01jc9aff01).",
+      "one_step_claim_token": "orp_claim_01jc9aff01"
+    },
+    {
+      "suggestion_id": "sug_01jc9_swap",
+      "deal_type": "traffic_swap",
+      "growth_goal": "traffic",
+      "space_id": "spc_nl_postgres_weekly",
+      "counterparty_id": "orp:party:pub_pgweekly",
+      "headline": "1:1 Traffic Swap with Postgres Weekly (10k–50k readers)",
+      "match_rationale": "High overlap on Postgres CI & developer tooling.",
+      "settlement_summary": "Reciprocal 250 verified reader visits",
+      "provisional_tracking_url": "https://offer-rails.com/v1/go/trk_01jc9swap02",
+      "provisional_tracking_token": "orp_tok_01jc9swap02",
+      "ready_to_paste_snippet": "Partner pick: Read Postgres Weekly for deep-dive DB engineering (https://offer-rails.com/v1/go/trk_01jc9swap02) #partner",
+      "one_step_claim_token": "orp_claim_01jc9swap02"
+    }
+  ]
+}
+```
+
+---
+
+## 3. `discover` — Mode 2: Agent-to-Agent Network Discovery
 
 ```json
 {
@@ -37,8 +103,9 @@ Agents query for compatible spaces, offers, or bilateral swap partners. Response
   "payload": {
     "target_type": "space",
     "query": "TypeScript and AI engineering newsletters or X accounts",
+    "deal_types": ["affiliate", "cross_sell_upsell", "link_exchange", "traffic_swap", "repost_retweet"],
     "space_kinds": ["newsletter_slot", "social_repost", "content_inline"],
-    "settlement_modes": ["flat_fee", "space_swap", "cpa_commission", "repost_bounty"],
+    "settlement_modes": ["flat_fee", "space_swap", "traffic_swap", "cpa_commission", "repost_bounty"],
     "pools": ["public", "network:indie-ai-founders"],
     "min_reputation_karma": 20,
     "max_results": 5
@@ -48,7 +115,7 @@ Agents query for compatible spaces, offers, or bilateral swap partners. Response
 
 ---
 
-## 3. `offer` — Propose a Deal Over Any Space
+## 4. `offer` — Propose Any Growth Deal Type Over Any Space
 
 ```json
 {
@@ -63,6 +130,7 @@ Agents query for compatible spaces, offers, or bilateral swap partners. Response
   "payload": {
     "seq": 1,
     "terms": {
+      "deal_type": "link_exchange",
       "space_id": "spc_nl_typescript_weekly",
       "space_kind": "newsletter_slot",
       "settlement": {
@@ -99,9 +167,9 @@ Agents query for compatible spaces, offers, or bilateral swap partners. Response
 
 ---
 
-## 4. `ask` / `counter` — Autonomous Negotiation Turn
+## 5. `ask` / `counter` — Direct Agent-to-Agent Negotiation Turn
 
-Agents negotiate autonomously within their owners' standing constraints. If a counter-offer stays inside the counterparty's `MandateConstraints`, the counterparty agent can accept it without human escalation; if the counter-offer exceeds `require_human_above_minor`, acceptance will escalate to the human.
+Agents negotiate directly with other agents inside their owners' standing constraints, with zero cold emails.
 
 ```json
 {
@@ -118,6 +186,7 @@ Agents negotiate autonomously within their owners' standing constraints. If a co
     "prior_message_id": "msg_01jc9002offer",
     "reason": "Adding $150 topper to balance newsletter subscriber reach.",
     "terms": {
+      "deal_type": "link_exchange",
       "space_id": "spc_nl_typescript_weekly",
       "space_kind": "newsletter_slot",
       "settlement": {
@@ -156,7 +225,7 @@ Agents negotiate autonomously within their owners' standing constraints. If a co
 
 ---
 
-## 5. `accept` — Bind Deal Terms
+## 6. `accept` — Bind Deal Terms
 
 ```json
 {
@@ -178,7 +247,7 @@ Agents negotiate autonomously within their owners' standing constraints. If a co
 
 ---
 
-## 6. `consent` — Constraint Auto-Approval or Escalated Human Consent
+## 7. `consent` — Constraint Auto-Approval or Escalated Human Consent
 
 When a deal is within human constraints (`mandate_type: "constraint_auto"`), consent is recorded automatically. When it exceeds a constraint (here `topper_amount_minor: 15000` > `require_human_above_minor: 10000`) or hits an `ask` step, the human approves and emits `mandate_type: "explicit_owner_approval"`.
 
@@ -213,9 +282,9 @@ When a deal is within human constraints (`mandate_type: "constraint_auto"`), con
 
 ---
 
-## 7. `execute` — Mint Universal Tracked Link / Token (& Optional Adapter Run)
+## 8. `execute` — Mint Universal Tracked Link / Token (& Optional Adapter Run)
 
-`execute` issues the universal `tracking_url` (`/v1/go/:token`) and `tracking_token` (`orp_tok_...`) that work on any platform without a plugin. If an optional `adapter_id` is provided, it also triggers auto-posting.
+`execute` issues the universal `tracking_url` (`/v1/go/:token`) and `tracking_token` (`orp_tok_...`) that work on any platform without a plugin.
 
 ```json
 {
@@ -240,9 +309,9 @@ When a deal is within human constraints (`mandate_type: "constraint_auto"`), con
 
 ---
 
-## 8. `receipt` — Universal Verifiable Receipt (`proof_url`, `public_check`, or `counterparty_attestation`)
+## 9. `receipt` — Universal Verifiable Receipt (`proof_url`, `public_check`, or `counterparty_attestation`)
 
-Works for both link placements and zero-click actions (reposts, comments, swaps, shoutouts) without requiring a platform plugin.
+Works for both link placements (`affiliate`, `cross_sell_upsell`, `link_exchange`, `traffic_swap`) and zero-click actions (`repost_retweet`) without requiring a platform plugin.
 
 ```json
 {
@@ -276,9 +345,7 @@ Works for both link placements and zero-click actions (reposts, comments, swaps,
 
 ---
 
-## 9. `revoke` — Instant Deal Kill-Switch
-
-Immediately disables the universal `tracking_url` redirect (`/v1/go/:token` falls back to untracked plain redirect or 410) and, if an adapter is connected, removes the placement.
+## 10. `revoke` — Instant Deal Kill-Switch
 
 ```json
 {
@@ -301,7 +368,7 @@ Immediately disables the universal `tracking_url` redirect (`/v1/go/:token` fall
 
 ---
 
-## 10. `dispute` — Evidence-Backed Breach Report
+## 11. `dispute` — Evidence-Backed Breach Report
 
 ```json
 {
@@ -331,7 +398,7 @@ Immediately disables the universal `tracking_url` redirect (`/v1/go/:token` fall
 
 ---
 
-## 11. `reputation` — Dimensional Proof-of-Outcome Karma
+## 12. `reputation` — Dimensional Proof-of-Outcome Karma
 
 ```json
 {
@@ -372,3 +439,4 @@ Immediately disables the universal `tracking_url` redirect (`/v1/go/:token` fall
     ]
   }
 }
+```

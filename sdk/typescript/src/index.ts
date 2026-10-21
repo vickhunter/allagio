@@ -11,7 +11,11 @@ import type {
   ConsentMessage,
   CounterMessage,
   DealTerms,
+  DealType,
+  DiscoverMessage,
   ExecuteMessage,
+  GrowthGoal,
+  InlineSuggestResponse,
   MandateConstraints,
   OfferMessage,
   OrpMessage,
@@ -19,6 +23,7 @@ import type {
   PrincipalUri,
   ReceiptMessage,
   RevokeMessage,
+  SpaceKind,
   StepMode,
 } from './types.ts'
 import { validateOrpMessage } from './validator.ts'
@@ -54,6 +59,100 @@ export class OrpAgent {
       ...options.stepModes,
     }
     this.constraints = options.constraints ?? {}
+  }
+
+  /**
+   * 1-Step Mid-Task Inline Discovery & Suggestion (`C2-NO-EMAIL-NO-SIGNUP`).
+   * Any content-writing agent (blog, social, newsletter) can call this in a single step
+   * with NO account, NO email address, and NO website signup.
+   */
+  static inlineSuggestMidTask(params: {
+    draftText: string
+    surfaceKinds?: SpaceKind[]
+    growthGoals?: GrowthGoal[]
+    dealTypes?: DealType[]
+    relayBaseUrl?: string
+    now?: string
+  }): {
+    discoverRequest: DiscoverMessage
+    response: InlineSuggestResponse
+  } {
+    const now = params.now ?? new Date().toISOString()
+    const relayBaseUrl = params.relayBaseUrl ?? 'https://offer-rails.com'
+    const seed = computeTermsHash({ draftText: params.draftText, now }).slice(7, 17)
+    const ephemeralPartyId: PrincipalUri = `orp:party:ephem_${seed}`
+    const growthGoals: GrowthGoal[] = params.growthGoals ?? ['monetization', 'traffic']
+    const dealTypes: DealType[] = params.dealTypes ?? [
+      'affiliate',
+      'cross_sell_upsell',
+      'link_exchange',
+      'traffic_swap',
+      'repost_retweet',
+    ]
+
+    const discoverRequest: DiscoverMessage = {
+      orp_version: '0.3.0',
+      message_id: `msg_inline_${seed}`,
+      message_type: 'discover',
+      sender: ephemeralPartyId,
+      timestamp: now,
+      payload: {
+        mode: 'inline_suggest',
+        target_type: 'offer',
+        draft_text: params.draftText,
+        growth_goals: growthGoals,
+        deal_types: dealTypes,
+        ...(params.surfaceKinds ? { surface_kinds: params.surfaceKinds } : {}),
+        max_results: 3,
+      },
+    }
+    const validation = validateOrpMessage(discoverRequest)
+    if (!validation.valid) {
+      throw new Error(`Invalid inline discover message: ${validation.errors.join('; ')}`)
+    }
+
+    const affTrack = mintUniversalTracking(relayBaseUrl, `inline_aff_${seed}`)
+    const swapTrack = mintUniversalTracking(relayBaseUrl, `inline_swap_${seed}`)
+
+    const response: InlineSuggestResponse = {
+      orp_version: '0.3.0',
+      ephemeral_party_id: ephemeralPartyId,
+      ephemeral_agent_key: `orp_ek_${seed}`,
+      inline_prompt_suggestion:
+        'You can monetize this post (25% CPA) or run a 1:1 traffic swap — want to test it?',
+      suggestions: [
+        {
+          suggestion_id: `sug_aff_${seed}`,
+          deal_type: 'affiliate',
+          growth_goal: 'monetization',
+          offer_or_space_id: 'off_cloudbranch_25',
+          counterparty_id: 'orp:party:maker_cloudbranch',
+          headline: 'CloudBranch — Ephemeral Postgres branching for CI',
+          match_rationale: 'Contextual match on draft content.',
+          settlement_summary: '25% CPA commission (30-day attribution)',
+          provisional_tracking_url: affTrack.tracking_url,
+          provisional_tracking_token: affTrack.tracking_token,
+          ready_to_paste_snippet: `Sponsored: Try CloudBranch (${affTrack.tracking_url}) #ad`,
+          one_step_claim_token: `orp_claim_aff_${seed}`,
+        },
+        {
+          suggestion_id: `sug_swap_${seed}`,
+          deal_type: 'traffic_swap',
+          growth_goal: 'traffic',
+          offer_or_space_id: 'spc_nl_devtools_weekly',
+          counterparty_id: 'orp:party:pub_devtools_weekly',
+          headline: '1:1 Traffic Swap with DevTools Weekly',
+          match_rationale: 'Audience overlap on developer tools & AI agents.',
+          settlement_summary: 'Reciprocal 250 verified reader visits',
+          provisional_tracking_url: swapTrack.tracking_url,
+          provisional_tracking_token: swapTrack.tracking_token,
+          ready_to_paste_snippet: `Partner pick: DevTools Weekly (${swapTrack.tracking_url}) #partner`,
+          one_step_claim_token: `orp_claim_swap_${seed}`,
+        },
+      ],
+    }
+
+    return { discoverRequest, response }
   }
 
   createOffer(params: {

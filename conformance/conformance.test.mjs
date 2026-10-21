@@ -197,9 +197,172 @@ test("1. [C1-UNIVERSAL-LINK-NO-ADAPTER] Any tracked link works on any surface wi
 });
 
 // ============================================================================
-// TEST 2: Discovery manifest (/.well-known/dcp.json & /.well-known/orp.json)
+// TEST 2 (NO EMAIL, NO SIGNUP & 5 GROWTH DEAL TYPES):
+// Any content-writing agent can suggest Offer Rails mid-task in one step with
+// no account, email, or website signup, and negotiate all 5 deal types.
 // ============================================================================
-test("2. [L1-MANIFEST] /.well-known/dcp.json is renamed away from distributoor-mcp to offer-rails v0.3.0", async () => {
+test("2. [C2-NO-EMAIL-NO-SIGNUP] Content-writing agent suggests Offer Rails mid-task in 1 step with no account, email, or website signup across all 5 growth deal types", async () => {
+  // 1. Mid-task 1-step inline suggestion with NO account, NO email, NO website signup
+  const { discoverRequest, response } = OrpAgent.inlineSuggestMidTask({
+    draftText:
+      "How we cut pull request CI latency by 45% using isolated Postgres database branches and automated schema checks.",
+    surfaceKinds: ["content_inline", "newsletter_slot", "social_post"],
+    growthGoals: ["monetization", "traffic", "engagement", "clients"],
+  });
+
+  assert.equal(validateOrpMessage(discoverRequest).valid, true);
+  assert.equal(discoverRequest.payload.mode, "inline_suggest");
+  assert.equal(discoverRequest.sender.includes("@"), false, "Ephemeral sender must never contain an email address");
+  assert.match(response.ephemeral_party_id, /^orp:party:ephem_/);
+  assert.match(response.ephemeral_agent_key, /^orp_ek_/);
+  assert.match(response.inline_prompt_suggestion, /want to test it\?/i);
+  assert.ok(response.suggestions.length >= 2);
+  for (const sug of response.suggestions) {
+    assert.match(sug.provisional_tracking_url, /^https:\/\/offer-rails\.com\/v1\/go\/trk_/);
+    assert.match(sug.provisional_tracking_token, /^orp_tok_/);
+    assert.match(sug.one_step_claim_token, /^orp_claim_/);
+  }
+
+  // 2. Verify all 5 canonical growth deal types (affiliate, cross_sell_upsell, link_exchange, traffic_swap, repost_retweet)
+  //    negotiate directly agent-to-agent with zero email/signup and pass their respective verification modes
+  const agentA = new OrpAgent({
+    principalId: response.ephemeral_party_id,
+    stepModes: { deal_offer: "auto", deal_accept: "auto", space_execute: "auto" },
+  });
+
+  const dealMatrix = [
+    {
+      deal_type: "affiliate",
+      space_kind: "content_inline",
+      settlement: { mode: "cpa_commission", commission_type: "percentage", commission_bps: 2500 },
+      verification_mode: "public_check",
+      proof_url: "https://blog.example.com/postgres-ci",
+    },
+    {
+      deal_type: "cross_sell_upsell",
+      space_kind: "cross_promo_slot",
+      settlement: { mode: "co_marketing", commission_type: "percentage", commission_bps: 2000 },
+      verification_mode: "counterparty_attestation",
+      proof_url: "https://app.example.com/post-checkout-perk",
+    },
+    {
+      deal_type: "link_exchange",
+      space_kind: "content_inline",
+      settlement: {
+        mode: "space_swap",
+        initiator_space_id: "spc_blog_a",
+        responder_space_id: "spc_blog_b",
+        sync_window_seconds: 86400,
+      },
+      verification_mode: "public_check",
+      proof_url: "https://docs.example.com/ecosystem-links",
+    },
+    {
+      deal_type: "traffic_swap",
+      space_kind: "newsletter_slot",
+      settlement: {
+        mode: "traffic_swap",
+        target_verified_visits: 250,
+        exchange_ratio_bps: 10000,
+      },
+      verification_mode: "public_check",
+      proof_url: "https://newsletter.example.com/archive/issue-42",
+    },
+    {
+      deal_type: "repost_retweet",
+      space_kind: "social_repost",
+      settlement: {
+        mode: "repost_bounty",
+        currency: "USD",
+        amount_minor: 2500,
+        target_post_uri: "https://x.com/cloudbranch/status/1849001",
+        required_action: "repost",
+      },
+      verification_mode: "public_check",
+      proof_url: "https://x.com/devwriter/status/1849002",
+    },
+  ];
+
+  for (const item of dealMatrix) {
+    const offerMsg = agentA.createOffer({
+      dealId: `deal_${item.deal_type}`,
+      recipient: "orp:party:counterparty_agent",
+      terms: {
+        deal_type: item.deal_type,
+        space_id: `spc_${item.deal_type}`,
+        space_kind: item.space_kind,
+        settlement: item.settlement,
+        creative: {
+          headline: `Growth deal: ${item.deal_type}`,
+          body: " Partner recommendation with zero cold email.",
+          target_url: "https://cloudbranch.example.com/start",
+          disclosure_text: "#ad",
+        },
+        window: { min_live_seconds: 86400 },
+      },
+      expiresAt: "2026-10-28T00:00:00Z",
+    });
+    assert.equal(validateOrpMessage(offerMsg).valid, true, `Offer for ${item.deal_type} must validate`);
+
+    const receiptMsg = {
+      orp_version: "0.3.0",
+      message_id: `msg_rcpt_${item.deal_type}`,
+      message_type: "receipt",
+      deal_id: `deal_${item.deal_type}`,
+      sender: response.ephemeral_party_id,
+      timestamp: "2026-10-21T10:15:00Z",
+      idempotency_key: `idem_rcpt_${item.deal_type}`,
+      payload: {
+        receipt_id: `rcpt_${item.deal_type}`,
+        space_id: `spc_${item.deal_type}`,
+        verification_mode: item.verification_mode,
+        proof_url: item.proof_url,
+        location_url: item.proof_url,
+        verified_at: "2026-10-21T10:15:00Z",
+        disclosure_verified: true,
+        observed_disclosure: "#ad",
+        content_hash: computeTermsHash({ deal_type: item.deal_type, proof: item.proof_url }),
+        ...(item.verification_mode === "public_check"
+          ? {
+              public_check_result: {
+                http_status: 200,
+                matched_target: "https://cloudbranch.example.com/start",
+                checked_at: "2026-10-21T10:15:00Z",
+              },
+            }
+          : {
+              counterparty_attestation: {
+                attested_by: "orp:party:counterparty_agent",
+                attested_at: "2026-10-21T10:15:00Z",
+                statement: "Verified post-checkout cross-sell conversion.",
+              },
+            }),
+      },
+    };
+    assert.equal(validateOrpMessage(receiptMsg).valid, true, `Receipt for ${item.deal_type} must validate`);
+  }
+
+  // 3. Live Go server check: unauthenticated /v1/revenue/preview works without email/signup,
+  //    while /v1/agent-accounts still requires email & domain (logged in GAPS.md)
+  if (liveBaseUrl) {
+    const previewRes = await fetch(`${liveBaseUrl}/v1/revenue/preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        context:
+          "How to speed up developer pull requests and CI pipelines using isolated Postgres database branches.",
+      }),
+    });
+    assert.equal(previewRes.status, 200, "Unauthenticated /v1/revenue/preview must return 200 with no email/signup");
+    const previewBody = await previewRes.json();
+    assert.equal(previewBody.preview_only, true);
+  }
+});
+
+// ============================================================================
+// TEST 3: Discovery manifest (/.well-known/dcp.json & /.well-known/orp.json)
+// ============================================================================
+test("3. [L1-MANIFEST] /.well-known/dcp.json is renamed away from distributoor-mcp to offer-rails v0.3.0", async () => {
   const mainGo = readFileSync(resolve(repoRoot, "affilio-api/cmd/server/main.go"), "utf8");
   assert.equal(mainGo.includes('"command": "distributoor-mcp"'), false, "main.go no longer advertises distributoor-mcp");
   assert.equal(mainGo.includes('"command": "offer-rails-mcp"'), true, "main.go advertises offer-rails-mcp");
@@ -219,9 +382,9 @@ test("2. [L1-MANIFEST] /.well-known/dcp.json is renamed away from distributoor-m
 });
 
 // ============================================================================
-// TEST 3: /llms.txt no longer says /mcp needs Google sign-in
+// TEST 4: /llms.txt no longer says /mcp needs Google sign-in
 // ============================================================================
-test("3. [L1-LLMS-TXT] /llms.txt documents bearer keys on /mcp and no longer claims /mcp needs Google sign-in", async () => {
+test("4. [L1-LLMS-TXT] /llms.txt documents bearer keys on /mcp and no longer claims /mcp needs Google sign-in", async () => {
   for (const relPath of [
     "ui/landing/public/llms.txt",
     "affilio-wp/admin/build/landing-v9/llms.txt",
@@ -239,9 +402,9 @@ test("3. [L1-LLMS-TXT] /llms.txt documents bearer keys on /mcp and no longer cla
 });
 
 // ============================================================================
-// TEST 4: JSON Schema Draft 2020-12 validation across protocol messages
+// TEST 5: JSON Schema Draft 2020-12 validation across protocol messages
 // ============================================================================
-test("4. [L1-SCHEMA-2020-12] Protocol messages validate against Draft 2020-12 schemas", () => {
+test("5. [L1-SCHEMA-2020-12] Protocol messages validate against Draft 2020-12 schemas", () => {
   const agent = new OrpAgent({
     principalId: "orp:party:maker_alpha",
     constraints: {
@@ -316,9 +479,9 @@ test("4. [L1-SCHEMA-2020-12] Protocol messages validate against Draft 2020-12 sc
 });
 
 // ============================================================================
-// TEST 5: Privacy by Default (Pseudonymous Party IDs, k >= 50, No PII)
+// TEST 6: Privacy by Default (Pseudonymous Party IDs, k >= 50, No PII)
 // ============================================================================
-test("5. [L1-PRIVACY-PSEUDONYMOUS] Rejects email/PII in party IDs and Audience Cards with k < 50", () => {
+test("6. [L1-PRIVACY-PSEUDONYMOUS] Rejects email/PII in party IDs and Audience Cards with k < 50", () => {
   const badOffer = {
     orp_version: "0.3.0",
     message_id: "msg_bad_pii",
@@ -351,9 +514,9 @@ test("5. [L1-PRIVACY-PSEUDONYMOUS] Rejects email/PII in party IDs and Audience C
 });
 
 // ============================================================================
-// TEST 6: Constraint-Bounded Autonomous Negotiation
+// TEST 7: Constraint-Bounded Autonomous Negotiation
 // ============================================================================
-test("6. [L2-CONSTRAINT-AUTO-VS-ESCALATE] Agents negotiate autonomously inside human constraints and escalate only outside them", () => {
+test("7. [L2-CONSTRAINT-AUTO-VS-ESCALATE] Agents negotiate autonomously inside human constraints and escalate only outside them", () => {
   const constraints = {
     max_deal_amount_minor: 100_00,
     daily_budget_minor: 250_00,
@@ -430,9 +593,9 @@ test("6. [L2-CONSTRAINT-AUTO-VS-ESCALATE] Agents negotiate autonomously inside h
 });
 
 // ============================================================================
-// TEST 7: Verifiable Receipts for Zero-Click Actions (Reposts, Comments, Swaps)
+// TEST 8: Verifiable Receipts for Zero-Click Actions (Reposts, Comments, Swaps)
 // ============================================================================
-test("7. [L2-RECEIPT-THREE-MODES] Zero-click actions validate with proof_url, public_check, and counterparty_attestation", () => {
+test("8. [L2-RECEIPT-THREE-MODES] Zero-click actions validate with proof_url, public_check, and counterparty_attestation", () => {
   const modes = [
     {
       verification_mode: "proof_url",
@@ -485,9 +648,9 @@ test("7. [L2-RECEIPT-THREE-MODES] Zero-click actions validate with proof_url, pu
 });
 
 // ============================================================================
-// TEST 8: Optional Adapters Degrade Gracefully & Proof-of-Outcome Reputation
+// TEST 9: Optional Adapters Degrade Gracefully & Proof-of-Outcome Reputation
 // ============================================================================
-test("8. [L3-ADAPTERS-AND-REPUTATION] Optional X and Newsletter adapters fall back to universal links and Karma decays wash trading", async () => {
+test("9. [L3-ADAPTERS-AND-REPUTATION] Optional X and Newsletter adapters fall back to universal links and Karma decays wash trading", async () => {
   const xAdapter = new XSpaceAdapter(); // No API token
   const nlAdapter = new NewsletterSpaceAdapter(); // No API key
   const link = mintUniversalTracking("https://offer-rails.com", "deal_opt_01");

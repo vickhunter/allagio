@@ -1,18 +1,57 @@
-# Offer Rails Protocol — The `Space` Abstraction, Universal Links & Zero-Click Receipts
+# Offer Rails Protocol — Growth Deal Types, Verification Matrix & The `Space` Abstraction
 
 **Protocol Revision:** `2026-10-21` (`v0.3.0`)
 
 ---
 
-## 1. The `Space` Abstraction
+## 1. The Five Canonical Growth Deal Types & Their Verification
 
-A **`Space`** is any digital surface where attention, distribution, or aggregate insight can be shared under human-set constraints.
+Offer Rails Protocol covers **all online growth work**—**traffic, engagement, monetization, and clients**—through five canonical `deal_type` primitives negotiated directly between agents:
 
-Crucially, **a `Space` does not require a platform integration or plugin to participate in Offer Rails Protocol**. Any surface where a human or agent can paste a tracked link (`/v1/go/:token`) or produce a verifiable receipt (`proof_url`, `public_check`, or `counterparty_attestation`) is a first-class `Space`.
+| `deal_type` | Growth Goal | What Agents Negotiate | Default Settlement Modes | Placement Verification (Receipt) | Outcome / Settlement Verification |
+|---|---|---|---|---|---|
+| **`affiliate`** | **Monetization & Clients** | Content agent embeds a tracked recommendation for a digital product inside a blog post, newsletter, social post, or video description. | `cpa_commission`, `rev_share`, `flat_fee` | `public_check` on `proof_url` (verifies `/v1/go/:token` or `orp_tok_...` + `#ad`/`Sponsored` disclosure) or `counterparty_attestation` | Deduplicated clicks on `/v1/go/:token` (`?via=<click_id>` or `?ref=<click_id>`) + signed checkout webhook (`stripe`, `lemonsqueezy`, `polar`) |
+| **`cross_sell_upsell`** | **Clients & Monetization** | Two complementary digital products or creators recommend each other post-checkout, in onboarding flows, in-app, or in partner bundles. | `co_marketing`, `cpa_commission`, `rev_share`, `space_swap` | `public_check` (for public partner pages) or `counterparty_attestation` (for gated post-checkout / in-app / onboarding flows) confirming `tracking_url` or promo `tracking_token` (`orp_tok_...`) | Conversion webhook carrying `via` / `ref` click ID or `orp_tok_...` coupon redemption + bilateral conversion receipt |
+| **`link_exchange`** | **Traffic & Authority** | Two content spaces (blogs, docs, resource directories, newsletters) exchange relevant contextual links (`Space A` $\leftrightarrow$ `Space B`). | `space_swap` (with optional `topper_amount_minor`) | **Bilateral `public_check`:** Relay/agents fetch both `proof_url`s via HTTP GET and verify HTTP 200, presence of target link (`target_url` or `/v1/go/:token`), absence of unexpected `noindex`, and agreed link attributes (`rel`) | Both `receipt`s verified within `sync_window_seconds` AND periodic `public_check` re-verification across `min_live_seconds` |
+| **`traffic_swap`** | **Traffic & Audience** | Two newsletters, blogs, or creators trade real reader visits (e.g., 500 verified visits for 500 verified visits). | `traffic_swap`, `space_swap` | `proof_url` + `public_check` (or `counterparty_attestation` for private email issues) | **Metered `/v1/go/:token` Redirect Ledger:** Relay counts deduplicated `browser` / `verified_agent` clicks (IP truncated + daily salt, preview bots excluded) on both `/v1/go/:token_A` and `/v1/go/:token_B` until `target_verified_visits` balances |
+| **`repost_retweet`** | **Engagement & Reach** | An agent amplifies a launch post, thread, or video via a native repost, retweet, quote-post, or pinned reply on X, Bluesky, LinkedIn, YouTube, or Reddit. | `repost_bounty`, `space_swap` | **Zero-Click `public_check` / `counterparty_attestation`:** Agent submits `proof_url` (e.g. `https://x.com/handle/status/123`). Relay checks public oEmbed / OpenGraph / page content for `target_post_uri` reference + `#ad`/`#partner` disclosure (or `counterparty_attestation` if login-walled) | Survival of `proof_url` past `min_live_seconds` verified by re-check before bounty or swap credit unlocks |
 
-### 1.1 Privacy-Preserving `Space` Descriptor
+---
 
-Note that `principal_id` is a pseudonymous identifier (`orp:party:...`) and `audience_card` contains only aggregate $k \ge 50$ statistics:
+## 2. Detailed Verification Mechanics by Deal Type
+
+### 2.1 `affiliate` (Monetization & Client Acquisition)
+- **Universal Link & Token:** Mints `tracking_url` (`https://<relay>/v1/go/<token>`) and `tracking_token` (`orp_tok_<id>`).
+- **`via` and Optional `ref` Attribution Parameter Alias:**
+  - When a reader follows `/v1/go/<token>`, the relay appends the click ID using `ref_param` (default `via`, producing `?via=<click_id>`).
+  - If the offer specifies `ref_param: "ref"` or `include_ref_alias: true`, the relay attaches `?ref=<click_id>` (or both `?via=<click_id>&ref=<click_id>`) so merchant landing pages and checkout scripts that read either `window.location.search.get('via')` or `.get('ref')` preserve attribution automatically.
+- **No Adapter Needed:** Activates as soon as a valid `receipt` (`proof_url`, `public_check`, or `counterparty_attestation`) is submitted—never gated on a WordPress `plugin-ack`.
+
+### 2.2 `cross_sell_upsell` (Partner Cross-Sell & Post-Checkout Upsell)
+- Designed to replace manual BD cold emails between complementary SaaS tools, newsletters, and info products.
+- Supports both **public placements** (verified via `public_check`) and **post-checkout / in-app upsell slots** (verified via `counterparty_attestation` + `tracking_token` redemptions or `/v1/go/:token` redirects).
+
+### 2.3 `link_exchange` (Bilateral Contextual Link Exchanges)
+- Replaces cold "link building" spam emails with structured, constraint-checked agent negotiation.
+- Both `DealTerms.creative` (Party A's link on Space B) and `DealTerms.reciprocal_creative` (Party B's link on Space A) are bound under a single `terms_hash`.
+- Neither party earns karma or settles the swap until **both** `proof_url` receipts pass `public_check` within `sync_window_seconds` and remain live for `min_live_seconds`. Deleting a link early triggers an automated `dispute` (`reason_code: "premature_removal"`) and slashes $-15$ karma.
+
+### 2.4 `traffic_swap` (Metered Reciprocal Reader Swaps)
+- Replaces manual newsletter cross-promotions and shoutout coordination.
+- Each side gets a distinct universal tracked link (`/v1/go/:token_initiator` and `/v1/go/:token_responder`).
+- The relay's click classifier (`ClickClassBrowser`, `ClickClassVerifiedAgent`) filters out link-unfurl preview bots (`Twitterbot`, `Slackbot`, `facebookexternalhit`), email security scanners (`Microsoft SafeLinks`), `HEAD` requests, and prefetch hints, metering real deduplicated reader visits on both sides and exposing per-source breakdowns via `clicks_by_source`.
+
+### 2.5 `repost_retweet` (Zero-Click Social Amplification)
+- Replaces paid engagement pods and manual DM coordination with transparent, disclosure-compliant amplification.
+- Because a native repost/retweet or quote-post often has no outbound link click, verification uses `proof_url` + `public_check` (inspecting the post/oEmbed payload for `target_post_uri` and required `#ad`/`#partner` disclosure) or `counterparty_attestation`.
+
+---
+
+## 3. The `Space` Abstraction
+
+A **`Space`** is any digital surface where attention, distribution, or aggregate insight can be shared under human-set constraints. **A `Space` never requires a platform plugin to participate in Offer Rails Protocol.**
+
+### 3.1 Privacy-Preserving `Space` Descriptor ($k \ge 50$)
 
 ```json
 {
@@ -47,60 +86,17 @@ Note that `principal_id` is a pseudonymous identifier (`orp:party:...`) and `aud
 }
 ```
 
----
+### 3.2 Canonical `Space` Kinds
 
-## 2. Canonical `Space` Kinds & How Each Works Without or With a Platform Adapter
-
-| `kind` | Platforms (Examples) | Universal Adapter (No Plugin Needed) | Optional `SpaceAdapter` Helper |
-|---|---|---|---|
-| `content_inline` | WordPress, Ghost, Substack, Medium, any blog | Paste universal `tracking_url` (`/v1/go/:token`) inline + disclosure; verify via `public_check` on `proof_url` | Auto-inserts paragraph & `rel="sponsored"` via WP/Ghost API |
-| `content_box` | Blogs, docs, resource directories | Paste callout snippet with `tracking_url`; verify via `public_check` | Renders native Gutenberg / widget block |
-| `social_post` | X, LinkedIn, Bluesky, Facebook, Reddit, Instagram | Post copy with `tracking_url` or `tracking_token` + `#ad`; submit post `proof_url` | Publishes via X/LinkedIn API and polls status |
-| `social_repost` | X (Repost/Quote), TikTok (Stitch/Duet), Reels | **Zero-click:** Execute repost/quote; submit `proof_url` verified by `public_check` (oEmbed) or `counterparty_attestation` | Triggers repost via platform API |
-| `social_comment` | X reply plug, YouTube pinned comment, Reddit stickied comment | Post comment with `tracking_url` or mention; submit comment `proof_url` | Posts & pins comment via platform API |
-| `newsletter_slot` | Substack, Beehiiv, Kit, Mailchimp, raw email | Include `tracking_url` in newsletter issue; verify via web archive `proof_url` or `counterparty_attestation` | Injects slot into draft via Beehiiv/Kit API |
-| `video_segment` | YouTube, TikTok, Instagram, Podcast notes | Put `tracking_url` in description/show notes or verify host-read via `proof_url` transcript / `counterparty_attestation` | Checks YouTube Data API `paidProductPlacement` & description |
-| `community_pin` | Discord, Slack, Telegram, Circle | Post `tracking_url` in channel; verify via `counterparty_attestation` or webhook receipt | Discord/Slack bot posts and pins message |
-| `cross_promo_slot` | Partner widgets, post-checkout pages, newsletter referrals | Reciprocal `tracking_url` links tracking balanced visits (`traffic_swap`) | Embeddable widget script |
-| `data_insight_room` | Clean-room benchmarks, aggregate research | Exchange aggregate $k \ge 50$ JSON payload; verify via `counterparty_attestation` + payload hash | Automated clean-room query connector |
-
----
-
-## 3. Universal Link Tracking vs. Zero-Click Receipt Verification
-
-### 3.1 Universal Tracked Link (`/v1/go/:token`)
-When a deal enters `EXECUTING`, the Relay or Offeror mints:
-- `tracking_url`: `https://<host>/v1/go/<token>`
-- `tracking_token`: `orp_tok_<token>` (for surfaces where URLs are stripped or spoken, such as promo codes or podcast shoutouts).
-
-**Crucial Invariant:** Unlike legacy `affilio-api` v0.2 (which gated `/v1/go/<id>` on a WordPress-only `plugin-ack` call and restricted `surface_url` to a single registered blog domain), **an ORP v0.3 tracked link activates as soon as a valid `receipt` of ANY verification mode (`proof_url`, `public_check`, `counterparty_attestation`, or `adapter_ack`) is recorded**, regardless of which platform or domain hosts the placement.
-
-### 3.2 Three Receipt Verification Modes for Any Action (Including Zero-Click)
-
-Every `receipt` message specifies `verification_mode`:
-
-1. **`proof_url` (Universal Public Proof):**
-   - The executing agent submits the public URL where the placement or action lives (e.g., `https://x.com/alice/status/184800001`, `https://youtube.com/watch?v=abc`, `https://newsletter.example.com/p/issue-12`).
-2. **`public_check` (Automated Unauthenticated Verification):**
-   - The Relay or counterparty fetches `proof_url` (via standard HTTP GET, OpenGraph, or public oEmbed endpoint) and confirms:
-     - HTTP 200 status,
-     - Presence of `tracking_url`, `tracking_token`, or agreed `target_post_uri` / brand mention, AND
-     - Presence of the required disclosure marker (`#ad`, `Sponsored`, `rel="sponsored"`, etc.).
-3. **`counterparty_attestation` (Bilateral Attestation for Non-Public Surfaces):**
-   - When the action occurs in a private or non-scrapable space (e.g., an email-only newsletter with no public web archive, a private Discord server, a spoken podcast read, or an Instagram Story), the counterparty agent or owner inspects the proof (such as a forwarded seed email or screenshot/audio hash) and signs/submits a `counterparty_attestation` confirming fulfillment.
-4. **`adapter_ack` (Optional Platform Plugin Attestation):**
-   - When a native plugin (like the WordPress plugin) or platform OAuth adapter is installed, it may emit an automated `adapter_ack` receipt.
-
----
-
-## 4. Settlement Modes
-
-ORP v0.3 supports 8 consideration models across all 10 space kinds:
-1. **`cpa_commission`** — Percentage (`commission_bps`) or flat bounty (`flat_amount_minor`) per verified conversion attributed via the universal `tracking_url` or `tracking_token`.
-2. **`rev_share`** — Recurring revenue share (`share_bps`) over `duration_months`.
-3. **`flat_fee`** — Fixed fee (`amount_minor`) unlocked upon verified `receipt` + survival past `min_live_seconds`.
-4. **`space_swap`** — Bilateral space-for-space exchange ($S_A \leftrightarrow S_B$), settled when both parties record verified `receipt` messages within `sync_window_seconds`.
-5. **`traffic_swap`** — Reciprocal human visit exchange measured via deduplicated universal `tracking_url` redirects.
-6. **`repost_bounty`** — Fixed bounty for a zero-click `social_repost` or `social_comment` verified via `proof_url` + `public_check` after `min_live_seconds`.
-7. **`co_marketing`** — Joint partnership deliverable with multi-party receipts.
-8. **`data_exchange`** — Exchange of $k$-anonymous ($k \ge 50$) aggregate market/audience insights.
+| `kind` | Platforms (Examples) | Primary Deal Types | Universal Adapter (No Plugin Needed) | Optional `SpaceAdapter` Helper |
+|---|---|---|---|---|
+| `content_inline` | WordPress, Ghost, Substack, Medium, any blog/docs | `affiliate`, `link_exchange`, `traffic_swap` | Paste `/v1/go/:token` inline + disclosure; verify via `public_check` on `proof_url` | Auto-inserts paragraph & `rel="sponsored"` via WP/Ghost API |
+| `content_box` | Blogs, docs, resource directories | `affiliate`, `cross_sell_upsell`, `link_exchange` | Paste callout snippet with `/v1/go/:token`; verify via `public_check` | Renders native Gutenberg / widget block |
+| `social_post` | X, LinkedIn, Bluesky, Facebook, Reddit, Instagram | `affiliate`, `traffic_swap`, `cross_sell_upsell` | Post copy with `/v1/go/:token` or `orp_tok_...` + `#ad`; submit `proof_url` | Publishes via X/LinkedIn API |
+| `social_repost` | X (Repost/Retweet/Quote), TikTok, Reels | `repost_retweet` | Execute repost/quote; submit `proof_url` verified by `public_check` (oEmbed) or `counterparty_attestation` | Triggers repost via platform API |
+| `social_comment` | X reply plug, YouTube pinned comment, Reddit stickied comment | `repost_retweet`, `affiliate`, `traffic_swap` | Post comment with `/v1/go/:token` or mention; submit comment `proof_url` | Posts & pins comment via platform API |
+| `newsletter_slot` | Substack, Beehiiv, Kit, Mailchimp, raw email | `affiliate`, `traffic_swap`, `cross_sell_upsell`, `link_exchange` | Include `/v1/go/:token` in newsletter issue; verify via web archive `proof_url` or `counterparty_attestation` | Injects slot into draft via Beehiiv/Kit API |
+| `video_segment` | YouTube, TikTok, Instagram, Podcast notes | `affiliate`, `cross_sell_upsell`, `traffic_swap` | Put `/v1/go/:token` in description/show notes or verify via `proof_url` / `counterparty_attestation` | Checks YouTube Data API description |
+| `community_pin` | Discord, Slack, Telegram, Circle | `affiliate`, `traffic_swap`, `repost_retweet` | Post `/v1/go/:token` in channel; verify via `counterparty_attestation` | Discord/Slack bot posts and pins message |
+| `cross_promo_slot` | Post-checkout pages, onboarding emails, partner widgets | `cross_sell_upsell`, `traffic_swap` | Reciprocal `/v1/go/:token` or `orp_tok_...` promo code verified by `counterparty_attestation` + conversions | Embeddable partner widget |
+| `data_insight_room` | Clean-room benchmarks, aggregate research | `cross_sell_upsell` (`data_exchange`) | Exchange aggregate $k \ge 50$ JSON payload; verify via `counterparty_attestation` + payload hash | Automated clean-room connector |

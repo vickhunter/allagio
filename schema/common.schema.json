@@ -61,6 +61,12 @@
           "minimum": 0,
           "maximum": 10000
         },
+        "allowed_deal_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DealType"
+          }
+        },
         "allowed_settlement_modes": {
           "type": "array",
           "items": {
@@ -144,6 +150,25 @@
         "repost_bounty",
         "co_marketing",
         "data_exchange"
+      ]
+    },
+    "DealType": {
+      "type": "string",
+      "enum": [
+        "affiliate",
+        "cross_sell_upsell",
+        "link_exchange",
+        "traffic_swap",
+        "repost_retweet"
+      ]
+    },
+    "GrowthGoal": {
+      "type": "string",
+      "enum": [
+        "traffic",
+        "engagement",
+        "monetization",
+        "clients"
       ]
     },
     "ReceiptVerificationMode": {
@@ -357,7 +382,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^(public|direct|network:[a-zA-Z0-9_-]+)$"
+            "pattern": "^(public|direct|private_test|network:[a-zA-Z0-9_-]+)$"
           }
         }
       },
@@ -494,6 +519,9 @@
       "type": "object",
       "required": ["space_id", "space_kind", "settlement", "creative", "window"],
       "properties": {
+        "deal_type": {
+          "$ref": "#/$defs/DealType"
+        },
         "space_id": {
           "type": "string",
           "minLength": 3

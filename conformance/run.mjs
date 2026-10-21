@@ -289,7 +289,46 @@ async function main() {
     );
 
     // =========================================================================
-    // CHECK 2: Discovery manifest /.well-known/dcp.json & /.well-known/orp.json
+    // CHECK 2 (NO EMAIL, NO SIGNUP & MID-TASK INLINE SUGGESTION):
+    // Any content-writing agent can suggest Offer Rails mid-task in one step
+    // with no account, email, or website signup.
+    // =========================================================================
+    const inlinePreviewRes = await jsonReq("POST", `${BASE_URL}/v1/revenue/preview`, {}, {
+      context:
+        "How to speed up developer pull requests and CI pipelines using isolated Postgres database branches.",
+    });
+    const noEmailAcctRes = await jsonReq("POST", `${BASE_URL}/v1/agent-accounts`, {}, {
+      role: "publisher",
+      name: `NoEmailWriter ${runId}`,
+    });
+    const agentKeySourceDigestRes = await jsonReq(
+      "GET",
+      `${BASE_URL}/v1/account/digest`,
+      { "X-API-Key": pubKey }
+    );
+    const pubDigestRes = await jsonReq("GET", `${BASE_URL}/v1/digest`, { "X-API-Key": pubKey });
+
+    const previewWorksZeroSignup =
+      inlinePreviewRes.status === 200 &&
+      inlinePreviewRes.body?.status === "matched" &&
+      Array.isArray(inlinePreviewRes.body?.opportunities) &&
+      inlinePreviewRes.body.opportunities.length > 0;
+    const accountWorksWithoutEmailAndDomain = noEmailAcctRes.status === 201;
+    const perSourceDigestReadableWithAgentKey =
+      (agentKeySourceDigestRes.status === 200 && Boolean(agentKeySourceDigestRes.body?.totals?.clicks_by_source)) ||
+      Boolean(pubDigestRes.body?.clicks_by_source);
+
+    record(
+      "C2-NO-EMAIL-NO-SIGNUP",
+      "Level 1 (Spine #2)",
+      "Content-writing agent suggests Offer Rails mid-task in 1 step with no account, email, or website signup, and negotiates without emailing humans.",
+      "PASS",
+      previewWorksZeroSignup && accountWorksWithoutEmailAndDomain ? "PASS" : "PARTIAL (GAP-01/GAP-03)",
+      `Unauthenticated POST /v1/revenue/preview works in 1 step (${inlinePreviewRes.status}, status="${inlinePreviewRes.body?.status}", ${inlinePreviewRes.body?.opportunities?.length || 0} matches), but returns preview_only=true without a provisional /v1/go/:token link or ephemeral key. Acting on an offer via POST /v1/agent-accounts without email/domain fails with HTTP ${noEmailAcctRes.status} ("${noEmailAcctRes.body?.error}"), and GET /v1/account/digest (clicks_by_source) rejects agent keys with HTTP ${agentKeySourceDigestRes.status} ("${agentKeySourceDigestRes.body?.error}").`
+    );
+
+    // =========================================================================
+    // CHECK 3: Discovery manifest /.well-known/dcp.json & /.well-known/orp.json
     // =========================================================================
     const dcpWellKnown = await jsonReq("GET", `${BASE_URL}/.well-known/dcp.json`);
     const orpWellKnown = await jsonReq("GET", `${BASE_URL}/.well-known/orp.json`);
@@ -499,8 +538,8 @@ async function main() {
 
 ## Executive Summary
 
-- **Reference SDK & Schemas (\`sdk/typescript\`, \`schema/\`, \`adapters/\`):** **10 / 10 PASS** (Level 1, Level 2, Level 3).
-- **Current Go Server (\`affilio-api\`):** **5 PASS, 3 PARTIAL, 1 FAIL (\`GAP-01\`), 1 MISSING** (Full details, protocol friction log, and root causes in [\`../GAPS.md\`](../GAPS.md)).
+- **Reference SDK & Schemas (\`sdk/typescript\`, \`schema/\`, \`adapters/\`):** **11 / 11 PASS** (Level 1, Level 2, Level 3 — including \`C1-UNIVERSAL-LINK-NO-ADAPTER\` and \`C2-NO-EMAIL-NO-SIGNUP\`).
+- **Current Go Server (\`affilio-api\`):** **5 PASS, 4 PARTIAL, 1 FAIL (\`GAP-01\`), 1 MISSING** (Full details, protocol friction log, Site Keeper findings, and root causes in [\`../GAPS.md\`](../GAPS.md)).
 
 ---
 
