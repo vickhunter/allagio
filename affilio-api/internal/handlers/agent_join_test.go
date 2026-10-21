@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/entry"
 	"affilio-api/internal/middleware"
 	"affilio-api/internal/services"
 
@@ -570,6 +571,53 @@ WHERE o.id=$1`, ownerID).Scan(&siteID, &publish, &match)
 	}
 	if _, publish, match := siteOf(ownerID); publish != "ask" || match != "auto" {
 		t.Fatalf("error write publish=%s match=%s", publish, match)
+	}
+}
+
+func TestJoinBearerFreshOwnerPlacementIsNotApproved(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	base := "http://join.example"
+	r := gin.New()
+	api := &AgentEntry{DB: db, BaseURL: base, AddressKey: testAddressKey, Claims: entry.LiveClaimChecker{}}
+	r.POST("/v1/agent-tokens", api.CreateAgentToken)
+	r.GET("/v1/step-modes", api.GetStepModes)
+	placements := &PlacementsHandler{DB: db, Claims: entry.LiveClaimChecker{}}
+	secured := r.Group("/v1", middleware.APIKeyAuth(db, nil, base+"/mcp"))
+	secured.POST("/placements", placements.Prepare)
+
+	mint, body := postJSON(t, r, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
+	token := assertJoinIssued(t, mint, body)
+	ownerID, _ := body["owner_id"].(string)
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes WHERE owner_id=$1`, ownerID) != 0 {
+		t.Fatal("fresh owner already had a step-mode row")
+	}
+	got, gotBody := postJSON(t, r, http.MethodGet, "/v1/step-modes", nil, bearerHeader(token))
+	modes := modeMap(t, gotBody)
+	if got.Code != http.StatusOK || modes["placement_publish"] != "ask" || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["link_change"] != "auto" || modes["payout"] != "auto" {
+		t.Fatalf("fresh modes: %d %s", got.Code, got.Body.String())
+	}
+
+	_, offerID := seedListedOffer(t, db, "join-fresh-maker", "join-fresh-maker@example.com", "CodeLens")
+	compact := strings.ReplaceAll(ownerID, "-", "")
+	domain := "j" + compact[:12] + ".invalid"
+	rec, placed := postJSON(t, r, http.MethodPost, "/v1/placements", map[string]any{
+		"offer_id": offerID, "surface_url": "https://" + domain + "/posts/first",
+		"context": stepArticle("CodeLens"), "copy": stepCopy, "post_id": 1,
+	}, bearerHeader(token))
+	if rec.Code != http.StatusCreated || placed["status"] == "published" || placed["error"] != nil {
+		t.Fatalf("fresh placement: %d %s", rec.Code, rec.Body.String())
+	}
+	placement := placementBody(t, placed)
+	if placement["status"] == "approved" || placement["status"] == "committed" || placement["approved_by"] != nil {
+		t.Fatalf("join bearer published without a person: %s", rec.Body.String())
+	}
+	if placed["status"] != "awaiting_approval" || placement["status"] != "pending" {
+		t.Fatalf("fresh placement was not held: %s", rec.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes m JOIN owners o ON o.site_id = m.site_id WHERE o.id=$1 AND m.placement_publish='ask'`, ownerID) != 1 {
+		t.Fatal("join site did not store placement publish ask")
 	}
 }
 

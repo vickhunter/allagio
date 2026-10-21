@@ -12,8 +12,9 @@ import (
 
 // TestLegacyCampaignGoLink locks the permanent /v1/go/<code> route. Saved
 // posts keep that URL, so the bare code and the same code with ?placement=
-// both follow the go-link rules: 302, no-store, noindex, a hit only while the
-// placement counts as live, and a rate limit that is an untracked 302.
+// both follow the go-link rules: 302, no-store, noindex, a hit while the
+// placement is clickable (including a committed placement before plugin-ack),
+// and a rate limit that is an untracked 302.
 func TestLegacyCampaignGoLink(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -134,7 +135,7 @@ WHERE id=$1`, id, current, campaignID, current.Add(48*time.Hour), postURL); err 
 			if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET status='committed', plugin_wait='', plugin_wait_at=$2 WHERE id=$1`, id, current); err != nil {
 				t.Fatal(err)
 			}
-		}, bareWant: plain, queryWant: plain},
+		}, bareWant: plain, queryWant: plain, tracked: true},
 		{name: "removed", setup: func() {
 			makeLive()
 			if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='removed' WHERE id=$1`, id); err != nil {

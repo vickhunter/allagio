@@ -260,6 +260,19 @@ func (h *AgentEntry) GetStepModes(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
 		return
 	}
+	// An owner with no site and no saved row has not chosen a mode. The next
+	// placement stores ask, so the read matches that hold. A site that already
+	// exists with no row still reads auto, which is what that placement uses.
+	if siteID == "" {
+		saved, savedErr := h.DB.HasStepModes(c.Request.Context(), ownerID, siteID)
+		if savedErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
+			return
+		}
+		if !saved {
+			modes.PlacementPublish = database.ModeAsk
+		}
+	}
 	body := gin.H{
 		"owner_id": ownerID,
 		"site_id":  siteID,
