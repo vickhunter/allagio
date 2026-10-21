@@ -1,0 +1,27 @@
+code head: fed14676b78b0c9b8dd581eb95dcafe7683229a6
+short: fed1467
+
+landing (ui/landing, node --test):
+tests 26
+pass 26
+fail 0
+skipped 0
+includes: the home Copy button sits above the fold
+
+go test ./... -count=1
+GOTOOLCHAIN=go1.23.0
+AFFILIO_TEST_DATABASE_URL=postgresql://affilio:password@localhost:5433/affilio_test
+postgres: 17.11 (Ubuntu 17.11-1.pgdg24.04+2)
+
+TZ=UTC: pass 614, fail 0, skip 8
+TZ=Europe/Rome: pass 614, fail 0, skip 8
+
+axe serious+critical: 0
+pages: / /makers /publishers
+viewports: 390 and 1440
+
+rendered banned-word grep: 0
+
+stamped home Copy button, scroll 0:
+390x844: top 572, bottom 616, sticky header bottom 113
+1440x900: top 583, bottom 627, sticky header bottom 65
