@@ -20,6 +20,5 @@ declare module '@/components/join-prompt.mjs' {
   export const joinPrompt: string
   export const joinLead: string
   export const joinHeading: string
-  export const joinSignInNote: string
   export function JoinPrompt(): ReactElement
 }

@@ -114,6 +114,9 @@ func PurgeClickSignals(ctx context.Context, db *database.DB) {
 		if err := db.PurgeClickSignals(ctx, cutoff); err != nil && ctx.Err() == nil {
 			logGo("click signal purge failed err=%v", err)
 		}
+		if err := db.PruneClientAddressHashes(ctx); err != nil && ctx.Err() == nil {
+			logGo("client address hash purge failed err=%v", err)
+		}
 	}
 	purge()
 	ticker := time.NewTicker(time.Hour)

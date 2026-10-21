@@ -102,23 +102,28 @@ func landingEventAllowed(name string) bool {
 	return ok
 }
 
-// eventClientIP is the landing-event rate-limit key.
-//
-// Locally, TRUSTED_PROXIES is empty and RENDER is unset, so the key is the
-// socket address. A spoofed X-Forwarded-For does not open another bucket.
-//
-// On Render, RENDER=true and every request arrives from Render's proxy. The
-// key is the rightmost X-Forwarded-For address, which is the one Render
-// appends. The caller-supplied entries to the left are ignored. When
-// TRUSTED_PLATFORM names a dedicated header, that header is the key instead,
-// the same value Gin reads as TrustedPlatform.
 func (h *HostedHandler) eventClientIP(c *gin.Context) string {
-	if header := strings.TrimSpace(h.TrustedPlatform); header != "" {
+	return clientAddress(c, h.Render, h.TrustedPlatform)
+}
+
+// clientAddress is the rate-limit and address-hash key for landing events and
+// open signup.
+//
+// Locally, render is false and the key is the socket address. A spoofed
+// X-Forwarded-For does not open another bucket.
+//
+// On Render, render is true and every request arrives from Render's proxy.
+// The key is the rightmost X-Forwarded-For address, which is the one Render
+// appends. The caller-supplied entries to the left are ignored. When
+// trustedPlatform names a dedicated header, that header is the key instead,
+// the same value Gin reads as TrustedPlatform.
+func clientAddress(c *gin.Context, render bool, trustedPlatform string) string {
+	if header := strings.TrimSpace(trustedPlatform); header != "" {
 		if ip := rightmostForwardedIP(c.GetHeader(header)); ip != "" {
 			return ip
 		}
 	}
-	if h.Render {
+	if render {
 		if ip := rightmostForwardedIP(c.GetHeader("X-Forwarded-For")); ip != "" {
 			return ip
 		}

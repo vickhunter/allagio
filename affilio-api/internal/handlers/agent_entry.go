@@ -29,11 +29,24 @@ const userCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 // AgentEntry is the D-032 HTTP API: device login, setup, policy, listing cards, and digest.
 type AgentEntry struct {
-	DB                 *database.DB
-	BaseURL            string
-	Claims             entry.ClaimChecker
-	Owner              func(*gin.Context)
-	AccountLimiter     *IPRateLimiter
+	DB             *database.DB
+	BaseURL        string
+	Claims         entry.ClaimChecker
+	Owner          func(*gin.Context)
+	AccountLimiter *IPRateLimiter
+	TokenLimiter   *IPRateLimiter
+	// AddressKey is the HMAC key for open-signup client addresses. It is
+	// API_KEY_SECRET, or a random per-process key when that secret is unset.
+	AddressKey []byte
+	// Render is true when RENDER=true. Open-signup limits then use the client
+	// address Render appended, the same key as landing events.
+	Render bool
+	// TrustedPlatform is a dedicated client-IP header. When set, it is the
+	// open-signup address.
+	TrustedPlatform string
+	// beforeJoinBearer runs after the step actor is loaded and before the
+	// join-bearer check. Tests revoke the token between those two lookups.
+	beforeJoinBearer   func()
 	DeviceLimiter      *IPRateLimiter
 	Now                func() time.Time
 	PluginOfflineAfter time.Duration
@@ -60,6 +73,10 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.POST("/v1/device/token", h.DeviceToken)
 	r.POST("/v1/device/approve", h.ApproveDevice)
 	r.POST("/v1/agent-accounts", h.CreateAgentAccount)
+	r.POST("/v1/agent-tokens", h.CreateAgentToken)
+	r.GET("/v1/agent-tokens", h.ListAgentTokens)
+	r.POST("/v1/agent-tokens/revoke", h.RevokeAgentToken)
+	r.POST("/v1/agent-tokens/:id/revoke", h.RevokeAgentTokenByID)
 	r.GET("/v1/step-modes", h.GetStepModes)
 	r.PUT("/v1/step-modes", h.PutStepModes)
 	r.GET("/v1/step-approvals/:id", h.GetStepApproval)
@@ -286,7 +303,8 @@ func (h *AgentEntry) ApproveDevice(c *gin.Context) {
 }
 
 func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
-	if h.AccountLimiter != nil && !h.AccountLimiter.Allow(c.ClientIP()) {
+	ip := h.joinClientIP(c)
+	if h.AccountLimiter != nil && !h.AccountLimiter.Allow(ip) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 		return
 	}
@@ -352,7 +370,11 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 		pluginHash = services.HashAPIKey(pluginKey)
 		pluginPrefix = services.KeyPrefix(pluginKey)
 	}
-	account, err := h.DB.CreateAgentOnlyAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey, pluginHash, pluginPrefix)
+	account, err := h.DB.CreateOpenAgentAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey, pluginHash, pluginPrefix, h.clientAddressHash(ip))
+	if errors.Is(err, database.ErrJoinLimited) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
+		return
+	}
 	if isUniqueViolation(err) {
 		writeNamedConflict(c, "account_exists")
 		return

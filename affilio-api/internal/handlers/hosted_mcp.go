@@ -16,6 +16,20 @@ import (
 )
 
 func hostedTools(g *database.AgentGrant) []dcp.Tool {
+	if g != nil && g.Join {
+		shown := *g
+		if shown.SiteID == "" {
+			shown.SiteID = "join"
+		}
+		if shown.MakerID == "" {
+			shown.MakerID = "join"
+		}
+		return hostedToolList(&shown)
+	}
+	return hostedToolList(g)
+}
+
+func hostedToolList(g *database.AgentGrant) []dcp.Tool {
 	tools := append([]dcp.Tool{}, dcp.PreviewTools...)
 	if g.MakerID != "" {
 		for _, t := range dcp.Tools {
@@ -91,10 +105,7 @@ func (h *HostedHandler) MCPTransport() http.Handler {
 	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
 	verify := func(ctx context.Context, token string, r *http.Request) (*auth.TokenInfo, error) {
 		hash := services.HashAPIKey(token)
-		g, err := h.DB.AgentToken(ctx, hash, h.resource())
-		if err != nil {
-			g, err = h.DB.AgentAccountBearer(ctx, hash, token, h.resource())
-		}
+		g, err := h.DB.ResolveBearer(ctx, hash, token, h.resource())
 		if err != nil {
 			return nil, auth.ErrInvalidToken
 		}

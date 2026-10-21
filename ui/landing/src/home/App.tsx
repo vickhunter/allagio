@@ -3,7 +3,7 @@ import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
 import { Runs } from '@/components/Runs'
 import { JoinForm } from '@/components/JoinForm'
-import { joinHeading, joinSignInNote } from '@/components/join-prompt.mjs'
+import { joinHeading } from '@/components/join-prompt.mjs'
 import { runsLead, runsTitle } from '@/surfaces.mjs'
 import { Checks } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
@@ -36,7 +36,7 @@ export function App() {
               <h2 id="join-h" className="font-display text-2xl font-bold leading-tight tracking-tight sm:text-3xl">{joinHeading}</h2>
               <p className="mt-2 text-sm leading-relaxed text-t2">{joinLine}</p>
               <div className="mt-4">
-                <JoinForm note={joinSignInNote} />
+                <JoinForm />
               </div>
             </div>
             <div className="mt-8 grid gap-6 border-t border-t1 pt-6 md:grid-cols-[1.1fr_1fr] md:items-start">

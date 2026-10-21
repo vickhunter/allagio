@@ -221,10 +221,20 @@ func (h *AgentEntry) stepActor(c *gin.Context) (ownerID, siteID string, ok bool)
 	if c.GetHeader("X-API-Key") == "" && c.GetHeader("X-Maker-Key") == "" {
 		if fields := strings.Fields(c.GetHeader("Authorization")); len(fields) == 2 && strings.EqualFold(fields[0], "Bearer") {
 			token := fields[1]
-			grant, err := h.DB.AgentAccountBearer(c.Request.Context(), services.HashAPIKey(token), token, "")
+			hash := services.HashAPIKey(token)
+			grant, err := h.DB.AgentJoinToken(c.Request.Context(), hash, h.mcpResource(c))
+			if err == nil && grant != nil && grant.Join {
+				c.Set("join_bearer", true)
+			}
+			if err != nil {
+				grant, err = h.DB.AgentAccountBearer(c.Request.Context(), hash, token, "")
+			}
 			if err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired bearer token"})
 				return "", "", false
+			}
+			if grant.OwnerID != "" {
+				return grant.OwnerID, grant.SiteID, true
 			}
 			if grant.SiteID != "" {
 				return ownerForSite(c, h.DB, grant.SiteID), grant.SiteID, true
@@ -249,6 +259,19 @@ func (h *AgentEntry) GetStepModes(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
 		return
+	}
+	// An owner with no site and no saved row has not chosen a mode. The next
+	// placement stores ask, so the read matches that hold. A site that already
+	// exists with no row still reads auto, which is what that placement uses.
+	if siteID == "" {
+		saved, savedErr := h.DB.HasStepModes(c.Request.Context(), ownerID, siteID)
+		if savedErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
+			return
+		}
+		if !saved {
+			modes.PlacementPublish = database.ModeAsk
+		}
 	}
 	body := gin.H{
 		"owner_id": ownerID,
@@ -307,11 +330,47 @@ func (h *AgentEntry) PutStepModes(c *gin.Context) {
 			return
 		}
 	}
+	if h.beforeJoinBearer != nil {
+		h.beforeJoinBearer()
+	}
+	// A lookup error forbids the write. A revoke between the actor read and
+	// this read, or a database error, is not "not a join bearer".
+	join, err := h.joinBearer(c)
+	if err != nil || (join && (siteID == "" || patch[database.StepPlacementPublish] == database.ModeAuto)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "a person approves this step"})
+		return
+	}
 	if err = h.DB.SaveStepModes(c.Request.Context(), ownerID, siteID, modes); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
 		return
 	}
 	h.GetStepModes(c)
+}
+
+func (h *AgentEntry) joinBearer(c *gin.Context) (bool, error) {
+	raw, ok := presentedBearer(c)
+	if !ok {
+		return false, nil
+	}
+	if h.DB == nil {
+		return false, errors.New("join token lookup unavailable")
+	}
+	grant, err := h.DB.AgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), h.mcpResource(c))
+	if err != nil {
+		// ErrNoRows is "not a join token" only when this request was not
+		// already accepted as one. A revoke between the two reads is an error.
+		if errors.Is(err, pgx.ErrNoRows) && !c.GetBool("join_bearer") {
+			return false, nil
+		}
+		return false, err
+	}
+	if grant == nil || !grant.Join {
+		if c.GetBool("join_bearer") {
+			return false, errors.New("join token lookup failed")
+		}
+		return false, nil
+	}
+	return true, nil
 }
 
 func (h *AgentEntry) GetStepApproval(c *gin.Context) {

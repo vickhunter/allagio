@@ -132,6 +132,20 @@ LIMIT 1`, ownerID, siteID).Scan(&m.SiteSignup, &m.OfferMatch, &m.PlacementPublis
 	return m.filled(), nil
 }
 
+// HasStepModes reports whether a site row or an owner-wide row is saved.
+func (d *DB) HasStepModes(ctx context.Context, ownerID, siteID string) (bool, error) {
+	if ownerID == "" && siteID == "" {
+		return false, nil
+	}
+	var saved bool
+	err := d.Pool.QueryRow(ctx, `SELECT EXISTS (
+SELECT 1 FROM agent_step_modes
+WHERE (NULLIF($2,'') IS NOT NULL AND site_id = NULLIF($2,'')::uuid)
+   OR (NULLIF($1,'') IS NOT NULL AND owner_id = NULLIF($1,'')::uuid AND site_id IS NULL)
+)`, ownerID, siteID).Scan(&saved)
+	return saved, err
+}
+
 // seedNewSitePublishAsk stores placement publish as ask for a site that was
 // just created. The other steps stay auto. An existing row is left alone, and
 // an owner-wide row is left alone, so a site that already chose its modes
