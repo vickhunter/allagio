@@ -1,0 +1,140 @@
+TAP version 13
+# Subtest: llms.txt matches the agent facts
+ok 1 - llms.txt matches the agent facts
+  ---
+  duration_ms: 2.549334
+  ...
+# Subtest: ordered steps name the hosted join, prepare, receipt, and sale bodies
+ok 2 - ordered steps name the hosted join, prepare, receipt, and sale bodies
+  ---
+  duration_ms: 0.358832
+  ...
+# Subtest: only page preview and digest are coming soon
+ok 3 - only page preview and digest are coming soon
+  ---
+  duration_ms: 0.138258
+  ...
+# Subtest: public agent copy stays on the documented words
+ok 4 - public agent copy stays on the documented words
+  ---
+  duration_ms: 0.299027
+  ...
+# Subtest: the join prompt and the Copy button render
+ok 5 - the join prompt and the Copy button render
+  ---
+  duration_ms: 5.470547
+  ...
+# Subtest: list URLs match the directory contract
+ok 6 - list URLs match the directory contract
+  ---
+  duration_ms: 1.274145
+  ...
+# Subtest: empty, results, and 404 follow the contract
+ok 7 - empty, results, and 404 follow the contract
+  ---
+  duration_ms: 0.775724
+  ...
+# Subtest: the client rejects a body the contract does not allow
+ok 8 - the client rejects a body the contract does not allow
+  ---
+  duration_ms: 0.258534
+  ...
+# Subtest: fixtures are TEST data and are not imported by the page
+ok 9 - fixtures are TEST data and are not imported by the page
+  ---
+  duration_ms: 0.752964
+  ...
+# Subtest: the home Copy button sits above the fold
+ok 10 - the home Copy button sits above the fold
+  ---
+  duration_ms: 2405.183777
+  ...
+# Subtest: privacy shows the draft line and is not indexed
+ok 11 - privacy shows the draft line and is not indexed
+  ---
+  duration_ms: 0.782273
+  ...
+# Subtest: terms shows the draft line and is not indexed
+ok 12 - terms shows the draft line and is not indexed
+  ---
+  duration_ms: 0.268375
+  ...
+# Subtest: no sitemap lists the draft privacy or terms pages
+ok 13 - no sitemap lists the draft privacy or terms pages
+  ---
+  duration_ms: 5.939277
+  ...
+# Subtest: home, makers and publishers copy avoids ads, revolution, pilot and every post
+ok 14 - home, makers and publishers copy avoids ads, revolution, pilot and every post
+  ---
+  duration_ms: 3.08614
+  ...
+# Subtest: groups a verified offer ahead of topic-matched unverified programs
+ok 15 - groups a verified offer ahead of topic-matched unverified programs
+  ---
+  duration_ms: 1.295794
+  ...
+# Subtest: defaults an existing offer to verified and leaves the fixture out
+ok 16 - defaults an existing offer to verified and leaves the fixture out
+  ---
+  duration_ms: 0.568132
+  ...
+# Subtest: names unreadable, private, and empty pages and never calls them no match
+ok 17 - names unreadable, private, and empty pages and never calls them no match
+  ---
+  duration_ms: 0.287053
+  ...
+# Subtest: shows closest programs and stores a local notify intent when nothing matches
+ok 18 - shows closest programs and stores a local notify intent when nothing matches
+  ---
+  duration_ms: 0.442262
+  ...
+# Subtest: drops go links and tracking params without caring about case, and strips userinfo
+ok 19 - drops go links and tracking params without caring about case, and strips userinfo
+  ---
+  duration_ms: 0.324306
+  ...
+# Subtest: dedupes notify urls ignoring case and a trailing slash, and a blank field changes nothing
+ok 20 - dedupes notify urls ignoring case and a trailing slash, and a blank field changes nothing
+  ---
+  duration_ms: 0.148322
+  ...
+# Subtest: keeps the newest notify urls and drops the oldest past the cap
+ok 21 - keeps the newest notify urls and drops the oldest past the cap
+  ---
+  duration_ms: 0.334162
+  ...
+# Subtest: maps every preview slot to a plain label and a bar
+ok 22 - maps every preview slot to a plain label and a bar
+  ---
+  duration_ms: 1.068787
+  ...
+# Subtest: maps every preview error status to its own line and next step
+ok 23 - maps every preview error status to its own line and next step
+  ---
+  duration_ms: 0.246822
+  ...
+# Subtest: reads a no-match body and ignores a card with no summary
+ok 24 - reads a no-match body and ignores a card with no summary
+  ---
+  duration_ms: 0.193343
+  ...
+# Subtest: rendered public landing copy has no ad, ads, fully automatic, or pilot
+ok 25 - rendered public landing copy has no ad, ads, fully automatic, or pilot
+  ---
+  duration_ms: 8.807587
+  ...
+# Subtest: a surface is verified end to end only when both checks passed
+ok 26 - a surface is verified end to end only when both checks passed
+  ---
+  duration_ms: 1.162833
+  ...
+1..26
+# tests 26
+# suites 0
+# pass 26
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2863.684863
