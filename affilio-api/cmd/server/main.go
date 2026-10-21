@@ -278,6 +278,8 @@ func main() {
 		AccountLimiter:     openSignup,
 		TokenLimiter:       openSignup,
 		AddressKey:         addressKey,
+		Render:             cfg.Render,
+		TrustedPlatform:    cfg.TrustedPlatform,
 		DeviceLimiter:      handlers.NewIPRateLimiter(30, time.Minute),
 		PluginOfflineAfter: cfg.PluginOfflineAfter,
 		StatusLimiter:      handlers.NewPlacementPollLimiter(),

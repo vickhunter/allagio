@@ -499,6 +499,173 @@ WHERE o.id=$1`, ownerID).Scan(&siteID, &publish)
 	}
 }
 
+func TestJoinBearerLookupErrorForbidsWrite(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	entry, _, r, _ := mountJoinTokens(t, db, 8)
+	r.PUT("/v1/step-modes", entry.PutStepModes)
+	t.Cleanup(func() { entry.beforeJoinBearer = nil })
+
+	siteOf := func(ownerID string) (siteID, publish, match string) {
+		t.Helper()
+		err := db.Pool.QueryRow(context.Background(), `SELECT s.id::text, m.placement_publish, m.offer_match
+FROM sites s
+JOIN owners o ON o.site_id = s.id
+JOIN agent_step_modes m ON m.site_id = s.id
+WHERE o.id=$1`, ownerID).Scan(&siteID, &publish, &match)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return siteID, publish, match
+	}
+	joinSite := func(token, ownerID string) {
+		t.Helper()
+		place, _ := postJSON(t, r, http.MethodPost, "/v1/placements", map[string]any{}, bearerHeader(token))
+		if place.Code != http.StatusBadRequest {
+			t.Fatalf("empty placement: %d %s", place.Code, place.Body.String())
+		}
+		_, publish, match := siteOf(ownerID)
+		if publish != "ask" || match != "auto" {
+			t.Fatalf("seed publish=%s match=%s", publish, match)
+		}
+	}
+
+	mint, body := postJSON(t, r, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
+	token := assertJoinIssued(t, mint, body)
+	ownerID, _ := body["owner_id"].(string)
+	joinSite(token, ownerID)
+	var revokeErr error
+	entry.beforeJoinBearer = func() {
+		_, revokeErr = db.RevokeAgentJoinToken(context.Background(), services.HashAPIKey(token))
+	}
+	revoked, revokedBody := postJSON(t, r, http.MethodPut, "/v1/step-modes", map[string]any{"offer_match": "off"}, bearerHeader(token))
+	if revokeErr != nil {
+		t.Fatal(revokeErr)
+	}
+	if revoked.Code != http.StatusForbidden || revokedBody["error"] != "a person approves this step" {
+		t.Fatalf("revoked between reads: %d %s", revoked.Code, revoked.Body.String())
+	}
+	var gone bool
+	if err := db.Pool.QueryRow(context.Background(), `SELECT revoked_at IS NOT NULL FROM agent_join_tokens WHERE token_hash=$1`, services.HashAPIKey(token)).Scan(&gone); err != nil || !gone {
+		t.Fatalf("token revoked=%v %v", gone, err)
+	}
+	if _, publish, match := siteOf(ownerID); publish != "ask" || match != "auto" {
+		t.Fatalf("revoked write publish=%s match=%s", publish, match)
+	}
+
+	mint, body = postJSON(t, r, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
+	token = assertJoinIssued(t, mint, body)
+	ownerID, _ = body["owner_id"].(string)
+	joinSite(token, ownerID)
+	ctx, cancel := context.WithCancel(context.Background())
+	entry.beforeJoinBearer = func() { cancel() }
+	req := httptest.NewRequest(http.MethodPut, "/v1/step-modes", strings.NewReader(`{"offer_match":"off"}`))
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "a person approves this step") {
+		t.Fatalf("lookup error: %d %s", rec.Code, rec.Body.String())
+	}
+	if _, publish, match := siteOf(ownerID); publish != "ask" || match != "auto" {
+		t.Fatalf("error write publish=%s match=%s", publish, match)
+	}
+}
+
+func TestOpenSignupClientAddressFollowsRender(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+
+	mount := func(render bool, platform string) (*AgentEntry, *gin.Engine) {
+		shared := NewIPRateLimiter(1, time.Minute)
+		entry := &AgentEntry{
+			DB: db, BaseURL: "http://127.0.0.1:8080",
+			AccountLimiter: shared, TokenLimiter: shared, AddressKey: testAddressKey,
+			Render: render, TrustedPlatform: platform,
+		}
+		r := gin.New()
+		r.POST("/v1/agent-tokens", entry.CreateAgentToken)
+		r.POST("/v1/agent-accounts", entry.CreateAgentAccount)
+		return entry, r
+	}
+	_, renderRouter := mount(true, "")
+	first, firstBody := serveOpenSignup(t, renderRouter, http.MethodPost, "/v1/agent-tokens", `{}`, "10.0.0.8:443", "198.51.100.9, 203.0.113.10", nil)
+	if first.Code != http.StatusCreated {
+		t.Fatalf("render client: %d %s", first.Code, first.Body.String())
+	}
+	clientHash := services.HashClientAddress(testAddressKey, "203.0.113.10")
+	if clientHash == services.HashClientAddress(testAddressKey, "10.0.0.8") {
+		t.Fatal("client hash collided with the proxy")
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_join_tokens WHERE owner_id=$1 AND creator_ip_hash=$2`, firstBody["owner_id"], clientHash) != 1 {
+		t.Fatal("stored hash is not the rightmost forwarded address")
+	}
+	spoof, _ := serveOpenSignup(t, renderRouter, http.MethodPost, "/v1/agent-tokens", `{}`, "10.0.0.8:443", "203.0.113.50, 203.0.113.10", nil)
+	if spoof.Code != http.StatusTooManyRequests {
+		t.Fatalf("spoofed left address: %d %s", spoof.Code, spoof.Body.String())
+	}
+	account, accountBody := serveOpenSignup(t, renderRouter, http.MethodPost, "/v1/agent-accounts", `{"role":"maker","name":"Ada","email":"ada-render@example.com"}`, "10.0.0.9:443", "198.51.100.1, 203.0.113.10", nil)
+	if account.Code != http.StatusTooManyRequests || accountBody["error"] != "rate limit exceeded" {
+		t.Fatalf("shared account bucket: %d %s", account.Code, account.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_open_signups WHERE creator_ip_hash=$1`, clientHash) != 0 {
+		t.Fatal("limited account signup was stored")
+	}
+	other, otherBody := serveOpenSignup(t, renderRouter, http.MethodPost, "/v1/agent-tokens", `{}`, "10.0.0.8:443", "198.51.100.9, 203.0.113.11", nil)
+	if other.Code != http.StatusCreated {
+		t.Fatalf("second render client: %d %s", other.Code, other.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_join_tokens WHERE owner_id=$1 AND creator_ip_hash=$2`, otherBody["owner_id"], services.HashClientAddress(testAddressKey, "203.0.113.11")) != 1 {
+		t.Fatal("second client did not get its own bucket")
+	}
+
+	_, platformRouter := mount(true, "CF-Connecting-IP")
+	platform, platformBody := serveOpenSignup(t, platformRouter, http.MethodPost, "/v1/agent-tokens", `{}`, "10.0.0.8:443", "203.0.113.10", map[string]string{"CF-Connecting-IP": "203.0.113.20"})
+	if platform.Code != http.StatusCreated {
+		t.Fatalf("platform client: %d %s", platform.Code, platform.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_join_tokens WHERE owner_id=$1 AND creator_ip_hash=$2`, platformBody["owner_id"], services.HashClientAddress(testAddressKey, "203.0.113.20")) != 1 {
+		t.Fatal("stored hash ignored the platform header")
+	}
+	samePlatform, _ := serveOpenSignup(t, platformRouter, http.MethodPost, "/v1/agent-tokens", `{}`, "10.0.0.8:443", "203.0.113.77", map[string]string{"CF-Connecting-IP": "203.0.113.20"})
+	if samePlatform.Code != http.StatusTooManyRequests {
+		t.Fatalf("same platform client: %d %s", samePlatform.Code, samePlatform.Body.String())
+	}
+
+	_, localRouter := mount(false, "")
+	local, localBody := serveOpenSignup(t, localRouter, http.MethodPost, "/v1/agent-tokens", `{}`, "10.1.0.5:9", "203.0.113.10", nil)
+	if local.Code != http.StatusCreated {
+		t.Fatalf("local client: %d %s", local.Code, local.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_join_tokens WHERE owner_id=$1 AND creator_ip_hash=$2`, localBody["owner_id"], services.HashClientAddress(testAddressKey, "10.1.0.5")) != 1 {
+		t.Fatal("local hash used the forwarded address")
+	}
+	forwarded, _ := serveOpenSignup(t, localRouter, http.MethodPost, "/v1/agent-tokens", `{}`, "10.1.0.5:9", "203.0.113.11", nil)
+	if forwarded.Code != http.StatusTooManyRequests {
+		t.Fatalf("spoofed local forward: %d %s", forwarded.Code, forwarded.Body.String())
+	}
+}
+
+func serveOpenSignup(t *testing.T, r http.Handler, method, path, raw, remote, forwarded string, extra map[string]string) (*httptest.ResponseRecorder, map[string]any) {
+	t.Helper()
+	req := httptest.NewRequest(method, path, strings.NewReader(raw))
+	req.RemoteAddr = remote
+	req.Header.Set("Content-Type", "application/json")
+	if forwarded != "" {
+		req.Header.Set("X-Forwarded-For", forwarded)
+	}
+	for key, value := range extra {
+		req.Header.Set(key, value)
+	}
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	var body map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	return rec, body
+}
+
 func TestAgentJoinExpiresInRome(t *testing.T) {
 	db, cleanup := setupTestDBInZone(t, "Europe/Rome")
 	defer cleanup()

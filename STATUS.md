@@ -4,7 +4,7 @@
 
 The token is shown once, stored as a hash, scoped to that agent, bound to this server's `/mcp` resource, and expires in 24 hours. `POST /v1/agent-tokens/revoke` revokes the presented token. `POST /v1/agent-tokens/:id/revoke` revokes one token on the same account. An empty name is stored as a generated `agent-` handle. One address can create 8 a minute and 30 a day. `POST /v1/agent-accounts` uses that same per-minute limiter and that same 24-hour cap. The address is HMAC-SHA256 keyed by `API_KEY_SECRET`, not the daily go-link salt. An empty `API_KEY_SECRET` uses a random per-process key and logs a warning. Hashes on expired join tokens are cleared, and account-signup rows older than 24 hours are deleted. Migration `045_d093a_agent_join_tokens.sql` and `046_d093a_open_signup_cap.sql` are additive. `AUTO_MIGRATE` stays off unless it is set to `true`.
 
-A join bearer cannot approve a placement, act as an admin key or a plugin key, write owner-wide step modes, or set placement publish to `auto`.
+A join bearer cannot approve a placement, act as an admin key or a plugin key, write owner-wide step modes, or set placement publish to `auto`. A step-mode write is also refused when the join-token lookup fails, including a revoke between the two reads. Open-signup limits use the same client address as landing events. On Render that is the rightmost `X-Forwarded-For` address, so callers do not share the platform proxy's bucket.
 
 `llms.txt` no longer says `/mcp` needs the Google sign-in. Step 2 describes the join response: no site id, no site key, and no plugin key.
 

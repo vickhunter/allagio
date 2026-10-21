@@ -28,7 +28,7 @@ const AgentJoinCommand = `curl -fsS -X POST "$OFFER_RAILS_URL/v1/agent-tokens" -
 // The body is {} or empty. A role field is refused. The plaintext token is
 // returned once and stored only as a hash.
 func (h *AgentEntry) CreateAgentToken(c *gin.Context) {
-	ip := joinClientIP(c)
+	ip := h.joinClientIP(c)
 	if h.TokenLimiter != nil && !h.TokenLimiter.Allow(ip) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 		return
@@ -287,10 +287,6 @@ func (h *AgentEntry) clientAddressHash(ip string) string {
 	return services.HashClientAddress(key, ip)
 }
 
-func joinClientIP(c *gin.Context) string {
-	ip := strings.TrimSpace(c.ClientIP())
-	if ip == "" {
-		return "unknown"
-	}
-	return ip
+func (h *AgentEntry) joinClientIP(c *gin.Context) string {
+	return clientAddress(c, h.Render, h.TrustedPlatform)
 }

@@ -223,6 +223,9 @@ func (h *AgentEntry) stepActor(c *gin.Context) (ownerID, siteID string, ok bool)
 			token := fields[1]
 			hash := services.HashAPIKey(token)
 			grant, err := h.DB.AgentJoinToken(c.Request.Context(), hash, h.mcpResource(c))
+			if err == nil && grant != nil && grant.Join {
+				c.Set("join_bearer", true)
+			}
 			if err != nil {
 				grant, err = h.DB.AgentAccountBearer(c.Request.Context(), hash, token, "")
 			}
@@ -314,7 +317,13 @@ func (h *AgentEntry) PutStepModes(c *gin.Context) {
 			return
 		}
 	}
-	if h.joinBearer(c) && (siteID == "" || patch[database.StepPlacementPublish] == database.ModeAuto) {
+	if h.beforeJoinBearer != nil {
+		h.beforeJoinBearer()
+	}
+	// A lookup error forbids the write. A revoke between the actor read and
+	// this read, or a database error, is not "not a join bearer".
+	join, err := h.joinBearer(c)
+	if err != nil || (join && (siteID == "" || patch[database.StepPlacementPublish] == database.ModeAuto)) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "a person approves this step"})
 		return
 	}
@@ -325,13 +334,30 @@ func (h *AgentEntry) PutStepModes(c *gin.Context) {
 	h.GetStepModes(c)
 }
 
-func (h *AgentEntry) joinBearer(c *gin.Context) bool {
+func (h *AgentEntry) joinBearer(c *gin.Context) (bool, error) {
 	raw, ok := presentedBearer(c)
-	if !ok || h.DB == nil {
-		return false
+	if !ok {
+		return false, nil
+	}
+	if h.DB == nil {
+		return false, errors.New("join token lookup unavailable")
 	}
 	grant, err := h.DB.AgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), h.mcpResource(c))
-	return err == nil && grant != nil && grant.Join
+	if err != nil {
+		// ErrNoRows is "not a join token" only when this request was not
+		// already accepted as one. A revoke between the two reads is an error.
+		if errors.Is(err, pgx.ErrNoRows) && !c.GetBool("join_bearer") {
+			return false, nil
+		}
+		return false, err
+	}
+	if grant == nil || !grant.Join {
+		if c.GetBool("join_bearer") {
+			return false, errors.New("join token lookup failed")
+		}
+		return false, nil
+	}
+	return true, nil
 }
 
 func (h *AgentEntry) GetStepApproval(c *gin.Context) {

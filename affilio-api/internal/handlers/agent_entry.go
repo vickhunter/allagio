@@ -37,7 +37,16 @@ type AgentEntry struct {
 	TokenLimiter   *IPRateLimiter
 	// AddressKey is the HMAC key for open-signup client addresses. It is
 	// API_KEY_SECRET, or a random per-process key when that secret is unset.
-	AddressKey         []byte
+	AddressKey []byte
+	// Render is true when RENDER=true. Open-signup limits then use the client
+	// address Render appended, the same key as landing events.
+	Render bool
+	// TrustedPlatform is a dedicated client-IP header. When set, it is the
+	// open-signup address.
+	TrustedPlatform string
+	// beforeJoinBearer runs after the step actor is loaded and before the
+	// join-bearer check. Tests revoke the token between those two lookups.
+	beforeJoinBearer   func()
 	DeviceLimiter      *IPRateLimiter
 	Now                func() time.Time
 	PluginOfflineAfter time.Duration
@@ -294,7 +303,7 @@ func (h *AgentEntry) ApproveDevice(c *gin.Context) {
 }
 
 func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
-	ip := joinClientIP(c)
+	ip := h.joinClientIP(c)
 	if h.AccountLimiter != nil && !h.AccountLimiter.Allow(ip) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 		return
