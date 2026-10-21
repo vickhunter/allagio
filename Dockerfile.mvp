@@ -11,7 +11,7 @@ COPY affilio-wp/admin ./wordpress/affilio-wp/admin
 COPY affilio-wp/public ./wordpress/affilio-wp/public
 COPY affilio-wp/languages ./wordpress/affilio-wp/languages
 RUN cd wordpress && zip -qr /release/affilio.zip affilio-wp \
-    -x 'affilio-wp/admin/build/agent-poc.html' 'affilio-wp/admin/build/workspace*' 'affilio-wp/admin/build/home.html' 'affilio-wp/admin/build/makers.html' 'affilio-wp/admin/build/publishers.html' 'affilio-wp/admin/build/publishers-setup.html' 'affilio-wp/admin/build/protocol.html' 'affilio-wp/admin/build/landing*' 'affilio-wp/admin/build/landing-v9/*' 'affilio-wp/admin/build/setup-controls.js' 'affilio-wp/admin/build/package*.json' 'affilio-wp/admin/build/THIRD_PARTY_NOTICES.md' \
+    -x 'affilio-wp/admin/build/agent-poc.html' 'affilio-wp/admin/build/workspace*' 'affilio-wp/admin/build/home.html' 'affilio-wp/admin/build/makers.html' 'affilio-wp/admin/build/publishers.html' 'affilio-wp/admin/build/publishers-setup.html' 'affilio-wp/admin/build/protocol.html' 'affilio-wp/admin/build/you.html' 'affilio-wp/admin/build/landing*' 'affilio-wp/admin/build/landing-v9/*' 'affilio-wp/admin/build/setup-controls.js' 'affilio-wp/admin/build/package*.json' 'affilio-wp/admin/build/THIRD_PARTY_NOTICES.md' \
        'affilio-wp/e2e/*' 'affilio-wp/tests/*' 'affilio-wp/phpunit.xml' 'affilio-wp/phpunit.xml.dist' '*test-results*' '*playwright-report*' '*.phpunit.result.cache' '*/.phpunit.*'
 
 FROM golang:1.23 AS build
@@ -28,7 +28,7 @@ FROM ubuntu:24.04
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /bin/affilio /bin/affilio
 COPY --from=releases /release /app/downloads
-COPY affilio-wp/admin/build/workspace.html affilio-wp/admin/build/home.html affilio-wp/admin/build/makers.html affilio-wp/admin/build/publishers.html affilio-wp/admin/build/publishers-setup.html affilio-wp/admin/build/protocol.html affilio-wp/admin/build/workspace.css affilio-wp/admin/build/workspace.js affilio-wp/admin/build/setup-controls.js affilio-wp/admin/build/landing.css affilio-wp/admin/build/landing.js affilio-wp/admin/build/landing-scene.bundle.js affilio-wp/admin/build/landing-scene.bundle.js.LEGAL.txt affilio-wp/admin/build/THIRD_PARTY_NOTICES.md /app/assets/
+COPY affilio-wp/admin/build/workspace.html affilio-wp/admin/build/home.html affilio-wp/admin/build/makers.html affilio-wp/admin/build/publishers.html affilio-wp/admin/build/publishers-setup.html affilio-wp/admin/build/protocol.html affilio-wp/admin/build/you.html affilio-wp/admin/build/workspace.css affilio-wp/admin/build/workspace.js affilio-wp/admin/build/setup-controls.js affilio-wp/admin/build/landing.css affilio-wp/admin/build/landing.js affilio-wp/admin/build/landing-scene.bundle.js affilio-wp/admin/build/landing-scene.bundle.js.LEGAL.txt affilio-wp/admin/build/THIRD_PARTY_NOTICES.md /app/assets/
 COPY affilio-wp/admin/build/landing-v9 /app/assets/landing-v9
 ENV GIN_MODE=release UI_ASSETS_PATH=/app/assets DOWNLOADS_PATH=/app/downloads
 EXPOSE 8080
