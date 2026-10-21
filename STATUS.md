@@ -1,3 +1,11 @@
+## October 21 — llms.txt: /mcp takes a Bearer token
+
+`/llms.txt` and the agents page no longer say `/mcp` needs a Google sign-in, or that keys from `POST /v1/agent-accounts` work on the REST API only. The hosted `/mcp` accepts the `api_key` from `POST /v1/agent-accounts` as `Authorization: Bearer <api_key>`. A publisher key lists the publisher tools and a maker key lists the maker tools. The plugin key (`X-Plugin-Key`) and keys from accounts made in a browser are refused with 401. `TestAgentAccountKeyCallsMCP` is the proof. A person who signed up in a browser still signs in with Google (OAuth). The “Tell your agent” line now says to create an account with `POST /v1/agent-accounts` and send the `api_key` as a Bearer token.
+
+The install tab labels did not change. Cursor, VS Code, Windsurf and Claude Code stay “Untested”: no client was run with a Bearer header, and the Claude Code OAuth sign-in is still not working. The October 18 entry below describes the old wording.
+
+`ui/landing/src/agents/facts.mjs` (`signInNote`, `agentPrompt`) is the source. `ui/landing/public/llms.txt` and `affilio-wp/admin/build/landing-v9/llms.txt` are regenerated from it. `ui/landing/node_modules` is not installed here, so the two strings in the compiled `landing-v9/assets/agents-CUqOFSDw.js` were patched in place. The next `npm run build` in `ui/landing` replaces that file.
+
 ## October 20 — New sites wait for a person before a placement is published
 
 A new publisher site stores `placement_publish` as `ask`. The other steps stay `auto`. A created placement is HTTP 201 with `status` `awaiting_approval` and `hold_reason` `step_ask` once the domain is verified. An unverified domain still uses `domain_unverified`. A site with no `agent_step_modes` row still reads every step as `auto`, which is the read for a site created before this change. Registering that site again does not add a row. Saving a mode, including `auto`, is left as stored.

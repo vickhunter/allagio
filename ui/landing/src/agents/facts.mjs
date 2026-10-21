@@ -71,9 +71,9 @@ export const tools = [
   { name: 'get_earnings', soon: false, maker: true, line: 'Call get_earnings to read clicks, sales, refunds, and commission for each offer.' },
 ]
 
-export const signInNote = 'This server needs a Google sign-in today. These snippets do not include an API key. POST /v1/agent-accounts is the no-browser way to get an account. Keys from /v1/agent-accounts work on the REST API only. /mcp needs the Google sign-in.'
+export const signInNote = '/mcp takes a Bearer token. These snippets do not include an API key. POST /v1/agent-accounts is the no-browser way to get one: send its api_key as Authorization: Bearer <api_key>. A publisher key lists the publisher tools and a maker key lists the maker tools. The plugin key (X-Plugin-Key) and keys from accounts made in a browser are refused with 401. A person who signed up in a browser uses the Google sign-in (OAuth) instead.'
 
-export const agentPrompt = 'Use the Offer Rails MCP server. Sign in with Google when it asks. Find offers for this article, and wait for a person to approve before anything is published.'
+export const agentPrompt = 'Use the Offer Rails MCP server. If you have no account, create one with POST /v1/agent-accounts and send the api_key as a Bearer token to /mcp. Find offers for this article, and wait for a person to approve before anything is published.'
 
 export const installs = [
   { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}' },
