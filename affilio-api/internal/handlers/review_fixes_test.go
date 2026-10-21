@@ -318,12 +318,20 @@ func TestReviewCampaignPathAndHeadProbe(t *testing.T) {
 		return rec
 	}
 	pending := hit("/v1/go/review-camp?placement=" + id)
-	requirePlainRedirect(t, pending, "https://example.com")
-	if n := clickCount(t, db); n != 0 {
-		t.Fatalf("unplaced query recorded %d", n)
+	if pending.Code != http.StatusFound || !strings.Contains(pending.Header().Get("Location"), "via=") {
+		t.Fatalf("unacked query: %d %s", pending.Code, pending.Header().Get("Location"))
+	}
+	requireGoLinkHeaders(t, pending)
+	if n := clickCount(t, db); n != 1 {
+		t.Fatalf("unacked query recorded %d", n)
 	}
 	bare := hit("/v1/go/review-camp")
-	requirePlainRedirect(t, bare, "https://example.com")
+	if bare.Code != http.StatusFound || !strings.Contains(bare.Header().Get("Location"), "via=") {
+		t.Fatalf("unacked code: %d %s", bare.Code, bare.Header().Get("Location"))
+	}
+	if n := clickCount(t, db); n != 1 {
+		t.Fatalf("deduped code recorded %d", n)
+	}
 	markPlacementLive(t, db, siteID, offerID, id, "review-camp", "https://go-review.example/post")
 	live := hit("/v1/go/review-camp")
 	if live.Code != http.StatusFound || !strings.Contains(live.Header().Get("Location"), "via=") {

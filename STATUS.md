@@ -1,3 +1,9 @@
+## October 21 — A tracked link counts before plugin-ack
+
+A click on a valid tracked link is counted from the first `GET /v1/go/<placement_id>` or `GET /v1/go/<code>` redirect. plugin-ack is not required. `POST /v1/placements/:id/plugin-ack` still stores the verified `placed` state and does not gate the click. `placement_counts_as_live` is unchanged: Live now, site totals, digest went-live, and account totals still require `plugin_state` `placed`.
+
+An email open sends no referrer, so its source is `direct`. An X, Instagram, or blog referrer uses that host. The same reader, user agent, and placement inside the dedupe window still counts once. Revoked links and removed placements stay uncounted, as do a pending removal, a failed restore, Pause, and the kill switch. No new column was added. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 20 — New sites wait for a person before a placement is published
 
 A new publisher site stores `placement_publish` as `ask`. The other steps stay `auto`. A created placement is HTTP 201 with `status` `awaiting_approval` and `hold_reason` `step_ask` once the domain is verified. An unverified domain still uses `domain_unverified`. A site with no `agent_step_modes` row still reads every step as `auto`, which is the read for a site created before this change. Registering that site again does not add a row. Saving a mode, including `auto`, is left as stored.

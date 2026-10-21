@@ -246,21 +246,22 @@ func TestAgentAccountSiteClicksCarryVia(t *testing.T) {
 		return n
 	}
 	pending := hitGo(t, r, http.MethodGet, "/v1/go/"+placementID, testBrowserUA)
-	if pending.Code != http.StatusFound || pending.Header().Get("Location") != "https://example.com/buy" || clicks() != 0 {
+	pendingURL, err := url.Parse(pending.Header().Get("Location"))
+	if pending.Code != http.StatusFound || err != nil || pendingURL.Query().Get("via") == "" || clicks() != 1 {
 		t.Fatalf("pending go: %d %s clicks %d", pending.Code, pending.Header().Get("Location"), clicks())
 	}
 	acked, ackBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+placementID+"/plugin-ack", map[string]any{"action": "placed", "rel_sponsored": true}, map[string]string{"X-Plugin-Key": pluginKey})
 	if acked.Code != http.StatusOK || ackBody["plugin_state"] != "placed" {
 		t.Fatalf("plugin ack: %d %s", acked.Code, ackBody)
 	}
-	live := hitGo(t, r, http.MethodGet, "/v1/go/"+placementID, testBrowserUA)
+	live := hitGo(t, r, http.MethodGet, "/v1/go/"+placementID, testFirefoxUA)
 	location := live.Header().Get("Location")
 	parsed, err := url.Parse(location)
-	if live.Code != http.StatusFound || err != nil || parsed.Query().Get("via") == "" || clicks() != 1 {
+	if live.Code != http.StatusFound || err != nil || parsed.Query().Get("via") == "" || clicks() != 2 {
 		t.Fatalf("live go: %d %s clicks %d", live.Code, location, clicks())
 	}
 	var clickID string
-	if err := db.Pool.QueryRow(context.Background(), `SELECT id::text FROM clicks WHERE placement_id=$1`, placementID).Scan(&clickID); err != nil || clickID != parsed.Query().Get("via") {
+	if err := db.Pool.QueryRow(context.Background(), `SELECT id::text FROM clicks WHERE placement_id=$1 AND user_agent=$2`, placementID, testFirefoxUA).Scan(&clickID); err != nil || clickID != parsed.Query().Get("via") {
 		t.Fatalf("via %s click %s err %v", parsed.Query().Get("via"), clickID, err)
 	}
 }
