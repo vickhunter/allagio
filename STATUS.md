@@ -1,6 +1,6 @@
 ## October 21 — Agent-first join
 
-The home hero asks a person to give an agent the line “Connect my site to Offer Rails”, with one Copy button and a link to llms.txt. Sign in, the install command, MCP setup, and the WordPress plugin sit under “Set it up yourself”, directly under that prompt. The page does not pick maker or publisher. Where it runs reads Live or Planned from one list. Live surfaces stay in view. Planned surfaces sit in one group. There is no adapters registry yet, so that list is the stand-in until D-092.
+The home hero asks a person to give an agent the line “Connect my site to Offer Rails”, with one Copy button and a link to llms.txt. Under that line: “Your agent will send you one sign-in link to finish.” Sign in, the install command, MCP setup, and the WordPress plugin sit under “Set it up yourself”. The page does not pick maker or publisher. One Offer Rails link counts clicks wherever it is shared. Each surface is “Verified end to end” only when both adapterTests and e2e are true. Both are false today, including WordPress, so each surface says “In testing”. There is no adapters registry yet, so that list is the stand-in until D-092.
 
 ## October 20 — New sites wait for a person before a placement is published
 

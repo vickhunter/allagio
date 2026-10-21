@@ -8,6 +8,7 @@ import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { runsLead, runsTitle } from '@/surfaces.mjs'
 import { example, faq, joinLine, painLine, publisherAdvantages } from '@/content'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
@@ -57,8 +58,8 @@ export function App() {
 
       <section id="how" aria-labelledby="how-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
-          <p className="eyebrow">Where it runs</p>
-          <h2 id="how-h" className="h-display mt-3 text-3xl sm:text-4xl">WordPress is live.</h2>
+          <h2 id="how-h" className="h-display text-3xl sm:text-4xl">{runsTitle}</h2>
+          <p className="mt-4 max-w-3xl text-lg leading-relaxed text-t2">{runsLead}</p>
           <div className="mt-10"><Runs audience="publisher" notes /></div>
         </div>
       </section>

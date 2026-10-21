@@ -3,7 +3,8 @@ import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
 import { Runs } from '@/components/Runs'
 import { JoinForm } from '@/components/JoinForm'
-import { joinHeading } from '@/components/join-prompt.mjs'
+import { joinHeading, joinSignInNote } from '@/components/join-prompt.mjs'
+import { runsLead, runsTitle } from '@/surfaces.mjs'
 import { Checks } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
@@ -35,7 +36,7 @@ export function App() {
               <h2 id="join-h" className="font-display text-2xl font-bold leading-tight tracking-tight sm:text-3xl">{joinHeading}</h2>
               <p className="mt-2 text-sm leading-relaxed text-t2">{joinLine}</p>
               <div className="mt-4">
-                <JoinForm />
+                <JoinForm note={joinSignInNote} />
               </div>
             </div>
             <div className="mt-8 grid gap-6 border-t border-t1 pt-6 md:grid-cols-[1.1fr_1fr] md:items-start">
@@ -64,8 +65,11 @@ export function App() {
             <SideLink id="publishers" href={withSource('/publishers/', source)} tone="pub" n="B" title="I publish." text="Earn from more of your posts. Agents find offers that fit the content you already make." cta={`All ${publisherAdvantages.length} publisher advantages`} />
           </div>
           <p className="mt-3 text-[13px] text-t2">Both? One account does both. Press <kbd className="font-mono">M</kbd> or <kbd className="font-mono">P</kbd>.</p>
-          <p className="eyebrow mb-3 mt-8">Where it runs</p>
-          <Runs audience="publisher" />
+          <div className="mt-8">
+            <h2 className="font-display text-2xl font-bold tracking-tight">{runsTitle}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-t2">{runsLead}</p>
+            <div className="mt-4"><Runs audience="publisher" /></div>
+          </div>
         </div>
       </section>
 

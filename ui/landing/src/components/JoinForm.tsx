@@ -3,13 +3,14 @@ import { signInHref, useOfferConfig, useSource, withSource } from '@/lib/source'
 
 type Role = 'maker' | 'publisher'
 
-export function JoinForm({ role, cta = 'Sign in with Google', id = 'join' }: { role?: Role; cta?: string; id?: string }) {
+export function JoinForm({ role, cta = 'Sign in with Google', id = 'join', note }: { role?: Role; cta?: string; id?: string; note?: string }) {
   const source = useSource()
   const { install, plugin } = useOfferConfig()
   const href = signInHref(role === 'publisher' ? '/publishers/setup' : role === 'maker' ? '/owner?setup=maker' : '/owner', source)
   return (
     <div id={id} className="flex flex-col gap-3">
       <JoinPrompt />
+      {note ? <p className="text-sm text-t2">{note}</p> : null}
       <details className="rounded-xl border border-line bg-s0">
         <summary className="inline-flex min-h-11 cursor-pointer items-center px-3 text-sm font-semibold">Set it up yourself</summary>
         <div className="flex flex-col gap-3 px-3 pb-3">

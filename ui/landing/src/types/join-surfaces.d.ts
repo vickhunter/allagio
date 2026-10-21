@@ -1,14 +1,18 @@
 declare module '@/surfaces.mjs' {
-  export type SurfaceState = 'Live' | 'Beta' | 'Planned'
   export type Surface = {
     name: string
-    state: SurfaceState
     audience: 'publisher' | 'maker' | 'both'
+    adapterTests: boolean
+    e2e: boolean
+    date: string
     note: string
   }
+  export const runsTitle: string
+  export const runsLead: string
   export const surfaces: readonly Surface[]
+  export function surfaceStatus(item: { adapterTests: boolean; e2e: boolean }): 'Verified end to end' | 'In testing'
   export function surfacesFor(audience: 'publisher' | 'maker'): Surface[]
-  export function splitSurfaces(audience: 'publisher' | 'maker'): { live: Surface[]; planned: Surface[] }
+  export function orderedSurfaces(audience: 'publisher' | 'maker'): Surface[]
 }
 
 declare module '@/components/join-prompt.mjs' {
@@ -16,5 +20,6 @@ declare module '@/components/join-prompt.mjs' {
   export const joinPrompt: string
   export const joinLead: string
   export const joinHeading: string
+  export const joinSignInNote: string
   export function JoinPrompt(): ReactElement
 }
