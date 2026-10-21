@@ -318,11 +318,34 @@ type AgentAccount struct {
 }
 
 func (d *DB) CreateAgentOnlyAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix string) (AgentAccount, error) {
+	return d.createAgentOnlyAccount(ctx, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix, "")
+}
+
+// CreateOpenAgentAccount is POST /v1/agent-accounts. ipHash is the HMAC of
+// the client address and counts toward the shared 24-hour open-signup cap.
+func (d *DB) CreateOpenAgentAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix, ipHash string) (AgentAccount, error) {
+	return d.createAgentOnlyAccount(ctx, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix, ipHash)
+}
+
+func (d *DB) createAgentOnlyAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix, ipHash string) (AgentAccount, error) {
+	if ipHash != "" {
+		if err := d.PruneClientAddressHashes(ctx); err != nil {
+			return AgentAccount{}, err
+		}
+	}
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return AgentAccount{}, err
 	}
 	defer tx.Rollback(ctx)
+	if ipHash != "" {
+		if err = reserveOpenSignup(ctx, tx, ipHash); err != nil {
+			return AgentAccount{}, err
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO agent_open_signups(creator_ip_hash) VALUES($1)`, ipHash); err != nil {
+			return AgentAccount{}, err
+		}
+	}
 	var out AgentAccount
 	err = tx.QueryRow(ctx, `INSERT INTO owners(issuer,subject,email,name,source,agent_only,human_login)
 VALUES('https://offer-rails.agent',$1,$2,$3,$4,true,false) RETURNING id`, subject, email, name, source).Scan(&out.OwnerID)

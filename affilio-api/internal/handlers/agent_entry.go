@@ -29,12 +29,15 @@ const userCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 // AgentEntry is the D-032 HTTP API: device login, setup, policy, listing cards, and digest.
 type AgentEntry struct {
-	DB                 *database.DB
-	BaseURL            string
-	Claims             entry.ClaimChecker
-	Owner              func(*gin.Context)
-	AccountLimiter     *IPRateLimiter
-	TokenLimiter       *IPRateLimiter
+	DB             *database.DB
+	BaseURL        string
+	Claims         entry.ClaimChecker
+	Owner          func(*gin.Context)
+	AccountLimiter *IPRateLimiter
+	TokenLimiter   *IPRateLimiter
+	// AddressKey is the HMAC key for open-signup client addresses. It is
+	// API_KEY_SECRET, or a random per-process key when that secret is unset.
+	AddressKey         []byte
 	DeviceLimiter      *IPRateLimiter
 	Now                func() time.Time
 	PluginOfflineAfter time.Duration
@@ -291,7 +294,8 @@ func (h *AgentEntry) ApproveDevice(c *gin.Context) {
 }
 
 func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
-	if h.AccountLimiter != nil && !h.AccountLimiter.Allow(c.ClientIP()) {
+	ip := joinClientIP(c)
+	if h.AccountLimiter != nil && !h.AccountLimiter.Allow(ip) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 		return
 	}
@@ -357,7 +361,11 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 		pluginHash = services.HashAPIKey(pluginKey)
 		pluginPrefix = services.KeyPrefix(pluginKey)
 	}
-	account, err := h.DB.CreateAgentOnlyAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey, pluginHash, pluginPrefix)
+	account, err := h.DB.CreateOpenAgentAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey, pluginHash, pluginPrefix, h.clientAddressHash(ip))
+	if errors.Is(err, database.ErrJoinLimited) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
+		return
+	}
 	if isUniqueViolation(err) {
 		writeNamedConflict(c, "account_exists")
 		return

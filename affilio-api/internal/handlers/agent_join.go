@@ -5,8 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -54,7 +57,7 @@ func (h *AgentEntry) CreateAgentToken(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "token failed"})
 		return
 	}
-	issued, err := h.DB.CreateAgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), services.KeyPrefix(raw), services.HashAPIKey(ip), h.mcpResource(c), name, "join:"+subject, "join-"+hex.EncodeToString(emailNonce)+"@agents.invalid")
+	issued, err := h.DB.CreateAgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), services.KeyPrefix(raw), h.clientAddressHash(ip), h.mcpResource(c), name, "join:"+subject, "join-"+hex.EncodeToString(emailNonce)+"@agents.invalid")
 	if errors.Is(err, database.ErrJoinLimited) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 		return
@@ -181,7 +184,7 @@ func (h *AgentEntry) mcpResource(c *gin.Context) string {
 func joinTokenName(c *gin.Context, body []byte) (string, bool) {
 	trimmed := bytesTrim(body)
 	if len(trimmed) == 0 {
-		return "Agent", true
+		return generatedAgentHandle(c)
 	}
 	var raw map[string]json.RawMessage
 	if decodeStrict(trimmed, &raw) != nil {
@@ -207,7 +210,7 @@ func joinTokenName(c *gin.Context, body []byte) (string, bool) {
 	}
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
-		return "Agent", true
+		return generatedAgentHandle(c)
 	}
 	if utf8.RuneCountInString(req.Name) > 80 || strings.ContainsAny(req.Name, "\r\n") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
@@ -253,6 +256,35 @@ func joinRoles(siteID, makerID string) []string {
 		roles = append(roles, "maker")
 	}
 	return roles
+}
+
+func generatedAgentHandle(c *gin.Context) (string, bool) {
+	var buf [4]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "token failed"})
+		return "", false
+	}
+	return "agent-" + hex.EncodeToString(buf[:]), true
+}
+
+var (
+	addressKeyOnce     sync.Once
+	addressKeyFallback []byte
+)
+
+func (h *AgentEntry) clientAddressHash(ip string) string {
+	key := h.AddressKey
+	if len(key) == 0 {
+		addressKeyOnce.Do(func() {
+			var warning string
+			addressKeyFallback, warning = services.ClientAddressHMACKey(os.Getenv("API_KEY_SECRET"))
+			if warning != "" {
+				log.Print(warning)
+			}
+		})
+		key = addressKeyFallback
+	}
+	return services.HashClientAddress(key, ip)
 }
 
 func joinClientIP(c *gin.Context) string {

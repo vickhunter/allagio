@@ -266,12 +266,18 @@ func main() {
 	}
 	v1.POST("/mcp", mcp.Receive)
 
+	openSignup := handlers.NewIPRateLimiter(8, time.Minute)
+	addressKey, addressWarning := services.ClientAddressHMACKey(cfg.APIKeySecret)
+	if addressWarning != "" {
+		log.Print(addressWarning)
+	}
 	agentEntry := &handlers.AgentEntry{
 		DB:                 db,
 		BaseURL:            strings.TrimRight(cfg.PublicBaseURL, "/"),
 		Claims:             claims,
-		AccountLimiter:     handlers.NewIPRateLimiter(8, time.Minute),
-		TokenLimiter:       handlers.NewIPRateLimiter(8, time.Minute),
+		AccountLimiter:     openSignup,
+		TokenLimiter:       openSignup,
+		AddressKey:         addressKey,
 		DeviceLimiter:      handlers.NewIPRateLimiter(30, time.Minute),
 		PluginOfflineAfter: cfg.PluginOfflineAfter,
 		StatusLimiter:      handlers.NewPlacementPollLimiter(),

@@ -314,11 +314,24 @@ func (h *AgentEntry) PutStepModes(c *gin.Context) {
 			return
 		}
 	}
+	if h.joinBearer(c) && (siteID == "" || patch[database.StepPlacementPublish] == database.ModeAuto) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "a person approves this step"})
+		return
+	}
 	if err = h.DB.SaveStepModes(c.Request.Context(), ownerID, siteID, modes); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
 		return
 	}
 	h.GetStepModes(c)
+}
+
+func (h *AgentEntry) joinBearer(c *gin.Context) bool {
+	raw, ok := presentedBearer(c)
+	if !ok || h.DB == nil {
+		return false
+	}
+	grant, err := h.DB.AgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), h.mcpResource(c))
+	return err == nil && grant != nil && grant.Join
 }
 
 func (h *AgentEntry) GetStepApproval(c *gin.Context) {

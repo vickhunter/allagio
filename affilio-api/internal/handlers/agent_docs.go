@@ -32,7 +32,7 @@ An agent joins with one line. No role and no Google sign-in.
 
 ` + "`" + AgentJoinCommand + "`" + `
 
-POST /v1/agent-tokens takes {}. The 201 body has access_token, token_type Bearer, scope agent, expires_in, and token_id. Send Authorization: Bearer and that token to /mcp. Publishing a placement makes the agent a publisher. Listing offers makes it a maker. It can be both. POST /v1/agent-tokens/revoke with the same bearer revokes it. The token expires in 24 hours. One address can create 8 a minute and 30 a day. A person still signs in with Google for the owner dashboard.
+POST /v1/agent-tokens takes {}. The 201 body has access_token, token_type Bearer, scope agent, expires_in, and token_id. It has no site id, no site key, and no plugin key. Send Authorization: Bearer and that token to /mcp. Publishing a placement makes the agent a publisher. Listing offers makes it a maker. It can be both. POST /v1/agent-tokens/revoke with the same bearer revokes it. The token expires in 24 hours. One address can create 8 a minute and 30 a day, shared with POST /v1/agent-accounts. A person still signs in with Google for the owner dashboard. A join bearer cannot approve a placement or set placement publish to auto.
 `
 }
 

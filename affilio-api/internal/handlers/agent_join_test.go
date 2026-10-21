@@ -23,7 +23,7 @@ import (
 func mountJoinTokens(t *testing.T, db *database.DB, perMinute int) (*AgentEntry, *HostedHandler, *gin.Engine, *httptest.Server) {
 	t.Helper()
 	h, r, server := hostedTestServer(t, db)
-	entry := &AgentEntry{DB: db, BaseURL: h.BaseURL}
+	entry := &AgentEntry{DB: db, BaseURL: h.BaseURL, AddressKey: testAddressKey}
 	if perMinute > 0 {
 		entry.TokenLimiter = NewIPRateLimiter(perMinute, time.Minute)
 	}
@@ -96,6 +96,13 @@ func TestAgentJoinTokenMintAndMCP(t *testing.T) {
 	}
 	if !strings.HasSuffix(email, "@agents.invalid") || !agentOnly || human {
 		t.Fatalf("owner %s agent_only=%v human=%v", email, agentOnly, human)
+	}
+	var handle string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT name FROM owners WHERE id=$1`, emptyBody["owner_id"]).Scan(&handle); err != nil {
+		t.Fatal(err)
+	}
+	if len(handle) != len("agent-")+8 || !strings.HasPrefix(handle, "agent-") || handle == "Agent" {
+		t.Fatalf("generated handle %q", handle)
 	}
 	var siteID, makerID *string
 	if err := db.Pool.QueryRow(context.Background(), `SELECT site_id::text, maker_id::text FROM owners WHERE id=$1`, body["owner_id"]).Scan(&siteID, &makerID); err != nil {
@@ -275,22 +282,71 @@ func TestAgentJoinInfersSidesAndRevokes(t *testing.T) {
 	_ = server
 }
 
+var testAddressKey = []byte("test-address-secret")
+
+func TestClientAddressHMACUsesAPIKeySecret(t *testing.T) {
+	key, warning := services.ClientAddressHMACKey("api-secret")
+	if warning != "" || string(key) != "api-secret" {
+		t.Fatalf("stable key %q %q", key, warning)
+	}
+	empty, emptyWarning := services.ClientAddressHMACKey("  ")
+	if len(empty) != 32 || !strings.Contains(emptyWarning, "API_KEY_SECRET is unset") {
+		t.Fatalf("fallback %d %q", len(empty), emptyWarning)
+	}
+	other, _ := services.ClientAddressHMACKey("")
+	if string(other) == string(empty) {
+		t.Fatal("fallback key was reused across calls")
+	}
+	ip := "203.0.113.10"
+	got := services.HashClientAddress(key, ip)
+	if got == services.HashAPIKey(ip) {
+		t.Fatal("client address hash is unsalted sha256")
+	}
+	salt := GoLinkDailySalt("api-secret", time.Now().UTC())
+	if got == GoLinkClientHash(ip, salt) || got == GoLinkClientHash(TruncateReaderIP(ip), salt) {
+		t.Fatal("client address hash uses the daily go-link salt")
+	}
+	if services.HashClientAddress(key, ip) != got {
+		t.Fatal("hmac was not stable")
+	}
+}
+
 func TestAgentJoinRateLimits(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	gin.SetMode(gin.TestMode)
+	shared := NewIPRateLimiter(2, time.Minute)
 	r := gin.New()
-	entry := &AgentEntry{DB: db, BaseURL: "http://127.0.0.1:8080", TokenLimiter: NewIPRateLimiter(1, time.Minute)}
+	entry := &AgentEntry{DB: db, BaseURL: "http://127.0.0.1:8080", AccountLimiter: shared, TokenLimiter: shared, AddressKey: testAddressKey}
 	r.POST("/v1/agent-tokens", entry.CreateAgentToken)
-	first, _ := postJSON(t, r, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
+	r.POST("/v1/agent-accounts", entry.CreateAgentAccount)
+	first, firstBody := postJSON(t, r, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
 	if first.Code != http.StatusCreated {
 		t.Fatal(first.Body.String())
 	}
-	second, secondBody := postJSON(t, r, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
-	if second.Code != http.StatusTooManyRequests || secondBody["error"] != "rate limit exceeded" {
-		t.Fatalf("minute cap: %d %s", second.Code, second.Body.String())
+	ipHash := services.HashClientAddress(testAddressKey, "192.0.2.1")
+	if ipHash == services.HashAPIKey("192.0.2.1") || ipHash == GoLinkClientHash("192.0.2.1", GoLinkDailySalt(string(testAddressKey), time.Now().UTC())) {
+		t.Fatal("stored address hash uses the wrong key")
 	}
-	if countRows(t, db, `SELECT COUNT(*) FROM owners`) != 1 {
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_join_tokens WHERE owner_id=$1 AND creator_ip_hash=$2`, firstBody["owner_id"], ipHash) != 1 {
+		t.Fatal("join token stored a different address hash")
+	}
+	account, accountBody := postJSON(t, r, http.MethodPost, "/v1/agent-accounts", map[string]any{"role": "publisher", "name": "Ada", "email": "ada@example.com", "domain": "ada.example"}, nil)
+	if account.Code != http.StatusCreated || accountBody["api_key"] == "" {
+		t.Fatalf("account: %d %s", account.Code, account.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_open_signups WHERE creator_ip_hash=$1`, ipHash) != 1 {
+		t.Fatal("account signup was not counted")
+	}
+	third, thirdBody := postJSON(t, r, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
+	if third.Code != http.StatusTooManyRequests || thirdBody["error"] != "rate limit exceeded" {
+		t.Fatalf("shared minute cap: %d %s", third.Code, third.Body.String())
+	}
+	fourth, _ := postJSON(t, r, http.MethodPost, "/v1/agent-accounts", map[string]any{"role": "maker", "name": "Bea", "email": "bea@example.com"}, nil)
+	if fourth.Code != http.StatusTooManyRequests {
+		t.Fatalf("account minute cap: %d %s", fourth.Code, fourth.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM owners`) != 2 {
 		t.Fatal("limited request created an account")
 	}
 
@@ -305,19 +361,141 @@ func TestAgentJoinRateLimits(t *testing.T) {
 		t.Fatalf("daily cap: %v", err)
 	}
 
-	ipHash := services.HashAPIKey("192.0.2.1")
-	for i := 0; i < database.AgentJoinDailyCap-1; i++ {
+	for i := 0; i < database.AgentJoinDailyCap-2; i++ {
 		n := strconv.Itoa(i)
 		if _, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("http-cap-"+n), "orat_htp", ipHash, "http://127.0.0.1:8080/mcp", "Agent", "join:http:"+n, "join-http-"+n+"@agents.invalid"); err != nil {
 			t.Fatal(err)
 		}
 	}
 	open := gin.New()
-	openEntry := &AgentEntry{DB: db, BaseURL: "http://127.0.0.1:8080"}
+	openEntry := &AgentEntry{DB: db, BaseURL: "http://127.0.0.1:8080", AddressKey: testAddressKey}
 	open.POST("/v1/agent-tokens", openEntry.CreateAgentToken)
+	open.POST("/v1/agent-accounts", openEntry.CreateAgentAccount)
 	blocked, blockedBody := postJSON(t, open, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
 	if blocked.Code != http.StatusTooManyRequests || blockedBody["error"] != "rate limit exceeded" {
-		t.Fatalf("http daily: %d %s", blocked.Code, blocked.Body.String())
+		t.Fatalf("http daily token: %d %s", blocked.Code, blocked.Body.String())
+	}
+	blockedAccount, blockedAccountBody := postJSON(t, open, http.MethodPost, "/v1/agent-accounts", map[string]any{"role": "maker", "name": "Cam", "email": "cam@example.com"}, nil)
+	if blockedAccount.Code != http.StatusTooManyRequests || blockedAccountBody["error"] != "rate limit exceeded" {
+		t.Fatalf("http daily account: %d %s", blockedAccount.Code, blockedAccount.Body.String())
+	}
+}
+
+func TestPruneClientAddressHashes(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+	issued, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("old"), "orat_old", "hashed-ip", "http://join.example/mcp", "Agent", "join:old", "join-old@agents.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Pool.Exec(ctx, `UPDATE agent_join_tokens SET created_at=NOW() - INTERVAL '25 hours', expires_at=NOW() - INTERVAL '1 hour' WHERE id=$1`, issued.TokenID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Pool.Exec(ctx, `INSERT INTO agent_open_signups(creator_ip_hash, created_at) VALUES('hashed-ip', NOW() - INTERVAL '25 hours')`); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.PruneClientAddressHashes(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var hash string
+	if err = db.Pool.QueryRow(ctx, `SELECT creator_ip_hash FROM agent_join_tokens WHERE id=$1`, issued.TokenID).Scan(&hash); err != nil || hash != "" {
+		t.Fatalf("join hash %q %v", hash, err)
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_open_signups`) != 0 {
+		t.Fatal("old account signup row remained")
+	}
+}
+
+func TestJoinBearerCannotEscalate(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	entry, h, r, _ := mountJoinTokens(t, db, 8)
+	r.PUT("/v1/step-modes", entry.PutStepModes)
+	r.POST("/v1/placements/:id/plugin-ack", entry.PluginAck)
+	admin := r.Group("/v1/offer-review", middleware.AdminKeyAuth("test-admin", nil))
+	admin.POST("/placements/:id/approve", (&PlacementsHandler{DB: db}).Approve)
+
+	mint, body := postJSON(t, r, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
+	token := assertJoinIssued(t, mint, body)
+	ownerID, _ := body["owner_id"].(string)
+	auth := bearerHeader(token)
+	id := "00000000-0000-4000-8000-0000000000aa"
+	approveBody := map[string]any{"site_id": id, "owner_email": "owner@example.com", "evidence": "owner approved this placement"}
+
+	asAdmin, asAdminBody := postJSON(t, r, http.MethodPost, "/v1/offer-review/placements/"+id+"/approve", approveBody, map[string]string{"X-Admin-Key": token})
+	if asAdmin.Code != http.StatusUnauthorized || asAdminBody["error"] != "invalid admin key" {
+		t.Fatalf("admin key: %d %s", asAdmin.Code, asAdmin.Body.String())
+	}
+	asAdminBearer, asAdminBearerBody := postJSON(t, r, http.MethodPost, "/v1/offer-review/placements/"+id+"/approve", approveBody, map[string]string{"Authorization": "Bearer " + token, "X-Admin-Key": token})
+	if asAdminBearer.Code != http.StatusUnauthorized || asAdminBearerBody["error"] != "invalid admin key" {
+		t.Fatalf("admin bearer: %d %s", asAdminBearer.Code, asAdminBearer.Body.String())
+	}
+
+	asPlugin, asPluginBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "placed", "rel_sponsored": true}, map[string]string{"X-Plugin-Key": token})
+	if asPlugin.Code != http.StatusForbidden || asPluginBody["error"] != "plugin key required" {
+		t.Fatalf("plugin key: %d %s", asPlugin.Code, asPlugin.Body.String())
+	}
+	asPluginBearer, asPluginBearerBody := postJSON(t, r, http.MethodPost, "/v1/placements/"+id+"/plugin-ack", map[string]any{"action": "placed", "rel_sponsored": true}, auth)
+	if asPluginBearer.Code != http.StatusForbidden || asPluginBearerBody["error"] != "plugin key required" {
+		t.Fatalf("plugin bearer: %d %s", asPluginBearer.Code, asPluginBearer.Body.String())
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/owner/placements/"+id+"/approve", strings.NewReader("csrf=nope"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Origin", h.BaseURL)
+	ownerRec := httptest.NewRecorder()
+	r.ServeHTTP(ownerRec, req)
+	if ownerRec.Code != http.StatusUnauthorized || !strings.Contains(ownerRec.Body.String(), "sign in at /auth/login") {
+		t.Fatalf("owner approve: %d %s", ownerRec.Code, ownerRec.Body.String())
+	}
+
+	loose, looseBody := postJSON(t, r, http.MethodPut, "/v1/step-modes", map[string]any{"placement_publish": "auto"}, auth)
+	if loose.Code != http.StatusForbidden || looseBody["error"] != "a person approves this step" {
+		t.Fatalf("owner-wide auto: %d %s", loose.Code, loose.Body.String())
+	}
+	wide, wideBody := postJSON(t, r, http.MethodPut, "/v1/step-modes", map[string]any{"offer_match": "off"}, auth)
+	if wide.Code != http.StatusForbidden || wideBody["error"] != "a person approves this step" {
+		t.Fatalf("owner-wide mode: %d %s", wide.Code, wide.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes WHERE owner_id=$1`, ownerID) != 0 {
+		t.Fatal("join bearer wrote a step mode before a site existed")
+	}
+
+	place, _ := postJSON(t, r, http.MethodPost, "/v1/placements", map[string]any{}, auth)
+	if place.Code != http.StatusBadRequest {
+		t.Fatalf("empty placement: %d %s", place.Code, place.Body.String())
+	}
+	var siteID, publish string
+	err := db.Pool.QueryRow(context.Background(), `SELECT s.id::text, m.placement_publish
+FROM sites s
+JOIN owners o ON o.site_id = s.id
+JOIN agent_step_modes m ON m.site_id = s.id
+WHERE o.id=$1`, ownerID).Scan(&siteID, &publish)
+	if err != nil || publish != "ask" || siteID == "" {
+		t.Fatalf("seed ask site=%s publish=%s err=%v", siteID, publish, err)
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes WHERE owner_id=$1 AND site_id IS NULL`, ownerID) != 0 {
+		t.Fatal("owner-wide step mode exists")
+	}
+
+	again, againBody := postJSON(t, r, http.MethodPut, "/v1/step-modes", map[string]any{"placement_publish": "auto"}, auth)
+	if again.Code != http.StatusForbidden || againBody["error"] != "a person approves this step" {
+		t.Fatalf("site auto: %d %s", again.Code, again.Body.String())
+	}
+	var still string
+	if err = db.Pool.QueryRow(context.Background(), `SELECT placement_publish FROM agent_step_modes WHERE site_id=$1`, siteID).Scan(&still); err != nil || still != "ask" {
+		t.Fatalf("publish after auto %q %v", still, err)
+	}
+
+	tight, tightBody := postJSON(t, r, http.MethodPut, "/v1/step-modes", map[string]any{"offer_match": "off"}, auth)
+	if tight.Code != http.StatusOK {
+		t.Fatalf("tighten: %d %s", tight.Code, tight.Body.String())
+	}
+	modes, _ := tightBody["modes"].(map[string]any)
+	if modes["offer_match"] != "off" || modes["placement_publish"] != "ask" {
+		t.Fatalf("modes %#v", tightBody["modes"])
 	}
 }
 

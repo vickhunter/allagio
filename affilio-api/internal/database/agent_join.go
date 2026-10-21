@@ -43,23 +43,50 @@ type AgentJoinTokenRow struct {
 	CreatedAt time.Time
 }
 
+// PruneClientAddressHashes drops client-address hashes that are outside the
+// rolling day. Expired join tokens keep their row and lose creator_ip_hash.
+// Account signup rows exist only for the cap, so they are deleted.
+func (d *DB) PruneClientAddressHashes(ctx context.Context) error {
+	if _, err := d.Pool.Exec(ctx, `UPDATE agent_join_tokens SET creator_ip_hash=''
+WHERE creator_ip_hash <> '' AND (created_at <= NOW() - INTERVAL '24 hours' OR expires_at <= NOW())`); err != nil {
+		return err
+	}
+	_, err := d.Pool.Exec(ctx, `DELETE FROM agent_open_signups WHERE created_at <= NOW() - INTERVAL '24 hours'`)
+	return err
+}
+
+// reserveOpenSignup locks one address hash and applies the shared 24-hour cap
+// for POST /v1/agent-tokens and POST /v1/agent-accounts.
+func reserveOpenSignup(ctx context.Context, tx pgx.Tx, ipHash string) error {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "open-signup:"+ipHash); err != nil {
+		return err
+	}
+	var n int
+	err := tx.QueryRow(ctx, `SELECT
+(SELECT COUNT(*) FROM agent_join_tokens WHERE creator_ip_hash=$1 AND creator_ip_hash <> '' AND created_at > NOW() - INTERVAL '24 hours')
++ (SELECT COUNT(*) FROM agent_open_signups WHERE creator_ip_hash=$1 AND created_at > NOW() - INTERVAL '24 hours')`, ipHash).Scan(&n)
+	if err != nil {
+		return err
+	}
+	if n >= AgentJoinDailyCap {
+		return ErrJoinLimited
+	}
+	return nil
+}
+
 // CreateAgentJoinToken inserts an agent-only owner with no site and no maker,
 // and one hashed bearer token. The caller supplies the token hash.
 func (d *DB) CreateAgentJoinToken(ctx context.Context, tokenHash, prefix, ipHash, resource, name, subject, email string) (AgentJoinIssued, error) {
+	if err := d.PruneClientAddressHashes(ctx); err != nil {
+		return AgentJoinIssued{}, err
+	}
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return AgentJoinIssued{}, err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "join:"+ipHash); err != nil {
+	if err = reserveOpenSignup(ctx, tx, ipHash); err != nil {
 		return AgentJoinIssued{}, err
-	}
-	var n int
-	if err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM agent_join_tokens WHERE creator_ip_hash=$1 AND created_at > NOW() - INTERVAL '24 hours'`, ipHash).Scan(&n); err != nil {
-		return AgentJoinIssued{}, err
-	}
-	if n >= AgentJoinDailyCap {
-		return AgentJoinIssued{}, ErrJoinLimited
 	}
 	var out AgentJoinIssued
 	err = tx.QueryRow(ctx, `INSERT INTO owners(issuer, subject, email, name, source, agent_only, human_login)
