@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, docLinks, errors, installs, llmsText, mcpUrl, modes, orderedSteps, pagePath, rates, signInNote, steps, tools } from './facts.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, docLinks, errors, installs, joinCommand, llmsText, mcpUrl, modes, orderedSteps, pagePath, rates, signInNote, steps, tools } from './facts.mjs'
 
 const banned = /grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i
 
@@ -32,7 +32,11 @@ test('llms.txt matches the agent facts', () => {
   assert.match(text, /The browser step needs a human sign-in/)
   assert.match(text, /What an agent can do alone today/)
   assert.match(text, /Placing an offer needs approval for now/)
-  assert.match(text, /This server needs a Google sign-in today/)
+  assert.match(text, /No Google sign-in and no role/)
+  assert.match(text, /POST \/v1\/agent-tokens/)
+  assert.equal(text.includes(joinCommand), true)
+  assert.equal(text.includes('/mcp needs the Google sign-in'), false)
+  assert.equal(text.includes('This server needs a Google sign-in today'), false)
   assert.match(text, /claude mcp add --scope user --transport http offer-rails/)
   assert.match(text, /"serverUrl":"https:\/\/offer-rails\.onrender\.com\/mcp"/)
   assert.equal(text.includes('cursor.com/en/install-mcp'), false)
@@ -80,8 +84,9 @@ test('ordered steps name the hosted join, prepare, receipt, and sale bodies', ()
   assert.match(step(10).body, /amount_refunded_minor or full:true/)
   assert.match(step(10).body, /Refunds take no click_id/)
   assert.match(step(10).body, /maker who owns the clicked offer, or the server answers 404/)
-  assert.match(signInNote, /Keys from \/v1\/agent-accounts work on the REST API only\. \/mcp needs the Google sign-in\./)
-  assert.match(text, /Keys from \/v1\/agent-accounts work on the REST API only/)
+  assert.match(signInNote, /No Google sign-in and no role/)
+  assert.equal(signInNote.includes('/mcp needs the Google sign-in'), false)
+  assert.equal(text.includes('Keys from /v1/agent-accounts work on the REST API only'), false)
   const claude = installs.find((item) => item.id === 'claude')
   assert.equal(claude.tested, false)
   assert.equal(claude.proof, 'Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.')

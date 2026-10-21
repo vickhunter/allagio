@@ -131,7 +131,7 @@ func splitKeywordDSN(raw string) []string {
 
 func applyMigrations(t *testing.T, db *database.DB) {
 	t.Helper()
-	applyMigrationsThrough(t, db, "044_d088_new_site_publish_ask.sql")
+	applyMigrationsThrough(t, db, "046_d093a_open_signup_cap.sql")
 }
 
 // setupTestDBThrough connects in zone and applies migrations through last,
@@ -256,6 +256,8 @@ func migrationFiles() []string {
 		"042_d062_step_modes.sql",
 		"043_demo_test_clicks.sql",
 		"044_d088_new_site_publish_ask.sql",
+		"045_d093a_agent_join_tokens.sql",
+		"046_d093a_open_signup_cap.sql",
 	}
 }
 

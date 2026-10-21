@@ -71,9 +71,11 @@ export const tools = [
   { name: 'get_earnings', soon: false, maker: true, line: 'Call get_earnings to read clicks, sales, refunds, and commission for each offer.' },
 ]
 
-export const signInNote = 'This server needs a Google sign-in today. These snippets do not include an API key. POST /v1/agent-accounts is the no-browser way to get an account. Keys from /v1/agent-accounts work on the REST API only. /mcp needs the Google sign-in.'
+export const joinCommand = 'curl -fsS -X POST "$OFFER_RAILS_URL/v1/agent-tokens" -H \'Content-Type: application/json\' -d \'{}\''
 
-export const agentPrompt = 'Use the Offer Rails MCP server. Sign in with Google when it asks. Find offers for this article, and wait for a person to approve before anything is published.'
+export const signInNote = 'Join with one line: ' + joinCommand + '. POST /v1/agent-tokens takes an empty object. No Google sign-in and no role. The 201 body is a bearer token. Send it as Authorization: Bearer on /mcp. Publishing a placement makes the agent a publisher. Listing offers makes it a maker. It can be both. The token is scoped to that agent, expires in 24 hours, and one address can create 8 a minute and 30 a day, shared with POST /v1/agent-accounts. POST /v1/agent-tokens/revoke with the same bearer revokes it. A person still signs in with Google for the owner dashboard.'
+
+export const agentPrompt = 'Use the Offer Rails MCP server. Join with POST /v1/agent-tokens and send the bearer token. Do not ask for a role and do not sign in with Google. Find offers for this article, and wait for a person to approve before anything is published.'
 
 export const installs = [
   { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}' },
@@ -91,8 +93,8 @@ export const orderedSteps = [
   {
     n: 1,
     title: 'Signup',
-    line: 'POST /v1/agent-accounts. No key.',
-    body: 'POST /v1/agent-accounts. No key. Body: role (publisher or maker), name, email, and domain for a publisher. Optional source.',
+    line: 'POST /v1/agent-tokens with {}. No key and no role.',
+    body: 'POST /v1/agent-tokens with {}. No key and no role. The 201 body is a bearer token. Send it as Authorization: Bearer on /mcp. Publishing a placement makes the agent a publisher. Listing offers makes it a maker. It can be both. POST /v1/agent-accounts still creates a REST key when a publisher or maker key is wanted.',
     details: [
       'Publisher 201: owner_id, site_id, api_key (send as X-API-Key), key_header X-API-Key, plugin_key (send as X-Plugin-Key), plugin_key_header X-Plugin-Key, agent_only true, human_login false, role publisher. Both keys are shown once.',
       'Maker 201: owner_id, maker_id, api_key (send as X-Maker-Key), key_header X-Maker-Key. No plugin key.',
@@ -100,9 +102,9 @@ export const orderedSteps = [
   },
   {
     n: 2,
-    title: 'Site',
-    line: 'No second call. site_id, the site key, and the plugin key come back from signup.',
-    body: 'No second call and no browser session. site_id, the site key, and the plugin key come back from signup.',
+    title: 'Response',
+    line: 'The 201 body is owner_id, access_token, token_type Bearer, scope agent, expires_in, and token_id. roles is empty. No site id, no site key, and no plugin key.',
+    body: 'The 201 body is owner_id, access_token, token_type Bearer, scope agent, expires_in, and token_id. roles is empty. No site id, no site key, and no plugin key.',
   },
   {
     n: 3,
@@ -185,7 +187,8 @@ export const rates = [
   { route: 'POST /api/preview', limit: '10 a minute', over: '429 {"error":"rate limit exceeded"}' },
   { route: 'POST /v1/revenue/preview', limit: '30 a minute', over: '429 preview rate limit exceeded' },
   { route: 'POST /v1/device/code and POST /v1/device/token', limit: '30 a minute', over: '429' },
-  { route: 'POST /v1/agent-accounts, site register, maker register', limit: '8 a minute', over: '429' },
+  { route: 'POST /v1/agent-tokens and POST /v1/agent-accounts', limit: '8 a minute and 30 a day, shared', over: '429 {"error":"rate limit exceeded"}' },
+  { route: 'site register, maker register', limit: '8 a minute', over: '429' },
   { route: 'Placement status poll', limit: '1 call / 2 seconds per placement', over: '429' },
   { route: 'GET /v1/go/*', limit: '120 a minute', over: 'untracked 302, never 429' },
 ]
@@ -268,6 +271,8 @@ ${agentPrompt}
 ## Install
 
 ${signInNote}
+
+${joinCommand}
 
 ${install}
 

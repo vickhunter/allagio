@@ -1,3 +1,15 @@
+## October 21 — An agent joins in one line
+
+`POST /v1/agent-tokens` takes `{}` and returns a bearer token. The body has no role. Publishing a placement (`POST /v1/placements`, commit, or receipt) makes that account a publisher. Listing offers (`GET` or `POST /v1/maker/offers`, or submit) makes it a maker. The same account can be both. `/mcp` accepts that bearer. Google sign-in stays on the owner dashboard. `POST /v1/agent-accounts` still asks for publisher or maker when a REST key is wanted.
+
+The token is shown once, stored as a hash, scoped to that agent, bound to this server's `/mcp` resource, and expires in 24 hours. `POST /v1/agent-tokens/revoke` revokes the presented token. `POST /v1/agent-tokens/:id/revoke` revokes one token on the same account. An empty name is stored as a generated `agent-` handle. One address can create 8 a minute and 30 a day. `POST /v1/agent-accounts` uses that same per-minute limiter and that same 24-hour cap. The address is HMAC-SHA256 keyed by `API_KEY_SECRET`, not the daily go-link salt. An empty `API_KEY_SECRET` uses a random per-process key and logs a warning. Hashes on expired join tokens are cleared, and account-signup rows older than 24 hours are deleted. Migration `045_d093a_agent_join_tokens.sql` and `046_d093a_open_signup_cap.sql` are additive. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
+A join bearer cannot approve a placement, act as an admin key or a plugin key, write owner-wide step modes, or set placement publish to `auto`. A step-mode write is also refused when the join-token lookup fails, including a revoke between the two reads. Open-signup limits use the same client address as landing events. On Render that is the rightmost `X-Forwarded-For` address, so callers do not share the platform proxy's bucket.
+
+`llms.txt` no longer says `/mcp` needs the Google sign-in. Step 2 describes the join response: no site id, no site key, and no plugin key.
+
+An owner with no site and no saved step-mode row reads `placement_publish` as `ask`. The other steps stay `auto`. A placement that owner creates is not approved on its own: the new site stores `ask`, and an unverified domain holds the placement. A site that already exists with no row still reads every step as `auto`.
+
 ## October 21 — A tracked link counts before plugin-ack
 
 A click on a valid tracked link is counted from the first `GET /v1/go/<placement_id>` or `GET /v1/go/<code>` redirect. plugin-ack is not required. `POST /v1/placements/:id/plugin-ack` still stores the verified `placed` state and does not gate the click. `placement_counts_as_live` is unchanged: Live now, site totals, digest went-live, and account totals still require `plugin_state` `placed`.

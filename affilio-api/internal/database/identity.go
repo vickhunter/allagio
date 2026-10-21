@@ -36,6 +36,10 @@ type AgentGrant struct {
 	SiteID     string    `json:"site_id,omitempty"`
 	MakerID    string    `json:"maker_id,omitempty"`
 	ExpiresAt  time.Time `json:"expires_at"`
+	// OwnerID is set for OAuth grants and for self-serve join tokens.
+	// Join is true only for a token from POST /v1/agent-tokens.
+	OwnerID string `json:"-"`
+	Join    bool   `json:"-"`
 }
 
 func (d *DB) SaveLoginAttempt(ctx context.Context, hash string, a LoginAttempt) error {
@@ -312,10 +316,10 @@ LIMIT 1`, rawKey).Scan(&makerID)
 
 func (d *DB) AgentToken(ctx context.Context, hash, resource string) (*AgentGrant, error) {
 	var g AgentGrant
-	err := d.Pool.QueryRow(ctx, `SELECT g.id,g.client_id,c.name,g.resource,g.scope,COALESCE(g.site_id::text,''),COALESCE(g.maker_id::text,''),LEAST(t.expires_at,g.expires_at)
+	err := d.Pool.QueryRow(ctx, `SELECT g.id,g.client_id,c.name,g.resource,g.scope,COALESCE(g.site_id::text,''),COALESCE(g.maker_id::text,''),LEAST(t.expires_at,g.expires_at),COALESCE(g.owner_id::text,'')
 FROM oauth_tokens t JOIN oauth_grants g ON g.id=t.grant_id JOIN oauth_clients c ON c.id=g.client_id
 WHERE t.token_hash=$1 AND g.resource=$2 AND t.kind='access' AND t.expires_at>NOW() AND g.expires_at>NOW() AND g.revoked_at IS NULL
-AND (g.maker_id IS NULL OR EXISTS(SELECT 1 FROM makers WHERE id=g.maker_id AND status='active'))`, hash, resource).Scan(&g.ID, &g.ClientID, &g.ClientName, &g.Resource, &g.Scope, &g.SiteID, &g.MakerID, &g.ExpiresAt)
+AND (g.maker_id IS NULL OR EXISTS(SELECT 1 FROM makers WHERE id=g.maker_id AND status='active'))`, hash, resource).Scan(&g.ID, &g.ClientID, &g.ClientName, &g.Resource, &g.Scope, &g.SiteID, &g.MakerID, &g.ExpiresAt, &g.OwnerID)
 	return &g, err
 }
 

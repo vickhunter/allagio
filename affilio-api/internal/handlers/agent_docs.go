@@ -22,7 +22,18 @@ Offer Rails is a publisher and maker workflow. Tools return offers, matches, and
 `
 
 func llmsBody() string {
-	return llmsText + "\n" + entry.HardCheckDoc() + "\n" + entry.RestoreRefusalDoc() + "\n" + entry.PluginRetryDoc()
+	return llmsText + "\n" + agentJoinDoc() + "\n" + entry.HardCheckDoc() + "\n" + entry.RestoreRefusalDoc() + "\n" + entry.PluginRetryDoc()
+}
+
+func agentJoinDoc() string {
+	return `## Join
+
+An agent joins with one line. No role and no Google sign-in.
+
+` + "`" + AgentJoinCommand + "`" + `
+
+POST /v1/agent-tokens takes {}. The 201 body has access_token, token_type Bearer, scope agent, expires_in, and token_id. It has no site id, no site key, and no plugin key. Send Authorization: Bearer and that token to /mcp. Publishing a placement makes the agent a publisher. Listing offers makes it a maker. It can be both. POST /v1/agent-tokens/revoke with the same bearer revokes it. The token expires in 24 hours. One address can create 8 a minute and 30 a day, shared with POST /v1/agent-accounts. A person still signs in with Google for the owner dashboard. A join bearer cannot approve a placement or set placement publish to auto.
+`
 }
 
 const deviceLoginDoc = `# Device login
@@ -101,6 +112,8 @@ POST /v1/agent-accounts
 ` + "```" + `
 
 ` + "`role`" + ` is ` + "`publisher`" + ` or ` + "`maker`" + `. An account created here has ` + "`agent_only: true`" + ` and ` + "`human_login: false`" + ` until a human approves a device code for that same owner. ` + "`GET /v1/agent-signals`" + ` (admin key) reports the two groups separately.
+
+The one-line join is POST /v1/agent-tokens with {}. It does not take a role. /mcp accepts that bearer token. Google sign-in stays on the owner dashboard.
 `
 
 const settingsDoc = `# Setup settings
@@ -120,7 +133,7 @@ Auth is the owner session or the site key. A project key is limited to the agent
 | cli, cursor, grok, mcp | yolo |
 | chatgpt, claude, direct, and anything else | manual |
 
-` + entry.NewSitePublishDefault + ` That sentence is the placement publish step, which is separate from the source table above. A new site stores ` + "`placement_publish`" + ` as ` + "`ask`" + `. A site with no saved step-mode row still reads that step as ` + "`auto`" + `.
+` + entry.NewSitePublishDefault + ` That sentence is the placement publish step, which is separate from the source table above. A new site stores ` + "`placement_publish`" + ` as ` + "`ask`" + `. An owner with no site and no saved step-mode row reads ` + "`placement_publish`" + ` as ` + "`ask`" + `. A site with no saved step-mode row still reads that step as ` + "`auto`" + `.
 
 ## Save
 
@@ -182,7 +195,7 @@ Unknown JSON fields are rejected. ` + "`payments_check`" + ` is ` + "`pass`" + `
 
 const modesDoc = `# Approval modes
 
-` + entry.NewSitePublishDefault + ` A new site stores ` + "`placement_publish`" + ` as ` + "`ask`" + `. The other steps stay ` + "`auto`" + `. A person can set placement publish to ` + "`auto`" + ` later. While claim checks are not live, a stored ` + "`auto`" + ` still waits. A site with no saved step-mode row, which is a site created before this default, still reads every step as ` + "`auto`" + `.
+` + entry.NewSitePublishDefault + ` A new site stores ` + "`placement_publish`" + ` as ` + "`ask`" + `. The other steps stay ` + "`auto`" + `. A person can set placement publish to ` + "`auto`" + ` later. While claim checks are not live, a stored ` + "`auto`" + ` still waits. An owner with no site and no saved step-mode row reads ` + "`placement_publish`" + ` as ` + "`ask`" + `. A site with no saved step-mode row, which is a site created before this default, still reads every step as ` + "`auto`" + `.
 
 Modes are ` + "`manual`" + `, ` + "`auto`" + `, and ` + "`yolo`" + `. They are set per site and per offer. A change applies to new decisions. Publishers see the plain labels "Ask me every time", "Approve within my rules", and "Approve anything that passes the checks".
 
