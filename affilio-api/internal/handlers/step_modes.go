@@ -62,11 +62,11 @@ type publishChoice struct {
 // publishChoice picks the placement publish mode. Off never runs.
 // An unverified domain forces ask over auto. A stored ask waits for a person.
 // A claims checker that is not live also holds an auto placement.
-// An empty stored value is the pre-D-088 read (auto). New sites store ask,
-// and that stored ask does not flip when claim checks are live.
+// An empty stored value is the missing-row default (ask). A stored auto
+// publishes when the domain is verified and claim checks are live.
 func choosePublish(stored string, verified, claimsReal bool) publishChoice {
 	if stored == "" {
-		stored = database.ModeAuto
+		stored = database.ModeAsk
 	}
 	if stored == database.ModeOff {
 		return publishChoice{Effective: database.ModeOff, Reason: "step_off", Message: stepOffMessage(database.StepPlacementPublish)}
@@ -259,19 +259,6 @@ func (h *AgentEntry) GetStepModes(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
 		return
-	}
-	// An owner with no site and no saved row has not chosen a mode. The next
-	// placement stores ask, so the read matches that hold. A site that already
-	// exists with no row still reads auto, which is what that placement uses.
-	if siteID == "" {
-		saved, savedErr := h.DB.HasStepModes(c.Request.Context(), ownerID, siteID)
-		if savedErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
-			return
-		}
-		if !saved {
-			modes.PlacementPublish = database.ModeAsk
-		}
 	}
 	body := gin.H{
 		"owner_id": ownerID,

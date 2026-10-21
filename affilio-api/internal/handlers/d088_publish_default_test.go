@@ -44,20 +44,29 @@ func TestFreshSetupHoldsPlacementForApproval(t *testing.T) {
 	}
 }
 
-func TestSiteWithNoStepRowStillPublishesWhenClaimsAreLive(t *testing.T) {
+func TestSiteWithNoStepRowStaysPendingWhenClaimsAreLive(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	_, live := newStepModeRouter(db, entry.LiveClaimChecker{})
-	_, siteID, key := signupPublisher(t, live, "legacy-auto@example.com", "legacy-auto.example")
-	verifySite(t, db, siteID, "legacy-auto.example")
+	_, siteID, key := signupPublisher(t, live, "legacy-ask@example.com", "legacy-ask.example")
+	verifySite(t, db, siteID, "legacy-ask.example")
 	if _, err := db.Pool.Exec(context.Background(), `DELETE FROM agent_step_modes WHERE site_id=$1`, siteID); err != nil {
 		t.Fatal(err)
 	}
-	_, offerID := seedListedOffer(t, db, "legacy-auto-maker", "legacy-auto-maker@example.com", "CodeLens")
+	_, offerID := seedListedOffer(t, db, "legacy-ask-maker", "legacy-ask-maker@example.com", "CodeLens")
 
-	rec, body := preparePlacement(t, live, key, offerID, "https://legacy-auto.example/posts/kept", 1)
+	got, gotBody := postJSON(t, live, http.MethodGet, "/v1/step-modes", nil, map[string]string{"X-API-Key": key})
+	modes := modeMap(t, gotBody)
+	if got.Code != http.StatusOK || modes["placement_publish"] != "ask" || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["link_change"] != "auto" || modes["payout"] != "auto" {
+		t.Fatalf("missing row modes: %d %s", got.Code, got.Body.String())
+	}
+	if gotBody["placement_publish_effective"] != "ask" || gotBody["placement_publish_reason"] != "step_ask" {
+		t.Fatalf("effective ask: %s", got.Body.String())
+	}
+
+	rec, body := preparePlacement(t, live, key, offerID, "https://legacy-ask.example/posts/kept", 1)
 	placement := placementBody(t, body)
-	if rec.Code != http.StatusCreated || body["status"] != "published" || placement["status"] != "committed" || placement["approved_by"] != "policy:auto" {
+	if rec.Code != http.StatusCreated || body["status"] != "awaiting_approval" || body["hold_reason"] != "step_ask" || body["error"] != nil || placement["status"] != "pending" {
 		t.Fatalf("legacy missing row: %d %s", rec.Code, rec.Body.String())
 	}
 }
@@ -95,7 +104,7 @@ func TestRegisterAgainDoesNotRewritePublishMode(t *testing.T) {
 		t.Fatal("an existing site with no step row gained one")
 	}
 	modes, err := db.LoadStepModes(ctx, "", oldID)
-	if err != nil || modes.PlacementPublish != "auto" {
+	if err != nil || modes.PlacementPublish != "ask" || modes.OfferMatch != "auto" || modes.Payout != "auto" {
 		t.Fatalf("old site read: %+v %v", modes, err)
 	}
 }
@@ -148,10 +157,16 @@ func TestLLMsAndDocsStateNewSitePublishDefault(t *testing.T) {
 		if !strings.Contains(string(body), entry.NewSitePublishDefault) {
 			t.Fatalf("%s does not state the new-site default", path)
 		}
+		if strings.Contains(path, "llms.txt") && !strings.Contains(string(body), entry.MissingRowPublishAsk) {
+			t.Fatalf("%s does not state the missing-row publish default", path)
+		}
+		if strings.Contains(string(body), "still reads as auto") || strings.Contains(string(body), "still reads every step as auto") {
+			t.Fatalf("%s still says a missing row reads as auto", path)
+		}
 	}
 	var described bool
 	for _, tool := range dcp.PublisherTools {
-		if tool.Name == "get_step_modes" && strings.Contains(tool.Description, entry.NewSitePublishDefault) {
+		if tool.Name == "get_step_modes" && strings.Contains(tool.Description, entry.NewSitePublishDefault) && strings.Contains(tool.Description, entry.MissingRowPublishAsk) && !strings.Contains(tool.Description, "still reads every step as auto") {
 			described = true
 		}
 	}
@@ -159,19 +174,22 @@ func TestLLMsAndDocsStateNewSitePublishDefault(t *testing.T) {
 		t.Fatal("get_step_modes does not state the new-site default")
 	}
 	modes, ok := agentDoc("modes.md")
-	if !ok || !strings.Contains(modes, entry.NewSitePublishDefault) {
-		t.Fatal("modes.md does not state the new-site default")
+	if !ok || !strings.Contains(modes, entry.NewSitePublishDefault) || !strings.Contains(modes, entry.MissingRowPublishAsk) {
+		t.Fatal("modes.md does not state the publish default")
 	}
 	settings, ok := agentDoc("settings.md")
-	if !ok || !strings.Contains(settings, entry.NewSitePublishDefault) {
-		t.Fatal("settings.md does not state the new-site default")
+	if !ok || !strings.Contains(settings, entry.NewSitePublishDefault) || !strings.Contains(settings, entry.MissingRowPublishAsk) {
+		t.Fatal("settings.md does not state the publish default")
+	}
+	if strings.Contains(modes, "still reads every step as") || strings.Contains(settings, "still reads that step as") {
+		t.Fatal("agent docs still say a missing row reads as auto")
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	(&AgentEntry{AssetsPath: filepath.Join(root, "affilio-wp", "admin", "build")}).Mount(r)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/llms.txt", nil))
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Type"), "text/plain") || !strings.Contains(rec.Body.String(), entry.NewSitePublishDefault) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Type"), "text/plain") || !strings.Contains(rec.Body.String(), entry.NewSitePublishDefault) || !strings.Contains(rec.Body.String(), entry.MissingRowPublishAsk) {
 		t.Fatalf("/llms.txt: %d %q %s", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
 	}
 }

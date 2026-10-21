@@ -17,9 +17,12 @@ const ClaimCheckReason = "claim_check_unavailable"
 const ClaimCheckMessage = "Automatic approval is off until claim checks are live."
 
 // NewSitePublishDefault is the plain-language default for a new publisher site.
-// It does not flip when claim checks are live. A site with no step-mode row
-// still reads as auto.
+// It does not flip when claim checks are live.
 const NewSitePublishDefault = "A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on."
+
+// MissingRowPublishAsk is the read when no step-mode row is saved for the
+// owner or the site. A stored auto is left as stored. The other steps stay auto.
+const MissingRowPublishAsk = "A site or owner with no saved step-mode row reads placement publish as ask. The other steps stay auto. A saved auto is left as stored."
 
 // YoloAfterFirstReason is why a saved yolo site still answers manual
 // until its first approved placement.
