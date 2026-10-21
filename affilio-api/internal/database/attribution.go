@@ -113,9 +113,40 @@ const approvedGoLinkSQL = `pp.status = 'approved'
    WHERE pol.offer_id = pp.offer_id AND pol.kill_switch
  )`
 
-// PlacementRedirectSQL is the placement go-link lookup. CountsAsLive is the
-// shared placement_counts_as_live predicate, or an approved placement that
-// approvedGoLinkSQL accepts. A hit is recorded only when it is true.
+// committedClickSQL is a committed placement whose tracked link counts before
+// plugin-ack. plugin-ack stores plugin_wait placed and does not gate the
+// click. A pending removal, a confirmed removal, and a failed restore stay
+// out. Revoked rows are not committed, so they stay out too.
+const committedClickSQL = `pp.status = 'committed'
+ AND NOT pp.restore_unconfirmed
+ AND COALESCE(pp.plugin_wait, '') NOT IN ('remove', 'removed')
+ AND o.status = 'listed'
+ AND pp.campaign_id IS NOT NULL
+ AND EXISTS (
+   SELECT 1 FROM campaigns c
+   WHERE c.id = pp.campaign_id
+     AND c.site_id = pp.site_id
+     AND c.offer_id = pp.offer_id
+     AND c.status = 'active'
+ )
+ AND NOT EXISTS (
+   SELECT 1 FROM approval_policies pol
+   WHERE pol.site_id = pp.site_id AND pol.kill_switch
+ )
+ AND NOT EXISTS (
+   SELECT 1 FROM approval_policies pol
+   WHERE pol.offer_id = pp.offer_id AND pol.kill_switch
+ )`
+
+// PlacementClickSQL is true when GET /v1/go records a hit. Live placements,
+// approved placements, and committed placements that have not been plugin-acked
+// all count. Dedupe and fraud checks still run after this predicate.
+const PlacementClickSQL = `EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)
+ OR (` + approvedGoLinkSQL + `)
+ OR (` + committedClickSQL + `)`
+
+// PlacementRedirectSQL is the placement go-link lookup. CountsAsLive is
+// PlacementClickSQL. A hit is recorded only when it is true.
 const PlacementRedirectSQL = `SELECT pp.site_id::text, s.domain, s.demo, pp.post_url,
        (o.status = 'listed'), o.landing_url, COALESCE(NULLIF(o.ref_param,''),'via'),
        COALESCE(pp.campaign_id, (
@@ -125,8 +156,7 @@ const PlacementRedirectSQL = `SELECT pp.site_id::text, s.domain, s.demo, pp.post
          LIMIT 1
        ))::text, o.program_id,
        (
-         EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)
-         OR (` + approvedGoLinkSQL + `)
+         ` + PlacementClickSQL + `
        )
 FROM placement_proposals pp
 JOIN sites s ON s.id = pp.site_id
@@ -252,14 +282,16 @@ func (d *DB) InsertCampaignClick(ctx context.Context, campaignID, siteID string,
 }
 
 // LivePlacementForCampaign returns the placement id only when exactly one
-// placement on this campaign is in placement_counts_as_live. Zero or two or
-// more return an empty id so the bare code redirects with no hit.
+// placement on this campaign is clickable. That is PlacementClickSQL: live,
+// approved, or committed without plugin-ack. Zero or two or more return an
+// empty id so the bare code redirects with no hit.
 func (d *DB) LivePlacementForCampaign(ctx context.Context, campaignID string) (string, error) {
 	var id string
 	err := d.Pool.QueryRow(ctx, `SELECT COALESCE(CASE WHEN COUNT(*) = 1 THEN MIN(pp.id::text) ELSE '' END, '')
 FROM placement_proposals pp
+JOIN offers o ON o.id = pp.offer_id
 WHERE pp.campaign_id=$1
-  AND EXISTS (SELECT 1 FROM placement_counts_as_live live WHERE live.id = pp.id)`, campaignID).Scan(&id)
+  AND (`+PlacementClickSQL+`)`, campaignID).Scan(&id)
 	return id, err
 }
 

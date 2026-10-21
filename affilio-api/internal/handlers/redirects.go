@@ -54,10 +54,11 @@ func (h *RedirectsHandler) Go(c *gin.Context) {
 // feeds, and caches keep this link, and nothing rewrites them, so both this
 // form and /v1/go/<placement_id> follow the go-link rules forever. Readers
 // never see a 4xx or a 5xx. ?placement= delegates to goPlacement. Without it,
-// a hit is recorded only when a placement on this campaign counts as live.
-// Anything else is a 302 to the plain offer URL with no hit. An offer that is
-// not live redirects to the site home, and an unknown code redirects to the
-// Offer Rails home. A rate limit is that untracked 302, never a 429.
+// a hit is recorded only when exactly one placement on this campaign is
+// clickable. A committed placement counts before plugin-ack. Anything else
+// is a 302 to the plain offer URL with no hit. An offer that is not live
+// redirects to the site home, and an unknown code redirects to the Offer
+// Rails home. A rate limit is that untracked 302, never a 429.
 func (h *RedirectsHandler) goCampaign(c *gin.Context, code string, req goRequest) {
 	if placementID := strings.TrimSpace(c.Query("placement")); placementID != "" {
 		h.goPlacement(c, placementID, req)
@@ -168,11 +169,12 @@ func appendRefParam(landingURL, refParam, clickID string) string {
 
 // goPlacement is GET /v1/go/<placement_id>. A known placement answers 302. A
 // ref is attached and a hit is recorded when CountsAsLive is true: the
-// placement is in placement_counts_as_live, or it is approved, still inside
-// its window, and the site has an active campaign for the listed offer.
-// Approval does not store campaign_id; the lookup uses that campaign. An
-// unknown id is an HTML 404 with no Location, so the request port stays on
-// the page the reader opened.
+// placement is in placement_counts_as_live, it is approved and still inside
+// its window with an active campaign for the listed offer, or it is committed
+// and waiting on plugin-ack. plugin-ack sets the verified placed state and
+// does not gate the click. Approval does not store campaign_id; the lookup
+// uses that campaign. An unknown id is an HTML 404 with no Location, so the
+// request port stays on the page the reader opened.
 func (h *RedirectsHandler) goPlacement(c *gin.Context, placementID string, req goRequest) {
 	link, err := h.DB.LookupPlacementRedirect(c.Request.Context(), placementID)
 	if err != nil {

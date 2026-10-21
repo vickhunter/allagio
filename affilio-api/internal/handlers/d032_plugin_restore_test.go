@@ -169,18 +169,20 @@ func TestRevokedGoLink(t *testing.T) {
 	path := "/v1/go/revoked-go?placement=" + placementID
 
 	pending := hitGo(t, r, http.MethodGet, path, testBrowserUA)
-	requirePlainRedirect(t, pending, "https://example.com")
-	if placementClickCount(t, db, placementID) != 0 {
-		t.Fatal("a committed placement that is not placed recorded a click")
+	if pending.Code != http.StatusFound || !containsAll(pending.Header().Get("Location"), "https://example.com", "via=") {
+		t.Fatalf("unacked redirect: %d %s", pending.Code, pending.Header().Get("Location"))
+	}
+	if placementClickCount(t, db, placementID) != 1 {
+		t.Fatal("a committed placement recorded no click before plugin-ack")
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET plugin_wait='placed', plugin_wait_at=NOW(), plugin_failed_reason='', failed_action='', restore_unconfirmed=false WHERE id=$1`, placementID); err != nil {
 		t.Fatal(err)
 	}
-	live := hitGo(t, r, http.MethodGet, path, testBrowserUA)
+	live := hitGo(t, r, http.MethodGet, path, testFirefoxUA)
 	if live.Code != http.StatusFound || live.Header().Get("Location") == "" || !containsAll(live.Header().Get("Location"), "https://example.com", "via=") {
 		t.Fatalf("live redirect: %d %s", live.Code, live.Header().Get("Location"))
 	}
-	if placementClickCount(t, db, placementID) != 1 {
+	if placementClickCount(t, db, placementID) != 2 {
 		t.Fatal("live click was not recorded")
 	}
 
@@ -199,7 +201,7 @@ func TestRevokedGoLink(t *testing.T) {
 		stopped := hitGo(t, r, hit.method, path, hit.agent)
 		requirePlainRedirect(t, stopped, "https://example.com")
 	}
-	if placementClickCount(t, db, placementID) != 1 {
+	if placementClickCount(t, db, placementID) != 2 {
 		t.Fatal("revoked link credited a click")
 	}
 
@@ -207,11 +209,11 @@ func TestRevokedGoLink(t *testing.T) {
 	if restored.Code != http.StatusOK {
 		t.Fatalf("restore: %d %s", restored.Code, restored.Body.String())
 	}
-	again := hitGo(t, r, http.MethodGet, path, testFirefoxUA)
+	again := hitGo(t, r, http.MethodGet, path, testSafariUA)
 	if again.Code != http.StatusFound || !strings.Contains(again.Header().Get("Location"), "via=") {
 		t.Fatalf("undo and redo before the plugin ack: %d %s", again.Code, again.Header().Get("Location"))
 	}
-	if placementClickCount(t, db, placementID) != 2 {
+	if placementClickCount(t, db, placementID) != 3 {
 		t.Fatal("undo and redo before the plugin sync stopped the go link")
 	}
 
@@ -223,7 +225,7 @@ func TestRevokedGoLink(t *testing.T) {
 	}
 	paused := hitGo(t, r, http.MethodGet, path, testBrowserUA)
 	requirePlainRedirect(t, paused, "https://golink.example/post")
-	if placementClickCount(t, db, placementID) != 2 {
+	if placementClickCount(t, db, placementID) != 3 {
 		t.Fatal("an offer that is not live credited a click")
 	}
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE placement_proposals SET post_url='' WHERE id=$1`, placementID); err != nil {
@@ -1002,7 +1004,7 @@ VALUES($1,'stripe','dark-other','sale',20,'USD',2.00,NOW(),'test') RETURNING id`
 	if placed.Code != http.StatusOK || placedBody["plugin_state"] != "placed" {
 		t.Fatalf("ack restored: %d %s", placed.Code, placed.Body.String())
 	}
-	back := hitGo(t, r, http.MethodGet, goPath, testBrowserUA)
+	back := hitGo(t, r, http.MethodGet, goPath, testFirefoxUA)
 	if back.Code != http.StatusFound {
 		t.Fatalf("confirmed redirect: %d %s", back.Code, back.Body.String())
 	}
