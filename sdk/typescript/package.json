@@ -1,0 +1,19 @@
+{
+  "name": "@offer-rails/protocol-sdk",
+  "version": "0.3.0",
+  "description": "Minimal TypeScript reference SDK for the Offer Rails Protocol (ORP v0.3.0)",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/sdk.test.ts",
+    "example": "node --experimental-strip-types examples/deal-agent.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

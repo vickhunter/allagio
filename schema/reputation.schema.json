@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.com/schema/v0.3/reputation.schema.json",
+  "title": "ORP v0.3 Reputation Message",
+  "type": "object",
+  "required": [
+    "orp_version",
+    "message_id",
+    "message_type",
+    "sender",
+    "timestamp",
+    "payload"
+  ],
+  "properties": {
+    "orp_version": {
+      "$ref": "common.schema.json#/$defs/OrpVersion"
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "message_type": {
+      "const": "reputation"
+    },
+    "sender": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "recipient": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "signature": {
+      "$ref": "common.schema.json#/$defs/Signature"
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "principal_id",
+        "calculated_at",
+        "total_karma",
+        "dimensions",
+        "stats"
+      ],
+      "properties": {
+        "principal_id": {
+          "$ref": "common.schema.json#/$defs/PrincipalUri"
+        },
+        "calculated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "total_karma": {
+          "type": "integer"
+        },
+        "dimensions": {
+          "type": "object",
+          "required": [
+            "fulfillment_karma",
+            "conversion_karma",
+            "compliance_karma",
+            "dispute_penalty"
+          ],
+          "properties": {
+            "fulfillment_karma": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "conversion_karma": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "compliance_karma": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "dispute_penalty": {
+              "type": "integer",
+              "maximum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "stats": {
+          "type": "object",
+          "required": [
+            "verified_deals_completed",
+            "unique_counterparties",
+            "fulfillment_rate_bps",
+            "disputes_lost"
+          ],
+          "properties": {
+            "verified_deals_completed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unique_counterparties": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "fulfillment_rate_bps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "disputes_lost": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "median_hold_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "recent_attestations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "deal_id",
+              "counterparty_id",
+              "space_kind",
+              "settlement_mode",
+              "receipt_id",
+              "pair_deal_index",
+              "pair_decay_weight",
+              "karma_delta",
+              "settled_at"
+            ],
+            "properties": {
+              "deal_id": {
+                "type": "string"
+              },
+              "counterparty_id": {
+                "$ref": "common.schema.json#/$defs/PrincipalUri"
+              },
+              "space_kind": {
+                "$ref": "common.schema.json#/$defs/SpaceKind"
+              },
+              "settlement_mode": {
+                "$ref": "common.schema.json#/$defs/SettlementMode"
+              },
+              "receipt_id": {
+                "type": "string"
+              },
+              "pair_deal_index": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "pair_decay_weight": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "karma_delta": {
+                "type": "integer"
+              },
+              "settled_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.com/schema/v0.3/dispute.schema.json",
+  "title": "ORP v0.3 Dispute Message",
+  "type": "object",
+  "required": [
+    "orp_version",
+    "message_id",
+    "message_type",
+    "deal_id",
+    "sender",
+    "timestamp",
+    "idempotency_key",
+    "payload"
+  ],
+  "properties": {
+    "orp_version": {
+      "$ref": "common.schema.json#/$defs/OrpVersion"
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "message_type": {
+      "const": "dispute"
+    },
+    "deal_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "sender": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "recipient": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 4
+    },
+    "signature": {
+      "$ref": "common.schema.json#/$defs/Signature"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["dispute_id", "reason_code", "description", "evidence", "requested_remedy"],
+      "properties": {
+        "dispute_id": {
+          "type": "string",
+          "minLength": 4
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "premature_removal",
+            "missing_disclosure",
+            "unfulfilled_swap",
+            "landing_page_deception",
+            "invalid_attribution"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 2000
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["type", "observed_at"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "public_check_failure",
+                  "adapter_recheck_failure",
+                  "disclosure_missing_snapshot",
+                  "webhook_discrepancy",
+                  "swap_timeout"
+                ]
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "target_uri": {
+                "type": "string",
+                "format": "uri"
+              },
+              "http_status": {
+                "type": "integer"
+              },
+              "details": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "requested_remedy": {
+          "type": "string",
+          "enum": [
+            "refund_escrow_and_slash_karma",
+            "require_republication",
+            "cancel_reciprocal_obligation",
+            "slash_karma_only"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

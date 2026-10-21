@@ -106,7 +106,7 @@ func main() {
 		Limiter: handlers.NewIPRateLimiter(10, time.Minute),
 	}
 	r.POST("/api/preview", preview.Preview)
-	r.GET("/.well-known/dcp.json", func(c *gin.Context) {
+	wellKnownManifest := func(c *gin.Context) {
 		mcpURL, mcpTransport := "/v1/mcp", "legacy-http-jsonrpc"
 		if cfg.PublicBaseURL != "" {
 			mcpURL, mcpTransport = "/mcp", "streamable-http"
@@ -120,16 +120,17 @@ func main() {
 			publisherVerbs = append(publisherVerbs, tool.Name)
 		}
 		c.JSON(200, gin.H{
-			"dcp_version": "0.1",
-			"name":        "distributoor",
+			"orp_version": "0.3.0",
+			"dcp_version": "0.3.0",
+			"name":        "offer-rails",
 			"description": "Agent-native distribution network: makers publish offers, publishers earn commissions, agents do the operational work.",
 			"http_base":   "/v1",
 			"mcp": gin.H{
 				"transport": mcpTransport,
 				"url":       mcpURL,
 				"stdio": gin.H{
-					"command": "distributoor-mcp",
-					"env":     []string{"DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY", "DISTRIBUTOOR_SITE_KEY"},
+					"command": "offer-rails-mcp",
+					"env":     []string{"OFFER_RAILS_API_URL", "OFFER_RAILS_API_KEY", "OFFER_RAILS_SITE_KEY"},
 				},
 			},
 			"verbs": gin.H{
@@ -139,7 +140,9 @@ func main() {
 			},
 			"payout_methods": []string{"manual"},
 		})
-	})
+	}
+	r.GET("/.well-known/dcp.json", wellKnownManifest)
+	r.GET("/.well-known/orp.json", wellKnownManifest)
 
 	v1 := r.Group("/v1")
 

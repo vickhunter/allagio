@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.com/schema/v0.3/receipt.schema.json",
+  "title": "ORP v0.3 Receipt Message",
+  "type": "object",
+  "required": [
+    "orp_version",
+    "message_id",
+    "message_type",
+    "deal_id",
+    "sender",
+    "timestamp",
+    "idempotency_key",
+    "payload"
+  ],
+  "properties": {
+    "orp_version": {
+      "$ref": "common.schema.json#/$defs/OrpVersion"
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "message_type": {
+      "const": "receipt"
+    },
+    "deal_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "sender": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "recipient": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 4
+    },
+    "signature": {
+      "$ref": "common.schema.json#/$defs/Signature"
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "receipt_id",
+        "space_id",
+        "verification_mode",
+        "location_url",
+        "verified_at",
+        "disclosure_verified",
+        "observed_disclosure",
+        "content_hash"
+      ],
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 4
+        },
+        "space_id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "verification_mode": {
+          "$ref": "common.schema.json#/$defs/ReceiptVerificationMode"
+        },
+        "proof_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "location_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "tracking_token_found": {
+          "type": "boolean"
+        },
+        "adapter_id": {
+          "description": "Optional helper adapter identifier; omitted when verified via proof_url, public_check, or counterparty_attestation.",
+          "type": "string",
+          "minLength": 3
+        },
+        "platform_object_id": {
+          "type": "string"
+        },
+        "verified_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "disclosure_verified": {
+          "const": true
+        },
+        "observed_disclosure": {
+          "type": "string",
+          "minLength": 2
+        },
+        "content_hash": {
+          "$ref": "common.schema.json#/$defs/Sha256Hash"
+        },
+        "hold_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "public_check_result": {
+          "type": "object",
+          "required": ["http_status", "checked_at"],
+          "properties": {
+            "http_status": {
+              "type": "integer",
+              "minimum": 200,
+              "maximum": 299
+            },
+            "matched_target": {
+              "type": "string"
+            },
+            "checked_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "additionalProperties": false
+        },
+        "counterparty_attestation": {
+          "type": "object",
+          "required": ["attested_by", "attested_at", "statement"],
+          "properties": {
+            "attested_by": {
+              "$ref": "common.schema.json#/$defs/PrincipalUri"
+            },
+            "attested_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "statement": {
+              "type": "string",
+              "minLength": 4
+            },
+            "signature": {
+              "$ref": "common.schema.json#/$defs/Signature"
+            }
+          },
+          "additionalProperties": false
+        },
+        "adapter_attestation": {
+          "type": "object",
+          "required": ["method"],
+          "properties": {
+            "method": {
+              "type": "string"
+            },
+            "status_code": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

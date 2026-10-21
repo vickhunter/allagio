@@ -71,13 +71,13 @@ export const tools = [
   { name: 'get_earnings', soon: false, maker: true, line: 'Call get_earnings to read clicks, sales, refunds, and commission for each offer.' },
 ]
 
-export const signInNote = 'This server needs a Google sign-in today. These snippets do not include an API key. POST /v1/agent-accounts is the no-browser way to get an account. Keys from /v1/agent-accounts work on the REST API only. /mcp needs the Google sign-in.'
+export const signInNote = 'POST /v1/agent-accounts is the no-browser way to get an account. Keys from /v1/agent-accounts work as Bearer tokens on /mcp and on the REST API. These snippets do not include an API key.'
 
-export const agentPrompt = 'Use the Offer Rails MCP server. Sign in with Google when it asks. Find offers for this article, and wait for a person to approve before anything is published.'
+export const agentPrompt = 'Use the Offer Rails MCP server. Authenticate with a key from POST /v1/agent-accounts or device sign-in. Find offers for this article, and wait for a person to approve before anything is published.'
 
 export const installs = [
   { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}' },
-  { id: 'claude', label: 'Claude Code', tested: false, proof: 'Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.', snippet: 'claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp' },
+  { id: 'claude', label: 'Claude Code', tested: false, proof: 'Untested. Claude Code adds and removes the server, and accepts a bearer token from /v1/agent-accounts.', snippet: 'claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp' },
   { id: 'vscode', label: 'VS Code', tested: false, proof: 'Untested. The VS Code client was not run against the hosted MCP server.', snippet: '{"servers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}' },
   { id: 'windsurf', label: 'Windsurf', tested: false, proof: 'Untested. The Windsurf client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"serverUrl":"https://offer-rails.onrender.com/mcp"}}}' },
   { id: 'generic', label: 'Generic', tested: true, proof: 'Checked. JSON-RPC initialize against this URL returned 401 no bearer token.', snippet: mcpConfig },

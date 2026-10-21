@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.com/schema/v0.3/discover.schema.json",
+  "title": "ORP v0.3 Discover Message",
+  "type": "object",
+  "required": ["orp_version", "message_id", "message_type", "sender", "timestamp", "payload"],
+  "properties": {
+    "orp_version": {
+      "$ref": "common.schema.json#/$defs/OrpVersion"
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "message_type": {
+      "const": "discover"
+    },
+    "sender": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "recipient": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "signature": {
+      "$ref": "common.schema.json#/$defs/Signature"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["target_type"],
+      "properties": {
+        "target_type": {
+          "type": "string",
+          "enum": ["space", "offer", "swap_partner"]
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "space_kinds": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/SpaceKind"
+          }
+        },
+        "platforms": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/PlatformId"
+          }
+        },
+        "settlement_modes": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/SettlementMode"
+          }
+        },
+        "pools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(public|direct|network:[a-zA-Z0-9_-]+)$"
+          }
+        },
+        "min_reputation_karma": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_results": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 5
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

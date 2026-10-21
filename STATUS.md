@@ -690,6 +690,7 @@ See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
 - Branch protection setup script: `scripts/setup_branch_protection.sh` (`make branch-protect`).
 
 ## Changelog
+- 2026-10-21: Drafted Offer Rails Protocol v0.3 (`spec/`, `schema/`, `sdk/typescript/`, `adapters/`, `conformance/`, `GAPS.md`). Made the Universal Tracked Link (`/v1/go/:token`) + 3-mode verifiable receipt (`proof_url`, `public_check`, `counterparty_attestation`) the universal adapter with optional `SpaceAdapter` helpers for X (`adapters/x`) and Newsletters (`adapters/newsletter`), added constraint-bounded autonomous negotiation (`MandateConstraints`) and Proof-of-Outcome Karma decay, updated `/llms.txt` (`ui/landing/src/agents/facts.mjs`, `ui/landing/public/llms.txt`, `affilio-wp/admin/build/landing-v9/llms.txt`) so `/mcp` no longer claims to require Google sign-in, and updated `GET /.well-known/dcp.json` (plus `GET /.well-known/orp.json`) from `distributoor-mcp` to `offer-rails-mcp` (`0.3.0`).
 - 2026-10-15: Sale windows follow the Postgres session clock. A sale at the click stays attributed in `Europe/Rome`, and the refund hold still clears against `NOW()`. No new migration.
 - 2026-10-15: The MVP plugin ZIP includes `affilio-wp/public/css/placement.css` and `affilio-wp/public/js/affilio-track.js`.
 - 2026-10-15: Removed WordPress `POST /affilio/v1/insert`. Plugin 0.1.26. The dashboard inserts through `POST /affilio/v1/editor/approve-insert` and does not send HTML. The inserter class remains for that editor path. `POST /v1/insert/confirm` remains.

@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.com/schema/v0.3/consent.schema.json",
+  "title": "ORP v0.3 Consent Message",
+  "type": "object",
+  "required": [
+    "orp_version",
+    "message_id",
+    "message_type",
+    "deal_id",
+    "sender",
+    "timestamp",
+    "idempotency_key",
+    "payload"
+  ],
+  "properties": {
+    "orp_version": {
+      "$ref": "common.schema.json#/$defs/OrpVersion"
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "message_type": {
+      "const": "consent"
+    },
+    "deal_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "sender": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "recipient": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 4
+    },
+    "signature": {
+      "$ref": "common.schema.json#/$defs/Signature"
+    },
+    "payload": {
+      "type": "object",
+      "required": [
+        "consent_id",
+        "principal_id",
+        "step",
+        "mode_at_evaluation",
+        "decision",
+        "terms_hash",
+        "mandate_type",
+        "verification_proof",
+        "expires_at"
+      ],
+      "properties": {
+        "consent_id": {
+          "type": "string",
+          "minLength": 4
+        },
+        "principal_id": {
+          "$ref": "common.schema.json#/$defs/PrincipalUri"
+        },
+        "step": {
+          "$ref": "common.schema.json#/$defs/PermissionStep"
+        },
+        "mode_at_evaluation": {
+          "$ref": "common.schema.json#/$defs/StepMode"
+        },
+        "escalation_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "step_ask",
+              "exceeds_approval_threshold",
+              "exceeds_daily_budget",
+              "category_not_allowed",
+              "counterparty_unverified",
+              "counterparty_karma_below_min",
+              "claim_check_unavailable",
+              "settlement_mode_restricted"
+            ]
+          }
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["approve", "deny"]
+        },
+        "terms_hash": {
+          "$ref": "common.schema.json#/$defs/Sha256Hash"
+        },
+        "mandate_type": {
+          "type": "string",
+          "enum": ["constraint_auto", "explicit_owner_approval", "standing_policy"]
+        },
+        "constraints_snapshot": {
+          "$ref": "common.schema.json#/$defs/MandateConstraints"
+        },
+        "verification_proof": {
+          "type": "object",
+          "required": ["method", "signed_at"],
+          "properties": {
+            "method": {
+              "type": "string",
+              "enum": ["jws_ed25519", "jws_es256", "relay_owner_session", "constraint_policy_engine"]
+            },
+            "kid": {
+              "type": "string"
+            },
+            "signed_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "jws": {
+              "type": "string"
+            },
+            "session_attestation_id": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.com/schema/v0.3/execute.schema.json",
+  "title": "ORP v0.3 Execute Message",
+  "type": "object",
+  "required": [
+    "orp_version",
+    "message_id",
+    "message_type",
+    "deal_id",
+    "sender",
+    "timestamp",
+    "idempotency_key",
+    "payload"
+  ],
+  "properties": {
+    "orp_version": {
+      "$ref": "common.schema.json#/$defs/OrpVersion"
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "message_type": {
+      "const": "execute"
+    },
+    "deal_id": {
+      "type": "string",
+      "minLength": 4
+    },
+    "sender": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "recipient": {
+      "$ref": "common.schema.json#/$defs/PrincipalUri"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 4
+    },
+    "signature": {
+      "$ref": "common.schema.json#/$defs/Signature"
+    },
+    "payload": {
+      "type": "object",
+      "required": ["space_id", "consent_id", "terms_hash"],
+      "properties": {
+        "space_id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "consent_id": {
+          "type": "string",
+          "minLength": 4
+        },
+        "terms_hash": {
+          "$ref": "common.schema.json#/$defs/Sha256Hash"
+        },
+        "tracking_url": {
+          "description": "Universal tracked link (/v1/go/:token) that works on any platform with no plugin.",
+          "type": "string",
+          "format": "uri"
+        },
+        "tracking_token": {
+          "description": "Deal-scoped token (orp_tok_...) for universal attribution.",
+          "type": "string",
+          "minLength": 4
+        },
+        "adapter_id": {
+          "description": "Optional platform adapter helper (never required for link tracking).",
+          "type": "string",
+          "minLength": 3
+        },
+        "dry_run": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

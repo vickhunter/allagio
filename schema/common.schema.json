@@ -1,0 +1,536 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.com/schema/v0.3/common.schema.json",
+  "title": "Offer Rails Protocol v0.3 Common Definitions",
+  "type": "object",
+  "$defs": {
+    "OrpVersion": {
+      "type": "string",
+      "pattern": "^0\\.3\\.[0-9]+$"
+    },
+    "PrincipalUri": {
+      "description": "Pseudonymous party identifier. Must never contain an email address (@).",
+      "type": "string",
+      "pattern": "^(orp:(party|principal):[a-zA-Z0-9_.-]+|https://[^\\s@]+)$"
+    },
+    "Sha256Hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "CurrencyCode": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "StepMode": {
+      "type": "string",
+      "enum": ["auto", "ask", "off"]
+    },
+    "PermissionStep": {
+      "type": "string",
+      "enum": [
+        "space_register",
+        "discover_respond",
+        "deal_offer",
+        "deal_accept",
+        "space_execute",
+        "deal_modify",
+        "settlement_payout"
+      ]
+    },
+    "MandateConstraints": {
+      "description": "Human-set constraints inside which an agent may negotiate and execute deals autonomously.",
+      "type": "object",
+      "properties": {
+        "max_deal_amount_minor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "daily_budget_minor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "require_human_above_minor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "min_cpa_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "allowed_settlement_modes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SettlementMode"
+          }
+        },
+        "allowed_categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blocked_categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "brand_rules": {
+          "type": "object",
+          "properties": {
+            "require_verified_counterparty": {
+              "type": "boolean"
+            },
+            "min_counterparty_karma": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_copy_chars": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "disallow_superlatives": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "SpaceKind": {
+      "type": "string",
+      "enum": [
+        "content_inline",
+        "content_box",
+        "social_post",
+        "social_repost",
+        "social_comment",
+        "newsletter_slot",
+        "video_segment",
+        "community_pin",
+        "cross_promo_slot",
+        "data_insight_room"
+      ]
+    },
+    "PlatformId": {
+      "type": "string",
+      "enum": [
+        "wordpress",
+        "x",
+        "newsletter",
+        "youtube",
+        "instagram",
+        "tiktok",
+        "reddit",
+        "discord",
+        "facebook",
+        "podcast",
+        "generic_web"
+      ]
+    },
+    "SettlementMode": {
+      "type": "string",
+      "enum": [
+        "cpa_commission",
+        "rev_share",
+        "flat_fee",
+        "space_swap",
+        "traffic_swap",
+        "repost_bounty",
+        "co_marketing",
+        "data_exchange"
+      ]
+    },
+    "ReceiptVerificationMode": {
+      "type": "string",
+      "enum": [
+        "proof_url",
+        "public_check",
+        "counterparty_attestation",
+        "adapter_ack"
+      ]
+    },
+    "Signature": {
+      "type": "object",
+      "required": ["alg", "kid", "jws"],
+      "properties": {
+        "alg": {
+          "type": "string",
+          "enum": ["EdDSA", "ES256"]
+        },
+        "kid": {
+          "type": "string",
+          "minLength": 3
+        },
+        "jws": {
+          "type": "string",
+          "minLength": 16
+        }
+      },
+      "additionalProperties": false
+    },
+    "AudienceCard": {
+      "type": "object",
+      "required": ["k_anonymity_threshold", "reach_bucket", "provenance"],
+      "properties": {
+        "k_anonymity_threshold": {
+          "type": "integer",
+          "minimum": 50
+        },
+        "reach_bucket": {
+          "type": "string",
+          "enum": [
+            "under_1k",
+            "1k_10k",
+            "10k_50k",
+            "50k_250k",
+            "250k_1m",
+            "over_1m"
+          ]
+        },
+        "engagement_rate_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "top_geos": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "maxItems": 10
+        },
+        "top_interests": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 64
+          },
+          "maxItems": 20
+        },
+        "provenance": {
+          "type": "string",
+          "enum": ["self_declared", "public_check", "adapter_verified", "relay_measured"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Space": {
+      "type": "object",
+      "required": [
+        "space_id",
+        "principal_id",
+        "platform",
+        "kind",
+        "uri",
+        "title",
+        "verification",
+        "accepted_settlement_modes"
+      ],
+      "properties": {
+        "space_id": {
+          "type": "string",
+          "minLength": 4
+        },
+        "principal_id": {
+          "$ref": "#/$defs/PrincipalUri"
+        },
+        "platform": {
+          "$ref": "#/$defs/PlatformId"
+        },
+        "kind": {
+          "$ref": "#/$defs/SpaceKind"
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "handle_or_domain": {
+          "type": "string",
+          "minLength": 2
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "locale": {
+          "type": "string"
+        },
+        "verification": {
+          "type": "object",
+          "required": ["status", "method"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["verified", "pending", "unverified"]
+            },
+            "method": {
+              "type": "string",
+              "enum": ["dns_txt", "http_well_known", "public_check", "oauth2_handle", "signed_challenge", "plugin_key"]
+            },
+            "verified_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "adapter_id": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "accepted_settlement_modes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/SettlementMode"
+          }
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "max_chars": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "media_allowed": {
+              "type": "boolean"
+            },
+            "min_live_seconds": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "required_disclosure_markers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "forbidden_categories": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "floor_pricing": {
+          "type": "object",
+          "properties": {
+            "currency": {
+              "$ref": "#/$defs/CurrencyCode"
+            },
+            "flat_fee_minor": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cpa_min_bps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          },
+          "additionalProperties": false
+        },
+        "audience_card": {
+          "$ref": "#/$defs/AudienceCard"
+        },
+        "visibility_pools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(public|direct|network:[a-zA-Z0-9_-]+)$"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Creative": {
+      "type": "object",
+      "required": ["body", "target_url", "disclosure_text"],
+      "properties": {
+        "headline": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        },
+        "target_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "target_post_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "disclosure_text": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200
+        },
+        "rel_attributes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["sponsored", "nofollow", "ugc"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Settlement": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/SettlementMode"
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "amount_minor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "topper_amount_minor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "commission_type": {
+          "type": "string",
+          "enum": ["percentage", "flat"]
+        },
+        "commission_bps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "flat_amount_minor": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "share_bps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "duration_months": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attribution_window_days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365
+        },
+        "initiator_space_id": {
+          "type": "string"
+        },
+        "responder_space_id": {
+          "type": "string"
+        },
+        "sync_window_seconds": {
+          "type": "integer",
+          "minimum": 60
+        },
+        "min_live_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_verified_visits": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "exchange_ratio_bps": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 100000
+        },
+        "target_post_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "required_action": {
+          "type": "string",
+          "enum": ["repost", "quote", "comment"]
+        },
+        "dataset_schema_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "min_k_anonymity": {
+          "type": "integer",
+          "minimum": 50
+        },
+        "escrow_required": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DealTerms": {
+      "type": "object",
+      "required": ["space_id", "space_kind", "settlement", "creative", "window"],
+      "properties": {
+        "space_id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "space_kind": {
+          "$ref": "#/$defs/SpaceKind"
+        },
+        "settlement": {
+          "$ref": "#/$defs/Settlement"
+        },
+        "creative": {
+          "$ref": "#/$defs/Creative"
+        },
+        "reciprocal_creative": {
+          "$ref": "#/$defs/Creative"
+        },
+        "window": {
+          "type": "object",
+          "required": ["min_live_seconds"],
+          "properties": {
+            "execute_after": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "execute_before": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "min_live_seconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

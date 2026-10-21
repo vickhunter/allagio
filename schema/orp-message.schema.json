@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.com/schema/v0.3/orp-message.schema.json",
+  "title": "Offer Rails Protocol v0.3 Any Message Union",
+  "oneOf": [
+    { "$ref": "discover.schema.json" },
+    { "$ref": "offer.schema.json" },
+    { "$ref": "counter.schema.json" },
+    { "$ref": "accept.schema.json" },
+    { "$ref": "consent.schema.json" },
+    { "$ref": "execute.schema.json" },
+    { "$ref": "receipt.schema.json" },
+    { "$ref": "revoke.schema.json" },
+    { "$ref": "dispute.schema.json" },
+    { "$ref": "reputation.schema.json" }
+  ]
+}
