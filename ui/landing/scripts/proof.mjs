@@ -487,6 +487,7 @@ try {
       const serious = axe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
       writeFileSync(join(out, `axe-${slug}.json`), JSON.stringify({ violations: serious, incomplete: axe.incomplete.map((item) => item.id) }, null, 2))
       await page.screenshot({ path: join(out, `${slug}.png`), fullPage: true })
+      await page.locator('#join summary').click()
       const signIn = page.getByRole('link', { name: /Sign in with Google|Start as a maker|Start as a publisher/ }).first()
       const signHref = await signIn.getAttribute('href')
       const zip = await page.getByRole('link', { name: 'Download WordPress plugin' }).first().getAttribute('href')

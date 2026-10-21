@@ -1,3 +1,7 @@
+## October 21 — Agent-first join
+
+The home join block asks a person to give an agent the line “Connect my site to Offer Rails”, with one Copy button and a link to llms.txt. Sign in, the install command, MCP setup, and the WordPress plugin sit under “Set it up yourself”. The page does not pick maker or publisher. Where it runs reads Live or Planned from one list. Live surfaces stay in view. Planned surfaces sit in one group. There is no adapters registry yet, so that list is the stand-in until D-092.
+
 ## October 20 — New sites wait for a person before a placement is published
 
 A new publisher site stores `placement_publish` as `ask`. The other steps stay `auto`. A created placement is HTTP 201 with `status` `awaiting_approval` and `hold_reason` `step_ask` once the domain is verified. An unverified domain still uses `domain_unverified`. A site with no `agent_step_modes` row still reads every step as `auto`, which is the read for a site created before this change. Registering that site again does not add a row. Saving a mode, including `auto`, is left as stored.

@@ -25,20 +25,6 @@ export const modes = [
   { name: 'Approve anything that passes the checks', note: 'Your agent decides. You get a digest with one-tap undo.' },
 ]
 
-export const publisherRuns = [
-  { name: 'WordPress', status: 'Live', note: 'The plugin places one labelled box in a post that fits.' },
-  { name: 'X', status: 'Planned', note: 'Share links you approve. Posting stays with you. Not live yet.' },
-  { name: 'Newsletter', status: 'Planned', note: 'Not live yet.' },
-  { name: 'YouTube', status: 'Planned', note: 'Not live yet.' },
-  { name: 'Instagram', status: 'Planned', note: 'Not live yet.' },
-  { name: 'TikTok', status: 'Planned', note: 'Not live yet.' },
-]
-
-export const makerRuns = [
-  { name: 'WordPress', status: 'Live', note: 'The plugin places one labelled box in a post that fits.' },
-  { name: 'Shopify', status: 'Planned', note: 'A shop can list products that fit. Not live yet.' },
-  { name: 'X', status: 'Planned', note: 'Share links you approve. Posting stays with you. Not live yet.' },
-]
 
 export const feed = [
   { kind: 'listed', who: 'maker', text: 'Hand-bound notebook listed', meta: '€24.00 · 10%' },
