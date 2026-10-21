@@ -83,7 +83,7 @@
   "keys": [
     {
       "crv": "Ed25519",
-      "x": "zrbgC9OT6J8_nUJeHSfPNAZ8UzUxKm_Uz1penavci84",
+      "x": "kdyMDwk4CBcDCgiyPImPfJuJr-2QdJ7l72X-4lztu1o",
       "kty": "OKP",
       "kid": "host-2026-10",
       "alg": "EdDSA",

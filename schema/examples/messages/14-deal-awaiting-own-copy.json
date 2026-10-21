@@ -83,7 +83,7 @@
       "since": "2026-10-21T11:30:01Z",
       "escalation": "esc_7Rk2",
       "reasons": [
-        "new_counterparty"
+        "step_ask"
       ],
       "url": "https://hub.example/approve/esc_7Rk2"
     }

@@ -39,7 +39,7 @@
             }
           }
         },
-        "waiting": { "$ref": "#/$defs/Waiting" },
+        "waiting": { "$ref": "../defs.schema.json#/$defs/Waiting" },
         "tracking": { "type": "array", "maxItems": 20, "items": { "$ref": "../defs.schema.json#/$defs/Tracking" } },
         "obligations": {
           "type": "array",
@@ -71,21 +71,6 @@
       "description": "proposed: terms on the table. awaiting: a party's person must decide. active: both bound, tracking live. completed: every obligation verified or waived. declined, expired, revoked: ended before or after activation. disputed: a dispute is open.",
       "type": "string",
       "enum": ["proposed", "awaiting", "active", "completed", "declined", "expired", "revoked", "disputed"]
-    },
-    "Waiting": {
-      "title": "Waiting",
-      "description": "Who the deal is waiting for. escalation, reasons and url appear only in the waiting party's own copy.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["party", "since"],
-      "properties": {
-        "party": { "$ref": "../defs.schema.json#/$defs/PartyId" },
-        "step": { "$ref": "../defs.schema.json#/$defs/Step" },
-        "since": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
-        "escalation": { "$ref": "../defs.schema.json#/$defs/LocalId" },
-        "reasons": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "$ref": "../defs.schema.json#/$defs/EscalationReason" } },
-        "url": { "$ref": "../defs.schema.json#/$defs/Url", "description": "Where the owner approves or refuses. The agent shows it to its person; it can never approve by itself." }
-      }
     }
   }
 }

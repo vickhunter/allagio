@@ -9,7 +9,7 @@
   "body": {
     "subject": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
     "algorithm": "orp-rep-1",
-    "score": 712,
+    "score": 858,
     "components": {
       "verified": 46.3,
       "failed": 2.1,

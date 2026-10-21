@@ -497,6 +497,21 @@
         "ref": { "$ref": "#/$defs/LocalId" }
       }
     },
+    "Waiting": {
+      "title": "Waiting",
+      "description": "Who a deal or a listing is waiting for. escalation, reasons and url appear only in the waiting party's own copy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["party", "since"],
+      "properties": {
+        "party": { "$ref": "#/$defs/PartyId" },
+        "step": { "$ref": "#/$defs/Step" },
+        "since": { "$ref": "#/$defs/Timestamp" },
+        "escalation": { "$ref": "#/$defs/LocalId" },
+        "reasons": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "$ref": "#/$defs/EscalationReason" } },
+        "url": { "$ref": "#/$defs/Url", "description": "Where the owner approves or refuses. The agent shows it to its person; it can never approve by itself." }
+      }
+    },
     "Fit": {
       "title": "Fit",
       "description": "Why a result fits, with evidence links a human can open.",

@@ -14,7 +14,7 @@
     "step": "accept",
     "terms_hash": "sha256-XqlxlRGWPLFRQGlZNLpnwIpj-F1xr7UK1Pilom6pvCk",
     "reasons": [
-      "new_counterparty"
+      "step_ask"
     ],
     "assurance": "passkey",
     "at": "2026-10-21T12:09:58Z"

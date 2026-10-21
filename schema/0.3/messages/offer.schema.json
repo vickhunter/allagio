@@ -21,6 +21,7 @@
         "terms": { "$ref": "../defs.schema.json#/$defs/Terms" },
         "terms_hash": { "$ref": "../defs.schema.json#/$defs/Hash", "description": "Optional from agents. When present the host checks it and refuses a mismatch with terms_mismatch." },
         "limit": { "type": "integer", "minimum": 1, "maximum": 100000, "description": "Standing offers only: the most deals it may open." },
+        "waiting": { "$ref": "../defs.schema.json#/$defs/Waiting", "description": "Set by the host when listing waits for the owner's person. The offer is listed once approved." },
         "note": { "$ref": "../defs.schema.json#/$defs/Text" },
         "expires": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
       }

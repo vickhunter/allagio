@@ -15,7 +15,7 @@
     "to": { "$ref": "defs.schema.json#/$defs/PartyId" },
     "deal": { "$ref": "defs.schema.json#/$defs/LocalId" },
     "re": { "$ref": "defs.schema.json#/$defs/MessageId" },
-    "body": { "type": "object" },
+    "body": { "type": "object", "additionalProperties": true },
     "agent": {
       "description": "The software acting for the party. Never a person.",
       "type": "object",
@@ -36,7 +36,8 @@
     "ext": {
       "type": "object",
       "propertyNames": { "$ref": "defs.schema.json#/$defs/ExtName" },
-      "maxProperties": 16
+      "maxProperties": 16,
+      "additionalProperties": true
     },
     "critical": {
       "description": "Extensions the receiver must understand, or refuse the message with unsupported_extension.",
