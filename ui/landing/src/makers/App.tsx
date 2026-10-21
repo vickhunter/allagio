@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { Terminal } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
+import { Runs } from '@/components/Runs'
 import { Checks, JoinSection } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { example, faq, feed, joinLine, makerAdvantages, makerRuns, painLine } from '@/content'
+import { example, faq, feed, joinLine, makerAdvantages, painLine } from '@/content'
 import { useOfferConfig } from '@/lib/source'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
@@ -71,7 +72,7 @@ export function App() {
             ))}
           </ol>
           <h3 className="mt-12 font-display text-lg font-semibold">Where your offer can run</h3>
-          <ol className="mt-4 grid gap-3 sm:grid-cols-3">{makerRuns.map((s) => <li key={s.name} className="rounded-xl border border-dashed border-line-strong p-4"><div className="flex items-center justify-between"><strong className="font-display">{s.name}</strong><Badge variant={s.status === 'Live' ? 'maker' : 'neutral'}>{s.status}</Badge></div><p className="mt-2 text-sm text-t2">{s.note}</p></li>)}</ol>
+          <div className="mt-4"><Runs audience="maker" notes /></div>
         </div>
       </section>
 

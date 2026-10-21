@@ -34,7 +34,7 @@ export function Checks({ id = 'checks', eyebrow }: { id?: string; eyebrow: strin
   )
 }
 
-export function JoinSection({ title, sub, role }: { title: string; sub: string; role?: 'maker' | 'publisher' | 'both' }) {
+export function JoinSection({ title, sub, role }: { title: string; sub: string; role?: 'maker' | 'publisher' }) {
   return (
     <section aria-labelledby="join-h" className="border-t border-line bg-s1">
       <div className="mx-auto grid max-w-6xl gap-8 px-5 py-16 md:grid-cols-2 md:py-20">

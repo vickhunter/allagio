@@ -1,10 +1,12 @@
 import { ArrowRight } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
+import { Runs } from '@/components/Runs'
+import { joinHeading } from '@/components/join-prompt.mjs'
 import { Checks, JoinSection } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
-import { driftChips, example, faq, joinLine, makerAdvantages, publisherAdvantages, publisherRuns } from '@/content'
+import { driftChips, example, faq, joinLine, makerAdvantages, publisherAdvantages } from '@/content'
 import { HeroShader } from './HeroShader'
 import { PostPreview } from '@/components/PostPreview'
 import { HowItWorks } from './HowItWorks'
@@ -55,14 +57,7 @@ export function App() {
           </div>
           <p className="mt-3 text-[13px] text-t2">Both? One account does both. Press <kbd className="font-mono">M</kbd> or <kbd className="font-mono">P</kbd>.</p>
           <p className="eyebrow mb-3 mt-8">Where it runs</p>
-          <ul className="grid gap-2 sm:grid-cols-3">
-            {publisherRuns.map((item) => (
-              <li key={item.name} className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-s1 px-4 py-2 text-sm">
-                <span className="font-semibold">{item.name}</span>
-                <span className="text-t2">{item.status}</span>
-              </li>
-            ))}
-          </ul>
+          <Runs audience="publisher" />
         </div>
       </section>
 
@@ -99,7 +94,7 @@ export function App() {
         </div>
       </section>
 
-      <JoinSection title="Not sure which side? Pick both." sub={joinLine} />
+      <JoinSection title={joinHeading} sub={joinLine} />
     </Page>
   )
 }
