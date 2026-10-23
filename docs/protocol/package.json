@@ -1,0 +1,16 @@
+{
+  "name": "@offerrails/orp",
+  "private": true,
+  "type": "module",
+  "description": "ORP 0.3 schemas, reference host, and the L0–L3 conformance suite.",
+  "scripts": {
+    "test": "node --test schema/test/*.test.mjs conformance/test/*.test.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

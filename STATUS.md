@@ -1,3 +1,9 @@
+## October 23 — ORP 0.3 conformance suite L0–L3 (D-092a)
+
+`cd docs/protocol && npm ci && npm test` runs the schema checks and the named behavioral suite in `docs/protocol/conformance/test/` against the reference host in `docs/protocol/sdk/`. The tests are L0-SCHEMA, L0-HASH, L0-IDEMPOTENT, L0-REPLAY, L0-STALE, C1-UNIVERSAL-LINK-NO-ADAPTER, C2-NO-EMAIL-NO-SIGNUP, L1-PLAIN-AFTER-REVOKE, L1-NO-PII, L1-TEST-CLICKS, L1-POLICIES, L2-STEP-MODES, L2-CONSENT-HOST-ONLY, L2-NO-SELF-RECEIPT, L2-ATTESTATION-NO-REP, L2-CLAIMS-UNCHECKED, L2-RECHECK, L3-KINDS, L3-NEGOTIATE, L3-SPACE, L3-DISPUTE, L3-REPUTATION, L3-PAYOUT, and INVALID-68. INVALID-68 posts the three #68-shaped examples and expects `invalid_message`.
+
+The reference host lists L0–L3 only while that suite passes. The hosted API is unchanged: no route, migration, config, or `CLAIMS_CHECK` value changed, and it still claims no conformance level. D-092 is not accepted; D-092b and the cold-agent bar are still open.
+
 ## October 23 — One canonical ORP 0.3 draft (D-099)
 
 `docs/protocol/SPEC.md` is the single Offer Rails Protocol 0.3 draft. The schemas are in `docs/protocol/schema/0.3/`. It replaces the two disagreeing drafts and closes GAP-06 at the document level. Draft PR #68 is superseded as a wire format. Draft PR #71's schemas are carried forward with additions: the `request` rename, `space` and `payout` messages, `via` click ids, claims-check status, and suggest-with-join. `npm test` in `docs/protocol/schema/` checks every schema, example, `terms_hash`, and SPEC JSON block. The decision log and the remaining blocker gaps are in `briefs/offer-rails-protocol-canonical-20261023.md`.

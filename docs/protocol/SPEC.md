@@ -1193,7 +1193,7 @@ A host or client states the levels it meets in `conformance.levels`. Each level 
 - **`C1-UNIVERSAL-LINK-NO-ADAPTER`.** Activate an affiliate deal. Without any plugin, adapter, `execute` or receipt, request the link with a browser user agent from three contexts (an email client, a social post, a plain page). Expect three `302`s with fresh `via` ids, three human clicks in the next outcome, and a `link` receipt after the first.
 - **`C2-NO-EMAIL-NO-SIGNUP`.** From a fresh client with no credentials, `POST {suggest}` with draft text and `join: {}`. Expect items with pitches and a `joined` token. Accept one offer with that token. Expect an `awaiting` deal with an approval URL and no request for an email at any point.
 
-**Status at the freeze.** The L0 schema and hash checks run today (`npm test` in [`schema/`](schema/)). The behavioral suite for L0 to L3 is not written yet. No host, including the hosted affilio-api, claims any level yet.
+**Status.** The suite is [`conformance/test/`](conformance/test/). From this directory, `npm test` runs the schema checks and that suite against the reference host in [`sdk/`](sdk/). The reference host lists L0 to L3 only as the subject of the suite. A failing suite voids the claim. The hosted affilio-api claims no level. See [Appendix C](#appendix-c-hosted-affilio-api-and-orp-03).
 
 ---
 
