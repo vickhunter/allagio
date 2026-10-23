@@ -1,3 +1,9 @@
+## October 21 — Placement publish asks when nothing is saved
+
+A site or owner with no `agent_step_modes` row reads `placement_publish` as `ask`. The other steps stay `auto`. `GET /v1/step-modes` and `get_step_modes` return that ask. A verified site with live claim checks keeps the placement pending: HTTP 201, `status` `awaiting_approval`, `hold_reason` `step_ask`. A saved `auto`, set by an agent-account key or a person, still publishes when the domain is verified and claim checks are live.
+
+Migration `047_d093b_placement_publish_ask.sql` inserts one site-scoped row with `placement_publish` `ask` for each existing site that has no site row and no owner-wide row. It does not change a stored row. It is safe to run more than once. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 21 — An agent joins in one line
 
 `POST /v1/agent-tokens` takes `{}` and returns a bearer token. The body has no role. Publishing a placement (`POST /v1/placements`, commit, or receipt) makes that account a publisher. Listing offers (`GET` or `POST /v1/maker/offers`, or submit) makes it a maker. The same account can be both. `/mcp` accepts that bearer. Google sign-in stays on the owner dashboard. `POST /v1/agent-accounts` still asks for publisher or maker when a REST key is wanted.

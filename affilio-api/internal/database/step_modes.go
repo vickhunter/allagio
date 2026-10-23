@@ -20,8 +20,8 @@ const (
 )
 
 // StepModes is the owner's choice for each agent step.
-// An empty field on a missing row reads as auto, which is what sites created
-// before D-088 still do. A new site stores placement publish as ask.
+// An empty field on a missing row reads as auto, except placement publish,
+// which reads as ask. A saved value, including auto, is left as stored.
 type StepModes struct {
 	SiteSignup       string
 	OfferMatch       string
@@ -45,6 +45,9 @@ func (m StepModes) Get(step string) string {
 		mode = m.Payout
 	}
 	if mode == "" {
+		if step == StepPlacementPublish {
+			return ModeAsk
+		}
 		return ModeAuto
 	}
 	return mode
@@ -76,7 +79,7 @@ func (m StepModes) filled() StepModes {
 		m.OfferMatch = ModeAuto
 	}
 	if m.PlacementPublish == "" {
-		m.PlacementPublish = ModeAuto
+		m.PlacementPublish = ModeAsk
 	}
 	if m.LinkChange == "" {
 		m.LinkChange = ModeAuto
@@ -105,9 +108,8 @@ func stepScopeKey(ownerID, siteID string) (string, bool) {
 }
 
 // LoadStepModes returns the saved modes for this owner and site.
-// A site row wins over an owner-wide row. No row means every step is auto.
-// New site creation writes placement publish as ask, so a missing row is only
-// a site that never received that write.
+// A site row wins over an owner-wide row. No row means placement publish is
+// ask and the other steps are auto. A saved auto stays auto.
 func (d *DB) LoadStepModes(ctx context.Context, ownerID, siteID string) (StepModes, error) {
 	if ownerID == "" && siteID == "" {
 		return StepModes{}.filled(), nil
@@ -132,24 +134,10 @@ LIMIT 1`, ownerID, siteID).Scan(&m.SiteSignup, &m.OfferMatch, &m.PlacementPublis
 	return m.filled(), nil
 }
 
-// HasStepModes reports whether a site row or an owner-wide row is saved.
-func (d *DB) HasStepModes(ctx context.Context, ownerID, siteID string) (bool, error) {
-	if ownerID == "" && siteID == "" {
-		return false, nil
-	}
-	var saved bool
-	err := d.Pool.QueryRow(ctx, `SELECT EXISTS (
-SELECT 1 FROM agent_step_modes
-WHERE (NULLIF($2,'') IS NOT NULL AND site_id = NULLIF($2,'')::uuid)
-   OR (NULLIF($1,'') IS NOT NULL AND owner_id = NULLIF($1,'')::uuid AND site_id IS NULL)
-)`, ownerID, siteID).Scan(&saved)
-	return saved, err
-}
-
 // seedNewSitePublishAsk stores placement publish as ask for a site that was
 // just created. The other steps stay auto. An existing row is left alone, and
 // an owner-wide row is left alone, so a site that already chose its modes
-// keeps them. A missing row still reads as auto.
+// keeps them. A missing row reads placement publish as ask.
 func seedNewSitePublishAsk(ctx context.Context, tx pgx.Tx, ownerID, siteID string) error {
 	if siteID == "" {
 		return errors.New("site required")

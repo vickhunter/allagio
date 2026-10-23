@@ -133,7 +133,7 @@ Auth is the owner session or the site key. A project key is limited to the agent
 | cli, cursor, grok, mcp | yolo |
 | chatgpt, claude, direct, and anything else | manual |
 
-` + entry.NewSitePublishDefault + ` That sentence is the placement publish step, which is separate from the source table above. A new site stores ` + "`placement_publish`" + ` as ` + "`ask`" + `. An owner with no site and no saved step-mode row reads ` + "`placement_publish`" + ` as ` + "`ask`" + `. A site with no saved step-mode row still reads that step as ` + "`auto`" + `.
+` + entry.NewSitePublishDefault + ` That sentence is the placement publish step, which is separate from the source table above. A new site stores ` + "`placement_publish`" + ` as ` + "`ask`" + `. ` + entry.MissingRowPublishAsk + `
 
 ## Save
 
@@ -195,7 +195,7 @@ Unknown JSON fields are rejected. ` + "`payments_check`" + ` is ` + "`pass`" + `
 
 const modesDoc = `# Approval modes
 
-` + entry.NewSitePublishDefault + ` A new site stores ` + "`placement_publish`" + ` as ` + "`ask`" + `. The other steps stay ` + "`auto`" + `. A person can set placement publish to ` + "`auto`" + ` later. While claim checks are not live, a stored ` + "`auto`" + ` still waits. An owner with no site and no saved step-mode row reads ` + "`placement_publish`" + ` as ` + "`ask`" + `. A site with no saved step-mode row, which is a site created before this default, still reads every step as ` + "`auto`" + `.
+` + entry.NewSitePublishDefault + ` A new site stores ` + "`placement_publish`" + ` as ` + "`ask`" + `. The other steps stay ` + "`auto`" + `. A person can set placement publish to ` + "`auto`" + ` later. While claim checks are not live, a stored ` + "`auto`" + ` still waits. ` + entry.MissingRowPublishAsk + `
 
 Modes are ` + "`manual`" + `, ` + "`auto`" + `, and ` + "`yolo`" + `. They are set per site and per offer. A change applies to new decisions. Publishers see the plain labels "Ask me every time", "Approve within my rules", and "Approve anything that passes the checks".
 
