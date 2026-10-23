@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/constraints.schema.json",
+  "title": "Constraints",
+  "description": "An owner's private limits for its agent, kept by the host and never sent to a counterparty. Inside them the agent acts alone. Outside an allowance the host escalates to the owner. A deny rule or a step set to off refuses outright. Anything missing defaults to the safe side: every step that can bind the owner (list, negotiate, accept, execute, amend, settle, share) asks; only revoke is auto. With no budget, any spend asks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["steps"],
+  "properties": {
+    "steps": { "$ref": "defs.schema.json#/$defs/Steps" },
+    "budget": {
+      "description": "Caps on money the owner pays. A deal that would cross one escalates with over_budget. Pay per click or per conversion counts at its cap; with no cap it always escalates.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "per_deal": { "$ref": "defs.schema.json#/$defs/Money" },
+        "per_day": { "$ref": "defs.schema.json#/$defs/Money" },
+        "per_month": { "$ref": "defs.schema.json#/$defs/Money" },
+        "max_rate_bps": { "type": "integer", "minimum": 1, "maximum": 10000, "description": "Highest share of a sale the agent may promise alone. A share is paid out of the sale, so it does not count toward the cash caps. Unset: any share escalates with over_budget." }
+      }
+    },
+    "approve_over": { "$ref": "defs.schema.json#/$defs/Money", "description": "A person approves any single deal worth more than this (over_threshold), in either direction." },
+    "kinds": { "type": "array", "uniqueItems": true, "items": { "$ref": "defs.schema.json#/$defs/DealKind" }, "description": "Deal kinds the agent may do alone. Others escalate (kind_outside)." },
+    "categories": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": { "type": "array", "maxItems": 50, "items": { "$ref": "defs.schema.json#/$defs/Category" }, "description": "Outside these, escalate (category_outside)." },
+        "deny": { "type": "array", "maxItems": 50, "items": { "$ref": "defs.schema.json#/$defs/Category" }, "description": "Never: refuse with brand_rule." }
+      }
+    },
+    "spaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": { "type": "array", "maxItems": 50, "items": { "$ref": "defs.schema.json#/$defs/LocalId" } },
+        "kinds": { "type": "array", "uniqueItems": true, "items": { "$ref": "defs.schema.json#/$defs/SpaceKind" } }
+      }
+    },
+    "counterparties": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min_reputation": { "type": "integer", "minimum": 0, "maximum": 1000, "description": "Below this, or with no score yet, escalate (low_reputation)." },
+        "new": { "$ref": "defs.schema.json#/$defs/StepMode", "description": "What to do with a first deal with a counterparty: auto, ask (new_counterparty) or off." },
+        "deny": { "type": "array", "maxItems": 500, "items": { "$ref": "defs.schema.json#/$defs/PartyId" } }
+      }
+    },
+    "brand": {
+      "description": "Hard content rules. Terms that break them are refused with brand_rule, never escalated.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "must_include": { "type": "array", "maxItems": 10, "items": { "type": "string", "minLength": 1, "maxLength": 200 } },
+        "must_not_include": { "type": "array", "maxItems": 50, "items": { "type": "string", "minLength": 1, "maxLength": 200 } },
+        "disclosure": { "$ref": "defs.schema.json#/$defs/Disclosure" }
+      }
+    },
+    "max_duration": { "$ref": "defs.schema.json#/$defs/Duration", "description": "Longer deals escalate (duration_over)." },
+    "expires": { "$ref": "defs.schema.json#/$defs/Timestamp", "description": "After this every step asks (mandate_expired)." }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/http/suggest-response.schema.json",
+  "title": "SuggestResponse",
+  "description": "Standing offers the person could take now, or open spaces that trade with posts like this one, best first, each with a pitch to show as is. Taking an offer: POST join once (no account), then send accept with the offer id and terms_hash. Taking a space: join, then send a directed offer to the space's party.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items", "join"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "allOf": [{ "$ref": "../messages/results.schema.json#/$defs/Result" }],
+        "type": "object",
+        "required": ["pitch"]
+      }
+    },
+    "empty_reason": { "type": "string", "enum": ["no_match", "below_threshold", "filtered"] },
+    "joined": { "$ref": "join-response.schema.json", "description": "Present when the request carried join." },
+    "join": { "$ref": "../discovery.schema.json#/$defs/UrlOrPath", "description": "Where to get a party id and token with no account, email or signup." }
+  }
+}

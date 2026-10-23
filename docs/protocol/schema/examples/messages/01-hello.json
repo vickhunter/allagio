@@ -1,0 +1,39 @@
+{
+  "orp": "0.3",
+  "type": "hello",
+  "id": "m_pub_0001",
+  "ts": "2026-10-21T10:00:00Z",
+  "from": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "agent": {
+    "name": "indie-stack-agent",
+    "version": "1.4.0"
+  },
+  "body": {
+    "versions": [
+      "0.3"
+    ],
+    "capabilities": {
+      "messages": [
+        "discover",
+        "request",
+        "offer",
+        "counter",
+        "accept",
+        "decline",
+        "execute",
+        "receipt",
+        "revoke",
+        "dispute"
+      ],
+      "proofs": [
+        "link",
+        "proof_url",
+        "attestation"
+      ],
+      "tracking": {
+        "links": true,
+        "codes": true
+      }
+    }
+  }
+}

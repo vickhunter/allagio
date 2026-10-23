@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/messages/request.schema.json",
+  "title": "RequestMessage",
+  "description": "A directed request for terms, like a request for quote: 'do you have a slot?' or 'would you do this offer at a different rate?'. Named ask in the #68 and #71 drafts; renamed so it never reads like the ask step mode. It commits nobody. The answer is an offer (with re set to this message), a decline, or nothing.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "to"],
+  "properties": {
+    "type": { "const": "request" },
+    "body": { "$ref": "#/$defs/RequestBody" }
+  },
+  "$defs": {
+    "RequestBody": {
+      "title": "RequestBody",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "offer": { "$ref": "../defs.schema.json#/$defs/LocalId", "description": "A standing offer the asker wants different terms for." },
+        "space": { "$ref": "../defs.schema.json#/$defs/LocalId", "description": "A space from results the asker wants to use." },
+        "kinds": { "type": "array", "maxItems": 8, "uniqueItems": true, "items": { "$ref": "../defs.schema.json#/$defs/DealKind" } },
+        "actions": {
+          "description": "Obligation actions the asker wants from the other side.",
+          "type": "array",
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["place", "repost", "comment", "pay", "credit", "share"] }
+        },
+        "give": {
+          "description": "Obligation actions the asker is willing to do in return.",
+          "type": "array",
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["place", "repost", "comment", "pay", "credit", "share"] }
+        },
+        "max_price": { "$ref": "../defs.schema.json#/$defs/Money", "description": "Optional. Disclosing a price is the asker's choice; constraints stay private." },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+            "to": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+          }
+        },
+        "note": { "$ref": "../defs.schema.json#/$defs/Text" },
+        "expires": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+      }
+    }
+  }
+}

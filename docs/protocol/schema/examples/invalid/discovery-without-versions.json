@@ -1,0 +1,9 @@
+{
+  "why": "Discovery must list the versions the host speaks.",
+  "schema": "discovery",
+  "path": "",
+  "instance": {
+    "host": "orp:hub.example/host",
+    "name": "No versions"
+  }
+}

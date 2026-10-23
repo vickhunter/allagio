@@ -1,0 +1,28 @@
+{
+  "orp": "0.3",
+  "type": "request",
+  "id": "m_mkr_0002",
+  "ts": "2026-10-21T11:00:00Z",
+  "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "body": {
+    "space": "sp_news_1",
+    "kinds": [
+      "swap",
+      "sponsored"
+    ],
+    "actions": [
+      "place"
+    ],
+    "give": [
+      "repost",
+      "pay"
+    ],
+    "window": {
+      "from": "2026-11-02T00:00:00Z",
+      "to": "2026-11-09T00:00:00Z"
+    },
+    "note": "Acme Notes 2.0 launches on 3 November. Is there room in an issue that week?",
+    "expires": "2026-10-25T00:00:00Z"
+  }
+}

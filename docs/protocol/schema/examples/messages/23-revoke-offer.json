@@ -1,0 +1,12 @@
+{
+  "orp": "0.3",
+  "type": "revoke",
+  "id": "m_mkr_0007",
+  "ts": "2026-12-01T09:01:00Z",
+  "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+  "body": {
+    "scope": "offer",
+    "offer": "ofr_acme_30",
+    "reason": "expired"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "why": "A receipt result is verified, failed or partial.",
+  "schema": "message",
+  "path": "/body/result",
+  "instance": {
+    "orp": "0.3",
+    "type": "receipt",
+    "id": "m_host_0010",
+    "ts": "2026-10-22T09:00:05Z",
+    "from": "orp:hub.example/host",
+    "to": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+    "deal": "deal_swp_4KfP",
+    "re": "m_mkr_0004",
+    "body": {
+      "obligation": "repost",
+      "result": "probably",
+      "method": "platform_check",
+      "at": "2026-10-22T09:00:04Z",
+      "url": "https://x.com/acmenotes/status/1848100000000000000",
+      "found": {
+        "target": true
+      },
+      "next_check": "2026-10-29T09:00:00Z"
+    }
+  }
+}

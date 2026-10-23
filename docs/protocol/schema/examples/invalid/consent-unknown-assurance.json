@@ -1,0 +1,27 @@
+{
+  "why": "Consent assurance is one of four known ways a host knows the owner decided.",
+  "schema": "message",
+  "path": "/body/assurance",
+  "instance": {
+    "orp": "0.3",
+    "type": "consent",
+    "id": "m_host_0008",
+    "ts": "2026-10-21T12:10:00Z",
+    "from": "orp:hub.example/host",
+    "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+    "deal": "deal_swp_4KfP",
+    "body": {
+      "consent": "cns_3Vt8",
+      "escalation": "esc_7Rk2",
+      "party": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+      "decision": "approved",
+      "step": "accept",
+      "terms_hash": "sha256-XqlxlRGWPLFRQGlZNLpnwIpj-F1xr7UK1Pilom6pvCk",
+      "reasons": [
+        "step_ask"
+      ],
+      "assurance": "agent_said_so",
+      "at": "2026-10-21T12:09:58Z"
+    }
+  }
+}

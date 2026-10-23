@@ -1,0 +1,249 @@
+{
+  "messages": [
+    {
+      "orp": "0.3",
+      "type": "deal",
+      "id": "m_host_0007",
+      "ts": "2026-10-21T11:30:01Z",
+      "from": "orp:hub.example/host",
+      "to": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+      "deal": "deal_swp_4KfP",
+      "body": {
+        "state": "awaiting",
+        "offerer": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+        "acceptor": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+        "terms": {
+          "title": "Newsletter mention for a launch repost",
+          "kind": "swap",
+          "categories": [
+            "software.productivity"
+          ],
+          "disclosure": {
+            "label": "Partner mention",
+            "lang": "en"
+          },
+          "obligations": [
+            {
+              "id": "mention",
+              "by": "offerer",
+              "action": "place",
+              "space": {
+                "kinds": [
+                  "newsletter.issue"
+                ]
+              },
+              "content": {
+                "link": true,
+                "brief": "One paragraph on why Acme Notes suits solo founders.",
+                "max_chars": 600,
+                "code": true
+              },
+              "destination": "https://acmenotes.example/",
+              "due": "P14D",
+              "proof": [
+                "link",
+                "witness",
+                "attestation"
+              ]
+            },
+            {
+              "id": "repost",
+              "by": "acceptor",
+              "action": "repost",
+              "target": "https://x.com/indiestackweekly/status/1848000000000000000",
+              "space": {
+                "kinds": [
+                  "social.repost"
+                ]
+              },
+              "due": "P7D",
+              "keep": "P14D",
+              "proof": [
+                "platform_check",
+                "proof_url",
+                "attestation"
+              ]
+            }
+          ]
+        },
+        "terms_hash": "sha256-XqlxlRGWPLFRQGlZNLpnwIpj-F1xr7UK1Pilom6pvCk",
+        "round": 2,
+        "bound": [
+          {
+            "party": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+            "authority": {
+              "type": "mandate"
+            },
+            "at": "2026-10-21T11:20:01Z"
+          }
+        ],
+        "updated": "2026-10-21T11:30:01Z",
+        "waiting": {
+          "party": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+          "step": "accept",
+          "since": "2026-10-21T11:30:01Z"
+        }
+      }
+    },
+    {
+      "orp": "0.3",
+      "type": "deal",
+      "id": "m_host_0009",
+      "ts": "2026-10-21T12:10:00Z",
+      "from": "orp:hub.example/host",
+      "to": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+      "deal": "deal_swp_4KfP",
+      "body": {
+        "state": "active",
+        "offerer": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+        "acceptor": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+        "terms": {
+          "title": "Newsletter mention for a launch repost",
+          "kind": "swap",
+          "categories": [
+            "software.productivity"
+          ],
+          "disclosure": {
+            "label": "Partner mention",
+            "lang": "en"
+          },
+          "obligations": [
+            {
+              "id": "mention",
+              "by": "offerer",
+              "action": "place",
+              "space": {
+                "kinds": [
+                  "newsletter.issue"
+                ]
+              },
+              "content": {
+                "link": true,
+                "brief": "One paragraph on why Acme Notes suits solo founders.",
+                "max_chars": 600,
+                "code": true
+              },
+              "destination": "https://acmenotes.example/",
+              "due": "P14D",
+              "proof": [
+                "link",
+                "witness",
+                "attestation"
+              ]
+            },
+            {
+              "id": "repost",
+              "by": "acceptor",
+              "action": "repost",
+              "target": "https://x.com/indiestackweekly/status/1848000000000000000",
+              "space": {
+                "kinds": [
+                  "social.repost"
+                ]
+              },
+              "due": "P7D",
+              "keep": "P14D",
+              "proof": [
+                "platform_check",
+                "proof_url",
+                "attestation"
+              ]
+            }
+          ]
+        },
+        "terms_hash": "sha256-XqlxlRGWPLFRQGlZNLpnwIpj-F1xr7UK1Pilom6pvCk",
+        "round": 2,
+        "bound": [
+          {
+            "party": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+            "authority": {
+              "type": "mandate"
+            },
+            "at": "2026-10-21T11:20:01Z"
+          },
+          {
+            "party": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+            "authority": {
+              "type": "consent",
+              "ref": "cns_3Vt8"
+            },
+            "at": "2026-10-21T12:10:00Z"
+          }
+        ],
+        "tracking": [
+          {
+            "obligation": "mention",
+            "link": "https://hub.example/go/Nw4Hd7Pe",
+            "code": "INDIE14",
+            "destination": "https://acmenotes.example/",
+            "status": "live"
+          }
+        ],
+        "obligations": [
+          {
+            "id": "mention",
+            "state": "pending",
+            "due": "2026-11-04T12:10:00Z"
+          },
+          {
+            "id": "repost",
+            "state": "pending",
+            "due": "2026-10-28T12:10:00Z"
+          }
+        ],
+        "spaces": [
+          {
+            "id": "sp_news_1",
+            "kind": "newsletter.issue",
+            "platform": "newsletter",
+            "title": "Indie Stack Weekly",
+            "topics": [
+              "software.productivity",
+              "business.startups"
+            ],
+            "languages": [
+              "en"
+            ],
+            "audience": {
+              "size": "10k-100k",
+              "regions": [
+                {
+                  "code": "US",
+                  "share": "25-50%"
+                },
+                {
+                  "code": "DE",
+                  "share": "10-25%"
+                }
+              ],
+              "k_min": 50,
+              "source": "host_measured"
+            },
+            "accepts": [
+              "affiliate",
+              "sponsored",
+              "swap"
+            ],
+            "disclosure": {
+              "label": "Partner mention",
+              "lang": "en"
+            },
+            "verified": [
+              {
+                "method": "domain",
+                "at": "2026-09-02T08:00:00Z"
+              }
+            ],
+            "rules": {
+              "rel": "sponsored",
+              "max_per_week": 2
+            },
+            "locator": "https://indiestackweekly.example/archive"
+          }
+        ],
+        "updated": "2026-10-21T12:10:00Z"
+      }
+    }
+  ],
+  "next": "c_000042"
+}

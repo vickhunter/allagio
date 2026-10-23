@@ -1,0 +1,13 @@
+{
+  "orp": "0.3",
+  "type": "execute",
+  "id": "m_mkr_0004",
+  "ts": "2026-10-22T09:00:00Z",
+  "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+  "deal": "deal_swp_4KfP",
+  "body": {
+    "obligation": "repost",
+    "proof_url": "https://x.com/acmenotes/status/1848100000000000000",
+    "at": "2026-10-22T08:58:00Z"
+  }
+}
