@@ -1,3 +1,14 @@
+## October 23 — Hosted ORP 0.3 thin layer (D-092b)
+
+A cold agent can discover this host and suggest or join without a credential. DCP v0.1 stays the live affiliate path.
+
+- `GET /.well-known/orp.json` is unauthenticated and sends `Access-Control-Allow-Origin: *`. The `name` is **In testing**. The document does not claim L0, L1, L2, or L3.
+- `POST /orp` accepts an ORP 0.3 envelope. A #68-shaped message is HTTP 400 `invalid_message` and creates no deal. Hello and discover are answered. This host does not open deals.
+- `POST /orp/suggest` takes a draft with no credential. When `join` is present, the same call returns pitches and the bearer `POST /v1/agent-tokens` would mint.
+- `POST /orp/join` mints that same agent account. It refuses an email, a name, and a signing key.
+
+`GET /.well-known/dcp.json` is unchanged. There is no migration. `CLAIMS_CHECK` is unchanged and is only reported. No deploy. D-092 is not accepted until a cold agent and Site Keeper prove this path end to end.
+
 ## October 23 — ORP 0.3 conformance suite L0–L3 (D-092a)
 
 `cd docs/protocol && npm ci && npm test` runs the schema checks and the named behavioral suite in `docs/protocol/conformance/test/` against the reference host in `docs/protocol/sdk/`. The tests are L0-SCHEMA, L0-HASH, L0-IDEMPOTENT, L0-REPLAY, L0-STALE, C1-UNIVERSAL-LINK-NO-ADAPTER, C2-NO-EMAIL-NO-SIGNUP, L1-PLAIN-AFTER-REVOKE, L1-NO-PII, L1-TEST-CLICKS, L1-POLICIES, L2-STEP-MODES, L2-CONSENT-HOST-ONLY, L2-NO-SELF-RECEIPT, L2-ATTESTATION-NO-REP, L2-CLAIMS-UNCHECKED, L2-RECHECK, L3-KINDS, L3-NEGOTIATE, L3-SPACE, L3-DISPUTE, L3-REPUTATION, L3-PAYOUT, and INVALID-68. INVALID-68 posts the three #68-shaped examples and expects `invalid_message`.

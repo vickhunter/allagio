@@ -21,8 +21,14 @@ func CORS(allowedOrigins string) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		origin := c.GetHeader("Origin")
-		if origin != "" {
+		// ORP discovery, suggest, and join are credential-free and must be
+		// readable from any page, including when the request has no Origin
+		// and when ALLOWED_ORIGINS is a restricted list. The envelope at
+		// POST /orp is not in this set.
+		if orpOpen(c.Request.URL.Path) {
+			c.Header("Access-Control-Allow-Origin", "*")
+			c.Header("Cache-Control", "no-store")
+		} else if origin := c.GetHeader("Origin"); origin != "" {
 			if allowAll {
 				c.Header("Access-Control-Allow-Origin", "*")
 			} else if _, ok := allowed[origin]; ok {
@@ -40,5 +46,14 @@ func CORS(allowedOrigins string) gin.HandlerFunc {
 			return
 		}
 		c.Next()
+	}
+}
+
+func orpOpen(path string) bool {
+	switch path {
+	case "/.well-known/orp.json", "/orp/suggest", "/orp/join":
+		return true
+	default:
+		return false
 	}
 }

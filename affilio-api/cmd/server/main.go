@@ -11,7 +11,6 @@ import (
 
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
-	"affilio-api/internal/dcp"
 	"affilio-api/internal/entry"
 	"affilio-api/internal/handlers"
 	"affilio-api/internal/middleware"
@@ -106,40 +105,7 @@ func main() {
 		Limiter: handlers.NewIPRateLimiter(10, time.Minute),
 	}
 	r.POST("/api/preview", preview.Preview)
-	r.GET("/.well-known/dcp.json", func(c *gin.Context) {
-		mcpURL, mcpTransport := "/v1/mcp", "legacy-http-jsonrpc"
-		if cfg.PublicBaseURL != "" {
-			mcpURL, mcpTransport = "/mcp", "streamable-http"
-		}
-		makerVerbs := make([]string, 0, len(dcp.Tools))
-		for _, tool := range dcp.Tools {
-			makerVerbs = append(makerVerbs, tool.Name)
-		}
-		publisherVerbs := make([]string, 0, len(dcp.PublisherTools))
-		for _, tool := range append(dcp.PublisherTools, dcp.RevenueTools...) {
-			publisherVerbs = append(publisherVerbs, tool.Name)
-		}
-		c.JSON(200, gin.H{
-			"dcp_version": "0.1",
-			"name":        "distributoor",
-			"description": "Agent-native distribution network: makers publish offers, publishers earn commissions, agents do the operational work.",
-			"http_base":   "/v1",
-			"mcp": gin.H{
-				"transport": mcpTransport,
-				"url":       mcpURL,
-				"stdio": gin.H{
-					"command": "distributoor-mcp",
-					"env":     []string{"DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY", "DISTRIBUTOOR_SITE_KEY"},
-				},
-			},
-			"verbs": gin.H{
-				"public":    []string{"preview_revenue"},
-				"maker":     makerVerbs,
-				"publisher": publisherVerbs,
-			},
-			"payout_methods": []string{"manual"},
-		})
-	})
+	r.GET("/.well-known/dcp.json", handlers.ServeDCPDiscovery(cfg.PublicBaseURL))
 
 	v1 := r.Group("/v1")
 
@@ -298,6 +264,10 @@ func main() {
 		log.Printf("local session auth enabled for %s", base)
 	}
 	agentEntry.Mount(r)
+	(&handlers.ORPHost{
+		Entry:          agentEntry,
+		SuggestLimiter: handlers.NewIPRateLimiter(30, time.Minute),
+	}).Mount(r)
 	signals := v1.Group("/agent-signals")
 	signals.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
 	signals.GET("", agentEntry.AgentSignals)
