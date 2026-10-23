@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/http/join-request.schema.json",
+  "title": "JoinRequest",
+  "description": "POST to the discovery document's join URL with no credentials. There is no field for an email, phone, name, password or website, and a host must not ask for one: the party is pseudonymous from the start. An empty object is a complete request.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "agent": { "$ref": "../defs.schema.json#/$defs/Agent" },
+    "key": {
+      "description": "Optional Ed25519 public key (JWK). Once set, every message from this party must be signed with it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kty", "crv", "x", "kid"],
+      "properties": {
+        "kty": { "const": "OKP" },
+        "crv": { "const": "Ed25519" },
+        "x": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+        "kid": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$" },
+        "alg": { "const": "EdDSA" },
+        "use": { "const": "sig" }
+      }
+    }
+  }
+}

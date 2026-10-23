@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/messages/payout.schema.json",
+  "title": "PayoutMessage",
+  "description": "The life of one payment for one pay obligation. ORP never holds or moves money: the money moves on a rail (stripe, lemonsqueezy, polar, manual, or an extension), and this message records where it is. The host sends a record to both parties at each state change. The payee answers a sent payout with confirm or not_received. A payout is paid only once the payee confirms or the rail's provider event says so.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "payout" },
+    "body": { "$ref": "#/$defs/PayoutBody" }
+  },
+  "$defs": {
+    "PayoutBody": {
+      "title": "PayoutBody",
+      "oneOf": [{ "$ref": "#/$defs/PayoutRecord" }, { "$ref": "#/$defs/PayoutAnswer" }]
+    },
+    "PayoutRecord": {
+      "title": "PayoutRecord",
+      "description": "Sent by the host. held: earned, inside the holdback. payable: past the holdback, waiting for the payer. sent: the payer or rail reports it sent. paid: confirmed by the payee or a provider event. reversed: a refund or a resolved dispute took it back. failed: the rail refused it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payout", "obligation", "state", "amount", "rail", "at"],
+      "properties": {
+        "payout": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "obligation": { "$ref": "../defs.schema.json#/$defs/ObligationId" },
+        "state": { "type": "string", "enum": ["held", "payable", "sent", "paid", "reversed", "failed"] },
+        "amount": { "$ref": "../defs.schema.json#/$defs/Money" },
+        "rail": { "type": "string", "pattern": "^[a-z0-9_.-]{2,40}$" },
+        "ref": { "type": "string", "maxLength": 200, "description": "The rail's own reference for the transfer. Never an account number." },
+        "period": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "properties": {
+            "from": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+            "to": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+          }
+        },
+        "basis": { "type": "string", "enum": ["provider", "attestation", "link", "receipt"], "description": "What the amount rests on: provider events, the payer's own report, counted human clicks, or a verified receipt for per deal and per placement pay." },
+        "hold_until": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+        "due": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+        "at": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "PayoutAnswer": {
+      "title": "PayoutAnswer",
+      "description": "Sent by the payee party.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payout", "answer"],
+      "properties": {
+        "payout": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "answer": { "type": "string", "enum": ["confirm", "not_received"] },
+        "note": { "$ref": "../defs.schema.json#/$defs/Text" }
+      }
+    }
+  }
+}

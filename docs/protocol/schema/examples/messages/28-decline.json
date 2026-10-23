@@ -1,0 +1,12 @@
+{
+  "orp": "0.3",
+  "type": "decline",
+  "id": "m_mkr_0008",
+  "ts": "2026-10-23T08:00:00Z",
+  "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+  "deal": "deal_spn_2Lx7",
+  "body": {
+    "reason": "timing",
+    "note": "Booked through November."
+  }
+}

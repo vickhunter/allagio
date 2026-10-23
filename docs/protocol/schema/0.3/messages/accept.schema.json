@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/messages/accept.schema.json",
+  "title": "AcceptMessage",
+  "description": "Agree to exact terms, named by terms_hash. Accept an open deal (deal set) or a standing offer (body.offer set, which opens a new deal). The host binds the sender only if the owner's constraints allow it; otherwise the deal waits for a person and the reply says so.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body"],
+  "properties": {
+    "type": { "const": "accept" },
+    "body": { "$ref": "#/$defs/AcceptBody" }
+  },
+  "anyOf": [
+    { "required": ["deal"] },
+    { "properties": { "body": { "type": "object", "required": ["offer"] } } }
+  ],
+  "$defs": {
+    "AcceptBody": {
+      "title": "AcceptBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terms_hash"],
+      "properties": {
+        "terms_hash": { "$ref": "../defs.schema.json#/$defs/Hash" },
+        "offer": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "spaces": {
+          "description": "Optional: which of the sender's spaces each obligation will use. Leave out to keep the choice open; the tracking link works on any of them.",
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["obligation", "space"],
+            "properties": {
+              "obligation": { "$ref": "../defs.schema.json#/$defs/ObligationId" },
+              "space": { "$ref": "../defs.schema.json#/$defs/LocalId" }
+            }
+          }
+        },
+        "note": { "$ref": "../defs.schema.json#/$defs/Text" }
+      }
+    }
+  }
+}

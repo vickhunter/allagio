@@ -1,0 +1,84 @@
+{
+  "orp": "0.3",
+  "type": "results",
+  "id": "m_host_0003",
+  "ts": "2026-10-21T10:01:01Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "re": "m_pub_0002",
+  "body": {
+    "items": [
+      {
+        "offer": {
+          "id": "ofr_acme_30",
+          "terms": {
+            "title": "Acme Notes: 30% of first-year revenue",
+            "kind": "affiliate",
+            "categories": [
+              "software.productivity"
+            ],
+            "disclosure": {
+              "label": "Affiliate link",
+              "lang": "en"
+            },
+            "obligations": [
+              {
+                "id": "place",
+                "by": "acceptor",
+                "action": "place",
+                "content": {
+                  "link": true,
+                  "must_not_include": [
+                    "free forever"
+                  ]
+                },
+                "destination": "https://acmenotes.example/pricing",
+                "proof": [
+                  "link"
+                ]
+              },
+              {
+                "id": "commission",
+                "by": "offerer",
+                "action": "pay",
+                "per": "conversion",
+                "rate_bps": 3000,
+                "window": "P30D",
+                "rail": "stripe",
+                "proof": [
+                  "provider"
+                ]
+              }
+            ]
+          },
+          "terms_hash": "sha256-Bti4pak22vzeA0HAuX0eLXhUQy1pnbf9YGiGKYgJpNo",
+          "expires": "2027-01-31T00:00:00Z"
+        },
+        "party": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+        "fit": {
+          "score": 82,
+          "reasons": [
+            "Note-taking for solo founders matches the issue topic.",
+            "Pays 30% for 30 days after a click."
+          ],
+          "evidence": [
+            "https://acmenotes.example/pricing"
+          ]
+        },
+        "trust": {
+          "reputation": 858,
+          "completed_deals": 48,
+          "verified": [
+            "person",
+            "domain"
+          ]
+        },
+        "pool": "public",
+        "pitch": "Acme Notes pays 30% of first-year revenue for readers who subscribe through your link.",
+        "checks": {
+          "claims": "not_checked"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "why": "A payee answers yes or no; it cannot restate the amount.",
+  "schema": "message",
+  "path": "/body",
+  "instance": {
+    "orp": "0.3",
+    "type": "payout",
+    "id": "m_pub_0202",
+    "ts": "2026-12-02T09:00:00Z",
+    "from": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+    "deal": "deal_aff_9wQz",
+    "body": {
+      "payout": "po_aff_9wQz_1",
+      "answer": "confirm",
+      "amount": {
+        "amount_minor": 9999,
+        "currency": "EUR"
+      }
+    }
+  }
+}

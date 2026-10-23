@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/envelope.schema.json",
+  "title": "Envelope",
+  "description": "The ORP 0.3 envelope. Six fields are required. Trust fields (prev, sig) and extensions are optional.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["orp", "type", "id", "ts", "from", "body"],
+  "properties": {
+    "orp": { "$ref": "defs.schema.json#/$defs/Version" },
+    "type": { "$ref": "defs.schema.json#/$defs/MessageType" },
+    "id": { "$ref": "defs.schema.json#/$defs/MessageId" },
+    "ts": { "$ref": "defs.schema.json#/$defs/Timestamp" },
+    "from": { "$ref": "defs.schema.json#/$defs/PartyId" },
+    "to": { "$ref": "defs.schema.json#/$defs/PartyId" },
+    "deal": { "$ref": "defs.schema.json#/$defs/LocalId" },
+    "re": { "$ref": "defs.schema.json#/$defs/MessageId" },
+    "body": { "type": "object", "additionalProperties": true },
+    "agent": { "$ref": "defs.schema.json#/$defs/Agent" },
+    "prev": { "$ref": "defs.schema.json#/$defs/Hash" },
+    "sig": {
+      "description": "Detached compact JWS (RFC 7515 Appendix F) over the JCS form of the envelope without sig.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+\\.\\.[A-Za-z0-9_-]+$",
+      "maxLength": 4096
+    },
+    "ext": {
+      "type": "object",
+      "propertyNames": { "$ref": "defs.schema.json#/$defs/ExtName" },
+      "maxProperties": 16,
+      "additionalProperties": true
+    },
+    "critical": {
+      "description": "Extensions the receiver must understand, or refuse the message with unsupported_extension.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "defs.schema.json#/$defs/ExtName" }
+    }
+  }
+}

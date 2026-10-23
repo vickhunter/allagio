@@ -1,0 +1,63 @@
+{
+  "why": "Money is a non-negative integer in minor units.",
+  "schema": "message",
+  "path": "/body/terms/obligations/1",
+  "instance": {
+    "orp": "0.3",
+    "type": "offer",
+    "id": "m_host_0002",
+    "ts": "2026-10-21T09:00:01Z",
+    "from": "orp:hub.example/host",
+    "to": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+    "re": "m_mkr_0001",
+    "body": {
+      "id": "ofr_acme_30",
+      "terms": {
+        "title": "Acme Notes: 30% of first-year revenue",
+        "kind": "affiliate",
+        "categories": [
+          "software.productivity"
+        ],
+        "disclosure": {
+          "label": "Affiliate link",
+          "lang": "en"
+        },
+        "obligations": [
+          {
+            "id": "place",
+            "by": "acceptor",
+            "action": "place",
+            "content": {
+              "link": true,
+              "must_not_include": [
+                "free forever"
+              ]
+            },
+            "destination": "https://acmenotes.example/pricing",
+            "proof": [
+              "link"
+            ]
+          },
+          {
+            "id": "commission",
+            "by": "offerer",
+            "action": "pay",
+            "per": "conversion",
+            "window": "P30D",
+            "rail": "stripe",
+            "proof": [
+              "provider"
+            ],
+            "amount": {
+              "amount_minor": -500,
+              "currency": "EUR"
+            }
+          }
+        ]
+      },
+      "terms_hash": "sha256-Bti4pak22vzeA0HAuX0eLXhUQy1pnbf9YGiGKYgJpNo",
+      "limit": 500,
+      "expires": "2027-01-31T00:00:00Z"
+    }
+  }
+}

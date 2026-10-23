@@ -1,0 +1,107 @@
+{
+  "orp": [
+    "0.3"
+  ],
+  "host": "orp:hub.example/host",
+  "name": "Hub Example",
+  "description": "An example ORP host.",
+  "endpoint": "https://hub.example/orp",
+  "suggest": "https://hub.example/orp/suggest",
+  "join": "https://hub.example/orp/join",
+  "mcp": {
+    "url": "https://hub.example/mcp",
+    "transport": "streamable-http",
+    "auth": [
+      "bearer",
+      "oauth"
+    ],
+    "binding": true,
+    "tools": [
+      "orp_suggest",
+      "orp_join",
+      "orp_send",
+      "orp_inbox",
+      "orp_deal"
+    ]
+  },
+  "auth": {
+    "bearer": true,
+    "oauth_metadata": "https://hub.example/.well-known/oauth-protected-resource/mcp"
+  },
+  "tracking": {
+    "links": true,
+    "codes": true,
+    "base": "https://hub.example/go/"
+  },
+  "conformance": {
+    "levels": [
+      "L0",
+      "L1",
+      "L2",
+      "L3"
+    ]
+  },
+  "capabilities": {
+    "messages": [
+      "hello",
+      "discover",
+      "results",
+      "space",
+      "request",
+      "offer",
+      "counter",
+      "accept",
+      "decline",
+      "deal",
+      "execute",
+      "receipt",
+      "outcome",
+      "payout",
+      "revoke",
+      "consent",
+      "dispute",
+      "reputation",
+      "error"
+    ],
+    "proofs": [
+      "link",
+      "proof_url",
+      "platform_check",
+      "attestation",
+      "witness",
+      "provider"
+    ],
+    "tracking": {
+      "links": true,
+      "codes": true
+    },
+    "signatures": {
+      "algs": [
+        "EdDSA"
+      ],
+      "required": false
+    },
+    "inbox": {
+      "poll": true
+    },
+    "checks": {
+      "claims": "real"
+    }
+  },
+  "keys": [
+    {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "kdyMDwk4CBcDCgiyPImPfJuJr-2QdJ7l72X-4lztu1o",
+      "kid": "host-2026-10",
+      "alg": "EdDSA",
+      "use": "sig"
+    }
+  ],
+  "policies": {
+    "terms": "https://hub.example/terms",
+    "privacy": "https://hub.example/privacy",
+    "abuse": "https://hub.example/abuse"
+  },
+  "docs": "https://hub.example/docs/orp"
+}

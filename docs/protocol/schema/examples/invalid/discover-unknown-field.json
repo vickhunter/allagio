@@ -1,0 +1,31 @@
+{
+  "why": "Core bodies are closed; extension data goes in ext.",
+  "schema": "message",
+  "path": "/body",
+  "instance": {
+    "orp": "0.3",
+    "type": "discover",
+    "id": "m_pub_0002",
+    "ts": "2026-10-21T10:01:00Z",
+    "from": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+    "body": {
+      "want": "offers",
+      "context": {
+        "text": "This week: five tools that keep a solo founder organised, from note-taking to invoicing.",
+        "space": "sp_news_1"
+      },
+      "filters": {
+        "kinds": [
+          "affiliate",
+          "swap"
+        ],
+        "categories": [
+          "software.productivity"
+        ],
+        "min_reputation": 500
+      },
+      "limit": 5,
+      "reader_emails": true
+    }
+  }
+}

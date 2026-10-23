@@ -1,0 +1,20 @@
+{
+  "why": "Extension types use reverse-DNS names.",
+  "schema": "message",
+  "path": "/type",
+  "instance": {
+    "orp": "0.3",
+    "type": "boost",
+    "id": "m_mkr_0010",
+    "ts": "2026-10-23T09:00:00Z",
+    "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+    "ext": {
+      "com.example.boost": {
+        "tier": "gold"
+      }
+    },
+    "body": {
+      "budget": 2000
+    }
+  }
+}

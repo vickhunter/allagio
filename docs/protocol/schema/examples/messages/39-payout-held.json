@@ -1,0 +1,26 @@
+{
+  "orp": "0.3",
+  "type": "payout",
+  "id": "m_host_0201",
+  "ts": "2026-10-28T00:00:05Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "deal": "deal_aff_9wQz",
+  "body": {
+    "payout": "po_aff_9wQz_1",
+    "obligation": "commission",
+    "state": "held",
+    "amount": {
+      "amount_minor": 5760,
+      "currency": "EUR"
+    },
+    "rail": "stripe",
+    "basis": "provider",
+    "period": {
+      "from": "2026-10-21T00:00:00Z",
+      "to": "2026-10-28T00:00:00Z"
+    },
+    "hold_until": "2026-11-27T00:00:00Z",
+    "at": "2026-10-28T00:00:05Z"
+  }
+}

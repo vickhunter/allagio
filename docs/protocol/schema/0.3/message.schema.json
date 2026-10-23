@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offerrails.com/orp/schema/0.3/message.schema.json",
+  "title": "Message",
+  "description": "Any ORP 0.3 message: the envelope, then the body rules for the declared type. Extension types (reverse-DNS names) get envelope checks only; a receiver that does not know them answers unsupported_type.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "envelope.schema.json" },
+    { "if": { "properties": { "type": { "const": "hello" } }, "required": ["type"] }, "then": { "$ref": "messages/hello.schema.json" } },
+    { "if": { "properties": { "type": { "const": "discover" } }, "required": ["type"] }, "then": { "$ref": "messages/discover.schema.json" } },
+    { "if": { "properties": { "type": { "const": "results" } }, "required": ["type"] }, "then": { "$ref": "messages/results.schema.json" } },
+    { "if": { "properties": { "type": { "const": "space" } }, "required": ["type"] }, "then": { "$ref": "messages/space.schema.json" } },
+    { "if": { "properties": { "type": { "const": "request" } }, "required": ["type"] }, "then": { "$ref": "messages/request.schema.json" } },
+    { "if": { "properties": { "type": { "const": "offer" } }, "required": ["type"] }, "then": { "$ref": "messages/offer.schema.json" } },
+    { "if": { "properties": { "type": { "const": "counter" } }, "required": ["type"] }, "then": { "$ref": "messages/counter.schema.json" } },
+    { "if": { "properties": { "type": { "const": "accept" } }, "required": ["type"] }, "then": { "$ref": "messages/accept.schema.json" } },
+    { "if": { "properties": { "type": { "const": "decline" } }, "required": ["type"] }, "then": { "$ref": "messages/decline.schema.json" } },
+    { "if": { "properties": { "type": { "const": "deal" } }, "required": ["type"] }, "then": { "$ref": "messages/deal.schema.json" } },
+    { "if": { "properties": { "type": { "const": "execute" } }, "required": ["type"] }, "then": { "$ref": "messages/execute.schema.json" } },
+    { "if": { "properties": { "type": { "const": "receipt" } }, "required": ["type"] }, "then": { "$ref": "messages/receipt.schema.json" } },
+    { "if": { "properties": { "type": { "const": "outcome" } }, "required": ["type"] }, "then": { "$ref": "messages/outcome.schema.json" } },
+    { "if": { "properties": { "type": { "const": "payout" } }, "required": ["type"] }, "then": { "$ref": "messages/payout.schema.json" } },
+    { "if": { "properties": { "type": { "const": "revoke" } }, "required": ["type"] }, "then": { "$ref": "messages/revoke.schema.json" } },
+    { "if": { "properties": { "type": { "const": "consent" } }, "required": ["type"] }, "then": { "$ref": "messages/consent.schema.json" } },
+    { "if": { "properties": { "type": { "const": "dispute" } }, "required": ["type"] }, "then": { "$ref": "messages/dispute.schema.json" } },
+    { "if": { "properties": { "type": { "const": "reputation" } }, "required": ["type"] }, "then": { "$ref": "messages/reputation.schema.json" } },
+    { "if": { "properties": { "type": { "const": "error" } }, "required": ["type"] }, "then": { "$ref": "messages/error.schema.json" } }
+  ]
+}
