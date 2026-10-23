@@ -2,7 +2,7 @@
 export const brand = 'Offer Rails'
 export const tagline = 'Affiliate marketing, evolved for agents.'
 export const pitch = 'Makers pay only for sales. Publishers earn from more of their posts. Agents find, match and place.'
-export const joinLine = 'One account can list a product and place offers. WordPress is live today.'
+export const joinLine = 'One account can list a product and place offers. One link counts clicks wherever you paste it.'
 export const painLine = 'Agents do the slow part: finding partners, matching them to content, and placing the offer.'
 
 export const example = { product: 'Hand-bound notebook', price: '€24.00', commission: '10%', publisher: '€2.40', maker: '€21.60' }
@@ -25,20 +25,6 @@ export const modes = [
   { name: 'Approve anything that passes the checks', note: 'Your agent decides. You get a digest with one-tap undo.' },
 ]
 
-export const publisherRuns = [
-  { name: 'WordPress', status: 'Live', note: 'The plugin places one labelled box in a post that fits.' },
-  { name: 'X', status: 'Planned', note: 'Share links you approve. Posting stays with you. Not live yet.' },
-  { name: 'Newsletter', status: 'Planned', note: 'Not live yet.' },
-  { name: 'YouTube', status: 'Planned', note: 'Not live yet.' },
-  { name: 'Instagram', status: 'Planned', note: 'Not live yet.' },
-  { name: 'TikTok', status: 'Planned', note: 'Not live yet.' },
-]
-
-export const makerRuns = [
-  { name: 'WordPress', status: 'Live', note: 'The plugin places one labelled box in a post that fits.' },
-  { name: 'Shopify', status: 'Planned', note: 'A shop can list products that fit. Not live yet.' },
-  { name: 'X', status: 'Planned', note: 'Share links you approve. Posting stays with you. Not live yet.' },
-]
 
 export const feed = [
   { kind: 'listed', who: 'maker', text: 'Hand-bound notebook listed', meta: '€24.00 · 10%' },
@@ -88,6 +74,6 @@ export const publisherAdvantages = [
   { k: 'stricter', t: 'Agents can only tighten', b: 'Your agent can make settings stricter. Loosening a mode needs you, signed in.' },
   { k: 'undo', t: 'Undo in one tap', b: 'Clicks stop at the link right away; the box leaves the page at the plugin’s next sync (every 5 minutes) plus any page-cache delay.' },
   { k: 'readers', t: 'Readers aren’t tracked by cookies', b: 'The go link records the click without cookies. No subscriber list is shared.' },
-  { k: 'surfaces', t: 'The content you already make', b: 'WordPress is live, with the plugin. X, newsletter, YouTube, Instagram and TikTok are planned. Posting stays with you.' },
+  { k: 'surfaces', t: 'The content you already make', b: 'Paste one link in email, on X, Instagram, YouTube, or a blog. It counts clicks there. No plugin is needed for that. Posting stays with you.' },
   { k: 'swap', t: 'No sale nearby? Traffic trade is coming', b: 'A mention swap with a related site is not live yet. Visibility for visibility, when it is.' },
 ] as const

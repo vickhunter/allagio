@@ -102,6 +102,8 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/publishers/:slug/", h.directoryProfile)
 		public.GET("/protocol", h.Protocol)
 		public.GET("/protocol/", h.Protocol)
+		public.GET("/you", h.You)
+		public.GET("/you/", h.You)
 		public.GET("/privacy", h.Privacy)
 		public.GET("/privacy/", h.Privacy)
 		public.GET("/terms", h.Terms)
@@ -212,6 +214,7 @@ func (h *HostedHandler) Makers(c *gin.Context)         { h.landing(c, "makers.ht
 func (h *HostedHandler) Publishers(c *gin.Context)     { h.landing(c, "publishers.html") }
 func (h *HostedHandler) PublisherSetup(c *gin.Context) { h.landing(c, "publishers-setup.html") }
 func (h *HostedHandler) Protocol(c *gin.Context)       { h.landing(c, "protocol.html") }
+func (h *HostedHandler) You(c *gin.Context)            { h.landing(c, "you.html") }
 func (h *HostedHandler) Privacy(c *gin.Context)        { h.builtPage(c, "privacy") }
 func (h *HostedHandler) Terms(c *gin.Context)          { h.builtPage(c, "terms") }
 func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents") }

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { Undo2 } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
+import { Runs } from '@/components/Runs'
 import { Checks, JoinSection } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { example, faq, joinLine, painLine, publisherAdvantages, publisherRuns } from '@/content'
+import { runsLead, runsTitle } from '@/surfaces.mjs'
+import { example, faq, joinLine, painLine, publisherAdvantages } from '@/content'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
 import { DirectorySection } from '@/directory/Directory'
@@ -56,9 +58,9 @@ export function App() {
 
       <section id="how" aria-labelledby="how-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
-          <p className="eyebrow">Where it runs</p>
-          <h2 id="how-h" className="h-display mt-3 text-3xl sm:text-4xl">WordPress is live. The others are planned.</h2>
-          <div className="mt-10 grid gap-3 sm:grid-cols-3">{publisherRuns.map((s) => <div key={s.name} className="rounded-2xl border border-dashed border-line-strong p-5"><p className="font-mono text-xs text-t2">{s.status}</p><h3 className="mt-1 font-display text-lg font-semibold">{s.name}</h3><p className="mt-1 text-sm text-t2">{s.note}</p></div>)}</div>
+          <h2 id="how-h" className="h-display text-3xl sm:text-4xl">{runsTitle}</h2>
+          <p className="mt-4 max-w-3xl text-lg leading-relaxed text-t2">{runsLead}</p>
+          <div className="mt-10"><Runs audience="publisher" notes /></div>
         </div>
       </section>
 

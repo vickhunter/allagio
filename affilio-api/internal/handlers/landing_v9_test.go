@@ -27,7 +27,7 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	r := gin.New()
 	h.Mount(r)
 
-	for _, path := range []string{"/", "/makers", "/makers/", "/publishers", "/publishers/", "/publishers/setup", "/publishers/setup/", "/protocol", "/protocol/"} {
+	for _, path := range []string{"/", "/makers", "/makers/", "/publishers", "/publishers/", "/publishers/setup", "/publishers/setup/", "/protocol", "/protocol/", "/you", "/you/"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusOK {
@@ -57,6 +57,18 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	r.ServeHTTP(protocol, httptest.NewRequest(http.MethodGet, "/protocol/", nil))
 	if !strings.Contains(protocol.Body.String(), "Offer Rails · Protocol") {
 		t.Fatal("protocol page title missing")
+	}
+	you := httptest.NewRecorder()
+	r.ServeHTTP(you, httptest.NewRequest(http.MethodGet, "/you/", nil))
+	youBody := you.Body.String()
+	if !strings.Contains(youBody, "Offer Rails · Your limits") || !strings.Contains(youBody, "This page is not a signup form") {
+		t.Fatal("human limits page is missing its title or the not-a-signup line")
+	}
+	if !strings.Contains(youBody, "Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.") || !strings.Contains(youBody, "Example wording. Not a live agreement.") {
+		t.Fatal("human limits page is missing the example receipt")
+	}
+	if !strings.Contains(youBody, "POST /v1/agent-tokens") || strings.Contains(youBody, "one sign-in link") {
+		t.Fatal("human limits page does not describe the token join")
 	}
 	setup := httptest.NewRecorder()
 	r.ServeHTTP(setup, httptest.NewRequest(http.MethodGet, "/publishers/setup?source=cursor", nil))

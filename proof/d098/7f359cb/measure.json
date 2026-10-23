@@ -1,0 +1,409 @@
+{
+  "origin": "http://127.0.0.1:39389",
+  "viewports": {
+    "390": {
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 113,
+        "top": 0,
+        "bottom": 113,
+        "right": 390
+      },
+      "copy": {
+        "x": 20,
+        "y": 624.984375,
+        "width": 74.140625,
+        "height": 44,
+        "top": 624.984375,
+        "bottom": 668.984375,
+        "right": 94.140625
+      },
+      "h1": {
+        "x": 20,
+        "y": 189.5,
+        "width": 350,
+        "height": 128.484375,
+        "top": 189.5,
+        "bottom": 317.984375,
+        "right": 370
+      },
+      "join": {
+        "x": 20,
+        "y": 341.984375,
+        "width": 350,
+        "height": 90,
+        "top": 341.984375,
+        "bottom": 431.984375,
+        "right": 370
+      },
+      "viewport": {
+        "name": "390",
+        "width": 390,
+        "height": 844
+      },
+      "foldOk": true,
+      "docSections": {
+        "does-h": {
+          "heading": {
+            "top": 1685.359375,
+            "bottom": 1717.359375,
+            "left": 20,
+            "right": 370
+          },
+          "section": {
+            "top": 1685.359375,
+            "bottom": 2685.609375,
+            "left": 20,
+            "right": 370
+          }
+        },
+        "keep-h": {
+          "heading": {
+            "top": 2725.609375,
+            "bottom": 2757.609375,
+            "left": 20,
+            "right": 370
+          },
+          "section": {
+            "top": 2725.609375,
+            "bottom": 3686.609375,
+            "left": 20,
+            "right": 370
+          }
+        },
+        "replaces-h": {
+          "heading": {
+            "top": 3726.609375,
+            "bottom": 3758.609375,
+            "left": 20,
+            "right": 370
+          },
+          "section": {
+            "top": 3726.609375,
+            "bottom": 4077.859375,
+            "left": 20,
+            "right": 370
+          }
+        }
+      },
+      "vision-does": {
+        "heading": {
+          "x": 20,
+          "y": 125.359375,
+          "width": 350,
+          "height": 32,
+          "top": 125.359375,
+          "bottom": 157.359375,
+          "right": 370
+        },
+        "section": {
+          "x": 20,
+          "y": 125.359375,
+          "width": 350,
+          "height": 1000.25,
+          "top": 125.359375,
+          "bottom": 1125.609375,
+          "right": 370
+        },
+        "header": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 113,
+          "top": 0,
+          "bottom": 113,
+          "right": 390
+        }
+      },
+      "vision-keep": {
+        "heading": {
+          "x": 20,
+          "y": 124.609375,
+          "width": 350,
+          "height": 32,
+          "top": 124.609375,
+          "bottom": 156.609375,
+          "right": 370
+        },
+        "section": {
+          "x": 20,
+          "y": 124.609375,
+          "width": 350,
+          "height": 961,
+          "top": 124.609375,
+          "bottom": 1085.609375,
+          "right": 370
+        },
+        "header": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 113,
+          "top": 0,
+          "bottom": 113,
+          "right": 390
+        }
+      },
+      "vision-replaces": {
+        "heading": {
+          "x": 20,
+          "y": 124.609375,
+          "width": 350,
+          "height": 32,
+          "top": 124.609375,
+          "bottom": 156.609375,
+          "right": 370
+        },
+        "section": {
+          "x": 20,
+          "y": 124.609375,
+          "width": 350,
+          "height": 351.25,
+          "top": 124.609375,
+          "bottom": 475.859375,
+          "right": 370
+        },
+        "header": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 113,
+          "top": 0,
+          "bottom": 113,
+          "right": 390
+        }
+      }
+    },
+    "1440": {
+      "header": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 65,
+        "top": 0,
+        "bottom": 65,
+        "right": 1440
+      },
+      "copy": {
+        "x": 164,
+        "y": 666.34375,
+        "width": 74.140625,
+        "height": 44,
+        "top": 666.34375,
+        "bottom": 710.34375,
+        "right": 238.140625
+      },
+      "h1": {
+        "x": 164,
+        "y": 165.5,
+        "width": 788,
+        "height": 171.34375,
+        "top": 165.5,
+        "bottom": 336.84375,
+        "right": 952
+      },
+      "join": {
+        "x": 164,
+        "y": 360.84375,
+        "width": 576,
+        "height": 112.5,
+        "top": 360.84375,
+        "bottom": 473.34375,
+        "right": 740
+      },
+      "viewport": {
+        "name": "1440",
+        "width": 1440,
+        "height": 900
+      },
+      "foldOk": true,
+      "docSections": {
+        "does-h": {
+          "heading": {
+            "top": 1246.96875,
+            "bottom": 1278.96875,
+            "left": 164,
+            "right": 1276
+          },
+          "section": {
+            "top": 1246.96875,
+            "bottom": 1696.21875,
+            "left": 164,
+            "right": 1276
+          }
+        },
+        "keep-h": {
+          "heading": {
+            "top": 1736.21875,
+            "bottom": 1768.21875,
+            "left": 164,
+            "right": 1276
+          },
+          "section": {
+            "top": 1736.21875,
+            "bottom": 2244.21875,
+            "left": 164,
+            "right": 1276
+          }
+        },
+        "replaces-h": {
+          "heading": {
+            "top": 2284.21875,
+            "bottom": 2316.21875,
+            "left": 164,
+            "right": 1276
+          },
+          "section": {
+            "top": 2284.21875,
+            "bottom": 2466.46875,
+            "left": 164,
+            "right": 1276
+          }
+        }
+      },
+      "vision-does": {
+        "heading": {
+          "x": 164,
+          "y": 76.96875,
+          "width": 1112,
+          "height": 32,
+          "top": 76.96875,
+          "bottom": 108.96875,
+          "right": 1276
+        },
+        "section": {
+          "x": 164,
+          "y": 76.96875,
+          "width": 1112,
+          "height": 449.25,
+          "top": 76.96875,
+          "bottom": 526.21875,
+          "right": 1276
+        },
+        "header": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 65,
+          "top": 0,
+          "bottom": 65,
+          "right": 1440
+        }
+      },
+      "vision-keep": {
+        "heading": {
+          "x": 164,
+          "y": 77.21875,
+          "width": 1112,
+          "height": 32,
+          "top": 77.21875,
+          "bottom": 109.21875,
+          "right": 1276
+        },
+        "section": {
+          "x": 164,
+          "y": 77.21875,
+          "width": 1112,
+          "height": 508,
+          "top": 77.21875,
+          "bottom": 585.21875,
+          "right": 1276
+        },
+        "header": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 65,
+          "top": 0,
+          "bottom": 65,
+          "right": 1440
+        }
+      },
+      "vision-replaces": {
+        "heading": {
+          "x": 164,
+          "y": 77.21875,
+          "width": 1112,
+          "height": 32,
+          "top": 77.21875,
+          "bottom": 109.21875,
+          "right": 1276
+        },
+        "section": {
+          "x": 164,
+          "y": 77.21875,
+          "width": 1112,
+          "height": 182.25,
+          "top": 77.21875,
+          "bottom": 259.46875,
+          "right": 1276
+        },
+        "header": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 65,
+          "top": 0,
+          "bottom": 65,
+          "right": 1440
+        }
+      }
+    }
+  },
+  "axe": {
+    "/390": {
+      "serious": 0,
+      "violations": 0,
+      "impacts": []
+    },
+    "/makers/390": {
+      "serious": 0,
+      "violations": 0,
+      "impacts": []
+    },
+    "/publishers/390": {
+      "serious": 0,
+      "violations": 0,
+      "impacts": []
+    },
+    "/you/390": {
+      "serious": 0,
+      "violations": 0,
+      "impacts": []
+    },
+    "/1440": {
+      "serious": 0,
+      "violations": 0,
+      "impacts": []
+    },
+    "/makers/1440": {
+      "serious": 0,
+      "violations": 0,
+      "impacts": []
+    },
+    "/publishers/1440": {
+      "serious": 0,
+      "violations": 0,
+      "impacts": []
+    },
+    "/you/1440": {
+      "serious": 0,
+      "violations": 0,
+      "impacts": []
+    }
+  },
+  "personal": {
+    "390 home": [],
+    "390 you": [],
+    "390 /makers/": [],
+    "390 /publishers/": [],
+    "1440 home": [],
+    "1440 you": [],
+    "1440 /makers/": [],
+    "1440 /publishers/": [],
+    "llms": []
+  },
+  "banned": []
+}

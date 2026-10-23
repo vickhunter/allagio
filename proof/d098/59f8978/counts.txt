@@ -1,0 +1,26 @@
+code head: 59f8978e70c32fb219058e634d8edd149522b488
+short: 59f8978
+
+landing (ui/landing, node --test):
+tests 27
+pass 27
+fail 0
+skipped 0
+includes: public copy rejects open source, and the home Copy button sits above the fold
+
+go test: not run. This pass did not change Go.
+
+axe serious+critical: 0
+pages: / /makers/ /publishers/ /you/
+viewports: 390x844 and 1440x900
+axe violations of any impact: 0
+
+rendered banned-word grep: 0
+pattern: ads, fully automatic, pilot, revolutionary, best-converting, open source / opensource / open-source
+rendered personal data (email, IP, phone): 0
+
+stamped home Copy button, scroll 0:
+390x844: top 625, bottom 669, sticky header bottom 113, viewport 844
+1440x900: top 666, bottom 710, sticky header bottom 65, viewport 900
+vision sections do not overlap
+no preview URL

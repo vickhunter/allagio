@@ -22,6 +22,18 @@ const shell = `<div id="static-landing">
     </main>
   </div>`
 
+const youShell = `<div id="static-landing">
+    <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+    <main id="main">
+      <h1>Your limits, your approvals, a receipt in plain words.</h1>
+      <p>This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.</p>
+      <p>Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.</p>
+      <section id="limits"><h2>Limits</h2><p>Your limits come first. A new site opens on Manual: ask every time.</p></section>
+      <section id="approvals"><h2>Approvals</h2><p>A person approves each placement. No agent tool can approve.</p></section>
+      <section id="receipts"><h2>Receipts</h2><p>Example wording. Not a live agreement.</p><p>Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.</p></section>
+    </main>
+  </div>`
+
 const setupShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
@@ -61,12 +73,14 @@ rmSync(resolve(assets, 'index.html'), { force: true })
 rmSync(resolve(assets, 'makers'), { recursive: true, force: true })
 rmSync(resolve(assets, 'publishers'), { recursive: true, force: true })
 rmSync(resolve(assets, 'protocol'), { recursive: true, force: true })
+rmSync(resolve(assets, 'you'), { recursive: true, force: true })
 
 writeFileSync(resolve(build, 'home.html'), stamp(resolve(dist, 'index.html')))
 writeFileSync(resolve(build, 'makers.html'), stamp(resolve(dist, 'makers/index.html')))
 writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers/index.html')))
 writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publishers/setup/index.html'), setupShell))
 writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html')))
+writeFileSync(resolve(build, 'you.html'), stamp(resolve(dist, 'you/index.html'), youShell))
 const agentsFile = resolve(assets, 'agents/index.html')
 writeFileSync(agentsFile, readFileSync(agentsFile, 'utf8').replaceAll('href="/landing-v9/llms.txt"', 'href="/llms.txt"'))
 const missingShell = `<div id="static-landing">

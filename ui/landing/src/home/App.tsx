@@ -1,10 +1,16 @@
 import { ArrowRight } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
-import { Checks, JoinSection } from '@/site/bits'
+import { Runs } from '@/components/Runs'
+import { JoinForm } from '@/components/JoinForm'
+import { joinHeading } from '@/components/join-prompt.mjs'
+import { runsLead, runsTitle } from '@/surfaces.mjs'
+import { Checks } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
-import { driftChips, example, faq, joinLine, makerAdvantages, publisherAdvantages, publisherRuns } from '@/content'
+import { driftChips, example, faq, joinLine, makerAdvantages, publisherAdvantages } from '@/content'
+import { evolutionLine, visionHonest, visionLine } from '@/vision.mjs'
+import { Vision } from './Vision'
 import { HeroShader } from './HeroShader'
 import { PostPreview } from '@/components/PostPreview'
 import { HowItWorks } from './HowItWorks'
@@ -28,15 +34,18 @@ export function App() {
                 </svg>
               </span>
             </h1>
+            <div className="mt-6 max-w-xl">
+              <h2 id="join-h" className="font-display text-2xl font-bold leading-tight tracking-tight sm:text-3xl">{joinHeading}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-t2">{joinLine}</p>
+              <div className="mt-4">
+                <JoinForm />
+              </div>
+            </div>
             <div className="mt-8 grid gap-6 border-t border-t1 pt-6 md:grid-cols-[1.1fr_1fr] md:items-start">
               <div>
-                <p className="text-lg leading-relaxed text-t2">Makers pay only for sales. Publishers earn from more of their posts. Agents find, match and place.</p>
-                <p className="mt-3 font-semibold text-t1">No paying for clicks or space. Only for results.</p>
-                <ol className="mt-4 list-decimal space-y-2 pl-5 text-[15px] leading-relaxed text-t1">
-                  <li>Paying for space. The bill is for clicks or a slot, whether or not anyone buys.</li>
-                  <li>Affiliate marketing pays per sale. Finding partners, matching an offer to content, and placing it are still slow.</li>
-                  <li>Agents do the finding, the matching and the placing.</li>
-                </ol>
+                <p className="text-lg leading-relaxed text-t2">{evolutionLine}</p>
+                <p className="mt-3 text-[15px] leading-relaxed text-t1">{visionLine}</p>
+                <p className="mt-3 text-sm leading-relaxed text-t2">{visionHonest}</p>
               </div>
               <div>
                 <p className="mb-3 text-[13px] font-semibold text-t2">Sign in. Which one are you?</p>
@@ -48,21 +57,18 @@ export function App() {
           <Drift />
         </div>
         <div className="mx-auto max-w-6xl px-5 pb-16">
-          <p className="eyebrow mb-3">Pick your side. Each page lists every advantage.</p>
+          <Vision />
+          <p className="eyebrow mb-3 mt-12">Pick your side. Each page lists every advantage.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <SideLink href={withSource('/makers/', source)} tone="maker" n="A" title="I sell something." text="Publishers’ agents find you. You pay only for sales." cta={`All ${makerAdvantages.length} maker advantages`} />
             <SideLink id="publishers" href={withSource('/publishers/', source)} tone="pub" n="B" title="I publish." text="Earn from more of your posts. Agents find offers that fit the content you already make." cta={`All ${publisherAdvantages.length} publisher advantages`} />
           </div>
           <p className="mt-3 text-[13px] text-t2">Both? One account does both. Press <kbd className="font-mono">M</kbd> or <kbd className="font-mono">P</kbd>.</p>
-          <p className="eyebrow mb-3 mt-8">Where it runs</p>
-          <ul className="grid gap-2 sm:grid-cols-3">
-            {publisherRuns.map((item) => (
-              <li key={item.name} className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line bg-s1 px-4 py-2 text-sm">
-                <span className="font-semibold">{item.name}</span>
-                <span className="text-t2">{item.status}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-8">
+            <h2 className="font-display text-2xl font-bold tracking-tight">{runsTitle}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-t2">{runsLead}</p>
+            <div className="mt-4"><Runs audience="publisher" /></div>
+          </div>
         </div>
       </section>
 
@@ -99,7 +105,6 @@ export function App() {
         </div>
       </section>
 
-      <JoinSection title="Not sure which side? Pick both." sub={joinLine} />
     </Page>
   )
 }

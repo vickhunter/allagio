@@ -1,0 +1,90 @@
+// D-098. The vision may name any agent, any platform, and any post.
+// A status says Coming unless that deal works today. Nothing is Verified end to end
+// until adapterTests and e2e are both true. They are not.
+
+export const visionLine = 'Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent.'
+
+export const visionHonest = 'That is the direction. What works today is an affiliate link a person approves. The other deals on this page are Coming. Nothing here is Verified end to end.'
+
+export const evolutionLine = 'This is affiliate marketing, evolved for agents. The same path, with the finding and the matching handed to the agent you already use.'
+
+export const agentDoesLead = 'While you write a blog post, a social post, or a newsletter, your agent can suggest a matching offer: "this fits your post, want to monetize it?" That suggestion is Coming. The agent does not write the post, and it does not choose the offer.'
+
+export const deals = [
+  {
+    name: 'Suggest an offer while you write',
+    status: 'Coming',
+    note: 'Not on the hosted server today. The agent does not write the post.',
+  },
+  {
+    name: 'Affiliate links',
+    status: 'A person approves',
+    note: 'Your agent can find an offer and prepare a placement. You approve it before it is published. A pasted link counts clicks. This is not Verified end to end.',
+  },
+  {
+    name: 'Link swaps',
+    status: 'Coming',
+    note: 'Agents would trade links with each other. That deal is not implemented.',
+  },
+  {
+    name: 'Cross-sells',
+    status: 'Coming',
+    note: 'A matching product beside yours. Not implemented.',
+  },
+  {
+    name: 'Upsells',
+    status: 'Coming',
+    note: 'A higher offer on something you already mention. Not implemented.',
+  },
+  {
+    name: 'Reposts',
+    status: 'Coming',
+    note: 'Another agent reposting your piece. Not implemented.',
+  },
+]
+
+export const youKeep = [
+  {
+    t: 'Your limits come first',
+    b: 'A new site opens on Manual: ask every time. You can later approve within your rules, or approve anything that passes the nine checks. While claims are not checked, those two still wait for a person.',
+  },
+  {
+    t: 'You approve',
+    b: 'A person approves each placement. No agent tool can approve.',
+  },
+  {
+    t: 'No personal data shared with the other agent',
+    b: 'The other agent does not get your subscriber list. A click on this server stores a truncated hash of the IP address. That hash is not sent to the other agent.',
+  },
+  {
+    t: 'No cold emails',
+    b: 'Offer Rails does not send cold emails. Deals with other agents are the aim. Those deals, apart from an approved affiliate link, are Coming.',
+  },
+  {
+    t: 'No signup on each program site',
+    b: 'The aim is that your agent joins an offer without you filling in a form on the program site. Your agent joins here with POST /v1/agent-tokens and a bearer. No sign-in link. Google sign-in stays on the owner dashboard.',
+  },
+]
+
+export const replaces = [
+  {
+    t: 'Manual affiliate signups',
+    b: 'Filling in a form on each program site is what this is built to replace. Today you still approve the placement. Your agent joins with POST /v1/agent-tokens and a bearer.',
+  },
+  {
+    t: 'Outreach email bots',
+    b: 'Cold email is what this is built to replace. Agent-to-agent link swaps, cross-sells, upsells, and reposts are Coming.',
+  },
+]
+
+export const limits = [
+  { name: 'Ask every time', note: 'Manual. A new site opens here. Each placement waits for you.' },
+  { name: 'Approve within your rules', note: 'Once you set it. While claims are not checked, this still waits for a person.' },
+  { name: 'Approve anything that passes the nine checks', note: 'Only you can turn this on. While claims are not checked, this also waits for a person.' },
+]
+
+export const youPageLead = 'This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.'
+
+export const receiptExample = 'Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.'
+
+export const receiptLabel = 'Example wording. Not a live agreement.'

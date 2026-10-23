@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { Terminal } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
+import { Runs } from '@/components/Runs'
 import { Checks, JoinSection } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { example, faq, feed, joinLine, makerAdvantages, makerRuns, painLine } from '@/content'
+import { runsLead, runsTitle } from '@/surfaces.mjs'
+import { example, faq, feed, joinLine, makerAdvantages, painLine } from '@/content'
 import { useOfferConfig } from '@/lib/source'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
@@ -70,8 +72,9 @@ export function App() {
               <li key={h} className="rounded-2xl border border-line bg-s1 p-5"><span className="font-display text-3xl font-bold text-maker">{i + 1}</span><h3 className="mt-2 font-display text-lg font-semibold">{h}</h3><p className="mt-1 text-sm leading-relaxed text-t2">{b}</p></li>
             ))}
           </ol>
-          <h3 className="mt-12 font-display text-lg font-semibold">Where your offer can run</h3>
-          <ol className="mt-4 grid gap-3 sm:grid-cols-3">{makerRuns.map((s) => <li key={s.name} className="rounded-xl border border-dashed border-line-strong p-4"><div className="flex items-center justify-between"><strong className="font-display">{s.name}</strong><Badge variant={s.status === 'Live' ? 'maker' : 'neutral'}>{s.status}</Badge></div><p className="mt-2 text-sm text-t2">{s.note}</p></li>)}</ol>
+          <h3 className="mt-12 font-display text-lg font-semibold">{runsTitle}</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-t2">{runsLead}</p>
+          <div className="mt-4"><Runs audience="maker" notes /></div>
         </div>
       </section>
 
