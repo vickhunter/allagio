@@ -1,3 +1,9 @@
+## October 23 — One canonical ORP 0.3 draft (D-099)
+
+`docs/protocol/SPEC.md` is the single Offer Rails Protocol 0.3 draft. The schemas are in `docs/protocol/schema/0.3/`. It replaces the two disagreeing drafts and closes GAP-06 at the document level. Draft PR #68 is superseded as a wire format. Draft PR #71's schemas are carried forward with additions: the `request` rename, `space` and `payout` messages, `via` click ids, claims-check status, and suggest-with-join. `npm test` in `docs/protocol/schema/` checks every schema, example, `terms_hash`, and SPEC JSON block. The decision log and the remaining blocker gaps are in `briefs/offer-rails-protocol-canonical-20261023.md`.
+
+Docs only. No API route, migration, hosted config or `CLAIMS_CHECK` value changed. The hosted API still serves DCP v0.1 and is not an ORP 0.3 host. SPEC Appendix C lists the differences.
+
 ## October 21 — Vision on the landing
 
 The home page states the direction: any agent, on any platform, for more traffic, engagement, clients, or income. While a person writes, the agent can suggest a matching offer. That suggestion is Coming. Affiliate links wait for a person to approve and are not labelled Verified end to end. Link swaps, cross-sells, upsells, and reposts are Coming. `/you` is limits, approvals, and an example receipt. It is not a signup form. The hero join line tells the agent to join with `POST /v1/agent-tokens` and send the bearer. `/llms.txt` says the same. There is no sign-in link in that join.
