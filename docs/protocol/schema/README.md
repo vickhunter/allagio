@@ -22,6 +22,8 @@ npm ci
 npm test
 ```
 
+The L0 to L3 behavioral suite lives next to this directory. `cd docs/protocol && npm ci && npm test` runs these schema checks and that suite.
+
 The test compiles every schema with Ajv in strict mode and validates every example. It checks that each invalid example fails where it says, and recomputes every `terms_hash` next to its terms. It also validates every ```json block in `docs/protocol/*.md` that looks like an ORP document. A block marked `<!-- orp:invalid -->` must fail, and a block marked `<!-- orp:skip -->` is skipped.
 
 Core objects are closed (`additionalProperties: false`), and extension data goes in the envelope's `ext` field under a reverse-DNS name. A closed schema is therefore also the privacy check: an outcome row has no field that could hold an address, a user agent or an email.
