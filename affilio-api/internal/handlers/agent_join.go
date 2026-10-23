@@ -42,28 +42,9 @@ func (h *AgentEntry) CreateAgentToken(c *gin.Context) {
 	if !ok {
 		return
 	}
-	raw, err := newAgentJoinSecret()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "token failed"})
-		return
-	}
-	subject, err := randomToken()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "token failed"})
-		return
-	}
-	emailNonce := make([]byte, 8)
-	if _, err = rand.Read(emailNonce); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "token failed"})
-		return
-	}
-	issued, err := h.DB.CreateAgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), services.KeyPrefix(raw), h.clientAddressHash(ip), h.mcpResource(c), name, "join:"+subject, "join-"+hex.EncodeToString(emailNonce)+"@agents.invalid")
-	if errors.Is(err, database.ErrJoinLimited) {
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
-		return
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "token failed"})
+	raw, issued, status, errText := h.mintJoinToken(c, name)
+	if status != 0 {
+		c.JSON(status, gin.H{"error": errText})
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{
@@ -150,6 +131,53 @@ func (h *AgentEntry) RevokeAgentTokenByID(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"revoked": true, "token_id": c.Param("id")})
+}
+
+// mintJoinToken creates the owner and the bearer. The caller already applied
+// the per-minute limiter, so this does not count the address a second time.
+func (h *AgentEntry) mintJoinToken(c *gin.Context, name string) (string, database.AgentJoinIssued, int, string) {
+	raw, err := newAgentJoinSecret()
+	if err != nil {
+		return "", database.AgentJoinIssued{}, http.StatusInternalServerError, "token failed"
+	}
+	subject, err := randomToken()
+	if err != nil {
+		return "", database.AgentJoinIssued{}, http.StatusInternalServerError, "token failed"
+	}
+	emailNonce := make([]byte, 8)
+	if _, err = rand.Read(emailNonce); err != nil {
+		return "", database.AgentJoinIssued{}, http.StatusInternalServerError, "token failed"
+	}
+	issued, err := h.DB.CreateAgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), services.KeyPrefix(raw), h.clientAddressHash(h.joinClientIP(c)), h.mcpResource(c), name, "join:"+subject, "join-"+hex.EncodeToString(emailNonce)+"@agents.invalid")
+	if errors.Is(err, database.ErrJoinLimited) {
+		return "", database.AgentJoinIssued{}, http.StatusTooManyRequests, "rate limit exceeded"
+	}
+	if err != nil {
+		return "", database.AgentJoinIssued{}, http.StatusInternalServerError, "token failed"
+	}
+	return raw, issued, 0, ""
+}
+
+// MintJoin is the ORP join. It uses the same per-minute limiter, the same
+// daily cap, and the same owner row as POST /v1/agent-tokens.
+func (h *AgentEntry) MintJoin(c *gin.Context, name string) (string, database.AgentJoinIssued, int, string) {
+	if h.TokenLimiter != nil && !h.TokenLimiter.Allow(h.joinClientIP(c)) {
+		return "", database.AgentJoinIssued{}, http.StatusTooManyRequests, "rate limit exceeded"
+	}
+	return h.mintJoinToken(c, name)
+}
+
+var errNoBearer = errors.New("no bearer")
+
+// JoinGrant reads the bearer the way GET /v1/agent-tokens does, without
+// writing a response. A missing bearer is errNoBearer. A bad token is the
+// database error.
+func (h *AgentEntry) JoinGrant(c *gin.Context) (*database.AgentGrant, error) {
+	raw, ok := presentedBearer(c)
+	if !ok {
+		return nil, errNoBearer
+	}
+	return h.DB.AgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), h.mcpResource(c))
 }
 
 func (h *AgentEntry) liveJoinGrant(c *gin.Context) (*database.AgentGrant, bool) {
@@ -258,13 +286,21 @@ func joinRoles(siteID, makerID string) []string {
 	return roles
 }
 
-func generatedAgentHandle(c *gin.Context) (string, bool) {
+func newAgentHandle() (string, error) {
 	var buf [4]byte
 	if _, err := rand.Read(buf[:]); err != nil {
+		return "", err
+	}
+	return "agent-" + hex.EncodeToString(buf[:]), nil
+}
+
+func generatedAgentHandle(c *gin.Context) (string, bool) {
+	name, err := newAgentHandle()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "token failed"})
 		return "", false
 	}
-	return "agent-" + hex.EncodeToString(buf[:]), true
+	return name, true
 }
 
 var (

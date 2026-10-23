@@ -178,6 +178,7 @@ func landingMiss(path string) bool {
 		strings.HasPrefix(path, "/mcp"),
 		strings.HasPrefix(path, "/oauth"),
 		strings.HasPrefix(path, "/.well-known"),
+		strings.HasPrefix(path, "/orp"),
 		strings.HasPrefix(path, "/downloads"),
 		strings.HasPrefix(path, "/assets"),
 		strings.HasPrefix(path, "/landing-v9"):
