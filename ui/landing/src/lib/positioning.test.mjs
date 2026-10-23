@@ -33,9 +33,11 @@ const banned = [
   ['revolution', /revolution/i],
   ['pilot', /\bpilot\b/i],
   ['every post', /every post/i],
+  ['best-converting', /best-converting/i],
+  ['open source', /open[\s-]?source/i],
 ]
 
-test('home, makers and publishers copy avoids ads, revolution, pilot and every post', () => {
+test('home, makers and publishers copy avoids ads, revolution, pilot, every post, best-converting, and open source', () => {
   const hits = []
   for (const file of files) {
     const text = readFileSync(resolve(root, file), 'utf8')
