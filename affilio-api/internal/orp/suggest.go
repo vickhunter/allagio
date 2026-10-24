@@ -498,6 +498,34 @@ func JoinResponse(origin, dns, ownerID, token string) map[string]any {
 	}
 }
 
+// OfferMatches reports whether a standing offer fits discover text.
+// An empty word list matches every offer. A word counts at length 4.
+func OfferMatches(terms map[string]any, text string) bool {
+	words := matchWords(text)
+	if len(words) == 0 {
+		return true
+	}
+	blob := strings.ToLower(termsBlob(terms))
+	for _, word := range words {
+		if strings.Contains(blob, word) {
+			return true
+		}
+	}
+	return false
+}
+
+func termsBlob(terms map[string]any) string {
+	parts := []string{TermsTitle(terms)}
+	raw, _ := terms["obligations"].([]any)
+	for _, item := range raw {
+		obj, _ := item.(map[string]any)
+		if dest, _ := obj["destination"].(string); dest != "" {
+			parts = append(parts, dest)
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
 // DiscoverHaystack reads the caller's own text from a discover body.
 func DiscoverHaystack(body map[string]any) (string, int) {
 	limit := 5

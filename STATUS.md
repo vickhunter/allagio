@@ -1,3 +1,17 @@
+## October 24 — Hosted ORP test deals (D-092c)
+
+A cold agent with only the host URL can discover, offer, accept, and record a test proof. The deal stays `awaiting`. Offer Rails does not hold money. The discovery `name` stays **In testing**. The document still does not claim L0, L1, L2, or L3.
+
+- `POST /orp` with a joined bearer runs `offer`, `accept`, and `execute`. A standing offer is listed and returned by `discover` in pool `test` with `checks.claims` `not_checked`. Accepting it opens one deal in state `awaiting`, with a waiting URL. No tracking link is minted.
+- `execute` on that awaiting deal accepts `proof_url` only when the URL is this host's `/orp/proof/<deal>` page. The host writes a `proof_url` receipt (`result` `verified`) and leaves the deal `awaiting`. Reference hosts refuse execute until a deal is active. This testing host does not. Pay obligations are stored and refused at execute. Nothing is written to offers, campaigns, placements, conversions, the ledger, or payouts.
+- `placement_publish` `off` answers `step_off` and stores no deal. `ask` adds `step_ask` to the waiting reasons. `auto` still waits, because `claims_unchecked` is always set. `CLAIMS_CHECK` is unchanged and is only reported.
+- The same bearer as `POST /v1/agent-tokens` is required. `X-API-Key` does not authenticate `/orp`. A repeated `(from, id)` with the same content returns the stored reply. Different content is `replay`. No email, name, or payment column is stored.
+- `GET /orp/inbox` and `GET /orp/deals/:id` are the caller's copies. `GET /orp/proof/:id` and `GET /orp/approve/:id` are public HTML and do not approve.
+
+Migration `048_d092c_orp_test_deals.sql` adds `orp_offers`, `orp_deals`, `orp_messages`, and `orp_inbox`. It is safe to run more than once. `AUTO_MIGRATE` stays off unless it is set to `true`. `scripts/d092c-smoke.sh` runs the cold-agent path against a local API. No deploy. D-092 is not accepted until a cold agent and Site Keeper prove this path end to end.
+
+Migration `049_site_key_grace_timestamptz.sql` converts `sites.api_key_rotated_at` and `sites.api_key_previous_expires_at` to `timestamptz`. A 24-hour previous-key grace stays 24 absolute hours when the session crosses a daylight-saving change. Apply it in a UTC session. It does not change a UTC server's stored instants.
+
 ## October 24 — Suggest monetization while drafting (D-097)
 
 A content agent can call one tool with a draft and get back zero to three offers, a tracked link, and a sentence to show the person. Nothing is published. `POST /orp/suggest` and its schema are unchanged.
@@ -10,7 +24,7 @@ A content agent can call one tool with a draft and get back zero to three offers
 - Emails, `@handles`, and phone numbers are stripped before matching. The draft is not stored, logged, or returned. The row keeps the SHA-256 of the stripped text and the keywords that overlapped a returned offer. `GET /v1/m/:code` counts a click and redirects to the offer. It does not read the draft.
 - Migration `048_d097_monetization_suggestions.sql` is additive. `AUTO_MIGRATE` stays off unless it is set to `true`. `CLAIMS_CHECK` is unchanged.
 - A local process with no `PUBLIC_BASE_URL`, not in release mode, and bound to `127.0.0.1`, `localhost`, or `::1` accepts the join bearer on publisher routes for `http://<host>:<port>/mcp`. That is how the owner turns `placement_publish` off after the empty placement attaches a site. An empty `HOST` or `0.0.0.0` listens on every interface and does not register that audience. A remote client that sends `Host: 127.0.0.1` is refused at mint. A public host still needs `PUBLIC_BASE_URL`.
-- Site key rotation stores the UTC face of `TIMESTAMP` columns. A previous key stays valid for the grace interval across the Europe/Rome October fallback. `CLAIMS_CHECK` is unchanged.
+- A previous site key stays valid for the grace interval because `049_site_key_grace_timestamptz.sql` stores those instants as `timestamptz`. `CLAIMS_CHECK` is unchanged.
 
 ## October 23 — Hosted ORP 0.3 thin layer (D-092b)
 

@@ -199,7 +199,7 @@ func TestORPSuggestJoinAndEnvelope(t *testing.T) {
 		"from": ownerID,
 		"body": map[string]any{},
 	}, bearerHeader(token))
-	if acceptRec.Code != http.StatusForbidden || acceptBody["body"].(map[string]any)["code"] != "forbidden" {
+	if acceptRec.Code != http.StatusBadRequest || acceptBody["body"].(map[string]any)["code"] != "invalid_message" {
 		t.Fatalf("accept %d %s", acceptRec.Code, acceptRec.Body.String())
 	}
 	if again := dealCounts(t, db); again != before {

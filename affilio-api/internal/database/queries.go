@@ -240,7 +240,7 @@ func (d *DB) GetSiteByAnyKeyHash(ctx context.Context, keyHash, keyPrefix string)
 SELECT id, api_key_hash, COALESCE(api_key_prefix,''), domain, COALESCE(name,'')
 FROM sites
 WHERE (api_key_prefix=$1 AND api_key_hash=$2)
-   OR (api_key_prev_prefix=$1 AND api_key_prev_hash=$2 AND (api_key_previous_expires_at IS NULL OR api_key_previous_expires_at AT TIME ZONE 'UTC' > NOW()))`,
+   OR (api_key_prev_prefix=$1 AND api_key_prev_hash=$2 AND (api_key_previous_expires_at IS NULL OR api_key_previous_expires_at > NOW()))`,
 		keyPrefix, keyHash)
 	var s Site
 	if err := row.Scan(&s.ID, &s.APIKeyHash, &s.APIKeyPrefix, &s.Domain, &s.Name); err != nil {
@@ -330,36 +330,16 @@ RETURNING id, (xmax = 0)`, keyHash, keyPrefix, domain, name).Scan(&id, &created)
 	return id, nil
 }
 
-// siteKeyNow is the clock stored on a site-key rotation. Tests pin it so a
-// 24-hour grace can be checked on either side of a DST fallback.
-var siteKeyNow = time.Now
-
-// SetSiteKeyNowForTest pins RotateSiteAPIKey. The returned function restores
-// the clock.
-func SetSiteKeyNowForTest(now func() time.Time) func() {
-	if now == nil {
-		now = time.Now
-	}
-	prev := siteKeyNow
-	siteKeyNow = now
-	return func() { siteKeyNow = prev }
-}
-
 func (d *DB) RotateSiteAPIKey(ctx context.Context, siteID, newKeyHash, newKeyPrefix string, gracePeriod time.Duration) error {
-	// The columns are TIMESTAMP without time zone. Store the UTC face so a
-	// session in Europe/Rome does not turn a 24-hour interval into 23 hours
-	// across the October fallback. The previous-key check reads that face
-	// back as UTC.
-	at := siteKeyNow().UTC()
 	_, err := d.Pool.Exec(ctx, `
 UPDATE sites
 SET api_key_prev_hash=api_key_hash,
     api_key_prev_prefix=api_key_prefix,
     api_key_hash=$2,
     api_key_prefix=$3,
-    api_key_rotated_at=$5::timestamptz AT TIME ZONE 'UTC',
-    api_key_previous_expires_at=($5::timestamptz + make_interval(hours => $4::int)) AT TIME ZONE 'UTC'
-WHERE id=$1`, siteID, newKeyHash, newKeyPrefix, int(gracePeriod.Hours()), at)
+    api_key_rotated_at=NOW(),
+    api_key_previous_expires_at=NOW() + make_interval(hours => $4::int)
+WHERE id=$1`, siteID, newKeyHash, newKeyPrefix, int(gracePeriod.Hours()))
 	return err
 }
 

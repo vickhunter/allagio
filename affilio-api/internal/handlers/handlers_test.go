@@ -131,7 +131,7 @@ func splitKeywordDSN(raw string) []string {
 
 func applyMigrations(t *testing.T, db *database.DB) {
 	t.Helper()
-	applyMigrationsThrough(t, db, "048_d097_monetization_suggestions.sql")
+	applyMigrationsThrough(t, db, "049_site_key_grace_timestamptz.sql")
 }
 
 // setupTestDBThrough connects in zone and applies migrations through last,
@@ -260,10 +260,18 @@ func migrationFiles() []string {
 		"046_d093a_open_signup_cap.sql",
 		"047_d093b_placement_publish_ask.sql",
 		"048_d097_monetization_suggestions.sql",
+		"048_d092c_orp_test_deals.sql",
+		"049_site_key_grace_timestamptz.sql",
 	}
 }
 
 func truncateAll(db *database.DB) error {
+	_, _ = db.Pool.Exec(context.Background(), `
+DO $$ BEGIN
+    IF to_regclass('public.orp_messages') IS NOT NULL THEN
+        EXECUTE 'TRUNCATE TABLE orp_inbox, orp_deals, orp_offers, orp_messages RESTART IDENTITY CASCADE';
+    END IF;
+END $$`)
 	_, err := db.Pool.Exec(context.Background(), `
 TRUNCATE TABLE
     audit_events,
