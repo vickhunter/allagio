@@ -1,3 +1,16 @@
+## October 24 — Suggest monetization while drafting (D-097)
+
+A content agent can call one tool with a draft and get back zero to three offers, a tracked link, and a sentence to show the person. Nothing is published. `POST /orp/suggest` and its schema are unchanged.
+
+- MCP tool `suggest_monetization` takes `text` (the draft), optional `surface` (`x`, `blog`, `newsletter`, or `email`), and optional `language`. It calls `POST /orp/monetize` with the bearer from `POST /v1/agent-tokens` and `{}`. No account and no email.
+- The body also accepts the suggest request fields `text`, `platform`, `lang`, and `limit`. `platform` `web` is surface `blog`. `email` is platform `other`. The reply is capped at 3 offers: `offer_id`, `title`, `why_match`, `tracked_link`, `disclosure_line`, and `needs_human_confirm`, plus `human_prompt`.
+- Matching uses the existing page scorer, including its stopword list and stemmer. Nothing that scores under the floor is returned. `its` stays a stopword. `it` stays matchable.
+- `offer_match` or `placement_publish` of `off` returns no offers and `reason` `step_off`. `ask` returns the offers with `needs_human_confirm`. A missing row still reads `placement_publish` as `ask`. `auto` returns the offers without that flag. The route never creates a placement or a campaign.
+- A site approval policy's `allow_categories` and `deny_categories` filter the offers. A denied or not-allowed category is `reason` `filtered`.
+- Emails, `@handles`, and phone numbers are stripped before matching. The draft is not stored, logged, or returned. The row keeps the SHA-256 of the stripped text and the keywords that overlapped a returned offer. `GET /v1/m/:code` counts a click and redirects to the offer. It does not read the draft.
+- Migration `048_d097_monetization_suggestions.sql` is additive. `AUTO_MIGRATE` stays off unless it is set to `true`. `CLAIMS_CHECK` is unchanged.
+- A local process with no `PUBLIC_BASE_URL`, not in release mode, and bound to loopback accepts the join bearer on publisher routes for `http://<host>:<port>/mcp`. That is how the owner turns `placement_publish` off after the empty placement attaches a site. A public host still needs `PUBLIC_BASE_URL`.
+
 ## October 23 — Hosted ORP 0.3 thin layer (D-092b)
 
 A cold agent can discover this host and suggest or join without a credential. DCP v0.1 stays the live affiliate path.

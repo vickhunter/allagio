@@ -160,6 +160,34 @@ func RankPageOffers(text string, offers []OfferTerms) []DryRunHit {
 	return out
 }
 
+// OverlapTokens returns the draft tokens that also appear in the offer terms.
+// It uses the same tokenizer as ScoreOfferForProfile, including the stopword
+// list and the stemmer. "its" is a stopword. "it" is not, and that stays.
+func OverlapTokens(text string, offer OfferTerms) []string {
+	draft := map[string]struct{}{}
+	for _, token := range tokenize(text) {
+		draft[token] = struct{}{}
+	}
+	seen := map[string]struct{}{}
+	terms := append([]string{offer.Name, offer.Tagline, offer.Category}, offer.Keywords...)
+	terms = append(terms, offer.Tags...)
+	out := []string{}
+	for _, term := range terms {
+		for _, token := range tokenize(term) {
+			if _, ok := draft[token]; !ok {
+				continue
+			}
+			if _, dup := seen[token]; dup {
+				continue
+			}
+			seen[token] = struct{}{}
+			out = append(out, token)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 func matchSlot(text string, offer OfferTerms) string {
 	paragraphs := splitPreviewParagraphs(text)
 	if len(paragraphs) < 2 {

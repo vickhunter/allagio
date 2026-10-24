@@ -40,6 +40,25 @@ func localSession(cfg config.Config) bool {
 	return false
 }
 
+// loopbackMCPResource is the join-token audience for a local process that has
+// no PUBLIC_BASE_URL. The token is minted against the request host, so this
+// string has to be that same origin. Release mode stays on the public URL.
+func loopbackMCPResource(cfg config.Config) (string, bool) {
+	if config.Hosted(cfg.GinMode) {
+		return "", false
+	}
+	host := strings.TrimSpace(cfg.Host)
+	switch host {
+	case "", "127.0.0.1", "localhost", "::1":
+	default:
+		return "", false
+	}
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, cfg.Port) + "/mcp", true
+}
+
 func healthHandler(native bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -195,6 +214,8 @@ func main() {
 		}
 		hosted.Mount(r)
 		oauthResources = append(oauthResources, cfg.PublicBaseURL+"/mcp")
+	} else if resource, ok := loopbackMCPResource(cfg); ok {
+		oauthResources = append(oauthResources, resource)
 	}
 	webhooks := &handlers.WebhooksHandler{
 		Cipher: connectionCipher,
@@ -220,6 +241,8 @@ func main() {
 	v1.POST("/makers/register", makers.Register)
 	v1.GET("/go/:code", redirects.Go)
 	v1.HEAD("/go/:code", redirects.Go)
+	v1.GET("/m/:code", redirects.Monetization)
+	v1.HEAD("/m/:code", redirects.Monetization)
 	v1.POST("/webhooks/:provider", webhooks.Receive)
 	v1.POST("/webhooks/:provider/:product_id", webhooks.Receive)
 	workerCtx, cancelWorker := context.WithCancel(ctx)

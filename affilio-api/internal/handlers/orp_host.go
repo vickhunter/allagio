@@ -27,6 +27,7 @@ func (h *ORPHost) Mount(r gin.IRouter) {
 	r.GET("/.well-known/orp.json", h.Discovery)
 	r.POST("/orp", h.Envelope)
 	r.POST("/orp/suggest", h.Suggest)
+	r.POST(MonetizationSuggestPath, h.Monetize)
 	r.POST("/orp/join", h.Join)
 }
 
