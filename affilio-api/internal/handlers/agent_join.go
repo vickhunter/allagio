@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -28,6 +29,9 @@ const AgentJoinCommand = `curl -fsS -X POST "$OFFER_RAILS_URL/v1/agent-tokens" -
 // The body is {} or empty. A role field is refused. The plaintext token is
 // returned once and stored only as a hash.
 func (h *AgentEntry) CreateAgentToken(c *gin.Context) {
+	if h.rejectSpoofedLoopbackMint(c) {
+		return
+	}
 	ip := h.joinClientIP(c)
 	if h.TokenLimiter != nil && !h.TokenLimiter.Allow(ip) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
@@ -161,6 +165,9 @@ func (h *AgentEntry) mintJoinToken(c *gin.Context, name string) (string, databas
 // MintJoin is the ORP join. It uses the same per-minute limiter, the same
 // daily cap, and the same owner row as POST /v1/agent-tokens.
 func (h *AgentEntry) MintJoin(c *gin.Context, name string) (string, database.AgentJoinIssued, int, string) {
+	if spoofedLoopbackMint(h.ListenHost, c.Request.Host, c.Request.RemoteAddr) {
+		return "", database.AgentJoinIssued{}, http.StatusForbidden, "loopback host is not accepted from this client"
+	}
 	if h.TokenLimiter != nil && !h.TokenLimiter.Allow(h.joinClientIP(c)) {
 		return "", database.AgentJoinIssued{}, http.StatusTooManyRequests, "rate limit exceeded"
 	}
@@ -325,4 +332,57 @@ func (h *AgentEntry) clientAddressHash(ip string) string {
 
 func (h *AgentEntry) joinClientIP(c *gin.Context) string {
 	return clientAddress(c, h.Render, h.TrustedPlatform)
+}
+
+func (h *AgentEntry) rejectSpoofedLoopbackMint(c *gin.Context) bool {
+	if c == nil || c.Request == nil || !spoofedLoopbackMint(h.ListenHost, c.Request.Host, c.Request.RemoteAddr) {
+		return false
+	}
+	c.JSON(http.StatusForbidden, gin.H{"error": "loopback host is not accepted from this client"})
+	return true
+}
+
+// spoofedLoopbackMint is true when this process is not bound only to loopback
+// and a non-loopback peer presents a loopback Host. Empty HOST listens on
+// every interface, so that Host would mint a token for 127.0.0.1.
+func spoofedLoopbackMint(listenHost, requestHost, remoteAddr string) bool {
+	if explicitLoopbackBind(listenHost) {
+		return false
+	}
+	return requestHostIsLoopback(requestHost) && !remoteAddrIsLoopback(remoteAddr)
+}
+
+func explicitLoopbackBind(host string) bool {
+	switch strings.ToLower(strings.TrimSpace(host)) {
+	case "127.0.0.1", "localhost", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
+func requestHostIsLoopback(hostport string) bool {
+	host := requestHostname(hostport)
+	switch host {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+func remoteAddrIsLoopback(remoteAddr string) bool {
+	ip := net.ParseIP(requestHostname(remoteAddr))
+	return ip != nil && ip.IsLoopback()
+}
+
+func requestHostname(hostport string) string {
+	hostport = strings.TrimSpace(hostport)
+	if hostport == "" {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(hostport); err == nil {
+		return strings.ToLower(strings.Trim(host, "[]"))
+	}
+	return strings.ToLower(strings.Trim(hostport, "[]"))
 }

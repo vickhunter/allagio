@@ -27,6 +27,7 @@ func (h *ORPHost) Mount(r gin.IRouter) {
 	r.GET("/.well-known/orp.json", h.Discovery)
 	r.POST("/orp", h.Envelope)
 	r.POST("/orp/suggest", h.Suggest)
+	r.POST(MonetizationSuggestPath, h.Monetize)
 	r.POST("/orp/join", h.Join)
 }
 
@@ -240,6 +241,9 @@ func (h *ORPHost) mint(c *gin.Context, origin, dns, agentName string) (map[strin
 	raw, issued, status, _ := h.Entry.MintJoin(c, name)
 	if status == http.StatusTooManyRequests {
 		return nil, rateLimited("Too many joins from this address."), false
+	}
+	if status == http.StatusForbidden {
+		return nil, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "loopback host is not accepted from this client"}, false
 	}
 	if status != 0 {
 		return nil, internalProblem(), false

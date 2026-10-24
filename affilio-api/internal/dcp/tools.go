@@ -308,7 +308,8 @@ func AllTools() []Tool {
 	out = append(out, Tools...)
 	out = append(out, PublisherTools...)
 	out = append(out, RevenueTools...)
-	return append(out, PreviewTools...)
+	out = append(out, PreviewTools...)
+	return append(out, MonetizationTools...)
 }
 
 func CallTool(c *Client, name string, args map[string]interface{}) (map[string]interface{}, error) {
