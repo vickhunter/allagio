@@ -10,6 +10,8 @@ A cold agent with only the host URL can discover, offer, accept, and record a te
 
 Migration `048_d092c_orp_test_deals.sql` adds `orp_offers`, `orp_deals`, `orp_messages`, and `orp_inbox`. It is safe to run more than once. `AUTO_MIGRATE` stays off unless it is set to `true`. `scripts/d092c-smoke.sh` runs the cold-agent path against a local API. No deploy. D-092 is not accepted until a cold agent and Site Keeper prove this path end to end.
 
+Migration `049_site_key_grace_timestamptz.sql` converts `sites.api_key_rotated_at` and `sites.api_key_previous_expires_at` to `timestamptz`. A 24-hour previous-key grace stays 24 absolute hours when the session crosses a daylight-saving change. Apply it in a UTC session. It does not change a UTC server's stored instants.
+
 ## October 24 — Suggest monetization while drafting (D-097)
 
 A content agent can call one tool with a draft and get back zero to three offers, a tracked link, and a sentence to show the person. Nothing is published. `POST /orp/suggest` and its schema are unchanged.
@@ -22,7 +24,7 @@ A content agent can call one tool with a draft and get back zero to three offers
 - Emails, `@handles`, and phone numbers are stripped before matching. The draft is not stored, logged, or returned. The row keeps the SHA-256 of the stripped text and the keywords that overlapped a returned offer. `GET /v1/m/:code` counts a click and redirects to the offer. It does not read the draft.
 - Migration `048_d097_monetization_suggestions.sql` is additive. `AUTO_MIGRATE` stays off unless it is set to `true`. `CLAIMS_CHECK` is unchanged.
 - A local process with no `PUBLIC_BASE_URL`, not in release mode, and bound to `127.0.0.1`, `localhost`, or `::1` accepts the join bearer on publisher routes for `http://<host>:<port>/mcp`. That is how the owner turns `placement_publish` off after the empty placement attaches a site. An empty `HOST` or `0.0.0.0` listens on every interface and does not register that audience. A remote client that sends `Host: 127.0.0.1` is refused at mint. A public host still needs `PUBLIC_BASE_URL`.
-- Site key rotation stores the UTC face of `TIMESTAMP` columns. A previous key stays valid for the grace interval across the Europe/Rome October fallback. `CLAIMS_CHECK` is unchanged.
+- A previous site key stays valid for the grace interval because `049_site_key_grace_timestamptz.sql` stores those instants as `timestamptz`. `CLAIMS_CHECK` is unchanged.
 
 ## October 23 — Hosted ORP 0.3 thin layer (D-092b)
 
