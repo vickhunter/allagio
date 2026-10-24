@@ -786,6 +786,9 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		"A hello body requires versions",
 		"https://offerrails.com/orp/schema/0.3/envelope.schema.json",
 		"docs/protocol/SPEC.md",
+		"body.terms_hash is optional",
+		"A missing or empty terms_hash is HTTP 400 invalid_message",
+		"Only a well-formed hash that does not match the terms is HTTP 409 terms_mismatch",
 	}
 	for _, item := range []struct {
 		name string

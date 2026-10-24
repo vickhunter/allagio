@@ -4,7 +4,7 @@
 
 `GET /.well-known/orp.json` sets `docs` to that section. `description` names the test proof page template `{origin}/orp/proof/<deal>` and the same schema and SPEC links. `docs` stays one URL. Execute does not read `proof_url` and does not name that page in an error. `CLAIMS_CHECK` is unchanged. No deploy.
 
-[`docs/protocol/GAPS.md`](docs/protocol/GAPS.md) records the D-099 ranked pitfalls and dispositions. SPEC Appendix C now says the hosted API serves `orp.json`, suggest, join, and the 0.3 message format, and that a `terms_hash` that does not match the terms is HTTP 409 `terms_mismatch`. The host still claims no conformance level.
+[`docs/protocol/GAPS.md`](docs/protocol/GAPS.md) records the D-099 ranked pitfalls and dispositions. SPEC Appendix C now says the hosted API serves `orp.json`, suggest, join, and the 0.3 message format. On accept, a missing or empty `terms_hash` is HTTP 400 and the message names `sha256-<b64url43>`, and any other non-matching string is HTTP 409 `terms_mismatch`. On offer, `terms_hash` is optional, an empty or malformed hash is a generic HTTP 400, and only a well-formed mismatch is HTTP 409. The host still claims no conformance level.
 
 ## October 24 — Offer Rails list and claim (D-104)
 

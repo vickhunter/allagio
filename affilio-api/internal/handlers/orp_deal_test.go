@@ -349,6 +349,14 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		"https://offerrails.com/orp/schema/0.3/envelope.schema.json",
 		"https://offerrails.com/orp/schema/0.3/messages/hello.schema.json",
 		"docs/protocol/SPEC.md",
+		"body.terms_hash is optional",
+		"Omit it and the host computes the hash",
+		"An empty or malformed hash is a generic HTTP 400 invalid_message",
+		"Only a well-formed hash that does not match the terms is HTTP 409 terms_mismatch",
+		"A missing or empty terms_hash is HTTP 400 invalid_message",
+		"terms_hash must be sha256-<b64url43>.",
+		"Any other string that does not match that hash is HTTP 409 terms_mismatch",
+		"terms_hash does not match the terms.",
 	} {
 		if !strings.Contains(orpTestDealSection, phrase) {
 			t.Fatalf("section missing %q", phrase)
@@ -363,8 +371,29 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		t.Fatal("SPEC has no Appendix C")
 	}
 	appendix := string(spec)[appendixAt:]
-	if !strings.Contains(appendix, "HTTP 409 `terms_mismatch`") || !strings.Contains(appendix, "terms_hash does not match the terms.") {
-		t.Fatal("Appendix C does not name terms_mismatch")
+	formatAt := strings.Index(appendix, "Message format over")
+	if formatAt < 0 {
+		t.Fatal("Appendix C has no message format row")
+	}
+	formatEnd := strings.Index(appendix[formatAt:], "\n|")
+	if formatEnd < 0 {
+		t.Fatal("Appendix C message format row does not end")
+	}
+	formatRow := appendix[formatAt : formatAt+formatEnd]
+	if strings.Contains(formatRow, "terms_hash") {
+		t.Fatal("message format row states terms_hash for every POST /orp message")
+	}
+	for _, phrase := range []string{
+		"On `accept`, a missing or empty `terms_hash` is HTTP 400 `invalid_message` and the message names `sha256-<b64url43>`",
+		"Any other string that does not match the terms is HTTP 409 `terms_mismatch`",
+		"terms_hash does not match the terms.",
+		"On `offer`, `terms_hash` is optional and the host computes it",
+		"An empty or malformed hash is a generic HTTP 400 `invalid_message`",
+		"Only a well-formed hash that does not match the terms is HTTP 409 `terms_mismatch`",
+	} {
+		if !strings.Contains(appendix, phrase) {
+			t.Fatalf("Appendix C missing %q", phrase)
+		}
 	}
 	if strings.Contains(orpTestDealSection, "PR #83 lands") || strings.Contains(orpTestDealSection, "The deal stays awaiting") || strings.Contains(orpTestDealSection, "not claimed as live") {
 		t.Fatal("walkthrough still describes the pre-D-104 host")
@@ -531,6 +560,27 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	termsHash, _ := published["terms_hash"].(string)
 	if offerID == "" || !strings.HasPrefix(termsHash, "sha256-") {
 		t.Fatalf("offer reply %s", offerRec.Body.String())
+	}
+	for _, item := range []struct {
+		name, typ, id, token string
+		body                 map[string]any
+		status               int
+		code, message, field string
+	}{
+		{"empty offer hash", "offer", "m_d105_emptyh", offererToken, map[string]any{"terms": terms, "terms_hash": ""}, http.StatusBadRequest, "invalid_message", "The message is not valid ORP 0.3.", "/body/terms_hash"},
+		{"malformed offer hash", "offer", "m_d105_malhsh", offererToken, map[string]any{"terms": terms, "terms_hash": "not-a-hash"}, http.StatusBadRequest, "invalid_message", "The message is not valid ORP 0.3.", "/body/terms_hash"},
+		{"offer mismatch", "offer", "m_d105_mismh", offererToken, map[string]any{"terms": terms, "terms_hash": "sha256-" + strings.Repeat("b", 43)}, http.StatusConflict, "terms_mismatch", "terms_hash does not match the terms.", ""},
+		{"missing accept hash", "accept", "m_d105_nohash", acceptorToken, map[string]any{"offer": offerID}, http.StatusBadRequest, "invalid_message", "terms_hash must be sha256-<b64url43>.", "/body/terms_hash"},
+		{"empty accept hash", "accept", "m_d105_emptya", acceptorToken, map[string]any{"offer": offerID, "terms_hash": ""}, http.StatusBadRequest, "invalid_message", "terms_hash must be sha256-<b64url43>.", "/body/terms_hash"},
+		{"accept other string", "accept", "m_d105_othrh", acceptorToken, map[string]any{"offer": offerID, "terms_hash": "not-a-hash"}, http.StatusConflict, "terms_mismatch", "terms_hash does not match the terms.", ""},
+		{"accept well-formed mismatch", "accept", "m_d105_wellh", acceptorToken, map[string]any{"offer": offerID, "terms_hash": "sha256-" + strings.Repeat("c", 43)}, http.StatusConflict, "terms_mismatch", "terms_hash does not match the terms.", ""},
+	} {
+		hashRec, hashBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope(item.typ, item.id, map[string]string{"offer": offerer, "accept": acceptor}[item.typ], item.body), bearerHeader(item.token))
+		hashInner, _ := hashBody["body"].(map[string]any)
+		field, _ := hashInner["field"].(string)
+		if hashRec.Code != item.status || hashInner["code"] != item.code || hashInner["message"] != item.message || field != item.field {
+			t.Fatalf("%s %d %s", item.name, hashRec.Code, hashRec.Body.String())
+		}
 	}
 	seenRec, _ := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "m_d105_find03", acceptor, map[string]any{
 		"want": "offers", "query": "zqwalkthrough", "limit": 5,
