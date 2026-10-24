@@ -258,7 +258,7 @@ func TestD104FitReasonsUseDraftTerms(t *testing.T) {
 	entry := &AgentEntry{DB: db, BaseURL: "http://127.0.0.1:8080", AddressKey: testAddressKey}
 	r := mountORP(entry, &ORPHost{Entry: entry})
 	token, _ := joinParty(t, r)
-	insertSuggestProgram(t, db, "Ahrefs Affiliate Program", "ahrefs-affiliate-program", "seo", []string{"zqfitdraft"})
+	insertSuggestProgram(t, db, "Ahrefs Zqfitdraft", "ahrefs-zqfitdraft", "seo", []string{"zqfitdraft"})
 
 	none, noneBody := postJSON(t, r, http.MethodPost, "/orp/suggest", map[string]any{"text": "qxnomatchleaf qxnomatchleaf"}, nil)
 	if none.Code != http.StatusOK || noneBody["empty_reason"] != "no_match" || strings.Contains(none.Body.String(), "The draft mentions") {
@@ -268,7 +268,7 @@ func TestD104FitReasonsUseDraftTerms(t *testing.T) {
 	if hit.Code != http.StatusOK {
 		t.Fatalf("hit %d %s", hit.Code, hit.Body.String())
 	}
-	reason := fitReasonOf(t, hitBody, "Ahrefs Affiliate Program")
+	reason := fitReasonOf(t, hitBody, "Ahrefs Zqfitdraft")
 	if !strings.Contains(reason, "zqfitdraft") || strings.Contains(reason, "Ahrefs") || reason == orp.NeutralFitReason {
 		t.Fatalf("suggest reason %q\n%s", reason, hit.Body.String())
 	}
@@ -283,7 +283,7 @@ func TestD104FitReasonsUseDraftTerms(t *testing.T) {
 	}
 	var why string
 	for _, offer := range suggestOffers(t, monetizeHitBody) {
-		if offer["title"] == "Ahrefs Affiliate Program" {
+		if offer["title"] == "Ahrefs Zqfitdraft" {
 			why, _ = offer["why_match"].(string)
 		}
 	}
