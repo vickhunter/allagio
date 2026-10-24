@@ -139,19 +139,6 @@ func TestORPTestDealProof(t *testing.T) {
 		t.Fatalf("approve %d %s", approveRec.Code, approveHTML)
 	}
 
-	badExec := orpEnvelope("execute", "m_d092c_execbad", publisher, map[string]any{
-		"obligation": "place",
-		"proof_url":  "https://example.com/not-the-test-page",
-	})
-	badExec["deal"] = dealID
-	badRec, badBody := postJSON(t, r, http.MethodPost, "/orp", badExec, bearerHeader(pubToken))
-	badInner, _ := badBody["body"].(map[string]any)
-	badMessage, _ := badInner["message"].(string)
-	wantProof := orp.ProofURL(origin, dealID)
-	if badRec.Code != http.StatusBadRequest || badInner["code"] != "invalid_message" || badInner["field"] != "/body/proof_url" || !strings.Contains(badMessage, wantProof) {
-		t.Fatalf("bad proof %d %s", badRec.Code, badRec.Body.String())
-	}
-
 	exec := orpEnvelope("execute", "m_d092c_exec01", publisher, map[string]any{
 		"obligation": "place",
 		"proof_url":  orp.ProofURL(origin, dealID),
@@ -334,19 +321,25 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		`{"id":"place","by":"acceptor","action":"place","destination":"https://example.com/notes","proof":["proof_url"]}`,
 		"obligation is the id from step 2",
 		"The acceptor is the second party",
-		"Accept and execute use the acceptor's bearer",
 		"HTTP 403 forbidden",
-		"PR #83 lands the suggest platform and monetize surface set x, blog, newsletter, email, web",
-		"not http or https",
+		"HTTP 404 not_found",
+		"No such offer for this sender.",
+		"placement_publish auto",
+		"platform is one of x, blog, newsletter, email, web",
+		"Allowed values: x, blog, newsletter, email, web.",
 		"409 state_conflict",
-		"The message is not valid ORP 0.3.",
+		"The deal is in the wrong state.",
+		"Execute does not read proof_url",
+		"obligation state becomes claimed",
+		"The deal stays active",
+		`{"obligation":"place"}`,
 	} {
 		if !strings.Contains(orpTestDealSection, phrase) {
 			t.Fatalf("section missing %q", phrase)
 		}
 	}
-	if strings.Contains(orpTestDealSection, "platform is one of x, blog, newsletter, email, web") {
-		t.Fatal("walkthrough treats the PR #83 surface set as already live")
+	if strings.Contains(orpTestDealSection, "PR #83 lands") || strings.Contains(orpTestDealSection, "The deal stays awaiting") || strings.Contains(orpTestDealSection, "not claimed as live") {
+		t.Fatal("walkthrough still describes the pre-D-104 host")
 	}
 
 	db, cleanup := setupTestDB(t)
@@ -371,21 +364,42 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		t.Fatalf("discovery %d %s", discDocRec.Code, discDocRec.Body.String())
 	}
 
-	offererToken, offerer := joinParty(t, r)
-	acceptorToken, acceptor := joinParty(t, r)
-	if offerer == acceptor {
-		t.Fatal("join returned one party")
+	offererRec, offererBody := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{}, nil)
+	acceptorRec, acceptorBody := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{}, nil)
+	if offererRec.Code != http.StatusCreated || acceptorRec.Code != http.StatusCreated {
+		t.Fatalf("join %d %d", offererRec.Code, acceptorRec.Code)
+	}
+	offererToken, _ := offererBody["token"].(string)
+	offerer, _ := offererBody["party"].(string)
+	acceptorToken, _ := acceptorBody["token"].(string)
+	acceptor, _ := acceptorBody["party"].(string)
+	if offerer == "" || acceptor == "" || offerer == acceptor || offererBody["steps"].(map[string]any)["list"] != "ask" || acceptorBody["steps"].(map[string]any)["list"] != "ask" {
+		t.Fatalf("parties %s %s", offererRec.Body.String(), acceptorRec.Body.String())
+	}
+
+	blogRec, _ := postJSON(t, r, http.MethodPost, "/orp/suggest", map[string]any{
+		"text": "Walkthrough notes about a public page.", "platform": "blog",
+	}, nil)
+	if blogRec.Code != http.StatusOK {
+		t.Fatalf("blog platform %d %s", blogRec.Code, blogRec.Body.String())
+	}
+	youtubeRec, youtubeBody := postJSON(t, r, http.MethodPost, "/orp/suggest", map[string]any{
+		"text": "Walkthrough notes about a public page.", "platform": "youtube",
+	}, nil)
+	youtubeInner, _ := youtubeBody["body"].(map[string]any)
+	if youtubeRec.Code != http.StatusBadRequest || youtubeInner["code"] != "invalid_message" || youtubeInner["message"] != "Allowed values: x, blog, newsletter, email, web." {
+		t.Fatalf("youtube platform %d %s", youtubeRec.Code, youtubeRec.Body.String())
 	}
 
 	findRec, findBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "m_d105_find01", offerer, map[string]any{
-		"want": "offers", "query": "walkthrough notes", "limit": 5,
+		"want": "offers", "query": "zqwalkthrough", "limit": 5,
 	}), bearerHeader(offererToken))
 	if findRec.Code != http.StatusOK || findBody["type"] != "results" {
 		t.Fatalf("discover %d %s", findRec.Code, findRec.Body.String())
 	}
 
 	terms := map[string]any{
-		"title":      "Walkthrough notes",
+		"title":      "zqwalkthrough notes",
 		"kind":       "sponsored",
 		"disclosure": map[string]any{"label": "Affiliate link", "lang": "en"},
 		"obligations": []any{map[string]any{
@@ -396,15 +410,55 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 			"proof":       []any{"proof_url"},
 		}},
 	}
+	waitRec, waitBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("offer", "m_d105_wait", offerer, map[string]any{"terms": terms}), bearerHeader(offererToken))
+	if waitRec.Code != http.StatusOK || waitBody["type"] != "offer" {
+		t.Fatalf("waiting offer %d %s", waitRec.Code, waitRec.Body.String())
+	}
+	waitingOffer := waitBody["body"].(map[string]any)
+	waiting, _ := waitingOffer["waiting"].(map[string]any)
+	waitID, _ := waitingOffer["id"].(string)
+	waitHash, _ := waitingOffer["terms_hash"].(string)
+	if waitID == "" || waiting["step"] != "list" || !hasAll(stringList(waiting["reasons"]), "step_ask") {
+		t.Fatalf("waiting %s", waitRec.Body.String())
+	}
+	hiddenRec, hiddenBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "m_d105_find02", acceptor, map[string]any{
+		"want": "offers", "query": "zqwalkthrough", "limit": 5,
+	}), bearerHeader(acceptorToken))
+	if hiddenRec.Code != http.StatusOK || strings.Contains(hiddenRec.Body.String(), waitID) || hiddenBody["body"].(map[string]any)["empty_reason"] != "no_match" {
+		t.Fatalf("hidden discover %d %s", hiddenRec.Code, hiddenRec.Body.String())
+	}
+	missRec, missBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("accept", "m_d105_miss", acceptor, map[string]any{
+		"offer": waitID, "terms_hash": waitHash,
+	}), bearerHeader(acceptorToken))
+	missInner, _ := missBody["body"].(map[string]any)
+	if missRec.Code != http.StatusNotFound || missInner["code"] != "not_found" || missInner["message"] != "No such offer for this sender." {
+		t.Fatalf("accept waiting %d %s", missRec.Code, missRec.Body.String())
+	}
+
+	modeRec, modeBody := postJSON(t, r, http.MethodPut, "/v1/step-modes", map[string]any{"placement_publish": "auto"}, bearerHeader(offererToken))
+	if modeRec.Code != http.StatusForbidden || modeBody["error"] != "a person approves this step" {
+		t.Fatalf("join bearer publish %d %s", modeRec.Code, modeRec.Body.String())
+	}
+	setPlacementPublish(t, db, ownerOfParty(offerer), "auto")
+
 	offerRec, offerBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("offer", "m_d105_offer1", offerer, map[string]any{"terms": terms}), bearerHeader(offererToken))
 	if offerRec.Code != http.StatusOK || offerBody["type"] != "offer" {
 		t.Fatalf("offer %d %s", offerRec.Code, offerRec.Body.String())
 	}
-	listed := offerBody["body"].(map[string]any)
-	offerID, _ := listed["id"].(string)
-	termsHash, _ := listed["terms_hash"].(string)
+	published := offerBody["body"].(map[string]any)
+	if _, waiting := published["waiting"]; waiting {
+		t.Fatalf("published offer waits %s", offerRec.Body.String())
+	}
+	offerID, _ := published["id"].(string)
+	termsHash, _ := published["terms_hash"].(string)
 	if offerID == "" || !strings.HasPrefix(termsHash, "sha256-") {
 		t.Fatalf("offer reply %s", offerRec.Body.String())
+	}
+	seenRec, _ := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "m_d105_find03", acceptor, map[string]any{
+		"want": "offers", "query": "zqwalkthrough", "limit": 5,
+	}), bearerHeader(acceptorToken))
+	if seenRec.Code != http.StatusOK || !strings.Contains(seenRec.Body.String(), offerID) {
+		t.Fatalf("discover published %d %s", seenRec.Code, seenRec.Body.String())
 	}
 
 	selfRec, selfBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("accept", "m_d105_self01", offerer, map[string]any{
@@ -417,7 +471,7 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	acceptRec, acceptBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("accept", "m_d105_accept", acceptor, map[string]any{
 		"offer": offerID, "terms_hash": termsHash,
 	}), bearerHeader(acceptorToken))
-	if acceptRec.Code != http.StatusOK || acceptBody["type"] != "deal" || acceptBody["from"] == offerer {
+	if acceptRec.Code != http.StatusOK || acceptBody["type"] != "deal" {
 		t.Fatalf("accept %d %s", acceptRec.Code, acceptRec.Body.String())
 	}
 	dealID, _ := acceptBody["deal"].(string)
@@ -425,71 +479,43 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		t.Fatalf("deal %s", acceptRec.Body.String())
 	}
 
-	makerExec := orpEnvelope("execute", "m_d105_execmk", offerer, map[string]any{
-		"obligation": "place",
-		"proof_url":  orp.ProofURL(origin, dealID),
-	})
+	early := orpEnvelope("execute", "m_d105_early", acceptor, map[string]any{"obligation": "place"})
+	early["deal"] = dealID
+	earlyRec, earlyBody := postJSON(t, r, http.MethodPost, "/orp", early, bearerHeader(acceptorToken))
+	earlyInner, _ := earlyBody["body"].(map[string]any)
+	if earlyRec.Code != http.StatusConflict || earlyInner["code"] != "state_conflict" || earlyInner["message"] != "The deal is in the wrong state." {
+		t.Fatalf("awaiting execute %d %s", earlyRec.Code, earlyRec.Body.String())
+	}
+	var obligationState string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT obligations->0->>'state' FROM orp_deals WHERE id=$1`, dealID).Scan(&obligationState); err != nil || obligationState != "pending" {
+		t.Fatalf("pending %s %v", obligationState, err)
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM orp_inbox WHERE message->>'type'='receipt'`) != 0 {
+		t.Fatal("awaiting execute wrote a receipt")
+	}
+
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='active' WHERE id=$1`, dealID); err != nil {
+		t.Fatal(err)
+	}
+	makerExec := orpEnvelope("execute", "m_d105_execmk", offerer, map[string]any{"obligation": "place"})
 	makerExec["deal"] = dealID
 	makerExecRec, makerExecBody := postJSON(t, r, http.MethodPost, "/orp", makerExec, bearerHeader(offererToken))
 	if makerExecRec.Code != http.StatusForbidden || makerExecBody["body"].(map[string]any)["code"] != "forbidden" {
 		t.Fatalf("offerer execute %d %s", makerExecRec.Code, makerExecRec.Body.String())
 	}
 
-	generic := orpEnvelope("execute", "m_d105_execftp", acceptor, map[string]any{
-		"obligation": "place",
-		"proof_url":  "ftp://example.com/proof",
-	})
-	generic["deal"] = dealID
-	genericRec, genericBody := postJSON(t, r, http.MethodPost, "/orp", generic, bearerHeader(acceptorToken))
-	genericInner, _ := genericBody["body"].(map[string]any)
-	genericMessage, _ := genericInner["message"].(string)
-	if genericRec.Code != http.StatusBadRequest || genericInner["code"] != "invalid_message" || genericInner["field"] != "/body/proof_url" || genericMessage != "The message is not valid ORP 0.3." || strings.Contains(genericMessage, "/orp/proof/") {
-		t.Fatalf("generic proof %d %s", genericRec.Code, genericRec.Body.String())
-	}
-
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='active' WHERE id=$1`, dealID); err != nil {
-		t.Fatal(err)
-	}
-	blocked := orpEnvelope("execute", "m_d105_execblk", acceptor, map[string]any{
-		"obligation": "place",
-		"proof_url":  "https://example.com/other",
-	})
-	blocked["deal"] = dealID
-	blockedRec, blockedBody := postJSON(t, r, http.MethodPost, "/orp", blocked, bearerHeader(acceptorToken))
-	blockedInner, _ := blockedBody["body"].(map[string]any)
-	blockedMessage, _ := blockedInner["message"].(string)
-	if blockedRec.Code != http.StatusConflict || blockedInner["code"] != "state_conflict" || blockedMessage != "The deal is in the wrong state." || strings.Contains(blockedMessage, "/orp/proof/") {
-		t.Fatalf("state %d %s", blockedRec.Code, blockedRec.Body.String())
-	}
-
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='awaiting' WHERE id=$1`, dealID); err != nil {
-		t.Fatal(err)
-	}
-	named := orpEnvelope("execute", "m_d105_execbad", acceptor, map[string]any{
-		"obligation": "place",
-		"proof_url":  "https://example.com/other",
-	})
-	named["deal"] = dealID
-	namedRec, namedBody := postJSON(t, r, http.MethodPost, "/orp", named, bearerHeader(acceptorToken))
-	namedInner, _ := namedBody["body"].(map[string]any)
-	namedMessage, _ := namedInner["message"].(string)
-	wantProof := orp.ProofURL(origin, dealID)
-	if namedRec.Code != http.StatusBadRequest || namedInner["code"] != "invalid_message" || namedInner["field"] != "/body/proof_url" || !strings.Contains(namedMessage, wantProof) {
-		t.Fatalf("named proof %d %s", namedRec.Code, namedRec.Body.String())
-	}
-
-	exec := orpEnvelope("execute", "m_d105_execok", acceptor, map[string]any{
-		"obligation": "place",
-		"proof_url":  wantProof,
-	})
+	exec := orpEnvelope("execute", "m_d105_execok", acceptor, map[string]any{"obligation": "place"})
 	exec["deal"] = dealID
 	execRec, execBody := postJSON(t, r, http.MethodPost, "/orp", exec, bearerHeader(acceptorToken))
-	if execRec.Code != http.StatusOK || execBody["body"].(map[string]any)["state"] != "awaiting" {
-		t.Fatalf("execute %d %s", execRec.Code, execRec.Body.String())
+	if execRec.Code != http.StatusOK || execBody["body"].(map[string]any)["state"] != "active" {
+		t.Fatalf("claim %d %s", execRec.Code, execRec.Body.String())
 	}
 	obligations := execBody["body"].(map[string]any)["obligations"].([]any)
-	if obligations[0].(map[string]any)["id"] != "place" || obligations[0].(map[string]any)["state"] != "verified" {
+	if obligations[0].(map[string]any)["id"] != "place" || obligations[0].(map[string]any)["state"] != "claimed" {
 		t.Fatalf("obligation %v", obligations)
+	}
+	if strings.Contains(execRec.Body.String(), "verified") || countRows(t, db, `SELECT COUNT(*) FROM orp_inbox WHERE message->>'type'='receipt'`) != 0 {
+		t.Fatal("active execute wrote a receipt")
 	}
 
 	proofRec, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+dealID, nil, nil)

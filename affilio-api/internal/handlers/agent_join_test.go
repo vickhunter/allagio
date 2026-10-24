@@ -773,10 +773,15 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		"obligation is the id from step 2",
 		"The acceptor is the second party",
 		"HTTP 403 forbidden",
-		"PR #83 lands the suggest platform and monetize surface set x, blog, newsletter, email, web",
-		"not http or https",
+		"HTTP 404 not_found",
+		"placement_publish auto",
+		"platform is one of x, blog, newsletter, email, web",
+		"Allowed values: x, blog, newsletter, email, web.",
 		"409 state_conflict",
-		"The message is not valid ORP 0.3.",
+		"The deal is in the wrong state.",
+		"Execute does not read proof_url",
+		"obligation state becomes claimed",
+		"The deal stays active",
 	}
 	for _, item := range []struct {
 		name string
@@ -789,8 +794,8 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		if !strings.Contains(item.body, orpTestDealSection) {
 			t.Errorf("%s does not contain the ORP test-deal section", item.name)
 		}
-		if strings.Contains(item.body, "platform is one of x, blog, newsletter, email, web") {
-			t.Errorf("%s treats the PR #83 surface set as already live", item.name)
+		if strings.Contains(item.body, "PR #83 lands") || strings.Contains(item.body, "not claimed as live") || strings.Contains(orpTestDealSection, "The deal stays awaiting") {
+			t.Errorf("%s still describes the pre-D-104 host", item.name)
 		}
 		for _, phrase := range phrases {
 			if !strings.Contains(item.body, phrase) {

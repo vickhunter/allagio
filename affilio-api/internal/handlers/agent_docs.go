@@ -4,7 +4,7 @@ import "affilio-api/internal/entry"
 
 const orpTestDealSection = `## ORP 0-3 test deal
 
-In testing. Start here for a test deal. Offer Rails does not hold money, and this host claims no conformance level. The deal stays awaiting.
+In testing. Start here for a test deal. Offer Rails does not hold money, and this host claims no conformance level.
 
 Read GET /.well-known/orp.json first. It names POST /orp, POST /orp/suggest, and POST /orp/join. Its docs link is this section. Its description names the test proof page template {origin}/orp/proof/<deal>.
 
@@ -12,18 +12,18 @@ Messages use ORP message format 0.3. The schema is 0.3. POST /orp takes one JSON
 
 Join two parties. Either call works, and either bearer works on POST /orp. The offerer is the first party. The acceptor is the second party. Accept and execute use the acceptor's bearer. Accepting your own offer returns HTTP 403 forbidden.
 
-- POST /orp/join with {} returns token and party. Send token as the bearer. Use party as from.
+- POST /orp/join with {} returns token and party. Send token as the bearer. Use party as from. steps.list is ask.
 - POST /v1/agent-tokens with {} returns access_token and owner_id. Send access_token as the bearer. from is orp:<host>/<owner_id>. The discovery host id looks like orp:<host>/host. Replace the last segment with owner_id.
 
-PR #83 lands the suggest platform and monetize surface set x, blog, newsletter, email, web. POST /orp/suggest takes a draft with no credential. A join object in that body returns a token in the same call.
+Suggest platform is one of x, blog, newsletter, email, web. Monetize surface is that same set. An unknown value is invalid_message, and the message is "Allowed values: x, blog, newsletter, email, web." POST /orp/suggest takes a draft with no credential. A join object in that body returns a token in the same call.
 
 Walkthrough, discover then offer then accept then execute then proof:
 
 1. discover. With the offerer's bearer, type is discover. body is {"want":"offers","query":"<words from the draft>","limit":5}.
-2. offer. With the offerer's bearer, type is offer. body.terms has title, disclosure {"label":"Affiliate link","lang":"en"}, and one obligation {"id":"place","by":"acceptor","action":"place","destination":"https://example.com/notes","proof":["proof_url"]}. id is required. kind, when sent, is a deal kind such as sponsored. The reply includes terms_hash, shaped sha256- and then the base64url SHA-256 of the canonical terms.
-3. accept. With the second party's bearer, type is accept. from is that second party. body is {"offer":"<offer id>","terms_hash":"<that hash>"}. The reply is a deal message. Read deal for the id. state is awaiting.
-4. execute. With the second party's bearer, type is execute. Set deal to that id. body is {"obligation":"place","proof_url":"<origin>/orp/proof/<deal>"}. obligation is the id from step 2. That URL is GET /orp/proof/<deal>, the test proof page. A proof_url that is not http or https is HTTP 400 invalid_message on /body/proof_url, and the message is "The message is not valid ORP 0.3." A deal that is not awaiting returns HTTP 409 state_conflict before the proof page is checked. On an awaiting deal, any other http or https proof_url is HTTP 400 invalid_message on /body/proof_url, and the message names the expected URL.
-5. proof. Open GET /orp/proof/<deal>. It is the page execute must name.
+2. offer. A fresh join is list ask, so a standing offer waits. The reply has waiting, step list, and reason step_ask. Discover does not return that offer. Accept of its id is HTTP 404 not_found, and the message is "No such offer for this sender." A join bearer cannot set placement_publish to auto. A person saves placement_publish auto for the offerer. Offer again with the offerer's bearer. type is offer. body.terms has title, disclosure {"label":"Affiliate link","lang":"en"}, and one obligation {"id":"place","by":"acceptor","action":"place","destination":"https://example.com/notes","proof":["proof_url"]}. id is required. kind, when sent, is a deal kind such as sponsored. The reply includes id and terms_hash, shaped sha256- and then the base64url SHA-256 of the canonical terms. That reply has no waiting.
+3. accept. With the second party's bearer, type is accept. from is that second party. body is {"offer":"<offer id>","terms_hash":"<that hash>"}. Use the id from the offer that had no waiting. The reply is a deal message. Read deal for the id. state is awaiting.
+4. execute. With the second party's bearer, type is execute. Set deal to that id. While the deal is awaiting, this is HTTP 409 state_conflict, and the message is "The deal is in the wrong state." The obligation stays pending. Execute does not read proof_url. When the deal is active, body is {"obligation":"place"}. obligation is the id from step 2. The obligation state becomes claimed. There is no receipt. The deal stays active.
+5. proof. Open GET /orp/proof/<deal>. It is a public page. Execute does not require that page.
 
 DCP v0.1 at /.well-known/dcp.json remains the live affiliate path.
 `
