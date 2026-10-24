@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -269,8 +270,61 @@ func TestORPTestDealProof(t *testing.T) {
 	directed := orpEnvelope("offer", "m_d092c_direct", maker, standingOffer())
 	directed["to"] = publisher
 	dirRec, dirBody := postJSON(t, r, http.MethodPost, "/orp", directed, bearerHeader(makerToken))
-	if dirRec.Code != http.StatusOK || dirBody["type"] != "deal" || dirBody["body"].(map[string]any)["state"] != "awaiting" {
+	dirDeal, _ := dirBody["body"].(map[string]any)
+	dirID, _ := dirBody["deal"].(string)
+	if dirRec.Code != http.StatusOK || dirBody["type"] != "deal" || dirDeal["state"] != "proposed" || dirID == "" {
 		t.Fatalf("directed %d %s", dirRec.Code, dirRec.Body.String())
+	}
+	if err := orp.ValidateAgainst(schemaPath(t, "messages/deal.schema.json"), dirBody); err != nil {
+		t.Fatalf("directed schema: %v\n%s", err, dirRec.Body.String())
+	}
+	var directedState, directedBound string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT state, COALESCE(bound::text, '') FROM orp_deals WHERE id=$1`, dirID).Scan(&directedState, &directedBound); err != nil || directedState != "proposed" || strings.Contains(directedBound, publisher) {
+		t.Fatalf("directed stored %s %s %v", directedState, directedBound, err)
+	}
+	earlyAct, earlyActBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dirID+"/activate", nil, bearerHeader(makerToken))
+	earlyActInner, _ := earlyActBody["body"].(map[string]any)
+	if earlyAct.Code != http.StatusConflict || earlyActInner["code"] != "state_conflict" || earlyActInner["message"] != "The deal is in the wrong state." {
+		t.Fatalf("activate before accept %d %s", earlyAct.Code, earlyAct.Body.String())
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT state, COALESCE(bound::text, '') FROM orp_deals WHERE id=$1`, dirID).Scan(&directedState, &directedBound); err != nil || directedState != "proposed" || strings.Contains(directedBound, publisher) {
+		t.Fatalf("activate before accept stored %s %s %v", directedState, directedBound, err)
+	}
+	offererAccept := orpEnvelope("accept", "m_d092c_diroff", maker, map[string]any{"terms_hash": dirDeal["terms_hash"]})
+	offererAccept["deal"] = dirID
+	offererAccRec, offererAccBody := postJSON(t, r, http.MethodPost, "/orp", offererAccept, bearerHeader(makerToken))
+	offererAccInner, _ := offererAccBody["body"].(map[string]any)
+	if offererAccRec.Code != http.StatusConflict || offererAccInner["code"] != "state_conflict" || offererAccInner["message"] != "The deal is in the wrong state." {
+		t.Fatalf("offerer accept %d %s", offererAccRec.Code, offererAccRec.Body.String())
+	}
+	counterAccept := orpEnvelope("accept", "m_d092c_diracc", publisher, map[string]any{"terms_hash": dirDeal["terms_hash"]})
+	counterAccept["deal"] = dirID
+	counterRec, counterBody := postJSON(t, r, http.MethodPost, "/orp", counterAccept, bearerHeader(pubToken))
+	if counterRec.Code != http.StatusOK || counterBody["type"] != "deal" || counterBody["body"].(map[string]any)["state"] != "awaiting" {
+		t.Fatalf("counterparty accept %d %s", counterRec.Code, counterRec.Body.String())
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT state FROM orp_deals WHERE id=$1`, dirID).Scan(&directedState); err != nil || directedState != "awaiting" {
+		t.Fatalf("accept stored %s %v", directedState, err)
+	}
+	dirAct, dirActBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dirID+"/activate", nil, bearerHeader(makerToken))
+	if dirAct.Code != http.StatusOK || dirActBody["body"].(map[string]any)["state"] != "active" {
+		t.Fatalf("activate after accept %d %s", dirAct.Code, dirAct.Body.String())
+	}
+	if _, waiting := dirActBody["body"].(map[string]any)["waiting"]; waiting {
+		t.Fatalf("directed activate still waiting %s", dirAct.Body.String())
+	}
+	dirBound, _ := dirActBody["body"].(map[string]any)["bound"].([]any)
+	dirParties := map[string]bool{}
+	for _, item := range dirBound {
+		row, _ := item.(map[string]any)
+		party, _ := row["party"].(string)
+		dirParties[party] = true
+	}
+	if len(dirBound) != 2 || !dirParties[maker] || !dirParties[publisher] {
+		t.Fatalf("directed bound %s", dirAct.Body.String())
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT state FROM orp_deals WHERE id=$1`, dirID).Scan(&directedState); err != nil || directedState != "active" {
+		t.Fatalf("activate stored %s %v", directedState, err)
 	}
 
 	setPlacementPublish(t, db, ownerOfParty(publisher), "auto")
@@ -709,6 +763,85 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	proofRec, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+dealID, nil, nil)
 	if proofRec.Code != http.StatusOK || !strings.Contains(proofRec.Header().Get("Content-Type"), "text/html") || !strings.Contains(proofRec.Body.String(), "Affiliate link") || !strings.Contains(proofRec.Body.String(), "The deal is active.") {
 		t.Fatalf("proof %d %s", proofRec.Code, proofRec.Body.String())
+	}
+}
+
+func TestORPConcurrentActivate(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	entry := &AgentEntry{
+		DB:           db,
+		BaseURL:      "http://127.0.0.1:8080",
+		AddressKey:   testAddressKey,
+		ClaimsCheck:  "off-local",
+		TokenLimiter: NewIPRateLimiter(8, time.Minute),
+	}
+	host := &ORPHost{Entry: entry}
+	r := mountORP(entry, host)
+	makerToken, maker := joinParty(t, r)
+	pubToken, publisher := joinParty(t, r)
+	setPlacementPublish(t, db, ownerOfParty(maker), "auto")
+
+	directed := orpEnvelope("offer", "m_d107_raceof", maker, standingOffer())
+	directed["to"] = publisher
+	dirRec, dirBody := postJSON(t, r, http.MethodPost, "/orp", directed, bearerHeader(makerToken))
+	dirDeal, _ := dirBody["body"].(map[string]any)
+	dealID, _ := dirBody["deal"].(string)
+	if dirRec.Code != http.StatusOK || dirDeal["state"] != "proposed" || dealID == "" {
+		t.Fatalf("directed %d %s", dirRec.Code, dirRec.Body.String())
+	}
+	accept := orpEnvelope("accept", "m_d107_raceac", publisher, map[string]any{"terms_hash": dirDeal["terms_hash"]})
+	accept["deal"] = dealID
+	acceptRec, acceptBody := postJSON(t, r, http.MethodPost, "/orp", accept, bearerHeader(pubToken))
+	accepted, _ := acceptBody["body"].(map[string]any)
+	if acceptRec.Code != http.StatusOK || accepted["state"] != "awaiting" {
+		t.Fatalf("accept %d %s", acceptRec.Code, acceptRec.Body.String())
+	}
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	codes := make([]int, 2)
+	bodies := make([]map[string]any, 2)
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			rec, body := postJSON(t, r, http.MethodPost, "/orp/deals/"+dealID+"/activate", nil, bearerHeader(pubToken))
+			codes[i] = rec.Code
+			bodies[i] = body
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	ok, conflict := 0, 0
+	for i, code := range codes {
+		inner, _ := bodies[i]["body"].(map[string]any)
+		switch code {
+		case http.StatusOK:
+			ok++
+			if inner["state"] != "active" {
+				t.Fatalf("winner %v", bodies[i])
+			}
+		case http.StatusConflict:
+			conflict++
+			if inner["code"] != "state_conflict" || inner["message"] != "The deal is in the wrong state." {
+				t.Fatalf("loser %v", bodies[i])
+			}
+		default:
+			t.Fatalf("activate %d %v", code, bodies[i])
+		}
+	}
+	if ok != 1 || conflict != 1 {
+		t.Fatalf("codes %v", codes)
+	}
+	var state string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT state FROM orp_deals WHERE id=$1`, dealID).Scan(&state); err != nil || state != "active" {
+		t.Fatalf("stored %s %v", state, err)
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM orp_inbox WHERE message->'body'->>'state'='active'`) != 2 {
+		t.Fatal("concurrent activate wrote more than one pair of snapshots")
 	}
 }
 

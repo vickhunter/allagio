@@ -268,6 +268,9 @@ func (h *ORPHost) directedOffer(c *gin.Context, dns string, msg orp.Message, has
 		bound = []any{mandate(msg.From, now)}
 	}
 	deal := newTestDeal("", ownerID, acceptorOwner, msg.From, msg.To, terms, hashOfTerms, waiting, bound, now)
+	// SPEC opens a directed offer as proposed. awaiting starts when the
+	// counterparty accept is stored, so the offerer cannot activate alone.
+	deal.State = "proposed"
 	h.commitDeal(c, dns, msg, hash, deal, now)
 }
 
@@ -382,7 +385,22 @@ func (h *ORPHost) acceptDeal(c *gin.Context, dns string, msg orp.Message, hash, 
 		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, stepOff("accept", "The owner has turned off placement publish, so this agent cannot accept a placement.")), database.ORPEffect{})
 		return
 	}
-	doc, err := h.dealMessage(dns, party, msg.ID, deal, h.now())
+	now := h.now()
+	effect := database.ORPEffect{}
+	// Only the counterparty accept of a proposed deal stores awaiting.
+	// The offerer's own accept leaves the row proposed.
+	if deal.State == "proposed" {
+		if party != deal.AcceptorParty {
+			h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}), database.ORPEffect{})
+			return
+		}
+		deal.State = "awaiting"
+		deal.UpdatedAt = now.UTC()
+		effect.UpdateDealID = deal.ID
+		effect.UpdateState = "awaiting"
+		effect.UpdatedAt = deal.UpdatedAt
+	}
+	doc, err := h.dealMessage(dns, party, msg.ID, deal, now)
 	if err != nil {
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
@@ -392,9 +410,8 @@ func (h *ORPHost) acceptDeal(c *gin.Context, dns string, msg orp.Message, hash, 
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
 	}
-	h.finishRaw(c, msg, hash, http.StatusOK, raw, database.ORPEffect{
-		Inbox: h.dealInbox(dns, msg.ID, deal, h.now()),
-	})
+	effect.Inbox = h.dealInbox(dns, msg.ID, deal, now)
+	h.finishRaw(c, msg, hash, http.StatusOK, raw, effect)
 }
 
 func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, ownerID string) {
@@ -639,6 +656,10 @@ func (h *ORPHost) finishRaw(c *gin.Context, msg orp.Message, hash string, status
 		_, dns := h.origin(c)
 		if errors.Is(err, database.ErrORPReplay) {
 			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusConflict, Code: "replay", Message: "This message id was already used with different content."}, false)
+			return
+		}
+		if errors.Is(err, database.ErrORPState) {
+			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
 			return
 		}
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)

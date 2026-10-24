@@ -147,8 +147,10 @@ func (h *ORPHost) Join(c *gin.Context) {
 }
 
 // Envelope is POST /orp. A #68-shaped body is invalid_message before any
-// credential check and before any write. Offer and accept open a test deal
-// that stays awaiting until activate. Execute on that deal is state_conflict.
+// credential check and before any write. A standing accept opens a test deal
+// in awaiting. A directed offer opens proposed, and the counterparty accept
+// stores awaiting. Activate is the only step from awaiting to active.
+// Execute on a deal that is not active is state_conflict.
 // This host does not hold money.
 func (h *ORPHost) Envelope(c *gin.Context) {
 	_, dns := h.origin(c)
