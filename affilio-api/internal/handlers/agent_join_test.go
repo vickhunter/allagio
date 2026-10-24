@@ -768,7 +768,7 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		"POST /v1/agent-tokens",
 		"POST /orp/join",
 		"{origin}/orp/proof/<deal>",
-		"hello then discover then offer then accept by the second party then activate then execute then proof",
+		"hello then discover then a directed offer (to) then accept by the second party then activate then execute then proof",
 		`{"id":"place","by":"acceptor","action":"place","destination":"https://example.com/notes","proof":["proof_url"]}`,
 		"obligation is the id from step 3",
 		"The acceptor is the second party",

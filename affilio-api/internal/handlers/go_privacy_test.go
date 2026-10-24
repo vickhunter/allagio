@@ -193,7 +193,7 @@ WHERE id=$1`, id, now, campaignID, now.Add(48*time.Hour)); err != nil {
 	missing.Header.Set("X-Forwarded-For", forwarded)
 	missed := httptest.NewRecorder()
 	r.ServeHTTP(missed, missing)
-	requirePlainRedirect(t, missed, "https://offerrails.com/")
+	requirePlainRedirect(t, missed, OfferRailsHome)
 	if strings.Contains(logs.String(), rawIP) || strings.Contains(logs.String(), forwarded) {
 		t.Fatalf("unknown code logged an address: %s", logs.String())
 	}
@@ -250,5 +250,33 @@ func TestGoLinkRateLimitKeepsHeaders(t *testing.T) {
 		t.Fatalf("rate limit recorded %d clicks", n)
 	}
 	missing := hit("/v1/go/not-a-placement")
-	requirePlainRedirect(t, missing, "https://offerrails.com/")
+	requirePlainRedirect(t, missing, OfferRailsHome)
+}
+
+func TestUnknownGoCodeUsesPublicHost(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	redirects := &RedirectsHandler{DB: db}
+	r.GET("/v1/go/:code", redirects.Go)
+	hit := func() *httptest.ResponseRecorder {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/v1/go/missing-code", nil)
+		req.Header.Set("User-Agent", testBrowserUA)
+		r.ServeHTTP(rec, req)
+		return rec
+	}
+	unknown := hit()
+	requirePlainRedirect(t, unknown, OfferRailsHome)
+	if strings.Contains(unknown.Body.String(), "offerrails.com") || !strings.Contains(unknown.Body.String(), OfferRailsHome) {
+		t.Fatalf("unknown code body %s", unknown.Body.String())
+	}
+	redirects.HomeURL = "https://public.example/"
+	withBase := hit()
+	requirePlainRedirect(t, withBase, "https://public.example/")
+	if strings.Contains(withBase.Body.String(), "offerrails.com") || !strings.Contains(withBase.Body.String(), "https://public.example/") {
+		t.Fatalf("public base body %s", withBase.Body.String())
+	}
 }

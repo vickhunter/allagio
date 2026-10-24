@@ -342,7 +342,7 @@ func TestReviewCampaignPathAndHeadProbe(t *testing.T) {
 		t.Fatalf("live campaign clicks %d", n)
 	}
 	unknown := hit("/v1/go/missing-code")
-	requirePlainRedirect(t, unknown, "https://offerrails.com/")
+	requirePlainRedirect(t, unknown, OfferRailsHome)
 	if n := clickCount(t, db); n != 1 {
 		t.Fatalf("unknown code clicks %d", n)
 	}

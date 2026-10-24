@@ -183,7 +183,7 @@ func main() {
 	redirects := &handlers.RedirectsHandler{
 		DB:           db,
 		RateLimiter:  handlers.NewIPRateLimiter(120, time.Minute),
-		HomeURL:      "https://offerrails.com/",
+		HomeURL:      handlers.OfferRailsHome,
 		IPSaltSecret: cfg.APIKeySecret,
 	}
 	var connectionCipher *services.ConnectionCipher

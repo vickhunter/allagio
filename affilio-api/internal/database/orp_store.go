@@ -274,6 +274,18 @@ LIMIT 1`, offerID, acceptorOwner).Scan(&id)
 	return id, true, nil
 }
 
+// ORPAcceptStored reports a stored HTTP 200 deal reply from this party for the deal.
+// That reply is the counterparty accept. Activate refuses the deal until it exists.
+func (d *DB) ORPAcceptStored(ctx context.Context, party, dealID string) (bool, error) {
+	var ok bool
+	err := d.Pool.QueryRow(ctx, `
+SELECT EXISTS(
+    SELECT 1 FROM orp_messages
+    WHERE party=$1 AND status=200 AND reply->>'type'='deal' AND reply->>'deal'=$2
+)`, party, dealID).Scan(&ok)
+	return ok, err
+}
+
 // ActivateORPDeal moves one awaiting deal to active and stores the snapshots.
 // changed is false when the row is no longer awaiting.
 func (d *DB) ActivateORPDeal(ctx context.Context, id string, bound json.RawMessage, updated time.Time, inbox []ORPInboxItem) (bool, error) {

@@ -95,7 +95,9 @@ func (h *ORPHost) Proof(c *gin.Context) {
 }
 
 // Activate moves an accepted deal from awaiting to active.
-// The caller is a party on the deal. Any other state is state_conflict.
+// The caller is a party on the deal. The counterparty accept must already be
+// stored, so neither the offerer nor the acceptor can activate before it.
+// Any other state is state_conflict.
 func (h *ORPHost) Activate(c *gin.Context) {
 	_, dns := h.origin(c)
 	grant, ok := h.bearer(c, dns)
@@ -113,6 +115,15 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		return
 	}
 	if deal.State != "awaiting" {
+		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
+		return
+	}
+	accepted, err := h.Entry.DB.ORPAcceptStored(c.Request.Context(), deal.AcceptorParty, deal.ID)
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
+	if !accepted {
 		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
 		return
 	}

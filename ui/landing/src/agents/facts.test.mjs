@@ -23,7 +23,7 @@ test('llms.txt matches the agent facts', () => {
   assert.match(text, /POST \/orp\/join/)
   assert.match(text, /POST \/v1\/agent-tokens/)
   assert.match(text, /\{origin\}\/orp\/proof\/<deal>/)
-  assert.match(text, /hello then discover then offer then accept by the second party then activate then execute then proof/)
+  assert.match(text, /hello then discover then a directed offer \(to\) then accept by the second party then activate then execute then proof/)
   assert.match(text, /"id":"place"/)
   assert.match(text, /obligation is the id from step 3/)
   assert.match(text, /second party/)

@@ -287,6 +287,28 @@ func TestORPTestDealProof(t *testing.T) {
 	if earlyAct.Code != http.StatusConflict || earlyActInner["code"] != "state_conflict" || earlyActInner["message"] != "The deal is in the wrong state." {
 		t.Fatalf("activate before accept %d %s", earlyAct.Code, earlyAct.Body.String())
 	}
+	acceptorEarly, acceptorEarlyBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dirID+"/activate", nil, bearerHeader(pubToken))
+	acceptorEarlyInner, _ := acceptorEarlyBody["body"].(map[string]any)
+	if acceptorEarly.Code != http.StatusConflict || acceptorEarlyInner["code"] != "state_conflict" || acceptorEarlyInner["message"] != "The deal is in the wrong state." {
+		t.Fatalf("acceptor activate before accept %d %s", acceptorEarly.Code, acceptorEarly.Body.String())
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='awaiting' WHERE id=$1`, dirID); err != nil {
+		t.Fatal(err)
+	}
+	forced, forcedBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dirID+"/activate", nil, bearerHeader(pubToken))
+	forcedInner, _ := forcedBody["body"].(map[string]any)
+	if forced.Code != http.StatusConflict || forcedInner["code"] != "state_conflict" || forcedInner["message"] != "The deal is in the wrong state." {
+		t.Fatalf("acceptor activate without accept message %d %s", forced.Code, forced.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM orp_messages WHERE party=$1 AND status=200 AND reply->>'type'='deal' AND reply->>'deal'=$2`, publisher, dirID) != 0 {
+		t.Fatal("accept stored before the counterparty accept")
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COALESCE(bound::text, '') FROM orp_deals WHERE id=$1`, dirID).Scan(&directedBound); err != nil || strings.Contains(directedBound, publisher) {
+		t.Fatalf("forced activate bound the acceptor %s %v", directedBound, err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='proposed' WHERE id=$1`, dirID); err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Pool.QueryRow(context.Background(), `SELECT state, COALESCE(bound::text, '') FROM orp_deals WHERE id=$1`, dirID).Scan(&directedState, &directedBound); err != nil || directedState != "proposed" || strings.Contains(directedBound, publisher) {
 		t.Fatalf("activate before accept stored %s %s %v", directedState, directedBound, err)
 	}
@@ -305,6 +327,9 @@ func TestORPTestDealProof(t *testing.T) {
 	}
 	if err := db.Pool.QueryRow(context.Background(), `SELECT state FROM orp_deals WHERE id=$1`, dirID).Scan(&directedState); err != nil || directedState != "awaiting" {
 		t.Fatalf("accept stored %s %v", directedState, err)
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM orp_messages WHERE party=$1 AND status=200 AND reply->>'type'='deal' AND reply->>'deal'=$2`, publisher, dirID) != 1 {
+		t.Fatal("counterparty accept was not stored")
 	}
 	dirAct, dirActBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dirID+"/activate", nil, bearerHeader(makerToken))
 	if dirAct.Code != http.StatusOK || dirActBody["body"].(map[string]any)["state"] != "active" {
@@ -404,7 +429,7 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		"https://offer-rails.onrender.com/orp/schemas/messages/hello.schema.json",
 		"https://offer-rails.onrender.com/orp/spec",
 		"POST /orp/deals/<deal>/activate",
-		"hello then discover then offer then accept by the second party then activate then execute then proof",
+		"hello then discover then a directed offer (to) then accept by the second party then activate then execute then proof",
 		"body.terms_hash is optional",
 		"Omit it and the host computes the hash",
 		"An empty or malformed hash is a generic HTTP 400 invalid_message",
@@ -602,65 +627,61 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	if modeRec.Code != http.StatusForbidden || modeBody["error"] != "a person approves this step" {
 		t.Fatalf("join bearer publish %d %s", modeRec.Code, modeRec.Body.String())
 	}
-	setPlacementPublish(t, db, ownerOfParty(offerer), "auto")
-
-	offerRec, offerBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("offer", "m_d105_offer1", offerer, map[string]any{"terms": terms}), bearerHeader(offererToken))
-	if offerRec.Code != http.StatusOK || offerBody["type"] != "offer" {
-		t.Fatalf("offer %d %s", offerRec.Code, offerRec.Body.String())
-	}
-	published := offerBody["body"].(map[string]any)
-	if _, waiting := published["waiting"]; waiting {
-		t.Fatalf("published offer waits %s", offerRec.Body.String())
-	}
-	offerID, _ := published["id"].(string)
-	termsHash, _ := published["terms_hash"].(string)
-	if offerID == "" || !strings.HasPrefix(termsHash, "sha256-") {
-		t.Fatalf("offer reply %s", offerRec.Body.String())
+	directed := orpEnvelope("offer", "m_d105_direct", offerer, map[string]any{"terms": terms})
+	directed["to"] = acceptor
+	dirRec, dirBody := postJSON(t, r, http.MethodPost, "/orp", directed, bearerHeader(offererToken))
+	dirDeal, _ := dirBody["body"].(map[string]any)
+	dealID, _ := dirBody["deal"].(string)
+	termsHash, _ := dirDeal["terms_hash"].(string)
+	if dirRec.Code != http.StatusOK || dirBody["type"] != "deal" || dirDeal["state"] != "proposed" || dealID == "" || !strings.HasPrefix(termsHash, "sha256-") {
+		t.Fatalf("directed %d %s", dirRec.Code, dirRec.Body.String())
 	}
 	for _, item := range []struct {
 		name, typ, id, token string
 		body                 map[string]any
 		status               int
 		code, message, field string
+		deal                 bool
 	}{
-		{"empty offer hash", "offer", "m_d105_emptyh", offererToken, map[string]any{"terms": terms, "terms_hash": ""}, http.StatusBadRequest, "invalid_message", "The message is not valid ORP 0.3.", "/body/terms_hash"},
-		{"malformed offer hash", "offer", "m_d105_malhsh", offererToken, map[string]any{"terms": terms, "terms_hash": "not-a-hash"}, http.StatusBadRequest, "invalid_message", "The message is not valid ORP 0.3.", "/body/terms_hash"},
-		{"offer mismatch", "offer", "m_d105_mismh", offererToken, map[string]any{"terms": terms, "terms_hash": "sha256-" + strings.Repeat("b", 43)}, http.StatusConflict, "terms_mismatch", "terms_hash does not match the terms.", ""},
-		{"missing accept hash", "accept", "m_d105_nohash", acceptorToken, map[string]any{"offer": offerID}, http.StatusBadRequest, "invalid_message", "terms_hash must be sha256-<b64url43>.", "/body/terms_hash"},
-		{"empty accept hash", "accept", "m_d105_emptya", acceptorToken, map[string]any{"offer": offerID, "terms_hash": ""}, http.StatusBadRequest, "invalid_message", "terms_hash must be sha256-<b64url43>.", "/body/terms_hash"},
-		{"accept other string", "accept", "m_d105_othrh", acceptorToken, map[string]any{"offer": offerID, "terms_hash": "not-a-hash"}, http.StatusConflict, "terms_mismatch", "terms_hash does not match the terms.", ""},
-		{"accept well-formed mismatch", "accept", "m_d105_wellh", acceptorToken, map[string]any{"offer": offerID, "terms_hash": "sha256-" + strings.Repeat("c", 43)}, http.StatusConflict, "terms_mismatch", "terms_hash does not match the terms.", ""},
+		{"empty offer hash", "offer", "m_d105_emptyh", offererToken, map[string]any{"terms": terms, "terms_hash": ""}, http.StatusBadRequest, "invalid_message", "The message is not valid ORP 0.3.", "/body/terms_hash", false},
+		{"malformed offer hash", "offer", "m_d105_malhsh", offererToken, map[string]any{"terms": terms, "terms_hash": "not-a-hash"}, http.StatusBadRequest, "invalid_message", "The message is not valid ORP 0.3.", "/body/terms_hash", false},
+		{"offer mismatch", "offer", "m_d105_mismh", offererToken, map[string]any{"terms": terms, "terms_hash": "sha256-" + strings.Repeat("b", 43)}, http.StatusConflict, "terms_mismatch", "terms_hash does not match the terms.", "", false},
+		{"missing accept hash", "accept", "m_d105_nohash", acceptorToken, map[string]any{}, http.StatusBadRequest, "invalid_message", "terms_hash must be sha256-<b64url43>.", "/body/terms_hash", true},
+		{"empty accept hash", "accept", "m_d105_emptya", acceptorToken, map[string]any{"terms_hash": ""}, http.StatusBadRequest, "invalid_message", "terms_hash must be sha256-<b64url43>.", "/body/terms_hash", true},
+		{"accept other string", "accept", "m_d105_othrh", acceptorToken, map[string]any{"terms_hash": "not-a-hash"}, http.StatusConflict, "terms_mismatch", "terms_hash does not match the terms.", "", true},
+		{"accept well-formed mismatch", "accept", "m_d105_wellh", acceptorToken, map[string]any{"terms_hash": "sha256-" + strings.Repeat("c", 43)}, http.StatusConflict, "terms_mismatch", "terms_hash does not match the terms.", "", true},
 	} {
-		hashRec, hashBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope(item.typ, item.id, map[string]string{"offer": offerer, "accept": acceptor}[item.typ], item.body), bearerHeader(item.token))
+		msg := orpEnvelope(item.typ, item.id, map[string]string{"offer": offerer, "accept": acceptor}[item.typ], item.body)
+		if item.deal {
+			msg["deal"] = dealID
+		}
+		hashRec, hashBody := postJSON(t, r, http.MethodPost, "/orp", msg, bearerHeader(item.token))
 		hashInner, _ := hashBody["body"].(map[string]any)
 		field, _ := hashInner["field"].(string)
 		if hashRec.Code != item.status || hashInner["code"] != item.code || hashInner["message"] != item.message || field != item.field {
 			t.Fatalf("%s %d %s", item.name, hashRec.Code, hashRec.Body.String())
 		}
 	}
-	seenRec, _ := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "m_d105_find03", acceptor, map[string]any{
-		"want": "offers", "query": "zqwalkthrough", "limit": 5,
-	}), bearerHeader(acceptorToken))
-	if seenRec.Code != http.StatusOK || !strings.Contains(seenRec.Body.String(), offerID) {
-		t.Fatalf("discover published %d %s", seenRec.Code, seenRec.Body.String())
+	beforeAccept, beforeBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dealID+"/activate", nil, bearerHeader(acceptorToken))
+	beforeInner, _ := beforeBody["body"].(map[string]any)
+	if beforeAccept.Code != http.StatusConflict || beforeInner["code"] != "state_conflict" || beforeInner["message"] != "The deal is in the wrong state." {
+		t.Fatalf("acceptor activate before accept %d %s", beforeAccept.Code, beforeAccept.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM orp_messages WHERE party=$1 AND status=200 AND reply->>'type'='deal' AND reply->>'deal'=$2`, acceptor, dealID) != 0 {
+		t.Fatal("accept stored before the counterparty accept")
 	}
 
-	selfRec, selfBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("accept", "m_d105_self01", offerer, map[string]any{
-		"offer": offerID, "terms_hash": termsHash,
-	}), bearerHeader(offererToken))
-	if selfRec.Code != http.StatusForbidden || selfBody["body"].(map[string]any)["code"] != "forbidden" {
-		t.Fatalf("self accept %d %s", selfRec.Code, selfRec.Body.String())
-	}
-
-	acceptRec, acceptBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("accept", "m_d105_accept", acceptor, map[string]any{
-		"offer": offerID, "terms_hash": termsHash,
-	}), bearerHeader(acceptorToken))
-	if acceptRec.Code != http.StatusOK || acceptBody["type"] != "deal" {
+	acceptMsg := orpEnvelope("accept", "m_d105_accept", acceptor, map[string]any{"terms_hash": termsHash})
+	acceptMsg["deal"] = dealID
+	acceptRec, acceptBody := postJSON(t, r, http.MethodPost, "/orp", acceptMsg, bearerHeader(acceptorToken))
+	if acceptRec.Code != http.StatusOK || acceptBody["type"] != "deal" || acceptBody["deal"] != dealID {
 		t.Fatalf("accept %d %s", acceptRec.Code, acceptRec.Body.String())
 	}
-	dealID, _ := acceptBody["deal"].(string)
-	if dealID == "" || acceptBody["body"].(map[string]any)["state"] != "awaiting" {
+	if acceptBody["body"].(map[string]any)["state"] != "awaiting" {
 		t.Fatalf("deal %s", acceptRec.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM orp_messages WHERE party=$1 AND status=200 AND reply->>'type'='deal' AND reply->>'deal'=$2`, acceptor, dealID) != 1 {
+		t.Fatal("counterparty accept was not stored")
 	}
 
 	early := orpEnvelope("execute", "m_d105_early", acceptor, map[string]any{"obligation": "place"})
