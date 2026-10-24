@@ -139,8 +139,9 @@ func (h *ORPHost) Join(c *gin.Context) {
 }
 
 // Envelope is POST /orp. A #68-shaped body is invalid_message before any
-// credential check and before any write. Offer, accept, and execute open a
-// test deal that stays awaiting. This host does not hold money.
+// credential check and before any write. Offer and accept open a test deal
+// that stays awaiting. Execute on that deal is state_conflict. This host
+// does not hold money.
 func (h *ORPHost) Envelope(c *gin.Context) {
 	_, dns := h.origin(c)
 	body, problem, ok := readORPBody(c)

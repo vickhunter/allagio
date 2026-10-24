@@ -1,9 +1,21 @@
+## October 24 — Offer Rails list and claim (D-104)
+
+The hosted ORP 0.3 layer follows the protocol on five points from the D-099 agent-as-user report. `CLAIMS_CHECK` stays `stub`. Nothing is deployed and no production data is touched.
+
+- `execute` on a deal that is not `active` returns HTTP 409 `state_conflict`. It does not write a receipt and it does not mark a placement verified. On an `active` deal, execute is a claim: a `pending` obligation becomes `claimed`, and there is still no receipt. A pay obligation on an active deal is refused with "This testing host does not settle money."
+- A new maker's standing offer honours `list: ask`. The row is stored with `listed` false. The offer reply has `waiting` (`step` `list`, reason `step_ask`) and does not bind the maker by mandate. Discover does not return it, and accept answers `not_found`. A saved `placement_publish` of `auto` still lists the offer, and accepting that offer binds the maker by mandate. `off` is `step_off` on `list`.
+- A wrong `terms_hash` on accept, including a string that is not `sha256-<b64url43>`, returns HTTP 409 `terms_mismatch`. A missing or empty `terms_hash` stays HTTP 400 `invalid_message` and the message names `sha256-<b64url43>`.
+- `POST /orp/suggest` `platform` and `POST /orp/monetize` `surface` and `platform` accept the same values: `x`, `blog`, `newsletter`, `email`, and `web`. An unknown value is `invalid_message`. The message lists those values. Monetize also returns `allowed`.
+- Suggest `fit.reasons` and monetize `why_match` cite only words that appear in both the draft and the offer. When nothing overlaps, the reason is "No terms in the draft match this offer."
+
+Migration `050_d104_orp_offer_listed.sql` adds `orp_offers.listed` (`BOOLEAN NOT NULL DEFAULT true`, so rows that already exist stay listed). It is safe to run more than once. `AUTO_MIGRATE` stays off unless it is set to `true`.
+
 ## October 24 — Hosted ORP test deals (D-092c)
 
-A cold agent with only the host URL can discover, offer, accept, and record a test proof. The deal stays `awaiting`. Offer Rails does not hold money. The discovery `name` stays **In testing**. The document still does not claim L0, L1, L2, or L3.
+A cold agent with only the host URL can discover, offer, and open a directed test deal. The deal stays `awaiting`. Execute on that deal is a conflict until the deal is active. Offer Rails does not hold money. The discovery `name` stays **In testing**. The document still does not claim L0, L1, L2, or L3.
 
-- `POST /orp` with a joined bearer runs `offer`, `accept`, and `execute`. A standing offer is listed and returned by `discover` in pool `test` with `checks.claims` `not_checked`. Accepting it opens one deal in state `awaiting`, with a waiting URL. No tracking link is minted.
-- `execute` on that awaiting deal accepts `proof_url` only when the URL is this host's `/orp/proof/<deal>` page. The host writes a `proof_url` receipt (`result` `verified`) and leaves the deal `awaiting`. Reference hosts refuse execute until a deal is active. This testing host does not. Pay obligations are stored and refused at execute. Nothing is written to offers, campaigns, placements, conversions, the ledger, or payouts.
+- `POST /orp` with a joined bearer runs `offer`, `accept`, and `execute`. D-104 is the current list and execute contract: a new maker's standing offer waits and is not listed, and execute on an awaiting deal is `state_conflict`. A listed offer (saved `placement_publish` `auto`) is returned by `discover` in pool `test` with `checks.claims` `not_checked`. Accepting a listed offer opens one deal in state `awaiting`, with a waiting URL. No tracking link is minted. Nothing is written to offers, campaigns, placements, conversions, the ledger, or payouts.
+- `GET /orp/proof/:id` is still the public proof page. Execute does not consume that URL and does not write a verified receipt. A pay obligation is stored. Execute refuses it only after the deal is `active`.
 - `placement_publish` `off` answers `step_off` and stores no deal. `ask` adds `step_ask` to the waiting reasons. `auto` still waits, because `claims_unchecked` is always set. `CLAIMS_CHECK` is unchanged and is only reported.
 - The same bearer as `POST /v1/agent-tokens` is required. `X-API-Key` does not authenticate `/orp`. A repeated `(from, id)` with the same content returns the stored reply. Different content is `replay`. No email, name, or payment column is stored.
 - `GET /orp/inbox` and `GET /orp/deals/:id` are the caller's copies. `GET /orp/proof/:id` and `GET /orp/approve/:id` are public HTML and do not approve.
@@ -16,8 +28,8 @@ Migration `049_site_key_grace_timestamptz.sql` converts `sites.api_key_rotated_a
 
 A content agent can call one tool with a draft and get back zero to three offers, a tracked link, and a sentence to show the person. Nothing is published. `POST /orp/suggest` and its schema are unchanged.
 
-- MCP tool `suggest_monetization` takes `text` (the draft), optional `surface` (`x`, `blog`, `newsletter`, or `email`), and optional `language`. It calls `POST /orp/monetize` with the bearer from `POST /v1/agent-tokens` and `{}`. No account and no email.
-- The body also accepts the suggest request fields `text`, `platform`, `lang`, and `limit`. `platform` `web` is surface `blog`. `email` is platform `other`. The reply is capped at 3 offers: `offer_id`, `title`, `why_match`, `tracked_link`, `disclosure_line`, and `needs_human_confirm`, plus `human_prompt`.
+- MCP tool `suggest_monetization` takes `text` (the draft), optional `surface` (`x`, `blog`, `newsletter`, `email`, or `web`), and optional `language`. It calls `POST /orp/monetize` with the bearer from `POST /v1/agent-tokens` and `{}`. No account and no email.
+- The body also accepts the suggest request fields `text`, `platform`, `lang`, and `limit`. D-104 uses that same set for `surface` and `platform`, with no alias between `blog` and `web` or between `email` and `other`. The reply is capped at 3 offers: `offer_id`, `title`, `why_match`, `tracked_link`, `disclosure_line`, and `needs_human_confirm`, plus `human_prompt`.
 - Matching uses the existing page scorer, including its stopword list and stemmer. Nothing that scores under the floor is returned. `its` stays a stopword. `it` stays matchable.
 - `offer_match` or `placement_publish` of `off` returns no offers and `reason` `step_off`. `ask` returns the offers with `needs_human_confirm`. A missing row still reads `placement_publish` as `ask`. `auto` returns the offers without that flag. The route never creates a placement or a campaign.
 - A site approval policy's `allow_categories` and `deny_categories` filter the offers. A denied or not-allowed category is `reason` `filtered`.

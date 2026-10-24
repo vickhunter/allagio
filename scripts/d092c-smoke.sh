@@ -98,8 +98,16 @@ status, raw = call("POST", endpoint, envelope("offer", "m_d092c_smoke_of", maker
 must(status, 200, raw, "offer")
 show("offer", status, raw)
 offered = json.loads(raw)
-offer_id = offered["body"]["id"]
-terms_hash = offered["body"]["terms_hash"]
+offer_body = offered["body"]
+offer_id = offer_body["id"]
+terms_hash = offer_body["terms_hash"]
+waiting = offer_body.get("waiting") or {}
+if offered.get("type") != "offer" or waiting.get("party") != maker or waiting.get("step") != "list" or "step_ask" not in (waiting.get("reasons") or []):
+    print("standing offer did not wait on list:ask")
+    sys.exit(1)
+if "bound" in offer_body or "mandate" in raw:
+    print("standing offer bound the maker by mandate")
+    sys.exit(1)
 
 status, raw = call("POST", endpoint, envelope("discover", "m_d092c_smoke_d1", publisher, {
     "want": "offers", "query": "zqtestmention", "limit": 5,
@@ -107,21 +115,29 @@ status, raw = call("POST", endpoint, envelope("discover", "m_d092c_smoke_d1", pu
 must(status, 200, raw, "discover")
 show("discover", status, raw)
 found = json.loads(raw)
-items = found["body"]["items"]
-if not any(item.get("offer", {}).get("id") == offer_id and item.get("pool") == "test" for item in items):
-    print("discover did not list the standing offer")
+if found["body"].get("empty_reason") != "no_match" or offer_id in raw:
+    print("discover listed an unapproved standing offer")
     sys.exit(1)
 
 status, raw = call("POST", endpoint, envelope("accept", "m_d092c_smoke_ac", publisher, {
     "offer": offer_id, "terms_hash": terms_hash,
 }), pub_token)
-must(status, 200, raw, "accept")
-show("accept", status, raw)
+must(status, 404, raw, "accept-waiting")
+show("accept-waiting", status, raw)
+if json.loads(raw)["body"].get("code") != "not_found":
+    print("accept of an unlisted offer was not not_found")
+    sys.exit(1)
+
+directed = envelope("offer", "m_d092c_smoke_dir", maker, {"terms": terms})
+directed["to"] = publisher
+status, raw = call("POST", endpoint, directed, maker_token)
+must(status, 200, raw, "directed")
+show("directed", status, raw)
 accepted = json.loads(raw)
 deal = accepted["body"]
 deal_id = accepted["deal"]
-if deal["state"] != "awaiting" or "tracking" in deal:
-    print("accept did not open an awaiting deal without tracking")
+if accepted.get("type") != "deal" or deal["state"] != "awaiting" or "tracking" in deal:
+    print("directed offer did not open an awaiting deal without tracking")
     sys.exit(1)
 reasons = deal["waiting"]["reasons"]
 if "step_ask" not in reasons or "claims_unchecked" not in reasons:
@@ -143,14 +159,20 @@ execute = envelope("execute", "m_d092c_smoke_ex", publisher, {
 })
 execute["deal"] = deal_id
 status, raw = call("POST", endpoint, execute, pub_token)
-must(status, 200, raw, "execute")
+must(status, 409, raw, "execute")
 show("execute", status, raw)
 executed = json.loads(raw)
-if executed["body"]["state"] != "awaiting":
-    print("execute moved the deal off awaiting")
+if executed["body"].get("code") != "state_conflict" or "verified" in raw:
+    print("execute on an awaiting deal was not state_conflict")
     sys.exit(1)
-if executed["body"]["obligations"][0]["state"] != "verified":
-    print("place obligation was not verified")
+
+status, raw = call("GET", endpoint + "/deals/" + deal_id, token=pub_token)
+must(status, 200, raw, "deal")
+show("deal", status, raw)
+stored = json.loads(raw)
+obligations = stored["body"].get("obligations") or []
+if not obligations or obligations[0].get("state") != "pending":
+    print("execute changed the place obligation")
     sys.exit(1)
 
 status, raw = call("GET", endpoint + "/inbox", token=pub_token)
@@ -158,8 +180,8 @@ must(status, 200, raw, "inbox")
 show("inbox", status, raw)
 inbox = json.loads(raw)
 receipts = [m for m in inbox["messages"] if m.get("type") == "receipt"]
-if not any(m["body"].get("method") == "proof_url" and m["body"].get("result") == "verified" for m in receipts):
-    print("inbox has no verified proof_url receipt")
+if any(m.get("body", {}).get("result") == "verified" for m in receipts):
+    print("inbox has a verified receipt")
     sys.exit(1)
 print("--- smoke ok")
 PY

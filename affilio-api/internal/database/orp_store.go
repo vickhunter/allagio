@@ -22,6 +22,7 @@ type ORPRecord struct {
 }
 
 // ORPOffer is a standing test offer. Terms are the public offer text.
+// Listed is false while the offerer's list step is ask. Discover skips it.
 type ORPOffer struct {
 	ID        string
 	OwnerID   string
@@ -30,6 +31,7 @@ type ORPOffer struct {
 	TermsHash string
 	Limit     int
 	CreatedAt time.Time
+	Listed    bool
 }
 
 // ORPDeal is a test-pool deal. It is not a placement and it is not a payout.
@@ -140,8 +142,8 @@ func applyORPEffect(ctx context.Context, tx pgx.Tx, effect ORPEffect) error {
 	if effect.Offer != nil {
 		offer := effect.Offer
 		if _, err := tx.Exec(ctx, `
-INSERT INTO orp_offers(id, owner_id, party, terms, terms_hash, deal_limit, created_at)
-VALUES($1,$2,$3,$4,$5,$6,$7)`, offer.ID, offer.OwnerID, offer.Party, offer.Terms, offer.TermsHash, offer.Limit, offer.CreatedAt); err != nil {
+INSERT INTO orp_offers(id, owner_id, party, terms, terms_hash, deal_limit, created_at, listed)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, offer.ID, offer.OwnerID, offer.Party, offer.Terms, offer.TermsHash, offer.Limit, offer.CreatedAt, offer.Listed); err != nil {
 			return err
 		}
 	}
@@ -188,8 +190,8 @@ func nullJSON(raw json.RawMessage) any {
 func (d *DB) GetORPOffer(ctx context.Context, id string) (ORPOffer, bool, error) {
 	var offer ORPOffer
 	err := d.Pool.QueryRow(ctx, `
-SELECT id, owner_id::text, party, terms, terms_hash, deal_limit, created_at
-FROM orp_offers WHERE id=$1`, id).Scan(&offer.ID, &offer.OwnerID, &offer.Party, &offer.Terms, &offer.TermsHash, &offer.Limit, &offer.CreatedAt)
+SELECT id, owner_id::text, party, terms, terms_hash, deal_limit, created_at, listed
+FROM orp_offers WHERE id=$1 AND listed`, id).Scan(&offer.ID, &offer.OwnerID, &offer.Party, &offer.Terms, &offer.TermsHash, &offer.Limit, &offer.CreatedAt, &offer.Listed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ORPOffer{}, false, nil
 	}
@@ -205,8 +207,9 @@ func (d *DB) ListORPOffers(ctx context.Context, limit int) ([]ORPOffer, error) {
 		limit = 50
 	}
 	rows, err := d.Pool.Query(ctx, `
-SELECT id, owner_id::text, party, terms, terms_hash, deal_limit, created_at
+SELECT id, owner_id::text, party, terms, terms_hash, deal_limit, created_at, listed
 FROM orp_offers
+WHERE listed
 ORDER BY created_at DESC
 LIMIT $1`, limit)
 	if err != nil {
@@ -216,7 +219,7 @@ LIMIT $1`, limit)
 	out := []ORPOffer{}
 	for rows.Next() {
 		var offer ORPOffer
-		if err = rows.Scan(&offer.ID, &offer.OwnerID, &offer.Party, &offer.Terms, &offer.TermsHash, &offer.Limit, &offer.CreatedAt); err != nil {
+		if err = rows.Scan(&offer.ID, &offer.OwnerID, &offer.Party, &offer.Terms, &offer.TermsHash, &offer.Limit, &offer.CreatedAt, &offer.Listed); err != nil {
 			return nil, err
 		}
 		out = append(out, offer)
