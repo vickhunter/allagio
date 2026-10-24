@@ -21,11 +21,6 @@ var (
 		"audio.segment": true, "audio.notes": true, "community.post": true, "community.comment": true,
 		"community.message": true, "app.slot": true, "data.feed": true,
 	}
-	platformCore = map[string]bool{
-		"web": true, "newsletter": true, "x": true, "youtube": true, "instagram": true,
-		"tiktok": true, "facebook": true, "linkedin": true, "reddit": true, "discord": true,
-		"telegram": true, "podcast": true, "app": true, "other": true,
-	}
 	dealKinds = map[string]bool{
 		"affiliate": true, "sponsored": true, "swap": true, "traffic_swap": true,
 		"link_exchange": true, "repost": true, "comment": true, "cross_sell": true,
@@ -36,6 +31,30 @@ var (
 	}
 	spaceExtPattern = regexp.MustCompile(`^[a-z0-9\-]+(\.[a-z0-9\-]+){2,}$`)
 )
+
+// DraftSurfaces is the platform and surface set POST /orp/suggest and
+// POST /orp/monetize both accept. blog and email are first-class values,
+// alongside x, newsletter, and web.
+var DraftSurfaces = []string{"x", "blog", "newsletter", "email", "web"}
+
+// NeutralFitReason is the fit line when the draft and the offer share no terms.
+const NeutralFitReason = "No terms in the draft match this offer."
+
+// DraftSurfaceAllowed reports whether value is in DraftSurfaces.
+func DraftSurfaceAllowed(value string) bool {
+	switch value {
+	case "x", "blog", "newsletter", "email", "web":
+		return true
+	default:
+		return false
+	}
+}
+
+// DraftSurfaceProblem is the invalid_message for a platform or surface
+// outside DraftSurfaces. The message lists the allowed values.
+func DraftSurfaceProblem(field string) Problem {
+	return Invalid("Allowed values: x, blog, newsletter, email, web.", field)
+}
 
 // Candidate is a listed offer or curated program the suggest layer can pitch.
 type Candidate struct {
@@ -94,8 +113,8 @@ func ParseSuggest(value any) (SuggestRequest, Problem, bool) {
 	req := SuggestRequest{Text: text, Haystack: text, Limit: 3}
 	if platform, present := obj["platform"]; present {
 		text, ok := platform.(string)
-		if !ok || !validPlatform(text) {
-			return SuggestRequest{}, Invalid("The suggest request is not valid.", "/platform"), false
+		if !ok || !DraftSurfaceAllowed(text) {
+			return SuggestRequest{}, DraftSurfaceProblem("/platform"), false
 		}
 	}
 	if kind, present := obj["space_kind"]; present {
@@ -190,10 +209,6 @@ func ParseJoin(value any, prefix string) (JoinRequest, Problem, bool) {
 	return req, Problem{}, true
 }
 
-func validPlatform(value string) bool {
-	return platformCore[value] || (extPattern.MatchString(value) && len(value) <= 128)
-}
-
 func validSpaceKind(value string) bool {
 	return spaceKindCore[value] || (spaceExtPattern.MatchString(value) && len(value) <= 128)
 }
@@ -252,7 +267,7 @@ func Match(dns string, req SuggestRequest, candidates []Candidate) ([]any, strin
 	}
 	var hits []hit
 	for _, candidate := range candidates {
-		item, score, ok := pitch(dns, candidate, words)
+		item, score, ok := pitch(dns, candidate, req.Text, words)
 		if !ok {
 			continue
 		}
@@ -280,6 +295,44 @@ func Match(dns string, req SuggestRequest, candidates []Candidate) ([]any, strin
 	return items, ""
 }
 
+// FitReason cites draft words that also appear in the offer terms.
+// It does not name an offer title the draft never used. An empty overlap
+// is NeutralFitReason.
+func FitReason(draft string, terms ...string) string {
+	words := matchWords(draft)
+	blob := strings.ToLower(strings.Join(terms, " "))
+	lowerDraft := strings.ToLower(draft)
+	cited := make([]string, 0, 4)
+	for _, word := range words {
+		if !strings.Contains(blob, word) || !strings.Contains(lowerDraft, word) {
+			continue
+		}
+		cited = append(cited, word)
+		if len(cited) == 4 {
+			break
+		}
+	}
+	if len(cited) == 0 {
+		return NeutralFitReason
+	}
+	reason := "The draft mentions " + joinCited(cited) + "."
+	if utf8.RuneCountInString(reason) > 200 {
+		return clipRunes(reason, 200)
+	}
+	return reason
+}
+
+func joinCited(words []string) string {
+	switch len(words) {
+	case 0:
+		return ""
+	case 1:
+		return words[0]
+	default:
+		return strings.Join(words[:len(words)-1], ", ") + " and " + words[len(words)-1]
+	}
+}
+
 func matchWords(text string) []string {
 	fields := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
@@ -296,7 +349,7 @@ func matchWords(text string) []string {
 	return out
 }
 
-func pitch(dns string, candidate Candidate, words []string) (map[string]any, int, bool) {
+func pitch(dns string, candidate Candidate, draft string, words []string) (map[string]any, int, bool) {
 	blob := strings.ToLower(strings.Join([]string{
 		candidate.Name, candidate.Company, candidate.Blurb, candidate.Category, strings.Join(candidate.Keywords, " "),
 	}, " "))
@@ -325,10 +378,7 @@ func pitch(dns string, candidate Candidate, words []string) (map[string]any, int
 	if utf8.RuneCountInString(text) > 280 {
 		text = clipRunes(text, 280)
 	}
-	reason := "The draft mentions " + clipRunes(title, 160) + "."
-	if utf8.RuneCountInString(reason) > 200 {
-		reason = clipRunes(reason, 200)
-	}
+	reason := FitReason(draft, candidate.Name, candidate.Company, candidate.Blurb, candidate.Category, strings.Join(candidate.Keywords, " "))
 	item := map[string]any{
 		"offer": map[string]any{
 			"id":         candidate.ID,

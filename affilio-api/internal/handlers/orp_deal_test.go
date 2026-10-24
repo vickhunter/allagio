@@ -49,6 +49,7 @@ func TestORPTestDealProof(t *testing.T) {
 		t.Fatal("offer stored without a bearer")
 	}
 
+	setPlacementPublish(t, db, ownerOfParty(maker), "auto")
 	offerMsg := orpEnvelope("offer", "m_d092c_offer1", maker, standingOffer())
 	offerRec, offerBody := postJSON(t, r, http.MethodPost, "/orp", offerMsg, bearerHeader(makerToken))
 	if offerRec.Code != http.StatusOK || offerBody["type"] != "offer" {
@@ -144,15 +145,18 @@ func TestORPTestDealProof(t *testing.T) {
 	})
 	exec["deal"] = dealID
 	execRec, execBody := postJSON(t, r, http.MethodPost, "/orp", exec, bearerHeader(pubToken))
-	if execRec.Code != http.StatusOK || execBody["body"].(map[string]any)["state"] != "awaiting" {
+	if execRec.Code != http.StatusConflict || execBody["body"].(map[string]any)["code"] != "state_conflict" {
 		t.Fatalf("execute %d %s", execRec.Code, execRec.Body.String())
 	}
-	if err := orp.ValidateAgainst(schemaPath(t, "messages/deal.schema.json"), execBody); err != nil {
+	if err := orp.ValidateAgainst(schemaPath(t, "messages/error.schema.json"), execBody); err != nil {
 		t.Fatalf("execute schema: %v\n%s", err, execRec.Body.String())
 	}
-	obligations := execBody["body"].(map[string]any)["obligations"].([]any)
-	if obligations[0].(map[string]any)["state"] != "verified" {
-		t.Fatalf("obligation %v", obligations)
+	var obligationState string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT obligations->0->>'state' FROM orp_deals WHERE id=$1`, dealID).Scan(&obligationState); err != nil || obligationState != "pending" {
+		t.Fatalf("obligation %s %v", obligationState, err)
+	}
+	if strings.Contains(execRec.Body.String(), `"verified"`) {
+		t.Fatalf("execute verified a non-active deal %s", execRec.Body.String())
 	}
 
 	inboxRec, inboxBody := postJSON(t, r, http.MethodGet, "/orp/inbox", nil, bearerHeader(pubToken))
@@ -162,8 +166,8 @@ func TestORPTestDealProof(t *testing.T) {
 	if err := orp.ValidateAgainst(schemaPath(t, "http/inbox.schema.json"), inboxBody); err != nil {
 		t.Fatalf("inbox schema: %v\n%s", err, inboxRec.Body.String())
 	}
-	if !inboxHasReceipt(t, inboxBody["messages"].([]any)) {
-		t.Fatalf("inbox %s", inboxRec.Body.String())
+	if inboxHasReceipt(t, inboxBody["messages"].([]any)) {
+		t.Fatalf("inbox receipt %s", inboxRec.Body.String())
 	}
 
 	makerDealRec, makerDeal := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(makerToken))
@@ -253,7 +257,7 @@ func TestORPTestDealProof(t *testing.T) {
 	payExec := orpEnvelope("execute", "m_d092c_payex1", maker, map[string]any{"obligation": "commission"})
 	payExec["deal"] = payAcceptBody["deal"]
 	payExecRec, payExecBody := postJSON(t, r, http.MethodPost, "/orp", payExec, bearerHeader(makerToken))
-	if payExecRec.Code != http.StatusForbidden || payExecBody["body"].(map[string]any)["message"] != "This testing host does not settle money." {
+	if payExecRec.Code != http.StatusConflict || payExecBody["body"].(map[string]any)["code"] != "state_conflict" {
 		t.Fatalf("pay execute %d %s", payExecRec.Code, payExecRec.Body.String())
 	}
 	if countRows(t, db, `SELECT COUNT(*) FROM ledger_entries`) != 0 || countRows(t, db, `SELECT COUNT(*) FROM payouts`) != 0 {

@@ -124,7 +124,7 @@ func (h *ORPHost) offer(c *gin.Context, dns string, msg orp.Message, hash, owner
 		h.directedOffer(c, dns, msg, hash, ownerID, mode, terms, hashOfTerms)
 		return
 	}
-	if orp.Places(terms, "offerer") && mode == database.ModeOff {
+	if mode == database.ModeOff {
 		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, stepOff("list", "The owner has turned off placement publish, so this agent cannot list a placement.")), database.ORPEffect{})
 		return
 	}
@@ -144,6 +144,15 @@ func (h *ORPHost) offer(c *gin.Context, dns string, msg orp.Message, hash, owner
 	if expires, _ := msg.Body["expires"].(string); expires != "" {
 		body["expires"] = expires
 	}
+	// list follows placement publish. A new party has no saved row, so the
+	// mode is ask, which is what join advertises. The offer waits and is not
+	// discoverable, and the maker is not bound by mandate. A saved auto
+	// still lists the offer.
+	listed := mode == database.ModeAuto
+	if !listed {
+		origin, _ := h.origin(c)
+		body["waiting"] = waitingOn(msg.From, "list", []any{"step_ask"}, origin, now)
+	}
 	doc := orp.ListedOffer(dns, msg.From, msg.ID, body, now)
 	termsRaw, err := json.Marshal(terms)
 	if err != nil {
@@ -158,7 +167,7 @@ func (h *ORPHost) offer(c *gin.Context, dns string, msg orp.Message, hash, owner
 	h.finishRaw(c, msg, hash, http.StatusOK, docRaw, database.ORPEffect{
 		Offer: &database.ORPOffer{
 			ID: offerID, OwnerID: ownerID, Party: msg.From, Terms: termsRaw,
-			TermsHash: hashOfTerms, Limit: limit, CreatedAt: now.UTC(),
+			TermsHash: hashOfTerms, Limit: limit, CreatedAt: now.UTC(), Listed: listed,
 		},
 		Inbox: []database.ORPInboxItem{{OwnerID: ownerID, Message: docRaw}},
 	})
@@ -344,7 +353,9 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 		h.finish(c, msg, hash, http.StatusNotFound, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}), database.ORPEffect{})
 		return
 	}
-	if deal.State != "awaiting" {
+	// Execute is a claim. Verification is a receipt, and only an active deal
+	// can be claimed. awaiting (step_ask, claims_unchecked) stays untouched.
+	if deal.State != "active" {
 		h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}), database.ORPEffect{})
 		return
 	}
@@ -374,36 +385,17 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "This testing host does not settle money."}), database.ORPEffect{})
 		return
 	}
-	if !orp.ProofAllows(obligation, "proof_url") {
-		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "This obligation does not accept proof_url."}), database.ORPEffect{})
-		return
-	}
-	origin, _ := h.origin(c)
-	want := orp.ProofURL(origin, deal.ID)
-	if msg.Body["proof_url"] != want {
-		h.finish(c, msg, hash, http.StatusBadRequest, h.errorDoc(dns, msg, orp.Invalid("The proof URL must be this host's test proof page.", "/body/proof_url")), database.ORPEffect{})
-		return
-	}
 	mode, err := h.placementMode(c, ownerID)
 	if err != nil {
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
 	}
 	if obligation["action"] == "place" && mode == database.ModeOff {
-		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, stepOff("execute", "The owner has turned off placement publish, so this agent cannot prove a placement.")), database.ORPEffect{})
+		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, stepOff("execute", "The owner has turned off placement publish, so this agent cannot claim a placement.")), database.ORPEffect{})
 		return
 	}
 	now := h.now()
-	receiptBody := map[string]any{
-		"obligation": obligationID,
-		"result":     "verified",
-		"method":     "proof_url",
-		"at":         orp.Stamp(now),
-		"url":        want,
-		"found":      map[string]any{"disclosure": orp.DisclosureLabel(terms) != ""},
-	}
-	receiptID := ""
-	obligations, err := markVerified(deal.Obligations, obligationID, &receiptID, dns, deal, msg.ID, receiptBody, now)
+	obligations, err := markClaimed(deal.Obligations, obligationID)
 	if err != nil {
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
@@ -420,13 +412,11 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
 	}
-	inbox := h.dealInbox(dns, msg.ID, deal, now)
-	inbox = append(inbox, h.receiptInbox(dns, msg.ID, deal, receiptBody, receiptID, now)...)
 	h.finishRaw(c, msg, hash, http.StatusOK, raw, database.ORPEffect{
 		UpdateDealID:      deal.ID,
 		UpdateObligations: obligations,
 		UpdatedAt:         now.UTC(),
-		Inbox:             inbox,
+		Inbox:             h.dealInbox(dns, msg.ID, deal, now),
 	})
 }
 
@@ -642,41 +632,19 @@ func (h *ORPHost) inboxDeal(dns, party, owner, re string, deal database.ORPDeal,
 	return database.ORPInboxItem{OwnerID: owner, Message: raw}
 }
 
-func (h *ORPHost) receiptInbox(dns, re string, deal database.ORPDeal, body map[string]any, receiptID string, now time.Time) []database.ORPInboxItem {
-	return []database.ORPInboxItem{
-		receiptItem(dns, deal.OffererParty, deal.OffererOwner, re, deal.ID, body, receiptID, now),
-		receiptItem(dns, deal.AcceptorParty, deal.AcceptorOwner, re, deal.ID, body, receiptID, now),
-	}
-}
-
-func receiptItem(dns, party, owner, re, dealID string, body map[string]any, receiptID string, now time.Time) database.ORPInboxItem {
-	if owner == "" {
-		return database.ORPInboxItem{}
-	}
-	doc := orp.ReceiptMessage(dns, party, re, dealID, body, now)
-	if receiptID != "" {
-		doc["id"] = receiptID
-	}
-	raw, err := json.Marshal(doc)
-	if err != nil {
-		return database.ORPInboxItem{}
-	}
-	return database.ORPInboxItem{OwnerID: owner, Message: raw}
-}
-
-func markVerified(raw json.RawMessage, obligationID string, receiptID *string, dns string, deal database.ORPDeal, re string, body map[string]any, now time.Time) (json.RawMessage, error) {
+// markClaimed moves a pending obligation to claimed. It does not verify it.
+func markClaimed(raw json.RawMessage, obligationID string) (json.RawMessage, error) {
 	var rows []map[string]any
 	if err := json.Unmarshal(raw, &rows); err != nil {
 		return nil, err
 	}
-	doc := orp.ReceiptMessage(dns, deal.AcceptorParty, re, deal.ID, body, now)
-	*receiptID = doc["id"].(string)
 	found := false
 	out := make([]any, 0, len(rows))
 	for _, row := range rows {
 		if row["id"] == obligationID {
-			row["state"] = "verified"
-			row["receipt"] = *receiptID
+			if row["state"] == "pending" || row["state"] == "" {
+				row["state"] = "claimed"
+			}
 			found = true
 		}
 		out = append(out, row)

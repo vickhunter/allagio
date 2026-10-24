@@ -66,7 +66,7 @@ func (h *ORPHost) Monetize(c *gin.Context) {
 	}
 	req, surface, problem, ok := parseMonetization(value)
 	if !ok {
-		c.JSON(problemStatus(problem), gin.H{"error": problem.Message})
+		writeSuggestInputProblem(c, problem)
 		return
 	}
 	stripped := services.StripDraftPII(req.Text)
@@ -249,7 +249,8 @@ func pickMonetization(text string, rows []orp.Candidate, allow, deny []string, l
 		if len(picked) >= limit {
 			continue
 		}
-		picked = append(picked, monetizationPick{Candidate: row, Why: hit.Reason, Score: hit.Relevance})
+		why := orp.FitReason(text, row.Name, row.Blurb, row.Company, row.Category, strings.Join(row.Keywords, " "))
+		picked = append(picked, monetizationPick{Candidate: row, Why: why, Score: hit.Relevance})
 		for _, token := range services.OverlapTokens(text, offers[hit.Index]) {
 			if _, ok := seenKeywords[token]; ok {
 				continue
@@ -356,6 +357,21 @@ func newSuggestionCode() (string, error) {
 	return "sg" + hex.EncodeToString(buf), nil
 }
 
+func writeSuggestInputProblem(c *gin.Context, problem orp.Problem) {
+	status := problemStatus(problem)
+	body := gin.H{"error": problem.Message}
+	if problem.Code != "" {
+		body["code"] = problem.Code
+	}
+	if problem.Field != "" {
+		body["field"] = problem.Field
+	}
+	if problem.Field == "/surface" || problem.Field == "/platform" {
+		body["allowed"] = append([]string(nil), orp.DraftSurfaces...)
+	}
+	c.JSON(status, body)
+}
+
 func problemStatus(problem orp.Problem) int {
 	if problem.Status == 0 {
 		return http.StatusBadRequest
@@ -373,8 +389,9 @@ func requestLang(value any) string {
 }
 
 // parseMonetization accepts the suggest request (text, platform, lang, limit)
-// and the tool aliases (draft, surface, language). surface is x, blog,
-// newsletter, or email. The draft stays in the returned request only.
+// and the tool aliases (draft, surface, language). surface and platform
+// share DraftSurfaces: x, blog, newsletter, email, and web. The draft stays
+// in the returned request only.
 func parseMonetization(value any) (orp.SuggestRequest, string, orp.Problem, bool) {
 	obj, ok := value.(map[string]any)
 	if !ok {
@@ -396,9 +413,7 @@ func parseMonetization(value any) (orp.SuggestRequest, string, orp.Problem, bool
 	}
 	if surface != "" {
 		if platform, _ := cleaned["platform"].(string); platform == "" {
-			if mapped := platformForSurface(surface); mapped != "" {
-				cleaned["platform"] = mapped
-			}
+			cleaned["platform"] = surface
 		}
 	}
 	req, problem, ok := orp.ParseSuggest(cleaned)
@@ -406,8 +421,8 @@ func parseMonetization(value any) (orp.SuggestRequest, string, orp.Problem, bool
 		return orp.SuggestRequest{}, "", problem, false
 	}
 	if surface == "" {
-		if platform, _ := cleaned["platform"].(string); platform != "" {
-			surface = surfaceForPlatform(platform)
+		if platform, _ := cleaned["platform"].(string); orp.DraftSurfaceAllowed(platform) {
+			surface = platform
 		}
 	}
 	return req, surface, orp.Problem{}, true
@@ -443,65 +458,13 @@ func takeSurface(obj map[string]any) (string, orp.Problem, bool) {
 		return "", orp.Problem{}, true
 	}
 	surface, ok := raw.(string)
-	if !ok || !validSurface(surface) {
-		return "", orp.Invalid("The suggest request is not valid.", "/surface"), false
+	if !ok || !orp.DraftSurfaceAllowed(surface) {
+		return "", orp.DraftSurfaceProblem("/surface"), false
 	}
-	if platform, _ := obj["platform"].(string); platform != "" && !surfaceMatchesPlatform(surface, platform) {
-		return "", orp.Invalid("The suggest request is not valid.", "/surface"), false
+	if platform, _ := obj["platform"].(string); platform != "" && platform != surface {
+		return "", orp.Invalid("surface and platform must match. Allowed values: x, blog, newsletter, email, web.", "/surface"), false
 	}
 	return surface, orp.Problem{}, true
-}
-
-func validSurface(surface string) bool {
-	switch surface {
-	case "x", "blog", "newsletter", "email":
-		return true
-	default:
-		return false
-	}
-}
-
-func platformForSurface(surface string) string {
-	switch surface {
-	case "x":
-		return "x"
-	case "blog":
-		return "web"
-	case "newsletter":
-		return "newsletter"
-	case "email":
-		return "other"
-	default:
-		return ""
-	}
-}
-
-func surfaceForPlatform(platform string) string {
-	switch platform {
-	case "x":
-		return "x"
-	case "web":
-		return "blog"
-	case "newsletter":
-		return "newsletter"
-	default:
-		return platform
-	}
-}
-
-func surfaceMatchesPlatform(surface, platform string) bool {
-	switch surface {
-	case "x":
-		return platform == "x"
-	case "blog":
-		return platform == "web"
-	case "newsletter":
-		return platform == "newsletter"
-	case "email":
-		return platform == "other"
-	default:
-		return false
-	}
 }
 
 // Monetization is GET /v1/m/:code. It counts a click and redirects to the

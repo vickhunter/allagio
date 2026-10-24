@@ -72,10 +72,14 @@ func checkAcceptBody(body map[string]any) (Problem, bool) {
 	if problem, bad := unknownKey(body, acceptBodyKeys, "/body"); bad {
 		return problem, true
 	}
-	hash, _ := body["terms_hash"].(string)
-	if !hashPattern.MatchString(hash) {
-		return Invalid("The message is not valid ORP 0.3.", "/body/terms_hash"), true
+	rawHash, present := body["terms_hash"]
+	hash, hashOK := rawHash.(string)
+	if !present || !hashOK || hash == "" {
+		return Invalid("terms_hash must be sha256-<b64url43>.", "/body/terms_hash"), true
 	}
+	// A present string that is not this offer's hash is terms_mismatch,
+	// including a string that is not sha256-<b64url43>. The host compares
+	// it with the stored hash instead of refusing the shape.
 	if problem, bad := optionalLocal(body, "offer", "/body/offer"); bad {
 		return problem, true
 	}
