@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/discovery.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/discovery.schema.json",
   "title": "Discovery",
   "description": "The document a host serves at /.well-known/orp.json. Serving it correctly is all Level 0 asks. URLs may be absolute or a path on the document's origin.",
   "type": "object",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/envelope.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/envelope.schema.json",
   "title": "Envelope",
   "description": "The ORP 0.3 envelope. Six fields are required. Trust fields (prev, sig) and extensions are optional.",
   "type": "object",

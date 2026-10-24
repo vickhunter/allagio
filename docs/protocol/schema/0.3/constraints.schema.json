@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/constraints.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/constraints.schema.json",
   "title": "Constraints",
   "description": "An owner's private limits for its agent, kept by the host and never sent to a counterparty. Inside them the agent acts alone. Outside an allowance the host escalates to the owner. A deny rule or a step set to off refuses outright. Anything missing defaults to the safe side: every step that can bind the owner (list, negotiate, accept, execute, amend, settle, share) asks; only revoke is auto. With no budget, any spend asks.",
   "type": "object",

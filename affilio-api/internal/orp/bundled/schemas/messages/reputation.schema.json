@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/reputation.schema.json",
+  "title": "ReputationMessage",
+  "description": "Ask the host for a party's reputation (body has only subject), or the host's signed answer (an attestation). Scores come only from verified receipts and resolved disputes. Components are counts; they never list counterparties.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body"],
+  "properties": {
+    "type": { "const": "reputation" },
+    "body": { "$ref": "#/$defs/ReputationBody" }
+  },
+  "$defs": {
+    "ReputationBody": {
+      "title": "ReputationBody",
+      "oneOf": [{ "$ref": "#/$defs/ReputationQuery" }, { "$ref": "#/$defs/ReputationAttestation" }]
+    },
+    "ReputationQuery": {
+      "title": "ReputationQuery",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject"],
+      "properties": {
+        "subject": { "$ref": "../defs.schema.json#/$defs/PartyId" }
+      }
+    },
+    "ReputationAttestation": {
+      "title": "ReputationAttestation",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "algorithm", "score", "computed_at"],
+      "properties": {
+        "subject": { "$ref": "../defs.schema.json#/$defs/PartyId" },
+        "algorithm": {
+          "anyOf": [{ "const": "orp-rep-1" }, { "$ref": "../defs.schema.json#/$defs/ExtName" }]
+        },
+        "score": { "type": ["integer", "null"], "minimum": 0, "maximum": 1000, "description": "null when there is not enough verified history yet." },
+        "components": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "verified": { "type": "number", "minimum": 0 },
+            "failed": { "type": "number", "minimum": 0 },
+            "disputes_lost": { "type": "integer", "minimum": 0 },
+            "counterparties": { "type": "integer", "minimum": 0 },
+            "evidence_weight": { "type": "number", "minimum": 0 }
+          }
+        },
+        "computed_at": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+        "valid_until": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+      }
+    }
+  }
+}

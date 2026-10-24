@@ -1,0 +1,10 @@
+{
+  "orp": "0.3",
+  "type": "reputation",
+  "id": "m_pub_0007",
+  "ts": "2026-10-21T11:06:00Z",
+  "from": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "body": {
+    "subject": "orp:hub.example/p_7Hq2kLm9Zt4Xw"
+  }
+}

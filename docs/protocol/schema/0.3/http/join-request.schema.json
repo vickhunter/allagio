@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/http/join-request.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/http/join-request.schema.json",
   "title": "JoinRequest",
   "description": "POST to the discovery document's join URL with no credentials. There is no field for an email, phone, name, password or website, and a host must not ask for one: the party is pseudonymous from the start. An empty object is a complete request.",
   "type": "object",

@@ -11,7 +11,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const schemaRoot = join(here, '..', '0.3');
 const examplesRoot = join(here, '..', 'examples');
 const specRoot = join(here, '..', '..');
-const BASE = 'https://offerrails.com/orp/schema/0.3/';
+const BASE = 'https://offer-rails.onrender.com/orp/schemas/';
 
 const CORE_TYPES = ['hello', 'discover', 'results', 'space', 'request', 'offer', 'counter', 'accept', 'decline', 'deal', 'execute', 'receipt', 'outcome', 'payout', 'revoke', 'consent', 'dispute', 'reputation', 'error'];
 

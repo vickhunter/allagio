@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/consent.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/consent.schema.json",
   "title": "ConsentMessage",
   "description": "The host's record that a person decided an escalation. Only a host sends it, never an agent. It names the exact terms_hash the person saw, how the host knows it was the owner (assurance), and when. The counterparty's copy omits reasons. A signed consent (envelope sig) is the verifiable human-consent record.",
   "type": "object",

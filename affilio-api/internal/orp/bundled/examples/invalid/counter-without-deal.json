@@ -1,0 +1,70 @@
+{
+  "why": "A counter belongs to an open deal.",
+  "schema": "message",
+  "path": "",
+  "instance": {
+    "orp": "0.3",
+    "type": "counter",
+    "id": "m_mkr_0003",
+    "ts": "2026-10-21T11:20:00Z",
+    "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+    "body": {
+      "terms": {
+        "title": "Newsletter mention for a launch repost",
+        "kind": "swap",
+        "categories": [
+          "software.productivity"
+        ],
+        "disclosure": {
+          "label": "Partner mention",
+          "lang": "en"
+        },
+        "obligations": [
+          {
+            "id": "mention",
+            "by": "offerer",
+            "action": "place",
+            "space": {
+              "kinds": [
+                "newsletter.issue"
+              ]
+            },
+            "content": {
+              "link": true,
+              "brief": "One paragraph on why Acme Notes suits solo founders.",
+              "max_chars": 600,
+              "code": true
+            },
+            "destination": "https://acmenotes.example/",
+            "due": "P14D",
+            "proof": [
+              "link",
+              "witness",
+              "attestation"
+            ]
+          },
+          {
+            "id": "repost",
+            "by": "acceptor",
+            "action": "repost",
+            "target": "https://x.com/indiestackweekly/status/1848000000000000000",
+            "space": {
+              "kinds": [
+                "social.repost"
+              ]
+            },
+            "due": "P7D",
+            "keep": "P14D",
+            "proof": [
+              "platform_check",
+              "proof_url",
+              "attestation"
+            ]
+          }
+        ]
+      },
+      "terms_hash": "sha256-XqlxlRGWPLFRQGlZNLpnwIpj-F1xr7UK1Pilom6pvCk",
+      "note": "Happy to repost. Our reposts stay up 14 days, and please add the code too."
+    }
+  }
+}

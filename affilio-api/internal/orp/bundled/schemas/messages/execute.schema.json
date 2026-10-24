@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/execute.schema.json",
+  "title": "ExecuteMessage",
+  "description": "The obligor says an obligation is done. A claim is not proof: it moves the obligation to claimed, and only a receipt moves it to verified. For click-tracked placements the claim is optional, since human clicks on the tracking link are the proof.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "execute" },
+    "body": { "$ref": "#/$defs/ExecuteBody" }
+  },
+  "$defs": {
+    "ExecuteBody": {
+      "title": "ExecuteBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["obligation"],
+      "properties": {
+        "obligation": { "$ref": "../defs.schema.json#/$defs/ObligationId" },
+        "proof_url": { "$ref": "../defs.schema.json#/$defs/Url", "description": "A public URL where the result can be seen, such as the post, the repost or the comment." },
+        "space": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "at": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+        "note": { "$ref": "../defs.schema.json#/$defs/Text" }
+      }
+    }
+  }
+}

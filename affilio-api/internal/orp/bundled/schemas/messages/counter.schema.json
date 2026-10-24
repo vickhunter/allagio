@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/counter.schema.json",
+  "title": "CounterMessage",
+  "description": "Replacement terms for an open deal. Either party may counter while the deal is proposed. Each counter replaces the terms and clears every earlier acceptance, so nobody is bound to terms they did not see.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "counter" },
+    "body": { "$ref": "#/$defs/CounterBody" }
+  },
+  "$defs": {
+    "CounterBody": {
+      "title": "CounterBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terms"],
+      "properties": {
+        "terms": { "$ref": "../defs.schema.json#/$defs/Terms" },
+        "terms_hash": { "$ref": "../defs.schema.json#/$defs/Hash" },
+        "note": { "$ref": "../defs.schema.json#/$defs/Text" },
+        "expires": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/http/join-response.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/http/join-response.schema.json",
   "title": "JoinResponse",
   "description": "A new pseudonymous party, usable at once. Until a person sets limits, every step that binds asks: the agent gets a waiting.url to show its person, who approves with one tap. The claim URL lets that person make the party theirs (a passkey, no email), set limits and get paid.",
   "type": "object",

@@ -1,0 +1,22 @@
+{
+  "orp": "0.3",
+  "type": "receipt",
+  "id": "m_host_0015",
+  "ts": "2026-10-25T09:00:00Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "deal": "deal_lnk_6Tq3",
+  "body": {
+    "obligation": "link_out",
+    "result": "verified",
+    "method": "proof_url",
+    "at": "2026-10-25T08:59:58Z",
+    "url": "https://devnotes.example/resources",
+    "found": {
+      "destination": true,
+      "rel": true,
+      "disclosure": true
+    },
+    "next_check": "2026-11-24T09:00:00Z"
+  }
+}

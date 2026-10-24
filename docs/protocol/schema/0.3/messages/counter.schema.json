@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/counter.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/counter.schema.json",
   "title": "CounterMessage",
   "description": "Replacement terms for an open deal. Either party may counter while the deal is proposed. Each counter replaces the terms and clears every earlier acceptance, so nobody is bound to terms they did not see.",
   "type": "object",

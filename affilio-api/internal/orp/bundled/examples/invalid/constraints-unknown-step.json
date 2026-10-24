@@ -1,0 +1,10 @@
+{
+  "why": "Steps are the eight named steps.",
+  "schema": "constraints",
+  "path": "/steps",
+  "instance": {
+    "steps": {
+      "publish_anything": "auto"
+    }
+  }
+}

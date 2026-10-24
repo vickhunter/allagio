@@ -1,0 +1,15 @@
+{
+  "orp": "0.3",
+  "type": "error",
+  "id": "m_host_0014",
+  "ts": "2026-10-23T08:30:01Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+  "re": "m_mkr_0009",
+  "body": {
+    "code": "step_off",
+    "message": "The owner has turned off the settle step for this agent.",
+    "step": "settle",
+    "retryable": false
+  }
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/error.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/error.schema.json",
   "title": "ErrorMessage",
   "description": "A refusal. An error never changes state. Escalation is not an error: a step that needs a person returns a deal snapshot in state awaiting.",
   "type": "object",

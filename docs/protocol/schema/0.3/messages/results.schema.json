@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/results.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/results.schema.json",
   "title": "ResultsMessage",
   "description": "The host's answer to discover. Every item says why it fits, with evidence links, and shows aggregate trust.",
   "type": "object",

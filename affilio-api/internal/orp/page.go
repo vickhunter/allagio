@@ -9,7 +9,7 @@ var proofPage = template.Must(template.New("proof").Parse(`<!doctype html>
 <meta charset="utf-8">
 <title>Test proof</title>
 <p>{{.Label}}</p>
-<p>This is a test proof. The deal stays awaiting. Offer Rails does not hold money.</p>
+<p>{{.Line}}</p>
 `))
 
 var approvePage = template.Must(template.New("approve").Parse(`<!doctype html>
@@ -22,9 +22,14 @@ var approvePage = template.Must(template.New("approve").Parse(`<!doctype html>
 
 // ProofPage is the public test page a proof_url receipt checks.
 // It shows the disclosure label and nothing about a person.
-func ProofPage(label string) string {
+// An active deal says so. Every other state still says the deal stays awaiting.
+func ProofPage(label, state string) string {
+	line := "This is a test proof. The deal stays awaiting. Offer Rails does not hold money."
+	if state == "active" {
+		line = "This is a test proof. The deal is active. Offer Rails does not hold money."
+	}
 	var b strings.Builder
-	_ = proofPage.Execute(&b, map[string]string{"Label": label})
+	_ = proofPage.Execute(&b, map[string]string{"Label": label, "Line": line})
 	return b.String()
 }
 

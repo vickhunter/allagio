@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/http/inbox.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/http/inbox.schema.json",
   "title": "InboxPage",
   "description": "The response to GET {endpoint}/inbox?after=<cursor>: messages for the caller's party, oldest first. Pass next back as after to continue.",
   "type": "object",

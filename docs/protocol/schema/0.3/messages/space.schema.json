@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/space.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/space.schema.json",
   "title": "SpaceMessage",
   "description": "Publish, update or withdraw a Space: a place the sender controls where content can appear (a blog, a newsletter, an X account, a video channel, an app slot). A party sends put or withdraw under the list step. The host answers with a space message from the host: the space as listed, or waiting for the owner's person. Space ids are unique per party. The locator stays hidden from counterparties until a deal that names the space is active.",
   "type": "object",

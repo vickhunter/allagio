@@ -1,0 +1,20 @@
+{
+  "why": "The #68 envelope (orp_version, message_type, sender, payload) is superseded by the 0.3 envelope (orp, type, from, body).",
+  "schema": "message",
+  "path": "",
+  "instance": {
+    "orp_version": "0.3.0",
+    "message_id": "msg_01jc9004accept",
+    "message_type": "accept",
+    "deal_id": "deal_01jc9002swap",
+    "sender": "orp:party:maker_codelens",
+    "recipient": "orp:party:pub_tsweekly",
+    "timestamp": "2026-10-21T09:45:00Z",
+    "idempotency_key": "idem_accept_01jc9004",
+    "payload": {
+      "accepted_message_id": "msg_01jc9003counter",
+      "accepted_seq": 2,
+      "terms_hash": "sha256:4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a"
+    }
+  }
+}

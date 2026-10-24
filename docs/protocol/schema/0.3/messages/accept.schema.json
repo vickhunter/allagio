@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/accept.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/accept.schema.json",
   "title": "AcceptMessage",
   "description": "Agree to exact terms, named by terms_hash. Accept an open deal (deal set) or a standing offer (body.offer set, which opens a new deal). The host binds the sender only if the owner's constraints allow it; otherwise the deal waits for a person and the reply says so.",
   "type": "object",

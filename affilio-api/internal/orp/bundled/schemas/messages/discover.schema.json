@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/discover.schema.json",
+  "title": "DiscoverMessage",
+  "description": "Search the host's index for offers (publisher side) or spaces (maker side). Read-only: it never commits anyone.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body"],
+  "properties": {
+    "type": { "const": "discover" },
+    "body": { "$ref": "#/$defs/DiscoverBody" }
+  },
+  "$defs": {
+    "DiscoverBody": {
+      "title": "DiscoverBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["want"],
+      "properties": {
+        "want": { "type": "string", "enum": ["offers", "spaces"] },
+        "query": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "context": {
+          "description": "The caller's own public content to match against. Never someone else's data.",
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "text": { "type": "string", "minLength": 10, "maxLength": 12000 },
+            "url": { "$ref": "../defs.schema.json#/$defs/Url" },
+            "space": { "$ref": "../defs.schema.json#/$defs/LocalId" }
+          }
+        },
+        "filters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kinds": { "type": "array", "uniqueItems": true, "items": { "$ref": "../defs.schema.json#/$defs/DealKind" } },
+            "space_kinds": { "type": "array", "uniqueItems": true, "items": { "$ref": "../defs.schema.json#/$defs/SpaceKind" } },
+            "platforms": { "type": "array", "uniqueItems": true, "items": { "$ref": "../defs.schema.json#/$defs/Platform" } },
+            "categories": { "type": "array", "maxItems": 10, "items": { "$ref": "../defs.schema.json#/$defs/Category" } },
+            "languages": { "type": "array", "maxItems": 5, "items": { "type": "string", "pattern": "^[a-z]{2,3}$" } },
+            "audience_min": { "$ref": "../defs.schema.json#/$defs/SizeBucket" },
+            "min_reputation": { "type": "integer", "minimum": 0, "maximum": 1000 },
+            "pool": { "type": "string", "pattern": "^[a-z0-9_-]{1,40}$" }
+          }
+        },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "cursor": { "type": "string", "maxLength": 200 }
+      }
+    }
+  }
+}

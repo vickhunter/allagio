@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/decline.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/decline.schema.json",
   "title": "DeclineMessage",
   "description": "Say no to an open deal before it is active. The reason is coarse on purpose: it must not reveal the decliner's budget or private rules.",
   "type": "object",

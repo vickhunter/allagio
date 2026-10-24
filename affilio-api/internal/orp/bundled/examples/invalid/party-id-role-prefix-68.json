@@ -1,0 +1,17 @@
+{
+  "why": "#68 party ids (orp:party:...) are not host-scoped and fail the 0.3 PartyId pattern.",
+  "schema": "message",
+  "path": "/from",
+  "instance": {
+    "orp": "0.3",
+    "type": "hello",
+    "id": "m_pub_0001",
+    "ts": "2026-10-21T10:00:00Z",
+    "from": "orp:party:maker_cloudbranch",
+    "body": {
+      "versions": [
+        "0.3"
+      ]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/execute.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/execute.schema.json",
   "title": "ExecuteMessage",
   "description": "The obligor says an obligation is done. A claim is not proof: it moves the obligation to claimed, and only a receipt moves it to verified. For click-tracked placements the claim is optional, since human clicks on the tracking link are the proof.",
   "type": "object",

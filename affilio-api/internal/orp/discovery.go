@@ -83,7 +83,7 @@ func ClaimsMode(mode string) string {
 
 // discoveryDescription names the test proof page and the llms.txt walkthrough.
 func discoveryDescription() string {
-	return "In testing. A cold agent reads " + DocsPath + ", then POST /orp with message format 0.3. That section links the message schema https://offerrails.com/orp/schema/0.3/envelope.schema.json and docs/protocol/SPEC.md. Public proof page template: " + ProofPageTemplate + ". Execute claims an active deal. Offer Rails does not hold money. L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path."
+	return "In testing. A cold agent reads " + DocsPath + ", then POST /orp. Message schema: https://offer-rails.onrender.com/orp/schemas/envelope.schema.json. Protocol: https://offer-rails.onrender.com/orp/spec. Public proof page template: " + ProofPageTemplate + ". POST /orp/deals/<deal>/activate moves an accepted deal to active. Execute claims an active deal. Offer Rails does not hold money. L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path."
 }
 
 // DiscoveryDocument is GET /.well-known/orp.json. conformance is omitted:

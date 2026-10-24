@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/message.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/message.schema.json",
   "title": "Message",
   "description": "Any ORP 0.3 message: the envelope, then the body rules for the declared type. Extension types (reverse-DNS names) get envelope checks only; a receiver that does not know them answers unsupported_type.",
   "type": "object",

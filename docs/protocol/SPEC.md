@@ -1,15 +1,15 @@
 # Offer Rails Protocol (ORP) 0.3
 
 **Status:** canonical draft, frozen 2026-10-23 (D-099). This is the one ORP 0.3 wire format. Changes after the freeze follow [§19](#19-change-control).
-**Schemas:** [`schema/0.3/`](schema/0.3/) (JSON Schema 2020-12). Valid and invalid examples are in [`schema/examples/`](schema/examples/), checked by `npm test` in [`schema/`](schema/).
+**Schemas:** [`schema/0.3/`](https://offer-rails.onrender.com/orp/schemas/) (JSON Schema 2020-12). Valid and invalid examples are in [`schema/examples/`](https://offer-rails.onrender.com/orp/examples/), checked by `npm test` in `schema/`.
 **License:** this specification and its schemas will be published under Apache-2.0. Until then it is a draft in this repository.
-**Decision log:** [`briefs/offer-rails-protocol-canonical-20261023.md`](../../briefs/offer-rails-protocol-canonical-20261023.md).
+**Decision log:** `briefs/offer-rails-protocol-canonical-20261023.md`.
 
 > **SUPERSEDES.** This document replaces both earlier 0.3 drafts and closes GAP-06.
 >
 > - **Draft PR #68** (the "v0.3.0" prose spec and its schemas) is **superseded as a wire format, in full.** Its envelope (`orp_version`, `message_type`, `sender`, `payload`), its SemVer `0.3.0` version string, its `orp:party:*` ids, its five fixed `deal_type` term shapes, its `sha256:<hex>` hashes, its self-submitted receipts, its agent-sent consent and its provisional tracking links are **not** ORP 0.3. A message in that shape is invalid (see [Appendix B](#appendix-b-pr-68-to-03-mapping)). Some of #68's product ideas are adopted here in the #71 shape: first-class spaces, the named growth deal types, the `via`/`ref` parameter, test clicks, clicks by source, and the "afternoon core" and C1/C2 conformance names.
 > - **Draft PR #71** (schemas and TypeScript SDK) **wins on the wire format.** Its envelope, version rule, party ids, obligation-based terms, host-only consent and receipts, and closed schemas are carried forward. Its `schema/` directory is superseded by `docs/protocol/schema/`, which applies the deltas in [Appendix A](#appendix-a-changes-from-the-pr-71-schemas). The #71 SDK is a reference implementation that still needs those deltas.
-> - **DCP v0.1** ([`docs/dcp/`](../dcp/)) stays the live affiliate path on the hosted affilio-api. [Appendix C](#appendix-c-hosted-affilio-api-and-orp-03) lists the ORP 0.3 slice that host serves and what it still does not do.
+> - **DCP v0.1** ([discovery](https://offer-rails.onrender.com/.well-known/dcp.json)) stays the live affiliate path on the hosted affilio-api. [Appendix C](#appendix-c-hosted-affilio-api-and-orp-03) lists the ORP 0.3 slice that host serves and what it still does not do.
 >
 > **The hosted service speaks a testing slice of ORP 0.3** (discovery, suggest, join, and the 0.3 message format) and claims no conformance level. Nothing in this document changes `CLAIMS_CHECK`.
 
@@ -95,7 +95,7 @@ In a deal, the **offerer** proposed the terms and the **acceptor** accepted them
 
 ### 4.1 Discovery document
 
-A host MUST serve `GET https://<host>/.well-known/orp.json` without authentication, with `Access-Control-Allow-Origin: *`. The body validates against [`discovery.schema.json`](schema/0.3/discovery.schema.json):
+A host MUST serve `GET https://<host>/.well-known/orp.json` without authentication, with `Access-Control-Allow-Origin: *`. The body validates against [`discovery.schema.json`](https://offer-rails.onrender.com/orp/schemas/discovery.schema.json):
 
 ```json
 {
@@ -179,7 +179,7 @@ An MCP client cannot change its headers in the middle of a conversation, so the 
 
 ## 5. Envelope
 
-Every message is one JSON object, defined in [`envelope.schema.json`](schema/0.3/envelope.schema.json). The full rules for each type are in [`message.schema.json`](schema/0.3/message.schema.json) and `messages/<type>.schema.json`.
+Every message is one JSON object, defined in [`envelope.schema.json`](https://offer-rails.onrender.com/orp/schemas/envelope.schema.json). The full rules for each type are in [`message.schema.json`](https://offer-rails.onrender.com/orp/schemas/message.schema.json) and `messages/<type>.schema.json`.
 
 | Field | Required | Meaning |
 |---|---|---|
@@ -239,7 +239,7 @@ An error never changes state. A host MUST NOT apply part of a message.
 }
 ```
 
-**Capabilities** (`Capabilities` in [`defs.schema.json`](schema/0.3/defs.schema.json)):
+**Capabilities** (`Capabilities` in [`defs.schema.json`](https://offer-rails.onrender.com/orp/schemas/defs.schema.json)):
 
 | Field | Meaning |
 |---|---|
@@ -294,7 +294,7 @@ This section is a protocol rule, not legal advice. A host also needs a lawful ba
 
 ## 8. Core objects
 
-All of these are defined in [`defs.schema.json`](schema/0.3/defs.schema.json).
+All of these are defined in [`defs.schema.json`](https://offer-rails.onrender.com/orp/schemas/defs.schema.json).
 
 ### 8.1 Space
 
@@ -366,7 +366,7 @@ Obligation states: `pending`, `claimed`, `verified`, `failed`, `revoked`, `waive
 
 ### 8.4 Constraints
 
-Constraints are the owner's standing rules for an agent ([`constraints.schema.json`](schema/0.3/constraints.schema.json)): a mode per step, budgets, an approval threshold, allowed kinds, categories and spaces, counterparty rules, brand rules, the longest deal it may agree to, and when the mandate expires. The owner sets them at the host. [§11](#11-human-approval-per-step) says how the host applies them.
+Constraints are the owner's standing rules for an agent ([`constraints.schema.json`](https://offer-rails.onrender.com/orp/schemas/constraints.schema.json)): a mode per step, budgets, an approval threshold, allowed kinds, categories and spaces, counterparty rules, brand rules, the longest deal it may agree to, and when the mandate expires. The owner sets them at the host. [§11](#11-human-approval-per-step) says how the host applies them.
 
 ```json
 {
@@ -1193,7 +1193,7 @@ A host or client states the levels it meets in `conformance.levels`. Each level 
 - **`C1-UNIVERSAL-LINK-NO-ADAPTER`.** Activate an affiliate deal. Without any plugin, adapter, `execute` or receipt, request the link with a browser user agent from three contexts (an email client, a social post, a plain page). Expect three `302`s with fresh `via` ids, three human clicks in the next outcome, and a `link` receipt after the first.
 - **`C2-NO-EMAIL-NO-SIGNUP`.** From a fresh client with no credentials, `POST {suggest}` with draft text and `join: {}`. Expect items with pitches and a `joined` token. Accept one offer with that token. Expect an `awaiting` deal with an approval URL and no request for an email at any point.
 
-**Status.** The suite is [`conformance/test/`](conformance/test/). From this directory, `npm test` runs the schema checks and that suite against the reference host in [`sdk/`](sdk/). The reference host lists L0 to L3 only as the subject of the suite. A failing suite voids the claim. The hosted affilio-api claims no level. See [Appendix C](#appendix-c-hosted-affilio-api-and-orp-03).
+**Status.** The suite is `conformance/test/`. From this directory, `npm test` runs the schema checks and that suite against the reference host in `sdk/`. The reference host lists L0 to L3 only as the subject of the suite. A failing suite voids the claim. The hosted affilio-api claims no level. See [Appendix C](#appendix-c-hosted-affilio-api-and-orp-03).
 
 ---
 
@@ -1211,7 +1211,7 @@ A host or client states the levels it meets in `conformance.levels`. Each level 
 
 ## 19. Change control
 
-- This document and the schemas in [`schema/0.3/`](schema/0.3/) are the canonical ORP 0.3. Where they disagree, the schema wins for shape and this document wins for behavior, and the disagreement is a bug to fix in both.
+- This document and the schemas at [`https://offer-rails.onrender.com/orp/schemas/`](https://offer-rails.onrender.com/orp/schemas/) are the canonical ORP 0.3. Where they disagree, the schema wins for shape and this document wins for behavior, and the disagreement is a bug to fix in both.
 - After the freeze, a 0.3 change may only fix an error, clarify text, or add an optional field that no existing receiver would refuse. Each change updates this document, the schema, the examples and the decision log together, and `npm test` must pass.
 - Anything that changes what a valid message means goes to 0.4. Candidates: federation between hosts, mandatory signatures, settlement profiles, A2A and x402 bindings, and verifiable party keys (DID or domain JWKS).
 - Extension names are reverse-DNS under a domain the author controls. An extension MUST NOT redefine a core field.
@@ -1315,11 +1315,12 @@ The hosted service now serves a testing slice of ORP 0.3. The discovery name is 
 | Message format over `POST /orp` | Served. A message is ORP 0.3: `orp` `"0.3"`, `type`, `id`, `ts`, `from`, and `body`. This testing host answers `hello`, `discover`, `offer`, `accept`, and `execute`. A #68-shaped body is `invalid_message`. Bearer auth is the join token. `from` must be `orp:<host>/<owner_id>`. |
 | `terms_hash` on `offer` and `accept` | On `accept`, a missing or empty `terms_hash` is HTTP 400 `invalid_message` and the message names `sha256-<b64url43>`. Any other string that does not match the terms is HTTP 409 `terms_mismatch` (`terms_hash does not match the terms.`). On `offer`, `terms_hash` is optional and the host computes it. An empty or malformed hash is a generic HTTP 400 `invalid_message` and the message is `The message is not valid ORP 0.3.` Only a well-formed hash that does not match the terms is HTTP 409 `terms_mismatch`. |
 | `suggest` and `join` | Served with no credentials. `POST /orp/suggest` and `POST /orp/join` (an empty object is a complete join). `POST /v1/agent-tokens` with `{}` mints the same kind of bearer. Suggest `platform` and monetize `surface` are `x`, `blog`, `newsletter`, `email`, and `web`. An unknown value is `invalid_message` and the message lists those values. |
-| Test proof | `GET /orp/proof/<deal>` is the public page. Execute does not read `proof_url` and does not require that page. A fresh join is `list: ask`, so a standing offer waits and accept of that id is HTTP 404 `not_found`. A saved `placement_publish` of `auto` publishes the offer. The second party accepts it. The deal opens `awaiting`. Execute on that deal is HTTP 409 `state_conflict`. On an `active` deal, execute claims the place obligation and leaves the deal `active`. There is no receipt. Offer Rails does not hold money. The offerer cannot accept its own offer (HTTP 403 `forbidden`). The place obligation `id` in the walkthrough is `place`. |
+| Test proof | `GET /orp/proof/<deal>` is the public page. Execute does not read `proof_url` and does not require that page. A fresh join is `list: ask`, so a standing offer waits and accept of that id is HTTP 404 `not_found`. A saved `placement_publish` of `auto` publishes the offer. The second party accepts it. The deal opens `awaiting`. Either party moves that deal to `active` with `POST /orp/deals/<deal>/activate`. Any other state is HTTP 409 `state_conflict` and the message is `The deal is in the wrong state.` A party that is not on the deal is HTTP 404 `not_found`. No bearer is HTTP 401 `unauthorized`. Execute on an `awaiting` deal is HTTP 409 `state_conflict`. On an `active` deal, execute claims the place obligation and leaves the deal `active`. There is no receipt. Offer Rails does not hold money. The offerer cannot accept its own offer (HTTP 403 `forbidden`). The place obligation `id` in the walkthrough is `place`. |
 | Tracked link counts on any surface (T6) | `GET /v1/go/<placement_id>` records a hit with or without plugin-ack. `placement_counts_as_live` still needs the plugin to report `placed`. An ORP test deal does not mint a tracked link. |
 | `via` click id (T3) | Hosted offers use `via` as their ref parameter and append the id of the click record. Repeat clicks from the same reader inside the dedup window reuse one id. The click record keeps the user agent, the referrer and a salted hash of the truncated address. |
 | `checks.claims: real` | `CLAIMS_CHECK` defaults to `stub` in release. This document does not change it. Discovery only reports the configured mode. |
 | Step modes `auto`, `ask`, `off` | Placement publish defaults to `ask` (#73). The step names differ. |
+| Schemas and this document | `GET /orp/schemas/` and `GET /orp/schemas/<name>.json` serve the JSON Schemas. `GET /orp/examples/` serves the examples. `GET /orp/spec` serves this document. `GET /orp/gaps` serves the ranked pitfalls. Each schema `$id` is `https://offer-rails.onrender.com/orp/schemas/` plus the file path. |
 | `payout` records | Hosted keeps a commission ledger (`/v1/payouts/*`). Payouts are manual. This testing host does not settle an ORP deal. |
 
-The cold-agent walkthrough is the `ORP 0-3 test deal` section of `/llms.txt`. Ranked pitfalls and their dispositions are in [`GAPS.md`](GAPS.md).
+The cold-agent walkthrough is the ORP 0-3 test deal section of [llms.txt](https://offer-rails.onrender.com/llms.txt#orp-0-3-test-deal). Ranked pitfalls and their dispositions are in [GAPS.md](https://offer-rails.onrender.com/orp/gaps). This document is [served here](https://offer-rails.onrender.com/orp/spec).

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/discovery.schema.json",
+  "title": "Discovery",
+  "description": "The document a host serves at /.well-known/orp.json. Serving it correctly is all Level 0 asks. URLs may be absolute or a path on the document's origin.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["orp", "host"],
+  "properties": {
+    "orp": {
+      "description": "Supported protocol versions, newest first.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "defs.schema.json#/$defs/Version" }
+    },
+    "host": { "$ref": "defs.schema.json#/$defs/PartyId", "description": "The host's own party id, orp:<host>/host. Host-originated messages use it as from." },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "description": { "type": "string", "maxLength": 500 },
+    "endpoint": { "$ref": "#/$defs/UrlOrPath", "description": "The HTTP binding: POST messages here. Required for Level 1 and up." },
+    "suggest": { "$ref": "#/$defs/UrlOrPath", "description": "POST a draft here with no credentials to get deals a person could take now. Required for Level 1 and up." },
+    "join": { "$ref": "#/$defs/UrlOrPath", "description": "POST here with no credentials and no personal data to get a party id and token. Required for Level 1 and up." },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "transport"],
+      "properties": {
+        "url": { "$ref": "#/$defs/UrlOrPath" },
+        "transport": { "type": "string", "enum": ["streamable-http", "legacy-http-jsonrpc"] },
+        "auth": { "type": "array", "uniqueItems": true, "items": { "type": "string", "enum": ["bearer", "oauth"] } },
+        "tools": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_]{1,64}$" } },
+        "binding": { "type": "boolean", "description": "True when the MCP server exposes the ORP binding tools: orp_suggest and orp_join (no credentials), and orp_send, orp_inbox and orp_deal." }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bearer": { "type": "boolean", "description": "Agents authenticate with Authorization: Bearer <key>." },
+        "oauth_metadata": { "$ref": "#/$defs/UrlOrPath" },
+        "docs": { "$ref": "#/$defs/UrlOrPath" }
+      }
+    },
+    "tracking": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "links": { "type": "boolean" },
+        "codes": { "type": "boolean" },
+        "base": { "$ref": "#/$defs/UrlOrPath", "description": "Where tracking links live." }
+      }
+    },
+    "conformance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "levels": { "type": "array", "uniqueItems": true, "items": { "type": "string", "enum": ["L0", "L1", "L2", "L3"] } },
+        "profiles": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9.-]{1,64}$" } },
+        "report": { "$ref": "#/$defs/UrlOrPath" }
+      }
+    },
+    "capabilities": { "$ref": "defs.schema.json#/$defs/Capabilities" },
+    "keys": {
+      "description": "Public keys for host signatures (Level 3), as JWKs.",
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["kty", "kid"],
+        "properties": {
+          "kty": { "type": "string", "enum": ["OKP", "EC"] },
+          "crv": { "type": "string" },
+          "x": { "type": "string" },
+          "y": { "type": "string" },
+          "kid": { "type": "string", "maxLength": 128 },
+          "alg": { "type": "string", "enum": ["EdDSA", "ES256"] },
+          "use": { "const": "sig" }
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "terms": { "$ref": "#/$defs/UrlOrPath" },
+        "privacy": { "$ref": "#/$defs/UrlOrPath" },
+        "abuse": { "$ref": "#/$defs/UrlOrPath" }
+      }
+    },
+    "docs": { "$ref": "#/$defs/UrlOrPath" },
+    "legacy": {
+      "description": "Pre-ORP interfaces the host still serves. Informational; ORP clients ignore it.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9_-]{1,32}$" },
+      "additionalProperties": { "type": "object" }
+    }
+  },
+  "$defs": {
+    "UrlOrPath": {
+      "title": "UrlOrPath",
+      "anyOf": [
+        { "$ref": "defs.schema.json#/$defs/Url" },
+        { "type": "string", "pattern": "^/[^/]", "maxLength": 2048 }
+      ]
+    }
+  }
+}

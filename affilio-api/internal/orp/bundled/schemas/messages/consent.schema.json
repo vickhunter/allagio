@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/consent.schema.json",
+  "title": "ConsentMessage",
+  "description": "The host's record that a person decided an escalation. Only a host sends it, never an agent. It names the exact terms_hash the person saw, how the host knows it was the owner (assurance), and when. The counterparty's copy omits reasons. A signed consent (envelope sig) is the verifiable human-consent record.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "consent" },
+    "body": { "$ref": "#/$defs/ConsentBody" }
+  },
+  "$defs": {
+    "ConsentBody": {
+      "title": "ConsentBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["consent", "party", "decision", "step", "terms_hash", "assurance", "at"],
+      "properties": {
+        "consent": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "escalation": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "party": { "$ref": "../defs.schema.json#/$defs/PartyId", "description": "The party whose person decided." },
+        "decision": { "type": "string", "enum": ["approved", "refused"] },
+        "step": { "$ref": "../defs.schema.json#/$defs/Step" },
+        "terms_hash": { "$ref": "../defs.schema.json#/$defs/Hash" },
+        "reasons": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "$ref": "../defs.schema.json#/$defs/EscalationReason" } },
+        "assurance": {
+          "description": "session: the owner approved in a signed-in host session. passkey: the owner's passkey signed a challenge derived from terms_hash. email_link: a one-time link sent to the owner. client_prompt: an MCP client asked the person (the host cannot tell a person from an auto-approving client, so it is the weakest).",
+          "type": "string",
+          "enum": ["session", "passkey", "email_link", "client_prompt"]
+        },
+        "at": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+        "expires": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+      }
+    }
+  }
+}

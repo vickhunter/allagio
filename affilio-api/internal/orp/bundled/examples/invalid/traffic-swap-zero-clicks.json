@@ -1,0 +1,59 @@
+{
+  "why": "A clicks target is at least one human click.",
+  "schema": "message",
+  "path": "/body/terms/obligations/0",
+  "instance": {
+    "orp": "0.3",
+    "type": "offer",
+    "id": "m_mkr_0011",
+    "ts": "2026-10-24T09:00:00Z",
+    "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+    "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+    "body": {
+      "terms": {
+        "title": "Traffic swap: 500 readers each way",
+        "kind": "traffic_swap",
+        "categories": [
+          "software.productivity"
+        ],
+        "disclosure": {
+          "label": "Partner link",
+          "lang": "en"
+        },
+        "obligations": [
+          {
+            "id": "send_readers",
+            "by": "offerer",
+            "action": "place",
+            "content": {
+              "link": true
+            },
+            "destination": "https://indiestackweekly.example/subscribe",
+            "clicks": 0,
+            "due": "P30D",
+            "proof": [
+              "link"
+            ]
+          },
+          {
+            "id": "send_back",
+            "by": "acceptor",
+            "action": "place",
+            "content": {
+              "link": true
+            },
+            "destination": "https://acmenotes.example/blog/launch",
+            "clicks": 500,
+            "due": "P30D",
+            "proof": [
+              "link"
+            ]
+          }
+        ]
+      },
+      "terms_hash": "sha256-j2f8SES1MpLaz_7cQKk3GfIystwFTjGh0Iri5QLp38U",
+      "note": "Our launch post is doing well. 500 readers each way this month?",
+      "expires": "2026-10-31T00:00:00Z"
+    }
+  }
+}

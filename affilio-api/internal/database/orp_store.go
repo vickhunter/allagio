@@ -253,6 +253,38 @@ LIMIT 1`, offerID, acceptorOwner).Scan(&id)
 	return id, true, nil
 }
 
+// ActivateORPDeal moves one awaiting deal to active and stores the snapshots.
+// changed is false when the row is no longer awaiting.
+func (d *DB) ActivateORPDeal(ctx context.Context, id string, bound json.RawMessage, updated time.Time, inbox []ORPInboxItem) (bool, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `
+UPDATE orp_deals
+SET state='active', waiting=NULL, bound=$2, updated_at=$3
+WHERE id=$1 AND state='awaiting'`, id, bound, updated)
+	if err != nil {
+		return false, err
+	}
+	if tag.RowsAffected() == 0 {
+		return false, nil
+	}
+	for _, item := range inbox {
+		if item.OwnerID == "" || len(item.Message) == 0 {
+			continue
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO orp_inbox(owner_id, message) VALUES($1,$2)`, item.OwnerID, item.Message); err != nil {
+			return false, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // GetORPDeal reads one deal.
 func (d *DB) GetORPDeal(ctx context.Context, id string) (ORPDeal, bool, error) {
 	var deal ORPDeal

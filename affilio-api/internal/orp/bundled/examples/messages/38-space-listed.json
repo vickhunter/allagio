@@ -1,0 +1,52 @@
+{
+  "orp": "0.3",
+  "type": "space",
+  "id": "m_host_0101",
+  "ts": "2026-10-21T08:00:01Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "re": "m_pub_0101",
+  "body": {
+    "action": "listed",
+    "space": {
+      "id": "sp_news_1",
+      "kind": "newsletter.issue",
+      "platform": "newsletter",
+      "title": "Indie Stack Weekly",
+      "locator": "https://indiestack.example/issues",
+      "topics": [
+        "software.productivity",
+        "business.startups"
+      ],
+      "languages": [
+        "en"
+      ],
+      "audience": {
+        "size": "10k-100k",
+        "k_min": 50,
+        "source": "platform"
+      },
+      "accepts": [
+        "affiliate",
+        "sponsored",
+        "swap",
+        "traffic_swap"
+      ],
+      "disclosure": {
+        "label": "Partner mention",
+        "lang": "en"
+      },
+      "rules": {
+        "rel": "sponsored",
+        "max_per_week": 2
+      },
+      "verified": [
+        {
+          "method": "domain",
+          "at": "2026-09-02T08:00:00Z"
+        }
+      ]
+    },
+    "status": "listed"
+  }
+}

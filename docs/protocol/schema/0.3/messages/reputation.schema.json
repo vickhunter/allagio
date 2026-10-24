@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/reputation.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/reputation.schema.json",
   "title": "ReputationMessage",
   "description": "Ask the host for a party's reputation (body has only subject), or the host's signed answer (an attestation). Scores come only from verified receipts and resolved disputes. Components are counts; they never list counterparties.",
   "type": "object",

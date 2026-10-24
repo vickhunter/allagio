@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/dispute.schema.json",
+  "title": "DisputeMessage",
+  "description": "Open, answer, resolve or withdraw a dispute about one obligation. The host (or a resolver it names) resolves. Evidence is public URLs and hashes, never personal data.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "dispute" },
+    "body": { "$ref": "#/$defs/DisputeBody" }
+  },
+  "$defs": {
+    "DisputeBody": {
+      "title": "DisputeBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": { "type": "string", "enum": ["open", "respond", "resolve", "withdraw"] },
+        "dispute": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "obligation": { "$ref": "../defs.schema.json#/$defs/ObligationId" },
+        "claim": { "type": "string", "enum": ["not_done", "removed_early", "disclosure_missing", "content_mismatch", "not_paid", "invalid_traffic", "bad_receipt", "other"] },
+        "statement": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "evidence": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "url": { "$ref": "../defs.schema.json#/$defs/Url" },
+              "hash": { "$ref": "../defs.schema.json#/$defs/Hash" },
+              "note": { "type": "string", "minLength": 1, "maxLength": 300 }
+            }
+          }
+        },
+        "remedy": { "$ref": "#/$defs/Remedy" },
+        "resolution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "remedy"],
+          "properties": {
+            "outcome": { "type": "string", "enum": ["upheld", "rejected", "split"] },
+            "remedy": { "$ref": "#/$defs/Remedy" },
+            "at_fault": { "$ref": "../defs.schema.json#/$defs/PartyId" },
+            "note": { "$ref": "../defs.schema.json#/$defs/Text" }
+          }
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "action": { "const": "open" } } }, "then": { "required": ["obligation", "claim", "statement"] }, "else": { "required": ["dispute"] } },
+        { "if": { "properties": { "action": { "const": "resolve" } } }, "then": { "required": ["resolution"] } }
+      ]
+    },
+    "Remedy": {
+      "title": "Remedy",
+      "type": "string",
+      "enum": ["redo", "pay", "refund", "void", "none"]
+    }
+  }
+}

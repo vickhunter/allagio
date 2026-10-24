@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/deal.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/deal.schema.json",
   "title": "DealMessage",
   "description": "The host's snapshot of a deal. It is the reply to every message that changes a deal, and it lands in both parties' inboxes. Each party gets its own copy: escalation ids, reasons and approval URLs appear only in the copy for the party that is waiting.",
   "type": "object",

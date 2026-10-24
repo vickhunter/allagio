@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/http/suggest-request.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/http/suggest-request.schema.json",
   "title": "SuggestRequest",
   "description": "POST to the discovery document's suggest URL with no credentials. Any agent that writes for someone (a post, a thread, a newsletter) sends what it is writing and gets deals its person could take now. The host uses the text in memory to match, then forgets it: it never stores, logs, shares or trains on it.",
   "type": "object",

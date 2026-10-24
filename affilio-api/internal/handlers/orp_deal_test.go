@@ -321,7 +321,7 @@ func TestORPTestDealProof(t *testing.T) {
 func TestORPLLMsWalkthrough(t *testing.T) {
 	for _, phrase := range []string{
 		`{"id":"place","by":"acceptor","action":"place","destination":"https://example.com/notes","proof":["proof_url"]}`,
-		"obligation is the id from step 2",
+		"obligation is the id from step 3",
 		"The acceptor is the second party",
 		"HTTP 403 forbidden",
 		"HTTP 404 not_found",
@@ -346,9 +346,11 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		"This host speaks 0.3.",
 		"Optional hello body keys are capabilities, party, and limits",
 		`The host reply versions is exactly ["0.3"]`,
-		"https://offerrails.com/orp/schema/0.3/envelope.schema.json",
-		"https://offerrails.com/orp/schema/0.3/messages/hello.schema.json",
-		"docs/protocol/SPEC.md",
+		"https://offer-rails.onrender.com/orp/schemas/envelope.schema.json",
+		"https://offer-rails.onrender.com/orp/schemas/messages/hello.schema.json",
+		"https://offer-rails.onrender.com/orp/spec",
+		"POST /orp/deals/<deal>/activate",
+		"hello then discover then offer then accept by the second party then activate then execute then proof",
 		"body.terms_hash is optional",
 		"Omit it and the host computes the hash",
 		"An empty or malformed hash is a generic HTTP 400 invalid_message",
@@ -418,7 +420,7 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	}
 	discDocRec, discDoc := postJSON(t, r, http.MethodGet, "/.well-known/orp.json", nil, nil)
 	desc, _ := discDoc["description"].(string)
-	if discDocRec.Code != http.StatusOK || discDoc["docs"] != origin+orp.DocsPath || !strings.Contains(desc, orp.ProofPageTemplate) || !strings.Contains(desc, "https://offerrails.com/orp/schema/0.3/envelope.schema.json") || !strings.Contains(desc, "docs/protocol/SPEC.md") || len(desc) > 500 {
+	if discDocRec.Code != http.StatusOK || discDoc["docs"] != origin+orp.DocsPath || !strings.Contains(desc, orp.ProofPageTemplate) || !strings.Contains(desc, "https://offer-rails.onrender.com/orp/schemas/envelope.schema.json") || !strings.Contains(desc, "https://offer-rails.onrender.com/orp/spec") || len(desc) > 500 {
 		t.Fatalf("discovery %d %s", discDocRec.Code, discDocRec.Body.String())
 	}
 
@@ -622,8 +624,66 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		t.Fatal("awaiting execute wrote a receipt")
 	}
 
-	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='active' WHERE id=$1`, dealID); err != nil {
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='proposed' WHERE id=$1`, dealID); err != nil {
 		t.Fatal(err)
+	}
+	wrongRec, wrongBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dealID+"/activate", nil, bearerHeader(acceptorToken))
+	wrongInner, _ := wrongBody["body"].(map[string]any)
+	if wrongRec.Code != http.StatusConflict || wrongInner["code"] != "state_conflict" || wrongInner["message"] != "The deal is in the wrong state." {
+		t.Fatalf("activate proposed %d %s", wrongRec.Code, wrongRec.Body.String())
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='awaiting' WHERE id=$1`, dealID); err != nil {
+		t.Fatal(err)
+	}
+	anonRec, anonBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dealID+"/activate", nil, nil)
+	anonInner, _ := anonBody["body"].(map[string]any)
+	if anonRec.Code != http.StatusUnauthorized || anonInner["code"] != "unauthorized" || anonInner["message"] != "No credential or a bad credential." {
+		t.Fatalf("activate anon %d %s", anonRec.Code, anonRec.Body.String())
+	}
+	strangerToken, _ := joinParty(t, r)
+	strangerRec, strangerBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dealID+"/activate", nil, bearerHeader(strangerToken))
+	strangerInner, _ := strangerBody["body"].(map[string]any)
+	if strangerRec.Code != http.StatusNotFound || strangerInner["code"] != "not_found" || strangerInner["message"] != "No such deal for this sender." {
+		t.Fatalf("activate stranger %d %s", strangerRec.Code, strangerRec.Body.String())
+	}
+	actRec, actBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dealID+"/activate", nil, bearerHeader(acceptorToken))
+	if actRec.Code != http.StatusOK || !strings.Contains(actRec.Header().Get("Content-Type"), "application/json") || actBody["type"] != "deal" {
+		t.Fatalf("activate %d %s", actRec.Code, actRec.Body.String())
+	}
+	actDeal := actBody["body"].(map[string]any)
+	if actDeal["state"] != "active" {
+		t.Fatalf("activate state %s", actRec.Body.String())
+	}
+	if _, waiting := actDeal["waiting"]; waiting {
+		t.Fatalf("activate still waiting %s", actRec.Body.String())
+	}
+	bound, _ := actDeal["bound"].([]any)
+	parties := map[string]bool{}
+	for _, item := range bound {
+		row, _ := item.(map[string]any)
+		party, _ := row["party"].(string)
+		parties[party] = true
+		authority, _ := row["authority"].(map[string]any)
+		if authority["type"] != "mandate" {
+			t.Fatalf("authority %v", row)
+		}
+	}
+	if len(bound) != 2 || !parties[offerer] || !parties[acceptor] {
+		t.Fatalf("bound %s", actRec.Body.String())
+	}
+	if _, ok := actDeal["tracking"]; ok {
+		t.Fatalf("tracking minted %s", actRec.Body.String())
+	}
+	if err := orp.ValidateAgainst(schemaPath(t, "messages/deal.schema.json"), actBody); err != nil {
+		t.Fatalf("activate schema: %v\n%s", err, actRec.Body.String())
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM orp_inbox WHERE message->'body'->>'state'='active'`) != 2 {
+		t.Fatal("activate inbox")
+	}
+	againRec, againBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dealID+"/activate", nil, bearerHeader(acceptorToken))
+	againInner, _ := againBody["body"].(map[string]any)
+	if againRec.Code != http.StatusConflict || againInner["code"] != "state_conflict" || againInner["message"] != "The deal is in the wrong state." {
+		t.Fatalf("activate again %d %s", againRec.Code, againRec.Body.String())
 	}
 	makerExec := orpEnvelope("execute", "m_d105_execmk", offerer, map[string]any{"obligation": "place"})
 	makerExec["deal"] = dealID
@@ -647,7 +707,7 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	}
 
 	proofRec, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+dealID, nil, nil)
-	if proofRec.Code != http.StatusOK || !strings.Contains(proofRec.Body.String(), "Affiliate link") {
+	if proofRec.Code != http.StatusOK || !strings.Contains(proofRec.Header().Get("Content-Type"), "text/html") || !strings.Contains(proofRec.Body.String(), "Affiliate link") || !strings.Contains(proofRec.Body.String(), "The deal is active.") {
 		t.Fatalf("proof %d %s", proofRec.Code, proofRec.Body.String())
 	}
 }

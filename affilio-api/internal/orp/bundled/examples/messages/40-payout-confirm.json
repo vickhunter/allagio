@@ -1,0 +1,13 @@
+{
+  "orp": "0.3",
+  "type": "payout",
+  "id": "m_pub_0201",
+  "ts": "2026-12-02T09:00:00Z",
+  "from": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "to": "orp:hub.example/host",
+  "deal": "deal_aff_9wQz",
+  "body": {
+    "payout": "po_aff_9wQz_1",
+    "answer": "confirm"
+  }
+}

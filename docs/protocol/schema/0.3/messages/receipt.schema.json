@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/receipt.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/receipt.schema.json",
   "title": "ReceiptMessage",
   "description": "A verifier's finding about one obligation. The host sends receipts for link, proof_url, platform_check, witness and provider checks. The counterparty sends a receipt with method attestation to confirm (or reject) work it saw itself. Only receipts count toward reputation; execute claims never do.",
   "type": "object",

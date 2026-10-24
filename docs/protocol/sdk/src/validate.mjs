@@ -6,7 +6,7 @@ import addFormats from 'ajv-formats';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const schemaRoot = join(here, '..', '..', 'schema', '0.3');
-const BASE = 'https://offerrails.com/orp/schema/0.3/';
+const BASE = 'https://offer-rails.onrender.com/orp/schemas/';
 
 function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

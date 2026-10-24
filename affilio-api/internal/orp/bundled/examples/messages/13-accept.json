@@ -1,0 +1,17 @@
+{
+  "orp": "0.3",
+  "type": "accept",
+  "id": "m_pub_0005",
+  "ts": "2026-10-21T11:30:00Z",
+  "from": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "deal": "deal_swp_4KfP",
+  "body": {
+    "terms_hash": "sha256-XqlxlRGWPLFRQGlZNLpnwIpj-F1xr7UK1Pilom6pvCk",
+    "spaces": [
+      {
+        "obligation": "mention",
+        "space": "sp_news_1"
+      }
+    ]
+  }
+}
