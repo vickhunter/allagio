@@ -242,6 +242,9 @@ func (h *ORPHost) mint(c *gin.Context, origin, dns, agentName string) (map[strin
 	if status == http.StatusTooManyRequests {
 		return nil, rateLimited("Too many joins from this address."), false
 	}
+	if status == http.StatusForbidden {
+		return nil, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "loopback host is not accepted from this client"}, false
+	}
 	if status != 0 {
 		return nil, internalProblem(), false
 	}

@@ -40,21 +40,20 @@ func localSession(cfg config.Config) bool {
 	return false
 }
 
-// loopbackMCPResource is the join-token audience for a local process that has
-// no PUBLIC_BASE_URL. The token is minted against the request host, so this
-// string has to be that same origin. Release mode stays on the public URL.
+// loopbackMCPResource is the join-token audience for a process that is bound
+// only to loopback and has no PUBLIC_BASE_URL. Empty HOST and 0.0.0.0 listen
+// on every interface, so they get no audience. Release mode stays on the
+// public URL. The token is minted against the request host, so this string
+// has to be that same origin.
 func loopbackMCPResource(cfg config.Config) (string, bool) {
 	if config.Hosted(cfg.GinMode) {
 		return "", false
 	}
 	host := strings.TrimSpace(cfg.Host)
-	switch host {
-	case "", "127.0.0.1", "localhost", "::1":
+	switch strings.ToLower(host) {
+	case "127.0.0.1", "localhost", "::1":
 	default:
 		return "", false
-	}
-	if host == "" {
-		host = "127.0.0.1"
 	}
 	return "http://" + net.JoinHostPort(host, cfg.Port) + "/mcp", true
 }
@@ -267,6 +266,7 @@ func main() {
 		AccountLimiter:     openSignup,
 		TokenLimiter:       openSignup,
 		AddressKey:         addressKey,
+		ListenHost:         cfg.Host,
 		Render:             cfg.Render,
 		TrustedPlatform:    cfg.TrustedPlatform,
 		DeviceLimiter:      handlers.NewIPRateLimiter(30, time.Minute),

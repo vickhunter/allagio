@@ -38,6 +38,10 @@ type AgentEntry struct {
 	// AddressKey is the HMAC key for open-signup client addresses. It is
 	// API_KEY_SECRET, or a random per-process key when that secret is unset.
 	AddressKey []byte
+	// ListenHost is the HOST this process binds. Empty and 0.0.0.0 listen on
+	// every interface. A loopback Host from a non-loopback peer is refused
+	// unless this is exactly 127.0.0.1, localhost, or ::1.
+	ListenHost string
 	// Render is true when RENDER=true. Open-signup limits then use the client
 	// address Render appended, the same key as landing events.
 	Render bool

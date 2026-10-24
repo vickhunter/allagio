@@ -9,7 +9,8 @@ A content agent can call one tool with a draft and get back zero to three offers
 - A site approval policy's `allow_categories` and `deny_categories` filter the offers. A denied or not-allowed category is `reason` `filtered`.
 - Emails, `@handles`, and phone numbers are stripped before matching. The draft is not stored, logged, or returned. The row keeps the SHA-256 of the stripped text and the keywords that overlapped a returned offer. `GET /v1/m/:code` counts a click and redirects to the offer. It does not read the draft.
 - Migration `048_d097_monetization_suggestions.sql` is additive. `AUTO_MIGRATE` stays off unless it is set to `true`. `CLAIMS_CHECK` is unchanged.
-- A local process with no `PUBLIC_BASE_URL`, not in release mode, and bound to loopback accepts the join bearer on publisher routes for `http://<host>:<port>/mcp`. That is how the owner turns `placement_publish` off after the empty placement attaches a site. A public host still needs `PUBLIC_BASE_URL`.
+- A local process with no `PUBLIC_BASE_URL`, not in release mode, and bound to `127.0.0.1`, `localhost`, or `::1` accepts the join bearer on publisher routes for `http://<host>:<port>/mcp`. That is how the owner turns `placement_publish` off after the empty placement attaches a site. An empty `HOST` or `0.0.0.0` listens on every interface and does not register that audience. A remote client that sends `Host: 127.0.0.1` is refused at mint. A public host still needs `PUBLIC_BASE_URL`.
+- Site key rotation stores the UTC face of `TIMESTAMP` columns. A previous key stays valid for the grace interval across the Europe/Rome October fallback. `CLAIMS_CHECK` is unchanged.
 
 ## October 23 — Hosted ORP 0.3 thin layer (D-092b)
 
