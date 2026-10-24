@@ -329,6 +329,175 @@ func TestORPTestDealProof(t *testing.T) {
 	}
 }
 
+func TestORPLLMsWalkthrough(t *testing.T) {
+	for _, phrase := range []string{
+		`{"id":"place","by":"acceptor","action":"place","destination":"https://example.com/notes","proof":["proof_url"]}`,
+		"obligation is the id from step 2",
+		"The acceptor is the second party",
+		"Accept and execute use the acceptor's bearer",
+		"HTTP 403 forbidden",
+		"PR #83 lands the suggest platform and monetize surface set x, blog, newsletter, email, web",
+		"not http or https",
+		"409 state_conflict",
+		"The message is not valid ORP 0.3.",
+	} {
+		if !strings.Contains(orpTestDealSection, phrase) {
+			t.Fatalf("section missing %q", phrase)
+		}
+	}
+	if strings.Contains(orpTestDealSection, "platform is one of x, blog, newsletter, email, web") {
+		t.Fatal("walkthrough treats the PR #83 surface set as already live")
+	}
+
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	entry := &AgentEntry{
+		DB:           db,
+		BaseURL:      "http://127.0.0.1:8080",
+		AddressKey:   testAddressKey,
+		ClaimsCheck:  "off-local",
+		TokenLimiter: NewIPRateLimiter(8, time.Minute),
+	}
+	host := &ORPHost{Entry: entry, SuggestLimiter: NewIPRateLimiter(30, time.Minute)}
+	r := mountORP(entry, host)
+	origin := "http://127.0.0.1:8080"
+
+	llmsRec, _ := postJSON(t, r, http.MethodGet, "/llms.txt", nil, nil)
+	if llmsRec.Code != http.StatusOK || !strings.Contains(llmsRec.Body.String(), orpTestDealSection) {
+		t.Fatalf("llms %d", llmsRec.Code)
+	}
+	discDocRec, discDoc := postJSON(t, r, http.MethodGet, "/.well-known/orp.json", nil, nil)
+	if discDocRec.Code != http.StatusOK || discDoc["docs"] != origin+orp.DocsPath || !strings.Contains(discDoc["description"].(string), orp.ProofPageTemplate) {
+		t.Fatalf("discovery %d %s", discDocRec.Code, discDocRec.Body.String())
+	}
+
+	offererToken, offerer := joinParty(t, r)
+	acceptorToken, acceptor := joinParty(t, r)
+	if offerer == acceptor {
+		t.Fatal("join returned one party")
+	}
+
+	findRec, findBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "m_d105_find01", offerer, map[string]any{
+		"want": "offers", "query": "walkthrough notes", "limit": 5,
+	}), bearerHeader(offererToken))
+	if findRec.Code != http.StatusOK || findBody["type"] != "results" {
+		t.Fatalf("discover %d %s", findRec.Code, findRec.Body.String())
+	}
+
+	terms := map[string]any{
+		"title":      "Walkthrough notes",
+		"kind":       "sponsored",
+		"disclosure": map[string]any{"label": "Affiliate link", "lang": "en"},
+		"obligations": []any{map[string]any{
+			"id":          "place",
+			"by":          "acceptor",
+			"action":      "place",
+			"destination": "https://example.com/notes",
+			"proof":       []any{"proof_url"},
+		}},
+	}
+	offerRec, offerBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("offer", "m_d105_offer1", offerer, map[string]any{"terms": terms}), bearerHeader(offererToken))
+	if offerRec.Code != http.StatusOK || offerBody["type"] != "offer" {
+		t.Fatalf("offer %d %s", offerRec.Code, offerRec.Body.String())
+	}
+	listed := offerBody["body"].(map[string]any)
+	offerID, _ := listed["id"].(string)
+	termsHash, _ := listed["terms_hash"].(string)
+	if offerID == "" || !strings.HasPrefix(termsHash, "sha256-") {
+		t.Fatalf("offer reply %s", offerRec.Body.String())
+	}
+
+	selfRec, selfBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("accept", "m_d105_self01", offerer, map[string]any{
+		"offer": offerID, "terms_hash": termsHash,
+	}), bearerHeader(offererToken))
+	if selfRec.Code != http.StatusForbidden || selfBody["body"].(map[string]any)["code"] != "forbidden" {
+		t.Fatalf("self accept %d %s", selfRec.Code, selfRec.Body.String())
+	}
+
+	acceptRec, acceptBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("accept", "m_d105_accept", acceptor, map[string]any{
+		"offer": offerID, "terms_hash": termsHash,
+	}), bearerHeader(acceptorToken))
+	if acceptRec.Code != http.StatusOK || acceptBody["type"] != "deal" || acceptBody["from"] == offerer {
+		t.Fatalf("accept %d %s", acceptRec.Code, acceptRec.Body.String())
+	}
+	dealID, _ := acceptBody["deal"].(string)
+	if dealID == "" || acceptBody["body"].(map[string]any)["state"] != "awaiting" {
+		t.Fatalf("deal %s", acceptRec.Body.String())
+	}
+
+	makerExec := orpEnvelope("execute", "m_d105_execmk", offerer, map[string]any{
+		"obligation": "place",
+		"proof_url":  orp.ProofURL(origin, dealID),
+	})
+	makerExec["deal"] = dealID
+	makerExecRec, makerExecBody := postJSON(t, r, http.MethodPost, "/orp", makerExec, bearerHeader(offererToken))
+	if makerExecRec.Code != http.StatusForbidden || makerExecBody["body"].(map[string]any)["code"] != "forbidden" {
+		t.Fatalf("offerer execute %d %s", makerExecRec.Code, makerExecRec.Body.String())
+	}
+
+	generic := orpEnvelope("execute", "m_d105_execftp", acceptor, map[string]any{
+		"obligation": "place",
+		"proof_url":  "ftp://example.com/proof",
+	})
+	generic["deal"] = dealID
+	genericRec, genericBody := postJSON(t, r, http.MethodPost, "/orp", generic, bearerHeader(acceptorToken))
+	genericInner, _ := genericBody["body"].(map[string]any)
+	genericMessage, _ := genericInner["message"].(string)
+	if genericRec.Code != http.StatusBadRequest || genericInner["code"] != "invalid_message" || genericInner["field"] != "/body/proof_url" || genericMessage != "The message is not valid ORP 0.3." || strings.Contains(genericMessage, "/orp/proof/") {
+		t.Fatalf("generic proof %d %s", genericRec.Code, genericRec.Body.String())
+	}
+
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='active' WHERE id=$1`, dealID); err != nil {
+		t.Fatal(err)
+	}
+	blocked := orpEnvelope("execute", "m_d105_execblk", acceptor, map[string]any{
+		"obligation": "place",
+		"proof_url":  "https://example.com/other",
+	})
+	blocked["deal"] = dealID
+	blockedRec, blockedBody := postJSON(t, r, http.MethodPost, "/orp", blocked, bearerHeader(acceptorToken))
+	blockedInner, _ := blockedBody["body"].(map[string]any)
+	blockedMessage, _ := blockedInner["message"].(string)
+	if blockedRec.Code != http.StatusConflict || blockedInner["code"] != "state_conflict" || blockedMessage != "The deal is in the wrong state." || strings.Contains(blockedMessage, "/orp/proof/") {
+		t.Fatalf("state %d %s", blockedRec.Code, blockedRec.Body.String())
+	}
+
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state='awaiting' WHERE id=$1`, dealID); err != nil {
+		t.Fatal(err)
+	}
+	named := orpEnvelope("execute", "m_d105_execbad", acceptor, map[string]any{
+		"obligation": "place",
+		"proof_url":  "https://example.com/other",
+	})
+	named["deal"] = dealID
+	namedRec, namedBody := postJSON(t, r, http.MethodPost, "/orp", named, bearerHeader(acceptorToken))
+	namedInner, _ := namedBody["body"].(map[string]any)
+	namedMessage, _ := namedInner["message"].(string)
+	wantProof := orp.ProofURL(origin, dealID)
+	if namedRec.Code != http.StatusBadRequest || namedInner["code"] != "invalid_message" || namedInner["field"] != "/body/proof_url" || !strings.Contains(namedMessage, wantProof) {
+		t.Fatalf("named proof %d %s", namedRec.Code, namedRec.Body.String())
+	}
+
+	exec := orpEnvelope("execute", "m_d105_execok", acceptor, map[string]any{
+		"obligation": "place",
+		"proof_url":  wantProof,
+	})
+	exec["deal"] = dealID
+	execRec, execBody := postJSON(t, r, http.MethodPost, "/orp", exec, bearerHeader(acceptorToken))
+	if execRec.Code != http.StatusOK || execBody["body"].(map[string]any)["state"] != "awaiting" {
+		t.Fatalf("execute %d %s", execRec.Code, execRec.Body.String())
+	}
+	obligations := execBody["body"].(map[string]any)["obligations"].([]any)
+	if obligations[0].(map[string]any)["id"] != "place" || obligations[0].(map[string]any)["state"] != "verified" {
+		t.Fatalf("obligation %v", obligations)
+	}
+
+	proofRec, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+dealID, nil, nil)
+	if proofRec.Code != http.StatusOK || !strings.Contains(proofRec.Body.String(), "Affiliate link") {
+		t.Fatalf("proof %d %s", proofRec.Code, proofRec.Body.String())
+	}
+}
+
 func TestORPMessageRateLimit(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

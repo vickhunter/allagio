@@ -769,8 +769,14 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		"POST /orp/join",
 		"{origin}/orp/proof/<deal>",
 		"discover then offer then accept then execute then proof",
-		"x, blog, newsletter, email, web",
-		"invalid_message",
+		`{"id":"place","by":"acceptor","action":"place","destination":"https://example.com/notes","proof":["proof_url"]}`,
+		"obligation is the id from step 2",
+		"The acceptor is the second party",
+		"HTTP 403 forbidden",
+		"PR #83 lands the suggest platform and monetize surface set x, blog, newsletter, email, web",
+		"not http or https",
+		"409 state_conflict",
+		"The message is not valid ORP 0.3.",
 	}
 	for _, item := range []struct {
 		name string
@@ -780,6 +786,12 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		{"public", string(public)},
 		{"built", string(built)},
 	} {
+		if !strings.Contains(item.body, orpTestDealSection) {
+			t.Errorf("%s does not contain the ORP test-deal section", item.name)
+		}
+		if strings.Contains(item.body, "platform is one of x, blog, newsletter, email, web") {
+			t.Errorf("%s treats the PR #83 surface set as already live", item.name)
+		}
 		for _, phrase := range phrases {
 			if !strings.Contains(item.body, phrase) {
 				t.Errorf("%s missing %q", item.name, phrase)

@@ -36,5 +36,5 @@ D-105 records this list on main. It does not change `CLAIMS_CHECK` and it does n
 
 ## Notes after the run
 
-- Item 7. PR #83 (D-104) treats suggest `platform` and monetize `surface` as the set `x`, `blog`, `newsletter`, `email`, `web`, and the error lists those values. Docs for this testing host use that set. `blog` and `email` are values in the set.
+- Item 7. PR #83 (D-104) lands the suggest `platform` and monetize `surface` set `x`, `blog`, `newsletter`, `email`, `web`, and the error lists those values. That set is not live on this branch before #83 merges. #83 merges before these discovery docs.
 - Items 2, 3, and 16, discovery only. D-105 points `/llms.txt` at the test deal, sets `orp.json` `docs` to that section, names the proof page template `{origin}/orp/proof/<deal>` in the discovery description, and makes the non-test `proof_url` 400 name the expected URL. Appendix C now says hosted serves `orp.json`, suggest, and the 0.3 message format. The deal snapshot still does not carry the proof URL. The other dispositions stay open.
