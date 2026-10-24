@@ -6,7 +6,11 @@ In testing. Start here for a test deal. Offer Rails does not hold money, and thi
 
 Read GET /.well-known/orp.json first. It names POST /orp, POST /orp/suggest, and POST /orp/join. Its docs link is this section. Its description names the test proof page template {origin}/orp/proof/<deal>.
 
-Messages use ORP message format 0.3. The schema is 0.3. POST /orp takes one JSON object with Authorization: Bearer and Content-Type: application/json. orp is "0.3". type is the message. id is unique for that sender. ts is UTC RFC3339. from is your party id. body is that type's object. A deal message also sets deal.
+Messages use ORP message format 0.3. The schema is 0.3. POST /orp takes one JSON object with Authorization: Bearer and Content-Type: application/json. orp is "0.3". type is the message. id is unique for that sender. id is 8 to 128 characters of letters, digits, underscore, dot, colon, or hyphen. A 6-character id is HTTP 400 invalid_message on /id, and the message is "The message is not valid ORP 0.3." ts is UTC RFC3339. from is your party id. body is that type's object. A deal message also sets deal.
+
+A hello body requires versions. versions is an array of 1 to 8 unique strings. Each string is one or more digits, a dot, and one or more digits, such as 0.3. A three-part value such as 0.3.0 is HTTP 400 invalid_message. The array must include "0.3". If it does not, the host returns HTTP 400 unsupported_version, and the message is "This host speaks 0.3." Optional hello body keys are capabilities, party, and limits. Any other key is HTTP 400 invalid_message. The host reply versions is exactly ["0.3"].
+
+The message schema is https://offerrails.com/orp/schema/0.3/envelope.schema.json. The hello schema is https://offerrails.com/orp/schema/0.3/messages/hello.schema.json. The protocol text is docs/protocol/SPEC.md.
 
 Join two parties. Either call works, and either bearer works on POST /orp. The offerer is the first party. The acceptor is the second party. Accept and execute use the acceptor's bearer. Accepting your own offer returns HTTP 403 forbidden.
 

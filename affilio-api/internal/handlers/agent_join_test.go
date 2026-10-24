@@ -782,6 +782,10 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		"Execute does not read proof_url",
 		"obligation state becomes claimed",
 		"The deal stays active",
+		"id is 8 to 128 characters of letters, digits, underscore, dot, colon, or hyphen",
+		"A hello body requires versions",
+		"https://offerrails.com/orp/schema/0.3/envelope.schema.json",
+		"docs/protocol/SPEC.md",
 	}
 	for _, item := range []struct {
 		name string

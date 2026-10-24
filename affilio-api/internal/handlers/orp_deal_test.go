@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -333,10 +335,36 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		"obligation state becomes claimed",
 		"The deal stays active",
 		`{"obligation":"place"}`,
+		"id is 8 to 128 characters of letters, digits, underscore, dot, colon, or hyphen",
+		"A 6-character id is HTTP 400 invalid_message on /id",
+		"The message is not valid ORP 0.3.",
+		"A hello body requires versions",
+		"versions is an array of 1 to 8 unique strings",
+		"A three-part value such as 0.3.0 is HTTP 400 invalid_message",
+		`The array must include "0.3"`,
+		"HTTP 400 unsupported_version",
+		"This host speaks 0.3.",
+		"Optional hello body keys are capabilities, party, and limits",
+		`The host reply versions is exactly ["0.3"]`,
+		"https://offerrails.com/orp/schema/0.3/envelope.schema.json",
+		"https://offerrails.com/orp/schema/0.3/messages/hello.schema.json",
+		"docs/protocol/SPEC.md",
 	} {
 		if !strings.Contains(orpTestDealSection, phrase) {
 			t.Fatalf("section missing %q", phrase)
 		}
+	}
+	spec, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "protocol", "SPEC.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendixAt := strings.Index(string(spec), "## Appendix C:")
+	if appendixAt < 0 {
+		t.Fatal("SPEC has no Appendix C")
+	}
+	appendix := string(spec)[appendixAt:]
+	if !strings.Contains(appendix, "HTTP 409 `terms_mismatch`") || !strings.Contains(appendix, "terms_hash does not match the terms.") {
+		t.Fatal("Appendix C does not name terms_mismatch")
 	}
 	if strings.Contains(orpTestDealSection, "PR #83 lands") || strings.Contains(orpTestDealSection, "The deal stays awaiting") || strings.Contains(orpTestDealSection, "not claimed as live") {
 		t.Fatal("walkthrough still describes the pre-D-104 host")
@@ -360,7 +388,8 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		t.Fatalf("llms %d", llmsRec.Code)
 	}
 	discDocRec, discDoc := postJSON(t, r, http.MethodGet, "/.well-known/orp.json", nil, nil)
-	if discDocRec.Code != http.StatusOK || discDoc["docs"] != origin+orp.DocsPath || !strings.Contains(discDoc["description"].(string), orp.ProofPageTemplate) {
+	desc, _ := discDoc["description"].(string)
+	if discDocRec.Code != http.StatusOK || discDoc["docs"] != origin+orp.DocsPath || !strings.Contains(desc, orp.ProofPageTemplate) || !strings.Contains(desc, "https://offerrails.com/orp/schema/0.3/envelope.schema.json") || !strings.Contains(desc, "docs/protocol/SPEC.md") || len(desc) > 500 {
 		t.Fatalf("discovery %d %s", discDocRec.Code, discDocRec.Body.String())
 	}
 
@@ -375,6 +404,55 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	acceptor, _ := acceptorBody["party"].(string)
 	if offerer == "" || acceptor == "" || offerer == acceptor || offererBody["steps"].(map[string]any)["list"] != "ask" || acceptorBody["steps"].(map[string]any)["list"] != "ask" {
 		t.Fatalf("parties %s %s", offererRec.Body.String(), acceptorRec.Body.String())
+	}
+
+	shortRec, shortBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "short1", offerer, map[string]any{
+		"want": "offers", "query": "zqwalkthrough", "limit": 5,
+	}), bearerHeader(offererToken))
+	shortInner, _ := shortBody["body"].(map[string]any)
+	if shortRec.Code != http.StatusBadRequest || shortInner["code"] != "invalid_message" || shortInner["field"] != "/id" || shortInner["message"] != "The message is not valid ORP 0.3." {
+		t.Fatalf("short id %d %s", shortRec.Code, shortRec.Body.String())
+	}
+	longID := strings.Repeat("b", 129)
+	longRec, longBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", longID, offerer, map[string]any{
+		"want": "offers", "query": "zqwalkthrough", "limit": 5,
+	}), bearerHeader(offererToken))
+	longInner, _ := longBody["body"].(map[string]any)
+	if longRec.Code != http.StatusBadRequest || longInner["code"] != "invalid_message" || longInner["field"] != "/id" {
+		t.Fatalf("long id %d %s", longRec.Code, longRec.Body.String())
+	}
+
+	helloRec, helloBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("hello", "m_hello1", offerer, map[string]any{
+		"versions": []any{"0.4", "0.3"},
+	}), bearerHeader(offererToken))
+	if helloRec.Code != http.StatusOK || helloBody["type"] != "hello" {
+		t.Fatalf("hello %d %s", helloRec.Code, helloRec.Body.String())
+	}
+	helloVersions, _ := helloBody["body"].(map[string]any)["versions"].([]any)
+	if len(helloVersions) != 1 || helloVersions[0] != "0.3" {
+		t.Fatalf("hello versions %s", helloRec.Body.String())
+	}
+	for _, item := range []struct {
+		id    string
+		body  map[string]any
+		code  string
+		field string
+	}{
+		{id: "m_d105_patch", body: map[string]any{"versions": []any{"0.3.0"}}, code: "invalid_message", field: "/body/versions/0"},
+		{id: "m_d105_oldv", body: map[string]any{"versions": []any{"0.2"}}, code: "unsupported_version", field: ""},
+		{id: "m_d105_dupv", body: map[string]any{"versions": []any{"0.3", "0.3"}}, code: "invalid_message", field: "/body/versions/1"},
+		{id: "m_d105_nine", body: map[string]any{"versions": []any{"0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0", "1.1"}}, code: "invalid_message", field: "/body/versions"},
+		{id: "m_d105_xkey", body: map[string]any{"versions": []any{"0.3"}, "extra": true}, code: "invalid_message", field: "/body/extra"},
+	} {
+		badRec, badBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("hello", item.id, offerer, item.body), bearerHeader(offererToken))
+		badInner, _ := badBody["body"].(map[string]any)
+		field, _ := badInner["field"].(string)
+		if badRec.Code != http.StatusBadRequest || badInner["code"] != item.code || field != item.field {
+			t.Fatalf("hello %s %d %s", item.id, badRec.Code, badRec.Body.String())
+		}
+		if item.code == "unsupported_version" && badInner["message"] != "This host speaks 0.3." {
+			t.Fatalf("hello version message %s", badRec.Body.String())
+		}
 	}
 
 	blogRec, _ := postJSON(t, r, http.MethodPost, "/orp/suggest", map[string]any{
