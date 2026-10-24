@@ -153,7 +153,13 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 	requestPath := c.Request.URL.Path
 	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
-		switch path.Clean(requestPath) {
+		cleaned := path.Clean(requestPath)
+		if h.AssetsPath != "" && strings.HasPrefix(cleaned, "/protocol/") {
+			h.writePublicHeaders(c)
+			h.Protocol(c)
+			return
+		}
+		switch cleaned {
 		case "/privacy":
 			if h.AssetsPath != "" {
 				h.writePublicHeaders(c)

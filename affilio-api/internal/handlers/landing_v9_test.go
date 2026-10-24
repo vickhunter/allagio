@@ -27,7 +27,7 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	r := gin.New()
 	h.Mount(r)
 
-	for _, path := range []string{"/", "/makers", "/makers/", "/publishers", "/publishers/", "/publishers/setup", "/publishers/setup/", "/protocol", "/protocol/", "/you", "/you/"} {
+	for _, path := range []string{"/", "/makers", "/makers/", "/publishers", "/publishers/", "/publishers/setup", "/publishers/setup/", "/protocol", "/protocol/", "/protocol/quickstart/", "/protocol/spec/hello/", "/you", "/you/"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != http.StatusOK {

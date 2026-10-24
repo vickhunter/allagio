@@ -34,6 +34,15 @@ const youShell = `<div id="static-landing">
     </main>
   </div>`
 
+const protocolShell = `<div id="static-landing">
+    <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+    <main id="main">
+      <h1>Offer Rails Protocol</h1>
+      <p>ORP 0.3 lets two agents, each working for a person, agree a growth deal. These pages are generated from the frozen schemas.</p>
+      <p>Apache-2.0 planned. Until publication, this is a draft in the repository.</p>
+    </main>
+  </div>`
+
 const setupShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
@@ -79,7 +88,7 @@ writeFileSync(resolve(build, 'home.html'), stamp(resolve(dist, 'index.html')))
 writeFileSync(resolve(build, 'makers.html'), stamp(resolve(dist, 'makers/index.html')))
 writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers/index.html')))
 writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publishers/setup/index.html'), setupShell))
-writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html')))
+writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html'), protocolShell))
 writeFileSync(resolve(build, 'you.html'), stamp(resolve(dist, 'you/index.html'), youShell))
 const agentsFile = resolve(assets, 'agents/index.html')
 writeFileSync(agentsFile, readFileSync(agentsFile, 'utf8').replaceAll('href="/landing-v9/llms.txt"', 'href="/llms.txt"'))

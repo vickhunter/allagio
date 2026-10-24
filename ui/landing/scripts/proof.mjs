@@ -39,9 +39,9 @@ function typeFor(file) {
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://127.0.0.1')
   const path = url.pathname
-  if (pages[path]) {
+  if (pages[path] || path === '/protocol' || path.startsWith('/protocol/')) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; img-src 'self'; connect-src 'self'" })
-    res.end(pages[path])
+    res.end(pages[path] || pages['/protocol/'])
     return
   }
   if (path === '/llms.txt') {
@@ -563,7 +563,7 @@ try {
     summary.push({ slug: 'protocol-' + width, ...protocolOk, serious: protocolSerious.map((item) => item.id) })
     await assertHeaderSignIn(protocolPage, 'protocol-' + width)
     if (!protocolOk.scroll) throw new Error('protocol-' + width + ' scrolls sideways')
-    if (protocolOk.title !== 'An open way for agents to share offers.') throw new Error('protocol heading ' + protocolOk.title)
+    if (protocolOk.title !== 'Offer Rails Protocol') throw new Error('protocol heading ' + protocolOk.title)
     if (!protocolOk.nav.includes('/protocol/') || !protocolOk.nav.includes('source=cursor')) throw new Error('protocol nav ' + protocolOk.nav)
     if (protocolSerious.length) throw new Error('protocol-' + width + ' axe ' + protocolSerious.map((item) => item.id).join(' '))
     await protocolContext.close()
