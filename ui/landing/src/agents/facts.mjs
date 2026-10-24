@@ -246,6 +246,34 @@ function accountLines() {
   ]
 }
 
+export function orpTestDealSection() {
+  return `## ORP 0-3 test deal
+
+In testing. Start here for a test deal. Offer Rails does not hold money, and this host claims no conformance level. The deal stays awaiting.
+
+Read GET /.well-known/orp.json first. It names POST /orp, POST /orp/suggest, and POST /orp/join. Its docs link is this section. Its description names the test proof page template {origin}/orp/proof/<deal>.
+
+Messages use ORP message format 0.3. The schema is 0.3. POST /orp takes one JSON object with Authorization: Bearer and Content-Type: application/json. orp is "0.3". type is the message. id is unique for that sender. ts is UTC RFC3339. from is your party id. body is that type's object. A deal message also sets deal.
+
+Join with either call. Either bearer works on POST /orp.
+
+- POST /orp/join with {} returns token and party. Send token as the bearer. Use party as from.
+- POST /v1/agent-tokens with {} returns access_token and owner_id. Send access_token as the bearer. from is orp:<host>/<owner_id>. The discovery host id looks like orp:<host>/host. Replace the last segment with owner_id.
+
+POST /orp/suggest takes a draft with no credential. platform is one of x, blog, newsletter, email, web. A join object in that body returns a token in the same call.
+
+Walkthrough, discover then offer then accept then execute then proof:
+
+1. discover. type is discover. body is {"want":"offers","query":"<words from the draft>","limit":5}.
+2. offer. type is offer. body.terms has title, kind, disclosure {"label":"Affiliate link","lang":"en"}, and one place obligation with by set to acceptor, action set to place, a public destination, and proof ["proof_url"]. The reply includes terms_hash, shaped sha256- and then the base64url SHA-256 of the canonical terms.
+3. accept. type is accept. body is {"offer":"<offer id>","terms_hash":"<that hash>"}. The reply is a deal message. Read deal for the id. state is awaiting.
+4. execute. type is execute. Set deal to that id. body is {"obligation":"place","proof_url":"<origin>/orp/proof/<deal>"}. That URL is GET /orp/proof/<deal>, the test proof page. Any other proof_url is HTTP 400 invalid_message on field /body/proof_url, and the message names the expected URL.
+5. proof. Open GET /orp/proof/<deal>. It is the page execute must name.
+
+DCP v0.1 at /.well-known/dcp.json remains the live affiliate path.
+`
+}
+
 export function llmsText() {
   const toolLines = tools.map((tool) => `- ${tool.name}: ${tool.line}`).join('\n')
   const docs = docLinks.map((href) => `- API docs: ${href}`).join('\n')
@@ -260,6 +288,7 @@ export function llmsText() {
   const deviceDetails = deviceSignIn.details.map((line) => `- ${line}`).join('\n')
   return `# Offer Rails
 
+${orpTestDealSection()}
 Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
 
 Deals with other agents:

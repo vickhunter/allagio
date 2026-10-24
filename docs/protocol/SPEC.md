@@ -9,9 +9,9 @@
 >
 > - **Draft PR #68** (the "v0.3.0" prose spec and its schemas) is **superseded as a wire format, in full.** Its envelope (`orp_version`, `message_type`, `sender`, `payload`), its SemVer `0.3.0` version string, its `orp:party:*` ids, its five fixed `deal_type` term shapes, its `sha256:<hex>` hashes, its self-submitted receipts, its agent-sent consent and its provisional tracking links are **not** ORP 0.3. A message in that shape is invalid (see [Appendix B](#appendix-b-pr-68-to-03-mapping)). Some of #68's product ideas are adopted here in the #71 shape: first-class spaces, the named growth deal types, the `via`/`ref` parameter, test clicks, clicks by source, and the "afternoon core" and C1/C2 conformance names.
 > - **Draft PR #71** (schemas and TypeScript SDK) **wins on the wire format.** Its envelope, version rule, party ids, obligation-based terms, host-only consent and receipts, and closed schemas are carried forward. Its `schema/` directory is superseded by `docs/protocol/schema/`, which applies the deltas in [Appendix A](#appendix-a-changes-from-the-pr-71-schemas). The #71 SDK is a reference implementation that still needs those deltas.
-> - **DCP v0.1** ([`docs/dcp/`](../dcp/)) stays the description of what the hosted affilio-api serves today. It is not ORP. [Appendix C](#appendix-c-hosted-affilio-api-and-orp-03) lists the differences.
+> - **DCP v0.1** ([`docs/dcp/`](../dcp/)) stays the live affiliate path on the hosted affilio-api. [Appendix C](#appendix-c-hosted-affilio-api-and-orp-03) lists the ORP 0.3 slice that host serves and what it still does not do.
 >
-> **The hosted service does not implement ORP 0.3.** Nothing in this document changes it.
+> **The hosted service speaks a testing slice of ORP 0.3** (discovery, suggest, join, and the 0.3 message format) and claims no conformance level. Nothing in this document changes `CLAIMS_CHECK`.
 
 ---
 
@@ -1307,17 +1307,18 @@ The same accept in ORP 0.3, on a host called `hub.example`, names the deal and t
 
 ## Appendix C: hosted affilio-api and ORP 0.3
 
-The hosted service is not an ORP 0.3 host. This freeze changes nothing on it. As of `main` at `27e0a63`:
+The hosted service now serves a testing slice of ORP 0.3. The discovery name is **In testing**. It claims no conformance level. DCP v0.1 remains the live affiliate path. `CLAIMS_CHECK` is unchanged.
 
 | ORP 0.3 | Hosted today |
 |---|---|
-| `/.well-known/orp.json` | Not served. `/.well-known/dcp.json` serves DCP `0.1`. |
-| ORP envelope over `POST {endpoint}` | Not served. Hosted speaks the DCP and REST shapes in [`docs/dcp/`](../dcp/) and MCP at `/v1/mcp` (and `/mcp`). |
-| `suggest` and `join` with no credentials | An agent can get a bearer token with `POST /v1/agent-tokens` and `{}` (#69). There is no ORP `suggest`. |
-| Tracked link counts on any surface (T6) | `GET /v1/go/<placement_id>` records a hit with or without plugin-ack. `placement_counts_as_live` still needs the plugin to report `placed`. |
+| `/.well-known/orp.json` | Served, with no credential and `Access-Control-Allow-Origin: *`. `orp` is `["0.3"]`, `name` is `In testing`, `endpoint` is `/orp`, `suggest` is `/orp/suggest`, and `join` is `/orp/join`. `docs` is that origin's `/llms.txt#orp-0-3-test-deal`. The description names the test proof page template `{origin}/orp/proof/<deal>`. There is no `conformance` object. `/.well-known/dcp.json` still serves DCP `0.1`. |
+| Message format over `POST /orp` | Served. A message is ORP 0.3: `orp` `"0.3"`, `type`, `id`, `ts`, `from`, and `body`. This testing host answers `hello`, `discover`, `offer`, `accept`, and `execute`. A #68-shaped body is `invalid_message`. Bearer auth is the join token. `from` must be `orp:<host>/<owner_id>`. |
+| `suggest` and `join` | Served with no credentials. `POST /orp/suggest` and `POST /orp/join` (an empty object is a complete join). `POST /v1/agent-tokens` with `{}` mints the same kind of bearer. Suggest `platform` and monetize `surface` on this testing host are `x`, `blog`, `newsletter`, `email`, and `web`. |
+| Test proof | `GET /orp/proof/<deal>` is the public test page. `execute` `proof_url` must be that URL, `{origin}/orp/proof/<deal>`. While the deal is `awaiting`, any other `proof_url` is HTTP 400 `invalid_message` and the message names the expected URL. The deal stays `awaiting`. Offer Rails does not hold money. |
+| Tracked link counts on any surface (T6) | `GET /v1/go/<placement_id>` records a hit with or without plugin-ack. `placement_counts_as_live` still needs the plugin to report `placed`. An ORP test deal does not mint a tracked link. |
 | `via` click id (T3) | Hosted offers use `via` as their ref parameter and append the id of the click record. Repeat clicks from the same reader inside the dedup window reuse one id. The click record keeps the user agent, the referrer and a salted hash of the truncated address. |
-| `checks.claims: real` | `CLAIMS_CHECK` defaults to `stub` in release. This freeze does not change it. |
+| `checks.claims: real` | `CLAIMS_CHECK` defaults to `stub` in release. This document does not change it. Discovery only reports the configured mode. |
 | Step modes `auto`, `ask`, `off` | Placement publish defaults to `ask` (#73). The step names differ. |
-| `payout` records | Hosted keeps a commission ledger (`/v1/payouts/*`). Payouts are manual. |
+| `payout` records | Hosted keeps a commission ledger (`/v1/payouts/*`). Payouts are manual. This testing host does not settle an ORP deal. |
 
-Moving hosted to ORP 0.3 is separate work, listed in the decision log.
+The cold-agent walkthrough is the `ORP 0-3 test deal` section of `/llms.txt`. Ranked pitfalls and their dispositions are in [`GAPS.md`](GAPS.md).

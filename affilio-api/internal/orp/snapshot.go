@@ -24,6 +24,12 @@ func ProofURL(origin, dealID string) string {
 	return strings.TrimRight(origin, "/") + "/orp/proof/" + dealID
 }
 
+// ProofURLRefusal is the 400 text for a proof_url other than the test page.
+// The message names the URL this host expected.
+func ProofURLRefusal(want string) string {
+	return "The proof URL must be this host's test proof page: " + want + "."
+}
+
 // ApproveURL is where the waiting party is sent. Opening it does not approve.
 func ApproveURL(origin, escalation string) string {
 	return strings.TrimRight(origin, "/") + "/orp/approve/" + escalation

@@ -1,3 +1,11 @@
+## October 24 — ORP discovery for a cold agent (D-105)
+
+`/llms.txt` opens with an **In testing** section for an ORP 0.3 test deal: `/.well-known/orp.json`, `POST /orp`, message format and schema 0.3, join by `POST /v1/agent-tokens` or `POST /orp/join`, and the public proof page `/orp/proof/<deal>`. The walkthrough joins a second party. A fresh join is `list: ask`, so a standing offer waits and accept of that id is HTTP 404 `not_found`. A saved `placement_publish` of `auto` publishes the offer, and the second party accepts it. Execute on an `awaiting` deal is HTTP 409 `state_conflict`. On an `active` deal, execute claims the obligation. Suggest `platform` and monetize `surface` are `x`, `blog`, `newsletter`, `email`, and `web`.
+
+`GET /.well-known/orp.json` sets `docs` to that section and names the test proof page template `{origin}/orp/proof/<deal>` in `description`. Execute does not read `proof_url` and does not name that page in an error. `CLAIMS_CHECK` is unchanged. No deploy.
+
+[`docs/protocol/GAPS.md`](docs/protocol/GAPS.md) records the D-099 ranked pitfalls and dispositions. SPEC Appendix C now says the hosted API serves `orp.json`, suggest, join, and the 0.3 message format, and still claims no conformance level.
+
 ## October 24 — Offer Rails list and claim (D-104)
 
 The hosted ORP 0.3 layer follows the protocol on five points from the D-099 agent-as-user report. `CLAIMS_CHECK` stays `stub`. Nothing is deployed and no production data is touched.

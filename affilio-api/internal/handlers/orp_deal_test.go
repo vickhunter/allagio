@@ -139,6 +139,19 @@ func TestORPTestDealProof(t *testing.T) {
 		t.Fatalf("approve %d %s", approveRec.Code, approveHTML)
 	}
 
+	badExec := orpEnvelope("execute", "m_d092c_execbad", publisher, map[string]any{
+		"obligation": "place",
+		"proof_url":  "https://example.com/not-the-test-page",
+	})
+	badExec["deal"] = dealID
+	badRec, badBody := postJSON(t, r, http.MethodPost, "/orp", badExec, bearerHeader(pubToken))
+	badInner, _ := badBody["body"].(map[string]any)
+	badMessage, _ := badInner["message"].(string)
+	wantProof := orp.ProofURL(origin, dealID)
+	if badRec.Code != http.StatusBadRequest || badInner["code"] != "invalid_message" || badInner["field"] != "/body/proof_url" || !strings.Contains(badMessage, wantProof) {
+		t.Fatalf("bad proof %d %s", badRec.Code, badRec.Body.String())
+	}
+
 	exec := orpEnvelope("execute", "m_d092c_exec01", publisher, map[string]any{
 		"obligation": "place",
 		"proof_url":  orp.ProofURL(origin, dealID),

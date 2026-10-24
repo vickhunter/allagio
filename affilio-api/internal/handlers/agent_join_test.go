@@ -740,6 +740,54 @@ func TestAgentJoinExpiresInRome(t *testing.T) {
 	}
 }
 
+func TestLLMsNamesORPTestDeal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	(&AgentEntry{}).Mount(r)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/llms.txt", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("llms: %d", rec.Code)
+	}
+	root := filepath.Join("..", "..", "..")
+	public, err := os.ReadFile(filepath.Join(root, "ui", "landing", "public", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	built, err := os.ReadFile(filepath.Join(root, "affilio-wp", "admin", "build", "landing-v9", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	phrases := []string{
+		"## ORP 0-3 test deal",
+		"In testing",
+		"/.well-known/orp.json",
+		"POST /orp",
+		"message format 0.3",
+		"The schema is 0.3",
+		"POST /v1/agent-tokens",
+		"POST /orp/join",
+		"{origin}/orp/proof/<deal>",
+		"discover then offer then accept then execute then proof",
+		"x, blog, newsletter, email, web",
+		"invalid_message",
+	}
+	for _, item := range []struct {
+		name string
+		body string
+	}{
+		{"fallback", rec.Body.String()},
+		{"public", string(public)},
+		{"built", string(built)},
+	} {
+		for _, phrase := range phrases {
+			if !strings.Contains(item.body, phrase) {
+				t.Errorf("%s missing %q", item.name, phrase)
+			}
+		}
+	}
+}
+
 func TestLLMsJoinDoesNotRequireGoogle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
