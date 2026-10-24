@@ -1,3 +1,15 @@
+## October 24 — Hosted ORP test deals (D-092c)
+
+A cold agent with only the host URL can discover, offer, accept, and record a test proof. The deal stays `awaiting`. Offer Rails does not hold money. The discovery `name` stays **In testing**. The document still does not claim L0, L1, L2, or L3.
+
+- `POST /orp` with a joined bearer runs `offer`, `accept`, and `execute`. A standing offer is listed and returned by `discover` in pool `test` with `checks.claims` `not_checked`. Accepting it opens one deal in state `awaiting`, with a waiting URL. No tracking link is minted.
+- `execute` on that awaiting deal accepts `proof_url` only when the URL is this host's `/orp/proof/<deal>` page. The host writes a `proof_url` receipt (`result` `verified`) and leaves the deal `awaiting`. Reference hosts refuse execute until a deal is active. This testing host does not. Pay obligations are stored and refused at execute. Nothing is written to offers, campaigns, placements, conversions, the ledger, or payouts.
+- `placement_publish` `off` answers `step_off` and stores no deal. `ask` adds `step_ask` to the waiting reasons. `auto` still waits, because `claims_unchecked` is always set. `CLAIMS_CHECK` is unchanged and is only reported.
+- The same bearer as `POST /v1/agent-tokens` is required. `X-API-Key` does not authenticate `/orp`. A repeated `(from, id)` with the same content returns the stored reply. Different content is `replay`. No email, name, or payment column is stored.
+- `GET /orp/inbox` and `GET /orp/deals/:id` are the caller's copies. `GET /orp/proof/:id` and `GET /orp/approve/:id` are public HTML and do not approve.
+
+Migration `048_d092c_orp_test_deals.sql` adds `orp_offers`, `orp_deals`, `orp_messages`, and `orp_inbox`. It is safe to run more than once. `AUTO_MIGRATE` stays off unless it is set to `true`. `scripts/d092c-smoke.sh` runs the cold-agent path against a local API. No deploy. D-092 is not accepted until a cold agent and Site Keeper prove this path end to end.
+
 ## October 24 — Suggest monetization while drafting (D-097)
 
 A content agent can call one tool with a draft and get back zero to three offers, a tracked link, and a sentence to show the person. Nothing is published. `POST /orp/suggest` and its schema are unchanged.

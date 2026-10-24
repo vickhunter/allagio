@@ -7,28 +7,32 @@ import (
 	"strconv"
 	"time"
 
+	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
 
 	"github.com/gin-gonic/gin"
 )
 
 // ORPHost is the hosted ORP 0.3 thin layer. It serves discovery, a credential-free
-// suggest (with optional join), and an envelope that does not open deals.
-// The discovery name is "In testing". This layer claims no conformance level.
+// suggest (with optional join), and a test-mode offer, accept, and proof.
+// Opened deals stay awaiting. The host does not hold money. The discovery
+// name is "In testing". This layer claims no conformance level.
 // DCP v0.1 stays the live affiliate path. CLAIMS_CHECK is only reported.
 type ORPHost struct {
 	Entry          *AgentEntry
 	SuggestLimiter *IPRateLimiter
+	MessageLimiter *IPRateLimiter
 	Now            func() time.Time
 }
 
-// Mount registers the ORP routes. POST /orp is the discovery endpoint.
+// Mount registers the ORP routes. POST /orp is the message endpoint.
 func (h *ORPHost) Mount(r gin.IRouter) {
 	r.GET("/.well-known/orp.json", h.Discovery)
 	r.POST("/orp", h.Envelope)
 	r.POST("/orp/suggest", h.Suggest)
 	r.POST(MonetizationSuggestPath, h.Monetize)
 	r.POST("/orp/join", h.Join)
+	mountORPDeals(h, r)
 }
 
 func (h *ORPHost) now() time.Time {
@@ -135,7 +139,8 @@ func (h *ORPHost) Join(c *gin.Context) {
 }
 
 // Envelope is POST /orp. A #68-shaped body is invalid_message before any
-// credential check and before any write. This testing host does not open deals.
+// credential check and before any write. Offer, accept, and execute open a
+// test deal that stays awaiting. This host does not hold money.
 func (h *ORPHost) Envelope(c *gin.Context) {
 	_, dns := h.origin(c)
 	body, problem, ok := readORPBody(c)
@@ -163,6 +168,10 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 		h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "from does not match the credential."}, false)
 		return
 	}
+	hash := orp.ContentHash(value)
+	if h.seen(c, dns, msg, hash) {
+		return
+	}
 	if msg.HasSig {
 		h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusUnauthorized, Code: "bad_signature", Message: "This testing host publishes no keys and cannot verify sig."}, false)
 		return
@@ -171,23 +180,34 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 		h.writeProblem(c, dns, msg.From, msg.ID, problem, false)
 		return
 	}
+	if h.MessageLimiter != nil && !h.MessageLimiter.Allow(grant.OwnerID) {
+		h.writeProblem(c, dns, msg.From, msg.ID, rateLimited("Too many messages from this party."), false)
+		return
+	}
 	switch {
 	case msg.Type == "hello":
-		writeORP(c, http.StatusOK, orp.HelloReply(dns, msg.From, msg.ID, party, h.claimsMode(), h.now()), false)
+		h.finish(c, msg, hash, http.StatusOK, orp.HelloReply(dns, msg.From, msg.ID, party, h.claimsMode(), h.now()), database.ORPEffect{})
 	case msg.Type == "discover":
-		h.discover(c, dns, msg)
+		h.discover(c, dns, msg, hash)
+	case msg.Type == "offer":
+		h.offer(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "accept":
+		h.accept(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "execute":
+		h.execute(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "receipt":
+		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the host issues a receipt."}), database.ORPEffect{})
 	case orp.IsHostOnly(msg.Type):
-		problem := orp.HostOnly()
-		h.writeProblem(c, dns, msg.From, msg.ID, problem, false)
+		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.HostOnly()), database.ORPEffect{})
 	default:
-		h.writeProblem(c, dns, msg.From, msg.ID, orp.RefusesDeal(), false)
+		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.RefusesDeal()), database.ORPEffect{})
 	}
 }
 
-func (h *ORPHost) discover(c *gin.Context, dns string, msg orp.Message) {
+func (h *ORPHost) discover(c *gin.Context, dns string, msg orp.Message, hash string) {
 	want, _ := msg.Body["want"].(string)
 	if want == "spaces" {
-		writeORP(c, http.StatusOK, orp.ResultsReply(dns, msg.From, msg.ID, []any{}, "no_match", h.now()), false)
+		h.finish(c, msg, hash, http.StatusOK, orp.ResultsReply(dns, msg.From, msg.ID, []any{}, "no_match", h.now()), database.ORPEffect{})
 		return
 	}
 	rows, err := h.candidates(c)
@@ -196,8 +216,23 @@ func (h *ORPHost) discover(c *gin.Context, dns string, msg orp.Message) {
 		return
 	}
 	text, limit := orp.DiscoverHaystack(msg.Body)
-	items, empty := orp.Match(dns, orp.SuggestRequest{Text: text, Haystack: text, Limit: limit}, rows)
-	writeORP(c, http.StatusOK, orp.ResultsReply(dns, msg.From, msg.ID, items, empty, h.now()), false)
+	standing, err := h.standingItems(c, text)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	catalog, empty := orp.Match(dns, orp.SuggestRequest{Text: text, Haystack: text, Limit: limit}, rows)
+	items := append(standing, catalog...)
+	if len(items) > limit {
+		items = items[:limit]
+	}
+	if len(items) == 0 && empty == "" {
+		empty = "no_match"
+	}
+	if len(items) > 0 {
+		empty = ""
+	}
+	h.finish(c, msg, hash, http.StatusOK, orp.ResultsReply(dns, msg.From, msg.ID, items, empty, h.now()), database.ORPEffect{})
 }
 
 func (h *ORPHost) candidates(c *gin.Context) ([]orp.Candidate, error) {

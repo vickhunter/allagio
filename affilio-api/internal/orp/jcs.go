@@ -117,6 +117,12 @@ func canonicalizeString(s string) string {
 
 // TermsHash is sha256- plus the unpadded base64url SHA-256 of the JCS form.
 func TermsHash(terms map[string]any) string {
-	sum := sha256.Sum256([]byte(Canonicalize(terms)))
+	return ContentHash(terms)
+}
+
+// ContentHash is the JCS hash of one JSON value. The same bytes are the
+// idempotency key for a stored envelope.
+func ContentHash(value any) string {
+	sum := sha256.Sum256([]byte(Canonicalize(value)))
 	return "sha256-" + base64.RawURLEncoding.EncodeToString(sum[:])
 }

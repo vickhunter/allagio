@@ -55,6 +55,7 @@ type Problem struct {
 	Supported  []string
 	RetryAfter int
 	Retryable  bool
+	Step       string
 }
 
 func (p Problem) WithField(field string) Problem {
@@ -75,12 +76,14 @@ type Message struct {
 	From   string
 	To     string
 	Body   map[string]any
+	Deal   string
+	Re     string
 	HasSig bool
 }
 
-// ParseEnvelope applies E1–E4 and E6 shape rules that do not need a credential.
-// A #68-shaped object fails here as invalid_message. Per-type bodies other
-// than hello and discover are not fully checked: this layer does not open deals.
+// ParseEnvelope applies E1–E4 shape rules that do not need a credential.
+// A #68-shaped object fails here as invalid_message. Offer, accept, and
+// execute bodies are checked here too. This layer still does not pay.
 func ParseEnvelope(value any) (Message, Problem, bool) {
 	obj, ok := value.(map[string]any)
 	if !ok {
@@ -149,12 +152,14 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 		if !ok || !localPattern.MatchString(text) {
 			return Message{}, Invalid("The message is not valid ORP 0.3.", "/deal"), false
 		}
+		msg.Deal = text
 	}
 	if re, present := obj["re"]; present {
 		text, ok := re.(string)
 		if !ok || !messagePattern.MatchString(text) {
 			return Message{}, Invalid("The message is not valid ORP 0.3.", "/re"), false
 		}
+		msg.Re = text
 	}
 	if prev, present := obj["prev"]; present {
 		text, ok := prev.(string)
@@ -191,6 +196,20 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 	if problem, bad := checkHandledBody(typ, body); bad {
 		return Message{}, problem, false
 	}
+	if typ == "execute" && msg.Deal == "" {
+		return Message{}, Invalid("The message is not valid ORP 0.3.", "/deal"), false
+	}
+	if typ == "accept" && msg.Deal == "" {
+		offer, _ := body["offer"].(string)
+		if offer == "" {
+			return Message{}, Invalid("The message is not valid ORP 0.3.", "/body/offer"), false
+		}
+	}
+	if typ == "accept" && msg.Deal != "" {
+		if _, present := body["offer"]; present {
+			return Message{}, Invalid("The message is not valid ORP 0.3.", "/deal"), false
+		}
+	}
 	return msg, Problem{}, true
 }
 
@@ -208,6 +227,12 @@ func checkHandledBody(typ string, body map[string]any) (Problem, bool) {
 		return checkHelloBody(body)
 	case "discover":
 		return checkDiscoverBody(body)
+	case "offer":
+		return checkOfferBody(body)
+	case "accept":
+		return checkAcceptBody(body)
+	case "execute":
+		return checkExecuteBody(body)
 	default:
 		return Problem{}, false
 	}
@@ -422,6 +447,9 @@ func ErrorDocument(dns string, to, re string, problem Problem, now time.Time) ma
 	if problem.RetryAfter > 0 {
 		body["retry_after"] = problem.RetryAfter
 	}
+	if problem.Step != "" {
+		body["step"] = problem.Step
+	}
 	doc := map[string]any{
 		"orp":  Version,
 		"type": "error",
@@ -485,7 +513,7 @@ func ResultsReply(dns, to, re string, items []any, emptyReason string, now time.
 // RefusesDeal is the reply for a core type this testing host does not run.
 // No deal, offer, campaign, or placement is created.
 func RefusesDeal() Problem {
-	return Problem{Status: 403, Code: "forbidden", Message: "This host is in testing and does not open deals."}
+	return Problem{Status: 403, Code: "forbidden", Message: "This host is in testing and does not run this message."}
 }
 
 // HostOnly is the reply when a party sends a host-only type.

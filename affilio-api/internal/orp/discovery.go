@@ -57,7 +57,7 @@ func MemberParty(dns, ownerID string) string {
 }
 
 // CatalogParty is a stable pseudonymous id for a catalog row. It is not a
-// login. Accepting the pitch does not open a deal on this thin layer.
+// login. Accepting the pitch opens a test deal that stays awaiting.
 func CatalogParty(dns, source, id string) string {
 	sum := sha256.Sum256([]byte(source + ":" + id))
 	return "orp:" + dns + "/c_" + hex.EncodeToString(sum[:8])
@@ -84,7 +84,7 @@ func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
 		"orp":         []any{Version},
 		"host":        HostParty(dns),
 		"name":        TestingName,
-		"description": "In testing. Hosted ORP 0.3 discovery, suggest, and join for a cold agent. Conformance levels L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path.",
+		"description": "In testing. A cold agent can discover this host, offer, accept, and record a test proof. The deal stays awaiting. Offer Rails does not hold money. Conformance levels L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path.",
 		"endpoint":    origin + "/orp",
 		"suggest":     origin + "/orp/suggest",
 		"join":        origin + "/orp/join",
@@ -102,12 +102,13 @@ func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
 	}
 }
 
-// Capabilities is what this thin layer actually handles. Deal-opening types
-// are absent, and checks.claims reports the configured mode.
+// Capabilities is what this testing host handles. It does not claim a
+// conformance level. checks.claims only reports the configured mode.
 func Capabilities(claimsMode string) map[string]any {
 	return map[string]any{
-		"messages": []any{"hello", "discover", "results", "error"},
-		"proofs":   []any{"link"},
+		"messages": []any{"hello", "discover", "results", "offer", "accept", "deal", "execute", "receipt", "error"},
+		"proofs":   []any{"proof_url"},
+		"inbox":    map[string]any{"poll": true},
 		"checks": map[string]any{
 			"claims": ClaimsMode(claimsMode),
 		},

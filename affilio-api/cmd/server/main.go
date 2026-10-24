@@ -290,6 +290,7 @@ func main() {
 	(&handlers.ORPHost{
 		Entry:          agentEntry,
 		SuggestLimiter: handlers.NewIPRateLimiter(30, time.Minute),
+		MessageLimiter: handlers.NewIPRateLimiter(30, time.Minute),
 	}).Mount(r)
 	signals := v1.Group("/agent-signals")
 	signals.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
