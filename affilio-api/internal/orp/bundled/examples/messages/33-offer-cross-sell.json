@@ -1,0 +1,55 @@
+{
+  "orp": "0.3",
+  "type": "offer",
+  "id": "m_mkr_0012",
+  "ts": "2026-10-24T11:00:00Z",
+  "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+  "body": {
+    "terms": {
+      "title": "Offer Acme Notes on your checkout thank-you page: 20% of the first payment",
+      "kind": "cross_sell",
+      "categories": [
+        "software.productivity"
+      ],
+      "disclosure": {
+        "label": "Partner offer",
+        "lang": "en"
+      },
+      "obligations": [
+        {
+          "id": "slot",
+          "by": "acceptor",
+          "action": "place",
+          "space": {
+            "kinds": [
+              "app.slot",
+              "newsletter.dedicated"
+            ]
+          },
+          "content": {
+            "link": true,
+            "brief": "One line under the receipt: notes that sync with your invoices."
+          },
+          "destination": "https://acmenotes.example/partners",
+          "proof": [
+            "link"
+          ]
+        },
+        {
+          "id": "commission",
+          "by": "offerer",
+          "action": "pay",
+          "per": "conversion",
+          "rate_bps": 2000,
+          "window": "P14D",
+          "rail": "stripe",
+          "proof": [
+            "provider"
+          ]
+        }
+      ]
+    },
+    "limit": 50,
+    "expires": "2027-03-31T00:00:00Z"
+  }
+}

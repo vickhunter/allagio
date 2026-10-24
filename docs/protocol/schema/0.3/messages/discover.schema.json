@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/discover.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/discover.schema.json",
   "title": "DiscoverMessage",
   "description": "Search the host's index for offers (publisher side) or spaces (maker side). Read-only: it never commits anyone.",
   "type": "object",

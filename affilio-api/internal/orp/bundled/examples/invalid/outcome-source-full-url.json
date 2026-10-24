@@ -1,0 +1,34 @@
+{
+  "why": "A click source is a registrable domain, never a page URL that could name a reader's page.",
+  "schema": "message",
+  "path": "/body/rows/0/sources/0/source",
+  "instance": {
+    "orp": "0.3",
+    "type": "outcome",
+    "id": "m_host_0006",
+    "ts": "2026-10-28T00:00:00Z",
+    "from": "orp:hub.example/host",
+    "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+    "deal": "deal_aff_9wQz",
+    "body": {
+      "period": {
+        "from": "2026-10-21T00:00:00Z",
+        "to": "2026-10-28T00:00:00Z"
+      },
+      "rows": [
+        {
+          "obligation": "place",
+          "clicks": {
+            "human": 3
+          },
+          "sources": [
+            {
+              "source": "https://someone.example/private/page?u=42",
+              "human": 3
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/results.schema.json",
+  "title": "ResultsMessage",
+  "description": "The host's answer to discover. Every item says why it fits, with evidence links, and shows aggregate trust.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "re"],
+  "properties": {
+    "type": { "const": "results" },
+    "body": { "$ref": "#/$defs/ResultsBody" }
+  },
+  "$defs": {
+    "ResultsBody": {
+      "title": "ResultsBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items"],
+      "properties": {
+        "items": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/Result" } },
+        "cursor": { "type": "string", "maxLength": 200 },
+        "empty_reason": { "type": "string", "enum": ["no_match", "below_threshold", "filtered"] }
+      }
+    },
+    "Result": {
+      "title": "Result",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["party", "fit"],
+      "properties": {
+        "offer": { "$ref": "#/$defs/OfferSummary" },
+        "space": { "$ref": "../defs.schema.json#/$defs/Space" },
+        "party": { "$ref": "../defs.schema.json#/$defs/PartyId" },
+        "fit": { "$ref": "../defs.schema.json#/$defs/Fit" },
+        "trust": { "$ref": "../defs.schema.json#/$defs/Trust" },
+        "pool": { "type": "string", "pattern": "^[a-z0-9_-]{1,40}$" },
+        "checks": { "$ref": "../defs.schema.json#/$defs/Checks", "description": "Whether the host has checked the offer's claims against its destination page." },
+        "pitch": { "type": "string", "minLength": 1, "maxLength": 280, "description": "One or two sentences an agent can show its person as is, such as 'You can monetize this post: ... Want to test it?'. Says what the person would do and what they get. No personal data." }
+      },
+      "oneOf": [{ "required": ["offer"] }, { "required": ["space"] }]
+    },
+    "OfferSummary": {
+      "title": "OfferSummary",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "terms", "terms_hash"],
+      "properties": {
+        "id": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "terms": { "$ref": "../defs.schema.json#/$defs/Terms" },
+        "terms_hash": { "$ref": "../defs.schema.json#/$defs/Hash" },
+        "expires": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+      }
+    }
+  }
+}

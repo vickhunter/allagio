@@ -1,0 +1,19 @@
+{
+  "why": "Revoking one obligation names it.",
+  "schema": "message",
+  "path": "/body",
+  "instance": {
+    "orp": "0.3",
+    "type": "revoke",
+    "id": "m_mkr_0006",
+    "ts": "2026-12-01T09:00:00Z",
+    "from": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+    "deal": "deal_aff_9wQz",
+    "body": {
+      "scope": "obligation",
+      "reason": "owner_request",
+      "note": "Spring pricing replaces this offer.",
+      "effective": "2026-12-08T00:00:00Z"
+    }
+  }
+}

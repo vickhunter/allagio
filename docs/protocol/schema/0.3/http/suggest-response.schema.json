@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/http/suggest-response.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/http/suggest-response.schema.json",
   "title": "SuggestResponse",
   "description": "Standing offers the person could take now, or open spaces that trade with posts like this one, best first, each with a pitch to show as is. Taking an offer: POST join once (no account), then send accept with the offer id and terms_hash. Taking a space: join, then send a directed offer to the space's party.",
   "type": "object",

@@ -13,11 +13,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ORPHost is the hosted ORP 0.3 thin layer. It serves discovery, a credential-free
-// suggest (with optional join), and a test-mode offer, accept, and proof.
-// Opened deals stay awaiting. The host does not hold money. The discovery
-// name is "In testing". This layer claims no conformance level.
-// DCP v0.1 stays the live affiliate path. CLAIMS_CHECK is only reported.
+// ORPHost is the hosted ORP 0.3 thin layer. It serves discovery, the protocol
+// text, the schemas, a credential-free suggest (with optional join), and a
+// test-mode offer, accept, activate, and proof. An accepted deal stays
+// awaiting until a party calls POST /orp/deals/:id/activate. The host does
+// not hold money. The discovery name is "In testing". This layer claims no
+// conformance level. DCP v0.1 stays the live affiliate path. CLAIMS_CHECK is
+// only reported.
 type ORPHost struct {
 	Entry          *AgentEntry
 	SuggestLimiter *IPRateLimiter
@@ -32,6 +34,12 @@ func (h *ORPHost) Mount(r gin.IRouter) {
 	r.POST("/orp/suggest", h.Suggest)
 	r.POST(MonetizationSuggestPath, h.Monetize)
 	r.POST("/orp/join", h.Join)
+	r.GET("/orp/spec", h.Spec)
+	r.GET("/orp/gaps", h.Gaps)
+	r.GET("/orp/schemas", h.SchemaIndex)
+	r.GET("/orp/schemas/*name", h.Schema)
+	r.GET("/orp/examples", h.ExampleIndex)
+	r.GET("/orp/examples/*name", h.Example)
 	mountORPDeals(h, r)
 }
 
@@ -139,9 +147,11 @@ func (h *ORPHost) Join(c *gin.Context) {
 }
 
 // Envelope is POST /orp. A #68-shaped body is invalid_message before any
-// credential check and before any write. Offer and accept open a test deal
-// that stays awaiting. Execute on that deal is state_conflict. This host
-// does not hold money.
+// credential check and before any write. A standing accept opens a test deal
+// in awaiting. A directed offer opens proposed, and the counterparty accept
+// stores awaiting. Activate is the only step from awaiting to active.
+// Execute on a deal that is not active is state_conflict.
+// This host does not hold money.
 func (h *ORPHost) Envelope(c *gin.Context) {
 	_, dns := h.origin(c)
 	body, problem, ok := readORPBody(c)

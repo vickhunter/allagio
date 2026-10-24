@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/revoke.schema.json",
+  "title": "RevokeMessage",
+  "description": "Stop a deal, one obligation, or a standing offer. Future obligations stop. Tracking links never break: they turn plain, still redirecting to the destination but no longer counting. Work already verified stays verified.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body"],
+  "properties": {
+    "type": { "const": "revoke" },
+    "body": { "$ref": "#/$defs/RevokeBody" }
+  },
+  "if": { "properties": { "body": { "type": "object", "properties": { "scope": { "const": "offer" } } } } },
+  "then": true,
+  "else": { "required": ["deal"] },
+  "$defs": {
+    "RevokeBody": {
+      "title": "RevokeBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "reason"],
+      "properties": {
+        "scope": { "type": "string", "enum": ["deal", "obligation", "offer"] },
+        "obligation": { "$ref": "../defs.schema.json#/$defs/ObligationId" },
+        "offer": { "$ref": "../defs.schema.json#/$defs/LocalId" },
+        "reason": { "type": "string", "enum": ["owner_request", "breach", "brand_safety", "expired", "other"] },
+        "note": { "$ref": "../defs.schema.json#/$defs/Text" },
+        "effective": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+      },
+      "allOf": [
+        { "if": { "properties": { "scope": { "const": "obligation" } } }, "then": { "required": ["obligation"] } },
+        { "if": { "properties": { "scope": { "const": "offer" } } }, "then": { "required": ["offer"] } }
+      ]
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "orp": "0.3",
+  "type": "outcome",
+  "id": "m_host_0005",
+  "ts": "2026-10-28T00:00:00Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "deal": "deal_aff_9wQz",
+  "body": {
+    "period": {
+      "from": "2026-10-21T00:00:00Z",
+      "to": "2026-10-28T00:00:00Z"
+    },
+    "rows": [
+      {
+        "obligation": "place",
+        "clicks": {
+          "human": 41,
+          "bot": 3,
+          "preview": 12,
+          "test": 1
+        },
+        "conversions": 2,
+        "refunds": 0,
+        "revenue": {
+          "amount_minor": 19200,
+          "currency": "EUR"
+        },
+        "earned": {
+          "amount_minor": 5760,
+          "currency": "EUR"
+        },
+        "attested_conversions": 0,
+        "sources": [
+          {
+            "source": "x.com",
+            "human": 27
+          },
+          {
+            "source": "direct",
+            "human": 9
+          },
+          {
+            "source": "other",
+            "human": 5
+          }
+        ]
+      }
+    ],
+    "final": false
+  }
+}

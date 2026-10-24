@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/outcome.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/outcome.schema.json",
   "title": "OutcomeMessage",
   "description": "Aggregate results for a period, sent by the host to both parties. Counts and money only. Rows are closed objects: there is no field for an address, user agent, referrer, email or order id.",
   "type": "object",

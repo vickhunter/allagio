@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/request.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/request.schema.json",
   "title": "RequestMessage",
   "description": "A directed request for terms, like a request for quote: 'do you have a slot?' or 'would you do this offer at a different rate?'. Named ask in the #68 and #71 drafts; renamed so it never reads like the ask step mode. It commits nobody. The answer is an offer (with re set to this message), a decline, or nothing.",
   "type": "object",

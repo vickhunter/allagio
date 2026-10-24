@@ -17,8 +17,8 @@ import (
 )
 
 // This checker exists so tests can validate documents against the canonical
-// schemas in docs/protocol/schema/0.3. The API image does not contain those
-// files, so request handling does not call it.
+// schemas in docs/protocol/schema/0.3. Request handling does not call it.
+// GET /orp/schemas serves an embedded copy of those files.
 
 var (
 	catalogMu sync.Mutex

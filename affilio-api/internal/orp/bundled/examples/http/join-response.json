@@ -1,0 +1,19 @@
+{
+  "party": "orp:hub.example/p_Wr1tE9xQ2mKa5",
+  "token": "orpt_3mV8kQ2xL9wR7tB4nZ6pD1sF5hJ0cY",
+  "claim": "https://hub.example/claim/clm_Hk7Qz2Lw9Rt4",
+  "steps": {
+    "list": "ask",
+    "negotiate": "ask",
+    "accept": "ask",
+    "execute": "ask",
+    "amend": "ask",
+    "settle": "ask",
+    "share": "ask",
+    "revoke": "auto"
+  },
+  "limits": {
+    "open_deals": 5,
+    "messages_per_minute": 30
+  }
+}

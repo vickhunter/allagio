@@ -1,0 +1,20 @@
+{
+  "orp": "0.3",
+  "type": "dispute",
+  "id": "m_host_0012",
+  "ts": "2026-10-29T10:00:00Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "deal": "deal_swp_4KfP",
+  "body": {
+    "action": "resolve",
+    "dispute": "dsp_5Mq1",
+    "obligation": "repost",
+    "resolution": {
+      "outcome": "upheld",
+      "remedy": "redo",
+      "at_fault": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+      "note": "The platform check confirms removal on day 5. Repost and keep it up for the remaining 9 days."
+    }
+  }
+}

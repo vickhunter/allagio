@@ -316,7 +316,7 @@ func TestRedirectStopsAttributingWhenPaused(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/doesnotexist", nil)
 	rrec := httptest.NewRecorder()
 	r.ServeHTTP(rrec, req)
-	requirePlainRedirect(t, rrec, "https://offerrails.com/")
+	requirePlainRedirect(t, rrec, OfferRailsHome)
 }
 
 func TestRedirectRefusesPausedUnlistedAndDeleted(t *testing.T) {
@@ -360,7 +360,7 @@ func TestRedirectRefusesPausedUnlistedAndDeleted(t *testing.T) {
 	t.Run("deleted", func(t *testing.T) {
 		deleted := httptest.NewRecorder()
 		r.ServeHTTP(deleted, httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil))
-		requirePlainRedirect(t, deleted, "https://offerrails.com/")
+		requirePlainRedirect(t, deleted, OfferRailsHome)
 		if n := clickCount(t, db); n != 0 {
 			t.Fatalf("deleted code recorded %d clicks", n)
 		}

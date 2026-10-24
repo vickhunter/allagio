@@ -12,6 +12,10 @@ import (
 // ErrORPReplay is a stored message id reused with different content.
 var ErrORPReplay = errors.New("orp replay")
 
+// ErrORPState is a conditional deal update that matched no row.
+// The message transaction rolls back, so the accept is not stored.
+var ErrORPState = errors.New("orp state")
+
 // ORPRecord is the idempotency row for one party message.
 type ORPRecord struct {
 	Party  string
@@ -64,8 +68,11 @@ type ORPEffect struct {
 	Deal              *ORPDeal
 	UpdateObligations json.RawMessage
 	UpdateDealID      string
-	UpdatedAt         time.Time
-	Inbox             []ORPInboxItem
+	// UpdateState "awaiting" moves that deal from proposed to awaiting.
+	// Any other value, or a row that is no longer proposed, is an error.
+	UpdateState string
+	UpdatedAt   time.Time
+	Inbox       []ORPInboxItem
 }
 
 // ORPSaved is the reply that should be written. Reused means an earlier
@@ -161,10 +168,24 @@ INSERT INTO orp_deals(
 			return err
 		}
 	}
-	if effect.UpdateDealID != "" {
+	if effect.UpdateDealID != "" && len(effect.UpdateObligations) > 0 {
 		if _, err := tx.Exec(ctx, `
 UPDATE orp_deals SET obligations=$2, updated_at=$3 WHERE id=$1`, effect.UpdateDealID, effect.UpdateObligations, effect.UpdatedAt); err != nil {
 			return err
+		}
+	}
+	if effect.UpdateState != "" {
+		if effect.UpdateDealID == "" || effect.UpdateState != "awaiting" {
+			return errors.New("orp state effect")
+		}
+		tag, err := tx.Exec(ctx, `
+UPDATE orp_deals SET state=$2, updated_at=$3
+WHERE id=$1 AND state='proposed'`, effect.UpdateDealID, effect.UpdateState, effect.UpdatedAt)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrORPState
 		}
 	}
 	for _, item := range effect.Inbox {
@@ -251,6 +272,50 @@ LIMIT 1`, offerID, acceptorOwner).Scan(&id)
 		return "", false, err
 	}
 	return id, true, nil
+}
+
+// ORPAcceptStored reports a stored HTTP 200 deal reply from this party for the deal.
+// That reply is the counterparty accept. Activate refuses the deal until it exists.
+func (d *DB) ORPAcceptStored(ctx context.Context, party, dealID string) (bool, error) {
+	var ok bool
+	err := d.Pool.QueryRow(ctx, `
+SELECT EXISTS(
+    SELECT 1 FROM orp_messages
+    WHERE party=$1 AND status=200 AND reply->>'type'='deal' AND reply->>'deal'=$2
+)`, party, dealID).Scan(&ok)
+	return ok, err
+}
+
+// ActivateORPDeal moves one awaiting deal to active and stores the snapshots.
+// changed is false when the row is no longer awaiting.
+func (d *DB) ActivateORPDeal(ctx context.Context, id string, bound json.RawMessage, updated time.Time, inbox []ORPInboxItem) (bool, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `
+UPDATE orp_deals
+SET state='active', waiting=NULL, bound=$2, updated_at=$3
+WHERE id=$1 AND state='awaiting'`, id, bound, updated)
+	if err != nil {
+		return false, err
+	}
+	if tag.RowsAffected() == 0 {
+		return false, nil
+	}
+	for _, item := range inbox {
+		if item.OwnerID == "" || len(item.Message) == 0 {
+			continue
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO orp_inbox(owner_id, message) VALUES($1,$2)`, item.OwnerID, item.Message); err != nil {
+			return false, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // GetORPDeal reads one deal.

@@ -22,6 +22,7 @@ const openTestDeals = 5
 func mountORPDeals(h *ORPHost, r gin.IRouter) {
 	r.GET("/orp/inbox", h.Inbox)
 	r.GET("/orp/deals/:id", h.Deal)
+	r.POST("/orp/deals/:id/activate", h.Activate)
 	r.GET("/orp/proof/:id", h.Proof)
 	r.GET("/orp/approve/:id", h.Approve)
 }
@@ -90,7 +91,72 @@ func (h *ORPHost) Proof(c *gin.Context) {
 		writeHTML(c, http.StatusNotFound, "not found")
 		return
 	}
-	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms)))
+	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms), deal.State))
+}
+
+// Activate moves an accepted deal from awaiting to active.
+// The caller is a party on the deal. The counterparty accept must already be
+// stored, so neither the offerer nor the acceptor can activate before it.
+// Any other state is state_conflict.
+func (h *ORPHost) Activate(c *gin.Context) {
+	_, dns := h.origin(c)
+	grant, ok := h.bearer(c, dns)
+	if !ok {
+		return
+	}
+	party := orp.MemberParty(dns, grant.OwnerID)
+	deal, found, err := h.Entry.DB.GetORPDeal(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
+	if !found || (deal.OffererParty != party && deal.AcceptorParty != party) {
+		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}, false)
+		return
+	}
+	if deal.State != "awaiting" {
+		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
+		return
+	}
+	accepted, err := h.Entry.DB.ORPAcceptStored(c.Request.Context(), deal.AcceptorParty, deal.ID)
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
+	if !accepted {
+		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
+		return
+	}
+	now := h.now()
+	bound, err := bindMandates(deal.Bound, deal.OffererParty, deal.AcceptorParty, now)
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
+	deal.State = "active"
+	deal.Waiting = nil
+	deal.Bound = bound
+	deal.UpdatedAt = now.UTC()
+	doc, err := h.dealMessage(dns, party, "", deal, now)
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
+	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, bound, deal.UpdatedAt, h.dealInbox(dns, "", deal, now))
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
+	if !changed {
+		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
+		return
+	}
+	writeORPBytes(c, http.StatusOK, raw)
 }
 
 // Approve shows the terms a person would decide. It does not approve.
@@ -213,6 +279,9 @@ func (h *ORPHost) directedOffer(c *gin.Context, dns string, msg orp.Message, has
 		bound = []any{mandate(msg.From, now)}
 	}
 	deal := newTestDeal("", ownerID, acceptorOwner, msg.From, msg.To, terms, hashOfTerms, waiting, bound, now)
+	// SPEC opens a directed offer as proposed. awaiting starts when the
+	// counterparty accept is stored, so the offerer cannot activate alone.
+	deal.State = "proposed"
 	h.commitDeal(c, dns, msg, hash, deal, now)
 }
 
@@ -327,7 +396,22 @@ func (h *ORPHost) acceptDeal(c *gin.Context, dns string, msg orp.Message, hash, 
 		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, stepOff("accept", "The owner has turned off placement publish, so this agent cannot accept a placement.")), database.ORPEffect{})
 		return
 	}
-	doc, err := h.dealMessage(dns, party, msg.ID, deal, h.now())
+	now := h.now()
+	effect := database.ORPEffect{}
+	// Only the counterparty accept of a proposed deal stores awaiting.
+	// The offerer's own accept leaves the row proposed.
+	if deal.State == "proposed" {
+		if party != deal.AcceptorParty {
+			h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}), database.ORPEffect{})
+			return
+		}
+		deal.State = "awaiting"
+		deal.UpdatedAt = now.UTC()
+		effect.UpdateDealID = deal.ID
+		effect.UpdateState = "awaiting"
+		effect.UpdatedAt = deal.UpdatedAt
+	}
+	doc, err := h.dealMessage(dns, party, msg.ID, deal, now)
 	if err != nil {
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
@@ -337,9 +421,8 @@ func (h *ORPHost) acceptDeal(c *gin.Context, dns string, msg orp.Message, hash, 
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
 	}
-	h.finishRaw(c, msg, hash, http.StatusOK, raw, database.ORPEffect{
-		Inbox: h.dealInbox(dns, msg.ID, deal, h.now()),
-	})
+	effect.Inbox = h.dealInbox(dns, msg.ID, deal, now)
+	h.finishRaw(c, msg, hash, http.StatusOK, raw, effect)
 }
 
 func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, ownerID string) {
@@ -586,6 +669,10 @@ func (h *ORPHost) finishRaw(c *gin.Context, msg orp.Message, hash string, status
 			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusConflict, Code: "replay", Message: "This message id was already used with different content."}, false)
 			return
 		}
+		if errors.Is(err, database.ErrORPState) {
+			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
+			return
+		}
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
 	}
@@ -747,6 +834,34 @@ func mandate(party string, at time.Time) map[string]any {
 		"authority": map[string]any{"type": "mandate"},
 		"at":        orp.Stamp(at),
 	}
+}
+
+// bindMandates records a mandate for each party that is not already bound.
+// The deal schema allows two bound rows.
+func bindMandates(raw json.RawMessage, offerer, acceptor string, now time.Time) (json.RawMessage, error) {
+	rows := []map[string]any{}
+	if len(raw) > 0 && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &rows); err != nil {
+			return nil, err
+		}
+	}
+	have := map[string]bool{}
+	for _, row := range rows {
+		if party, _ := row["party"].(string); party != "" {
+			have[party] = true
+		}
+	}
+	for _, party := range []string{offerer, acceptor} {
+		if party == "" || have[party] {
+			continue
+		}
+		rows = append(rows, mandate(party, now))
+		have[party] = true
+	}
+	if len(rows) > 2 {
+		return nil, errors.New("too many bound parties")
+	}
+	return json.Marshal(rows)
 }
 
 func stepOff(step, message string) orp.Problem {

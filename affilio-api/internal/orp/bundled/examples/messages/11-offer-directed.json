@@ -1,0 +1,67 @@
+{
+  "orp": "0.3",
+  "type": "offer",
+  "id": "m_pub_0004",
+  "ts": "2026-10-21T11:05:00Z",
+  "from": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "to": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+  "re": "m_mkr_0002",
+  "body": {
+    "terms": {
+      "title": "Newsletter mention for a launch repost",
+      "kind": "swap",
+      "categories": [
+        "software.productivity"
+      ],
+      "disclosure": {
+        "label": "Partner mention",
+        "lang": "en"
+      },
+      "obligations": [
+        {
+          "id": "mention",
+          "by": "offerer",
+          "action": "place",
+          "space": {
+            "kinds": [
+              "newsletter.issue"
+            ]
+          },
+          "content": {
+            "link": true,
+            "brief": "One paragraph on why Acme Notes suits solo founders.",
+            "max_chars": 600
+          },
+          "destination": "https://acmenotes.example/",
+          "due": "P14D",
+          "proof": [
+            "link",
+            "witness",
+            "attestation"
+          ]
+        },
+        {
+          "id": "repost",
+          "by": "acceptor",
+          "action": "repost",
+          "target": "https://x.com/indiestackweekly/status/1848000000000000000",
+          "space": {
+            "kinds": [
+              "social.repost"
+            ]
+          },
+          "due": "P7D",
+          "keep": "P30D",
+          "proof": [
+            "platform_check",
+            "proof_url",
+            "attestation"
+          ]
+        }
+      ]
+    },
+    "terms_hash": "sha256-6zjTp5mN8-GueFQpGvpswiLBxnrTUE3v927FEe-qX4k",
+    "note": "A swap: a mention in the 4 November issue for a repost of our launch thread.",
+    "expires": "2026-10-24T00:00:00Z"
+  }
+}

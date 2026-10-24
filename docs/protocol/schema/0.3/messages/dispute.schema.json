@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/dispute.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/dispute.schema.json",
   "title": "DisputeMessage",
   "description": "Open, answer, resolve or withdraw a dispute about one obligation. The host (or a resolver it names) resolves. Evidence is public URLs and hashes, never personal data.",
   "type": "object",

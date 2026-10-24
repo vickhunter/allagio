@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/offer.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/offer.schema.json",
   "title": "OfferMessage",
   "description": "Proposed terms. With to, it is directed: the host opens a deal and answers with a deal snapshot. Without to, it is a standing offer: the host lists it in discovery and answers with the offer as listed, id and terms_hash filled in. Anyone may accept a standing offer without negotiating.",
   "type": "object",

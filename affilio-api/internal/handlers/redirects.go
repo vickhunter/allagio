@@ -25,7 +25,9 @@ type RedirectsHandler struct {
 }
 
 const (
-	offerRailsHome             = "https://offerrails.com/"
+	// OfferRailsHome is the public host. An unknown /v1/go code lands here
+	// when HomeURL is empty. PUBLIC_BASE_URL, stored in HomeURL, wins when set.
+	OfferRailsHome             = "https://offer-rails.onrender.com/"
 	placementClickDedupSeconds = 45
 )
 
@@ -385,7 +387,7 @@ func (h *RedirectsHandler) offerRailsHome() string {
 	if home := strings.TrimSpace(h.HomeURL); home != "" {
 		return home
 	}
-	return offerRailsHome
+	return OfferRailsHome
 }
 
 func siteHome(domain string) string {

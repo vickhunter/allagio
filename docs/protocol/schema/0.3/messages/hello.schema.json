@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/hello.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/hello.schema.json",
   "title": "HelloMessage",
   "description": "Version and capability negotiation. Optional for agents, required for hosts to answer. The reply carries exactly one version: the one both sides will use.",
   "type": "object",

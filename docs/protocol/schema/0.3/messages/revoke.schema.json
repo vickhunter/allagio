@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/messages/revoke.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/revoke.schema.json",
   "title": "RevokeMessage",
   "description": "Stop a deal, one obligation, or a standing offer. Future obligations stop. Tracking links never break: they turn plain, still redirecting to the destination but no longer counting. Work already verified stays verified.",
   "type": "object",

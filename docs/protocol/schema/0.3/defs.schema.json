@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://offerrails.com/orp/schema/0.3/defs.schema.json",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json",
   "title": "ORP 0.3 shared definitions",
   "description": "Types shared by every ORP 0.3 message. Core objects are closed (additionalProperties false); extension data goes in the envelope's ext field.",
   "$defs": {

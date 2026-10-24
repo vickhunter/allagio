@@ -1,0 +1,137 @@
+{
+  "why": "Every suggestion carries a pitch the agent can show its person.",
+  "schema": "suggest-response",
+  "path": "/items/0",
+  "instance": {
+    "items": [
+      {
+        "offer": {
+          "id": "ofr_acme_30",
+          "terms": {
+            "title": "Acme Notes: 30% of first-year revenue",
+            "kind": "affiliate",
+            "categories": [
+              "software.productivity"
+            ],
+            "disclosure": {
+              "label": "Affiliate link",
+              "lang": "en"
+            },
+            "obligations": [
+              {
+                "id": "place",
+                "by": "acceptor",
+                "action": "place",
+                "content": {
+                  "link": true,
+                  "must_not_include": [
+                    "free forever"
+                  ]
+                },
+                "destination": "https://acmenotes.example/pricing",
+                "proof": [
+                  "link"
+                ]
+              },
+              {
+                "id": "commission",
+                "by": "offerer",
+                "action": "pay",
+                "per": "conversion",
+                "rate_bps": 3000,
+                "window": "P30D",
+                "rail": "stripe",
+                "proof": [
+                  "provider"
+                ]
+              }
+            ]
+          },
+          "terms_hash": "sha256-Bti4pak22vzeA0HAuX0eLXhUQy1pnbf9YGiGKYgJpNo",
+          "expires": "2027-01-31T00:00:00Z"
+        },
+        "party": "orp:hub.example/p_7Hq2kLm9Zt4Xw",
+        "fit": {
+          "score": 82,
+          "reasons": [
+            "The thread recommends note-taking tools for solo founders."
+          ]
+        },
+        "trust": {
+          "reputation": 858,
+          "completed_deals": 48,
+          "verified": [
+            "person",
+            "domain"
+          ]
+        }
+      },
+      {
+        "space": {
+          "id": "sp_news_1",
+          "kind": "newsletter.issue",
+          "platform": "newsletter",
+          "title": "Indie Stack Weekly",
+          "topics": [
+            "software.productivity",
+            "business.startups"
+          ],
+          "languages": [
+            "en"
+          ],
+          "audience": {
+            "size": "10k-100k",
+            "regions": [
+              {
+                "code": "US",
+                "share": "25-50%"
+              },
+              {
+                "code": "DE",
+                "share": "10-25%"
+              }
+            ],
+            "k_min": 50,
+            "source": "host_measured"
+          },
+          "accepts": [
+            "affiliate",
+            "sponsored",
+            "swap"
+          ],
+          "disclosure": {
+            "label": "Partner mention",
+            "lang": "en"
+          },
+          "verified": [
+            {
+              "method": "domain",
+              "at": "2026-09-02T08:00:00Z"
+            }
+          ],
+          "rules": {
+            "rel": "sponsored",
+            "max_per_week": 2
+          }
+        },
+        "party": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+        "fit": {
+          "score": 64,
+          "reasons": [
+            "Writes for the same readers and accepts swaps."
+          ]
+        },
+        "trust": {
+          "reputation": 791,
+          "completed_deals": 17,
+          "verified": [
+            "person",
+            "domain"
+          ]
+        },
+        "pitch": "Want more readers? Indie Stack Weekly (10k to 100k readers) trades mentions with posts like this. Want me to propose a swap?"
+      }
+    ],
+    "join": "https://hub.example/orp/join"
+  }
+}

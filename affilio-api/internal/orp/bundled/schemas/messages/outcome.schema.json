@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/messages/outcome.schema.json",
+  "title": "OutcomeMessage",
+  "description": "Aggregate results for a period, sent by the host to both parties. Counts and money only. Rows are closed objects: there is no field for an address, user agent, referrer, email or order id.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "outcome" },
+    "body": { "$ref": "#/$defs/OutcomeBody" }
+  },
+  "$defs": {
+    "OutcomeBody": {
+      "title": "OutcomeBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["period", "rows"],
+      "properties": {
+        "period": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from", "to"],
+          "properties": {
+            "from": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+            "to": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+          }
+        },
+        "rows": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/OutcomeRow" } },
+        "final": { "type": "boolean", "description": "No later outcome will change these numbers." }
+      }
+    },
+    "OutcomeRow": {
+      "title": "OutcomeRow",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["obligation", "clicks"],
+      "properties": {
+        "obligation": { "$ref": "../defs.schema.json#/$defs/ObligationId" },
+        "clicks": { "$ref": "../defs.schema.json#/$defs/ClickCounts" },
+        "conversions": { "type": "integer", "minimum": 0 },
+        "attested_conversions": { "type": "integer", "minimum": 0, "description": "The part of conversions the payer reported itself instead of a payment provider. They never count toward reputation." },
+        "refunds": { "type": "integer", "minimum": 0 },
+        "revenue": { "$ref": "../defs.schema.json#/$defs/Money" },
+        "earned": { "$ref": "../defs.schema.json#/$defs/Money" },
+        "credits": { "type": "integer", "minimum": 0 },
+        "sources": {
+          "description": "Human clicks by where they came from: a registrable domain such as x.com, or direct (no referrer, as in most email clients), or other. Sources under 5 clicks fold into other.",
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "human"],
+            "properties": {
+              "source": { "type": "string", "pattern": "^(direct|other|[a-z0-9-]+(\\.[a-z0-9-]+)+)$", "maxLength": 253 },
+              "human": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
