@@ -14,6 +14,10 @@ const (
 	// TestingName is the discovery name. The host is in testing and claims
 	// no conformance level.
 	TestingName = "In testing"
+	// DocsPath is the /llms.txt section a cold agent follows from discovery.
+	DocsPath = "/llms.txt#orp-0-3-test-deal"
+	// ProofPageTemplate is the test proof URL with the origin and deal id open.
+	ProofPageTemplate = "{origin}/orp/proof/<deal>"
 )
 
 var partyHostPattern = regexp.MustCompile(`^[A-Za-z0-9.\-]{1,253}(:[0-9]{1,5})?$`)
@@ -77,6 +81,11 @@ func ClaimsMode(mode string) string {
 	}
 }
 
+// discoveryDescription names the test proof page and the llms.txt walkthrough.
+func discoveryDescription() string {
+	return "In testing. A cold agent reads " + DocsPath + ", then POST /orp with message format 0.3. That section links the message schema https://offerrails.com/orp/schema/0.3/envelope.schema.json and docs/protocol/SPEC.md. Public proof page template: " + ProofPageTemplate + ". Execute claims an active deal. Offer Rails does not hold money. L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path."
+}
+
 // DiscoveryDocument is GET /.well-known/orp.json. conformance is omitted:
 // this host does not claim L0, L1, L2, or L3.
 func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
@@ -84,7 +93,8 @@ func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
 		"orp":         []any{Version},
 		"host":        HostParty(dns),
 		"name":        TestingName,
-		"description": "In testing. A cold agent can discover this host, offer, accept, and record a test proof. The deal stays awaiting. Offer Rails does not hold money. Conformance levels L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path.",
+		"description": discoveryDescription(),
+		"docs":        strings.TrimRight(origin, "/") + DocsPath,
 		"endpoint":    origin + "/orp",
 		"suggest":     origin + "/orp/suggest",
 		"join":        origin + "/orp/join",

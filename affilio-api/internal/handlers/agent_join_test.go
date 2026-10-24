@@ -740,6 +740,78 @@ func TestAgentJoinExpiresInRome(t *testing.T) {
 	}
 }
 
+func TestLLMsNamesORPTestDeal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	(&AgentEntry{}).Mount(r)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/llms.txt", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("llms: %d", rec.Code)
+	}
+	root := filepath.Join("..", "..", "..")
+	public, err := os.ReadFile(filepath.Join(root, "ui", "landing", "public", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	built, err := os.ReadFile(filepath.Join(root, "affilio-wp", "admin", "build", "landing-v9", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	phrases := []string{
+		"## ORP 0-3 test deal",
+		"In testing",
+		"/.well-known/orp.json",
+		"POST /orp",
+		"message format 0.3",
+		"The schema is 0.3",
+		"POST /v1/agent-tokens",
+		"POST /orp/join",
+		"{origin}/orp/proof/<deal>",
+		"discover then offer then accept then execute then proof",
+		`{"id":"place","by":"acceptor","action":"place","destination":"https://example.com/notes","proof":["proof_url"]}`,
+		"obligation is the id from step 2",
+		"The acceptor is the second party",
+		"HTTP 403 forbidden",
+		"HTTP 404 not_found",
+		"placement_publish auto",
+		"platform is one of x, blog, newsletter, email, web",
+		"Allowed values: x, blog, newsletter, email, web.",
+		"409 state_conflict",
+		"The deal is in the wrong state.",
+		"Execute does not read proof_url",
+		"obligation state becomes claimed",
+		"The deal stays active",
+		"id is 8 to 128 characters of letters, digits, underscore, dot, colon, or hyphen",
+		"A hello body requires versions",
+		"https://offerrails.com/orp/schema/0.3/envelope.schema.json",
+		"docs/protocol/SPEC.md",
+		"body.terms_hash is optional",
+		"A missing or empty terms_hash is HTTP 400 invalid_message",
+		"Only a well-formed hash that does not match the terms is HTTP 409 terms_mismatch",
+	}
+	for _, item := range []struct {
+		name string
+		body string
+	}{
+		{"fallback", rec.Body.String()},
+		{"public", string(public)},
+		{"built", string(built)},
+	} {
+		if !strings.Contains(item.body, orpTestDealSection) {
+			t.Errorf("%s does not contain the ORP test-deal section", item.name)
+		}
+		if strings.Contains(item.body, "PR #83 lands") || strings.Contains(item.body, "not claimed as live") || strings.Contains(orpTestDealSection, "The deal stays awaiting") {
+			t.Errorf("%s still describes the pre-D-104 host", item.name)
+		}
+		for _, phrase := range phrases {
+			if !strings.Contains(item.body, phrase) {
+				t.Errorf("%s missing %q", item.name, phrase)
+			}
+		}
+	}
+}
+
 func TestLLMsJoinDoesNotRequireGoogle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()

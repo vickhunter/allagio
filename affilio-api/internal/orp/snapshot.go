@@ -19,7 +19,7 @@ func LocalID(prefix string) string {
 	return prefix + base64.RawURLEncoding.EncodeToString(buf[:])
 }
 
-// ProofURL is the same-origin page an execute proof_url must name.
+// ProofURL is this host's public test proof page for a deal.
 func ProofURL(origin, dealID string) string {
 	return strings.TrimRight(origin, "/") + "/orp/proof/" + dealID
 }

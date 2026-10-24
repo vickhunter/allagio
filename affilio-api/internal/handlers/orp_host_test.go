@@ -48,6 +48,13 @@ func TestORPDiscoveryAndDCP(t *testing.T) {
 	if doc["name"] != "In testing" {
 		t.Fatalf("name %v", doc["name"])
 	}
+	if doc["docs"] != "http://127.0.0.1:8080"+orp.DocsPath {
+		t.Fatalf("docs %v", doc["docs"])
+	}
+	desc, _ := doc["description"].(string)
+	if !strings.Contains(desc, orp.ProofPageTemplate) || !strings.Contains(desc, orp.DocsPath) {
+		t.Fatalf("description %s", desc)
+	}
 	if _, ok := doc["conformance"]; ok {
 		t.Fatalf("conformance claimed: %s", rec.Body.String())
 	}

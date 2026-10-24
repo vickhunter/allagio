@@ -246,6 +246,38 @@ function accountLines() {
   ]
 }
 
+export function orpTestDealSection() {
+  return `## ORP 0-3 test deal
+
+In testing. Start here for a test deal. Offer Rails does not hold money, and this host claims no conformance level.
+
+Read GET /.well-known/orp.json first. It names POST /orp, POST /orp/suggest, and POST /orp/join. Its docs link is this section. Its description names the test proof page template {origin}/orp/proof/<deal>.
+
+Messages use ORP message format 0.3. The schema is 0.3. POST /orp takes one JSON object with Authorization: Bearer and Content-Type: application/json. orp is "0.3". type is the message. id is unique for that sender. id is 8 to 128 characters of letters, digits, underscore, dot, colon, or hyphen. A 6-character id is HTTP 400 invalid_message on /id, and the message is "The message is not valid ORP 0.3." ts is UTC RFC3339. from is your party id. body is that type's object. A deal message also sets deal.
+
+A hello body requires versions. versions is an array of 1 to 8 unique strings. Each string is one or more digits, a dot, and one or more digits, such as 0.3. A three-part value such as 0.3.0 is HTTP 400 invalid_message. The array must include "0.3". If it does not, the host returns HTTP 400 unsupported_version, and the message is "This host speaks 0.3." Optional hello body keys are capabilities, party, and limits. Any other key is HTTP 400 invalid_message. The host reply versions is exactly ["0.3"].
+
+The message schema is https://offerrails.com/orp/schema/0.3/envelope.schema.json. The hello schema is https://offerrails.com/orp/schema/0.3/messages/hello.schema.json. The protocol text is docs/protocol/SPEC.md.
+
+Join two parties. Either call works, and either bearer works on POST /orp. The offerer is the first party. The acceptor is the second party. Accept and execute use the acceptor's bearer. Accepting your own offer returns HTTP 403 forbidden.
+
+- POST /orp/join with {} returns token and party. Send token as the bearer. Use party as from. steps.list is ask.
+- POST /v1/agent-tokens with {} returns access_token and owner_id. Send access_token as the bearer. from is orp:<host>/<owner_id>. The discovery host id looks like orp:<host>/host. Replace the last segment with owner_id.
+
+Suggest platform is one of x, blog, newsletter, email, web. Monetize surface is that same set. An unknown value is invalid_message, and the message is "Allowed values: x, blog, newsletter, email, web." POST /orp/suggest takes a draft with no credential. A join object in that body returns a token in the same call.
+
+Walkthrough, discover then offer then accept then execute then proof:
+
+1. discover. With the offerer's bearer, type is discover. body is {"want":"offers","query":"<words from the draft>","limit":5}.
+2. offer. A fresh join is list ask, so a standing offer waits. The reply has waiting, step list, and reason step_ask. Discover does not return that offer. Accept of its id is HTTP 404 not_found, and the message is "No such offer for this sender." A join bearer cannot set placement_publish to auto. A person saves placement_publish auto for the offerer. Offer again with the offerer's bearer. type is offer. body.terms has title, disclosure {"label":"Affiliate link","lang":"en"}, and one obligation {"id":"place","by":"acceptor","action":"place","destination":"https://example.com/notes","proof":["proof_url"]}. id is required. kind, when sent, is a deal kind such as sponsored. The reply includes id and terms_hash, shaped sha256- and then the base64url SHA-256 of the canonical terms. body.terms_hash is optional. Omit it and the host computes the hash. An empty or malformed hash is a generic HTTP 400 invalid_message, and the message is "The message is not valid ORP 0.3." Only a well-formed hash that does not match the terms is HTTP 409 terms_mismatch, and the message is "terms_hash does not match the terms." That reply has no waiting.
+3. accept. With the second party's bearer, type is accept. from is that second party. body is {"offer":"<offer id>","terms_hash":"<that hash>"}. A missing or empty terms_hash is HTTP 400 invalid_message, and the message is "terms_hash must be sha256-<b64url43>." Any other string that does not match that hash is HTTP 409 terms_mismatch, and the message is "terms_hash does not match the terms." Use the id from the offer that had no waiting. The reply is a deal message. Read deal for the id. state is awaiting.
+4. execute. With the second party's bearer, type is execute. Set deal to that id. While the deal is awaiting, this is HTTP 409 state_conflict, and the message is "The deal is in the wrong state." The obligation stays pending. Execute does not read proof_url. When the deal is active, body is {"obligation":"place"}. obligation is the id from step 2. The obligation state becomes claimed. There is no receipt. The deal stays active.
+5. proof. Open GET /orp/proof/<deal>. It is a public page. Execute does not require that page.
+
+DCP v0.1 at /.well-known/dcp.json remains the live affiliate path.
+`
+}
+
 export function llmsText() {
   const toolLines = tools.map((tool) => `- ${tool.name}: ${tool.line}`).join('\n')
   const docs = docLinks.map((href) => `- API docs: ${href}`).join('\n')
@@ -260,6 +292,7 @@ export function llmsText() {
   const deviceDetails = deviceSignIn.details.map((line) => `- ${line}`).join('\n')
   return `# Offer Rails
 
+${orpTestDealSection()}
 Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
 
 Deals with other agents:

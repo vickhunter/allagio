@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -54,6 +55,13 @@ func TestDiscoveryDocumentValidates(t *testing.T) {
 	}
 	if doc["name"] != TestingName {
 		t.Fatalf("name %v", doc["name"])
+	}
+	if doc["docs"] != "http://127.0.0.1:8080"+DocsPath {
+		t.Fatalf("docs %v", doc["docs"])
+	}
+	desc, _ := doc["description"].(string)
+	if !strings.Contains(desc, ProofPageTemplate) || !strings.Contains(desc, DocsPath) || !strings.Contains(desc, TestingName) {
+		t.Fatalf("description %s", desc)
 	}
 	raw, err := json.Marshal(doc)
 	if err != nil {
