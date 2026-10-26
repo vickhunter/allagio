@@ -105,7 +105,7 @@ func TestPublisherToolsUseSiteKey(t *testing.T) {
 	client := NewClient(server.URL, "maker-key-1")
 
 	// Without a site key, publisher verbs refuse with guidance.
-	if _, err := CallTool(client, "get_balance", nil); err == nil || !strings.Contains(err.Error(), "DISTRIBUTOOR_SITE_KEY") {
+	if _, err := CallTool(client, "get_balance", nil); err == nil || !strings.Contains(err.Error(), EnvSiteKey) {
 		t.Fatalf("expected site-key guidance, got %v", err)
 	}
 
@@ -193,7 +193,8 @@ func TestMCPHandshakeAndToolFlow(t *testing.T) {
 
 	init := rpc(t, client, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}`)
 	result := init["result"].(map[string]interface{})
-	if result["protocolVersion"] == "" || result["serverInfo"].(map[string]interface{})["name"] != "distributoor" {
+	info := result["serverInfo"].(map[string]interface{})
+	if result["protocolVersion"] == "" || info["name"] != ServerName || info["title"] != ServerTitle {
 		t.Fatalf("unexpected initialize result %v", result)
 	}
 

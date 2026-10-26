@@ -7,9 +7,10 @@ exposes and what its attribution guarantees mean. An agent that speaks DCP can
 take a product from zero → assessed → listed → earning on any compliant
 network without learning a proprietary dashboard.
 
-v0.1 is **extracted from the working Distributoor network in this repository**
+v0.1 is **extracted from the working Offer Rails network in this repository**
 (spec follows implementation). Every verb, schema, and semantic documented here
-is implemented and tested in `affilio-api/`.
+is implemented and tested in `affilio-api/`. The name an agent sees is
+`offer-rails-mcp`.
 
 | Document | Contents |
 |---|---|
@@ -32,4 +33,6 @@ A DCP endpoint MUST:
    machine-actionable `remediation` strings.
 
 Reference implementation: this repository. Reference client + MCP server:
-`affilio-api/internal/dcp`, `affilio-api/cmd/distributoor-mcp`.
+`affilio-api/internal/dcp`, `affilio-api/cmd/distributoor-mcp` (that directory
+name stays; the server reports `offer-rails-mcp`). The npm package
+`offer-rails` is not published yet.

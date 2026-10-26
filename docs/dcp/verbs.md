@@ -3,7 +3,7 @@
 ## Maker verbs (MCP tools)
 
 Exposed by the network's MCP server; authenticated by the maker api key
-(env `DISTRIBUTOOR_API_KEY` for the reference server). Input fields marked *
+(env `OFFERRAILS_API_KEY` for the reference server). Input fields marked *
 are required.
 
 | Tool | Input | Result |
@@ -35,7 +35,7 @@ readiness error also includes `reason` (`claims`, `head`, or `relevance`) and
 
 The demand side is served by publisher platforms (WordPress plugin today) over
 HTTP under the publisher's site key, and the same verbs are exposed as MCP
-tools (site key via `DISTRIBUTOOR_SITE_KEY` on the stdio server, or the
+tools (site key via `OFFERRAILS_SITE_KEY` on the stdio server, or the
 `X-API-Key` header on the hosted transport):
 
 | Tool | HTTP binding | Result |
@@ -47,9 +47,12 @@ tools (site key via `DISTRIBUTOOR_SITE_KEY` on the stdio server, or the
 
 ## Transports
 
-Both verb sets are served two ways: a **stdio** MCP server (`distributoor-mcp`,
-spawned by the Agent Plugin; env `DISTRIBUTOOR_API_URL`,
-`DISTRIBUTOOR_API_KEY`, `DISTRIBUTOOR_SITE_KEY`) and a **hosted
-streamable-HTTP** endpoint at `POST /v1/mcp` (one JSON-RPC message per POST;
+Both verb sets are served two ways: a **stdio** MCP server whose reported
+name is `offer-rails-mcp` (the source directory stays
+`affilio-api/cmd/distributoor-mcp`; env `OFFERRAILS_API_URL`,
+`OFFERRAILS_API_KEY`, `OFFERRAILS_SITE_KEY`) and a **hosted
+streamable-HTTP** endpoint at `POST /mcp` when a public base is set, or
+`POST /v1/mcp` otherwise (one JSON-RPC message per POST;
 maker auth via `X-Maker-Key` or `Authorization: Bearer`, publisher auth via
-`X-API-Key`; notifications are acknowledged with 202).
+`X-API-Key`; notifications are acknowledged with 202). The npm package
+`offer-rails` is not published yet. Use the hosted MCP URL.

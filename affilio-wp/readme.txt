@@ -34,7 +34,7 @@ AI affiliate copilot for WordPress. Connect from Settings, then review recommend
 * Creating a placement retries once when the first POST is unreachable or returns 503.
 
 = 0.1.27 =
-* The disconnected Affilio Dashboard card is drawn by the dashboard script. The server sends that same card only inside noscript, for a browser with JavaScript off.
+* The disconnected Offer Rails Dashboard card is drawn by the dashboard script. The server sends that same card only inside noscript, for a browser with JavaScript off.
 * Settings loads the admin stylesheet, so the connection status keeps its spacing.
 * "Key saved (…)" can be translated. Italian (it_IT) uses "Chiave salvata (…)".
 
@@ -46,7 +46,7 @@ AI affiliate copilot for WordPress. Connect from Settings, then review recommend
 * The "Vedi il prodotto" link is an inline-block at least 44px tall, so it is a tap target on a 390px-wide screen.
 
 = 0.1.24 =
-* The five-minute box sync also checks published posts and pages whose content contains an Affilio box, even when that box is missing from the local index. A draft is not scanned. A placement revoked on the server is removed and acknowledged.
+* The five-minute box sync also checks published posts and pages whose content contains an Offer Rails box, even when that box is missing from the local index. A draft is not scanned. A placement revoked on the server is removed and acknowledged.
 
 = 0.1.23 =
 * If the five-minute box sync is not scheduled, the next load schedules it again. A second load does not add another event. A placement revoked on the server is removed from the post when that sync runs.
@@ -74,7 +74,7 @@ AI affiliate copilot for WordPress. Connect from Settings, then review recommend
 * Settings stores a plugin key for box acknowledgements. The field renders empty, and an empty save keeps the saved key.
 
 = 0.1.18 =
-* Inserting or removing an Affilio block does not create a WordPress post revision. The revision skip runs last, so another plugin cannot turn revisions back on for that write.
+* Inserting or removing an Offer Rails block does not create a WordPress post revision. The revision skip runs last, so another plugin cannot turn revisions back on for that write.
 * If a refused receipt cannot be rolled back, even after one retry, the admin sees that the box is live without a receipt.
 
 = 0.1.14 =
@@ -97,7 +97,7 @@ From WP-CLI, when it is loaded:
 `--dry-run` prints the post change and does not call the API. A local revert exits 0 even when the API result is "API: non raggiungibile, riprovo più tardi". Nothing matched locally exits non-zero.
 
 = 0.1.13 =
-* A placement receipt accepts a disclosure already written in the post. The setting does not skip Affilio's disclosure unless that post text actually discloses.
+* A placement receipt accepts a disclosure already written in the post. The setting does not skip the Offer Rails disclosure unless that post text actually discloses.
 
 = 0.1.12 =
 * Distribution matches listed offers that have no payment provider, and explains an empty result in Italian.

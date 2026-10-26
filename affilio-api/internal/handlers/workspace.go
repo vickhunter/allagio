@@ -117,8 +117,10 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		}
 		public.GET("/downloads/"+installerArchive, h.serveInstaller)
 		public.GET("/downloads/"+legacyInstallerArchive, h.serveInstaller)
-		public.GET("/downloads/affilio.zip", h.DownloadWordPress)
-		public.HEAD("/downloads/affilio.zip", h.DownloadWordPress)
+		public.GET("/downloads/"+pluginZipName, h.DownloadWordPress)
+		public.HEAD("/downloads/"+pluginZipName, h.DownloadWordPress)
+		public.GET("/downloads/"+pluginZipOnDisk, h.DownloadWordPress)
+		public.HEAD("/downloads/"+pluginZipOnDisk, h.DownloadWordPress)
 	}
 }
 
@@ -141,6 +143,11 @@ func (h *HostedHandler) requireOperator(c *gin.Context) {
 const (
 	installerArchive       = "offer-rails-0.1.0.tgz"
 	legacyInstallerArchive = "distributoor-setup-0.1.0.tgz"
+	// pluginZipOnDisk is the file the release image writes. The browser
+	// download name is pluginZipName. The old URL stays so an existing link
+	// still downloads the same archive.
+	pluginZipOnDisk = "affilio.zip"
+	pluginZipName   = "offer-rails.zip"
 )
 
 func (h *HostedHandler) installCommand() string {
@@ -204,7 +211,12 @@ func (h *HostedHandler) writeBuiltHTML(c *gin.Context, name string) {
 	body := []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · Page not found</title></head><body><header><a href="/">Offer Rails</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a><a href="/agents">Agents</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main><h1>That page is not on Offer Rails.</h1><p>The address does not match a page on this site.</p><p><a href="/">Home</a></p><p><a href="/agents">Agents</a></p></main></body></html>`)
 	if h.AssetsPath != "" {
 		if file, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", name, "index.html")); err == nil {
-			body = file
+			rendered, renderErr := executeLandingTemplate(name, file, h.landingView())
+			if renderErr != nil {
+				c.Status(http.StatusInternalServerError)
+				return
+			}
+			body = rendered
 		}
 	}
 	c.Data(http.StatusNotFound, "text/html; charset=utf-8", body)
@@ -256,20 +268,36 @@ func (h *HostedHandler) builtPage(c *gin.Context, name string) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", body)
 }
 
+func (h *HostedHandler) landingView() gin.H {
+	_, installerReady := h.installerPath()
+	_, pluginErr := os.Stat(filepath.Join(h.DownloadsPath, pluginZipOnDisk))
+	return gin.H{"BaseURL": h.BaseURL, "InstallCommand": h.installCommand(), "InstallerReady": installerReady, "PluginReady": h.DownloadsPath != "" && pluginErr == nil}
+}
+
+func executeLandingTemplate(name string, src []byte, data gin.H) ([]byte, error) {
+	page, err := template.New(name).Parse(string(src))
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	if err = page.Execute(&buf, data); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func (h *HostedHandler) landing(c *gin.Context, name string) {
-	page, err := template.ParseFiles(filepath.Join(h.AssetsPath, name))
+	src, err := os.ReadFile(filepath.Join(h.AssetsPath, name))
 	if err != nil {
 		c.Status(500)
 		return
 	}
-	_, installerReady := h.installerPath()
-	_, pluginErr := os.Stat(filepath.Join(h.DownloadsPath, "affilio.zip"))
-	var buf bytes.Buffer
-	if err = page.Execute(&buf, gin.H{"BaseURL": h.BaseURL, "InstallCommand": h.installCommand(), "InstallerReady": installerReady, "PluginReady": h.DownloadsPath != "" && pluginErr == nil}); err != nil {
+	body, err := executeLandingTemplate(name, src, h.landingView())
+	if err != nil {
 		c.Abort()
 		return
 	}
-	c.Data(http.StatusOK, "text/html; charset=utf-8", stampLandingLinks(buf.Bytes(), landingSourceFrom(c)))
+	c.Data(http.StatusOK, "text/html; charset=utf-8", stampLandingLinks(body, landingSourceFrom(c)))
 }
 
 func (h *HostedHandler) DownloadWordPress(c *gin.Context) {
@@ -279,7 +307,7 @@ func (h *HostedHandler) DownloadWordPress(c *gin.Context) {
 		return
 	}
 	c.Header("Content-Type", "application/zip")
-	c.Header("Content-Disposition", `attachment; filename="affilio.zip"`)
+	c.Header("Content-Disposition", `attachment; filename="`+pluginZipName+`"`)
 	c.Header("Content-Length", strconv.Itoa(len(payload)))
 	if c.Request.Method == http.MethodHead {
 		c.Status(http.StatusOK)
@@ -293,7 +321,7 @@ func (h *HostedHandler) wordpressZip() ([]byte, int) {
 	if h.DownloadsPath == "" {
 		return nil, http.StatusServiceUnavailable
 	}
-	raw, err := os.ReadFile(filepath.Join(h.DownloadsPath, "affilio.zip"))
+	raw, err := os.ReadFile(filepath.Join(h.DownloadsPath, pluginZipOnDisk))
 	if err != nil {
 		return nil, http.StatusServiceUnavailable
 	}

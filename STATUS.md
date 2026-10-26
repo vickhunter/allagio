@@ -1,3 +1,13 @@
+## October 26 — Offer Rails connector names (D-056)
+
+An outside agent sees one name. `/.well-known/dcp.json`, the stdio process, and both MCP `initialize` responses (`POST /v1/mcp` and the hosted `POST /mcp` server) use `offer-rails-mcp` and the title Offer Rails. That pair is `dcp.ServerName` and `dcp.ServerTitle`.
+
+The stdio process reads `OFFERRAILS_API_URL`, `OFFERRAILS_API_KEY`, and `OFFERRAILS_SITE_KEY` first. A blank or unset value falls back to `DISTRIBUTOOR_API_URL`, `DISTRIBUTOOR_API_KEY`, and `DISTRIBUTOOR_SITE_KEY`, so a host that still sets the old names keeps working. Discovery and the served docs name only the new variables. The npm package `offer-rails` is not published. Served install text says it is coming soon and points at the hosted MCP URL or the installer archive already on this host (`npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>`).
+
+The browser download name is `offer-rails.zip` at `/downloads/offer-rails.zip`. The release image still writes `affilio.zip`, and `/downloads/affilio.zip` still serves that file. Unknown pages such as `/version` execute the 404 template, so the `or-install` and `or-plugin` meta tags render.
+
+Left unchanged on purpose: the Go module path `affilio-api`, the `cmd/distributoor-mcp` directory, database table names and `source=distributoor`, the WordPress folder `affilio-wp`, slug, text domain, `Affilio_*` prefixes, the `affilio/v1` REST namespace, the HTML marker `distributoor-placement`, skill directory names, the installer config key `mcpServers.distributoor`, `plugin.json` name `distributoor`, and the legacy installer URL `/downloads/distributoor-setup-0.1.0.tgz`. `CLAIMS_CHECK` is unchanged. No migration. No deploy.
+
 ## October 24 — ORP activate and served docs (D-107)
 
 A cold agent can follow `/llms.txt` and the SPEC through to proof. The API serves the ORP 0.3 schemas at `GET /orp/schemas/` and `GET /orp/schemas/<name>.json`, the examples at `GET /orp/examples/`, the protocol at `GET /orp/spec`, and the ranked pitfalls at `GET /orp/gaps`. Schema `$id` values and the document links in the SPEC, both `/llms.txt` copies, and the Go fallback use `https://offer-rails.onrender.com`. The served docs do not name `offerrails.com` and do not say open source. An unknown go link uses the public host.

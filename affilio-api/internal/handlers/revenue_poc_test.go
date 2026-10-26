@@ -363,7 +363,7 @@ func startStdioAgent(t *testing.T, binary, apiURL, makerKey, siteKey string) *st
 	t.Helper()
 	cmd := exec.Command(binary)
 	for _, value := range os.Environ() {
-		if !strings.HasPrefix(value, "DISTRIBUTOOR_") {
+		if !strings.HasPrefix(value, "DISTRIBUTOOR_") && !strings.HasPrefix(value, "OFFERRAILS_") {
 			cmd.Env = append(cmd.Env, value)
 		}
 	}

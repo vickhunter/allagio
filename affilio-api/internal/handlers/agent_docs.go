@@ -50,6 +50,10 @@ Offer Rails is a publisher and maker workflow. Tools return offers, matches, and
 ## Start
 
 ` + "`POST /v1/device/code`" + ` then open verification_uri. Poll ` + "`POST /v1/device/token`" + ` until it returns a project key.
+
+### Stdio
+
+The MCP server name is offer-rails-mcp. The npm package offer-rails is not published yet. It is coming soon. Use the hosted MCP URL. When the hosted installer archive is on this origin, the command is npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>. The environment names are OFFERRAILS_API_URL, OFFERRAILS_API_KEY, and OFFERRAILS_SITE_KEY.
 `
 
 func llmsBody() string {

@@ -60,7 +60,7 @@ func bodyWithout(args map[string]interface{}, keys ...string) map[string]interfa
 var Tools = []Tool{
 	{
 		Name:        "register_maker",
-		Description: "Register a new maker account on the Distributoor network. Returns the maker_id and the api_key to use for every other tool (set it as DISTRIBUTOOR_API_KEY).",
+		Description: "Register a new maker account on Offer Rails. Returns the maker_id and the api_key to use for every other tool (set it as " + EnvAPIKey + ").",
 		InputSchema: schema([]string{"email"}, map[string]interface{}{
 			"email": str("Maker's email address (unique)"),
 			"name":  str("Display name"),

@@ -67,7 +67,7 @@ func (h *HostedHandler) MCPTransport() http.Handler {
 		if !ok {
 			return nil
 		}
-		s := mcp.NewServer(&mcp.Implementation{Name: "distributoor", Version: "0.3.0"}, &mcp.ServerOptions{Instructions: "Use existing products and publishing tools. Prepare a placement, send its owner approval URL to the human, and wait for approval before committing. Never ask for payment secrets in chat. Agents cannot approve placements, connect Stripe or confirm receipt of money. suggest_monetization takes a draft and returns up to three offers with a tracked link and a disclosure line. It does not publish."})
+		s := mcp.NewServer(&mcp.Implementation{Name: dcp.ServerName, Title: dcp.ServerTitle, Version: "0.3.0"}, &mcp.ServerOptions{Instructions: "Use existing products and publishing tools. Prepare a placement, send its owner approval URL to the human, and wait for approval before committing. Never ask for payment secrets in chat. Agents cannot approve placements, connect Stripe or confirm receipt of money. suggest_monetization takes a draft and returns up to three offers with a tracked link and a disclosure line. It does not publish."})
 		bearer := strings.Fields(r.Header.Get("Authorization"))[1]
 		for _, tool := range hostedTools(g) {
 			readOnly := strings.HasPrefix(tool.Name, "get_") || strings.HasPrefix(tool.Name, "list_") || tool.Name == "find_opportunities" || tool.Name == "preview_revenue" || tool.Name == "suggest_monetization"
