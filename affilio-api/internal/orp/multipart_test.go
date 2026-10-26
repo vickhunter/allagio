@@ -2,6 +2,7 @@ package orp
 
 import (
 	"encoding/json"
+	"math/rand"
 	"strings"
 	"testing"
 	"time"
@@ -95,6 +96,15 @@ func TestClickClass(t *testing.T) {
 	opera := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 OPR/116.0.0.0"
 	abbott := "Mozilla/5.0 (Linux; Android 10; Abbott) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 	robotek := "Mozilla/5.0 (Linux; Android 10; Robotek) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+	brave := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Brave/1.73.91"
+	ddg := "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1 Ddg/7.140.0"
+	instagram := "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 321.0.0.0.0 (iPhone15,3; iOS 17_4; en_US; en; scale=3.00; 1290x2796; 123456789)"
+	facebook := "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/450.0.0.29.118;FBBV/123456;FBDV/iPhone15,3;FBMD/iPhone;FBSN/iOS;FBSV/17.4;FBSS/3;FBID/phone;FBLC/en_US;FBOP/5]"
+	linkedin := "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [LinkedInApp]/9.29.5093"
+	telegramWeb := "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.0.0 Mobile Safari/537.36 Telegram-Android/11.1.2"
+	whatsappChrome := "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.0.0 Mobile Safari/537.36 WhatsApp/2.24.20.78"
+	applebotMac := "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)"
+	applebotPhone := "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1 (Applebot/0.1; +http://www.apple.com/go/applebot)"
 	cases := []struct {
 		name, method, ua, purpose, query, want string
 	}{
@@ -110,7 +120,18 @@ func TestClickClass(t *testing.T) {
 		{"opera", "GET", opera, "", "", "human"},
 		{"abbott device", "GET", abbott, "", "", "human"},
 		{"robotek device", "GET", robotek, "", "", "human"},
+		{"brave", "GET", brave, "", "", "human"},
+		{"duckduckgo", "GET", ddg, "", "", "human"},
+		{"instagram", "GET", instagram, "", "", "human"},
+		{"facebook in app", "GET", facebook, "", "", "human"},
+		{"linkedin in app", "GET", linkedin, "", "", "human"},
+		{"telegram webview", "GET", telegramWeb, "", "", "human"},
+		{"whatsapp opened chrome", "GET", whatsappChrome, "", "", "human"},
+		{"nodebb", "GET", "nodebb/1.2.3", "", "", "human"},
+		{"comment word u", "GET", "Mozilla/5.0 (U) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", "", "", "human"},
 		{"preview product name", "GET", "Slack-Preview/1.0", "", "", "human"},
+		{"unclosed cubot", "GET", "(Linux; Android 11; CUBOT NOTE 20", "", "", "human"},
+		{"unclosed khtml", "GET", "(KHTML, like Gecko", "", "", "human"},
 		{"head", "HEAD", chrome, "", "", "preview"},
 		{"head with googlebot", "HEAD", "Googlebot/2.1", "", "", "preview"},
 		{"head with cubot", "HEAD", cubot, "", "", "preview"},
@@ -143,6 +164,31 @@ func TestClickClass(t *testing.T) {
 		{"crawler", "GET", "generic-crawler/1.0", "", "", "bot"},
 		{"spider", "GET", "Mozilla/5.0 (compatible; Baiduspider/2.0)", "", "", "bot"},
 		{"slurp", "GET", "Mozilla/5.0 (compatible; Yahoo! Slurp)", "", "", "bot"},
+		{"applebot mac", "GET", applebotMac, "", "", "bot"},
+		{"applebot iphone", "GET", applebotPhone, "", "", "bot"},
+		{"applebot compatible", "GET", "Mozilla/5.0 (compatible; Applebot/0.1; +http://www.apple.com/go/applebot)", "", "", "bot"},
+		{"unclosed pixel bot", "GET", "(Linux; Pixel bot/1.0", "", "", "bot"},
+		{"unclosed android pixel bot", "GET", "(Linux; Android 11; Pixel bot/1.0", "", "", "bot"},
+		{"mediapartners", "GET", "Mozilla/5.0 (compatible; Mediapartners-Google/2.1; +http://www.google.com/bot.html)", "", "", "bot"},
+		{"adsbot", "GET", "AdsBot-Google (+http://www.google.com/adsbot.html)", "", "", "bot"},
+		{"adsbot mobile", "GET", "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.69 Mobile Safari/537.36 (compatible; AdsBot-Google-Mobile; +http://www.google.com/mobile/adsbot.html)", "", "", "bot"},
+		{"skype preview", "GET", "SkypeUriPreview Preview/0.5", "", "", "bot"},
+		{"java", "GET", "Java/17.0.1", "", "", "bot"},
+		{"apache httpclient", "GET", "Apache-HttpClient/4.5.13 (Java/11.0.11)", "", "", "bot"},
+		{"iframely", "GET", "Iframely/1.3.1 (+https://iframely.com/docs/about)", "", "", "bot"},
+		{"node", "GET", "node", "", "", "bot"},
+		{"node version", "GET", "node/20.11.0", "", "", "bot"},
+		{"undici", "GET", "undici", "", "", "bot"},
+		{"undici version", "GET", "undici/6.19.8", "", "", "bot"},
+		{"google inspection", "GET", "Mozilla/5.0 (compatible; Google-InspectionTool/1.0;)", "", "", "bot"},
+		{"google read aloud", "GET", "Mozilla/5.0 (Linux; Android 7.0; SM-G930V Build/NRD90M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.125 Mobile Safari/537.36 (compatible; Google-Read-Aloud; +https://support.google.com/webmasters/answer/1061943)", "", "", "bot"},
+		{"storebot", "GET", "Mozilla/5.0 (X11; Linux x86_64; Storebot-Google/1.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36", "", "", "bot"},
+		{"lighthouse", "GET", "Lighthouse/10.4.0", "", "", "bot"},
+		{"chrome lighthouse", "GET", "Mozilla/5.0 (Linux; Android 7.0; Moto G (4)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4590.2 Mobile Safari/537.36 Chrome-Lighthouse", "", "", "bot"},
+		{"ptst", "GET", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 PTST/240201.144200", "", "", "bot"},
+		{"pingdom", "GET", "Pingdom.com_bot_version_1.4_(http://www.pingdom.com/)", "", "", "bot"},
+		{"uptimerobot", "GET", "Mozilla/5.0 (compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)", "", "", "bot"},
+		{"datadog", "GET", "Datadog/Synthetics", "", "", "bot"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -150,6 +196,40 @@ func TestClickClass(t *testing.T) {
 				t.Fatalf("ClickClass(%q, %q) = %s, want %s", tc.method, tc.ua, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestClickClassFuzzNoPanic(t *testing.T) {
+	const size = 100 * 1024
+	rng := rand.New(rand.NewSource(20261026))
+	buf := make([]byte, size)
+	for i := range buf {
+		buf[i] = byte(rng.Intn(95) + 32)
+	}
+	for i := 0; i+8 < len(buf); i += 97 {
+		copy(buf[i:], []byte("(bot/1;"))
+	}
+	start := time.Now()
+	check := func(ua string) {
+		t.Helper()
+		switch got := ClickClass("GET", ua, "", ""); got {
+		case "bot", "human", "preview", "test":
+		default:
+			t.Fatalf("class %s", got)
+		}
+	}
+	check(string(buf))
+	for off := 0; off < len(buf); off += 4096 {
+		end := off + 4096
+		if end > len(buf) {
+			end = len(buf)
+		}
+		check(string(buf[off:end]))
+	}
+	check(strings.Repeat("(", size))
+	check(strings.Repeat("(Linux; Android 11; CUBOT NOTE 20", 2048))
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Fatalf("100KB scan took %s", elapsed)
 	}
 }
 

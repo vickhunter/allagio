@@ -36,12 +36,18 @@ var (
 		"disclosure": true, "starts": true, "ends": true,
 		"checked_at": true, "expires_at": true, "claims": true,
 	}
+	// clientExact are product tokens that match the whole token only.
+	// node must not match nodebb. java must not match a longer name.
+	clientExact = []string{"node", "undici", "java", "ptst"}
 	// clientPrefixes are product-token prefixes. A hit is class bot.
 	// Longer names come first. A device name inside parentheses is not a product token.
 	clientPrefixes = []string{
 		"python-requests", "python-urllib", "go-http-client", "facebookexternalhit",
-		"headlesschrome", "node-fetch", "headless", "libwww", "scrapy", "okhttp",
-		"axios", "postman", "whatsapp", "wget", "curl",
+		"mediapartners-google", "google-inspectiontool", "google-read-aloud",
+		"chrome-lighthouse", "apache-httpclient", "skypeuripreview",
+		"adsbot-google", "storebot-google", "headlesschrome", "uptimerobot",
+		"node-fetch", "headless", "lighthouse", "iframely", "pingdom", "datadog",
+		"libwww", "scrapy", "okhttp", "axios", "postman", "wget", "curl",
 	}
 )
 
@@ -497,11 +503,11 @@ func ClickClass(method, ua, purpose, rawQuery string) string {
 }
 
 // automationClient is true for a known automation product token.
-// A token is the name before "/", or the name after "compatible;".
-// Text inside parentheses is a comment, so CUBOT NOTE 20 stays human.
-// bot matches when that token ends in bot or bot-..., or is bot.html.
-// crawler, spider, and slurp match anywhere. preview, discord, whatsapp,
-// telegram, and bot are not bare substrings.
+// A top-level token is the name before "/". Inside every parenthesis,
+// including the tail of an unclosed "(", a semicolon entry counts when it
+// has name/version shape, or when the whole entry is one named client.
+// CUBOT NOTE 20, preview, Linux, and U stay comment text.
+// crawler, spider, and slurp match anywhere. The scan is one pass.
 func automationClient(ua string) bool {
 	low := strings.ToLower(ua)
 	if strings.Contains(low, "crawler") || strings.Contains(low, "spider") || strings.Contains(low, "slurp") {
@@ -510,12 +516,24 @@ func automationClient(ua string) bool {
 	if strings.Contains(low, "/bot.html") || strings.HasPrefix(low, "bot.html") {
 		return true
 	}
-	for _, token := range productTokens(low) {
+	tokens := productTokens(low)
+	whatsapp := false
+	chrome := false
+	for _, token := range tokens {
+		if token == "whatsapp" {
+			whatsapp = true
+			continue
+		}
+		if token == "chrome" || token == "crios" {
+			chrome = true
+		}
 		if botProduct(token) || namedClient(token) {
 			return true
 		}
 	}
-	return false
+	// WhatsApp/2.x alone is the link preview. Chrome opened from WhatsApp
+	// keeps that token beside Chrome and stays human.
+	return whatsapp && !chrome
 }
 
 func botProduct(token string) bool {
@@ -524,6 +542,11 @@ func botProduct(token string) bool {
 }
 
 func namedClient(token string) bool {
+	for _, name := range clientExact {
+		if token == name {
+			return true
+		}
+	}
 	for _, name := range clientPrefixes {
 		if token == name || strings.HasPrefix(token, name) {
 			return true
@@ -538,7 +561,7 @@ func productTokens(ua string) []string {
 	for i < len(ua) {
 		if ua[i] == '(' {
 			end, inner := commentSpan(ua, i)
-			out = append(out, compatibleNames(inner)...)
+			out = append(out, commentProducts(inner)...)
 			i = end
 			continue
 		}
@@ -556,24 +579,55 @@ func productTokens(ua string) []string {
 	return out
 }
 
-func compatibleNames(comment string) []string {
+// commentProducts reads one parenthesis body. Entries without name/version
+// shape are ignored, except a named client that is the whole entry.
+func commentProducts(comment string) []string {
 	var out []string
-	rest := comment
-	for {
-		i := strings.Index(rest, "compatible;")
-		if i < 0 {
-			return out
+	start := 0
+	for i := 0; i <= len(comment); i++ {
+		if i < len(comment) && comment[i] != ';' {
+			continue
 		}
-		rest = strings.TrimLeft(rest[i+len("compatible;"):], " \t")
-		j := 0
-		for j < len(rest) && isProductChar(rest[j]) {
+		entry := strings.TrimSpace(comment[start:i])
+		if name, ok := soleProduct(entry); ok && namedClient(name) {
+			out = append(out, name)
+		}
+		out = append(out, versionedNames(entry)...)
+		start = i + 1
+	}
+	return out
+}
+
+func versionedNames(entry string) []string {
+	var out []string
+	i := 0
+	for i < len(entry) {
+		if !isProductChar(entry[i]) {
+			i++
+			continue
+		}
+		j := i + 1
+		for j < len(entry) && isProductChar(entry[j]) {
 			j++
 		}
-		if j > 0 {
-			out = append(out, rest[:j])
+		if j < len(entry) && entry[j] == '/' {
+			out = append(out, entry[i:j])
 		}
-		rest = rest[j:]
+		i = j
 	}
+	return out
+}
+
+func soleProduct(entry string) (string, bool) {
+	if entry == "" {
+		return "", false
+	}
+	for i := 0; i < len(entry); i++ {
+		if !isProductChar(entry[i]) {
+			return "", false
+		}
+	}
+	return entry, true
 }
 
 func commentSpan(ua string, open int) (int, string) {

@@ -1552,6 +1552,39 @@ func TestORP04CubotVerifies(t *testing.T) {
 	}
 }
 
+func TestORP04ApplebotLeavesPlacePending(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, link, offerer := openActivePlace(t, db, r)
+	const applebot = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)"
+	first := clickClassed(t, r, link, applebot)
+	if first.Code != http.StatusFound || !strings.Contains(first.Header().Get("Location"), "example.com/notes") {
+		t.Fatalf("applebot %d %s", first.Code, first.Header().Get("Location"))
+	}
+	place := readPlace(t, r, dealID, offerer.token)
+	if place["state"] != "pending" || place["receipt"] != nil {
+		t.Fatalf("applebot verified %#v", place)
+	}
+	rec, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offerer.token))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("deal %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), applebot) || strings.Contains(rec.Body.String(), "Applebot") {
+		t.Fatalf("stored the user agent %s", rec.Body.String())
+	}
+	row := docBody(t, doc)["tracking"].([]any)[0].(map[string]any)
+	if asFloat(row["clicks"]) != 0 {
+		t.Fatalf("clicks %#v", row["clicks"])
+	}
+	clicks := storedClicks(t, db, dealID)
+	if len(clicks) != 1 || clicks[0].(map[string]any)["class"] != "bot" {
+		t.Fatalf("stored %#v", clicks)
+	}
+	if receiptCount(t, db) != 0 {
+		t.Fatal("applebot wrote a receipt")
+	}
+}
+
 func TestORP04BotUADoesNotVerify(t *testing.T) {
 	db, _, r, cleanup := newORP04(t)
 	defer cleanup()

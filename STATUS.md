@@ -1,3 +1,7 @@
+## October 26 — ORP Applebot in a comment stays a bot (D-102b)
+
+Click classification reads a `name/version` entry inside every parenthesis, including the tail of an unclosed parenthesis. A named client written as its own entry there is a bot too. Comment text without that shape, such as CUBOT, preview, Linux, and U, stays human. Applebot/0.1 in a plain comment is a bot, so the first click leaves the place obligation pending and counts as zero clicks. The named list also includes Mediapartners-Google, AdsBot-Google, SkypeUriPreview, Java, Apache-HttpClient, Iframely, node, undici, Google-InspectionTool, Google-Read-Aloud, Storebot-Google, Lighthouse, Chrome-Lighthouse, PTST, Pingdom, UptimeRobot, and Datadog. `node` and `undici` match the whole token. `POST /orp/approve/<id>` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 26 — ORP browser device names stay human (D-102b)
 
 Click classification matches a product token, not a bare substring. A token is the name before `/`, or the name after `compatible;`. It is a bot when that token ends in `bot` or `bot-...`, when it is a known client such as curl or wget, or when the agent contains crawler, spider, or slurp. `CUBOT NOTE 20` and a Safari `(preview)` comment stay human, so the first click verifies the place obligation and counts. `HEAD`, prefetch, and `orp_test=1` are unchanged. `POST /orp/approve/<id>` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
