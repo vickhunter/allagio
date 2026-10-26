@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = join(here, '..', '..', '..')
-const schemaRoot = join(repo, 'docs/protocol/schema/0.3')
 const examplesRoot = join(repo, 'docs/protocol/schema/examples')
 const conformanceRoot = join(repo, 'docs/protocol/conformance/test')
 const sdkRoot = join(repo, 'docs/protocol/sdk/src')
@@ -145,51 +144,71 @@ function kindFor(rel) {
   return 'schema'
 }
 
-export function buildCatalog() {
-  const schemaFiles = files(schemaRoot, '.schema.json')
-  const messageExamples = files(join(examplesRoot, 'messages'), '.json').map((path) => ({
-    name: relative(examplesRoot, path),
-    value: readJson(path),
-  }))
-  const otherExamples = [
-    ['discovery.json', 'discovery'],
-    ['constraints.json', 'constraints'],
-    ['inbox.json', 'inbox'],
-  ].map(([name, slug]) => ({ name, slug, value: readJson(join(examplesRoot, name)) }))
-  const httpExamples = files(join(examplesRoot, 'http'), '.json').map((path) => ({
-    name: relative(examplesRoot, path),
-    slug: relative(join(examplesRoot, 'http'), path).replace(/\.json$/, ''),
-    value: readJson(path),
-  }))
-  const invalid = files(join(examplesRoot, 'invalid'), '.json').map((path) => ({
-    name: relative(examplesRoot, path),
-    value: readJson(path),
-  }))
+function examplesFor(version) {
+  if (version === '0.3') {
+    return {
+      root: examplesRoot,
+      messages: files(join(examplesRoot, 'messages'), '.json').map((path) => ({
+        name: relative(examplesRoot, path),
+        value: readJson(path),
+      })),
+      other: [
+        ['discovery.json', 'discovery'],
+        ['constraints.json', 'constraints'],
+        ['inbox.json', 'inbox'],
+      ].map(([name, slug]) => ({ name, slug, value: readJson(join(examplesRoot, name)) })),
+      http: files(join(examplesRoot, 'http'), '.json').map((path) => ({
+        name: relative(examplesRoot, path),
+        slug: relative(join(examplesRoot, 'http'), path).replace(/\.json$/, ''),
+        value: readJson(path),
+      })),
+      invalid: files(join(examplesRoot, 'invalid'), '.json').map((path) => ({
+        name: relative(examplesRoot, path),
+        value: readJson(path),
+      })),
+    }
+  }
+  const root = join(examplesRoot, version)
+  const validPaths = files(root, '.json').filter((path) => !path.includes(`${version}/invalid-schema`))
+  return {
+    root,
+    messages: validPaths.map((path) => ({ name: relative(root, path), value: readJson(path) })),
+    other: [],
+    http: [],
+    invalid: files(join(root, 'invalid-schema'), '.json').map((path) => ({
+      name: relative(root, path),
+      value: readJson(path),
+    })),
+  }
+}
 
-  const schemas = schemaFiles.map((path) => {
-    const rel = relative(schemaRoot, path)
+function schemasFor(version) {
+  const root = join(repo, 'docs/protocol/schema', version)
+  const examples = examplesFor(version)
+  return files(root, '.schema.json').map((path) => {
+    const rel = relative(root, path)
     const schema = readJson(path)
     const slug = slugFor(rel)
     const kind = kindFor(rel)
     const type = schema.properties?.type?.const || ''
     const valid = []
     if (kind === 'message' && type) {
-      for (const example of messageExamples) {
+      for (const example of examples.messages) {
         if (example.value.type === type) valid.push({ name: example.name, json: JSON.stringify(example.value, null, 2) })
       }
     }
     if (slug === 'discovery' || slug === 'constraints' || slug === 'inbox') {
-      for (const example of otherExamples) {
+      for (const example of examples.other) {
         if (example.slug === slug) valid.push({ name: example.name, json: JSON.stringify(example.value, null, 2) })
       }
     }
     if (kind === 'http') {
-      for (const example of httpExamples) {
+      for (const example of examples.http) {
         if (example.slug === slug) valid.push({ name: example.name, json: JSON.stringify(example.value, null, 2) })
       }
     }
     const bad = []
-    for (const example of invalid) {
+    for (const example of examples.invalid) {
       const instance = example.value.instance
       const named = example.value.schema
       const matchesType = kind === 'message' && type && instance && instance.type === type
@@ -211,10 +230,11 @@ export function buildCatalog() {
       return true
     })
     return {
-      file: rel,
+      file: `${version}/${rel}`,
+      version,
       id: schema.$id,
       slug,
-      href: `/protocol/spec/${slug}/`,
+      href: `/protocol/spec/${version}/${slug}/`,
       title: schema.title || slug,
       description: schema.description || '',
       kind,
@@ -226,7 +246,11 @@ export function buildCatalog() {
       invalid: invalidExamples,
     }
   })
+}
 
+export function buildCatalog() {
+  const versions = ['0.3', '0.4']
+  const schemas = versions.flatMap((version) => schemasFor(version))
   const tests = []
   for (const path of files(conformanceRoot, '.test.mjs')) {
     const text = readFileSync(path, 'utf8')
@@ -235,13 +259,14 @@ export function buildCatalog() {
 
   return {
     version: '0.3',
+    versions,
     license: 'Apache-2.0 planned',
     schemas,
     conformance: tests,
     sdk: files(sdkRoot, '.mjs').map((path) => relative(join(repo, 'docs/protocol'), path)),
     sdkReadme: readFileSync(join(repo, 'docs/protocol/sdk/README.md'), 'utf8').trim(),
-    exampleCount: messageExamples.length + otherExamples.length + httpExamples.length,
-    invalidCount: invalid.length,
+    exampleCount: schemas.reduce((sum, schema) => sum + schema.valid.length, 0),
+    invalidCount: schemas.reduce((sum, schema) => sum + schema.invalid.length, 0),
   }
 }
 

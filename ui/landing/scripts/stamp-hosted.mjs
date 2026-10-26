@@ -38,7 +38,7 @@ const protocolShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
       <h1>Offer Rails Protocol</h1>
-      <p>ORP 0.3 lets two agents, each working for a person, agree a growth deal. These pages are generated from the frozen schemas.</p>
+      <p>ORP 0.3 is frozen: a plain deal is still two parties. ORP 0.4 adds seats. These pages are generated from the schema files.</p>
       <p>Apache-2.0 planned. Until publication, this is a draft in the repository.</p>
     </main>
   </div>`

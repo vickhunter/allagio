@@ -4,6 +4,7 @@ declare module '@/protocol/generated/catalog.mjs' {
     license: string
     schemas: {
       file: string
+      version: string
       id: string
       slug: string
       href: string
@@ -22,6 +23,7 @@ declare module '@/protocol/generated/catalog.mjs' {
       valid: { name: string; json: string }[]
       invalid: { name: string; why: string; json: string }[]
     }[]
+    versions: string[]
     conformance: string[]
     sdk: string[]
     sdkReadme: string
@@ -31,15 +33,18 @@ declare module '@/protocol/generated/catalog.mjs' {
 }
 
 declare module '@/protocol/route.mjs' {
-  export function routeFor(pathname: string): { name: string; slug: string }
+  export function routeFor(pathname: string): { name: string; version: string; slug: string }
 }
 
 declare module '@/protocol/hosted.mjs' {
   export const discoveryName: string
   export const handledMessages: readonly string[]
   export const hostOnlyTypes: readonly string[]
-  export const refusedTypes: readonly string[]
-  export const hostedRefusal: string
   export const hostOnlyRefusal: string
   export const joinSteps: string
+  export const noMoney: string
+  export const notSpoken04: string
+  export const receiptRefusal: string
+  export const otherRefusal: string
+  export const payRefusal: string
 }

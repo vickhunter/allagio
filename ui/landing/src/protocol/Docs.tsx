@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { catalog } from '@/protocol/generated/catalog.mjs'
-import { discoveryName, handledMessages, hostedRefusal, hostOnlyRefusal, hostOnlyTypes, joinSteps, refusedTypes } from '@/protocol/hosted.mjs'
+import { discoveryName, handledMessages, hostOnlyRefusal, hostOnlyTypes, joinSteps, noMoney, notSpoken04, otherRefusal, payRefusal, receiptRefusal } from '@/protocol/hosted.mjs'
+import { FivePartyWalkthrough, ManyPage, StartPrompt, ThreePartyExample } from '@/protocol/many'
 import { routeFor } from '@/protocol/route.mjs'
 import { useSource, withSource } from '@/lib/source'
 
@@ -9,6 +10,7 @@ type Schema = (typeof catalog.schemas)[number]
 const guides = [
   ['/protocol/', 'Overview'],
   ['/protocol/concepts/', 'Concepts'],
+  ['/protocol/many/', 'Many-to-many deals'],
   ['/protocol/quickstart/', 'Quickstart'],
   ['/protocol/sdk/', 'SDK and examples'],
   ['/protocol/conformance/', 'Conformance'],
@@ -20,11 +22,21 @@ const schemaOrder = ['envelope', 'message', 'discovery', 'constraints', 'defs']
 const httpOrder = ['suggest-request', 'suggest-response', 'join-request', 'join-response', 'inbox']
 
 function byList(rows: Schema[], list: string[], key: 'slug' | 'type') {
-  return rows.slice().sort((a, b) => list.indexOf(a[key]) - list.indexOf(b[key]))
+  const rank = (value: string) => {
+    const index = list.indexOf(value)
+    return index === -1 ? list.length : index
+  }
+  return rows.slice().sort((a, b) => rank(a[key]) - rank(b[key]) || a.slug.localeCompare(b.slug))
 }
 
-function schemaBy(slug: string) {
-  return catalog.schemas.find((schema) => schema.slug === slug)
+function schemaBy(version: string, slug: string) {
+  return catalog.schemas.find((schema) => schema.version === version && schema.slug === slug)
+}
+
+function sameRoute(href: string, pathname: string) {
+  const left = routeFor(href)
+  const right = routeFor(pathname)
+  return left.name === right.name && left.slug === right.slug && left.version === right.version
 }
 
 function CopyBlock({ label, code }: { label: string; code: string }) {
@@ -105,13 +117,16 @@ function DocsNav({ pathname }: { pathname: string }) {
   const source = useSource()
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
-  const groups = [
-    ['Schemas', byList(catalog.schemas.filter((schema) => schema.kind === 'schema'), schemaOrder, 'slug')],
-    ['Messages', byList(catalog.schemas.filter((schema) => schema.kind === 'message'), messageOrder, 'type')],
-    ['HTTP', byList(catalog.schemas.filter((schema) => schema.kind === 'http'), httpOrder, 'slug')],
-  ] as const
+  const groups = catalog.versions.flatMap((version) => {
+    const rows = catalog.schemas.filter((schema) => schema.version === version)
+    return [
+      [`ORP ${version} schemas`, byList(rows.filter((schema) => schema.kind === 'schema'), schemaOrder, 'slug')],
+      [`ORP ${version} messages`, byList(rows.filter((schema) => schema.kind === 'message'), messageOrder, 'type')],
+      [`ORP ${version} HTTP`, byList(rows.filter((schema) => schema.kind === 'http'), httpOrder, 'slug')],
+    ] as const
+  })
   const show = (label: string) => !needle || label.toLowerCase().includes(needle)
-  const linkClass = (href: string) => `flex min-h-11 items-center rounded-md px-2 text-sm ${routeFor(href).name === routeFor(pathname).name && routeFor(href).slug === routeFor(pathname).slug ? 'bg-s2 font-semibold text-t1' : 'text-t2 hover:bg-s2 hover:text-t1'}`
+  const linkClass = (href: string) => `flex min-h-11 items-center rounded-md px-2 text-sm ${sameRoute(href, pathname) ? 'bg-s2 font-semibold text-t1' : 'text-t2 hover:bg-s2 hover:text-t1'}`
   return (
     <nav id="protocol-nav" aria-label="Protocol" tabIndex={0} className="md:sticky md:top-24 md:max-h-[calc(100vh-7rem)] md:overflow-y-auto md:pr-2">
       <label htmlFor="docs-find" className="eyebrow">Find a page</label>
@@ -129,8 +144,8 @@ function DocsNav({ pathname }: { pathname: string }) {
             <p className="eyebrow px-2">{label}</p>
             <ul className="mt-1 grid gap-0.5">
               {visible.map((schema) => (
-                <li key={schema.slug}>
-                  <a className={linkClass(schema.href)} href={withSource(schema.href, source)} aria-current={routeFor(pathname).slug === schema.slug ? 'page' : undefined}>{schema.title}</a>
+                <li key={schema.file}>
+                  <a className={linkClass(schema.href)} href={withSource(schema.href, source)} aria-current={sameRoute(schema.href, pathname) ? 'page' : undefined}>{schema.title}</a>
                 </li>
               ))}
             </ul>
@@ -152,7 +167,7 @@ function Overview() {
     <>
       <p className="eyebrow">ORP {catalog.version}</p>
       <h1 id="proto-h" className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">Offer Rails Protocol</h1>
-      <p className="mt-4 text-lg leading-8">ORP lets two agents, each working for a person, find each other, agree a growth deal, and carry it out. An affiliate placement is one kind of deal. These pages are generated from the frozen 0.3 schemas.</p>
+      <p className="mt-4 text-lg leading-8">ORP lets agents, each working for a person, find each other, agree a growth deal, and carry it out. An affiliate placement is one kind of deal. ORP 0.3 is frozen: a plain deal is still two parties. ORP 0.4 adds seats. These pages are generated from the schema files.</p>
       <h2 className="h-display mt-10 text-2xl">Three properties</h2>
       <ol className="mt-4 grid gap-3">
         {properties.map(([title, body]) => (
@@ -163,8 +178,8 @@ function Overview() {
         ))}
       </ol>
       <h2 className="h-display mt-10 text-2xl">This host</h2>
-      <p className="mt-3 text-[16px] leading-7 text-t2">The hosted service speaks a thin layer. Discovery names it “{discoveryName}”. It answers hello and discover. It does not claim conformance levels L0, L1, L2, or L3. Accept and offer return 403: “{hostedRefusal}”</p>
-      <p className="mt-3 text-[16px] leading-7 text-t2"><a className="underline underline-offset-4" href={withSource('/protocol/quickstart/', source)}>Quickstart for agents</a> follows the routes this host serves today. <a className="underline underline-offset-4" href={withSource('/protocol/concepts/', source)}>Concepts</a> explains a space, an offer, approval, the deal, and a receipt.</p>
+      <p className="mt-3 text-[16px] leading-7 text-t2">The hosted service speaks a thin layer. Discovery names it “{discoveryName}”. It answers hello, discover, offer, accept, and execute for a 0.3 test deal. It does not claim conformance levels L0, L1, L2, or L3. {notSpoken04} {noMoney}</p>
+      <p className="mt-3 text-[16px] leading-7 text-t2"><a className="underline underline-offset-4" href={withSource('/protocol/quickstart/', source)}>Quickstart for agents</a> follows the routes this host serves today. <a className="underline underline-offset-4" href={withSource('/protocol/concepts/', source)}>Concepts</a> explains a space, an offer, approval, the deal, and a receipt. <a className="underline underline-offset-4" href={withSource('/protocol/many/', source)}>Many-to-many deals</a> is the 0.4 seat model.</p>
       <p className="mt-6 text-sm text-t2">{catalog.license}. Until publication, this is a draft in the repository.</p>
     </>
   )
@@ -175,14 +190,14 @@ function Concepts() {
     ['space', 'Space', 'A space is a place a person can publish: a post, a newsletter issue, a video description. The space message describes it. On this host, discover with want set to spaces returns an empty results list and empty_reason no_match.'],
     ['offer', 'Offer', 'An offer states the work and the terms. Suggest can return pitches from the catalog. A pitch is not a stored offer, and sending an offer message does not open a deal here.'],
     ['consent', 'Consent and approval', 'Each step of a deal is auto, ask, or off. Only the host records approval. An agent cannot approve. Join on this host returns steps where ' + joinSteps],
-    ['lifecycle', 'Exchange and the deal', 'The exchange runs request, offer, counter, accept, and decline. The host then records the deal, execute, receipt, outcome, and payout. This host stops before that. Accept does not create a deal, an offer, a campaign, or a placement.'],
+    ['lifecycle', 'Exchange and the deal', 'The exchange runs request, offer, counter, accept, and decline. The host then records the deal, execute, receipt, outcome, and payout. On this host, a directed offer and the counterparty accept can open an awaiting test deal. Activate moves that deal to active. ' + notSpoken04],
     ['proof', 'Proof and receipts', 'A receipt is proof the host writes after the work. Parties do not submit their own receipts. The proof this host lists is a tracked link.'],
   ]
   return (
     <>
       <p className="eyebrow">Concepts</p>
       <h1 className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">How a deal is put together</h1>
-      <p className="mt-4 text-lg leading-8">The words below are the objects in ORP 0.3. The hosted thin layer does not run the full exchange.</p>
+      <p className="mt-4 text-lg leading-8">The words below are the objects in ORP 0.3. A plain 0.3 deal is still two parties. Seats are on the many-to-many page.</p>
       {blocks.map(([id, title, body]) => (
         <section key={id} id={id} className="mt-10 scroll-mt-28">
           <h2 className="h-display text-2xl">{title}</h2>
@@ -194,10 +209,10 @@ function Concepts() {
 }
 
 function Quickstart() {
-  const suggest = schemaBy('suggest-request')
-  const join = schemaBy('join-request')
-  const hello = schemaBy('hello')
-  const discover = schemaBy('discover')
+  const suggest = schemaBy('0.3', 'suggest-request')
+  const join = schemaBy('0.3', 'join-request')
+  const hello = schemaBy('0.3', 'hello')
+  const discover = schemaBy('0.3', 'discover')
   return (
     <>
       <p className="eyebrow">Quickstart</p>
@@ -215,9 +230,12 @@ function Quickstart() {
       <p className="mt-3 text-[16px] leading-7 text-t2">POST /orp with Authorization: Bearer and the token from join. Set from to that same party, or the host answers 403 “from does not match the credential.” Hello returns one version, 0.3. Discover returns results. Discover with want set to spaces returns no items. The samples below are valid requests from the spec.</p>
       {hello?.valid[0] ? <CopyBlock label={`POST /orp · ${hello.valid[0].name}`} code={hello.valid[0].json} /> : null}
       {discover?.valid[0] ? <CopyBlock label={`POST /orp · ${discover.valid[0].name}`} code={discover.valid[0].json} /> : null}
-      <h2 className="h-display mt-10 text-2xl">Accept and offer</h2>
-      <p className="mt-3 text-[16px] leading-7 text-t2">POST /orp with type {refusedTypes.join(' or ')} returns 403 forbidden. The message is “{hostedRefusal}” No deal, offer, campaign, or placement is created.</p>
-      <p className="mt-3 text-[16px] leading-7 text-t2">Host-only types {hostOnlyTypes.join(', ')} return a different 403: “{hostOnlyRefusal}”</p>
+      <h2 className="h-display mt-10 text-2xl">Offer, accept, and execute</h2>
+      <p className="mt-3 text-[16px] leading-7 text-t2">This host handles offer and accept for a 0.3 test deal. A directed offer and the counterparty accept can open an awaiting test deal. Activate moves awaiting to active. Execute on a deal that is not active is 409 state_conflict, and the message is “The deal is in the wrong state.” A pay obligation on an active deal is refused: “{payRefusal}” {noMoney}</p>
+      <p className="mt-3 text-[16px] leading-7 text-t2">Host-only types {hostOnlyTypes.join(', ')} return 403: “{hostOnlyRefusal}” A receipt returns 403: “{receiptRefusal}” {notSpoken04} Other message types return 403: “{otherRefusal}”</p>
+      <ThreePartyExample />
+      <FivePartyWalkthrough />
+      <StartPrompt />
     </>
   )
 }
@@ -241,7 +259,7 @@ function SdkPage() {
 
 function ConformancePage() {
   const groups = useMemo(() => {
-    const order = ['L0', 'C1', 'C2', 'L1', 'L2', 'L3', 'INVALID']
+    const order = ['L0', 'C1', 'C2', 'L1', 'L2', 'L3', 'INVALID', 'ORP04']
     return order.map((prefix) => ({
       prefix,
       names: catalog.conformance.filter((name) => name.startsWith(prefix)),
@@ -268,23 +286,35 @@ function ConformancePage() {
 }
 
 function SpecIndex() {
-  const source = useSource()
-  const groups = [
-    ['Schemas', byList(catalog.schemas.filter((schema) => schema.kind === 'schema'), schemaOrder, 'slug')],
-    ['Messages', byList(catalog.schemas.filter((schema) => schema.kind === 'message'), messageOrder, 'type')],
-    ['HTTP', byList(catalog.schemas.filter((schema) => schema.kind === 'http'), httpOrder, 'slug')],
-  ] as const
   return (
     <>
       <p className="eyebrow">Spec reference</p>
       <h1 className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">Message reference</h1>
-      <p className="mt-4 text-lg leading-8">Each page is built from a JSON Schema in docs/protocol/schema/0.3, plus the valid and invalid examples that name it. {catalog.schemas.length} schemas, version {catalog.version}.</p>
-      {groups.map(([label, rows]) => (
+      <p className="mt-4 text-lg leading-8">Each page is built from a JSON Schema under docs/protocol/schema, plus the valid and invalid examples that name it. {catalog.schemas.length} schemas across {catalog.versions.join(' and ')}. ORP 0.3 stays the frozen two-party draft. ORP 0.4 adds seats.</p>
+      {catalog.versions.map((version) => (
+        <VersionIndex key={version} version={version} />
+      ))}
+    </>
+  )
+}
+
+function VersionIndex({ version }: { version: string }) {
+  const source = useSource()
+  const rows = catalog.schemas.filter((schema) => schema.version === version)
+  const groups = [
+    ['Schemas', byList(rows.filter((schema) => schema.kind === 'schema'), schemaOrder, 'slug')],
+    ['Messages', byList(rows.filter((schema) => schema.kind === 'message'), messageOrder, 'type')],
+    ['HTTP', byList(rows.filter((schema) => schema.kind === 'http'), httpOrder, 'slug')],
+  ] as const
+  return (
+    <section className="mt-10">
+      <h2 className="h-display text-2xl">ORP {version}</h2>
+      {groups.map(([label, group]) => (
         <section key={label} className="mt-8">
           <h2 className="h-display text-2xl">{label}</h2>
           <ul className="mt-3 grid gap-3">
-            {rows.map((schema) => (
-              <li key={schema.slug}>
+            {group.map((schema) => (
+              <li key={schema.file}>
                 <a className="block rounded-xl border border-line bg-s1 p-4 underline-offset-4 hover:underline" href={withSource(schema.href, source)}>
                   <span className="h-display text-xl">{schema.title}</span>
                   <span className="mt-1 block text-[15px] leading-6 text-t2">{schema.description}</span>
@@ -294,14 +324,19 @@ function SpecIndex() {
           </ul>
         </section>
       ))}
-    </>
+    </section>
   )
 }
 
 function SpecPage({ schema }: { schema: Schema }) {
+  const source = useSource()
+  const siblings = catalog.schemas.filter((item) => item.slug === schema.slug)
   return (
     <>
-      <p className="eyebrow">{schema.kind === 'message' ? `Message · ${schema.type}` : schema.kind === 'http' ? 'HTTP' : 'Schema'} · {schema.file}</p>
+      <p className="eyebrow">ORP {schema.version} · {schema.kind === 'message' ? `Message · ${schema.type}` : schema.kind === 'http' ? 'HTTP' : 'Schema'} · {schema.file}</p>
+      <p className="mt-3 text-sm text-t2">Version {siblings.map((item, index) => (
+        <span key={item.file}>{index ? ' · ' : ''}{item.version === schema.version ? <span className="font-semibold text-t1">ORP {item.version}</span> : <a className="underline underline-offset-4" href={withSource(item.href, source)}>ORP {item.version}</a>}</span>
+      ))}.</p>
       <h1 className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">{schema.title}</h1>
       <p className="mt-4 text-lg leading-8">{schema.description}</p>
       {schema.required.length ? <p className="mt-3 text-[16px] leading-7 text-t2">Required on this schema: {schema.required.join(', ')}.</p> : null}
@@ -332,9 +367,10 @@ function Missing() {
 
 export function Docs({ pathname }: { pathname: string }) {
   const route = routeFor(pathname)
-  const schema = route.name === 'spec' ? schemaBy(route.slug) : undefined
+  const schema = route.name === 'spec' ? schemaBy(route.version || '0.3', route.slug) : undefined
   const title = route.name === 'overview' ? 'Offer Rails Protocol'
     : route.name === 'concepts' ? 'Concepts'
+    : route.name === 'many' ? 'Many-to-many deals'
     : route.name === 'quickstart' ? 'Quickstart for agents'
     : route.name === 'sdk' ? 'SDK and examples'
     : route.name === 'conformance' ? 'Conformance'
@@ -348,6 +384,7 @@ export function Docs({ pathname }: { pathname: string }) {
   let body = <Missing />
   if (route.name === 'overview') body = <Overview />
   else if (route.name === 'concepts') body = <Concepts />
+  else if (route.name === 'many') body = <ManyPage />
   else if (route.name === 'quickstart') body = <Quickstart />
   else if (route.name === 'sdk') body = <SdkPage />
   else if (route.name === 'conformance') body = <ConformancePage />
