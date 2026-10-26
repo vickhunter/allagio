@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { check, check04, dealHash, digest } from '../../sdk/src/index.mjs';
 import {
-  AUTO, DAY, DESTINATION, OrpClient, affiliateTerms, codeOf, directDeal, disclosure, party, tempStore, withHost,
+  AUTO, BROWSER, DAY, DESTINATION, OrpClient, affiliateTerms, codeOf, directDeal, disclosure, party, tempStore, withHost,
 } from './helpers.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -521,26 +521,133 @@ test('ORP04-SEAT-READS-PENDING', async () => {
     assert.equal(held.status, 200, held.text);
     const escalated = await acceptDeal(again, held.message);
     assert.equal(escalated.message.body.state, 'awaiting');
+    const beforeInbox = inboxSnapshot(host);
+    const beforeLinks = host.links.size;
     host.storePath = tempStore();
-    let dealEmits = 0;
-    const emit = host.emit.bind(host);
-    host.emit = (message, options) => {
-      if (message?.type === 'deal') {
-        dealEmits += 1;
-        if (dealEmits >= 4) throw new Error('snapshot failed');
-      }
-      return emit(message, options);
-    };
-    const failed = await again.approve(escalated.message.body.waiting.escalation);
+    const failed = await throwOnDealEmit(host, 4, () => again.approve(escalated.message.body.waiting.escalation));
     assert.equal(failed.status, 500);
     assert.equal(existsSync(host.storePath), false);
     const stored = host.deals.get(held.message.deal);
     assert.equal(stored.parties.find((seat) => seat.id === again.party).signed, false);
     assert.equal(stored.bound.some((item) => item.party === again.party), false);
-    host.emit = emit;
+    assertInboxSame(host, beforeInbox);
     const reread = await creator.deal(held.message.deal);
     assert.equal(reread.status, 200, reread.text);
     assert.equal(reread.message.body.parties.find((seat) => seat.id === again.party).signed, false);
+    await assertNoMisroute(host, beforeLinks);
+  });
+});
+
+test('ORP04-ORIGINAL-SEAT-DOES-NOT-FILL-VACANCY', async () => {
+  await withHost({}, async (host) => {
+    const offerer = await party(host, AUTO);
+    const acceptor = await party(host, AUTO);
+    const facilitatorA = await party(host, AUTO);
+    const facilitatorB = await party(host, AUTO);
+    const replacement = await party(host, AUTO);
+    const fee = eur(1000);
+    const opened = await offerMany(offerer, shareTerms('Original seat does not fill a vacancy'), [
+      { id: offerer.party, role: 'offerer', required: true, terms: { amount: eur(0) } },
+      { id: acceptor.party, role: 'acceptor', required: true, terms: { amount: fee } },
+      { id: facilitatorA.party, role: 'facilitator', required: true, terms: { amount: fee } },
+      { id: facilitatorB.party, role: 'facilitator', required: true, terms: { amount: fee } },
+    ]);
+    assert.equal(opened.status, 200, opened.text);
+    assert.equal(opened.message.body.state, 'pending');
+    const left = await facilitatorA.send(msg(facilitatorA, { type: 'leave', deal: opened.message.deal, body: {} }));
+    assert.equal(left.status, 200, left.text);
+    assert.equal(left.message.body.state, 'pending');
+    assert.deepEqual(left.message.body.vacancies, ['facilitator']);
+    const bSigned = await acceptDeal(facilitatorB, left.message);
+    assert.equal(bSigned.status, 200, bSigned.text);
+    assert.equal(bSigned.message.body.state, 'pending');
+    assert.deepEqual(bSigned.message.body.vacancies, ['facilitator']);
+    assert.equal(bSigned.message.body.parties.find((seat) => seat.id === facilitatorB.party).signed, true);
+    const acceptorSigned = await acceptDeal(acceptor, bSigned.message);
+    assert.equal(acceptorSigned.status, 200, acceptorSigned.text);
+    assert.equal(acceptorSigned.message.body.state, 'pending');
+    assert.deepEqual(acceptorSigned.message.body.vacancies, ['facilitator']);
+    const seated = await offerer.send(msg(offerer, {
+      type: 'seat',
+      deal: acceptorSigned.message.deal,
+      body: { seat: { id: replacement.party, role: 'facilitator', required: true, terms: { amount: fee } } },
+    }));
+    assert.equal(seated.status, 200, seated.text);
+    assert.equal(seated.message.body.state, 'pending');
+    assert.deepEqual(seated.message.body.vacancies, ['facilitator']);
+    const replaced = await acceptDeal(replacement, seated.message);
+    assert.equal(replaced.status, 200, replaced.text);
+    assert.equal(replaced.message.body.state, 'active');
+    assert.equal(replaced.message.body.vacancies, undefined);
+    assert.equal(replaced.message.body.parties.find((seat) => seat.id === replacement.party).required, true);
+    assert.equal(replaced.message.body.parties.find((seat) => seat.id === replacement.party).signed, true);
+  });
+});
+
+test('ORP04-APPROVE-ATOMIC', async () => {
+  await withHost({}, async (host) => {
+    const maker = await party(host, AUTO);
+    const acceptor = await party(host, ASK);
+    const offered = await maker.send(maker.msg({
+      type: 'offer',
+      to: acceptor.party,
+      body: { terms: affiliateTerms() },
+    }));
+    assert.equal(offered.status, 200, offered.text);
+    assert.equal(offered.message.orp, '0.3');
+    const accepted = await acceptor.send(acceptor.msg({
+      type: 'accept',
+      deal: offered.message.deal,
+      body: { terms_hash: offered.message.body.terms_hash },
+    }));
+    assert.equal(accepted.status, 200, accepted.text);
+    assert.equal(accepted.message.body.state, 'awaiting');
+    const beforeInbox = inboxSnapshot(host);
+    const beforeLinks = host.links.size;
+    host.storePath = tempStore();
+    const failed = await throwOnDealEmit(host, 3, () => acceptor.approve(accepted.message.body.waiting.escalation));
+    assert.equal(failed.status, 500);
+    assert.equal(existsSync(host.storePath), false);
+    const stored = host.deals.get(offered.message.deal);
+    assert.equal(stored.state, 'awaiting');
+    assert.equal(stored.tracking.length, 0);
+    assert.equal(stored.bound.some((item) => item.party === acceptor.party), false);
+    assert.equal(stored.bound.some((item) => item.party === maker.party), true);
+    assertInboxSame(host, beforeInbox);
+    await assertNoMisroute(host, beforeLinks);
+  });
+
+  await withHost({}, async (host) => {
+    const maker = await party(host, AUTO);
+    const acceptor = await party(host, ASK);
+    const offered = await maker.send(maker.msg({
+      type: 'offer',
+      to: acceptor.party,
+      body: { terms: affiliateTerms() },
+    }));
+    assert.equal(offered.status, 200, offered.text);
+    const accepted = await acceptor.send(acceptor.msg({
+      type: 'accept',
+      deal: offered.message.deal,
+      body: { terms_hash: offered.message.body.terms_hash },
+    }));
+    assert.equal(accepted.message.body.state, 'awaiting');
+    const beforeInbox = inboxSnapshot(host);
+    const beforeLinks = host.links.size;
+    host.storePath = tempStore();
+    const failed = await throwOnDealEmit(host, 1, () => acceptor.approve(accepted.message.body.waiting.escalation));
+    assert.equal(failed.status, 500);
+    assert.equal(existsSync(host.storePath), false);
+    const stored = host.deals.get(offered.message.deal);
+    assert.equal(stored.state, 'awaiting');
+    assert.notEqual(stored.state, 'active');
+    assert.equal(stored.tracking.length, 0);
+    assert.equal(stored.bound.some((item) => item.party === acceptor.party), false);
+    assertInboxSame(host, beforeInbox);
+    await assertNoMisroute(host, beforeLinks);
+    const missed = await OrpClient.click(`${host.origin}/go/not-minted`, { headers: { 'user-agent': BROWSER } });
+    assert.equal(missed.status, 302);
+    assert.equal(missed.location, `${host.origin}/`);
   });
 });
 
@@ -626,8 +733,78 @@ test('ORP04-MIXED-SPLIT', async () => {
     assert.equal(bare.status, 400);
     assert.equal(codeOf(bare), 'invalid_message');
     assert.match(bare.message.body.message, /cap/);
+
+    const hoursShort = await offerMany(maker, terms, [
+      { id: maker.party, role: 'offerer', required: true, terms: { percent: 40, hours: 2, cap } },
+      { id: other.party, role: 'acceptor', required: true, terms: { percent: 40, hours: 2, cap } },
+    ]);
+    assert.equal(hoursShort.status, 400);
+    assert.equal(codeOf(hoursShort), 'invalid_message');
+    assert.match(hoursShort.message.body.message, /100/);
+
+    const hoursEven = await offerMany(maker, terms, [
+      { id: maker.party, role: 'offerer', required: true, terms: { percent: 50, hours: 2 } },
+      { id: other.party, role: 'acceptor', required: true, terms: { percent: 50, hours: 2 } },
+    ]);
+    assert.equal(hoursEven.status, 200, hoursEven.text);
+
+    const perEven = await offerMany(maker, terms, [
+      { id: maker.party, role: 'offerer', required: true, terms: { percent: 50, per: 'hour' } },
+      { id: other.party, role: 'acceptor', required: true, terms: { percent: 50, per: 'hour' } },
+    ]);
+    assert.equal(perEven.status, 200, perEven.text);
+
+    const depositEven = await offerMany(maker, terms, [
+      { id: maker.party, role: 'offerer', required: true, terms: { percent: 50 } },
+      {
+        id: other.party,
+        role: 'acceptor',
+        required: true,
+        terms: { percent: 50, deposit: { amount: eur(2000), holder: 'viewing-desk', purpose: 'viewing' } },
+      },
+    ]);
+    assert.equal(depositEven.status, 200, depositEven.text);
   });
 });
+
+function inboxSnapshot(host) {
+  return new Map([...host.inbox].map(([id, rows]) => [id, rows.length]));
+}
+
+function assertInboxSame(host, before) {
+  assert.equal(host.inbox.size, before.size);
+  for (const [id, length] of before) assert.equal((host.inbox.get(id) || []).length, length, id);
+}
+
+async function assertNoMisroute(host, beforeSize) {
+  assert.equal(host.links.size, beforeSize);
+  for (const [token, row] of host.links) {
+    const deal = host.deals.get(row.dealId);
+    assert.ok(deal?.tracking.some((entry) => entry.token === token), token);
+    const click = await OrpClient.click(`${host.origin}/go/${encodeURIComponent(token)}`, {
+      headers: { 'user-agent': BROWSER },
+    });
+    assert.equal(click.status, 302);
+    assert.notEqual(click.location, `${host.origin}/`);
+  }
+}
+
+async function throwOnDealEmit(host, limit, run) {
+  let dealEmits = 0;
+  const emit = host.emit.bind(host);
+  host.emit = (message, options) => {
+    if (message?.type === 'deal') {
+      dealEmits += 1;
+      if (dealEmits >= limit) throw new Error('snapshot failed');
+    }
+    return emit(message, options);
+  };
+  try {
+    return await run();
+  } finally {
+    host.emit = emit;
+  }
+}
 
 test('ORP04-DEPOSIT-HOLDER', async () => {
   await withHost({}, async (host) => {

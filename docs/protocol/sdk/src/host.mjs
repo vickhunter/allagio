@@ -1104,45 +1104,58 @@ export class ReferenceHost {
       return [403, this.plainError('forbidden', 'client_prompt cannot bind a party to pay.')];
     }
     const consentId = localId('cns_');
-    let consent = null;
-    if (esc.dealId) {
-      const body = {
-        consent: consentId,
-        escalation: esc.id,
-        party: esc.party,
-        decision,
-        step: esc.step,
-        terms_hash: esc.termsHash,
-        reasons: esc.reasons,
-        assurance,
-        at: this.iso(),
-      };
-      consent = this.emit({ type: 'consent', to: esc.party, deal: esc.dealId, body });
-      this.deliver(esc.party, consent);
-      const other = otherParty(this.deals.get(esc.dealId), esc.party);
-      const otherBody = { ...body };
-      delete otherBody.reasons;
-      this.deliver(other, this.emit({ type: 'consent', to: other, deal: esc.dealId, body: otherBody }));
-    }
-    esc.resolved = true;
     const deal = esc.dealId ? this.deals.get(esc.dealId) : null;
-    const prior = deal ? structuredClone(deal) : null;
+    const priorDeal = deal ? structuredClone(deal) : null;
+    const priorOutbound = this.outbound.length;
+    const priorInboxSeq = this.inboxSeq;
+    const priorInbox = new Map([...this.inbox].map(([id, rows]) => [id, rows.slice()]));
+    const priorLinks = new Map(this.links);
+    const bucket = [];
+    this.stageLinks = new Map();
+    let consent = null;
     try {
+      if (esc.dealId) {
+        const consentBody = {
+          consent: consentId,
+          escalation: esc.id,
+          party: esc.party,
+          decision,
+          step: esc.step,
+          terms_hash: esc.termsHash,
+          reasons: esc.reasons,
+          assurance,
+          at: this.iso(),
+        };
+        consent = this.emit({ type: 'consent', to: esc.party, deal: esc.dealId, body: consentBody });
+        bucket.push({ to: esc.party, message: consent });
+        const other = otherParty(deal, esc.party);
+        const otherBody = { ...consentBody };
+        delete otherBody.reasons;
+        bucket.push({ to: other, message: this.emit({ type: 'consent', to: other, deal: esc.dealId, body: otherBody }) });
+      }
+      esc.resolved = true;
       if (decision === 'refused') this.refuseEscalation(esc);
-      else this.applyEscalation(esc, consentId);
+      else this.applyEscalation(esc, consentId, bucket);
       const payload = !deal
         ? { ok: true }
         : deal.version === '0.4'
           ? this.snapshotMany(deal, esc.party, consent?.id || '')
           : this.snapshot(deal, esc.party, consent?.id || '');
+      for (const [token, row] of this.stageLinks) this.links.set(token, row);
+      for (const item of bucket) this.deliver(item.to, item.message);
       this.save();
       return [200, payload];
     } catch (error) {
-      if (deal && prior) {
-        this.deals.set(deal.id, prior);
-        esc.resolved = false;
-      }
+      if (deal && priorDeal) this.deals.set(deal.id, priorDeal);
+      this.outbound.length = priorOutbound;
+      this.inboxSeq = priorInboxSeq;
+      this.inbox = priorInbox;
+      this.links.clear();
+      for (const [token, row] of priorLinks) this.links.set(token, row);
+      esc.resolved = false;
       throw error;
+    } finally {
+      this.stageLinks = null;
     }
   }
 
@@ -1170,7 +1183,7 @@ export class ReferenceHost {
     deal.updated = this.iso();
   }
 
-  applyEscalation(esc, consentId) {
+  applyEscalation(esc, consentId, bucket) {
     if (esc.kind === 'offer') {
       const offer = this.offers.get(esc.offerId);
       offer.listed = true;
@@ -1185,7 +1198,8 @@ export class ReferenceHost {
       return;
     }
     if (esc.kind === 'request') {
-      this.deliver(esc.message.to, esc.message);
+      if (bucket) bucket.push({ to: esc.message.to, message: esc.message });
+      else this.deliver(esc.message.to, esc.message);
       return;
     }
     const deal = this.deals.get(esc.dealId);
@@ -1198,7 +1212,7 @@ export class ReferenceHost {
     } else if (esc.kind === 'counter') this.finishBind(deal, esc.party, 'consent', consentId);
     else if (esc.kind === 'payout') this.answerPayout(this.payouts.get(esc.payout), esc.answer);
     deal.updated = this.iso();
-    if (esc.kind !== 'payout') this.publishDeal(deal, '');
+    if (esc.kind !== 'payout') this.publishDeal(deal, '', undefined, bucket);
   }
 
   evaluate(party, step, ctx) {
@@ -1376,7 +1390,8 @@ export class ReferenceHost {
       };
       if (content.code) entry.code = token(6).replace(/[^A-Za-z0-9]/g, 'x').slice(0, 8);
       deal.tracking.push(entry);
-      this.links.set(entry.token, { dealId: deal.id, obligation: obligation.id });
+      const links = this.stageLinks || this.links;
+      links.set(entry.token, { dealId: deal.id, obligation: obligation.id });
     }
     deal.updated = this.iso();
   }
@@ -1395,13 +1410,18 @@ export class ReferenceHost {
     for (const entry of deal.tracking) entry.status = 'plain';
   }
 
-  publishDeal(deal, re, viewer) {
-    if (deal.version === '0.4') return this.publishMany(deal, re, viewer);
+  publishDeal(deal, re, viewer, bucket) {
+    if (deal.version === '0.4') return this.publishMany(deal, re, viewer, bucket);
     deal.updated = this.iso();
     const offerer = this.snapshot(deal, deal.offerer, re);
     const acceptor = this.snapshot(deal, deal.acceptor, re);
-    this.deliver(deal.offerer, offerer);
-    this.deliver(deal.acceptor, acceptor);
+    if (bucket) {
+      bucket.push({ to: deal.offerer, message: offerer });
+      bucket.push({ to: deal.acceptor, message: acceptor });
+    } else {
+      this.deliver(deal.offerer, offerer);
+      this.deliver(deal.acceptor, acceptor);
+    }
     return viewer === deal.acceptor ? acceptor : offerer;
   }
 
@@ -2106,8 +2126,8 @@ export class ReferenceHost {
       seat.signed = true;
       this.bind(deal, partyId, type, ref);
       deal.bound.sort((a, b) => (a.party < b.party ? -1 : a.party > b.party ? 1 : 0));
-      if (seat.required) {
-        const vacancy = deal.vacancies.indexOf(seat.role);
+      if (seat.fills) {
+        const vacancy = deal.vacancies.findIndex((item) => item.id === seat.fills);
         if (vacancy >= 0) deal.vacancies.splice(vacancy, 1);
       }
     }
@@ -2234,7 +2254,7 @@ export class ReferenceHost {
     if (!verdict.ok) return this.failure('invalid_message', verdict.message, message, { field: verdict.field });
     deal.parties = remaining;
     deal.bound = deal.bound.filter((item) => item.party !== party.id);
-    if (seat.required) deal.vacancies.push(seat.role);
+    if (seat.required) deal.vacancies.push({ id: localId('vac_'), role: seat.role });
     if (deal.offerer === party.id) deal.offerer = '';
     if (deal.acceptor === party.id) deal.acceptor = '';
     deal.termsHash = dealHash(deal.terms, deal.parties);
@@ -2255,6 +2275,11 @@ export class ReferenceHost {
     const next = { id: seat.id, role: seat.role, required: Boolean(seat.required), signed: false };
     if (seat.terms && Object.keys(seat.terms).length) next.terms = structuredClone(seat.terms);
     if (seat.identity) next.identity = structuredClone(seat.identity);
+    if (next.required) {
+      const taken = new Set(deal.parties.map((item) => item.fills).filter(Boolean));
+      const open = deal.vacancies.find((item) => item.role === next.role && !taken.has(item.id));
+      if (open) next.fills = open.id;
+    }
     deal.parties.push(next);
     if (seat.role === 'offerer' && !deal.offerer) deal.offerer = seat.id;
     if (seat.role === 'acceptor' && !deal.acceptor) deal.acceptor = seat.id;
@@ -2264,17 +2289,19 @@ export class ReferenceHost {
     return { status: 200, message: this.publishMany(deal, message.id, party.id) };
   }
 
-  publishMany(deal, re, viewer) {
+  publishMany(deal, re, viewer, bucket) {
     deal.updated = this.iso();
     const sent = new Map();
     for (const seat of deal.parties) {
       const snap = this.snapshotMany(deal, seat.id, re);
       sent.set(seat.id, snap);
-      this.deliver(seat.id, snap);
+      if (bucket) bucket.push({ to: seat.id, message: snap });
+      else this.deliver(seat.id, snap);
     }
     if (viewer && !sent.has(viewer)) {
       const snap = this.snapshotMany(deal, viewer, re);
-      this.deliver(viewer, snap);
+      if (bucket) bucket.push({ to: viewer, message: snap });
+      else this.deliver(viewer, snap);
       return snap;
     }
     return sent.get(viewer) || [...sent.values()][0];
@@ -2299,7 +2326,7 @@ export class ReferenceHost {
     if (deal.offerId) body.offer = deal.offerId;
     if (deal.round) body.round = deal.round;
     if (deal.bound.length) body.bound = deal.bound.map((item) => structuredClone(item));
-    if (deal.vacancies.length) body.vacancies = [...deal.vacancies];
+    if (deal.vacancies.length) body.vacancies = deal.vacancies.map((item) => item.role);
     if (deal.waiting) {
       body.waiting = viewer === deal.waiting.party
         ? structuredClone(deal.waiting)

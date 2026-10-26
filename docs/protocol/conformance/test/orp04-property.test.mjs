@@ -159,7 +159,7 @@ test('ORP04-PROPERTY', async (t) => {
       }));
       assert.equal(opened.status, 200, opened.text);
       const seats = opened.message.body.parties.map((seat) => ({ ...seat, signed: seat.signed }));
-      let vacancies = [...(opened.message.body.vacancies || [])];
+      let vacancies = (opened.message.body.vacancies || []).map((role, index) => ({ id: `vac_open_${trial}_${index}`, role }));
       let snapshot = opened.message;
       const byId = new Map(clients.map((client) => [client.party, client]));
       let spare = 4;
@@ -178,7 +178,7 @@ test('ORP04-PROPERTY', async (t) => {
         vacancies = clearVacancy(seat, vacancies);
         snapshot = accepted.message;
         assert.equal(snapshot.body.state, index === signers.length - 1 ? 'active' : 'pending');
-        assert.deepEqual(snapshot.body.vacancies || [], vacancies);
+        assert.deepEqual(snapshot.body.vacancies || [], vacancyRoles(vacancies));
       }
       for (let step = 0; step < 4; step += 1) {
         const roll = hostRandom();
@@ -201,12 +201,12 @@ test('ORP04-PROPERTY', async (t) => {
           assert.equal(sent.status, 200, sent.text);
           const index = seats.findIndex((item) => item.id === seat.id);
           seats.splice(index, 1);
-          if (seat.required) vacancies.push(seat.role);
+          if (seat.required) vacancies.push({ id: `vac_${trial}_${seat.id}`, role: seat.role });
           snapshot = sent.message;
         } else if (roll < 0.67 && spare < clients.length) {
           const client = clients[spare];
           spare += 1;
-          const needsFacilitator = vacancies.includes('facilitator') && !seats.some((seat) => seat.role === 'facilitator' && seat.required);
+          const needsFacilitator = vacancies.some((item) => item.role === 'facilitator') && !seats.some((seat) => seat.role === 'facilitator' && seat.required);
           const seat = needsFacilitator
             ? { id: client.party, role: 'facilitator', required: true, terms: { amount: fee } }
             : { id: client.party, role: 'member', required: false, terms: { amount: { amount_minor: 1, currency: 'EUR' } } };
@@ -223,7 +223,13 @@ test('ORP04-PROPERTY', async (t) => {
             continue;
           }
           assert.equal(sent.status, 200, sent.text);
-          seats.push({ ...seat, signed: false });
+          const record = { ...seat, signed: false };
+          if (record.required) {
+            const taken = new Set(seats.map((item) => item.fills).filter(Boolean));
+            const open = vacancies.find((item) => item.role === record.role && !taken.has(item.id));
+            if (open) record.fills = open.id;
+          }
+          seats.push(record);
           byId.set(client.party, client);
           snapshot = sent.message;
         } else {
@@ -243,13 +249,14 @@ test('ORP04-PROPERTY', async (t) => {
         }
         const expected = signatureState(seats, seats.filter((seat) => seat.signed).map((seat) => seat.id), vacancies);
         assert.equal(snapshot.body.state, expected.state, `${trial}.${step}`);
-        assert.deepEqual([...(snapshot.body.vacancies || [])].sort(), [...vacancies].sort());
+        assert.deepEqual([...(snapshot.body.vacancies || [])].sort(), vacancyRoles(vacancies).sort());
         assert.deepEqual(
           snapshot.body.parties.filter((seat) => seat.signed).map((seat) => seat.id).sort(),
           seats.filter((seat) => seat.signed).map((seat) => seat.id).sort(),
         );
-        if (vacancies.includes('facilitator')) {
-          assert.equal(snapshot.body.parties.some((seat) => seat.role === 'facilitator' && seat.required && seat.signed), false);
+        const openIds = new Set(vacancies.map((item) => item.id));
+        for (const id of seats.filter((item) => item.signed && item.fills).map((item) => item.fills)) {
+          assert.equal(openIds.has(id), false);
         }
       }
     }
@@ -297,11 +304,12 @@ test('ORP04-PROPERTY', async (t) => {
 });
 
 function clearVacancy(seat, vacancies) {
-  if (!seat.required) return vacancies;
-  const next = [...vacancies];
-  const index = next.indexOf(seat.role);
-  if (index >= 0) next.splice(index, 1);
-  return next;
+  if (!seat.fills) return vacancies;
+  return vacancies.filter((item) => item.id !== seat.fills);
+}
+
+function vacancyRoles(vacancies) {
+  return vacancies.map((item) => item.role);
 }
 
 function eurParties() {

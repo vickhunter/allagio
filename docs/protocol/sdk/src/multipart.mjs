@@ -72,7 +72,7 @@ export function validateParties(parties, { hostId = '' } = {}) {
       }
     }
     const percent = hasOwn(terms, 'percent');
-    const fixed = Boolean(terms.amount) || hasOwn(terms, 'per') || hasOwn(terms, 'hours') || Boolean(terms.deposit);
+    const fixed = Boolean(terms.amount);
     if (percent) {
       if (!Number.isInteger(terms.percent) || terms.percent < 0 || terms.percent > 100) {
         return { ok: false, field: `${field}/terms/percent`, message: 'A percent split is an integer from 0 to 100.' };

@@ -12,7 +12,7 @@
     },
     "PartyTerms": {
       "title": "PartyTerms",
-      "description": "What this seat is paid or owes. Percent splits are integers. Fixed amounts use amount. A deposit names who holds it outside Offer Rails.",
+      "description": "What this seat is paid or owes. Percent splits are integers. An amount is the amount field. per, hours, and a deposit are not amounts for the split rule. A deposit names who holds it outside Offer Rails.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
