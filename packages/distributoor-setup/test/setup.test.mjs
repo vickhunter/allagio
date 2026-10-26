@@ -99,13 +99,15 @@ test('re-running setup upgrades the previous canonical skill text', async t => {
   };
   const oldContext = '## This installation\n\nHosted API: https://old.example\n\nDetected dependencies (hints to verify): {"frameworks":["go"],"providers":[]}\n\nRequested product URL: "https://old.example"\n';
   const legacy = paths.filter(path => previousSkillBodies[path.split('/').at(-2)]);
-  assert.equal(legacy.length, 3);
+  assert.equal(legacy.length, 4);
   assert.ok(paths.some(path => path.endsWith('/distributoor-revenue/SKILL.md')));
   for (const path of legacy) {
     const name = path.split('/').at(-2);
     const previous = previousSkillBodies[name];
     assert.match(previous, new RegExp(`name: ${name}`));
-    assert.ok(previous.includes(titles[name][0]));
+    if (titles[name]) {
+      assert.ok(previous.includes(titles[name][0]));
+    }
     await writeFile(path, `${previous}${marker}${oldContext}`);
   }
   await installSkills(root, 'skill', { ...context, website: 'https://product.example' });

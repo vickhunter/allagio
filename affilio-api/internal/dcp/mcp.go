@@ -5,8 +5,8 @@ import (
 )
 
 // Minimal MCP server core: JSON-RPC 2.0 messages over a line-delimited stdio
-// transport (the loop lives in cmd/distributoor-mcp). Only the methods an MCP
-// client needs to drive tools are implemented.
+// transport (RunStdio). Only the methods an MCP client needs to drive tools
+// are implemented.
 
 const mcpProtocolVersion = "2025-06-18"
 

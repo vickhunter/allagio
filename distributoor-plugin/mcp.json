@@ -3,9 +3,12 @@
     "distributoor": {
       "command": "offer-rails-mcp",
       "env": {
-        "OFFERRAILS_API_URL": "${OFFERRAILS_API_URL:-http://localhost:8080}",
+        "OFFERRAILS_API_URL": "${OFFERRAILS_API_URL}",
         "OFFERRAILS_API_KEY": "${OFFERRAILS_API_KEY}",
-        "OFFERRAILS_SITE_KEY": "${OFFERRAILS_SITE_KEY}"
+        "OFFERRAILS_SITE_KEY": "${OFFERRAILS_SITE_KEY}",
+        "DISTRIBUTOOR_API_URL": "${DISTRIBUTOOR_API_URL}",
+        "DISTRIBUTOOR_API_KEY": "${DISTRIBUTOOR_API_KEY}",
+        "DISTRIBUTOOR_SITE_KEY": "${DISTRIBUTOOR_SITE_KEY}"
       }
     }
   }

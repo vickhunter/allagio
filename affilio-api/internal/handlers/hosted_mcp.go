@@ -57,6 +57,46 @@ func hostedToolList(g *database.AgentGrant) []dcp.Tool {
 	return tools
 }
 
+const hostedMCPInstructions = "Use existing products and publishing tools. Prepare a placement, send its owner approval URL to the human, and wait for approval before committing. Never ask for payment secrets in chat. Agents cannot approve placements, connect Stripe or confirm receipt of money. suggest_monetization takes a draft and returns up to three offers with a tracked link and a disclosure line. It does not publish."
+
+func newHostedMCPServer(grant *database.AgentGrant, loopbackURL, baseURL, bearer string) *mcp.Server {
+	s := mcp.NewServer(&mcp.Implementation{Name: dcp.ServerName, Title: dcp.ServerTitle, Version: "0.3.0"}, &mcp.ServerOptions{Instructions: hostedMCPInstructions})
+	for _, tool := range hostedTools(grant) {
+		readOnly := strings.HasPrefix(tool.Name, "get_") || strings.HasPrefix(tool.Name, "list_") || tool.Name == "find_opportunities" || tool.Name == "preview_revenue" || tool.Name == "suggest_monetization"
+		destructive := strings.HasPrefix(tool.Name, "update_") || tool.Name == "undo_placement" || tool.Name == "restore_placement"
+		openWorld := tool.Name == "run_assessment"
+		s.AddTool(&mcp.Tool{Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: readOnly || tool.Name == "commit_placement", DestructiveHint: &destructive, OpenWorldHint: &openWorld}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			args := map[string]any{}
+			if len(req.Params.Arguments) > 0 {
+				if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+					return nil, err
+				}
+			}
+			client := dcp.NewClient(loopbackURL, "")
+			client.Bearer = bearer
+			client.Context = ctx
+			client.HTTP = &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+			out, err := dcp.CallTool(client, tool.Name, args)
+			if err != nil {
+				return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}, nil
+			}
+			if tool.Name == "prepare_placement" || tool.Name == "get_placement" {
+				if p, ok := out["placement"].(map[string]any); ok {
+					if id, ok := p["id"].(string); ok {
+						out["owner_approval_url"] = baseURL + "/owner/placements/" + id
+					}
+				}
+			}
+			raw, err := json.Marshal(out)
+			if err != nil {
+				return nil, err
+			}
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}}, nil
+		})
+	}
+	return s
+}
+
 func (h *HostedHandler) MCPTransport() http.Handler {
 	transport := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
 		info := auth.TokenInfoFromContext(r.Context())
@@ -67,42 +107,8 @@ func (h *HostedHandler) MCPTransport() http.Handler {
 		if !ok {
 			return nil
 		}
-		s := mcp.NewServer(&mcp.Implementation{Name: dcp.ServerName, Title: dcp.ServerTitle, Version: "0.3.0"}, &mcp.ServerOptions{Instructions: "Use existing products and publishing tools. Prepare a placement, send its owner approval URL to the human, and wait for approval before committing. Never ask for payment secrets in chat. Agents cannot approve placements, connect Stripe or confirm receipt of money. suggest_monetization takes a draft and returns up to three offers with a tracked link and a disclosure line. It does not publish."})
 		bearer := strings.Fields(r.Header.Get("Authorization"))[1]
-		for _, tool := range hostedTools(g) {
-			readOnly := strings.HasPrefix(tool.Name, "get_") || strings.HasPrefix(tool.Name, "list_") || tool.Name == "find_opportunities" || tool.Name == "preview_revenue" || tool.Name == "suggest_monetization"
-			destructive := strings.HasPrefix(tool.Name, "update_") || tool.Name == "undo_placement" || tool.Name == "restore_placement"
-			openWorld := tool.Name == "run_assessment"
-			s.AddTool(&mcp.Tool{Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: readOnly || tool.Name == "commit_placement", DestructiveHint: &destructive, OpenWorldHint: &openWorld}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-				args := map[string]any{}
-				if len(req.Params.Arguments) > 0 {
-					if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
-						return nil, err
-					}
-				}
-				client := dcp.NewClient(h.LoopbackURL, "")
-				client.Bearer = bearer
-				client.Context = ctx
-				client.HTTP = &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-				out, err := dcp.CallTool(client, tool.Name, args)
-				if err != nil {
-					return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}, nil
-				}
-				if tool.Name == "prepare_placement" || tool.Name == "get_placement" {
-					if p, ok := out["placement"].(map[string]any); ok {
-						if id, ok := p["id"].(string); ok {
-							out["owner_approval_url"] = h.BaseURL + "/owner/placements/" + id
-						}
-					}
-				}
-				raw, err := json.Marshal(out)
-				if err != nil {
-					return nil, err
-				}
-				return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}}, nil
-			})
-		}
-		return s
+		return newHostedMCPServer(g, h.LoopbackURL, h.BaseURL, bearer)
 	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
 	verify := func(ctx context.Context, token string, r *http.Request) (*auth.TokenInfo, error) {
 		hash := services.HashAPIKey(token)

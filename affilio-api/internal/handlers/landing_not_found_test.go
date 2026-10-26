@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -39,5 +40,51 @@ func TestLandingUnknownPathIs404(t *testing.T) {
 	r.ServeHTTP(api, httptest.NewRequest(http.MethodGet, "/v1/directory/makers", nil))
 	if api.Code != http.StatusNotFound || strings.Contains(api.Body.String(), "That page is not on Offer Rails.") {
 		t.Fatalf("api miss %d %s", api.Code, api.Body.String())
+	}
+}
+
+func TestLandingTemplateErrorServesFallback(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "home.html"), []byte("<html>{{if</html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := &HostedHandler{BaseURL: "http://127.0.0.1:8080", AssetsPath: dir, DownloadsPath: t.TempDir()}
+	r := gin.New()
+	h.Mount(r)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "That page is not on Offer Rails.") || rec.Body.Len() == 0 {
+		t.Fatalf("body %q", rec.Body.String())
+	}
+}
+
+func TestLandingStaticShellsRenderTemplates(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &HostedHandler{
+		BaseURL:       "http://127.0.0.1:8080",
+		AssetsPath:    filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"),
+		DownloadsPath: t.TempDir(),
+	}
+	r := gin.New()
+	h.Mount(r)
+	for _, path := range []string{
+		"/landing-v9/not-found/index.html",
+		"/landing-v9/not-found/",
+		"/landing-v9/profile/index.html",
+		"/landing-v9/profile",
+	} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		body := rec.Body.String()
+		if strings.Contains(body, "{{") || strings.Contains(body, "InstallerReady") {
+			t.Fatalf("%s still serves template source, status %d", path, rec.Code)
+		}
+		if !strings.Contains(body, `name="or-plugin" content="0"`) {
+			t.Fatalf("%s missing rendered plugin meta, status %d", path, rec.Code)
+		}
 	}
 }

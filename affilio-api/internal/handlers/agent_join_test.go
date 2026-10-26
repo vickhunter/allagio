@@ -836,6 +836,10 @@ func TestLLMsJoinDoesNotRequireGoogle(t *testing.T) {
 	if string(public) != string(built) || !strings.Contains(string(public), AgentJoinCommand) || strings.Contains(string(public), "/mcp needs the Google sign-in") {
 		t.Fatal("served llms.txt still sends agents to Google")
 	}
+	const stdioSentence = "The MCP server name is offer-rails-mcp. The npm package offer-rails is not published yet. It is coming soon. Use the hosted MCP URL in this document. When the hosted installer archive is on this origin, the command is npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>. The environment names are OFFERRAILS_API_URL, OFFERRAILS_API_KEY, and OFFERRAILS_SITE_KEY."
+	if !strings.Contains(llmsBody(), stdioSentence) || !strings.Contains(string(public), stdioSentence) || !strings.Contains(string(built), stdioSentence) {
+		t.Fatal("llms fallback stdio text does not match the served file")
+	}
 }
 
 func TestJoinOneLinerFromCleanFolder(t *testing.T) {

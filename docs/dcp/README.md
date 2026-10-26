@@ -33,6 +33,7 @@ A DCP endpoint MUST:
    machine-actionable `remediation` strings.
 
 Reference implementation: this repository. Reference client + MCP server:
-`affilio-api/internal/dcp`, `affilio-api/cmd/distributoor-mcp` (that directory
-name stays; the server reports `offer-rails-mcp`). The npm package
-`offer-rails` is not published yet.
+`affilio-api/internal/dcp`, `affilio-api/cmd/offer-rails-mcp`. The binary name
+is `offer-rails-mcp`. `affilio-api/cmd/distributoor-mcp` is the same process
+under the previous binary name. The server reports `offer-rails-mcp`. The npm
+package `offer-rails` is not published yet.

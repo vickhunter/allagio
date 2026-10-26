@@ -110,6 +110,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/terms/", h.Terms)
 		public.GET("/agents", h.Agents)
 		public.GET("/agents/", h.Agents)
+		public.Use(h.renderLandingShells)
 		public.Static("/landing-v9", filepath.Join(h.AssetsPath, "landing-v9"))
 		for _, name := range []string{"workspace.css", "workspace.js", "setup-controls.js", "landing.css", "landing.js", "landing-scene.bundle.js", "landing-scene.bundle.js.LEGAL.txt", "THIRD_PARTY_NOTICES.md"} {
 			file := name
@@ -207,19 +208,38 @@ func (h *HostedHandler) directoryProfile(c *gin.Context) {
 	h.writeBuiltHTML(c, "profile")
 }
 
+// landingNotFoundFallback is the page served when a landing template cannot
+// be read or executed. A parse error uses it with HTTP 500.
+var landingNotFoundFallback = []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · Page not found</title></head><body><header><a href="/">Offer Rails</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a><a href="/agents">Agents</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main><h1>That page is not on Offer Rails.</h1><p>The address does not match a page on this site.</p><p><a href="/">Home</a></p><p><a href="/agents">Agents</a></p></main></body></html>`)
+
 func (h *HostedHandler) writeBuiltHTML(c *gin.Context, name string) {
-	body := []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · Page not found</title></head><body><header><a href="/">Offer Rails</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a><a href="/agents">Agents</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main><h1>That page is not on Offer Rails.</h1><p>The address does not match a page on this site.</p><p><a href="/">Home</a></p><p><a href="/agents">Agents</a></p></main></body></html>`)
+	body := landingNotFoundFallback
 	if h.AssetsPath != "" {
 		if file, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", name, "index.html")); err == nil {
 			rendered, renderErr := executeLandingTemplate(name, file, h.landingView())
 			if renderErr != nil {
-				c.Status(http.StatusInternalServerError)
+				c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", landingNotFoundFallback)
 				return
 			}
 			body = rendered
 		}
 	}
 	c.Data(http.StatusNotFound, "text/html; charset=utf-8", body)
+}
+
+// renderLandingShells executes the not-found and profile shells. The static
+// file server would otherwise send those files with the Go actions intact.
+func (h *HostedHandler) renderLandingShells(c *gin.Context) {
+	switch path.Clean(c.Request.URL.Path) {
+	case "/landing-v9/not-found", "/landing-v9/not-found/index.html":
+		h.writeBuiltHTML(c, "not-found")
+		c.Abort()
+	case "/landing-v9/profile", "/landing-v9/profile/index.html":
+		h.writeBuiltHTML(c, "profile")
+		c.Abort()
+	default:
+		c.Next()
+	}
 }
 
 func (h *HostedHandler) Home(c *gin.Context)           { h.landing(c, "home.html") }
@@ -294,7 +314,7 @@ func (h *HostedHandler) landing(c *gin.Context, name string) {
 	}
 	body, err := executeLandingTemplate(name, src, h.landingView())
 	if err != nil {
-		c.Abort()
+		c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", landingNotFoundFallback)
 		return
 	}
 	c.Data(http.StatusOK, "text/html; charset=utf-8", stampLandingLinks(body, landingSourceFrom(c)))
