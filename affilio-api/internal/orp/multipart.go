@@ -35,6 +35,15 @@ var (
 		"disclosure": true, "starts": true, "ends": true,
 		"checked_at": true, "expires_at": true, "claims": true,
 	}
+	// automationUA are case-insensitive substrings. A hit is class bot.
+	// A browser user agent does not contain these tokens.
+	automationUA = []string{
+		"bot", "crawler", "spider", "slurp", "curl/", "wget",
+		"python-requests", "python-urllib", "go-http-client", "httpclient",
+		"okhttp", "libwww", "headless", "facebookexternalhit", "slackbot",
+		"whatsapp", "telegram", "discord", "preview", "scrapy", "axios",
+		"node-fetch", "postman",
+	}
 )
 
 // HolderKey compares a deposit holder after lowercasing and stripping
@@ -367,6 +376,12 @@ func ClickClass(method, ua, purpose, rawQuery string) string {
 	}
 	if strings.TrimSpace(ua) == "" {
 		return "bot"
+	}
+	lowUA := strings.ToLower(ua)
+	for _, token := range automationUA {
+		if strings.Contains(lowUA, token) {
+			return "bot"
+		}
 	}
 	return "human"
 }

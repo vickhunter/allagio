@@ -314,22 +314,24 @@ FROM orp_offers WHERE id=$1 AND owner_id=$2::uuid`, id, ownerID).Scan(
 // of that click. A later click records its own split and does not add those
 // percents onto an earlier click. The first human click that meets a place
 // obligation whose proof includes link marks that obligation verified and
-// writes one receipt. A bot, preview, or test click does not. It does not
-// store an address, a user agent, or a referrer. No new column is required:
-// the obligation list and the inbox already hold the receipt.
-func (d *DB) RecordORPClick(ctx context.Context, token, class, clickID string, at time.Time) (destination, param, alias string, found bool, err error) {
+// writes one receipt. A bot, preview, or test click does not. Verification
+// runs only when the deal is active and the place obligation is pending or
+// claimed. record is false for HEAD: the redirect is returned and nothing is
+// written. It does not store an address, a user agent, or a referrer. No new
+// column is required: the obligation list and the inbox already hold the receipt.
+func (d *DB) RecordORPClick(ctx context.Context, token, class, clickID string, at time.Time, record bool) (destination, param, alias string, found bool, err error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return "", "", "", false, err
 	}
 	defer tx.Rollback(ctx)
-	var id string
+	var id, state string
 	var parties, obligationsRaw, termsRaw []byte
 	err = tx.QueryRow(ctx, `
-SELECT id, parties, obligations, terms
+SELECT id, state, parties, obligations, terms
 FROM orp_deals
 WHERE parties->'tracking' @> jsonb_build_array(jsonb_build_object('token', $1::text))
-FOR UPDATE`, token).Scan(&id, &parties, &obligationsRaw, &termsRaw)
+FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", "", "", false, nil
 	}
@@ -377,6 +379,10 @@ FOR UPDATE`, token).Scan(&id, &parties, &obligationsRaw, &termsRaw)
 		param = "via"
 	}
 	if entry.Status != "live" {
+		return destination, param, alias, true, nil
+	}
+	// HEAD is class preview. The redirect is the same and the row is not written.
+	if !record {
 		return destination, param, alias, true, nil
 	}
 	shares := make([]any, 0)
@@ -429,7 +435,7 @@ FOR UPDATE`, token).Scan(&id, &parties, &obligationsRaw, &termsRaw)
 	if err != nil {
 		return "", "", "", false, err
 	}
-	receiptID, nextObligations, receiptBody := linkReceipt(termsRaw, obligationsRaw, clicks, entry.Obligation, class, at)
+	receiptID, nextObligations, receiptBody := linkReceipt(termsRaw, obligationsRaw, clicks, entry.Obligation, class, state, at)
 	if receiptID == "" {
 		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET parties=$2 WHERE id=$1`, id, raw); err != nil {
 			return "", "", "", false, err
@@ -438,7 +444,7 @@ FOR UPDATE`, token).Scan(&id, &parties, &obligationsRaw, &termsRaw)
 		if at.IsZero() {
 			at = time.Now().UTC()
 		}
-		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET parties=$2, obligations=$3, updated_at=$4 WHERE id=$1`, id, raw, nextObligations, at.UTC()); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET parties=$2, obligations=$3, updated_at=$4 WHERE id=$1`, id, raw, JSONList(nextObligations), at.UTC()); err != nil {
 			return "", "", "", false, err
 		}
 		host := ""
@@ -468,11 +474,11 @@ FOR UPDATE`, token).Scan(&id, &parties, &obligationsRaw, &termsRaw)
 }
 
 // linkReceipt verifies a place obligation once the human clicks reach its
-// target. The default target is the first human click. An obligation that is
-// already verified is left alone, so a repeat click does not write a second
-// receipt or change the split stored on an earlier click.
-func linkReceipt(termsRaw, obligationsRaw []byte, clicks []any, obligation, class string, at time.Time) (receiptID string, obligations json.RawMessage, body map[string]any) {
-	if class != "human" {
+// target. The default target is the first human click. The deal must be
+// active, and the stored obligation must be pending or claimed. failed,
+// partial, verified, and any other state stay as they are, with no receipt.
+func linkReceipt(termsRaw, obligationsRaw []byte, clicks []any, obligation, class, dealState string, at time.Time) (receiptID string, obligations json.RawMessage, body map[string]any) {
+	if class != "human" || dealState != "active" {
 		return "", nil, nil
 	}
 	var terms map[string]any
@@ -506,7 +512,8 @@ func linkReceipt(termsRaw, obligationsRaw []byte, clicks []any, obligation, clas
 		if rows[i]["id"] != obligation {
 			continue
 		}
-		if rows[i]["state"] == "verified" {
+		stored, _ := rows[i]["state"].(string)
+		if stored != "pending" && stored != "claimed" {
 			return "", nil, nil
 		}
 		found = true

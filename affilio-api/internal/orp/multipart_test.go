@@ -45,6 +45,71 @@ func TestValidatePartiesSplitsAndHolders(t *testing.T) {
 	}
 }
 
+func TestClickClass(t *testing.T) {
+	chrome := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+	safari := "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+	firefox := "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
+	edge := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
+	cases := []struct {
+		name, method, ua, purpose, query, want string
+	}{
+		{"empty user agent", "GET", "", "", "", "bot"},
+		{"chrome", "GET", chrome, "", "", "human"},
+		{"safari", "GET", safari, "", "", "human"},
+		{"firefox", "GET", firefox, "", "", "human"},
+		{"edge", "GET", edge, "", "", "human"},
+		{"head", "HEAD", chrome, "", "", "preview"},
+		{"head with googlebot", "HEAD", "Googlebot/2.1", "", "", "preview"},
+		{"prefetch", "GET", chrome, "prefetch", "", "preview"},
+		{"prerender", "GET", chrome, "prerender", "", "preview"},
+		{"orp test stays test", "GET", "curl/8.0.1", "", "orp_test=1", "test"},
+		{"googlebot", "GET", "Googlebot/2.1", "", "", "bot"},
+		{"twitterbot", "GET", "Twitterbot/1.0", "", "", "bot"},
+		{"curl", "GET", "curl/8.0.1", "", "", "bot"},
+		{"wget", "GET", "Wget/1.21", "", "", "bot"},
+		{"python requests", "GET", "python-requests/2.31.0", "", "", "bot"},
+		{"python urllib", "GET", "Python-urllib/3.11", "", "", "bot"},
+		{"go http client", "GET", "Go-http-client/1.1", "", "", "bot"},
+		{"java httpclient", "GET", "Apache-HttpClient/4.5.14", "", "", "bot"},
+		{"okhttp", "GET", "okhttp/4.12.0", "", "", "bot"},
+		{"libwww", "GET", "libwww-perl/6.72", "", "", "bot"},
+		{"headless chrome", "GET", "Mozilla/5.0 HeadlessChrome/120.0.0.0", "", "", "bot"},
+		{"facebook", "GET", "facebookexternalhit/1.1", "", "", "bot"},
+		{"slackbot", "GET", "Slackbot-LinkExpanding 1.0", "", "", "bot"},
+		{"whatsapp", "GET", "WhatsApp/2.23.20", "", "", "bot"},
+		{"telegram", "GET", "TelegramBot (like TwitterBot)", "", "", "bot"},
+		{"discord", "GET", "Discordbot/2.0", "", "", "bot"},
+		{"preview", "GET", "Slack-Preview/1.0", "", "", "bot"},
+		{"scrapy", "GET", "Scrapy/2.11.0", "", "", "bot"},
+		{"axios", "GET", "axios/1.6.0", "", "", "bot"},
+		{"node fetch", "GET", "node-fetch/3.3.2", "", "", "bot"},
+		{"postman", "GET", "PostmanRuntime/7.36.0", "", "", "bot"},
+		{"crawler", "GET", "generic-crawler/1.0", "", "", "bot"},
+		{"spider", "GET", "Mozilla/5.0 (compatible; Baiduspider/2.0)", "", "", "bot"},
+		{"slurp", "GET", "Mozilla/5.0 (compatible; Yahoo! Slurp)", "", "", "bot"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ClickClass(tc.method, tc.ua, tc.purpose, tc.query); got != tc.want {
+				t.Fatalf("ClickClass(%q, %q) = %s, want %s", tc.method, tc.ua, got, tc.want)
+			}
+		})
+	}
+	for _, token := range automationUA {
+		ua := "Check-" + token + "-1"
+		if got := ClickClass("GET", ua, "", ""); got != "bot" {
+			t.Fatalf("token %q ua %q class %s", token, ua, got)
+		}
+		upper := strings.ToUpper(ua)
+		if got := ClickClass("GET", upper, "", ""); got != "bot" {
+			t.Fatalf("token %q upper %q class %s", token, upper, got)
+		}
+		if got := ClickClass("HEAD", ua, "", ""); got != "preview" {
+			t.Fatalf("HEAD token %q class %s", token, got)
+		}
+	}
+}
+
 func TestSignatureStateAndExpiry(t *testing.T) {
 	seats := []Seat{
 		{ID: "a", Required: true, Signed: true},

@@ -27,6 +27,7 @@ func mountORPDeals(h *ORPHost, r gin.IRouter) {
 	r.GET("/orp/approve/:id", h.Approve)
 	r.POST("/orp/approve/:id", h.ApprovePost)
 	r.GET("/go/:token", h.Go)
+	r.HEAD("/go/:token", h.Go)
 }
 
 // Inbox is GET /orp/inbox. The bearer is the joined agent.

@@ -485,7 +485,9 @@ func (h *ORPHost) Go(c *gin.Context) {
 	purpose := c.GetHeader("Sec-Purpose") + " " + c.GetHeader("Purpose")
 	class := orp.ClickClass(c.Request.Method, c.GetHeader("User-Agent"), purpose, c.Request.URL.RawQuery)
 	clickID := orp.LocalID("clk_")
-	dest, param, alias, found, err := h.Entry.DB.RecordORPClick(c.Request.Context(), token, class, clickID, h.now())
+	// HEAD is class preview. It redirects with the same headers and does not record.
+	record := !strings.EqualFold(c.Request.Method, http.MethodHead)
+	dest, param, alias, found, err := h.Entry.DB.RecordORPClick(c.Request.Context(), token, class, clickID, h.now(), record)
 	if err != nil || !found {
 		c.Redirect(http.StatusFound, strings.TrimRight(origin, "/")+"/")
 		return
