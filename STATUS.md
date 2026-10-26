@@ -1,3 +1,11 @@
+## October 26 — ORP docs, many-party pages (D-103)
+
+`/protocol/many/` is the many-to-many concepts page. Spec pages for ORP 0.3 and ORP 0.4 are generated from `docs/protocol/schema/0.3` and `docs/protocol/schema/0.4`, with the examples under `schema/examples`. A plain 0.3 deal stays two parties. The quickstart shows the 3-party referral file and the 5-party home-sale file, including the leave example that returns the deal to pending. The license line is “Apache-2.0 planned.” The hosted deal API does not speak 0.4 leave or seat. Offer Rails does not hold money. No migration. No deploy.
+
+## October 26 — ORP 0.3 protocol docs (D-094)
+
+`/protocol/` is the ORP 0.3 reference, generated at build time from `docs/protocol/schema/0.3` and the example files. Overview, concepts, a page per schema, the agent quickstart, the reference SDK, and the L0–L3 test names live in the landing build. Deep links such as `/protocol/spec/hello/` and `/protocol/quickstart/` serve the same page. The license line is “Apache-2.0 planned.”
+
 ## October 26 — ORP 0.4 re-review
 
 A required vacancy clears only when the replacement seated for that vacancy signs. An original required seat of the same role does not clear it. `per`, `hours`, and `deposit` are not amounts: percents with no `amount` still sum to 100, and a cap is required only for a mix with an amount. Approve builds the next deal, the consent messages, and the tracking links first, and delivers them only after every snapshot has succeeded. A thrown snapshot leaves every inbox, the store, and `this.links` as they were, so a click does not follow an orphan token to the host root. The same rollback covers a 0.3 approval. No migration. The hosted deal API does not speak 0.4. `CLAIMS_CHECK` is unchanged. No deploy.
