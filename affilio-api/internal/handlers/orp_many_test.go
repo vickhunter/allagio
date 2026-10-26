@@ -1521,6 +1521,37 @@ func receiptCount(t *testing.T, db *database.DB) int {
 	return countRows(t, db, `SELECT COUNT(*) FROM orp_inbox WHERE message->>'type' = 'receipt'`)
 }
 
+func TestORP04CubotVerifies(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, link, offerer := openActivePlace(t, db, r)
+	const cubot = "Mozilla/5.0 (Linux; Android 11; CUBOT NOTE 20) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36"
+	first := clickClassed(t, r, link, cubot)
+	if first.Code != http.StatusFound || !strings.Contains(first.Header().Get("Location"), "example.com/notes") {
+		t.Fatalf("cubot %d %s", first.Code, first.Header().Get("Location"))
+	}
+	place := readPlace(t, r, dealID, offerer.token)
+	receipt, _ := place["receipt"].(string)
+	if place["state"] != "verified" || receipt == "" {
+		t.Fatalf("cubot left place pending %#v", place)
+	}
+	rec, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offerer.token))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("deal %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), cubot) || strings.Contains(rec.Body.String(), "CUBOT") {
+		t.Fatalf("stored the user agent %s", rec.Body.String())
+	}
+	row := docBody(t, doc)["tracking"].([]any)[0].(map[string]any)
+	if asFloat(row["clicks"]) != 1 {
+		t.Fatalf("clicks %#v", row["clicks"])
+	}
+	clicks := storedClicks(t, db, dealID)
+	if len(clicks) != 1 || clicks[0].(map[string]any)["class"] != "human" {
+		t.Fatalf("stored %#v", clicks)
+	}
+}
+
 func TestORP04BotUADoesNotVerify(t *testing.T) {
 	db, _, r, cleanup := newORP04(t)
 	defer cleanup()

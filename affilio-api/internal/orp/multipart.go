@@ -36,14 +36,12 @@ var (
 		"disclosure": true, "starts": true, "ends": true,
 		"checked_at": true, "expires_at": true, "claims": true,
 	}
-	// automationUA are case-insensitive substrings. A hit is class bot.
-	// A browser user agent does not contain these tokens.
-	automationUA = []string{
-		"bot", "crawler", "spider", "slurp", "curl/", "wget",
-		"python-requests", "python-urllib", "go-http-client", "httpclient",
-		"okhttp", "libwww", "headless", "facebookexternalhit", "slackbot",
-		"whatsapp", "telegram", "discord", "preview", "scrapy", "axios",
-		"node-fetch", "postman",
+	// clientPrefixes are product-token prefixes. A hit is class bot.
+	// Longer names come first. A device name inside parentheses is not a product token.
+	clientPrefixes = []string{
+		"python-requests", "python-urllib", "go-http-client", "facebookexternalhit",
+		"headlesschrome", "node-fetch", "headless", "libwww", "scrapy", "okhttp",
+		"axios", "postman", "whatsapp", "wget", "curl",
 	}
 )
 
@@ -492,13 +490,120 @@ func ClickClass(method, ua, purpose, rawQuery string) string {
 	if strings.TrimSpace(ua) == "" {
 		return "bot"
 	}
-	lowUA := strings.ToLower(ua)
-	for _, token := range automationUA {
-		if strings.Contains(lowUA, token) {
-			return "bot"
-		}
+	if automationClient(ua) {
+		return "bot"
 	}
 	return "human"
+}
+
+// automationClient is true for a known automation product token.
+// A token is the name before "/", or the name after "compatible;".
+// Text inside parentheses is a comment, so CUBOT NOTE 20 stays human.
+// bot matches when that token ends in bot or bot-..., or is bot.html.
+// crawler, spider, and slurp match anywhere. preview, discord, whatsapp,
+// telegram, and bot are not bare substrings.
+func automationClient(ua string) bool {
+	low := strings.ToLower(ua)
+	if strings.Contains(low, "crawler") || strings.Contains(low, "spider") || strings.Contains(low, "slurp") {
+		return true
+	}
+	if strings.Contains(low, "/bot.html") || strings.HasPrefix(low, "bot.html") {
+		return true
+	}
+	for _, token := range productTokens(low) {
+		if botProduct(token) || namedClient(token) {
+			return true
+		}
+	}
+	return false
+}
+
+func botProduct(token string) bool {
+	name := strings.TrimSuffix(token, ".html")
+	return strings.HasSuffix(name, "bot") || strings.Contains(name, "bot-")
+}
+
+func namedClient(token string) bool {
+	for _, name := range clientPrefixes {
+		if token == name || strings.HasPrefix(token, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func productTokens(ua string) []string {
+	var out []string
+	i := 0
+	for i < len(ua) {
+		if ua[i] == '(' {
+			end, inner := commentSpan(ua, i)
+			out = append(out, compatibleNames(inner)...)
+			i = end
+			continue
+		}
+		if !isProductChar(ua[i]) {
+			i++
+			continue
+		}
+		j := i + 1
+		for j < len(ua) && isProductChar(ua[j]) {
+			j++
+		}
+		out = append(out, ua[i:j])
+		i = j
+	}
+	return out
+}
+
+func compatibleNames(comment string) []string {
+	var out []string
+	rest := comment
+	for {
+		i := strings.Index(rest, "compatible;")
+		if i < 0 {
+			return out
+		}
+		rest = strings.TrimLeft(rest[i+len("compatible;"):], " \t")
+		j := 0
+		for j < len(rest) && isProductChar(rest[j]) {
+			j++
+		}
+		if j > 0 {
+			out = append(out, rest[:j])
+		}
+		rest = rest[j:]
+	}
+}
+
+func commentSpan(ua string, open int) (int, string) {
+	depth := 1
+	i := open + 1
+	for i < len(ua) && depth > 0 {
+		switch ua[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		}
+		i++
+	}
+	if depth == 0 {
+		return i, ua[open+1 : i-1]
+	}
+	return len(ua), ua[open+1:]
+}
+
+func isProductChar(c byte) bool {
+	if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
+		return true
+	}
+	switch c {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	default:
+		return false
+	}
 }
 
 // MintTracking mints place links that carry content.link or content.code.

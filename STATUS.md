@@ -1,3 +1,7 @@
+## October 26 — ORP browser device names stay human (D-102b)
+
+Click classification matches a product token, not a bare substring. A token is the name before `/`, or the name after `compatible;`. It is a bot when that token ends in `bot` or `bot-...`, when it is a known client such as curl or wget, or when the agent contains crawler, spider, or slurp. `CUBOT NOTE 20` and a Safari `(preview)` comment stay human, so the first click verifies the place obligation and counts. `HEAD`, prefetch, and `orp_test=1` are unchanged. `POST /orp/approve/<id>` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 26 — ORP deal read shows the click split (D-109)
 
 `GET /orp/deals/<id>` now returns `clicks` and `click_share` on the tracking entry, and every party sees the same numbers. `clicks` counts human clicks. A request with no user agent, a known automation client, `HEAD`, prefetch, prerender, and `orp_test=1` stay at 0. `click_share` sums each party's percent or amount across the counted clicks. Two counted clicks on a 50/30/20 split read 1.0, 0.6, and 0.4. An amount stays an integer sum of `amount_minor`. The fields carry no personal data. A 0.3 deal omits them. `POST /orp/approve/<id>` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

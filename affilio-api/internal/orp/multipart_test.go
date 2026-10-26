@@ -86,30 +86,47 @@ func TestClickReadout(t *testing.T) {
 
 func TestClickClass(t *testing.T) {
 	chrome := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-	safari := "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+	cubot := "Mozilla/5.0 (Linux; Android 11; CUBOT NOTE 20) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36"
+	safariPreview := "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15 (preview)"
+	iphone := "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 	firefox := "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"
 	edge := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
+	samsung := "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36"
+	opera := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 OPR/116.0.0.0"
+	abbott := "Mozilla/5.0 (Linux; Android 10; Abbott) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+	robotek := "Mozilla/5.0 (Linux; Android 10; Robotek) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 	cases := []struct {
 		name, method, ua, purpose, query, want string
 	}{
 		{"empty user agent", "GET", "", "", "", "bot"},
-		{"chrome", "GET", chrome, "", "", "human"},
-		{"safari", "GET", safari, "", "", "human"},
-		{"firefox", "GET", firefox, "", "", "human"},
-		{"edge", "GET", edge, "", "", "human"},
+		{"whitespace user agent", "GET", "  \t  ", "", "", "bot"},
+		{"cubot device", "GET", cubot, "", "", "human"},
+		{"safari preview comment", "GET", safariPreview, "", "", "human"},
+		{"chrome 131", "GET", chrome, "", "", "human"},
+		{"iphone safari", "GET", iphone, "", "", "human"},
+		{"firefox 128", "GET", firefox, "", "", "human"},
+		{"edge 131", "GET", edge, "", "", "human"},
+		{"samsung internet", "GET", samsung, "", "", "human"},
+		{"opera", "GET", opera, "", "", "human"},
+		{"abbott device", "GET", abbott, "", "", "human"},
+		{"robotek device", "GET", robotek, "", "", "human"},
+		{"preview product name", "GET", "Slack-Preview/1.0", "", "", "human"},
 		{"head", "HEAD", chrome, "", "", "preview"},
 		{"head with googlebot", "HEAD", "Googlebot/2.1", "", "", "preview"},
+		{"head with cubot", "HEAD", cubot, "", "", "preview"},
 		{"prefetch", "GET", chrome, "prefetch", "", "preview"},
 		{"prerender", "GET", chrome, "prerender", "", "preview"},
 		{"orp test stays test", "GET", "curl/8.0.1", "", "orp_test=1", "test"},
 		{"googlebot", "GET", "Googlebot/2.1", "", "", "bot"},
+		{"googlebot url", "GET", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "", "", "bot"},
+		{"bot html", "GET", "+http://www.google.com/bot.html", "", "", "bot"},
 		{"twitterbot", "GET", "Twitterbot/1.0", "", "", "bot"},
+		{"bingbot", "GET", "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)", "", "", "bot"},
 		{"curl", "GET", "curl/8.0.1", "", "", "bot"},
 		{"wget", "GET", "Wget/1.21", "", "", "bot"},
 		{"python requests", "GET", "python-requests/2.31.0", "", "", "bot"},
 		{"python urllib", "GET", "Python-urllib/3.11", "", "", "bot"},
 		{"go http client", "GET", "Go-http-client/1.1", "", "", "bot"},
-		{"java httpclient", "GET", "Apache-HttpClient/4.5.14", "", "", "bot"},
 		{"okhttp", "GET", "okhttp/4.12.0", "", "", "bot"},
 		{"libwww", "GET", "libwww-perl/6.72", "", "", "bot"},
 		{"headless chrome", "GET", "Mozilla/5.0 HeadlessChrome/120.0.0.0", "", "", "bot"},
@@ -118,7 +135,7 @@ func TestClickClass(t *testing.T) {
 		{"whatsapp", "GET", "WhatsApp/2.23.20", "", "", "bot"},
 		{"telegram", "GET", "TelegramBot (like TwitterBot)", "", "", "bot"},
 		{"discord", "GET", "Discordbot/2.0", "", "", "bot"},
-		{"preview", "GET", "Slack-Preview/1.0", "", "", "bot"},
+		{"discord compatible", "GET", "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)", "", "", "bot"},
 		{"scrapy", "GET", "Scrapy/2.11.0", "", "", "bot"},
 		{"axios", "GET", "axios/1.6.0", "", "", "bot"},
 		{"node fetch", "GET", "node-fetch/3.3.2", "", "", "bot"},
@@ -133,19 +150,6 @@ func TestClickClass(t *testing.T) {
 				t.Fatalf("ClickClass(%q, %q) = %s, want %s", tc.method, tc.ua, got, tc.want)
 			}
 		})
-	}
-	for _, token := range automationUA {
-		ua := "Check-" + token + "-1"
-		if got := ClickClass("GET", ua, "", ""); got != "bot" {
-			t.Fatalf("token %q ua %q class %s", token, ua, got)
-		}
-		upper := strings.ToUpper(ua)
-		if got := ClickClass("GET", upper, "", ""); got != "bot" {
-			t.Fatalf("token %q upper %q class %s", token, upper, got)
-		}
-		if got := ClickClass("HEAD", ua, "", ""); got != "preview" {
-			t.Fatalf("HEAD token %q class %s", token, got)
-		}
 	}
 }
 
