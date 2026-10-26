@@ -1,0 +1,112 @@
+{
+  "why": "A deal has at most 16 parties.",
+  "schema": "message",
+  "path": "/body/parties",
+  "instance": {
+    "orp": "0.4",
+    "type": "offer",
+    "id": "m_maker_toomany",
+    "ts": "2026-10-26T12:00:00.000Z",
+    "from": "orp:hub.example/p_maker01",
+    "body": {
+      "terms": {
+        "title": "Bad notes split",
+        "kind": "partnership",
+        "obligations": [
+          {
+            "id": "share",
+            "by": "offerer",
+            "action": "share"
+          }
+        ]
+      },
+      "parties": [
+        {
+          "id": "orp:hub.example/p_many00",
+          "role": "offerer",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many01",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many02",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many03",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many04",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many05",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many06",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many07",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many08",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many09",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many10",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many11",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many12",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many13",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many14",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many15",
+          "role": "member",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_many16",
+          "role": "member",
+          "required": true
+        }
+      ]
+    }
+  }
+}

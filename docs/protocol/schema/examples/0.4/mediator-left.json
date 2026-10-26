@@ -1,0 +1,57 @@
+{
+  "orp": "0.4",
+  "type": "deal",
+  "id": "m_host_medleft",
+  "ts": "2026-10-26T12:00:00.000Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_seller01",
+  "deal": "deal_medleft",
+  "body": {
+    "state": "pending",
+    "parties": [
+      {
+        "id": "orp:hub.example/p_seller01",
+        "role": "offerer",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "amount": {
+            "amount_minor": 0,
+            "currency": "EUR"
+          }
+        }
+      },
+      {
+        "id": "orp:hub.example/p_buyer01",
+        "role": "acceptor",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "amount": {
+            "amount_minor": 100000,
+            "currency": "EUR"
+          }
+        }
+      }
+    ],
+    "terms": {
+      "title": "Illustrative mediator seat, test mode only",
+      "kind": "partnership",
+      "obligations": [
+        {
+          "id": "share",
+          "by": "offerer",
+          "action": "share"
+        }
+      ]
+    },
+    "terms_hash": "sha256-7PdskwQsfwZslXUx3OE0sySgXwH0bB5QGpatMOvGW2k",
+    "updated": "2026-10-26T12:00:00.000Z",
+    "offerer": "orp:hub.example/p_seller01",
+    "acceptor": "orp:hub.example/p_buyer01",
+    "round": 1,
+    "vacancies": [
+      "facilitator"
+    ]
+  }
+}

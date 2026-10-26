@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/messages/results.schema.json",
+  "title": "ResultsMessage",
+  "description": "Discovery results that may include 0.4 offer terms (checked_at, expires_at, claims).",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "re"],
+  "properties": {
+    "type": { "const": "results" },
+    "body": { "$ref": "#/$defs/ResultsBody" }
+  },
+  "$defs": {
+    "OfferSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "terms", "terms_hash"],
+      "properties": {
+        "id": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/LocalId" },
+        "terms": { "$ref": "../defs.schema.json#/$defs/Terms" },
+        "terms_hash": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Hash" },
+        "expires": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "Result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["party", "fit"],
+      "properties": {
+        "offer": { "$ref": "#/$defs/OfferSummary" },
+        "space": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Space" },
+        "party": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/PartyId" },
+        "fit": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Fit" },
+        "trust": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Trust" },
+        "pool": { "type": "string", "pattern": "^[a-z0-9_-]{1,40}$" },
+        "checks": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Checks" },
+        "pitch": { "type": "string", "minLength": 1, "maxLength": 280 }
+      },
+      "oneOf": [{ "required": ["offer"] }, { "required": ["space"] }]
+    },
+    "ResultsBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items"],
+      "properties": {
+        "items": { "type": "array", "maxItems": 50, "items": { "$ref": "#/$defs/Result" } },
+        "cursor": { "type": "string", "maxLength": 200 },
+        "empty_reason": { "type": "string", "enum": ["no_match", "below_threshold", "filtered"] }
+      }
+    }
+  }
+}

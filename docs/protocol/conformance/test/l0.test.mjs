@@ -15,11 +15,17 @@ test('L0-SCHEMA', async () => {
     assert.equal(codeOf(missing), 'invalid_message');
 
     const hello = maker.msg({ type: 'hello', body: { versions: ['0.3'] } });
-    hello.orp = '0.4';
+    hello.orp = '9.9';
     const version = await maker.send(hello);
     assert.equal(version.status, 400);
     assert.equal(codeOf(version), 'unsupported_version');
-    assert.deepEqual(version.message.body.supported, ['0.3']);
+    assert.deepEqual(version.message.body.supported, ['0.4', '0.3']);
+
+    const hello04 = maker.msg({ orp: '0.4', type: 'hello', body: { versions: ['0.4'] } });
+    const ok04 = await maker.send(hello04);
+    assert.equal(ok04.status, 200);
+    assert.equal(ok04.message.orp, '0.4');
+    assert.deepEqual(ok04.message.body.versions, ['0.4']);
 
     const critical = await maker.send(maker.msg({
       type: 'hello',

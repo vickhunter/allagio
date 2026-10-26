@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/messages/deal.schema.json",
+  "title": "DealMessage",
+  "description": "A many-party deal snapshot. State is pending until every required party has signed. Optional parties do not block active.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "deal" },
+    "body": { "$ref": "#/$defs/DealBody" }
+  },
+  "$defs": {
+    "DealBody": {
+      "title": "DealBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "parties", "terms", "terms_hash", "updated"],
+      "properties": {
+        "state": { "$ref": "#/$defs/DealState" },
+        "parties": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "items": { "$ref": "../defs.schema.json#/$defs/DealParty" }
+        },
+        "offerer": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/PartyId" },
+        "acceptor": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/PartyId" },
+        "offer": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/LocalId" },
+        "terms": { "$ref": "../defs.schema.json#/$defs/Terms" },
+        "terms_hash": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Hash" },
+        "round": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "bound": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["party", "authority", "at"],
+            "properties": {
+              "party": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/PartyId" },
+              "authority": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Authority" },
+              "at": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" }
+            }
+          }
+        },
+        "vacancies": {
+          "description": "Roles whose required seat is empty. The deal stays pending until a replacement for each role signs.",
+          "type": "array",
+          "maxItems": 16,
+          "items": { "$ref": "../defs.schema.json#/$defs/Role" }
+        },
+        "waiting": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Waiting" },
+        "tracking": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Tracking" }
+        },
+        "obligations": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "state"],
+            "properties": {
+              "id": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/ObligationId" },
+              "state": { "type": "string", "enum": ["pending", "claimed", "verified", "failed", "revoked", "waived"] },
+              "due": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" },
+              "receipt": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/MessageId" }
+            }
+          }
+        },
+        "expires": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" },
+        "updated": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" }
+      }
+    },
+    "DealState": {
+      "title": "DealState",
+      "description": "pending: a required signature is missing. active: every required party has signed. The other states match 0.3.",
+      "type": "string",
+      "enum": ["pending", "proposed", "awaiting", "active", "completed", "declined", "expired", "revoked", "disputed"]
+    }
+  }
+}

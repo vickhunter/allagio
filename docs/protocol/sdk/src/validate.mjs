@@ -5,7 +5,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const schemaRoot = join(here, '..', '..', 'schema', '0.3');
+const schemaRoots = [join(here, '..', '..', 'schema', '0.3'), join(here, '..', '..', 'schema', '0.4')];
 const BASE = 'https://offer-rails.onrender.com/orp/schemas/';
 
 function walk(dir) {
@@ -22,7 +22,9 @@ const ajv = new Ajv2020({
   validateSchema: false,
 });
 addFormats(ajv);
-for (const file of walk(schemaRoot)) ajv.addSchema(JSON.parse(readFileSync(file, 'utf8')));
+for (const schemaRoot of schemaRoots) {
+  for (const file of walk(schemaRoot)) ajv.addSchema(JSON.parse(readFileSync(file, 'utf8')));
+}
 
 function validator(name) {
   const validate = ajv.getSchema(`${BASE}${name}`);
@@ -52,8 +54,25 @@ export function problemPointer(errors) {
   return pointer;
 }
 
+const validators04 = {
+  message: validator('0.4/message.schema.json'),
+  'suggest-response': validator('0.4/http/suggest-response.schema.json'),
+  inbox: validator('0.4/http/inbox.schema.json'),
+};
+
 export function check(kind, value) {
   const validate = validators[kind];
   const ok = validate(value);
   return { ok: ok === true, errors: ok ? [] : validate.errors, field: ok ? '' : problemPointer(validate.errors) };
+}
+
+export function check04(kind, value) {
+  const validate = validators04[kind];
+  if (!validate) throw new Error(`missing 0.4 schema ${kind}`);
+  const ok = validate(value);
+  return { ok: ok === true, errors: ok ? [] : validate.errors, field: ok ? '' : problemPointer(validate.errors) };
+}
+
+export function checkMessage(message) {
+  return message?.orp === '0.4' ? check04('message', message) : check('message', message);
 }

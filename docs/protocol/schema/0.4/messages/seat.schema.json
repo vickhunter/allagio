@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/messages/seat.schema.json",
+  "title": "SeatMessage",
+  "description": "Add a party to an open deal. The new party is unsigned until it accepts. A seat that fills a vacancy still leaves the deal pending until that party signs.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "seat" },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seat"],
+      "properties": {
+        "seat": { "$ref": "../defs.schema.json#/$defs/PartySeat" }
+      }
+    }
+  }
+}

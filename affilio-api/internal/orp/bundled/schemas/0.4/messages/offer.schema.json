@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/messages/offer.schema.json",
+  "title": "OfferMessage",
+  "description": "A 0.4 offer. parties opens a many-party deal. Without parties it lists a standing offer whose terms carry checked_at and expires_at. confirm refreshes that window.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body"],
+  "properties": {
+    "type": { "const": "offer" },
+    "body": { "$ref": "#/$defs/OfferBody" }
+  },
+  "if": {
+    "type": "object",
+    "properties": { "body": { "type": "object", "required": ["confirm"], "properties": { "confirm": { "const": true } } } },
+    "required": ["body"]
+  },
+  "then": { "properties": { "body": { "type": "object", "required": ["id"] } } },
+  "else": { "properties": { "body": { "type": "object", "required": ["terms"] } } },
+  "$defs": {
+    "OfferBody": {
+      "title": "OfferBody",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/LocalId" },
+        "confirm": { "type": "boolean" },
+        "terms": { "$ref": "../defs.schema.json#/$defs/Terms" },
+        "terms_hash": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Hash" },
+        "parties": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 16,
+          "items": { "$ref": "../defs.schema.json#/$defs/PartySeat" }
+        },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "waiting": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Waiting" },
+        "note": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Text" },
+        "expires": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" }
+      }
+    }
+  }
+}

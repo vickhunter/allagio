@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/http/inbox.schema.json",
+  "title": "InboxPage",
+  "description": "Inbox page that may mix 0.3 and 0.4 messages.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["messages", "next"],
+  "properties": {
+    "messages": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "anyOf": [
+          { "$ref": "https://offer-rails.onrender.com/orp/schemas/message.schema.json" },
+          { "$ref": "https://offer-rails.onrender.com/orp/schemas/0.4/message.schema.json" }
+        ]
+      }
+    },
+    "next": { "type": "string", "maxLength": 200 }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/messages/leave.schema.json",
+  "title": "LeaveMessage",
+  "description": "The sender leaves a deal. An optional party can leave and the deal stays valid. A required party leaves a vacancy and the deal returns to pending until a replacement signs.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body", "deal"],
+  "properties": {
+    "type": { "const": "leave" },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "note": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Text" }
+      }
+    }
+  }
+}

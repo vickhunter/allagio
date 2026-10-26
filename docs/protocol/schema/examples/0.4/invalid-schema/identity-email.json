@@ -1,0 +1,42 @@
+{
+  "why": "Identity is a hash and an issuer name.",
+  "schema": "message",
+  "path": "/body/parties/1/identity",
+  "instance": {
+    "orp": "0.4",
+    "type": "offer",
+    "id": "m_maker_identity",
+    "ts": "2026-10-26T12:00:00.000Z",
+    "from": "orp:hub.example/p_maker01",
+    "body": {
+      "terms": {
+        "title": "Bad notes split",
+        "kind": "partnership",
+        "obligations": [
+          {
+            "id": "share",
+            "by": "offerer",
+            "action": "share"
+          }
+        ]
+      },
+      "parties": [
+        {
+          "id": "orp:hub.example/p_maker01",
+          "role": "offerer",
+          "required": true
+        },
+        {
+          "id": "orp:hub.example/p_other01",
+          "role": "facilitator",
+          "required": true,
+          "identity": {
+            "hash": "sha256-Hr6VqstWHV4oel7_vs40UWBZF-_GVFzxoFUbPvD2-jg",
+            "issuer": "example-issuer",
+            "email": "person@example.com"
+          }
+        }
+      ]
+    }
+  }
+}
