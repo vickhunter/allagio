@@ -193,7 +193,7 @@ Every message is one JSON object, defined in [`envelope.schema.json`](https://of
 | `to` | per type | The recipient party. Required on `request` and on directed `offer`. Host messages carry it. |
 | `deal` | per type | The deal id. Required on every message about an existing deal. |
 | `re` | no | The `id` of the message this one answers. |
-| `agent` | no | `{ "name", "version" }` of the software that sent it. Informational. |
+| `agent` | no | `{ "name", "version" }` of the software that sent it. Informational. `name` matches `^[A-Za-z0-9_. -]{1,64}$`: letters, digits, underscore, dot, space, or hyphen, 1 to 64 characters. Parentheses are not allowed. |
 | `prev` | no | Hash chain: the hash of the JCS form of the sender's previous message in the same deal, including its `sig`. |
 | `sig` | no | Detached compact JWS (RFC 7515 Appendix F), EdDSA over Ed25519, over the JCS form of the envelope without `sig`. |
 | `ext` | no | Extension data, keyed by reverse-DNS name (`com.example.boost`). At most 16 keys. |

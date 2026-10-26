@@ -22,10 +22,13 @@ var approvePage = template.Must(template.New("approve").Parse(`<!doctype html>
 
 // ProofPage is the public test page a proof_url receipt checks.
 // It shows the disclosure label and nothing about a person.
-// An active deal says so. Every other state still says the deal stays awaiting.
-func ProofPage(label, state string) string {
+// An active deal says so. A verified tracked link says so, which changes the
+// page from the active line. Every other state still says the deal stays awaiting.
+func ProofPage(label, state string, linkVerified bool) string {
 	line := "This is a test proof. The deal stays awaiting. Offer Rails does not hold money."
-	if state == "active" {
+	if linkVerified {
+		line = "This is a test proof. The tracked link is verified. Offer Rails does not hold money."
+	} else if state == "active" {
 		line = "This is a test proof. The deal is active. Offer Rails does not hold money."
 	}
 	var b strings.Builder

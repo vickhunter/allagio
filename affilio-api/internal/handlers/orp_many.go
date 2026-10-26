@@ -477,12 +477,15 @@ func (h *ORPHost) ApprovePost(c *gin.Context) {
 
 // Go redirects a tracked 0.4 link and attributes the click by split.
 func (h *ORPHost) Go(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Referrer-Policy", "no-referrer")
+	c.Header("X-Robots-Tag", "noindex")
 	origin, _ := h.origin(c)
 	token := c.Param("token")
 	purpose := c.GetHeader("Sec-Purpose") + " " + c.GetHeader("Purpose")
 	class := orp.ClickClass(c.Request.Method, c.GetHeader("User-Agent"), purpose, c.Request.URL.RawQuery)
 	clickID := orp.LocalID("clk_")
-	dest, param, alias, found, err := h.Entry.DB.RecordORPClick(c.Request.Context(), token, class, clickID)
+	dest, param, alias, found, err := h.Entry.DB.RecordORPClick(c.Request.Context(), token, class, clickID, h.now())
 	if err != nil || !found {
 		c.Redirect(http.StatusFound, strings.TrimRight(origin, "/")+"/")
 		return
@@ -501,8 +504,6 @@ func (h *ORPHost) Go(c *gin.Context) {
 		q.Add(alias, clickID)
 	}
 	target.RawQuery = q.Encode()
-	c.Header("Cache-Control", "no-store")
-	c.Header("Referrer-Policy", "no-referrer")
 	c.Redirect(http.StatusFound, target.String())
 }
 

@@ -181,7 +181,7 @@
       "additionalProperties": false,
       "required": ["name"],
       "properties": {
-        "name": { "type": "string", "pattern": "^[A-Za-z0-9_. -]{1,64}$" },
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_. -]{1,64}$", "description": "1 to 64 characters: letters, digits, underscore, dot, space, or hyphen. Parentheses are not allowed." },
         "version": { "type": "string", "maxLength": 32 }
       }
     },
