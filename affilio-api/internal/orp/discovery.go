@@ -83,14 +83,14 @@ func ClaimsMode(mode string) string {
 
 // discoveryDescription names the test proof page and the llms.txt walkthrough.
 func discoveryDescription() string {
-	return "In testing. A cold agent reads " + DocsPath + ", then POST /orp. Message schema: https://offer-rails.onrender.com/orp/schemas/envelope.schema.json. Protocol: https://offer-rails.onrender.com/orp/spec. Public proof page template: " + ProofPageTemplate + ". POST /orp/deals/<deal>/activate moves an accepted deal to active. Execute claims an active deal. Offer Rails does not hold money. L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path."
+	return "In testing. A cold agent reads " + DocsPath + ", then POST /orp. Message schema: https://offer-rails.onrender.com/orp/schemas/envelope.schema.json. Protocol: https://offer-rails.onrender.com/orp/spec. Public proof page template: " + ProofPageTemplate + ". POST /orp/deals/<deal>/activate moves an accepted deal to active. Execute claims an active deal. Offer Rails does not hold money. L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path. Many-party, leave, seat."
 }
 
 // DiscoveryDocument is GET /.well-known/orp.json. conformance is omitted:
 // this host does not claim L0, L1, L2, or L3.
 func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
 	return map[string]any{
-		"orp":         []any{Version},
+		"orp":         []any{Version04, Version},
 		"host":        HostParty(dns),
 		"name":        TestingName,
 		"description": discoveryDescription(),
@@ -101,7 +101,7 @@ func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
 		"auth": map[string]any{
 			"bearer": true,
 		},
-		"capabilities": Capabilities(claimsMode),
+		"capabilities": CapabilitiesFor(Version04, claimsMode),
 		"legacy": map[string]any{
 			"dcp": map[string]any{
 				"version":   "0.1",
@@ -112,8 +112,9 @@ func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
 	}
 }
 
-// Capabilities is what this testing host handles. It does not claim a
-// conformance level. checks.claims only reports the configured mode.
+// Capabilities is what a 0.3 hello lists. It does not claim a conformance
+// level. checks.claims only reports the configured mode. leave and seat are
+// not in this list.
 func Capabilities(claimsMode string) map[string]any {
 	return map[string]any{
 		"messages": []any{"hello", "discover", "results", "offer", "accept", "deal", "execute", "receipt", "error"},
@@ -123,4 +124,16 @@ func Capabilities(claimsMode string) map[string]any {
 			"claims": ClaimsMode(claimsMode),
 		},
 	}
+}
+
+// CapabilitiesFor advertises leave and seat only on the 0.4 host document
+// and a 0.4 hello. A 0.3 hello keeps Capabilities.
+func CapabilitiesFor(version, claimsMode string) map[string]any {
+	caps := Capabilities(claimsMode)
+	if version != Version04 {
+		return caps
+	}
+	messages := append([]any{}, caps["messages"].([]any)...)
+	caps["messages"] = append(messages, "leave", "seat")
+	return caps
 }

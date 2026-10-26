@@ -1,3 +1,19 @@
+## October 26 — ORP empty bound list (D-102)
+
+A directed 0.3 offer whose offerer owes `place`, from a fresh join on placement publish `ask`, stored a nil signature list. `json.Marshal` of that slice is `null`, and the store wrote SQL NULL into `bound JSONB NOT NULL`, so the offer returned HTTP 500 and no deal row. `JSONList` stores an empty NOT NULL list as `[]`. `waiting` and `parties` stay nullable. The 0.3 deal wire still omits an empty bound. After `POST /orp/approve/<id>`, waiting is cleared once that party has signed. Another required seat can still be unsigned. `CLAIMS_CHECK` is unchanged. No new migration. No deploy.
+
+## October 26 — ORP 0.4 ask-mode offer (D-102)
+
+A 0.4 offer from a party on placement publish `ask` (the mode a fresh join gets) returns HTTP 200 and waits for approval. Waiting step is `list` and the reason is `step_ask`. The offerer is unsigned. `orp_deals.bound` is `JSONB NOT NULL`, and an empty signature set is stored as `[]`. A nil bound was inserted as SQL NULL, which is the HTTP 500. Accept, leave, and seat on that unsigned deal write `[]` as well, including a leave that drops the last signature. An invalid 0.4 message says `The message is not valid ORP 0.4.` A 0.3 message still says `The message is not valid ORP 0.3.` No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 26 — Hosted ORP 0.4 many-party deals (D-102)
+
+The hosted `/orp` API speaks ORP 0.4 beside ORP 0.3. A 0.4 offer carries 2 to 16 parties. The deal stays pending until every required party signs. An optional party does not block active. `leave` and `seat` are served. A vacancy clears only when the replacement seated for that vacancy signs. The first time the deal is active, one tracked link is minted. `GET /go/<token>` attributes the click by each party's percent or amount and stores no personal data. An expired 0.4 offer is left out of discover and suggest. Identity is a hash and an issuer name. A deposit term names an outside holder. Offer Rails does not hold money. A failed sign rolls back the inbox row and the tracking token.
+
+A 0.3 message, a 0.3 hello, and the 0.3 activate path are unchanged. A 0.3 deal still does not mint a tracked link. `GET /orp/approve/<id>` still does not approve. `POST /orp/approve/<id>` signs a waiting 0.4 party. Discovery `orp` is `["0.4","0.3"]` and the description ends with `Many-party, leave, seat.` The name stays **In testing**. `CLAIMS_CHECK` is unchanged, so claim fields stay `unknown`.
+
+Migration `051_d102_orp_many_party.sql` adds a nullable `parties` JSONB column and a pending open-offer index. It is additive and idempotent. A 0.3 row leaves `parties` null. Deploy needs a Neon snapshot and Victor's OK. No deploy in this change.
+
 ## October 26 — ORP docs, many-party pages (D-103)
 
 `/protocol/many/` is the many-to-many concepts page. Spec pages for ORP 0.3 and ORP 0.4 are generated from `docs/protocol/schema/0.3` and `docs/protocol/schema/0.4`, with the examples under `schema/examples`. A plain 0.3 deal stays two parties. The quickstart shows the 3-party referral file and the 5-party home-sale file, including the leave example that returns the deal to pending. The license line is “Apache-2.0 planned.” The hosted deal API does not speak 0.4 leave or seat. Offer Rails does not hold money. No migration. No deploy.

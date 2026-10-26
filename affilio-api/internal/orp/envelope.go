@@ -92,122 +92,139 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 	if found := DirtyPointer(value); found != "" {
 		return Message{}, Invalid("The message contains disallowed characters or markup.", found), false
 	}
+	// Name the version the message already claims. A 0.4 envelope that fails
+	// a shape check says ORP 0.4. Anything else, including a missing orp,
+	// stays ORP 0.3 so existing 0.3 errors stay byte-identical.
+	label := "The message is not valid ORP 0.3."
+	if text, isString := obj["orp"].(string); isString && text == Version04 {
+		label = "The message is not valid ORP 0.4."
+	}
 	for key := range obj {
 		if !envelopeKeys[key] {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/"+escapePointer(key)), false
+			return Message{}, Invalid(label, "/"+escapePointer(key)), false
 		}
 	}
 	for _, key := range []string{"orp", "type", "id", "ts", "from", "body"} {
 		if _, present := obj[key]; !present {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/"+key), false
+			return Message{}, Invalid(label, "/"+key), false
 		}
 	}
 	orp, ok := obj["orp"].(string)
 	if !ok || !versionPattern.MatchString(orp) || utf8.RuneCountInString(orp) > 16 {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/orp"), false
+		return Message{}, Invalid(label, "/orp"), false
 	}
-	if orp != Version {
+	if orp != Version && orp != Version04 {
 		return Message{}, Problem{Status: 400, Code: "unsupported_version", Message: "This host speaks 0.3.", Supported: []string{Version}}, false
+	}
+	if orp == Version04 {
+		label = "The message is not valid ORP 0.4."
+	} else {
+		label = "The message is not valid ORP 0.3."
 	}
 	typ, ok := obj["type"].(string)
 	if !ok || typ == "" {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/type"), false
+		return Message{}, Invalid(label, "/type"), false
 	}
-	if !coreTypes[typ] {
+	if orp == Version04 && (typ == "leave" || typ == "seat") {
+		// leave and seat are 0.4 message types. A 0.3 leave stays invalid_message.
+	} else if !coreTypes[typ] {
 		if !extPattern.MatchString(typ) || len(typ) > 128 {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/type"), false
+			return Message{}, Invalid(label, "/type"), false
 		}
 		return Message{}, Problem{Status: 400, Code: "unsupported_type", Message: "The type is not supported."}, false
 	}
 	id, ok := obj["id"].(string)
 	if !ok || !messagePattern.MatchString(id) {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/id"), false
+		return Message{}, Invalid(label, "/id"), false
 	}
 	tsRaw, ok := obj["ts"].(string)
 	if !ok || utf8.RuneCountInString(tsRaw) > 40 {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/ts"), false
+		return Message{}, Invalid(label, "/ts"), false
 	}
 	ts, err := time.Parse(time.RFC3339, tsRaw)
 	if err != nil {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/ts"), false
+		return Message{}, Invalid(label, "/ts"), false
 	}
 	from, ok := obj["from"].(string)
 	if !ok || !partyPattern.MatchString(from) || len(from) > 330 {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/from"), false
+		return Message{}, Invalid(label, "/from"), false
 	}
 	body, ok := obj["body"].(map[string]any)
 	if !ok {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/body"), false
+		return Message{}, Invalid(label, "/body"), false
 	}
 	msg := Message{ORP: orp, Type: typ, ID: id, TS: ts, From: from, Body: body}
 	if to, present := obj["to"]; present {
 		text, ok := to.(string)
 		if !ok || !partyPattern.MatchString(text) {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/to"), false
+			return Message{}, Invalid(label, "/to"), false
 		}
 		msg.To = text
 	}
 	if deal, present := obj["deal"]; present {
 		text, ok := deal.(string)
 		if !ok || !localPattern.MatchString(text) {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/deal"), false
+			return Message{}, Invalid(label, "/deal"), false
 		}
 		msg.Deal = text
 	}
 	if re, present := obj["re"]; present {
 		text, ok := re.(string)
 		if !ok || !messagePattern.MatchString(text) {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/re"), false
+			return Message{}, Invalid(label, "/re"), false
 		}
 		msg.Re = text
 	}
 	if prev, present := obj["prev"]; present {
 		text, ok := prev.(string)
 		if !ok || !hashPattern.MatchString(text) {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/prev"), false
+			return Message{}, Invalid(label, "/prev"), false
 		}
 	}
 	if sig, present := obj["sig"]; present {
 		text, ok := sig.(string)
 		if !ok || !sigPattern.MatchString(text) || len(text) > 4096 {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/sig"), false
+			return Message{}, Invalid(label, "/sig"), false
 		}
 		msg.HasSig = true
 	}
 	if agent, present := obj["agent"]; present {
 		if problem, bad := checkAgent(agent, "/agent"); bad {
+			problem, _ = relabelVersion(orp, problem, bad)
 			return Message{}, problem, false
 		}
 	}
 	if ext, present := obj["ext"]; present {
 		if problem, bad := checkExt(ext); bad {
+			problem, _ = relabelVersion(orp, problem, bad)
 			return Message{}, problem, false
 		}
 	}
 	if critical, present := obj["critical"]; present {
 		names, problem, bad := checkCritical(critical)
 		if bad {
+			problem, _ = relabelVersion(orp, problem, bad)
 			return Message{}, problem, false
 		}
 		if len(names) > 0 {
 			return Message{}, Problem{Status: 400, Code: "unsupported_extension", Message: "A critical extension is unknown."}, false
 		}
 	}
-	if problem, bad := checkHandledBody(typ, body); bad {
+	if problem, bad := checkHandledBody(orp, typ, body); bad {
 		return Message{}, problem, false
 	}
-	if typ == "execute" && msg.Deal == "" {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/deal"), false
+	if (typ == "execute" || typ == "leave" || typ == "seat") && msg.Deal == "" {
+		return Message{}, Invalid(label, "/deal"), false
 	}
 	if typ == "accept" && msg.Deal == "" {
 		offer, _ := body["offer"].(string)
 		if offer == "" {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/body/offer"), false
+			return Message{}, Invalid(label, "/body/offer"), false
 		}
 	}
 	if typ == "accept" && msg.Deal != "" {
 		if _, present := body["offer"]; present {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/deal"), false
+			return Message{}, Invalid(label, "/deal"), false
 		}
 	}
 	return msg, Problem{}, true
@@ -221,21 +238,81 @@ func ClockProblem(ts, now time.Time) (Problem, bool) {
 	return Problem{}, false
 }
 
-func checkHandledBody(typ string, body map[string]any) (Problem, bool) {
+func checkHandledBody(version, typ string, body map[string]any) (Problem, bool) {
 	switch typ {
 	case "hello":
-		return checkHelloBody(body)
+		return checkHelloFor(version, body)
 	case "discover":
-		return checkDiscoverBody(body)
+		problem, bad := checkDiscoverBody(body)
+		return relabelVersion(version, problem, bad)
 	case "offer":
+		if version == Version04 {
+			return checkOfferV4(body)
+		}
 		return checkOfferBody(body)
 	case "accept":
-		return checkAcceptBody(body)
+		problem, bad := checkAcceptBody(body)
+		return relabelVersion(version, problem, bad)
 	case "execute":
-		return checkExecuteBody(body)
+		problem, bad := checkExecuteBody(body)
+		return relabelVersion(version, problem, bad)
+	case "leave":
+		return checkLeaveBody(body)
+	case "seat":
+		return checkSeatBody(body)
 	default:
 		return Problem{}, false
 	}
+}
+
+func checkHelloFor(version string, body map[string]any) (Problem, bool) {
+	if version != Version04 {
+		return checkHelloBody(body)
+	}
+	problem, bad := checkHelloBody(body)
+	if bad && problem.Code != "unsupported_version" {
+		problem.Message = strings.ReplaceAll(problem.Message, "ORP 0.3.", "ORP 0.4.")
+		return problem, true
+	}
+	raw, _ := body["versions"].([]any)
+	for _, item := range raw {
+		if item == Version04 {
+			return Problem{}, false
+		}
+	}
+	return Problem{Status: 400, Code: "unsupported_version", Message: "This host speaks 0.4 and 0.3.", Supported: []string{Version04, Version}}, true
+}
+
+func relabelVersion(version string, problem Problem, bad bool) (Problem, bool) {
+	if bad && version == Version04 {
+		problem.Message = strings.ReplaceAll(problem.Message, "ORP 0.3.", "ORP 0.4.")
+	}
+	return problem, bad
+}
+
+func checkLeaveBody(body map[string]any) (Problem, bool) {
+	for key := range body {
+		if key != "note" {
+			return Invalid("The message is not valid ORP 0.4.", "/body/"+escapePointer(key)), true
+		}
+	}
+	if problem, bad := optionalText(body, "note", "/body/note"); bad {
+		problem.Message = strings.ReplaceAll(problem.Message, "ORP 0.3.", "ORP 0.4.")
+		return problem, true
+	}
+	return Problem{}, false
+}
+
+func checkSeatBody(body map[string]any) (Problem, bool) {
+	for key := range body {
+		if key != "seat" {
+			return Invalid("The message is not valid ORP 0.4.", "/body/"+escapePointer(key)), true
+		}
+	}
+	if _, ok := body["seat"].(map[string]any); !ok {
+		return Invalid("The message is not valid ORP 0.4.", "/body/seat"), true
+	}
+	return Problem{}, false
 }
 
 func checkHelloBody(body map[string]any) (Problem, bool) {
@@ -467,10 +544,24 @@ func ErrorDocument(dns string, to, re string, problem Problem, now time.Time) ma
 	return doc
 }
 
-// HelloReply answers hello. It names the party behind the bearer.
+// HelloReply answers a 0.3 hello. It names the party behind the bearer.
 func HelloReply(dns, to, re, party string, claimsMode string, now time.Time) map[string]any {
+	return HelloReplyFor(Version, dns, to, re, party, claimsMode, now)
+}
+
+// HelloReplyFor answers hello. A 0.4 hello lists 0.4 and adds leave and seat.
+// A 0.3 hello stays exactly ["0.3"] and does not list leave or seat.
+func HelloReplyFor(version, dns, to, re, party, claimsMode string, now time.Time) map[string]any {
+	orpVersion := Version
+	versions := []any{Version}
+	caps := Capabilities(claimsMode)
+	if version == Version04 {
+		orpVersion = Version04
+		versions = []any{Version04}
+		caps = CapabilitiesFor(Version04, claimsMode)
+	}
 	return map[string]any{
-		"orp":  Version,
+		"orp":  orpVersion,
 		"type": "hello",
 		"id":   NewMessageID(),
 		"ts":   now.UTC().Format(time.RFC3339),
@@ -478,8 +569,8 @@ func HelloReply(dns, to, re, party string, claimsMode string, now time.Time) map
 		"to":   to,
 		"re":   re,
 		"body": map[string]any{
-			"versions":     []any{Version},
-			"capabilities": Capabilities(claimsMode),
+			"versions":     versions,
+			"capabilities": caps,
 			"party":        party,
 			"limits": map[string]any{
 				"messages_per_minute": 30,

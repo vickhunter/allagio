@@ -13,6 +13,11 @@ type DB struct {
 	// Now, when set, replaces the process wall clock for instants this
 	// process writes. Production leaves it nil.
 	Now func() time.Time
+	// ORPBeforeCommit runs inside CommitORP after the effect is applied and
+	// before the commit. A non-nil error rolls the message, inbox, and deal
+	// back. Production leaves it nil. Tests use it to prove a failed approve
+	// leaves no inbox row and no tracking token.
+	ORPBeforeCommit func(context.Context) error
 }
 
 // Clock returns the injected instant, or the wall clock when none is set.
