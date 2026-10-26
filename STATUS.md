@@ -1,3 +1,23 @@
+## October 26 — ORP Applebot in a comment stays a bot (D-102b)
+
+Click classification reads a `name/version` entry inside every parenthesis, including the tail of an unclosed parenthesis. A named client written as its own entry there is a bot too. Comment text without that shape, such as CUBOT, preview, Linux, and U, stays human. Applebot/0.1 in a plain comment is a bot, so the first click leaves the place obligation pending and counts as zero clicks. The named list also includes Mediapartners-Google, AdsBot-Google, SkypeUriPreview, Java, Apache-HttpClient, Iframely, node, undici, Google-InspectionTool, Google-Read-Aloud, Storebot-Google, Lighthouse, Chrome-Lighthouse, PTST, Pingdom, UptimeRobot, and Datadog. `node` and `undici` match the whole token. `POST /orp/approve/<id>` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 26 — ORP browser device names stay human (D-102b)
+
+Click classification matches a product token, not a bare substring. A token is the name before `/`, or the name after `compatible;`. It is a bot when that token ends in `bot` or `bot-...`, when it is a known client such as curl or wget, or when the agent contains crawler, spider, or slurp. `CUBOT NOTE 20` and a Safari `(preview)` comment stay human, so the first click verifies the place obligation and counts. `HEAD`, prefetch, and `orp_test=1` are unchanged. `POST /orp/approve/<id>` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 26 — ORP deal read shows the click split (D-109)
+
+`GET /orp/deals/<id>` now returns `clicks` and `click_share` on the tracking entry, and every party sees the same numbers. `clicks` counts human clicks. A request with no user agent, a known automation client, `HEAD`, prefetch, prerender, and `orp_test=1` stay at 0. `click_share` sums each party's percent or amount across the counted clicks. Two counted clicks on a 50/30/20 split read 1.0, 0.6, and 0.4. An amount stays an integer sum of `amount_minor`. The fields carry no personal data. A 0.3 deal omits them. `POST /orp/approve/<id>` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 26 — ORP click review: bots, state, HEAD (D-102b)
+
+A known automation user agent is class bot. That includes Googlebot, Twitterbot, curl, wget, and the other listed clients. A browser user agent stays human. A bot click is stored and does not verify the place obligation. Verification runs only when the deal state is active and the place obligation is pending or claimed. A live token on a pending or ended deal still redirects and can record the click, and it does not write a receipt. failed, partial, verified, and any other obligation state stay as they are. HEAD /go/<token> is class preview. It sends the same three redirect headers and writes nothing. The obligations write on a verifying click goes through JSONList, so an empty list stays [] and does not become SQL NULL. A link that is not live still returns its destination and does not record. POST /orp/approve/<id> is unchanged. No new migration. CLAIMS_CHECK is unchanged. No deploy.
+
+## October 26 — ORP link click verifies the place obligation (D-102b)
+
+`GET /go/<token>` recorded the click and answered 302, and it left the place obligation pending with no receipt. The proof page did not change. The first human click on a live link now verifies a place obligation whose proof includes `link`, stores one receipt id on that obligation, and delivers that receipt to each seat. A request with no user agent stays a bot and does not verify. A later click keeps the same receipt and does not add the seat split onto an earlier click. The redirect sends `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, and `X-Robots-Tag: noindex`. An `agent.name` that breaks the existing pattern is `invalid_message`. A 0.4 message names ORP 0.4 and states the pattern. A space is already allowed. Parentheses are not. `POST /orp/approve/<id>` still lets the waiting party sign, including when that party is the one that opened the ask. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 26 — ORP empty bound list (D-102)
 
 A directed 0.3 offer whose offerer owes `place`, from a fresh join on placement publish `ask`, stored a nil signature list. `json.Marshal` of that slice is `null`, and the store wrote SQL NULL into `bound JSONB NOT NULL`, so the offer returned HTTP 500 and no deal row. `JSONList` stores an empty NOT NULL list as `[]`. `waiting` and `parties` stay nullable. The 0.3 deal wire still omits an empty bound. After `POST /orp/approve/<id>`, waiting is cleared once that party has signed. Another required seat can still be unsigned. `CLAIMS_CHECK` is unchanged. No new migration. No deploy.

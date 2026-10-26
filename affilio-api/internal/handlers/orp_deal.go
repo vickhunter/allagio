@@ -27,6 +27,7 @@ func mountORPDeals(h *ORPHost, r gin.IRouter) {
 	r.GET("/orp/approve/:id", h.Approve)
 	r.POST("/orp/approve/:id", h.ApprovePost)
 	r.GET("/go/:token", h.Go)
+	r.HEAD("/go/:token", h.Go)
 }
 
 // Inbox is GET /orp/inbox. The bearer is the joined agent.
@@ -93,7 +94,21 @@ func (h *ORPHost) Proof(c *gin.Context) {
 		writeHTML(c, http.StatusNotFound, "not found")
 		return
 	}
-	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms), deal.State))
+	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms), deal.State, linkObligationVerified(deal.Obligations)))
+}
+
+func linkObligationVerified(raw json.RawMessage) bool {
+	var rows []map[string]any
+	if json.Unmarshal(raw, &rows) != nil {
+		return false
+	}
+	for _, row := range rows {
+		receipt, _ := row["receipt"].(string)
+		if row["state"] == "verified" && receipt != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // Activate moves an accepted deal from awaiting to active.

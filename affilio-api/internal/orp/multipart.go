@@ -2,6 +2,7 @@ package orp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -34,6 +35,19 @@ var (
 		"title": true, "kind": true, "obligations": true, "categories": true,
 		"disclosure": true, "starts": true, "ends": true,
 		"checked_at": true, "expires_at": true, "claims": true,
+	}
+	// clientExact are product tokens that match the whole token only.
+	// node must not match nodebb. java must not match a longer name.
+	clientExact = []string{"node", "undici", "java", "ptst"}
+	// clientPrefixes are product-token prefixes. A hit is class bot.
+	// Longer names come first. A device name inside parentheses is not a product token.
+	clientPrefixes = []string{
+		"python-requests", "python-urllib", "go-http-client", "facebookexternalhit",
+		"mediapartners-google", "google-inspectiontool", "google-read-aloud",
+		"chrome-lighthouse", "apache-httpclient", "skypeuripreview",
+		"adsbot-google", "storebot-google", "headlesschrome", "uptimerobot",
+		"node-fetch", "headless", "lighthouse", "iframely", "pingdom", "datadog",
+		"libwww", "scrapy", "okhttp", "axios", "postman", "wget", "curl",
 	}
 )
 
@@ -86,6 +100,120 @@ type Click struct {
 	Obligation string `json:"obligation"`
 	Class      string `json:"class"`
 	Shares     []any  `json:"shares"`
+}
+
+// ClickReadout is the counted view of one obligation. clicks is the number of
+// human clicks. Bot, preview, and test clicks are left out. click_share sums
+// each party's percent or amount across the counted clicks, in seat order.
+// A percent is stored as an integer from 0 to 100, and the sum is that
+// integer divided by 100, so 50 twice is 1.0. An amount_minor stays an integer
+// sum. The result has no address, user agent, or referrer.
+func ClickReadout(doc Many, obligation string) (clicks int, share []any) {
+	type acc struct {
+		percent    int
+		amount     int
+		currency   string
+		hasPercent bool
+		hasAmount  bool
+	}
+	byParty := map[string]*acc{}
+	order := make([]string, 0, len(doc.Seats))
+	remember := func(party string) *acc {
+		if party == "" {
+			return nil
+		}
+		if row := byParty[party]; row != nil {
+			return row
+		}
+		row := &acc{}
+		byParty[party] = row
+		order = append(order, party)
+		return row
+	}
+	for _, seat := range doc.Seats {
+		row := &acc{}
+		if _, ok := wholeNumber(seat.Terms["percent"]); ok {
+			row.hasPercent = true
+		}
+		if amount, ok := seat.Terms["amount"].(map[string]any); ok {
+			if _, ok := wholeNumber(amount["amount_minor"]); ok {
+				row.hasAmount = true
+			}
+			if currency, _ := amount["currency"].(string); currency != "" {
+				row.currency = currency
+			}
+		}
+		if !row.hasPercent && !row.hasAmount {
+			continue
+		}
+		byParty[seat.ID] = row
+		order = append(order, seat.ID)
+	}
+	for _, click := range doc.Clicks {
+		if click.Class != "human" || click.Obligation != obligation {
+			continue
+		}
+		clicks++
+		for _, item := range click.Shares {
+			one, _ := item.(map[string]any)
+			row := remember(oneString(one, "party"))
+			if row == nil {
+				continue
+			}
+			if n, ok := wholeNumber(one["percent"]); ok {
+				row.percent += n
+				row.hasPercent = true
+			}
+			if n, ok := wholeNumber(one["amount_minor"]); ok {
+				row.amount += n
+				row.hasAmount = true
+			}
+			if currency := oneString(one, "currency"); currency != "" {
+				row.currency = currency
+			}
+		}
+	}
+	share = make([]any, 0, len(order))
+	for _, party := range order {
+		row := byParty[party]
+		item := map[string]any{"party": party}
+		if row.hasPercent {
+			item["percent"] = fixedPercent(row.percent)
+		}
+		if row.hasAmount {
+			item["amount_minor"] = row.amount
+			if row.currency != "" {
+				item["currency"] = row.currency
+			}
+		}
+		share = append(share, item)
+	}
+	return clicks, share
+}
+
+func oneString(row map[string]any, key string) string {
+	if row == nil {
+		return ""
+	}
+	text, _ := row[key].(string)
+	return text
+}
+
+func wholeNumber(value any) (int, bool) {
+	n, ok := asFloat(value)
+	if !ok || n != float64(int(n)) || n < 0 || n > 1e9 {
+		return 0, false
+	}
+	return int(n), true
+}
+
+func fixedPercent(percentPoints int) json.Number {
+	whole := percentPoints / 100
+	frac := percentPoints % 100
+	if frac%10 == 0 {
+		return json.Number(fmt.Sprintf("%d.%d", whole, frac/10))
+	}
+	return json.Number(fmt.Sprintf("%d.%02d", whole, frac))
 }
 
 // Many is the nullable parties document. A 0.3 row leaves the column NULL.
@@ -368,7 +496,168 @@ func ClickClass(method, ua, purpose, rawQuery string) string {
 	if strings.TrimSpace(ua) == "" {
 		return "bot"
 	}
+	if automationClient(ua) {
+		return "bot"
+	}
 	return "human"
+}
+
+// automationClient is true for a known automation product token.
+// A top-level token is the name before "/". Inside every parenthesis,
+// including the tail of an unclosed "(", a semicolon entry counts when it
+// has name/version shape, or when the whole entry is one named client.
+// CUBOT NOTE 20, preview, Linux, and U stay comment text.
+// crawler, spider, and slurp match anywhere. The scan is one pass.
+func automationClient(ua string) bool {
+	low := strings.ToLower(ua)
+	if strings.Contains(low, "crawler") || strings.Contains(low, "spider") || strings.Contains(low, "slurp") {
+		return true
+	}
+	if strings.Contains(low, "/bot.html") || strings.HasPrefix(low, "bot.html") {
+		return true
+	}
+	tokens := productTokens(low)
+	whatsapp := false
+	chrome := false
+	for _, token := range tokens {
+		if token == "whatsapp" {
+			whatsapp = true
+			continue
+		}
+		if token == "chrome" || token == "crios" {
+			chrome = true
+		}
+		if botProduct(token) || namedClient(token) {
+			return true
+		}
+	}
+	// WhatsApp/2.x alone is the link preview. Chrome opened from WhatsApp
+	// keeps that token beside Chrome and stays human.
+	return whatsapp && !chrome
+}
+
+func botProduct(token string) bool {
+	name := strings.TrimSuffix(token, ".html")
+	return strings.HasSuffix(name, "bot") || strings.Contains(name, "bot-")
+}
+
+func namedClient(token string) bool {
+	for _, name := range clientExact {
+		if token == name {
+			return true
+		}
+	}
+	for _, name := range clientPrefixes {
+		if token == name || strings.HasPrefix(token, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func productTokens(ua string) []string {
+	var out []string
+	i := 0
+	for i < len(ua) {
+		if ua[i] == '(' {
+			end, inner := commentSpan(ua, i)
+			out = append(out, commentProducts(inner)...)
+			i = end
+			continue
+		}
+		if !isProductChar(ua[i]) {
+			i++
+			continue
+		}
+		j := i + 1
+		for j < len(ua) && isProductChar(ua[j]) {
+			j++
+		}
+		out = append(out, ua[i:j])
+		i = j
+	}
+	return out
+}
+
+// commentProducts reads one parenthesis body. Entries without name/version
+// shape are ignored, except a named client that is the whole entry.
+func commentProducts(comment string) []string {
+	var out []string
+	start := 0
+	for i := 0; i <= len(comment); i++ {
+		if i < len(comment) && comment[i] != ';' {
+			continue
+		}
+		entry := strings.TrimSpace(comment[start:i])
+		if name, ok := soleProduct(entry); ok && namedClient(name) {
+			out = append(out, name)
+		}
+		out = append(out, versionedNames(entry)...)
+		start = i + 1
+	}
+	return out
+}
+
+func versionedNames(entry string) []string {
+	var out []string
+	i := 0
+	for i < len(entry) {
+		if !isProductChar(entry[i]) {
+			i++
+			continue
+		}
+		j := i + 1
+		for j < len(entry) && isProductChar(entry[j]) {
+			j++
+		}
+		if j < len(entry) && entry[j] == '/' {
+			out = append(out, entry[i:j])
+		}
+		i = j
+	}
+	return out
+}
+
+func soleProduct(entry string) (string, bool) {
+	if entry == "" {
+		return "", false
+	}
+	for i := 0; i < len(entry); i++ {
+		if !isProductChar(entry[i]) {
+			return "", false
+		}
+	}
+	return entry, true
+}
+
+func commentSpan(ua string, open int) (int, string) {
+	depth := 1
+	i := open + 1
+	for i < len(ua) && depth > 0 {
+		switch ua[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		}
+		i++
+	}
+	if depth == 0 {
+		return i, ua[open+1 : i-1]
+	}
+	return len(ua), ua[open+1:]
+}
+
+func isProductChar(c byte) bool {
+	if c >= 'a' && c <= 'z' || c >= '0' && c <= '9' {
+		return true
+	}
+	switch c {
+	case '!', '#', '$', '%', '&', '\'', '*', '+', '-', '.', '^', '_', '`', '|', '~':
+		return true
+	default:
+		return false
+	}
 }
 
 // MintTracking mints place links that carry content.link or content.code.

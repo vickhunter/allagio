@@ -477,12 +477,17 @@ func (h *ORPHost) ApprovePost(c *gin.Context) {
 
 // Go redirects a tracked 0.4 link and attributes the click by split.
 func (h *ORPHost) Go(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	c.Header("Referrer-Policy", "no-referrer")
+	c.Header("X-Robots-Tag", "noindex")
 	origin, _ := h.origin(c)
 	token := c.Param("token")
 	purpose := c.GetHeader("Sec-Purpose") + " " + c.GetHeader("Purpose")
 	class := orp.ClickClass(c.Request.Method, c.GetHeader("User-Agent"), purpose, c.Request.URL.RawQuery)
 	clickID := orp.LocalID("clk_")
-	dest, param, alias, found, err := h.Entry.DB.RecordORPClick(c.Request.Context(), token, class, clickID)
+	// HEAD is class preview. It redirects with the same headers and does not record.
+	record := !strings.EqualFold(c.Request.Method, http.MethodHead)
+	dest, param, alias, found, err := h.Entry.DB.RecordORPClick(c.Request.Context(), token, class, clickID, h.now(), record)
 	if err != nil || !found {
 		c.Redirect(http.StatusFound, strings.TrimRight(origin, "/")+"/")
 		return
@@ -501,8 +506,6 @@ func (h *ORPHost) Go(c *gin.Context) {
 		q.Add(alias, clickID)
 	}
 	target.RawQuery = q.Encode()
-	c.Header("Cache-Control", "no-store")
-	c.Header("Referrer-Policy", "no-referrer")
 	c.Redirect(http.StatusFound, target.String())
 }
 
@@ -838,12 +841,15 @@ func (h *ORPHost) manySnapshot(dns, viewer, re string, deal database.ORPDeal, no
 		origin := h.publicOrigin(dns)
 		rows := make([]any, len(doc.Tracking))
 		for i, entry := range doc.Tracking {
+			clicks, share := orp.ClickReadout(doc, entry.Obligation)
 			item := map[string]any{
 				"obligation":  entry.Obligation,
 				"link":        strings.TrimRight(origin, "/") + "/go/" + entry.Token,
 				"destination": entry.Destination,
 				"status":      entry.Status,
 				"param":       entry.Param,
+				"clicks":      clicks,
+				"click_share": share,
 			}
 			if entry.Alias != "" {
 				item["alias"] = entry.Alias

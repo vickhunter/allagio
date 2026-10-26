@@ -2,8 +2,11 @@ package database
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -307,21 +310,28 @@ FROM orp_offers WHERE id=$1 AND owner_id=$2::uuid`, id, ownerID).Scan(
 }
 
 // RecordORPClick attributes one live tracked redirect and returns where it goes.
-// found is false for an unknown token. The row stores the class and the split.
-// It does not store an address, a user agent, or a referrer.
-func (d *DB) RecordORPClick(ctx context.Context, token, class, clickID string) (destination, param, alias string, found bool, err error) {
+// found is false for an unknown token. The row stores the class and the split
+// of that click. A later click records its own split and does not add those
+// percents onto an earlier click. The first human click that meets a place
+// obligation whose proof includes link marks that obligation verified and
+// writes one receipt. A bot, preview, or test click does not. Verification
+// runs only when the deal is active and the place obligation is pending or
+// claimed. record is false for HEAD: the redirect is returned and nothing is
+// written. It does not store an address, a user agent, or a referrer. No new
+// column is required: the obligation list and the inbox already hold the receipt.
+func (d *DB) RecordORPClick(ctx context.Context, token, class, clickID string, at time.Time, record bool) (destination, param, alias string, found bool, err error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return "", "", "", false, err
 	}
 	defer tx.Rollback(ctx)
-	var id string
-	var parties []byte
+	var id, state string
+	var parties, obligationsRaw, termsRaw []byte
 	err = tx.QueryRow(ctx, `
-SELECT id, parties
+SELECT id, state, parties, obligations, terms
 FROM orp_deals
 WHERE parties->'tracking' @> jsonb_build_array(jsonb_build_object('token', $1::text))
-FOR UPDATE`, token).Scan(&id, &parties)
+FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", "", "", false, nil
 	}
@@ -331,6 +341,7 @@ FOR UPDATE`, token).Scan(&id, &parties)
 	var doc struct {
 		Seats []struct {
 			ID    string         `json:"id"`
+			Owner string         `json:"owner"`
 			Terms map[string]any `json:"terms"`
 		} `json:"seats"`
 		Tracking []struct {
@@ -368,6 +379,10 @@ FOR UPDATE`, token).Scan(&id, &parties)
 		param = "via"
 	}
 	if entry.Status != "live" {
+		return destination, param, alias, true, nil
+	}
+	// HEAD is class preview. The redirect is the same and the row is not written.
+	if !record {
 		return destination, param, alias, true, nil
 	}
 	shares := make([]any, 0)
@@ -420,13 +435,149 @@ FOR UPDATE`, token).Scan(&id, &parties)
 	if err != nil {
 		return "", "", "", false, err
 	}
-	if _, err = tx.Exec(ctx, `UPDATE orp_deals SET parties=$2 WHERE id=$1`, id, raw); err != nil {
-		return "", "", "", false, err
+	receiptID, nextObligations, receiptBody := linkReceipt(termsRaw, obligationsRaw, clicks, entry.Obligation, class, state, at)
+	if receiptID == "" {
+		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET parties=$2 WHERE id=$1`, id, raw); err != nil {
+			return "", "", "", false, err
+		}
+	} else {
+		if at.IsZero() {
+			at = time.Now().UTC()
+		}
+		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET parties=$2, obligations=$3, updated_at=$4 WHERE id=$1`, id, raw, JSONList(nextObligations), at.UTC()); err != nil {
+			return "", "", "", false, err
+		}
+		host := ""
+		if len(doc.Seats) > 0 {
+			host = hostPartyFromSeat(doc.Seats[0].ID)
+		}
+		for _, seat := range doc.Seats {
+			if seat.Owner == "" || host == "" {
+				continue
+			}
+			message, err := json.Marshal(map[string]any{
+				"orp": "0.4", "type": "receipt", "id": receiptID, "ts": at.UTC().Format(time.RFC3339),
+				"from": host, "to": seat.ID, "deal": id, "body": receiptBody,
+			})
+			if err != nil {
+				return "", "", "", false, err
+			}
+			if _, err = tx.Exec(ctx, `INSERT INTO orp_inbox(owner_id, message) VALUES($1,$2)`, seat.Owner, message); err != nil {
+				return "", "", "", false, err
+			}
+		}
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return "", "", "", false, err
 	}
 	return destination, param, alias, true, nil
+}
+
+// linkReceipt verifies a place obligation once the human clicks reach its
+// target. The default target is the first human click. The deal must be
+// active, and the stored obligation must be pending or claimed. failed,
+// partial, verified, and any other state stay as they are, with no receipt.
+func linkReceipt(termsRaw, obligationsRaw []byte, clicks []any, obligation, class, dealState string, at time.Time) (receiptID string, obligations json.RawMessage, body map[string]any) {
+	if class != "human" || dealState != "active" {
+		return "", nil, nil
+	}
+	var terms map[string]any
+	if json.Unmarshal(termsRaw, &terms) != nil {
+		return "", nil, nil
+	}
+	spec := obligationSpec(terms, obligation)
+	if spec["action"] != "place" || !proofIncludes(spec, "link") {
+		return "", nil, nil
+	}
+	humans := 0
+	for _, item := range clicks {
+		row, _ := item.(map[string]any)
+		if row["class"] == "human" && row["obligation"] == obligation {
+			humans++
+		}
+	}
+	target := 1
+	if n, ok := jsonWhole(spec["clicks"]); ok && n > 0 {
+		target = n
+	}
+	if humans < target {
+		return "", nil, nil
+	}
+	var rows []map[string]any
+	if json.Unmarshal(obligationsRaw, &rows) != nil {
+		return "", nil, nil
+	}
+	found := false
+	for i := range rows {
+		if rows[i]["id"] != obligation {
+			continue
+		}
+		stored, _ := rows[i]["state"].(string)
+		if stored != "pending" && stored != "claimed" {
+			return "", nil, nil
+		}
+		found = true
+		rows[i]["state"] = "verified"
+		rows[i]["receipt"] = newReceiptID()
+		receiptID, _ = rows[i]["receipt"].(string)
+		break
+	}
+	if !found || receiptID == "" {
+		return "", nil, nil
+	}
+	raw, err := json.Marshal(rows)
+	if err != nil {
+		return "", nil, nil
+	}
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	body = map[string]any{
+		"obligation": obligation,
+		"result":     "verified",
+		"method":     "link",
+		"at":         at.UTC().Format(time.RFC3339),
+		"found":      map[string]any{"link": true, "clicks": humans},
+	}
+	return receiptID, raw, body
+}
+
+func obligationSpec(terms map[string]any, id string) map[string]any {
+	raw, _ := terms["obligations"].([]any)
+	for _, item := range raw {
+		obj, _ := item.(map[string]any)
+		if obj["id"] == id {
+			return obj
+		}
+	}
+	return nil
+}
+
+func proofIncludes(spec map[string]any, method string) bool {
+	raw, _ := spec["proof"].([]any)
+	for _, item := range raw {
+		if item == method {
+			return true
+		}
+	}
+	return false
+}
+
+func newReceiptID() string {
+	var buf [8]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "m_host_fallbackrc"
+	}
+	return "m_host_" + hex.EncodeToString(buf[:])
+}
+
+func hostPartyFromSeat(seatID string) string {
+	rest := strings.TrimPrefix(seatID, "orp:")
+	i := strings.LastIndex(rest, "/")
+	if i <= 0 {
+		return ""
+	}
+	return "orp:" + rest[:i] + "/host"
 }
 
 func jsonWhole(value any) (int, bool) {

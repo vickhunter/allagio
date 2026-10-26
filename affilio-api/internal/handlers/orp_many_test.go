@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -1173,6 +1174,192 @@ func TestORP04FreshJoinDefault(t *testing.T) {
 	}
 }
 
+func clickClassed(t *testing.T, r http.Handler, link, ua string) *httptest.ResponseRecorder {
+	t.Helper()
+	parsed, err := url.Parse(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodGet, parsed.Path, nil)
+	if ua != "" {
+		req.Header.Set("User-Agent", ua)
+	}
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	return rec
+}
+
+func placeObligation(t *testing.T, body map[string]any) map[string]any {
+	t.Helper()
+	rows, _ := body["obligations"].([]any)
+	for _, item := range rows {
+		row, _ := item.(map[string]any)
+		if row["id"] == "place" {
+			return row
+		}
+	}
+	t.Fatalf("place obligation missing %s", mustJSON(map[string]any{"body": body}))
+	return nil
+}
+
+func sharePercents(t *testing.T, click map[string]any) map[string]float64 {
+	t.Helper()
+	shares, _ := click["shares"].([]any)
+	got := map[string]float64{}
+	for _, item := range shares {
+		row, _ := item.(map[string]any)
+		party, _ := row["party"].(string)
+		got[party] = asFloat(row["percent"])
+	}
+	return got
+}
+
+// TestORP04LinkClickVerifies is the cold-walk failure: an ask-mode 3-party
+// deal goes active, the tracked link 302s, and the first human click still
+// leaves place pending with no receipt and an unchanged proof page.
+func TestORP04LinkClickVerifies(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	e := &orp04Env{t: t, r: r}
+	offerer := joinDefault(t, r)
+	curator := joinDefault(t, r)
+	acceptor := joinDefault(t, r)
+	terms := map[string]any{
+		"title": "Referral notes chain", "kind": "partnership",
+		"disclosure": map[string]any{"label": "Affiliate link", "lang": "en"},
+		"obligations": []any{map[string]any{
+			"id": "place", "by": acceptor.party, "action": "place",
+			"content":     map[string]any{"link": true, "brief": "Mention the notes app."},
+			"destination": "https://example.com/notes", "proof": []any{"link"},
+		}},
+	}
+	code, opened := e.send(offerer, "0.4", "offer", "", map[string]any{"terms": terms, "parties": []any{
+		map[string]any{"id": offerer.party, "role": "offerer", "required": true, "terms": map[string]any{"percent": 50}},
+		map[string]any{"id": curator.party, "role": "curator", "required": true, "terms": map[string]any{"percent": 30}},
+		map[string]any{"id": acceptor.party, "role": "acceptor", "required": true, "terms": map[string]any{"percent": 20}},
+	}})
+	assertAskWait(t, db, code, opened, offerer.party)
+	code, opened = postApprove(t, r, offerer.token, opened)
+	if code != http.StatusOK || docBody(t, opened)["state"] != "pending" {
+		t.Fatalf("offerer approve %d %s", code, mustJSON(opened))
+	}
+	code, opened = acceptSeat(e, curator, opened)
+	if code != http.StatusOK {
+		t.Fatalf("curator accept %d %s", code, mustJSON(opened))
+	}
+	code, opened = postApprove(t, r, curator.token, opened)
+	if code != http.StatusOK || docBody(t, opened)["state"] != "pending" {
+		t.Fatalf("curator approve %d %s", code, mustJSON(opened))
+	}
+	code, opened = acceptSeat(e, acceptor, opened)
+	if code != http.StatusOK {
+		t.Fatalf("acceptor accept %d %s", code, mustJSON(opened))
+	}
+	code, opened = postApprove(t, r, acceptor.token, opened)
+	body := docBody(t, opened)
+	if code != http.StatusOK || body["state"] != "active" || body["waiting"] != nil {
+		t.Fatalf("active %d %s", code, mustJSON(opened))
+	}
+	tracking, _ := body["tracking"].([]any)
+	if len(tracking) != 1 {
+		t.Fatalf("tracking %s", mustJSON(opened))
+	}
+	link, _ := tracking[0].(map[string]any)["link"].(string)
+	dealID, _ := opened["deal"].(string)
+	proofBefore, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+dealID, nil, nil)
+	beforeHTML := proofBefore.Body.String()
+	browser := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+	bot := clickClassed(t, r, link, "")
+	if bot.Code != http.StatusFound {
+		t.Fatalf("bot click %d", bot.Code)
+	}
+	botDealRec, botDeal := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offerer.token))
+	botPlace := placeObligation(t, docBody(t, botDeal))
+	if botDealRec.Code != http.StatusOK || botPlace["state"] != "pending" || botPlace["receipt"] != nil {
+		t.Fatalf("bot verified the link %d %s", botDealRec.Code, botDealRec.Body.String())
+	}
+
+	click := clickClassed(t, r, link, browser)
+	if click.Code != http.StatusFound {
+		t.Fatalf("human click %d %s", click.Code, click.Body.String())
+	}
+	loc := click.Header().Get("Location")
+	if !strings.Contains(loc, "via=") || !strings.Contains(loc, "ref=") {
+		t.Fatalf("location %s", loc)
+	}
+	dealRec, deal := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offerer.token))
+	place := placeObligation(t, docBody(t, deal))
+	receipt, _ := place["receipt"].(string)
+	if dealRec.Code != http.StatusOK || place["state"] != "verified" || receipt == "" {
+		t.Fatalf("link obligation %d %s", dealRec.Code, dealRec.Body.String())
+	}
+	if click.Header().Get("Cache-Control") != "no-store" || click.Header().Get("Referrer-Policy") != "no-referrer" || click.Header().Get("X-Robots-Tag") != "noindex" {
+		t.Fatalf("redirect headers cache %q referrer %q robots %q", click.Header().Get("Cache-Control"), click.Header().Get("Referrer-Policy"), click.Header().Get("X-Robots-Tag"))
+	}
+	proofAfter, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+dealID, nil, nil)
+	if proofAfter.Code != http.StatusOK || proofAfter.Body.String() == beforeHTML {
+		t.Fatalf("proof unchanged %d", proofAfter.Code)
+	}
+	stored := storedParties(t, db, dealID)
+	rawStored := mustJSON(stored)
+	if strings.Contains(rawStored, browser) || strings.Contains(rawStored, "@") {
+		t.Fatalf("pii stored %s", rawStored)
+	}
+	again := clickClassed(t, r, link, browser)
+	if again.Code != http.StatusFound || again.Header().Get("X-Robots-Tag") != "noindex" {
+		t.Fatalf("repeat %d robots %q", again.Code, again.Header().Get("X-Robots-Tag"))
+	}
+	againRec, againDeal := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(acceptor.token))
+	againPlace := placeObligation(t, docBody(t, againDeal))
+	if againRec.Code != http.StatusOK || againPlace["state"] != "verified" || againPlace["receipt"] != receipt {
+		t.Fatalf("repeat receipt %s", againRec.Body.String())
+	}
+	clicks, _ := storedParties(t, db, dealID)["clicks"].([]any)
+	human := 0
+	for _, item := range clicks {
+		row, _ := item.(map[string]any)
+		if row["class"] != "human" {
+			continue
+		}
+		human++
+		got := sharePercents(t, row)
+		if got[offerer.party] != 50 || got[curator.party] != 30 || got[acceptor.party] != 20 || len(got) != 3 {
+			t.Fatalf("shares doubled %#v", got)
+		}
+	}
+	if human != 2 {
+		t.Fatalf("human clicks %d in %s", human, mustJSON(storedParties(t, db, dealID)))
+	}
+	inboxRec, inbox := postJSON(t, r, http.MethodGet, "/orp/inbox", nil, bearerHeader(offerer.token))
+	messages, _ := inbox["messages"].([]any)
+	receipts := 0
+	for _, item := range messages {
+		msg, _ := item.(map[string]any)
+		if msg["type"] != "receipt" {
+			continue
+		}
+		receipts++
+		if msg["id"] != receipt || msg["orp"] != "0.4" {
+			t.Fatalf("receipt message %s", mustJSON(msg))
+		}
+		inner, _ := msg["body"].(map[string]any)
+		if inner["obligation"] != "place" || inner["result"] != "verified" || inner["method"] != "link" {
+			t.Fatalf("receipt body %v", inner)
+		}
+		if strings.Contains(mustJSON(msg), browser) {
+			t.Fatalf("receipt stored the user agent %s", mustJSON(msg))
+		}
+	}
+	if inboxRec.Code != http.StatusOK || receipts != 1 {
+		t.Fatalf("inbox receipts %d %s", receipts, inboxRec.Body.String())
+	}
+	unknown := clickClassed(t, r, "http://127.0.0.1:8080/go/missing-token", browser)
+	if unknown.Code != http.StatusFound || unknown.Header().Get("X-Robots-Tag") != "noindex" || unknown.Header().Get("Cache-Control") != "no-store" || unknown.Header().Get("Referrer-Policy") != "no-referrer" {
+		t.Fatalf("unknown redirect %d cache %q robots %q", unknown.Code, unknown.Header().Get("Cache-Control"), unknown.Header().Get("X-Robots-Tag"))
+	}
+}
+
 func TestORP04InvalidNamesVersion(t *testing.T) {
 	_, _, r, cleanup := newORP04(t)
 	defer cleanup()
@@ -1197,8 +1384,34 @@ func TestORP04InvalidNamesVersion(t *testing.T) {
 		"agent": map[string]any{"name": ""},
 	}, nil)
 	agentInner, _ := agentBody["body"].(map[string]any)
-	if agent.Code != http.StatusBadRequest || agentInner["message"] != "The message is not valid ORP 0.4." || agentInner["field"] != "/agent/name" {
+	name04 := "The message is not valid ORP 0.4. " + orp.AgentNameRule
+	if agent.Code != http.StatusBadRequest || agentInner["message"] != name04 || agentInner["field"] != "/agent/name" || strings.Contains(agentInner["message"].(string), "ORP 0.3.") {
 		t.Fatalf("0.4 agent %d %s", agent.Code, agent.Body.String())
+	}
+	spaced, spacedBody := postJSON(t, r, http.MethodPost, "/orp", map[string]any{
+		"orp": "0.4", "type": "hello", "id": "m_d102_space", "ts": time.Now().UTC().Format(time.RFC3339), "from": from, "body": body,
+		"agent": map[string]any{"name": "Cold Agent"},
+	}, nil)
+	spacedInner, _ := spacedBody["body"].(map[string]any)
+	if spaced.Code == http.StatusBadRequest && spacedInner["field"] == "/agent/name" {
+		t.Fatalf("space in the name was refused %s", spaced.Body.String())
+	}
+	paren, parenBody := postJSON(t, r, http.MethodPost, "/orp", map[string]any{
+		"orp": "0.4", "type": "hello", "id": "m_d102_paren", "ts": time.Now().UTC().Format(time.RFC3339), "from": from, "body": body,
+		"agent": map[string]any{"name": "Cold Agent (walk)"},
+	}, nil)
+	parenInner, _ := parenBody["body"].(map[string]any)
+	if paren.Code != http.StatusBadRequest || parenInner["message"] != name04 || parenInner["field"] != "/agent/name" {
+		t.Fatalf("0.4 parentheses %d %s", paren.Code, paren.Body.String())
+	}
+	paren03, paren03Body := postJSON(t, r, http.MethodPost, "/orp", map[string]any{
+		"orp": "0.3", "type": "hello", "id": "m_d102_paren3", "ts": time.Now().UTC().Format(time.RFC3339), "from": from, "body": map[string]any{"versions": []any{"0.3"}},
+		"agent": map[string]any{"name": "Cold Agent (walk)"},
+	}, nil)
+	paren03Inner, _ := paren03Body["body"].(map[string]any)
+	name03 := "The message is not valid ORP 0.3. " + orp.AgentNameRule
+	if paren03.Code != http.StatusBadRequest || paren03Inner["message"] != name03 || paren03Inner["field"] != "/agent/name" || strings.Contains(paren03Inner["message"].(string), "ORP 0.4.") {
+		t.Fatalf("0.3 parentheses %d %s", paren03.Code, paren03.Body.String())
 	}
 	short03, short03Body := postJSON(t, r, http.MethodPost, "/orp", map[string]any{
 		"orp": "0.3", "type": "hello", "id": "short1", "ts": time.Now().UTC().Format(time.RFC3339), "from": from, "body": map[string]any{"versions": []any{"0.3"}},
@@ -1206,5 +1419,487 @@ func TestORP04InvalidNamesVersion(t *testing.T) {
 	inner03, _ := short03Body["body"].(map[string]any)
 	if short03.Code != http.StatusBadRequest || inner03["message"] != "The message is not valid ORP 0.3." || inner03["field"] != "/id" {
 		t.Fatalf("0.3 id %d %s", short03.Code, short03.Body.String())
+	}
+}
+
+const browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+func openActivePlace(t *testing.T, db *database.DB, r http.Handler) (dealID, link string, offerer party04) {
+	t.Helper()
+	e := &orp04Env{t: t, r: r}
+	offerer = joinAuto(t, db, r)
+	acceptor := joinAuto(t, db, r)
+	terms := map[string]any{
+		"title": "Referral notes chain", "kind": "partnership",
+		"disclosure": map[string]any{"label": "Affiliate link", "lang": "en"},
+		"obligations": []any{map[string]any{
+			"id": "place", "by": acceptor.party, "action": "place",
+			"content":     map[string]any{"link": true, "brief": "Mention the notes app."},
+			"destination": "https://example.com/notes", "proof": []any{"link"},
+		}},
+	}
+	code, opened := e.send(offerer, "0.4", "offer", "", map[string]any{"terms": terms, "parties": []any{
+		map[string]any{"id": offerer.party, "role": "offerer", "required": true, "terms": map[string]any{"percent": 50}},
+		map[string]any{"id": acceptor.party, "role": "acceptor", "required": true, "terms": map[string]any{"percent": 50}},
+	}})
+	if code != http.StatusOK {
+		t.Fatalf("offer %d %s", code, mustJSON(opened))
+	}
+	code, opened = acceptSeat(e, acceptor, opened)
+	body := docBody(t, opened)
+	if code != http.StatusOK || body["state"] != "active" {
+		t.Fatalf("active %d %s", code, mustJSON(opened))
+	}
+	tracking, _ := body["tracking"].([]any)
+	if len(tracking) != 1 {
+		t.Fatalf("tracking %s", mustJSON(opened))
+	}
+	link, _ = tracking[0].(map[string]any)["link"].(string)
+	dealID, _ = opened["deal"].(string)
+	if link == "" || dealID == "" {
+		t.Fatalf("link %q deal %q", link, dealID)
+	}
+	return dealID, link, offerer
+}
+
+func readPlace(t *testing.T, r http.Handler, dealID, token string) map[string]any {
+	t.Helper()
+	rec, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(token))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("deal %d %s", rec.Code, rec.Body.String())
+	}
+	return placeObligation(t, docBody(t, doc))
+}
+
+func setDealState(t *testing.T, db *database.DB, dealID, state string) {
+	t.Helper()
+	tag, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET state=$2 WHERE id=$1`, dealID, state)
+	if err != nil || tag.RowsAffected() != 1 {
+		t.Fatalf("set state %s: %v rows %d", state, err, tag.RowsAffected())
+	}
+}
+
+func setPlaceState(t *testing.T, db *database.DB, dealID, state string) {
+	t.Helper()
+	var raw []byte
+	if err := db.Pool.QueryRow(context.Background(), `SELECT obligations FROM orp_deals WHERE id=$1`, dealID).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var rows []map[string]any
+	if err := json.Unmarshal(raw, &rows); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for i := range rows {
+		if rows[i]["id"] != "place" {
+			continue
+		}
+		rows[i]["state"] = state
+		delete(rows[i], "receipt")
+		found = true
+	}
+	if !found {
+		t.Fatal("place missing")
+	}
+	next, err := json.Marshal(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Pool.Exec(context.Background(), `UPDATE orp_deals SET obligations=$2 WHERE id=$1`, dealID, next); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func storedClicks(t *testing.T, db *database.DB, dealID string) []any {
+	t.Helper()
+	clicks, _ := storedParties(t, db, dealID)["clicks"].([]any)
+	return clicks
+}
+
+func receiptCount(t *testing.T, db *database.DB) int {
+	t.Helper()
+	return countRows(t, db, `SELECT COUNT(*) FROM orp_inbox WHERE message->>'type' = 'receipt'`)
+}
+
+func TestORP04CubotVerifies(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, link, offerer := openActivePlace(t, db, r)
+	const cubot = "Mozilla/5.0 (Linux; Android 11; CUBOT NOTE 20) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36"
+	first := clickClassed(t, r, link, cubot)
+	if first.Code != http.StatusFound || !strings.Contains(first.Header().Get("Location"), "example.com/notes") {
+		t.Fatalf("cubot %d %s", first.Code, first.Header().Get("Location"))
+	}
+	place := readPlace(t, r, dealID, offerer.token)
+	receipt, _ := place["receipt"].(string)
+	if place["state"] != "verified" || receipt == "" {
+		t.Fatalf("cubot left place pending %#v", place)
+	}
+	rec, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offerer.token))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("deal %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), cubot) || strings.Contains(rec.Body.String(), "CUBOT") {
+		t.Fatalf("stored the user agent %s", rec.Body.String())
+	}
+	row := docBody(t, doc)["tracking"].([]any)[0].(map[string]any)
+	if asFloat(row["clicks"]) != 1 {
+		t.Fatalf("clicks %#v", row["clicks"])
+	}
+	clicks := storedClicks(t, db, dealID)
+	if len(clicks) != 1 || clicks[0].(map[string]any)["class"] != "human" {
+		t.Fatalf("stored %#v", clicks)
+	}
+}
+
+func TestORP04ApplebotLeavesPlacePending(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, link, offerer := openActivePlace(t, db, r)
+	const applebot = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)"
+	first := clickClassed(t, r, link, applebot)
+	if first.Code != http.StatusFound || !strings.Contains(first.Header().Get("Location"), "example.com/notes") {
+		t.Fatalf("applebot %d %s", first.Code, first.Header().Get("Location"))
+	}
+	place := readPlace(t, r, dealID, offerer.token)
+	if place["state"] != "pending" || place["receipt"] != nil {
+		t.Fatalf("applebot verified %#v", place)
+	}
+	rec, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offerer.token))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("deal %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), applebot) || strings.Contains(rec.Body.String(), "Applebot") {
+		t.Fatalf("stored the user agent %s", rec.Body.String())
+	}
+	row := docBody(t, doc)["tracking"].([]any)[0].(map[string]any)
+	if asFloat(row["clicks"]) != 0 {
+		t.Fatalf("clicks %#v", row["clicks"])
+	}
+	clicks := storedClicks(t, db, dealID)
+	if len(clicks) != 1 || clicks[0].(map[string]any)["class"] != "bot" {
+		t.Fatalf("stored %#v", clicks)
+	}
+	if receiptCount(t, db) != 0 {
+		t.Fatal("applebot wrote a receipt")
+	}
+}
+
+func TestORP04BotUADoesNotVerify(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, link, offerer := openActivePlace(t, db, r)
+	first := clickClassed(t, r, link, "Googlebot/2.1")
+	if first.Code != http.StatusFound || !strings.Contains(first.Header().Get("Location"), "example.com/notes") {
+		t.Fatalf("googlebot %d %s", first.Code, first.Header().Get("Location"))
+	}
+	place := readPlace(t, r, dealID, offerer.token)
+	if place["state"] != "pending" || place["receipt"] != nil {
+		t.Fatalf("googlebot verified %#v", place)
+	}
+	clicks := storedClicks(t, db, dealID)
+	if len(clicks) != 1 || clicks[0].(map[string]any)["class"] != "bot" {
+		t.Fatalf("googlebot class %#v", clicks)
+	}
+	for _, ua := range []string{"Twitterbot/1.0", "curl/8.0.1"} {
+		rec := clickClassed(t, r, link, ua)
+		if rec.Code != http.StatusFound {
+			t.Fatalf("%s %d", ua, rec.Code)
+		}
+	}
+	place = readPlace(t, r, dealID, offerer.token)
+	if place["state"] != "pending" || place["receipt"] != nil || receiptCount(t, db) != 0 {
+		t.Fatalf("bots verified %#v receipts %d", place, receiptCount(t, db))
+	}
+	for _, item := range storedClicks(t, db, dealID) {
+		row, _ := item.(map[string]any)
+		if row["class"] != "bot" {
+			t.Fatalf("class %#v", row)
+		}
+	}
+	human := clickClassed(t, r, link, browserUA)
+	if human.Code != http.StatusFound {
+		t.Fatalf("human %d", human.Code)
+	}
+	place = readPlace(t, r, dealID, offerer.token)
+	if place["state"] != "verified" || place["receipt"] == nil {
+		t.Fatalf("browser after bots %#v", place)
+	}
+}
+
+func TestORP04InactiveDealDoesNotVerify(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, link, offerer := openActivePlace(t, db, r)
+	for _, state := range []string{"pending", "ended"} {
+		setDealState(t, db, dealID, state)
+		rec := clickClassed(t, r, link, browserUA)
+		if rec.Code != http.StatusFound || !strings.Contains(rec.Header().Get("Location"), "example.com/notes") {
+			t.Fatalf("%s redirect %d %s", state, rec.Code, rec.Header().Get("Location"))
+		}
+		place := readPlace(t, r, dealID, offerer.token)
+		if place["state"] != "pending" || place["receipt"] != nil {
+			t.Fatalf("%s verified %#v", state, place)
+		}
+	}
+	if n := receiptCount(t, db); n != 0 {
+		t.Fatalf("receipts %d", n)
+	}
+	clicks := storedClicks(t, db, dealID)
+	if len(clicks) != 2 {
+		t.Fatalf("clicks %#v", clicks)
+	}
+	setDealState(t, db, dealID, "active")
+	rec := clickClassed(t, r, link, browserUA)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("active %d", rec.Code)
+	}
+	place := readPlace(t, r, dealID, offerer.token)
+	if place["state"] != "verified" || place["receipt"] == nil {
+		t.Fatalf("active verify %#v", place)
+	}
+}
+
+func TestORP04ObligationStateGuard(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, link, offerer := openActivePlace(t, db, r)
+	for _, state := range []string{"failed", "partial"} {
+		setPlaceState(t, db, dealID, state)
+		before := len(storedClicks(t, db, dealID))
+		rec := clickClassed(t, r, link, browserUA)
+		if rec.Code != http.StatusFound {
+			t.Fatalf("%s %d", state, rec.Code)
+		}
+		place := readPlace(t, r, dealID, offerer.token)
+		if place["state"] != state || place["receipt"] != nil {
+			t.Fatalf("%s changed %#v", state, place)
+		}
+		if len(storedClicks(t, db, dealID)) != before+1 || receiptCount(t, db) != 0 {
+			t.Fatalf("%s clicks %d receipts %d", state, len(storedClicks(t, db, dealID)), receiptCount(t, db))
+		}
+	}
+	setPlaceState(t, db, dealID, "claimed")
+	rec := clickClassed(t, r, link, browserUA)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("claimed %d", rec.Code)
+	}
+	place := readPlace(t, r, dealID, offerer.token)
+	receipt, _ := place["receipt"].(string)
+	if place["state"] != "verified" || receipt == "" || receiptCount(t, db) != 2 {
+		t.Fatalf("claimed verify %#v receipts %d", place, receiptCount(t, db))
+	}
+	again := clickClassed(t, r, link, browserUA)
+	if again.Code != http.StatusFound {
+		t.Fatalf("repeat %d", again.Code)
+	}
+	place = readPlace(t, r, dealID, offerer.token)
+	if place["state"] != "verified" || place["receipt"] != receipt || receiptCount(t, db) != 2 {
+		t.Fatalf("repeat receipt %#v count %d", place, receiptCount(t, db))
+	}
+}
+
+func TestORP04HeadDoesNotRecord(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, link, offerer := openActivePlace(t, db, r)
+	parsed, err := url.Parse(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodHead, parsed.Path, nil)
+	req.Header.Set("User-Agent", browserUA)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusFound {
+		t.Fatalf("head %d %s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("Referrer-Policy") != "no-referrer" || rec.Header().Get("X-Robots-Tag") != "noindex" {
+		t.Fatalf("head headers cache %q referrer %q robots %q", rec.Header().Get("Cache-Control"), rec.Header().Get("Referrer-Policy"), rec.Header().Get("X-Robots-Tag"))
+	}
+	if !strings.Contains(rec.Header().Get("Location"), "example.com/notes") {
+		t.Fatalf("head location %s", rec.Header().Get("Location"))
+	}
+	place := readPlace(t, r, dealID, offerer.token)
+	if place["state"] != "pending" || place["receipt"] != nil || len(storedClicks(t, db, dealID)) != 0 || receiptCount(t, db) != 0 {
+		t.Fatalf("head recorded %#v clicks %#v", place, storedClicks(t, db, dealID))
+	}
+	if got := orp.ClickClass(http.MethodHead, browserUA, "", ""); got != "preview" {
+		t.Fatalf("head class %s", got)
+	}
+	get := clickClassed(t, r, link, browserUA)
+	if get.Code != http.StatusFound || get.Header().Get("X-Robots-Tag") != "noindex" {
+		t.Fatalf("get after head %d", get.Code)
+	}
+	place = readPlace(t, r, dealID, offerer.token)
+	if place["state"] != "verified" || place["receipt"] == nil || len(storedClicks(t, db, dealID)) != 1 {
+		t.Fatalf("get after head %#v clicks %d", place, len(storedClicks(t, db, dealID)))
+	}
+}
+
+func TestORP04ClickShareRead(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	e := &orp04Env{t: t, r: r}
+	offerer := joinDefault(t, r)
+	curator := joinDefault(t, r)
+	acceptor := joinDefault(t, r)
+	terms := map[string]any{
+		"title": "Referral notes chain", "kind": "partnership",
+		"disclosure": map[string]any{"label": "Affiliate link", "lang": "en"},
+		"obligations": []any{map[string]any{
+			"id": "place", "by": acceptor.party, "action": "place",
+			"content":     map[string]any{"link": true, "brief": "Mention the notes app."},
+			"destination": "https://example.com/notes", "proof": []any{"link"},
+		}},
+	}
+	code, opened := e.send(offerer, "0.4", "offer", "", map[string]any{"terms": terms, "parties": []any{
+		map[string]any{"id": offerer.party, "role": "offerer", "required": true, "terms": map[string]any{"percent": 50}},
+		map[string]any{"id": curator.party, "role": "curator", "required": true, "terms": map[string]any{"percent": 30}},
+		map[string]any{"id": acceptor.party, "role": "acceptor", "required": true, "terms": map[string]any{"percent": 20}},
+	}})
+	assertAskWait(t, db, code, opened, offerer.party)
+	code, opened = postApprove(t, r, offerer.token, opened)
+	if code != http.StatusOK {
+		t.Fatalf("offerer approve %d %s", code, mustJSON(opened))
+	}
+	code, opened = acceptSeat(e, curator, opened)
+	if code != http.StatusOK {
+		t.Fatalf("curator accept %d %s", code, mustJSON(opened))
+	}
+	code, opened = postApprove(t, r, curator.token, opened)
+	if code != http.StatusOK {
+		t.Fatalf("curator approve %d %s", code, mustJSON(opened))
+	}
+	code, opened = acceptSeat(e, acceptor, opened)
+	if code != http.StatusOK {
+		t.Fatalf("acceptor accept %d %s", code, mustJSON(opened))
+	}
+	code, opened = postApprove(t, r, acceptor.token, opened)
+	body := docBody(t, opened)
+	if code != http.StatusOK || body["state"] != "active" {
+		t.Fatalf("active %d %s", code, mustJSON(opened))
+	}
+	tracking, _ := body["tracking"].([]any)
+	if len(tracking) != 1 {
+		t.Fatalf("tracking %s", mustJSON(opened))
+	}
+	link, _ := tracking[0].(map[string]any)["link"].(string)
+	dealID, _ := opened["deal"].(string)
+	parties := []party04{offerer, curator, acceptor}
+	assertShare := func(wantClicks float64, want map[string]float64) {
+		t.Helper()
+		var seen string
+		for _, party := range parties {
+			rec, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(party.token))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("deal %d %s", rec.Code, rec.Body.String())
+			}
+			if strings.Contains(rec.Body.String(), browserUA) || strings.Contains(rec.Body.String(), "Googlebot") || strings.Contains(rec.Body.String(), "@") {
+				t.Fatalf("pii %s", rec.Body.String())
+			}
+			row := docBody(t, doc)["tracking"].([]any)[0].(map[string]any)
+			if asFloat(row["clicks"]) != wantClicks {
+				t.Fatalf("clicks %#v", row["clicks"])
+			}
+			got := map[string]float64{}
+			shares, _ := row["click_share"].([]any)
+			for _, item := range shares {
+				one, _ := item.(map[string]any)
+				id, _ := one["party"].(string)
+				got[id] = asFloat(one["percent"])
+			}
+			raw, err := json.Marshal(row["click_share"])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if seen == "" {
+				seen = string(raw)
+			} else if seen != string(raw) {
+				t.Fatalf("share differed %s vs %s", seen, raw)
+			}
+			for id, value := range want {
+				if got[id] != value || len(got) != len(want) {
+					t.Fatalf("share %#v want %#v", got, want)
+				}
+			}
+		}
+	}
+	zero := map[string]float64{offerer.party: 0, curator.party: 0, acceptor.party: 0}
+	clickClassed(t, r, link, "")
+	assertShare(0, zero)
+	clickClassed(t, r, link, "Googlebot/2.1")
+	assertShare(0, zero)
+	parsed, err := url.Parse(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := httptest.NewRequest(http.MethodHead, parsed.Path, nil)
+	head.Header.Set("User-Agent", browserUA)
+	headRec := httptest.NewRecorder()
+	r.ServeHTTP(headRec, head)
+	if headRec.Code != http.StatusFound {
+		t.Fatalf("head %d", headRec.Code)
+	}
+	assertShare(0, zero)
+	prefetch := httptest.NewRequest(http.MethodGet, parsed.Path, nil)
+	prefetch.Header.Set("User-Agent", browserUA)
+	prefetch.Header.Set("Sec-Purpose", "prefetch")
+	prefetchRec := httptest.NewRecorder()
+	r.ServeHTTP(prefetchRec, prefetch)
+	if prefetchRec.Code != http.StatusFound {
+		t.Fatalf("prefetch %d", prefetchRec.Code)
+	}
+	testClick := httptest.NewRequest(http.MethodGet, parsed.Path+"?orp_test=1", nil)
+	testClick.Header.Set("User-Agent", browserUA)
+	testRec := httptest.NewRecorder()
+	r.ServeHTTP(testRec, testClick)
+	if testRec.Code != http.StatusFound {
+		t.Fatalf("orp_test %d", testRec.Code)
+	}
+	assertShare(0, zero)
+	clickClassed(t, r, link, browserUA)
+	clickClassed(t, r, link, browserUA)
+	assertShare(2, map[string]float64{offerer.party: 1, curator.party: 0.6, acceptor.party: 0.4})
+	shown, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(acceptor.token))
+	if !strings.Contains(shown.Body.String(), `"percent":1.0`) || !strings.Contains(shown.Body.String(), `"percent":0.6`) || !strings.Contains(shown.Body.String(), `"percent":0.4`) {
+		t.Fatalf("fixed point %s", shown.Body.String())
+	}
+	if err := orp.ValidateAgainst(filepath.Join(orpRepoRoot(t), "docs", "protocol", "schema", "0.4", "messages", "deal.schema.json"), doc); err != nil {
+		t.Fatalf("schema %v", err)
+	}
+
+	env := orpEnvelope("offer", "m_d109_03offer", offerer.party, map[string]any{"terms": testTerms()})
+	env["to"] = acceptor.party
+	oldRec, oldDoc := postJSON(t, r, http.MethodPost, "/orp", env, bearerHeader(offerer.token))
+	if oldRec.Code != http.StatusOK || oldDoc["orp"] != "0.3" || strings.Contains(oldRec.Body.String(), "click_share") || strings.Contains(oldRec.Body.String(), `"clicks"`) {
+		t.Fatalf("0.3 offer %d %s", oldRec.Code, oldRec.Body.String())
+	}
+	oldID, _ := oldDoc["deal"].(string)
+	oldGet, _ := postJSON(t, r, http.MethodGet, "/orp/deals/"+oldID, nil, bearerHeader(offerer.token))
+	if oldGet.Code != http.StatusOK || strings.Contains(oldGet.Body.String(), "click_share") || strings.Contains(oldGet.Body.String(), `"clicks"`) {
+		t.Fatalf("0.3 read %d %s", oldGet.Code, oldGet.Body.String())
+	}
+	if err := orp.ValidateAgainst(schemaPath(t, "messages/deal.schema.json"), oldDoc); err != nil {
+		t.Fatalf("0.3 schema %v", err)
+	}
+}
+
+func TestORPClickWriteKeepsEmptyObligations(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, _, _ := openActivePlace(t, db, r)
+	for _, raw := range []json.RawMessage{nil, {}, json.RawMessage("null"), json.RawMessage("[]")} {
+		if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET obligations=$2 WHERE id=$1`, dealID, database.JSONList(raw)); err != nil {
+			t.Fatal(err)
+		}
+		var isNull bool
+		var text string
+		if err := db.Pool.QueryRow(context.Background(), `SELECT obligations IS NULL, obligations::text FROM orp_deals WHERE id=$1`, dealID).Scan(&isNull, &text); err != nil {
+			t.Fatal(err)
+		}
+		if isNull || text != "[]" {
+			t.Fatalf("JSONList(%q) stored null=%v text=%s", raw, isNull, text)
+		}
 	}
 }

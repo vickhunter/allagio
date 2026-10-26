@@ -28,6 +28,10 @@ var (
 	agentPattern   = regexp.MustCompile(`^[A-Za-z0-9_. \-]{1,64}$`)
 )
 
+// AgentNameRule is the agent.name pattern. Spaces are allowed. Parentheses are not.
+// A 0.4 invalid_message names 0.4 and includes this sentence. The pattern is not loosened.
+const AgentNameRule = "agent.name matches ^[A-Za-z0-9_. -]{1,64}$: letters, digits, underscore, dot, space, or hyphen, 1 to 64 characters."
+
 var coreTypes = map[string]bool{
 	"hello": true, "discover": true, "results": true, "space": true,
 	"request": true, "offer": true, "counter": true, "accept": true,
@@ -384,7 +388,7 @@ func checkAgent(value any, path string) (Problem, bool) {
 	}
 	name, _ := obj["name"].(string)
 	if !agentPattern.MatchString(name) {
-		return Invalid("The message is not valid ORP 0.3.", path+"/name"), true
+		return Invalid("The message is not valid ORP 0.3. "+AgentNameRule, path+"/name"), true
 	}
 	if version, present := obj["version"]; present {
 		text, ok := version.(string)

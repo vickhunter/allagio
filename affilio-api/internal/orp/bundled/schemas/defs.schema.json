@@ -181,7 +181,7 @@
       "additionalProperties": false,
       "required": ["name"],
       "properties": {
-        "name": { "type": "string", "pattern": "^[A-Za-z0-9_. -]{1,64}$" },
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_. -]{1,64}$", "description": "1 to 64 characters: letters, digits, underscore, dot, space, or hyphen. Parentheses are not allowed." },
         "version": { "type": "string", "maxLength": 32 }
       }
     },
@@ -502,6 +502,27 @@
         "status": { "type": "string", "enum": ["live", "plain"] },
         "param": { "type": "string", "pattern": "^[a-z_]{1,20}$", "default": "via", "description": "Query parameter that carries the random click id on the redirect to destination." },
         "alias": { "type": "string", "pattern": "^[a-z_]{1,20}$", "description": "A second parameter, such as ref, that carries the same click id for checkouts that read it." },
+        "clicks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Counted human clicks on this entry. Bot, preview, and test clicks are excluded. A 0.3 deal snapshot omits this field."
+        },
+        "click_share": {
+          "type": "array",
+          "maxItems": 16,
+          "description": "Each party's share summed across counted human clicks, in seat order. A percent is an integer from 0 to 100 on the click, and this sum divides that integer by 100, so 50 twice is 1.0. amount_minor stays an integer sum. No address, user agent, or referrer. A 0.3 deal snapshot omits this field.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["party"],
+            "properties": {
+              "party": { "$ref": "#/$defs/PartyId" },
+              "percent": { "type": "number", "minimum": 0 },
+              "amount_minor": { "type": "integer", "minimum": 0, "maximum": 100000000000 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+            }
+          }
+        },
         "expires": { "$ref": "#/$defs/Timestamp" }
       }
     },
