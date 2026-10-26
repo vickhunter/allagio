@@ -1,6 +1,7 @@
 package orp
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,44 @@ func TestValidatePartiesSplitsAndHolders(t *testing.T) {
 	ok(pair(map[string]any{"percent": 40, "amount": eur(500), "cap": eur(1000)}, map[string]any{"percent": 40, "amount": eur(500), "cap": eur(1000)}))
 	if HolderKey("Offer.Rails") != "offerrails" || HolderKey("hosted api") != "hostedapi" {
 		t.Fatal("holder key")
+	}
+}
+
+func TestClickReadout(t *testing.T) {
+	seats := []Seat{
+		{ID: "orp:h/a", Terms: map[string]any{"percent": 50}},
+		{ID: "orp:h/b", Terms: map[string]any{"percent": 30}},
+		{ID: "orp:h/c", Terms: map[string]any{"percent": 20}},
+	}
+	split := []any{
+		map[string]any{"party": "orp:h/a", "percent": float64(50)},
+		map[string]any{"party": "orp:h/b", "percent": float64(30)},
+		map[string]any{"party": "orp:h/c", "percent": float64(20)},
+	}
+	doc := Many{Seats: seats, Clicks: []Click{
+		{Obligation: "place", Class: "bot", Shares: split},
+		{Obligation: "place", Class: "preview", Shares: split},
+		{Obligation: "place", Class: "test", Shares: split},
+		{Obligation: "place", Class: "human", Shares: split},
+		{Obligation: "other", Class: "human", Shares: split},
+		{Obligation: "place", Class: "human", Shares: split},
+	}}
+	clicks, share := ClickReadout(doc, "place")
+	if clicks != 2 {
+		t.Fatalf("clicks %d", clicks)
+	}
+	raw, err := json.Marshal(share)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, `"percent":1.0`) || !strings.Contains(text, `"percent":0.6`) || !strings.Contains(text, `"percent":0.4`) {
+		t.Fatalf("share %s", text)
+	}
+	zeroClicks, zeroShare := ClickReadout(Many{Seats: seats}, "place")
+	zeroRaw, err := json.Marshal(zeroShare)
+	if err != nil || zeroClicks != 0 || !strings.Contains(string(zeroRaw), `"percent":0.0`) {
+		t.Fatalf("zero %d %s %v", zeroClicks, zeroRaw, err)
 	}
 }
 

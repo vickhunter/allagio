@@ -841,12 +841,15 @@ func (h *ORPHost) manySnapshot(dns, viewer, re string, deal database.ORPDeal, no
 		origin := h.publicOrigin(dns)
 		rows := make([]any, len(doc.Tracking))
 		for i, entry := range doc.Tracking {
+			clicks, share := orp.ClickReadout(doc, entry.Obligation)
 			item := map[string]any{
 				"obligation":  entry.Obligation,
 				"link":        strings.TrimRight(origin, "/") + "/go/" + entry.Token,
 				"destination": entry.Destination,
 				"status":      entry.Status,
 				"param":       entry.Param,
+				"clicks":      clicks,
+				"click_share": share,
 			}
 			if entry.Alias != "" {
 				item["alias"] = entry.Alias

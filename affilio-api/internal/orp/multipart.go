@@ -2,6 +2,7 @@ package orp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -95,6 +96,120 @@ type Click struct {
 	Obligation string `json:"obligation"`
 	Class      string `json:"class"`
 	Shares     []any  `json:"shares"`
+}
+
+// ClickReadout is the counted view of one obligation. clicks is the number of
+// human clicks. Bot, preview, and test clicks are left out. click_share sums
+// each party's percent or amount across the counted clicks, in seat order.
+// A percent is stored as an integer from 0 to 100, and the sum is that
+// integer divided by 100, so 50 twice is 1.0. An amount_minor stays an integer
+// sum. The result has no address, user agent, or referrer.
+func ClickReadout(doc Many, obligation string) (clicks int, share []any) {
+	type acc struct {
+		percent    int
+		amount     int
+		currency   string
+		hasPercent bool
+		hasAmount  bool
+	}
+	byParty := map[string]*acc{}
+	order := make([]string, 0, len(doc.Seats))
+	remember := func(party string) *acc {
+		if party == "" {
+			return nil
+		}
+		if row := byParty[party]; row != nil {
+			return row
+		}
+		row := &acc{}
+		byParty[party] = row
+		order = append(order, party)
+		return row
+	}
+	for _, seat := range doc.Seats {
+		row := &acc{}
+		if _, ok := wholeNumber(seat.Terms["percent"]); ok {
+			row.hasPercent = true
+		}
+		if amount, ok := seat.Terms["amount"].(map[string]any); ok {
+			if _, ok := wholeNumber(amount["amount_minor"]); ok {
+				row.hasAmount = true
+			}
+			if currency, _ := amount["currency"].(string); currency != "" {
+				row.currency = currency
+			}
+		}
+		if !row.hasPercent && !row.hasAmount {
+			continue
+		}
+		byParty[seat.ID] = row
+		order = append(order, seat.ID)
+	}
+	for _, click := range doc.Clicks {
+		if click.Class != "human" || click.Obligation != obligation {
+			continue
+		}
+		clicks++
+		for _, item := range click.Shares {
+			one, _ := item.(map[string]any)
+			row := remember(oneString(one, "party"))
+			if row == nil {
+				continue
+			}
+			if n, ok := wholeNumber(one["percent"]); ok {
+				row.percent += n
+				row.hasPercent = true
+			}
+			if n, ok := wholeNumber(one["amount_minor"]); ok {
+				row.amount += n
+				row.hasAmount = true
+			}
+			if currency := oneString(one, "currency"); currency != "" {
+				row.currency = currency
+			}
+		}
+	}
+	share = make([]any, 0, len(order))
+	for _, party := range order {
+		row := byParty[party]
+		item := map[string]any{"party": party}
+		if row.hasPercent {
+			item["percent"] = fixedPercent(row.percent)
+		}
+		if row.hasAmount {
+			item["amount_minor"] = row.amount
+			if row.currency != "" {
+				item["currency"] = row.currency
+			}
+		}
+		share = append(share, item)
+	}
+	return clicks, share
+}
+
+func oneString(row map[string]any, key string) string {
+	if row == nil {
+		return ""
+	}
+	text, _ := row[key].(string)
+	return text
+}
+
+func wholeNumber(value any) (int, bool) {
+	n, ok := asFloat(value)
+	if !ok || n != float64(int(n)) || n < 0 || n > 1e9 {
+		return 0, false
+	}
+	return int(n), true
+}
+
+func fixedPercent(percentPoints int) json.Number {
+	whole := percentPoints / 100
+	frac := percentPoints % 100
+	if frac%10 == 0 {
+		return json.Number(fmt.Sprintf("%d.%d", whole, frac/10))
+	}
+	return json.Number(fmt.Sprintf("%d.%02d", whole, frac))
 }
 
 // Many is the nullable parties document. A 0.3 row leaves the column NULL.

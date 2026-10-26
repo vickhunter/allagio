@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -1669,6 +1670,154 @@ func TestORP04HeadDoesNotRecord(t *testing.T) {
 	place = readPlace(t, r, dealID, offerer.token)
 	if place["state"] != "verified" || place["receipt"] == nil || len(storedClicks(t, db, dealID)) != 1 {
 		t.Fatalf("get after head %#v clicks %d", place, len(storedClicks(t, db, dealID)))
+	}
+}
+
+func TestORP04ClickShareRead(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	e := &orp04Env{t: t, r: r}
+	offerer := joinDefault(t, r)
+	curator := joinDefault(t, r)
+	acceptor := joinDefault(t, r)
+	terms := map[string]any{
+		"title": "Referral notes chain", "kind": "partnership",
+		"disclosure": map[string]any{"label": "Affiliate link", "lang": "en"},
+		"obligations": []any{map[string]any{
+			"id": "place", "by": acceptor.party, "action": "place",
+			"content":     map[string]any{"link": true, "brief": "Mention the notes app."},
+			"destination": "https://example.com/notes", "proof": []any{"link"},
+		}},
+	}
+	code, opened := e.send(offerer, "0.4", "offer", "", map[string]any{"terms": terms, "parties": []any{
+		map[string]any{"id": offerer.party, "role": "offerer", "required": true, "terms": map[string]any{"percent": 50}},
+		map[string]any{"id": curator.party, "role": "curator", "required": true, "terms": map[string]any{"percent": 30}},
+		map[string]any{"id": acceptor.party, "role": "acceptor", "required": true, "terms": map[string]any{"percent": 20}},
+	}})
+	assertAskWait(t, db, code, opened, offerer.party)
+	code, opened = postApprove(t, r, offerer.token, opened)
+	if code != http.StatusOK {
+		t.Fatalf("offerer approve %d %s", code, mustJSON(opened))
+	}
+	code, opened = acceptSeat(e, curator, opened)
+	if code != http.StatusOK {
+		t.Fatalf("curator accept %d %s", code, mustJSON(opened))
+	}
+	code, opened = postApprove(t, r, curator.token, opened)
+	if code != http.StatusOK {
+		t.Fatalf("curator approve %d %s", code, mustJSON(opened))
+	}
+	code, opened = acceptSeat(e, acceptor, opened)
+	if code != http.StatusOK {
+		t.Fatalf("acceptor accept %d %s", code, mustJSON(opened))
+	}
+	code, opened = postApprove(t, r, acceptor.token, opened)
+	body := docBody(t, opened)
+	if code != http.StatusOK || body["state"] != "active" {
+		t.Fatalf("active %d %s", code, mustJSON(opened))
+	}
+	tracking, _ := body["tracking"].([]any)
+	if len(tracking) != 1 {
+		t.Fatalf("tracking %s", mustJSON(opened))
+	}
+	link, _ := tracking[0].(map[string]any)["link"].(string)
+	dealID, _ := opened["deal"].(string)
+	parties := []party04{offerer, curator, acceptor}
+	assertShare := func(wantClicks float64, want map[string]float64) {
+		t.Helper()
+		var seen string
+		for _, party := range parties {
+			rec, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(party.token))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("deal %d %s", rec.Code, rec.Body.String())
+			}
+			if strings.Contains(rec.Body.String(), browserUA) || strings.Contains(rec.Body.String(), "Googlebot") || strings.Contains(rec.Body.String(), "@") {
+				t.Fatalf("pii %s", rec.Body.String())
+			}
+			row := docBody(t, doc)["tracking"].([]any)[0].(map[string]any)
+			if asFloat(row["clicks"]) != wantClicks {
+				t.Fatalf("clicks %#v", row["clicks"])
+			}
+			got := map[string]float64{}
+			shares, _ := row["click_share"].([]any)
+			for _, item := range shares {
+				one, _ := item.(map[string]any)
+				id, _ := one["party"].(string)
+				got[id] = asFloat(one["percent"])
+			}
+			raw, err := json.Marshal(row["click_share"])
+			if err != nil {
+				t.Fatal(err)
+			}
+			if seen == "" {
+				seen = string(raw)
+			} else if seen != string(raw) {
+				t.Fatalf("share differed %s vs %s", seen, raw)
+			}
+			for id, value := range want {
+				if got[id] != value || len(got) != len(want) {
+					t.Fatalf("share %#v want %#v", got, want)
+				}
+			}
+		}
+	}
+	zero := map[string]float64{offerer.party: 0, curator.party: 0, acceptor.party: 0}
+	clickClassed(t, r, link, "")
+	assertShare(0, zero)
+	clickClassed(t, r, link, "Googlebot/2.1")
+	assertShare(0, zero)
+	parsed, err := url.Parse(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := httptest.NewRequest(http.MethodHead, parsed.Path, nil)
+	head.Header.Set("User-Agent", browserUA)
+	headRec := httptest.NewRecorder()
+	r.ServeHTTP(headRec, head)
+	if headRec.Code != http.StatusFound {
+		t.Fatalf("head %d", headRec.Code)
+	}
+	assertShare(0, zero)
+	prefetch := httptest.NewRequest(http.MethodGet, parsed.Path, nil)
+	prefetch.Header.Set("User-Agent", browserUA)
+	prefetch.Header.Set("Sec-Purpose", "prefetch")
+	prefetchRec := httptest.NewRecorder()
+	r.ServeHTTP(prefetchRec, prefetch)
+	if prefetchRec.Code != http.StatusFound {
+		t.Fatalf("prefetch %d", prefetchRec.Code)
+	}
+	testClick := httptest.NewRequest(http.MethodGet, parsed.Path+"?orp_test=1", nil)
+	testClick.Header.Set("User-Agent", browserUA)
+	testRec := httptest.NewRecorder()
+	r.ServeHTTP(testRec, testClick)
+	if testRec.Code != http.StatusFound {
+		t.Fatalf("orp_test %d", testRec.Code)
+	}
+	assertShare(0, zero)
+	clickClassed(t, r, link, browserUA)
+	clickClassed(t, r, link, browserUA)
+	assertShare(2, map[string]float64{offerer.party: 1, curator.party: 0.6, acceptor.party: 0.4})
+	shown, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(acceptor.token))
+	if !strings.Contains(shown.Body.String(), `"percent":1.0`) || !strings.Contains(shown.Body.String(), `"percent":0.6`) || !strings.Contains(shown.Body.String(), `"percent":0.4`) {
+		t.Fatalf("fixed point %s", shown.Body.String())
+	}
+	if err := orp.ValidateAgainst(filepath.Join(orpRepoRoot(t), "docs", "protocol", "schema", "0.4", "messages", "deal.schema.json"), doc); err != nil {
+		t.Fatalf("schema %v", err)
+	}
+
+	env := orpEnvelope("offer", "m_d109_03offer", offerer.party, map[string]any{"terms": testTerms()})
+	env["to"] = acceptor.party
+	oldRec, oldDoc := postJSON(t, r, http.MethodPost, "/orp", env, bearerHeader(offerer.token))
+	if oldRec.Code != http.StatusOK || oldDoc["orp"] != "0.3" || strings.Contains(oldRec.Body.String(), "click_share") || strings.Contains(oldRec.Body.String(), `"clicks"`) {
+		t.Fatalf("0.3 offer %d %s", oldRec.Code, oldRec.Body.String())
+	}
+	oldID, _ := oldDoc["deal"].(string)
+	oldGet, _ := postJSON(t, r, http.MethodGet, "/orp/deals/"+oldID, nil, bearerHeader(offerer.token))
+	if oldGet.Code != http.StatusOK || strings.Contains(oldGet.Body.String(), "click_share") || strings.Contains(oldGet.Body.String(), `"clicks"`) {
+		t.Fatalf("0.3 read %d %s", oldGet.Code, oldGet.Body.String())
+	}
+	if err := orp.ValidateAgainst(schemaPath(t, "messages/deal.schema.json"), oldDoc); err != nil {
+		t.Fatalf("0.3 schema %v", err)
 	}
 }
 
