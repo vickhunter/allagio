@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/http/suggest-response.schema.json",
+  "title": "SuggestResponse",
+  "description": "Suggest response that may include 0.4 offer terms. An expired offer is absent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items", "join"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "allOf": [{ "$ref": "../messages/results.schema.json#/$defs/Result" }],
+        "type": "object",
+        "required": ["pitch"]
+      }
+    },
+    "empty_reason": { "type": "string", "enum": ["no_match", "below_threshold", "filtered"] },
+    "joined": { "$ref": "https://offer-rails.onrender.com/orp/schemas/http/join-response.schema.json" },
+    "join": { "$ref": "https://offer-rails.onrender.com/orp/schemas/discovery.schema.json#/$defs/UrlOrPath" }
+  }
+}

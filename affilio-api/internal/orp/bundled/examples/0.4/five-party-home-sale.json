@@ -1,0 +1,98 @@
+{
+  "orp": "0.4",
+  "type": "deal",
+  "id": "m_host_fiveseat",
+  "ts": "2026-10-26T12:00:00.000Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_seller01",
+  "deal": "deal_fiveseat",
+  "body": {
+    "state": "active",
+    "parties": [
+      {
+        "id": "orp:hub.example/p_seller01",
+        "role": "offerer",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "amount": {
+            "amount_minor": 0,
+            "currency": "EUR"
+          }
+        }
+      },
+      {
+        "id": "orp:hub.example/p_buyer01",
+        "role": "acceptor",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "amount": {
+            "amount_minor": 100000,
+            "currency": "EUR"
+          }
+        }
+      },
+      {
+        "id": "orp:hub.example/p_media01",
+        "role": "facilitator",
+        "required": true,
+        "signed": true,
+        "identity": {
+          "hash": "sha256-Hr6VqstWHV4oel7_vs40UWBZF-_GVFzxoFUbPvD2-jg",
+          "issuer": "example-issuer"
+        },
+        "terms": {
+          "amount": {
+            "amount_minor": 100000,
+            "currency": "EUR"
+          }
+        }
+      },
+      {
+        "id": "orp:hub.example/p_door01",
+        "role": "service",
+        "required": false,
+        "signed": false,
+        "terms": {
+          "amount": {
+            "amount_minor": 4000,
+            "currency": "EUR"
+          },
+          "per": "hour",
+          "hours": 2,
+          "deposit": {
+            "amount": {
+              "amount_minor": 2000,
+              "currency": "EUR"
+            },
+            "holder": "viewing-desk",
+            "purpose": "viewing"
+          }
+        }
+      },
+      {
+        "id": "orp:hub.example/p_notary01",
+        "role": "signer",
+        "required": true,
+        "signed": true
+      }
+    ],
+    "terms": {
+      "title": "Illustrative five-seat deal, test mode only",
+      "kind": "partnership",
+      "obligations": [
+        {
+          "id": "share",
+          "by": "signer",
+          "action": "share"
+        }
+      ]
+    },
+    "terms_hash": "sha256-8yasGCLG6_gYnrZohUPxzWrcvfATIfaDgRovkGODFyk",
+    "updated": "2026-10-26T12:00:00.000Z",
+    "offerer": "orp:hub.example/p_seller01",
+    "acceptor": "orp:hub.example/p_buyer01",
+    "round": 1
+  }
+}

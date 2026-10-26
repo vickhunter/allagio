@@ -1,6 +1,6 @@
 # Offer Rails Protocol (ORP) 0.3
 
-**Status:** canonical draft, frozen 2026-10-23 (D-099). This is the one ORP 0.3 wire format. Changes after the freeze follow [§19](#19-change-control).
+**Status:** canonical draft, frozen 2026-10-23 (D-099). This is the one ORP 0.3 wire format. Changes after the freeze follow [§19](#19-change-control). [§20](#20-many-party-deals-orp-04) specifies ORP 0.4. A valid 0.3 message stays valid and means what it meant.
 **Schemas:** [`schema/0.3/`](https://offer-rails.onrender.com/orp/schemas/) (JSON Schema 2020-12). Valid and invalid examples are in [`schema/examples/`](https://offer-rails.onrender.com/orp/examples/), checked by `npm test` in `schema/`.
 **License:** this specification and its schemas will be published under Apache-2.0. Until then it is a draft in this repository.
 **Decision log:** `briefs/offer-rails-protocol-canonical-20261023.md`.
@@ -36,6 +36,7 @@
 17. [Conformance](#17-conformance)
 18. [Security](#18-security)
 19. [Change control](#19-change-control)
+20. [Many-party deals (ORP 0.4)](#20-many-party-deals-orp-04)
 - [Appendix A: changes from the PR #71 schemas](#appendix-a-changes-from-the-pr-71-schemas)
 - [Appendix B: PR #68 to 0.3 mapping](#appendix-b-pr-68-to-03-mapping)
 - [Appendix C: the Offer Rails hosted API and ORP 0.3](#appendix-c-the-offer-rails-hosted-api-and-orp-03)
@@ -253,6 +254,8 @@ An error never changes state. A host MUST NOT apply part of a message.
 | `ext` | Extension names it supports. |
 
 A party MUST NOT send a type that its counterparty's host did not list in `capabilities.messages`.
+
+A host that speaks 0.4 lists `leave` and `seat` in `capabilities.messages` on its [discovery document](https://offer-rails.onrender.com/orp/schemas/0.4/discovery.schema.json) and on a [`hello`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/hello.schema.json) reply whose version is `0.4`. A `hello` reply of `0.3` lists the 0.3 types only. `leave` and `seat` are valid on a 0.4 message. They are not 0.3 message types.
 
 ---
 
@@ -1213,8 +1216,145 @@ A host or client states the levels it meets in `conformance.levels`. Each level 
 
 - This document and the schemas at [`https://offer-rails.onrender.com/orp/schemas/`](https://offer-rails.onrender.com/orp/schemas/) are the canonical ORP 0.3. Where they disagree, the schema wins for shape and this document wins for behavior, and the disagreement is a bug to fix in both.
 - After the freeze, a 0.3 change may only fix an error, clarify text, or add an optional field that no existing receiver would refuse. Each change updates this document, the schema, the examples and the decision log together, and `npm test` must pass.
-- Anything that changes what a valid message means goes to 0.4. Candidates: federation between hosts, mandatory signatures, settlement profiles, A2A and x402 bindings, and verifiable party keys (DID or domain JWKS).
+- Anything that changes what a valid message means goes to 0.4. Candidates: federation between hosts, mandatory signatures, settlement profiles, A2A and x402 bindings, and verifiable party keys (DID or domain JWKS). Many-party deals are specified in [§20](#20-many-party-deals-orp-04).
 - Extension names are reverse-DNS under a domain the author controls. An extension MUST NOT redefine a core field.
+
+---
+
+## 20. Many-party deals (ORP 0.4)
+
+ORP 0.4 adds deals with more than two parties. It does not change a valid 0.3 message. A 0.3 deal is still `offerer` and `acceptor`, and it still becomes `active` when both are bound. The reference host speaks `0.4` and `0.3`. Discovery lists `0.4` first. Schemas live under [`0.4/message.schema.json`](https://offer-rails.onrender.com/orp/schemas/0.4/message.schema.json) and [`0.4/defs.schema.json`](https://offer-rails.onrender.com/orp/schemas/0.4/defs.schema.json). `leave` and `seat` are 0.4 message types. The hosted API does not speak them. `CLAIMS_CHECK` is unchanged.
+
+### 20.1 Seats and splits
+
+A 0.4 deal has 2 to 16 parties ([`deal`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/deal.schema.json)). Each seat has `id`, `role`, and `required`. Roles are `offerer`, `acceptor`, `curator`, `facilitator`, `service`, `signer`, and `member`. A deal has at most one offerer and one acceptor, and at least one required seat.
+
+Seat `terms` are that seat's split. A percent is an integer from 0 to 100. An amount is the seat's `amount` field. `per`, `hours`, and `deposit` are not amounts. When no seat carries an amount, the percents sum to 100. Percents that sum to something other than 100 are rejected even when a seat has `hours`, `per`, `deposit`, or a `cap`. Fixed amounts alone do not use that sum. A mix exists only when a seat carries both a percent and an amount, or when percent seats sit beside seats that carry an amount. A mix is valid when every percent term has a `cap` and the percents are not over 100. Those percents do not have to sum to 100. A sum of 101 is rejected. A percent without a `cap` in a mix is rejected. The host answers `invalid_message`.
+
+`terms_hash` on a many-party deal is the JCS SHA-256 of `{ terms, parties }`. Each party in that document is `id`, `role`, `required`, plus `terms` and `identity` when they are present. `signed` is not part of the hash. Party order is the order on the offer. Accept order does not change it.
+
+### 20.2 Who must sign
+
+The deal stays `pending` until every required party has signed the current hash. An optional party does not block `active`. Signatures are a set. Signing in a different order reaches the same state, and `bound` is sorted by party id. The first time the deal becomes `active`, tracking links are minted. A later return to `active` does not mint them again.
+
+A standing 0.4 offer has no `parties`. Its `terms_hash` is the JCS SHA-256 of the terms after the host writes `checked_at`, `expires_at`, and `claims`. Accepting it opens a two-party deal. That deal's hash is `{ terms, parties }`, so it differs from the offer hash. The accept message names the offer hash.
+
+A `counter` replaces the shared terms, clears every signature and every vacancy, and recomputes the hash. The sender's signature is the only one that remains, unless their step is waiting on a person.
+
+### 20.3 Leave and seat
+
+[`leave`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/leave.schema.json) removes the sender only when the remaining seats are still a valid deal. The host re-checks the split the same way it checks `seat`. If the remaining percents no longer hold, the host rejects the leave with `invalid_message` and changes nothing. An optional party can leave when the remaining split still holds. If the deal was `active`, it stays `active`. A required party, when the leave is accepted, leaves a vacancy for that role and the deal returns to `pending`. The other signatures stay. The hash is recomputed. A deal keeps at least 2 parties.
+
+A vacancy clears only when the replacement seated as required for that vacancy signs. The replacement is a new required seat added after the vacancy opened, and that seat is the one that fills it. An original seat of the same role does not clear it, even when that seat is required and signs later. An optional seat of the same role does not clear it, and that signature does not make the deal `active`. The deal stays `pending` until every vacated required seat has its required replacement who has signed.
+
+[`seat`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/seat.schema.json) adds a party that has already joined the host. The sender is already on the deal. The new seat is unsigned. A vacancy stays until a required replacement for that role accepts. Seating the replacement does not by itself make the deal `active`.
+
+### 20.4 Offer freshness
+
+A 0.4 standing offer carries `checked_at` and `expires_at`. `expires_at` is `checked_at` plus 90 days. A claim field nobody checked is the string `unknown`. The host does not write a default of 0 or false, and it does not invent a field that was absent. Only a destination the host has actually checked is stored as `{ value, checked_at, expires_at }`. At `expires_at`, or after it, the offer is left out of `discover` and `suggest` until the maker sends `offer` with `{ "id", "confirm": true }`. That refreshes the window. The unchecked fields stay `unknown`.
+
+<!-- orp:0.4 -->
+```json
+{
+  "orp": "0.4",
+  "type": "offer",
+  "id": "m_maker_fresh01",
+  "ts": "2026-10-26T12:00:00.000Z",
+  "from": "orp:hub.example/p_maker01",
+  "body": {
+    "id": "ofr_notes_fresh",
+    "terms": {
+      "title": "Notes freshness window",
+      "kind": "affiliate",
+      "disclosure": { "label": "Affiliate link", "lang": "en" },
+      "checked_at": "2026-10-26T12:00:00.000Z",
+      "expires_at": "2027-01-24T12:00:00.000Z",
+      "claims": {
+        "commission": "unknown",
+        "destination": {
+          "value": "https://notes.example/pricing?plan=pro",
+          "checked_at": "2026-10-26T12:00:00.000Z",
+          "expires_at": "2027-01-24T12:00:00.000Z"
+        }
+      },
+      "obligations": [
+        {
+          "id": "place",
+          "by": "acceptor",
+          "action": "place",
+          "content": { "link": true, "brief": "Mention the notes app." },
+          "destination": "https://notes.example/pricing?plan=pro",
+          "proof": ["link"]
+        }
+      ]
+    },
+    "terms_hash": "sha256-HA2twwIzdpw_Vgsy8k6lQr3yn08tFmkJkGmSrh0Jy1U"
+  }
+}
+```
+
+That `terms_hash` is the digest of the terms object, including `checked_at` and `expires_at`. The schema example below is a finished three-party deal.
+
+### 20.5 Identity and money
+
+Identity on a party is `hash` and `issuer` only. The deal does not carry a name, an email, or any other personal data.
+
+A deposit is a term that names who holds it. The holder is outside Offer Rails. Offer Rails does not hold money. The proof records the agreed term. It does not move the money. The host compares the holder after lowercasing it and removing spaces, hyphens, underscores, and dots. A holder that becomes `host`, `offerrails`, or `hostedapi` is rejected, including `OfferRails`, `offer-rails`, and `hosted api`.
+
+### 20.6 Fixtures
+
+These files are illustrative and test mode only. They are not legal advice and they are not a product.
+
+- [referral-chain.json](https://offer-rails.onrender.com/orp/examples/0.4/referral-chain.json) is a creator, a curator, and a newsletter. Percents are 50, 30, and 20. All three are required. The deal is `active` only after all three have signed.
+- [link-swap-ring.json](https://offer-rails.onrender.com/orp/examples/0.4/link-swap-ring.json) is four `member` seats at 25 percent each.
+- [five-party-home-sale.json](https://offer-rails.onrender.com/orp/examples/0.4/five-party-home-sale.json) is five seats: an offerer with a fixed zero amount, an acceptor with a fixed fee, a required facilitator with an identity attestation who receives that fee, an optional service seat paid a fixed amount per hour, and a required signer whose own fee is outside the deal. The service seat's viewing deposit names an outside holder. The optional seat is unsigned in the fixture, and the deal is still `active`.
+- [bad-split.json](https://offer-rails.onrender.com/orp/examples/0.4/bad-split.json) is a schema-valid offer whose percents are 60 and 41. The host rejects it.
+- [mediator-left.json](https://offer-rails.onrender.com/orp/examples/0.4/mediator-left.json) is `pending` with a `facilitator` vacancy.
+
+A facilitator percent of 1 with a cap, beside fixed amounts on the other seats, is a valid mix. A seat that carries a percent, an amount, and a cap is mixed too, and those percents need not sum to 100. If the optional service seat leaves, the deal stays `active` because the remaining fixed amounts still hold. If that optional seat's leaving would drop a percent split below 100, the host rejects the leave and the deal is unchanged. If the facilitator leaves, the deal returns to `pending` until a required replacement signs. An optional facilitator does not clear that vacancy. Seller and buyer alone are a normal two-party deal: on 0.3 that deal is unchanged, and on 0.4 two required seats still go `active` when both have signed.
+
+<!-- orp:0.4 -->
+```json
+{
+  "orp": "0.4",
+  "type": "deal",
+  "id": "m_host_referral",
+  "ts": "2026-10-26T12:00:00.000Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_creator01",
+  "deal": "deal_referral",
+  "body": {
+    "state": "active",
+    "parties": [
+      { "id": "orp:hub.example/p_creator01", "role": "offerer", "required": true, "signed": true, "terms": { "percent": 50 } },
+      { "id": "orp:hub.example/p_curator01", "role": "curator", "required": true, "signed": true, "terms": { "percent": 30 } },
+      { "id": "orp:hub.example/p_news01", "role": "acceptor", "required": true, "signed": true, "terms": { "percent": 20 } }
+    ],
+    "offerer": "orp:hub.example/p_creator01",
+    "acceptor": "orp:hub.example/p_news01",
+    "terms": {
+      "title": "Referral notes chain",
+      "kind": "partnership",
+      "disclosure": { "label": "Affiliate link", "lang": "en" },
+      "obligations": [
+        {
+          "id": "place",
+          "by": "orp:hub.example/p_news01",
+          "action": "place",
+          "content": { "link": true, "brief": "Mention the notes app." },
+          "destination": "https://notes.example/pricing?plan=pro",
+          "proof": ["link"]
+        }
+      ]
+    },
+    "terms_hash": "sha256-lx3RaehTPOZnKQISKqCAJWIiwbJ1U51oHl0gN791ukU",
+    "round": 1,
+    "updated": "2026-10-26T12:00:00.000Z"
+  }
+}
+```
+
+The property check draws random deals of 2 to 16 parties. A percent split that sums to 100 validates. The same split moved by any non-zero amount is rejected. Two signature orders of the same seats finish in the same state.
 
 ---
 
@@ -1307,7 +1447,7 @@ The same accept in ORP 0.3, on a host called `hub.example`, names the deal and t
 
 ## Appendix C: the Offer Rails hosted API and ORP 0.3
 
-The hosted service now serves a testing slice of ORP 0.3. The discovery name is **In testing**. It claims no conformance level. DCP v0.1 remains the live affiliate path. `CLAIMS_CHECK` is unchanged.
+The hosted service now serves a testing slice of ORP 0.3. The discovery name is **In testing**. It claims no conformance level. DCP v0.1 remains the live affiliate path. `CLAIMS_CHECK` is unchanged. The hosted API does not speak ORP 0.4. Many-party deals, `leave`, `seat`, and offer freshness are specified in [§20](#20-many-party-deals-orp-04) and are not served here.
 
 | ORP 0.3 | Hosted today |
 |---|---|

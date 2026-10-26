@@ -1,0 +1,69 @@
+{
+  "orp": "0.4",
+  "type": "deal",
+  "id": "m_host_referral",
+  "ts": "2026-10-26T12:00:00.000Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_creator01",
+  "deal": "deal_referral",
+  "body": {
+    "state": "active",
+    "parties": [
+      {
+        "id": "orp:hub.example/p_creator01",
+        "role": "offerer",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "percent": 50
+        }
+      },
+      {
+        "id": "orp:hub.example/p_curator01",
+        "role": "curator",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "percent": 30
+        }
+      },
+      {
+        "id": "orp:hub.example/p_news01",
+        "role": "acceptor",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "percent": 20
+        }
+      }
+    ],
+    "terms": {
+      "title": "Referral notes chain",
+      "kind": "partnership",
+      "disclosure": {
+        "label": "Affiliate link",
+        "lang": "en"
+      },
+      "obligations": [
+        {
+          "id": "place",
+          "by": "orp:hub.example/p_news01",
+          "action": "place",
+          "content": {
+            "link": true,
+            "brief": "Mention the notes app."
+          },
+          "destination": "https://notes.example/pricing?plan=pro",
+          "proof": [
+            "link"
+          ]
+        }
+      ]
+    },
+    "terms_hash": "sha256-lx3RaehTPOZnKQISKqCAJWIiwbJ1U51oHl0gN791ukU",
+    "updated": "2026-10-26T12:00:00.000Z",
+    "offerer": "orp:hub.example/p_creator01",
+    "acceptor": "orp:hub.example/p_news01",
+    "round": 1
+  }
+}

@@ -1,3 +1,19 @@
+## October 26 — ORP 0.4 re-review
+
+A required vacancy clears only when the replacement seated for that vacancy signs. An original required seat of the same role does not clear it. `per`, `hours`, and `deposit` are not amounts: percents with no `amount` still sum to 100, and a cap is required only for a mix with an amount. Approve builds the next deal, the consent messages, and the tracking links first, and delivers them only after every snapshot has succeeded. A thrown snapshot leaves every inbox, the store, and `this.links` as they were, so a click does not follow an orphan token to the host root. The same rollback covers a 0.3 approval. No migration. The hosted deal API does not speak 0.4. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 26 — ORP 0.4 review fixes
+
+A required vacancy clears only when a required replacement of that role signs. An optional seat of the same role does not clear it, and the deal stays `pending`. `leave` re-checks the remaining split and is rejected with `invalid_message` when the split no longer holds, leaving the deal unchanged. `GET /orp/deals/:id` and approve return a 0.4 snapshot for a many-party deal and admit every seated party. A snapshot that fails does not keep the signature that approve had just written. A 0.4 host advertises `leave` and `seat` on discovery and on a 0.4 hello. A 0.3 hello still lists the 0.3 types. A seat with both a percent and an amount is a mixed term: the percents need a cap and must not pass 100, and they do not have to sum to 100. Deposit holders are compared after lowercasing and stripping spaces, hyphens, underscores, and dots, so `OfferRails` and `hosted api` are rejected. The property test also checks that a deal stays `pending` until the last required signature, and that those vacancy and leave rules hold over random seat, leave, and sign sequences. No migration. The hosted deal API does not speak 0.4. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 26 — ORP 0.4 many-party deals (spec and conformance)
+
+ORP 0.4 is specified in `docs/protocol` (SPEC §20, schemas under `schema/0.4/`, examples under `schema/examples/0.4/`). A deal has 2 to 16 parties, each with a role and terms. It stays `pending` until every required party signs. An optional party does not block `active`. An optional party can leave and the deal stays valid. A required party leaving opens a vacancy and returns the deal to `pending` until a replacement signs. Percent splits sum to 100, fixed amounts stand alone, and a mix of percent and fixed amount is valid when each percent has a cap. 101 percent is rejected. A 0.4 standing offer carries `checked_at` and `expires_at` (`checked_at` plus 90 days). A field nobody checked is `unknown`. An expired offer is left out of `discover` and `suggest` until the maker confirms it. Identity on a seat is a hash and an issuer name. A deposit term names an outside holder. Offer Rails does not hold money.
+
+The reference host speaks 0.4 and 0.3 so the fixtures can run. N=2 ORP 0.3 deals and the existing 0.3 fixtures are unchanged. The hosted deal API does not speak 0.4. No migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+Conformance: ORP04-REFERRAL-CHAIN, ORP04-LINK-SWAP-RING, ORP04-HOME-SALE, ORP04-BAD-SPLIT, ORP04-MEDIATOR-LEAVES, ORP04-EXPIRED-OFFER, ORP04-N2-UNCHANGED, and ORP04-PROPERTY. The five-seat fixture is illustrative and test mode only. It is not legal advice and it is not a product. The property test found no bug. On this machine it added about 1.2s (`duration_ms` 1052 to 1195, 240 split trials and 20 host deals).
+
 ## October 26 — Offer Rails connector names (D-056)
 
 An outside agent sees one name. `/.well-known/dcp.json`, the stdio process, and both MCP `initialize` responses (`POST /v1/mcp` and the hosted `POST /mcp` server) use `offer-rails-mcp` and the title Offer Rails. That pair is `dcp.ServerName` and `dcp.ServerTitle`.

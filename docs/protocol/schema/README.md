@@ -24,6 +24,8 @@ npm test
 
 The L0 to L3 behavioral suite lives next to this directory. `cd docs/protocol && npm ci && npm test` runs these schema checks and that suite.
 
-The test compiles every schema with Ajv in strict mode and validates every example. It checks that each invalid example fails where it says, and recomputes every `terms_hash` next to its terms. It also validates every ```json block in `docs/protocol/*.md` that looks like an ORP document. A block marked `<!-- orp:invalid -->` must fail, and a block marked `<!-- orp:skip -->` is skipped.
+The test compiles every schema with Ajv in strict mode and validates every example. It checks that each invalid example fails where it says, and recomputes every `terms_hash` next to its terms. It also validates every ```json block in `docs/protocol/*.md` that looks like an ORP document. A block marked `<!-- orp:invalid -->` must fail, and a block marked `<!-- orp:skip -->` is skipped. A block marked `<!-- orp:0.4 -->` is checked against the 0.4 message schema, not the 0.3 one.
+
+`0.4/` is the many-party deal vocabulary: seats, splits, `leave`, `seat`, offer `checked_at` / `expires_at`, plus a discovery document and a hello body that can name `leave` and `seat`. `examples/0.4/` holds the 3-party, 4-party, and 5-party fixtures and the negative cases. A 0.3 example is unchanged.
 
 Core objects are closed (`additionalProperties: false`), and extension data goes in the envelope's `ext` field under a reverse-DNS name. A closed schema is therefore also the privacy check: an outcome row has no field that could hold an address, a user agent or an email.

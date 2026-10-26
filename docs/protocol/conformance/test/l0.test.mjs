@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { check, digest, generateEd25519, publicJwk, signEnvelope } from '../../sdk/src/index.mjs';
+import { checkMessage, digest, generateEd25519, publicJwk, signEnvelope } from '../../sdk/src/index.mjs';
 import {
   AUTO, OrpClient, ReferenceHost, affiliateTerms, codeOf, inbox, party, tempStore, withHost,
 } from './helpers.mjs';
@@ -15,11 +15,17 @@ test('L0-SCHEMA', async () => {
     assert.equal(codeOf(missing), 'invalid_message');
 
     const hello = maker.msg({ type: 'hello', body: { versions: ['0.3'] } });
-    hello.orp = '0.4';
+    hello.orp = '9.9';
     const version = await maker.send(hello);
     assert.equal(version.status, 400);
     assert.equal(codeOf(version), 'unsupported_version');
-    assert.deepEqual(version.message.body.supported, ['0.3']);
+    assert.deepEqual(version.message.body.supported, ['0.4', '0.3']);
+
+    const hello04 = maker.msg({ orp: '0.4', type: 'hello', body: { versions: ['0.4'] } });
+    const ok04 = await maker.send(hello04);
+    assert.equal(ok04.status, 200);
+    assert.equal(ok04.message.orp, '0.4');
+    assert.deepEqual(ok04.message.body.versions, ['0.4']);
 
     const critical = await maker.send(maker.msg({
       type: 'hello',
@@ -72,8 +78,8 @@ test('L0-SCHEMA', async () => {
 
     assert.ok(host.outbound.length > 0);
     for (const message of host.outbound) {
-      const verdict = check('message', message);
-      assert.equal(verdict.ok, true, `${message.type} invalid at ${verdict.field}`);
+      const verdict = checkMessage(message);
+      assert.equal(verdict.ok, true, `${message.orp} ${message.type} invalid at ${verdict.field}`);
     }
   });
 });

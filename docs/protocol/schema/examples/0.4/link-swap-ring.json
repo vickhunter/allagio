@@ -1,0 +1,115 @@
+{
+  "orp": "0.4",
+  "type": "deal",
+  "id": "m_host_linkring",
+  "ts": "2026-10-26T12:00:00.000Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_ring01",
+  "deal": "deal_linkring",
+  "body": {
+    "state": "active",
+    "parties": [
+      {
+        "id": "orp:hub.example/p_ring01",
+        "role": "member",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "percent": 25
+        }
+      },
+      {
+        "id": "orp:hub.example/p_ring02",
+        "role": "member",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "percent": 25
+        }
+      },
+      {
+        "id": "orp:hub.example/p_ring03",
+        "role": "member",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "percent": 25
+        }
+      },
+      {
+        "id": "orp:hub.example/p_ring04",
+        "role": "member",
+        "required": true,
+        "signed": true,
+        "terms": {
+          "percent": 25
+        }
+      }
+    ],
+    "terms": {
+      "title": "Link swap ring",
+      "kind": "link_exchange",
+      "disclosure": {
+        "label": "Affiliate link",
+        "lang": "en"
+      },
+      "obligations": [
+        {
+          "id": "place1",
+          "by": "orp:hub.example/p_ring01",
+          "action": "place",
+          "content": {
+            "link": true,
+            "brief": "A notes link."
+          },
+          "destination": "https://notes.example/pricing?plan=pro",
+          "proof": [
+            "link"
+          ]
+        },
+        {
+          "id": "place2",
+          "by": "orp:hub.example/p_ring02",
+          "action": "place",
+          "content": {
+            "link": true,
+            "brief": "A notes link."
+          },
+          "destination": "https://notes.example/pricing?plan=pro",
+          "proof": [
+            "link"
+          ]
+        },
+        {
+          "id": "place3",
+          "by": "orp:hub.example/p_ring03",
+          "action": "place",
+          "content": {
+            "link": true,
+            "brief": "A notes link."
+          },
+          "destination": "https://notes.example/pricing?plan=pro",
+          "proof": [
+            "link"
+          ]
+        },
+        {
+          "id": "place4",
+          "by": "orp:hub.example/p_ring04",
+          "action": "place",
+          "content": {
+            "link": true,
+            "brief": "A notes link."
+          },
+          "destination": "https://notes.example/pricing?plan=pro",
+          "proof": [
+            "link"
+          ]
+        }
+      ]
+    },
+    "terms_hash": "sha256-OFGZAtUqd100Srkb76A7dIG8SNY3KWa9-eIiTsCbTlw",
+    "updated": "2026-10-26T12:00:00.000Z",
+    "round": 1
+  }
+}

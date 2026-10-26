@@ -34,6 +34,8 @@ D-105 records this list on main. It does not change `CLAIMS_CHECK` and it does n
 
 **Blockers in that run: 6** (items 1–6). Item 5 can now go `active`; the tracked link is still open. Item 6 stays a critic carry-over. Items 1–4 were new in that run.
 
+ORP 0.4 many-party deals are specified in SPEC §20. The hosted deal API does not speak 0.4. `CLAIMS_CHECK` is unchanged. This ranked list is the D-099 record and is not rewritten for 0.4.
+
 ## Notes after the run
 
 - Item 1. D-104, now on main, refuses execute unless the deal is `active` (HTTP 409 `state_conflict`). An active execute claims the obligation and does not write a verified receipt.

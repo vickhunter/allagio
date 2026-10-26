@@ -1,0 +1,32 @@
+{
+  "why": "A deal has at least 2 parties.",
+  "schema": "message",
+  "path": "/body/parties",
+  "instance": {
+    "orp": "0.4",
+    "type": "offer",
+    "id": "m_maker_oneparty",
+    "ts": "2026-10-26T12:00:00.000Z",
+    "from": "orp:hub.example/p_maker01",
+    "body": {
+      "terms": {
+        "title": "Bad notes split",
+        "kind": "partnership",
+        "obligations": [
+          {
+            "id": "share",
+            "by": "offerer",
+            "action": "share"
+          }
+        ]
+      },
+      "parties": [
+        {
+          "id": "orp:hub.example/p_maker01",
+          "role": "offerer",
+          "required": true
+        }
+      ]
+    }
+  }
+}

@@ -4,7 +4,8 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { canonicalize, digest } from './jcs.mjs';
 import { generateEd25519, publicJwk, signEnvelope, verifyEnvelope } from './sign.mjs';
-import { check } from './validate.mjs';
+import { dealHash, normalizeClaims, signatureState, validateParties } from './multipart.mjs';
+import { check, check04, checkMessage } from './validate.mjs';
 
 const DAY = 86400000;
 const CORE = new Set(['hello', 'discover', 'results', 'space', 'request', 'offer', 'counter', 'accept', 'decline', 'deal', 'execute', 'receipt', 'outcome', 'payout', 'revoke', 'consent', 'dispute', 'reputation', 'error']);
@@ -83,14 +84,26 @@ function textsOf(value) {
 }
 
 function roleParty(deal, role) {
+  if (deal?.parties) {
+    const byId = deal.parties.find((seat) => seat.id === role);
+    if (byId) return byId.id;
+    const byRole = deal.parties.find((seat) => seat.role === role);
+    if (byRole) return byRole.id;
+  }
   return role === 'offerer' ? deal.offerer : deal.acceptor;
 }
 
 function otherParty(deal, partyId) {
+  if (deal?.parties?.length) {
+    const other = deal.parties.find((seat) => seat.id !== partyId);
+    return other ? other.id : '';
+  }
   return deal.offerer === partyId ? deal.acceptor : deal.offerer;
 }
 
 function partyRole(deal, partyId) {
+  const seat = deal?.parties?.find((item) => item.id === partyId);
+  if (seat) return seat.role;
   if (deal.offerer === partyId) return 'offerer';
   if (deal.acceptor === partyId) return 'acceptor';
   return '';
@@ -189,17 +202,17 @@ export class ReferenceHost {
 
   discovery() {
     const doc = {
-      orp: ['0.3'],
+      orp: ['0.4', '0.3'],
       host: this.hostId,
       name: 'ORP Reference Host',
-      description: 'Reference host for the ORP 0.3 conformance suite. Not the Offer Rails hosted API.',
+      description: 'Reference host for the ORP 0.3 and 0.4 conformance suite. Not the Offer Rails hosted API.',
       endpoint: `${this.origin}/orp`,
       suggest: `${this.origin}/orp/suggest`,
       join: `${this.origin}/orp/join`,
       auth: { bearer: true },
       tracking: { links: true, codes: true, base: `${this.origin}/go/` },
       conformance: { levels: this.levels() },
-      capabilities: this.capabilities(),
+      capabilities: this.capabilities('0.4'),
       keys: [publicJwk(this.hostKey)],
       docs: `${this.origin}/docs/orp`,
     };
@@ -213,9 +226,10 @@ export class ReferenceHost {
     return doc;
   }
 
-  capabilities() {
+  capabilities(version = '0.3') {
+    const messages = version === '0.4' ? [...CORE, 'leave', 'seat'] : [...CORE];
     return {
-      messages: [...CORE],
+      messages,
       proofs: ['link', 'proof_url', 'platform_check', 'attestation', 'witness', 'provider'],
       tracking: { links: true, codes: true },
       signatures: { algs: ['EdDSA'], required: false },
@@ -273,7 +287,7 @@ export class ReferenceHost {
     }
     if (req.method === 'GET' && url.pathname === '/.well-known/orp.json') {
       const doc = this.discovery();
-      const verdict = check('discovery', doc);
+      const verdict = check04('discovery', doc);
       if (!verdict.ok) throw new Error(`discovery invalid at ${verdict.field}`);
       this.write(res, 200, doc, { cors: true });
       return;
@@ -345,11 +359,14 @@ export class ReferenceHost {
     const dealPath = url.pathname.match(/^\/orp\/deals\/([^/]+)$/);
     if (req.method === 'GET' && dealPath) {
       const deal = this.deals.get(dealPath[1]);
-      if (!deal || (deal.offerer !== auth.party.id && deal.acceptor !== auth.party.id)) {
+      if (!deal || !partyRole(deal, auth.party.id)) {
         this.write(res, 404, this.plainError('not_found', 'No such deal for this sender.'));
         return;
       }
-      this.write(res, 200, this.snapshot(deal, auth.party.id, ''));
+      const snap = deal.version === '0.4'
+        ? this.snapshotMany(deal, auth.party.id, '')
+        : this.snapshot(deal, auth.party.id, '');
+      this.write(res, 200, snap);
       return;
     }
     const keys = url.pathname.match(/^\/orp\/keys\/([^/]+)$/);
@@ -424,14 +441,16 @@ export class ReferenceHost {
   }
 
   handleMessage(party, message) {
-    const shape = check('message', message);
-    if (!shape.ok) return { status: 400, message: this.plainError('invalid_message', 'The message is not valid ORP 0.3.', { field: shape.field || '' }) };
+    const version = typeof message.orp === 'string' ? message.orp : '';
+    if (/^[0-9]+\.[0-9]+$/.test(version) && version !== '0.3' && version !== '0.4') {
+      return { status: 400, message: this.plainError('unsupported_version', 'This host speaks 0.4 and 0.3.', { supported: ['0.4', '0.3'] }) };
+    }
+    const shape = version === '0.4' ? check04('message', message) : check('message', message);
+    if (!shape.ok) return { status: 400, message: this.plainError('invalid_message', `The message is not valid ORP ${message.orp}.`, { field: shape.field || '' }) };
     const dirtyAt = dirty(message);
     if (dirtyAt) return { status: 400, message: this.plainError('invalid_message', 'The message contains disallowed characters or markup.', { field: dirtyAt }) };
-    if (message.orp !== '0.3') {
-      return { status: 400, message: this.plainError('unsupported_version', 'This host speaks 0.3.', { supported: ['0.3'] }) };
-    }
-    if (!CORE.has(message.type)) return { status: 400, message: this.plainError('unsupported_type', 'The type is not supported.') };
+    const known = message.orp === '0.4' ? new Set([...CORE, 'leave', 'seat']) : CORE;
+    if (!known.has(message.type)) return { status: 400, message: this.plainError('unsupported_type', 'The type is not supported.') };
     if ((message.critical || []).some((name) => name !== 'com.offerrails.none')) {
       return { status: 400, message: this.plainError('unsupported_extension', 'A critical extension is unknown.') };
     }
@@ -527,6 +546,8 @@ export class ReferenceHost {
       case 'counter': return this.onCounter(party, message);
       case 'accept': return this.onAccept(party, message);
       case 'decline': return this.onDecline(party, message);
+      case 'leave': return this.onLeave(party, message);
+      case 'seat': return this.onSeat(party, message);
       case 'execute': return this.onExecute(party, message);
       case 'receipt': return this.onReceipt(party, message);
       case 'revoke': return this.onRevoke(party, message);
@@ -539,13 +560,14 @@ export class ReferenceHost {
 
   onHello(party, message) {
     const reply = this.emit({
+      orp: message.orp === '0.4' ? '0.4' : '0.3',
       type: 'hello',
       to: party.id,
       re: message.id,
       body: {
-        versions: ['0.3'],
+        versions: [message.orp === '0.4' ? '0.4' : '0.3'],
         party: party.id,
-        capabilities: this.capabilities(),
+        capabilities: this.capabilities(message.orp === '0.4' ? '0.4' : '0.3'),
         limits: { messages_per_minute: 60, max_body_bytes: 65536 },
       },
     });
@@ -555,7 +577,9 @@ export class ReferenceHost {
 
   onDiscover(party, message) {
     const items = message.body.want === 'offers' ? this.offerItems() : this.spaceItems();
+    const fresh = items.some((item) => item.offer?.terms?.checked_at || item.offer?.terms?.claims);
     const reply = this.emit({
+      orp: fresh ? '0.4' : '0.3',
       type: 'results',
       to: party.id,
       re: message.id,
@@ -626,6 +650,20 @@ export class ReferenceHost {
   }
 
   onOffer(party, message) {
+    if (message.orp === '0.4' && message.body?.confirm) return this.confirmOffer(party, message);
+    if (message.orp === '0.4' && Array.isArray(message.body?.parties)) return this.onOfferMany(party, message);
+    if (message.orp === '0.4' && message.to) {
+      const hashError = hashMatches(message.body.terms, message.body.terms_hash);
+      if (hashError) return this.failure('terms_mismatch', hashError, message);
+      const directed = structuredClone(message);
+      delete directed.body.terms_hash;
+      directed.body.parties = [
+        { id: party.id, role: 'offerer', required: true },
+        { id: message.to, role: 'acceptor', required: true },
+      ];
+      return this.onOfferMany(party, directed);
+    }
+    if (message.orp === '0.4') return this.onOfferFresh(party, message);
     const hashError = hashMatches(message.body.terms, message.body.terms_hash);
     if (hashError) return this.failure('terms_mismatch', hashError, message);
     const directed = Boolean(message.to);
@@ -683,7 +721,7 @@ export class ReferenceHost {
     if (offer.limit) body.limit = offer.limit;
     if (offer.expires) body.expires = offer.expires;
     if (offer.waiting) body.waiting = offer.waiting;
-    const reply = this.emit({ type: 'offer', to: party.id, re: message.id, body });
+    const reply = this.emit({ orp: offer.version || '0.3', type: 'offer', to: party.id, re: message.id, body });
     this.deliver(party.id, reply);
     return reply;
   }
@@ -691,6 +729,7 @@ export class ReferenceHost {
   onCounter(party, message) {
     const deal = this.deals.get(message.deal);
     if (!deal || !partyRole(deal, party.id)) return this.failure('not_found', 'No such deal for this sender.', message);
+    if (deal.version === '0.4') return this.counterMany(party, message, deal);
     if (!['proposed', 'awaiting', 'active'].includes(deal.state)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
     if ((deal.round || 1) >= 100) return this.failure('state_conflict', 'The round cap is reached.', message);
     const hashError = hashMatches(message.body.terms, message.body.terms_hash);
@@ -725,6 +764,7 @@ export class ReferenceHost {
     if (message.body.offer) return this.acceptOffer(party, message);
     const deal = this.deals.get(message.deal);
     if (!deal || !partyRole(deal, party.id)) return this.failure('not_found', 'No such deal for this sender.', message);
+    if (deal.version === '0.4') return this.acceptMany(party, message, deal);
     if (message.body.terms_hash !== deal.termsHash) return this.failure('terms_mismatch', 'terms_hash does not match the terms.', message);
     if (!['proposed', 'awaiting'].includes(deal.state)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
     const decision = this.evaluate(party, 'accept', {
@@ -741,8 +781,9 @@ export class ReferenceHost {
 
   acceptOffer(party, message) {
     const offer = this.offers.get(message.body.offer);
-    if (!offer || !offer.listed || offer.owner === party.id) return this.failure('not_found', 'No such offer for this sender.', message);
+    if (!offer || !this.offerListed(offer) || offer.owner === party.id) return this.failure('not_found', 'No such offer for this sender.', message);
     if (message.body.terms_hash !== offer.termsHash) return this.failure('terms_mismatch', 'terms_hash does not match the terms.', message);
+    if (offer.version === '0.4') return this.acceptFreshOffer(party, message, offer);
     const decision = this.evaluate(party, 'accept', {
       counterparty: this.parties.get(offer.owner),
       terms: offer.terms,
@@ -770,6 +811,7 @@ export class ReferenceHost {
   onDecline(party, message) {
     const deal = this.deals.get(message.deal);
     if (!deal || !partyRole(deal, party.id)) return this.failure('not_found', 'No such deal for this sender.', message);
+    if (deal.version === '0.4') return this.declineMany(party, message, deal);
     if (!['proposed', 'awaiting'].includes(deal.state)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
     deal.state = 'declined';
     deal.waiting = null;
@@ -953,7 +995,8 @@ export class ReferenceHost {
       if (status !== 201) return [status, joined];
       response.joined = joined;
     }
-    const verdict = check('suggest-response', response);
+    let verdict = check('suggest-response', response);
+    if (!verdict.ok) verdict = check04('suggest-response', response);
     if (!verdict.ok) throw new Error(`suggest response invalid at ${verdict.field}`);
     this.save();
     return [200, response];
@@ -962,7 +1005,7 @@ export class ReferenceHost {
   matchOffers(body) {
     const hay = `${body.text} ${(body.kinds || []).join(' ')}`.toLowerCase();
     const words = new Set(hay.split(/[^a-z0-9]+/).filter((word) => word.length >= 4));
-    return [...this.offers.values()].filter((offer) => offer.listed).map((offer) => {
+    return [...this.offers.values()].filter((offer) => this.offerListed(offer)).map((offer) => {
       const blob = `${offer.terms.title} ${(offer.terms.categories || []).join(' ')} ${offer.terms.kind || ''}`.toLowerCase();
       const hit = [...words].some((word) => blob.includes(word));
       return hit ? this.offerItem(offer, body.text) : null;
@@ -1061,32 +1104,59 @@ export class ReferenceHost {
       return [403, this.plainError('forbidden', 'client_prompt cannot bind a party to pay.')];
     }
     const consentId = localId('cns_');
-    let consent = null;
-    if (esc.dealId) {
-      const body = {
-        consent: consentId,
-        escalation: esc.id,
-        party: esc.party,
-        decision,
-        step: esc.step,
-        terms_hash: esc.termsHash,
-        reasons: esc.reasons,
-        assurance,
-        at: this.iso(),
-      };
-      consent = this.emit({ type: 'consent', to: esc.party, deal: esc.dealId, body });
-      this.deliver(esc.party, consent);
-      const other = otherParty(this.deals.get(esc.dealId), esc.party);
-      const otherBody = { ...body };
-      delete otherBody.reasons;
-      this.deliver(other, this.emit({ type: 'consent', to: other, deal: esc.dealId, body: otherBody }));
-    }
-    esc.resolved = true;
-    if (decision === 'refused') this.refuseEscalation(esc);
-    else this.applyEscalation(esc, consentId);
-    this.save();
     const deal = esc.dealId ? this.deals.get(esc.dealId) : null;
-    return [200, deal ? this.snapshot(deal, esc.party, consent?.id || '') : { ok: true }];
+    const priorDeal = deal ? structuredClone(deal) : null;
+    const priorOutbound = this.outbound.length;
+    const priorInboxSeq = this.inboxSeq;
+    const priorInbox = new Map([...this.inbox].map(([id, rows]) => [id, rows.slice()]));
+    const priorLinks = new Map(this.links);
+    const bucket = [];
+    this.stageLinks = new Map();
+    let consent = null;
+    try {
+      if (esc.dealId) {
+        const consentBody = {
+          consent: consentId,
+          escalation: esc.id,
+          party: esc.party,
+          decision,
+          step: esc.step,
+          terms_hash: esc.termsHash,
+          reasons: esc.reasons,
+          assurance,
+          at: this.iso(),
+        };
+        consent = this.emit({ type: 'consent', to: esc.party, deal: esc.dealId, body: consentBody });
+        bucket.push({ to: esc.party, message: consent });
+        const other = otherParty(deal, esc.party);
+        const otherBody = { ...consentBody };
+        delete otherBody.reasons;
+        bucket.push({ to: other, message: this.emit({ type: 'consent', to: other, deal: esc.dealId, body: otherBody }) });
+      }
+      esc.resolved = true;
+      if (decision === 'refused') this.refuseEscalation(esc);
+      else this.applyEscalation(esc, consentId, bucket);
+      const payload = !deal
+        ? { ok: true }
+        : deal.version === '0.4'
+          ? this.snapshotMany(deal, esc.party, consent?.id || '')
+          : this.snapshot(deal, esc.party, consent?.id || '');
+      for (const [token, row] of this.stageLinks) this.links.set(token, row);
+      for (const item of bucket) this.deliver(item.to, item.message);
+      this.save();
+      return [200, payload];
+    } catch (error) {
+      if (deal && priorDeal) this.deals.set(deal.id, priorDeal);
+      this.outbound.length = priorOutbound;
+      this.inboxSeq = priorInboxSeq;
+      this.inbox = priorInbox;
+      this.links.clear();
+      for (const [token, row] of priorLinks) this.links.set(token, row);
+      esc.resolved = false;
+      throw error;
+    } finally {
+      this.stageLinks = null;
+    }
   }
 
   refuseEscalation(esc) {
@@ -1113,7 +1183,7 @@ export class ReferenceHost {
     deal.updated = this.iso();
   }
 
-  applyEscalation(esc, consentId) {
+  applyEscalation(esc, consentId, bucket) {
     if (esc.kind === 'offer') {
       const offer = this.offers.get(esc.offerId);
       offer.listed = true;
@@ -1128,7 +1198,8 @@ export class ReferenceHost {
       return;
     }
     if (esc.kind === 'request') {
-      this.deliver(esc.message.to, esc.message);
+      if (bucket) bucket.push({ to: esc.message.to, message: esc.message });
+      else this.deliver(esc.message.to, esc.message);
       return;
     }
     const deal = this.deals.get(esc.dealId);
@@ -1141,7 +1212,7 @@ export class ReferenceHost {
     } else if (esc.kind === 'counter') this.finishBind(deal, esc.party, 'consent', consentId);
     else if (esc.kind === 'payout') this.answerPayout(this.payouts.get(esc.payout), esc.answer);
     deal.updated = this.iso();
-    if (esc.kind !== 'payout') this.publishDeal(deal, '');
+    if (esc.kind !== 'payout') this.publishDeal(deal, '', undefined, bucket);
   }
 
   evaluate(party, step, ctx) {
@@ -1207,7 +1278,10 @@ export class ReferenceHost {
   }
 
   together(a, b) {
-    return [...this.deals.values()].some((deal) => (deal.offerer === a && deal.acceptor === b) || (deal.offerer === b && deal.acceptor === a));
+    return [...this.deals.values()].some((deal) => {
+      if (deal.parties) return deal.parties.some((seat) => seat.id === a) && deal.parties.some((seat) => seat.id === b);
+      return (deal.offerer === a && deal.acceptor === b) || (deal.offerer === b && deal.acceptor === a);
+    });
   }
 
   owes(terms, role) {
@@ -1252,6 +1326,10 @@ export class ReferenceHost {
   }
 
   finishBind(deal, partyId, type, ref) {
+    if (deal.version === '0.4') {
+      this.signSeat(deal, partyId, type, ref);
+      return;
+    }
     this.bind(deal, partyId, type, ref);
     deal.waiting = null;
     const both = deal.bound.some((item) => item.party === deal.offerer) && deal.bound.some((item) => item.party === deal.acceptor);
@@ -1312,7 +1390,8 @@ export class ReferenceHost {
       };
       if (content.code) entry.code = token(6).replace(/[^A-Za-z0-9]/g, 'x').slice(0, 8);
       deal.tracking.push(entry);
-      this.links.set(entry.token, { dealId: deal.id, obligation: obligation.id });
+      const links = this.stageLinks || this.links;
+      links.set(entry.token, { dealId: deal.id, obligation: obligation.id });
     }
     deal.updated = this.iso();
   }
@@ -1331,12 +1410,18 @@ export class ReferenceHost {
     for (const entry of deal.tracking) entry.status = 'plain';
   }
 
-  publishDeal(deal, re, viewer) {
+  publishDeal(deal, re, viewer, bucket) {
+    if (deal.version === '0.4') return this.publishMany(deal, re, viewer, bucket);
     deal.updated = this.iso();
     const offerer = this.snapshot(deal, deal.offerer, re);
     const acceptor = this.snapshot(deal, deal.acceptor, re);
-    this.deliver(deal.offerer, offerer);
-    this.deliver(deal.acceptor, acceptor);
+    if (bucket) {
+      bucket.push({ to: deal.offerer, message: offerer });
+      bucket.push({ to: deal.acceptor, message: acceptor });
+    } else {
+      this.deliver(deal.offerer, offerer);
+      this.deliver(deal.acceptor, acceptor);
+    }
     return viewer === deal.acceptor ? acceptor : offerer;
   }
 
@@ -1822,7 +1907,7 @@ export class ReferenceHost {
   }
 
   offerItems() {
-    return [...this.offers.values()].filter((offer) => offer.listed).map((offer) => this.offerItem(offer, ''));
+    return [...this.offers.values()].filter((offer) => this.offerListed(offer)).map((offer) => this.offerItem(offer, ''));
   }
 
   offerItem(offer, text) {
@@ -1853,14 +1938,14 @@ export class ReferenceHost {
     const messages = rows.filter((row) => row.seq > cursor).slice(0, 100);
     const next = messages.length ? String(messages[messages.length - 1].seq) : String(cursor || 0);
     const page = { messages: messages.map((row) => row.message), next };
-    const verdict = check('inbox', page);
+    const verdict = page.messages.some((item) => item.orp === '0.4') ? check04('inbox', page) : check('inbox', page);
     if (!verdict.ok) throw new Error(`inbox invalid at ${verdict.field}`);
     return page;
   }
 
   deliver(partyId, message) {
     if (!partyId || partyId === this.hostId) return;
-    const verdict = check('message', message);
+    const verdict = checkMessage(message);
     if (!verdict.ok) throw new Error(`refusing to deliver invalid ${message?.type} at ${verdict.field}`);
     const rows = this.inbox.get(partyId) || [];
     this.inboxSeq += 1;
@@ -1869,18 +1954,21 @@ export class ReferenceHost {
   }
 
   emit(message, { inbox = false } = {}) {
+    const orp = message.orp || '0.3';
     const full = {
-      orp: '0.3',
+      orp,
       id: localId('m_'),
       ts: this.iso(),
       from: this.hostId,
       ...message,
     };
+    full.orp = orp;
+    if (!message.from) full.from = this.hostId;
     if (!full.re) delete full.re;
     if (!full.to) delete full.to;
     if (!full.deal) delete full.deal;
     const signed = SIGNED.has(full.type) ? signEnvelope(full, this.hostKey) : full;
-    const verdict = check('message', signed);
+    const verdict = checkMessage(signed);
     if (!verdict.ok) {
       throw new Error(`host emitted invalid ${full.type} at ${verdict.field}: ${JSON.stringify(verdict.errors?.slice(0, 3))}`);
     }
@@ -1898,6 +1986,376 @@ export class ReferenceHost {
       status: HTTP_STATUS[code] || 400,
       message: this.emit({ type: 'error', to: inbound?.from, re: inbound?.id, body }, { inbox: false }),
     };
+  }
+
+  checkedFieldKeys(terms) {
+    const keys = new Set();
+    if (this.claims !== 'real') return keys;
+    const destinations = (terms?.obligations || []).map((item) => item.destination).filter(Boolean);
+    if (destinations.length && destinations.every((url) => this.pages.has(url))) keys.add('destination');
+    return keys;
+  }
+
+  offerListed(offer) {
+    if (!offer?.listed) return false;
+    if (offer.version === '0.4' && offer.expiresAt) {
+      const at = Date.parse(offer.expiresAt);
+      if (Number.isFinite(at) && at <= this.businessNow()) return false;
+    }
+    return true;
+  }
+
+  onOfferFresh(party, message) {
+    const hashError = hashMatches(message.body.terms, message.body.terms_hash);
+    if (hashError) return this.failure('terms_mismatch', hashError, message);
+    const decision = this.evaluate(party, 'list', { terms: message.body.terms, role: 'offerer' });
+    if (decision.error) return this.failure(decision.error.code, decision.error.message, message, decision.error);
+    const now = this.iso(this.businessNow());
+    const checked = this.checkedFieldKeys(message.body.terms);
+    const terms = normalizeClaims(message.body.terms, now, checked);
+    const offer = {
+      id: localId('ofr_'),
+      version: '0.4',
+      owner: party.id,
+      terms,
+      termsHash: digest(terms),
+      limit: message.body.limit,
+      expires: terms.expires_at,
+      expiresAt: terms.expires_at,
+      listed: !decision.escalate,
+      checked: checked.size > 0,
+      bound: null,
+      created: now,
+    };
+    if (!decision.escalate) offer.bound = { party: party.id, authority: { type: 'mandate' }, at: this.iso() };
+    this.offers.set(offer.id, offer);
+    if (decision.escalate) {
+      const esc = this.openEscalation(party, 'list', decision.escalate.reasons, { kind: 'offer', offerId: offer.id, pays: this.owes(terms, 'offerer') });
+      offer.waiting = esc.waiting;
+    }
+    return { status: 200, message: this.offerReply(party, message, offer) };
+  }
+
+  confirmOffer(party, message) {
+    const offer = this.offers.get(message.body.id);
+    if (!offer || offer.owner !== party.id) return this.failure('not_found', 'No such offer for this sender.', message);
+    if (offer.version !== '0.4') return this.failure('state_conflict', 'The deal is in the wrong state.', message);
+    const now = this.iso(this.businessNow());
+    const checked = this.checkedFieldKeys(offer.terms);
+    offer.terms = normalizeClaims(offer.terms, now, checked);
+    offer.termsHash = digest(offer.terms);
+    offer.expires = offer.terms.expires_at;
+    offer.expiresAt = offer.terms.expires_at;
+    offer.checked = checked.size > 0;
+    offer.created = now;
+    return { status: 200, message: this.offerReply(party, message, offer) };
+  }
+
+  onOfferMany(party, message) {
+    const parties = message.body.parties;
+    const verdict = validateParties(parties, { hostId: this.hostId });
+    if (!verdict.ok) return this.failure('invalid_message', verdict.message, message, { field: verdict.field });
+    if (!parties.some((seat) => seat.id === party.id)) return this.failure('forbidden', 'The sender is not a party on this deal.', message);
+    if (parties.some((seat) => !this.parties.has(seat.id))) return this.failure('not_found', 'No such party for this sender.', message);
+    const terms = structuredClone(message.body.terms);
+    const hashed = dealHash(terms, parties);
+    if (message.body.terms_hash && message.body.terms_hash !== hashed) {
+      return this.failure('terms_mismatch', 'terms_hash does not match the terms.', message);
+    }
+    const seat = parties.find((item) => item.id === party.id);
+    const decision = this.evaluate(party, 'negotiate', {
+      counterparty: this.parties.get(parties.find((item) => item.id !== party.id)?.id),
+      terms,
+      role: seat.role,
+    });
+    if (decision.error) return this.failure(decision.error.code, decision.error.message, message, decision.error);
+    const deal = this.newManyDeal({
+      parties,
+      terms,
+      termsHash: hashed,
+      re: message.id,
+      expires: message.body.expires,
+    });
+    this.deals.set(deal.id, deal);
+    if (decision.escalate) this.hold(deal, party, 'negotiate', decision.escalate.reasons, { kind: 'bind-offerer', pays: this.owes(terms, seat.role) });
+    else this.signSeat(deal, party.id, 'mandate');
+    return { status: 200, message: this.publishMany(deal, message.id, party.id) };
+  }
+
+  newManyDeal({ parties, terms, termsHash, offerId, re, expires, checked }) {
+    const seats = parties.map((seat) => {
+      const item = { id: seat.id, role: seat.role, required: Boolean(seat.required), signed: false };
+      if (seat.terms && Object.keys(seat.terms).length) item.terms = structuredClone(seat.terms);
+      if (seat.identity) item.identity = structuredClone(seat.identity);
+      return item;
+    });
+    const offerer = seats.find((seat) => seat.role === 'offerer');
+    const acceptor = seats.find((seat) => seat.role === 'acceptor');
+    return {
+      id: localId('deal_'),
+      version: '0.4',
+      state: 'pending',
+      parties: seats,
+      offerer: offerer ? offerer.id : '',
+      acceptor: acceptor ? acceptor.id : '',
+      offerId: offerId || '',
+      terms,
+      termsHash,
+      round: 1,
+      bound: [],
+      vacancies: [],
+      waiting: null,
+      tracking: [],
+      obligations: terms.obligations.map((item) => ({ id: item.id, state: 'pending' })),
+      expires: expires || '',
+      updated: this.iso(),
+      re: re || '',
+      pool: '',
+      checked: Boolean(checked),
+      counts: {},
+      sources: {},
+      revokeAt: '',
+      live: false,
+    };
+  }
+
+  signSeat(deal, partyId, type, ref) {
+    const seat = deal.parties.find((item) => item.id === partyId);
+    if (!seat) return;
+    if (!seat.signed) {
+      seat.signed = true;
+      this.bind(deal, partyId, type, ref);
+      deal.bound.sort((a, b) => (a.party < b.party ? -1 : a.party > b.party ? 1 : 0));
+      if (seat.fills) {
+        const vacancy = deal.vacancies.findIndex((item) => item.id === seat.fills);
+        if (vacancy >= 0) deal.vacancies.splice(vacancy, 1);
+      }
+    }
+    this.refreshQuorum(deal);
+  }
+
+  refreshQuorum(deal) {
+    const signedIds = deal.parties.filter((seat) => seat.signed).map((seat) => seat.id);
+    const next = signatureState(deal.parties, signedIds, deal.vacancies);
+    if (next.state === 'active' && !deal.live) {
+      deal.state = 'pending';
+      this.activate(deal);
+      deal.live = true;
+      return;
+    }
+    if (next.state === 'active') {
+      deal.state = 'active';
+      deal.waiting = null;
+      return;
+    }
+    deal.state = 'pending';
+  }
+
+  acceptMany(party, message, deal) {
+    if (message.body.terms_hash !== deal.termsHash) return this.failure('terms_mismatch', 'terms_hash does not match the terms.', message);
+    const seat = deal.parties.find((item) => item.id === party.id);
+    if (!seat) return this.failure('not_found', 'No such deal for this sender.', message);
+    if (seat.signed) {
+      const snap = this.snapshotMany(deal, party.id, message.id);
+      this.deliver(party.id, snap);
+      return { status: 200, message: snap };
+    }
+    if (!['pending', 'awaiting', 'active'].includes(deal.state)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
+    const decision = this.evaluate(party, 'accept', {
+      counterparty: this.parties.get(otherParty(deal, party.id)),
+      terms: deal.terms,
+      role: seat.role,
+    });
+    if (decision.error) return this.failure(decision.error.code, decision.error.message, message, decision.error);
+    deal.re = message.id;
+    if (decision.escalate) this.hold(deal, party, 'accept', decision.escalate.reasons, { kind: 'bind', pays: this.owes(deal.terms, seat.role) });
+    else this.signSeat(deal, party.id, 'mandate');
+    return { status: 200, message: this.publishMany(deal, message.id, party.id) };
+  }
+
+  acceptFreshOffer(party, message, offer) {
+    const decision = this.evaluate(party, 'accept', {
+      counterparty: this.parties.get(offer.owner),
+      terms: offer.terms,
+      role: 'acceptor',
+      claimsUnchecked: !offer.checked,
+    });
+    if (decision.error) return this.failure(decision.error.code, decision.error.message, message, decision.error);
+    const parties = [
+      { id: offer.owner, role: 'offerer', required: true },
+      { id: party.id, role: 'acceptor', required: true },
+    ];
+    const terms = structuredClone(offer.terms);
+    const deal = this.newManyDeal({
+      parties,
+      terms,
+      termsHash: dealHash(terms, parties),
+      offerId: offer.id,
+      re: message.id,
+      expires: offer.expires,
+      checked: offer.checked,
+    });
+    this.deals.set(deal.id, deal);
+    if (offer.bound) this.signSeat(deal, offer.owner, offer.bound.authority?.type || 'mandate', offer.bound.authority?.ref);
+    if (decision.escalate) this.hold(deal, party, 'accept', decision.escalate.reasons, { kind: 'bind', pays: this.owes(terms, 'acceptor') });
+    else this.signSeat(deal, party.id, 'mandate');
+    return { status: 200, message: this.publishMany(deal, message.id, party.id) };
+  }
+
+  declineMany(party, message, deal) {
+    const seat = deal.parties.find((item) => item.id === party.id);
+    if (!seat) return this.failure('not_found', 'No such deal for this sender.', message);
+    if (!seat.required) return this.onLeave(party, message);
+    if (!['pending', 'awaiting'].includes(deal.state)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
+    deal.state = 'declined';
+    deal.waiting = null;
+    deal.re = message.id;
+    return { status: 200, message: this.publishMany(deal, message.id, party.id) };
+  }
+
+  counterMany(party, message, deal) {
+    if (!['pending', 'awaiting', 'active'].includes(deal.state)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
+    if ((deal.round || 1) >= 100) return this.failure('state_conflict', 'The round cap is reached.', message);
+    const step = deal.state === 'active' ? 'amend' : 'negotiate';
+    const hashError = hashMatches(message.body.terms, message.body.terms_hash);
+    if (hashError) return this.failure('terms_mismatch', hashError, message);
+    const seat = deal.parties.find((item) => item.id === party.id);
+    const decision = this.evaluate(party, step, {
+      counterparty: this.parties.get(otherParty(deal, party.id)),
+      terms: message.body.terms,
+      role: seat.role,
+    });
+    if (decision.error) return this.failure(decision.error.code, decision.error.message, message, decision.error);
+    deal.terms = structuredClone(message.body.terms);
+    for (const item of deal.parties) item.signed = false;
+    deal.bound = [];
+    deal.vacancies = [];
+    deal.live = false;
+    deal.termsHash = dealHash(deal.terms, deal.parties);
+    deal.waiting = null;
+    deal.round = (deal.round || 1) + 1;
+    deal.obligations = deal.terms.obligations.map((item) => ({ id: item.id, state: 'pending' }));
+    if (deal.tracking.length) this.plainLinks(deal);
+    deal.re = message.id;
+    if (decision.escalate) this.hold(deal, party, step, decision.escalate.reasons, { kind: 'counter', pays: this.owes(deal.terms, seat.role) });
+    else this.signSeat(deal, party.id, 'mandate');
+    return { status: 200, message: this.publishMany(deal, message.id, party.id) };
+  }
+
+  onLeave(party, message) {
+    const deal = this.deals.get(message.deal);
+    if (!deal || deal.version !== '0.4') return this.failure('not_found', 'No such deal for this sender.', message);
+    const seat = deal.parties.find((item) => item.id === party.id);
+    if (!seat) return this.failure('not_found', 'No such deal for this sender.', message);
+    if (!['pending', 'awaiting', 'active'].includes(deal.state)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
+    if (deal.parties.length <= 2) return this.failure('invalid_message', 'A deal keeps at least 2 parties.', message);
+    const remaining = deal.parties.filter((item) => item.id !== party.id);
+    const verdict = validateParties(remaining, { hostId: this.hostId });
+    if (!verdict.ok) return this.failure('invalid_message', verdict.message, message, { field: verdict.field });
+    deal.parties = remaining;
+    deal.bound = deal.bound.filter((item) => item.party !== party.id);
+    if (seat.required) deal.vacancies.push({ id: localId('vac_'), role: seat.role });
+    if (deal.offerer === party.id) deal.offerer = '';
+    if (deal.acceptor === party.id) deal.acceptor = '';
+    deal.termsHash = dealHash(deal.terms, deal.parties);
+    deal.re = message.id;
+    this.refreshQuorum(deal);
+    return { status: 200, message: this.publishMany(deal, message.id, party.id) };
+  }
+
+  onSeat(party, message) {
+    const deal = this.deals.get(message.deal);
+    if (!deal || deal.version !== '0.4' || !partyRole(deal, party.id)) return this.failure('not_found', 'No such deal for this sender.', message);
+    if (!['pending', 'awaiting', 'active'].includes(deal.state)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
+    const seat = message.body.seat;
+    if (deal.parties.some((item) => item.id === seat.id)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
+    if (!this.parties.has(seat.id)) return this.failure('not_found', 'No such party for this sender.', message);
+    const verdict = validateParties([...deal.parties, seat], { hostId: this.hostId });
+    if (!verdict.ok) return this.failure('invalid_message', verdict.message, message, { field: verdict.field });
+    const next = { id: seat.id, role: seat.role, required: Boolean(seat.required), signed: false };
+    if (seat.terms && Object.keys(seat.terms).length) next.terms = structuredClone(seat.terms);
+    if (seat.identity) next.identity = structuredClone(seat.identity);
+    if (next.required) {
+      const taken = new Set(deal.parties.map((item) => item.fills).filter(Boolean));
+      const open = deal.vacancies.find((item) => item.role === next.role && !taken.has(item.id));
+      if (open) next.fills = open.id;
+    }
+    deal.parties.push(next);
+    if (seat.role === 'offerer' && !deal.offerer) deal.offerer = seat.id;
+    if (seat.role === 'acceptor' && !deal.acceptor) deal.acceptor = seat.id;
+    deal.termsHash = dealHash(deal.terms, deal.parties);
+    deal.re = message.id;
+    this.refreshQuorum(deal);
+    return { status: 200, message: this.publishMany(deal, message.id, party.id) };
+  }
+
+  publishMany(deal, re, viewer, bucket) {
+    deal.updated = this.iso();
+    const sent = new Map();
+    for (const seat of deal.parties) {
+      const snap = this.snapshotMany(deal, seat.id, re);
+      sent.set(seat.id, snap);
+      if (bucket) bucket.push({ to: seat.id, message: snap });
+      else this.deliver(seat.id, snap);
+    }
+    if (viewer && !sent.has(viewer)) {
+      const snap = this.snapshotMany(deal, viewer, re);
+      if (bucket) bucket.push({ to: viewer, message: snap });
+      else this.deliver(viewer, snap);
+      return snap;
+    }
+    return sent.get(viewer) || [...sent.values()][0];
+  }
+
+  snapshotMany(deal, viewer, re) {
+    const parties = deal.parties.map((seat) => {
+      const item = { id: seat.id, role: seat.role, required: Boolean(seat.required), signed: Boolean(seat.signed) };
+      if (seat.terms && Object.keys(seat.terms).length) item.terms = structuredClone(seat.terms);
+      if (seat.identity) item.identity = structuredClone(seat.identity);
+      return item;
+    });
+    const body = {
+      state: deal.state,
+      parties,
+      terms: deal.terms,
+      terms_hash: deal.termsHash,
+      updated: deal.updated || this.iso(),
+    };
+    if (deal.offerer) body.offerer = deal.offerer;
+    if (deal.acceptor) body.acceptor = deal.acceptor;
+    if (deal.offerId) body.offer = deal.offerId;
+    if (deal.round) body.round = deal.round;
+    if (deal.bound.length) body.bound = deal.bound.map((item) => structuredClone(item));
+    if (deal.vacancies.length) body.vacancies = deal.vacancies.map((item) => item.role);
+    if (deal.waiting) {
+      body.waiting = viewer === deal.waiting.party
+        ? structuredClone(deal.waiting)
+        : { party: deal.waiting.party, since: deal.waiting.since, step: deal.waiting.step };
+    }
+    if (deal.tracking.length) {
+      body.tracking = deal.tracking.map((entry) => {
+        const item = {
+          obligation: entry.obligation,
+          link: `${this.origin}/go/${entry.token}`,
+          destination: entry.destination,
+          status: entry.status,
+          param: entry.param,
+        };
+        if (entry.code) item.code = entry.code;
+        if (entry.alias) item.alias = entry.alias;
+        return item;
+      });
+    }
+    if (deal.obligations.length) {
+      body.obligations = deal.obligations.map((item) => {
+        const row = { id: item.id, state: item.state };
+        if (item.due) row.due = item.due;
+        if (item.receipt) row.receipt = item.receipt;
+        return row;
+      });
+    }
+    if (deal.expires) body.expires = deal.expires;
+    return this.emit({ orp: '0.4', type: 'deal', to: viewer, deal: deal.id, re, body });
   }
 
   save() {

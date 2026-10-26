@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/message.schema.json",
+  "title": "Message",
+  "description": "An ORP 0.4 message. hello, deal, offer, results, leave, and seat use the 0.4 bodies. Every other type uses the 0.3 body rules.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "envelope.schema.json" },
+    {
+      "if": { "type": "object", "properties": { "type": { "const": "hello" } }, "required": ["type"] },
+      "then": { "$ref": "messages/hello.schema.json" }
+    },
+    {
+      "if": { "type": "object", "properties": { "type": { "const": "deal" } }, "required": ["type"] },
+      "then": { "$ref": "messages/deal.schema.json" }
+    },
+    {
+      "if": { "type": "object", "properties": { "type": { "const": "offer" } }, "required": ["type"] },
+      "then": { "$ref": "messages/offer.schema.json" }
+    },
+    {
+      "if": { "type": "object", "properties": { "type": { "const": "leave" } }, "required": ["type"] },
+      "then": { "$ref": "messages/leave.schema.json" }
+    },
+    {
+      "if": { "type": "object", "properties": { "type": { "const": "seat" } }, "required": ["type"] },
+      "then": { "$ref": "messages/seat.schema.json" }
+    },
+    {
+      "if": { "type": "object", "properties": { "type": { "const": "results" } }, "required": ["type"] },
+      "then": { "$ref": "messages/results.schema.json" }
+    }
+  ],
+  "if": {
+    "not": {
+      "type": "object",
+      "properties": { "type": { "enum": ["hello", "deal", "offer", "leave", "seat", "results"] } },
+      "required": ["type"]
+    }
+  },
+  "then": { "$ref": "https://offer-rails.onrender.com/orp/schemas/message.schema.json" }
+}

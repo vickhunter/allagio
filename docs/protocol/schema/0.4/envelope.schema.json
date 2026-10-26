@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/envelope.schema.json",
+  "title": "Envelope",
+  "description": "The ORP 0.4 envelope. orp is 0.4. leave and seat are 0.4 message types.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["orp", "type", "id", "ts", "from", "body"],
+  "properties": {
+    "orp": { "const": "0.4" },
+    "type": {
+      "type": "string",
+      "enum": ["hello", "discover", "results", "space", "request", "offer", "counter", "accept", "decline", "deal", "execute", "receipt", "outcome", "payout", "revoke", "consent", "dispute", "reputation", "error", "leave", "seat"]
+    },
+    "id": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/MessageId" },
+    "ts": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" },
+    "from": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/PartyId" },
+    "to": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/PartyId" },
+    "deal": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/LocalId" },
+    "re": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/MessageId" },
+    "body": { "type": "object" },
+    "agent": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Agent" },
+    "prev": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Hash" },
+    "sig": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+\\.\\.[A-Za-z0-9_-]+$",
+      "maxLength": 4096
+    },
+    "ext": {
+      "type": "object",
+      "propertyNames": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/ExtName" },
+      "maxProperties": 16,
+      "additionalProperties": true
+    },
+    "critical": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/ExtName" }
+    }
+  }
+}

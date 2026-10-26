@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // PublicHost is the stable host for schema ids and document links.
@@ -150,6 +151,10 @@ func (m mappedDocs) path(name string) (string, error) {
 		return filepath.Join(m.root, filepath.FromSlash(name)), nil
 	case name == "schemas" || strings.HasPrefix(name, "schemas/"):
 		rest := strings.TrimPrefix(strings.TrimPrefix(name, "schemas"), "/")
+		if rest == "0.4" || strings.HasPrefix(rest, "0.4/") {
+			inner := strings.TrimPrefix(strings.TrimPrefix(rest, "0.4"), "/")
+			return filepath.Join(m.root, "schema", "0.4", filepath.FromSlash(inner)), nil
+		}
 		return filepath.Join(m.root, "schema", "0.3", filepath.FromSlash(rest)), nil
 	case name == "examples" || strings.HasPrefix(name, "examples/"):
 		rest := strings.TrimPrefix(strings.TrimPrefix(name, "examples"), "/")
@@ -158,3 +163,52 @@ func (m mappedDocs) path(name string) (string, error) {
 		return "", fs.ErrNotExist
 	}
 }
+
+func (m mappedDocs) ReadDir(name string) ([]fs.DirEntry, error) {
+	name, ok := cleanPublic(name)
+	if !ok {
+		return nil, fs.ErrInvalid
+	}
+	if name == "schemas" {
+		entries, err := os.ReadDir(filepath.Join(m.root, "schema", "0.3"))
+		if err != nil {
+			return nil, err
+		}
+		out := make([]fs.DirEntry, 0, len(entries)+1)
+		seen := false
+		for _, entry := range entries {
+			if entry.Name() == "0.4" {
+				seen = true
+			}
+			out = append(out, entry)
+		}
+		if !seen {
+			out = append(out, staticDir{name: "0.4"})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Name() < out[j].Name() })
+		return out, nil
+	}
+	full, err := m.path(name)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadDir(full)
+}
+
+type staticDir struct{ name string }
+
+func (d staticDir) Name() string      { return d.name }
+func (d staticDir) IsDir() bool       { return true }
+func (d staticDir) Type() fs.FileMode { return fs.ModeDir }
+func (d staticDir) Info() (fs.FileInfo, error) {
+	return staticInfo{name: d.name}, nil
+}
+
+type staticInfo struct{ name string }
+
+func (s staticInfo) Name() string       { return s.name }
+func (s staticInfo) Size() int64        { return 0 }
+func (s staticInfo) Mode() fs.FileMode  { return fs.ModeDir }
+func (s staticInfo) ModTime() time.Time { return time.Time{} }
+func (s staticInfo) IsDir() bool        { return true }
+func (s staticInfo) Sys() any           { return nil }

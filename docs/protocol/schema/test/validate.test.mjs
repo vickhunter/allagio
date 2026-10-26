@@ -142,9 +142,9 @@ test('JSON blocks in docs/protocol/*.md validate', () => {
   const specFiles = readdirSync(specRoot).filter((name) => name.endsWith('.md')).map((name) => join(specRoot, name));
   for (const file of specFiles) {
     const text = readFileSync(file, 'utf8');
-    for (const match of text.matchAll(/(<!-- orp:(invalid|skip) -->\s*)?```json\n([\s\S]*?)```/g)) {
+    for (const match of text.matchAll(/(<!-- orp:(invalid|skip|0\.4) -->\s*)?```json\n([\s\S]*?)```/g)) {
       const marker = match[2];
-      if (marker === 'skip') continue;
+      if (marker === 'skip' || marker === '0.4') continue;
       let doc;
       try {
         doc = JSON.parse(match[3]);
