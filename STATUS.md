@@ -1,3 +1,7 @@
+## October 26 — ORP 0.4 ask-mode offer (D-102)
+
+A 0.4 offer from a party on placement publish `ask` (the mode a fresh join gets) returns HTTP 200 and waits for approval. Waiting step is `list` and the reason is `step_ask`. The offerer is unsigned. `orp_deals.bound` is `JSONB NOT NULL`, and an empty signature set is stored as `[]`. A nil bound was inserted as SQL NULL, which is the HTTP 500. Accept, leave, and seat on that unsigned deal write `[]` as well, including a leave that drops the last signature. An invalid 0.4 message says `The message is not valid ORP 0.4.` A 0.3 message still says `The message is not valid ORP 0.3.` No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 26 — Hosted ORP 0.4 many-party deals (D-102)
 
 The hosted `/orp` API speaks ORP 0.4 beside ORP 0.3. A 0.4 offer carries 2 to 16 parties. The deal stays pending until every required party signs. An optional party does not block active. `leave` and `seat` are served. A vacancy clears only when the replacement seated for that vacancy signs. The first time the deal is active, one tracked link is minted. `GET /go/<token>` attributes the click by each party's percent or amount and stores no personal data. An expired 0.4 offer is left out of discover and suggest. Identity is a hash and an issuer name. A deposit term names an outside holder. Offer Rails does not hold money. A failed sign rolls back the inbox row and the tracking token.

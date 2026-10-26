@@ -167,7 +167,11 @@ func (h *ORPHost) offerMany(c *gin.Context, dns string, msg orp.Message, hash, o
 		h.signSeat(&deal, msg.From, now)
 		h.refreshMany(&deal, terms, now)
 	} else {
-		h.holdMany(&deal, msg.From, "negotiate", manyReasons(mode), now)
+		// A fresh join has no saved step row, so placement publish is ask.
+		// That is the 0.3 list path: the offer waits, the offerer is not
+		// signed, and nothing is bound. Step negotiate signed nobody and
+		// left bound nil, which the NOT NULL column rejected.
+		h.holdMany(&deal, msg.From, "list", []any{"step_ask"}, now)
 	}
 	h.insertMany(c, dns, msg, hash, deal, now)
 }
@@ -570,8 +574,12 @@ func (h *ORPHost) newManyDeal(dns, offerID string, terms map[string]any, hash st
 		CreatedAt:   now.UTC(),
 	}
 	h.syncColumns(&deal, doc)
-	if len(bound) == 0 {
-		deal.Bound = nil
+	// bound is JSONB NOT NULL. An empty signature set is [], not SQL NULL.
+	// nullJSON turns nil into NULL and the insert fails, which is why an
+	// ask-mode offer (nobody signed yet) returned HTTP 500. Auto mode hid
+	// it by writing the offerer's mandate first. The snapshot omits [].
+	if len(bound) == 0 || string(deal.Bound) == "null" {
+		deal.Bound = json.RawMessage(`[]`)
 	}
 	if waiting == nil {
 		deal.Waiting = nil
@@ -996,7 +1004,7 @@ func dropBound(raw json.RawMessage, party string) json.RawMessage {
 		kept = append(kept, row)
 	}
 	if len(kept) == 0 {
-		return nil
+		return json.RawMessage(`[]`)
 	}
 	return rawJSON(kept)
 }

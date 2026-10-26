@@ -859,3 +859,262 @@ func messagesHave(items []any, want ...string) bool {
 	}
 	return true
 }
+
+func shareTerms04() map[string]any {
+	return map[string]any{
+		"title": "Ask mode notes", "kind": "partnership",
+		"obligations": []any{map[string]any{"id": "share", "by": "offerer", "action": "share"}},
+	}
+}
+
+func percentParties(parties []party04) []any {
+	out := make([]any, len(parties))
+	for i, party := range parties {
+		role := "member"
+		if i == 0 {
+			role = "offerer"
+		} else if i == 1 {
+			role = "acceptor"
+		}
+		percent := 1
+		if i == 0 {
+			percent = 100 - (len(parties) - 1)
+		}
+		out[i] = map[string]any{
+			"id": party.party, "role": role, "required": true,
+			"terms": map[string]any{"percent": percent},
+		}
+	}
+	return out
+}
+
+func joinDefault(t *testing.T, r http.Handler) party04 {
+	t.Helper()
+	rec, body := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{}, nil)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("join %d %s", rec.Code, rec.Body.String())
+	}
+	steps, _ := body["steps"].(map[string]any)
+	if steps["list"] != "ask" {
+		t.Fatalf("fresh join list mode %s", rec.Body.String())
+	}
+	token, _ := body["token"].(string)
+	party, _ := body["party"].(string)
+	return party04{token: token, party: party, owner: ownerOfParty(party)}
+}
+
+func storedBound(t *testing.T, db *database.DB, dealID string) string {
+	t.Helper()
+	var raw string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT bound::text FROM orp_deals WHERE id=$1`, dealID).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func assertAskWait(t *testing.T, db *database.DB, code int, opened map[string]any, offerer string) {
+	t.Helper()
+	if code != http.StatusOK || opened["orp"] != "0.4" {
+		t.Fatalf("ask offer %d %s", code, mustJSON(opened))
+	}
+	body := docBody(t, opened)
+	if body["state"] != "awaiting" {
+		t.Fatalf("state %v %s", body["state"], mustJSON(opened))
+	}
+	signed, _, found := seatState(t, opened, offerer)
+	if !found || signed {
+		t.Fatalf("offerer signature %s", mustJSON(opened))
+	}
+	if _, present := body["bound"]; present {
+		t.Fatalf("bound on the wire %s", mustJSON(opened))
+	}
+	waiting, _ := body["waiting"].(map[string]any)
+	reasons, _ := waiting["reasons"].([]any)
+	if waiting["step"] != "list" || len(reasons) != 1 || reasons[0] != "step_ask" || waiting["url"] == "" || waiting["escalation"] == "" {
+		t.Fatalf("waiting %v", waiting)
+	}
+	dealID, _ := opened["deal"].(string)
+	if storedBound(t, db, dealID) != "[]" {
+		t.Fatalf("stored bound %s", storedBound(t, db, dealID))
+	}
+}
+
+func TestORP04OfferAsk(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	e := &orp04Env{t: t, r: r}
+	for _, n := range []int{2, 3, 16} {
+		parties := make([]party04, n)
+		for i := range parties {
+			parties[i] = joinPartyOnly(t, r)
+			setPlacementPublish(t, db, parties[i].owner, "ask")
+		}
+		code, opened := e.send(parties[0], "0.4", "offer", "", map[string]any{
+			"terms": shareTerms04(), "parties": percentParties(parties),
+		})
+		assertAskWait(t, db, code, opened, parties[0].party)
+	}
+	offerer := joinPartyOnly(t, r)
+	acceptor := joinPartyOnly(t, r)
+	signer := joinPartyOnly(t, r)
+	for _, party := range []party04{offerer, acceptor, signer} {
+		setPlacementPublish(t, db, party.owner, "ask")
+	}
+	code, opened := e.send(offerer, "0.4", "offer", "", map[string]any{
+		"terms": shareTerms04(),
+		"parties": []any{
+			map[string]any{"id": offerer.party, "role": "offerer", "required": true, "terms": map[string]any{"percent": 50}},
+			map[string]any{"id": acceptor.party, "role": "acceptor", "required": true, "terms": map[string]any{"percent": 50}},
+			map[string]any{"id": signer.party, "role": "signer", "required": false},
+		},
+	})
+	assertAskWait(t, db, code, opened, offerer.party)
+	dealID, _ := opened["deal"].(string)
+	code, accepted := acceptSeat(e, acceptor, opened)
+	acceptedBody := docBody(t, accepted)
+	acceptedSigned, _, _ := seatState(t, accepted, acceptor.party)
+	waiting, _ := acceptedBody["waiting"].(map[string]any)
+	reasons, _ := waiting["reasons"].([]any)
+	if code != http.StatusOK || acceptedSigned || acceptedBody["state"] == "active" || waiting["step"] != "accept" || !messagesHave(reasons, "step_ask") || storedBound(t, db, dealID) != "[]" {
+		t.Fatalf("ask accept %d %s bound %s", code, mustJSON(accepted), storedBound(t, db, dealID))
+	}
+	code, left := e.send(signer, "0.4", "leave", dealID, map[string]any{})
+	if code != http.StatusOK || len(docBody(t, left)["parties"].([]any)) != 2 || storedBound(t, db, dealID) != "[]" {
+		t.Fatalf("ask leave %d %s", code, mustJSON(left))
+	}
+	extra := joinPartyOnly(t, r)
+	setPlacementPublish(t, db, extra.owner, "ask")
+	code, seated := e.send(offerer, "0.4", "seat", dealID, map[string]any{"seat": map[string]any{
+		"id": extra.party, "role": "member", "required": false,
+	}})
+	if code != http.StatusOK || len(docBody(t, seated)["parties"].([]any)) != 3 || storedBound(t, db, dealID) != "[]" {
+		t.Fatalf("ask seat %d %s", code, mustJSON(seated))
+	}
+}
+
+func TestORP04OfferAuto(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	e := &orp04Env{t: t, r: r}
+	for _, n := range []int{2, 3, 16} {
+		parties := make([]party04, n)
+		for i := range parties {
+			parties[i] = joinAuto(t, db, r)
+		}
+		code, opened := e.send(parties[0], "0.4", "offer", "", map[string]any{
+			"terms": shareTerms04(), "parties": percentParties(parties),
+		})
+		body := docBody(t, opened)
+		signed, _, found := seatState(t, opened, parties[0].party)
+		if code != http.StatusOK || opened["orp"] != "0.4" || body["state"] != "pending" || !found || !signed || body["waiting"] != nil {
+			t.Fatalf("auto %d %s", code, mustJSON(opened))
+		}
+		dealID, _ := opened["deal"].(string)
+		if !strings.Contains(storedBound(t, db, dealID), parties[0].party) {
+			t.Fatalf("auto bound %s", storedBound(t, db, dealID))
+		}
+	}
+	offerer := joinAuto(t, db, r)
+	acceptor := joinAuto(t, db, r)
+	member := joinAuto(t, db, r)
+	code, opened := e.send(offerer, "0.4", "offer", "", map[string]any{
+		"terms": shareTerms04(),
+		"parties": []any{
+			map[string]any{"id": offerer.party, "role": "offerer", "required": true, "terms": map[string]any{"amount": eur(0)}},
+			map[string]any{"id": acceptor.party, "role": "acceptor", "required": true, "terms": map[string]any{"amount": eur(100)}},
+			map[string]any{"id": member.party, "role": "member", "required": false},
+		},
+	})
+	dealID, _ := opened["deal"].(string)
+	if code != http.StatusOK || docBody(t, opened)["state"] != "pending" {
+		t.Fatalf("amount offer %d %s", code, mustJSON(opened))
+	}
+	code, left := e.send(offerer, "0.4", "leave", dealID, map[string]any{})
+	if code != http.StatusOK || docBody(t, left)["state"] != "pending" || storedBound(t, db, dealID) != "[]" {
+		t.Fatalf("last signature leave %d %s bound %s", code, mustJSON(left), storedBound(t, db, dealID))
+	}
+	extra := joinAuto(t, db, r)
+	code, seated := e.send(acceptor, "0.4", "seat", dealID, map[string]any{"seat": map[string]any{
+		"id": extra.party, "role": "member", "required": false,
+	}})
+	if code != http.StatusOK || storedBound(t, db, dealID) != "[]" {
+		t.Fatalf("seat after empty bound %d %s", code, mustJSON(seated))
+	}
+}
+
+func TestORP04FreshJoinDefault(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	e := &orp04Env{t: t, r: r}
+	offerer := joinDefault(t, r)
+	acceptor := joinDefault(t, r)
+	signer := joinDefault(t, r)
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes WHERE owner_id=$1 AND placement_publish='auto'`, offerer.owner) != 0 {
+		t.Fatal("fresh join was set to auto")
+	}
+	code, opened := e.send(offerer, "0.4", "offer", "", map[string]any{
+		"terms": shareTerms04(),
+		"parties": []any{
+			map[string]any{"id": offerer.party, "role": "offerer", "required": true, "terms": map[string]any{"percent": 50}},
+			map[string]any{"id": acceptor.party, "role": "acceptor", "required": true, "terms": map[string]any{"percent": 50}},
+			map[string]any{"id": signer.party, "role": "signer", "required": false},
+		},
+	})
+	assertAskWait(t, db, code, opened, offerer.party)
+	dealID, _ := opened["deal"].(string)
+	code, accepted := acceptSeat(e, acceptor, opened)
+	if code != http.StatusOK || docBody(t, accepted)["state"] == "active" || storedBound(t, db, dealID) != "[]" {
+		t.Fatalf("default accept %d %s", code, mustJSON(accepted))
+	}
+	signed, _, _ := seatState(t, accepted, acceptor.party)
+	if signed {
+		t.Fatalf("default acceptor signed %s", mustJSON(accepted))
+	}
+	code, left := e.send(signer, "0.4", "leave", dealID, map[string]any{})
+	if code != http.StatusOK || storedBound(t, db, dealID) != "[]" {
+		t.Fatalf("default leave %d %s", code, mustJSON(left))
+	}
+	extra := joinDefault(t, r)
+	code, seated := e.send(offerer, "0.4", "seat", dealID, map[string]any{"seat": map[string]any{
+		"id": extra.party, "role": "member", "required": false,
+	}})
+	if code != http.StatusOK || storedBound(t, db, dealID) != "[]" {
+		t.Fatalf("default seat %d %s", code, mustJSON(seated))
+	}
+}
+
+func TestORP04InvalidNamesVersion(t *testing.T) {
+	_, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	from := "orp:127.0.0.1/party"
+	body := map[string]any{"versions": []any{"0.4"}}
+	short04, short04Body := postJSON(t, r, http.MethodPost, "/orp", map[string]any{
+		"orp": "0.4", "type": "hello", "id": "short1", "ts": time.Now().UTC().Format(time.RFC3339), "from": from, "body": body,
+	}, nil)
+	inner, _ := short04Body["body"].(map[string]any)
+	if short04.Code != http.StatusBadRequest || short04Body["orp"] != "0.4" || inner["message"] != "The message is not valid ORP 0.4." || inner["field"] != "/id" {
+		t.Fatalf("0.4 id %d %s", short04.Code, short04.Body.String())
+	}
+	extra, extraBody := postJSON(t, r, http.MethodPost, "/orp", map[string]any{
+		"orp": "0.4", "type": "hello", "id": "m_d102_extra", "ts": time.Now().UTC().Format(time.RFC3339), "from": from, "body": body, "note": "nope",
+	}, nil)
+	extraInner, _ := extraBody["body"].(map[string]any)
+	if extra.Code != http.StatusBadRequest || extraInner["message"] != "The message is not valid ORP 0.4." || extraInner["field"] != "/note" {
+		t.Fatalf("0.4 key %d %s", extra.Code, extra.Body.String())
+	}
+	agent, agentBody := postJSON(t, r, http.MethodPost, "/orp", map[string]any{
+		"orp": "0.4", "type": "hello", "id": "m_d102_agent", "ts": time.Now().UTC().Format(time.RFC3339), "from": from, "body": body,
+		"agent": map[string]any{"name": ""},
+	}, nil)
+	agentInner, _ := agentBody["body"].(map[string]any)
+	if agent.Code != http.StatusBadRequest || agentInner["message"] != "The message is not valid ORP 0.4." || agentInner["field"] != "/agent/name" {
+		t.Fatalf("0.4 agent %d %s", agent.Code, agent.Body.String())
+	}
+	short03, short03Body := postJSON(t, r, http.MethodPost, "/orp", map[string]any{
+		"orp": "0.3", "type": "hello", "id": "short1", "ts": time.Now().UTC().Format(time.RFC3339), "from": from, "body": map[string]any{"versions": []any{"0.3"}},
+	}, nil)
+	inner03, _ := short03Body["body"].(map[string]any)
+	if short03.Code != http.StatusBadRequest || inner03["message"] != "The message is not valid ORP 0.3." || inner03["field"] != "/id" {
+		t.Fatalf("0.3 id %d %s", short03.Code, short03.Body.String())
+	}
+}

@@ -92,26 +92,34 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 	if found := DirtyPointer(value); found != "" {
 		return Message{}, Invalid("The message contains disallowed characters or markup.", found), false
 	}
+	// Name the version the message already claims. A 0.4 envelope that fails
+	// a shape check says ORP 0.4. Anything else, including a missing orp,
+	// stays ORP 0.3 so existing 0.3 errors stay byte-identical.
+	label := "The message is not valid ORP 0.3."
+	if text, isString := obj["orp"].(string); isString && text == Version04 {
+		label = "The message is not valid ORP 0.4."
+	}
 	for key := range obj {
 		if !envelopeKeys[key] {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/"+escapePointer(key)), false
+			return Message{}, Invalid(label, "/"+escapePointer(key)), false
 		}
 	}
 	for _, key := range []string{"orp", "type", "id", "ts", "from", "body"} {
 		if _, present := obj[key]; !present {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/"+key), false
+			return Message{}, Invalid(label, "/"+key), false
 		}
 	}
 	orp, ok := obj["orp"].(string)
 	if !ok || !versionPattern.MatchString(orp) || utf8.RuneCountInString(orp) > 16 {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/orp"), false
+		return Message{}, Invalid(label, "/orp"), false
 	}
 	if orp != Version && orp != Version04 {
 		return Message{}, Problem{Status: 400, Code: "unsupported_version", Message: "This host speaks 0.3.", Supported: []string{Version}}, false
 	}
-	label := "The message is not valid ORP 0.3."
 	if orp == Version04 {
 		label = "The message is not valid ORP 0.4."
+	} else {
+		label = "The message is not valid ORP 0.3."
 	}
 	typ, ok := obj["type"].(string)
 	if !ok || typ == "" {
@@ -121,78 +129,81 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 		// leave and seat are 0.4 message types. A 0.3 leave stays invalid_message.
 	} else if !coreTypes[typ] {
 		if !extPattern.MatchString(typ) || len(typ) > 128 {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/type"), false
+			return Message{}, Invalid(label, "/type"), false
 		}
 		return Message{}, Problem{Status: 400, Code: "unsupported_type", Message: "The type is not supported."}, false
 	}
 	id, ok := obj["id"].(string)
 	if !ok || !messagePattern.MatchString(id) {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/id"), false
+		return Message{}, Invalid(label, "/id"), false
 	}
 	tsRaw, ok := obj["ts"].(string)
 	if !ok || utf8.RuneCountInString(tsRaw) > 40 {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/ts"), false
+		return Message{}, Invalid(label, "/ts"), false
 	}
 	ts, err := time.Parse(time.RFC3339, tsRaw)
 	if err != nil {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/ts"), false
+		return Message{}, Invalid(label, "/ts"), false
 	}
 	from, ok := obj["from"].(string)
 	if !ok || !partyPattern.MatchString(from) || len(from) > 330 {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/from"), false
+		return Message{}, Invalid(label, "/from"), false
 	}
 	body, ok := obj["body"].(map[string]any)
 	if !ok {
-		return Message{}, Invalid("The message is not valid ORP 0.3.", "/body"), false
+		return Message{}, Invalid(label, "/body"), false
 	}
 	msg := Message{ORP: orp, Type: typ, ID: id, TS: ts, From: from, Body: body}
 	if to, present := obj["to"]; present {
 		text, ok := to.(string)
 		if !ok || !partyPattern.MatchString(text) {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/to"), false
+			return Message{}, Invalid(label, "/to"), false
 		}
 		msg.To = text
 	}
 	if deal, present := obj["deal"]; present {
 		text, ok := deal.(string)
 		if !ok || !localPattern.MatchString(text) {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/deal"), false
+			return Message{}, Invalid(label, "/deal"), false
 		}
 		msg.Deal = text
 	}
 	if re, present := obj["re"]; present {
 		text, ok := re.(string)
 		if !ok || !messagePattern.MatchString(text) {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/re"), false
+			return Message{}, Invalid(label, "/re"), false
 		}
 		msg.Re = text
 	}
 	if prev, present := obj["prev"]; present {
 		text, ok := prev.(string)
 		if !ok || !hashPattern.MatchString(text) {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/prev"), false
+			return Message{}, Invalid(label, "/prev"), false
 		}
 	}
 	if sig, present := obj["sig"]; present {
 		text, ok := sig.(string)
 		if !ok || !sigPattern.MatchString(text) || len(text) > 4096 {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/sig"), false
+			return Message{}, Invalid(label, "/sig"), false
 		}
 		msg.HasSig = true
 	}
 	if agent, present := obj["agent"]; present {
 		if problem, bad := checkAgent(agent, "/agent"); bad {
+			problem, _ = relabelVersion(orp, problem, bad)
 			return Message{}, problem, false
 		}
 	}
 	if ext, present := obj["ext"]; present {
 		if problem, bad := checkExt(ext); bad {
+			problem, _ = relabelVersion(orp, problem, bad)
 			return Message{}, problem, false
 		}
 	}
 	if critical, present := obj["critical"]; present {
 		names, problem, bad := checkCritical(critical)
 		if bad {
+			problem, _ = relabelVersion(orp, problem, bad)
 			return Message{}, problem, false
 		}
 		if len(names) > 0 {
@@ -208,12 +219,12 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 	if typ == "accept" && msg.Deal == "" {
 		offer, _ := body["offer"].(string)
 		if offer == "" {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/body/offer"), false
+			return Message{}, Invalid(label, "/body/offer"), false
 		}
 	}
 	if typ == "accept" && msg.Deal != "" {
 		if _, present := body["offer"]; present {
-			return Message{}, Invalid("The message is not valid ORP 0.3.", "/deal"), false
+			return Message{}, Invalid(label, "/deal"), false
 		}
 	}
 	return msg, Problem{}, true
