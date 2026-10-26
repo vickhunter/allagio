@@ -990,6 +990,96 @@ func TestORP04OfferAsk(t *testing.T) {
 	if code != http.StatusOK || len(docBody(t, seated)["parties"].([]any)) != 3 || storedBound(t, db, dealID) != "[]" {
 		t.Fatalf("ask seat %d %s", code, mustJSON(seated))
 	}
+
+	first := joinPartyOnly(t, r)
+	second := joinPartyOnly(t, r)
+	third := joinPartyOnly(t, r)
+	for _, party := range []party04{first, second, third} {
+		setPlacementPublish(t, db, party.owner, "ask")
+	}
+	code, opened = e.send(first, "0.4", "offer", "", map[string]any{
+		"terms": shareTerms04(),
+		"parties": []any{
+			map[string]any{"id": first.party, "role": "offerer", "required": true, "terms": map[string]any{"percent": 50}},
+			map[string]any{"id": second.party, "role": "acceptor", "required": true, "terms": map[string]any{"percent": 30}},
+			map[string]any{"id": third.party, "role": "curator", "required": true, "terms": map[string]any{"percent": 20}},
+		},
+	})
+	assertAskWait(t, db, code, opened, first.party)
+	code, opened = postApprove(t, r, first.token, opened)
+	if code != http.StatusOK || docBody(t, opened)["state"] != "pending" || waitingNames(t, opened, first.party) {
+		t.Fatalf("offerer approve %d %s", code, mustJSON(opened))
+	}
+	signed, _, found := seatState(t, opened, first.party)
+	if !found || !signed {
+		t.Fatalf("offerer still unsigned %s", mustJSON(opened))
+	}
+	code, opened = acceptSeat(e, second, opened)
+	if code != http.StatusOK || !waitingNames(t, opened, second.party) {
+		t.Fatalf("second hold %d %s", code, mustJSON(opened))
+	}
+	code, opened = postApprove(t, r, second.token, opened)
+	if code != http.StatusOK || docBody(t, opened)["state"] != "pending" || waitingNames(t, opened, second.party) {
+		t.Fatalf("second approve %d %s", code, mustJSON(opened))
+	}
+	code, opened = acceptSeat(e, third, opened)
+	if code != http.StatusOK || !waitingNames(t, opened, third.party) {
+		t.Fatalf("third hold %d %s", code, mustJSON(opened))
+	}
+	code, opened = postApprove(t, r, third.token, opened)
+	if code != http.StatusOK || docBody(t, opened)["state"] != "active" || docBody(t, opened)["waiting"] != nil {
+		t.Fatalf("last approve %d %s", code, mustJSON(opened))
+	}
+}
+
+func waitingNames(t *testing.T, doc map[string]any, party string) bool {
+	t.Helper()
+	waiting, _ := docBody(t, doc)["waiting"].(map[string]any)
+	return waiting["party"] == party
+}
+
+func postApprove(t *testing.T, r http.Handler, token string, doc map[string]any) (int, map[string]any) {
+	t.Helper()
+	waiting, _ := docBody(t, doc)["waiting"].(map[string]any)
+	esc, _ := waiting["escalation"].(string)
+	if esc == "" {
+		t.Fatalf("no escalation %s", mustJSON(doc))
+	}
+	rec, body := postJSON(t, r, http.MethodPost, "/orp/approve/"+esc, map[string]any{}, bearerHeader(token))
+	return rec.Code, body
+}
+
+func TestORP03DirectedPlaceAsk(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	offerer := joinDefault(t, r)
+	acceptor := joinDefault(t, r)
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes WHERE owner_id=$1 AND site_id IS NULL`, offerer.owner) != 0 {
+		t.Fatal("fresh join saved an owner mode row")
+	}
+	terms := testTerms()
+	obligations := terms["obligations"].([]any)
+	place := obligations[0].(map[string]any)
+	place["by"] = "offerer"
+	env := orpEnvelope("offer", "m_d102_placeby", offerer.party, map[string]any{"terms": terms})
+	env["to"] = acceptor.party
+	rec, doc := postJSON(t, r, http.MethodPost, "/orp", env, bearerHeader(offerer.token))
+	body := docBody(t, doc)
+	if rec.Code != http.StatusOK || doc["orp"] != "0.3" || doc["type"] != "deal" || body["state"] != "proposed" || body["bound"] != nil {
+		t.Fatalf("directed %d %s", rec.Code, rec.Body.String())
+	}
+	dealID, _ := doc["deal"].(string)
+	var bound string
+	var partiesNull bool
+	if err := db.Pool.QueryRow(context.Background(), `SELECT bound::text, parties IS NULL FROM orp_deals WHERE id=$1`, dealID).Scan(&bound, &partiesNull); err != nil {
+		t.Fatal(err)
+	}
+	if bound != "[]" || !partiesNull {
+		t.Fatalf("stored bound %s parties null %v", bound, partiesNull)
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM orp_deals WHERE id=$1`, dealID) != 1 {
+		t.Fatal("deal row missing")
+	}
 }
 
 func TestORP04OfferAuto(t *testing.T) {

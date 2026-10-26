@@ -783,8 +783,8 @@ func newTestDeal(offerID, offererOwner, acceptorOwner, offererParty, acceptorPar
 		TermsHash:     termsHash,
 		State:         "awaiting",
 		Waiting:       waitingRaw,
-		Obligations:   obligations,
-		Bound:         boundRaw,
+		Obligations:   database.JSONList(obligations),
+		Bound:         database.JSONList(boundRaw),
 		UpdatedAt:     now.UTC(),
 		CreatedAt:     now.UTC(),
 	}

@@ -1,3 +1,7 @@
+## October 26 — ORP empty bound list (D-102)
+
+A directed 0.3 offer whose offerer owes `place`, from a fresh join on placement publish `ask`, stored a nil signature list. `json.Marshal` of that slice is `null`, and the store wrote SQL NULL into `bound JSONB NOT NULL`, so the offer returned HTTP 500 and no deal row. `JSONList` stores an empty NOT NULL list as `[]`. `waiting` and `parties` stay nullable. The 0.3 deal wire still omits an empty bound. After `POST /orp/approve/<id>`, waiting is cleared once that party has signed. Another required seat can still be unsigned. `CLAIMS_CHECK` is unchanged. No new migration. No deploy.
+
 ## October 26 — ORP 0.4 ask-mode offer (D-102)
 
 A 0.4 offer from a party on placement publish `ask` (the mode a fresh join gets) returns HTTP 200 and waits for approval. Waiting step is `list` and the reason is `step_ask`. The offerer is unsigned. `orp_deals.bound` is `JSONB NOT NULL`, and an empty signature set is stored as `[]`. A nil bound was inserted as SQL NULL, which is the HTTP 500. Accept, leave, and seat on that unsigned deal write `[]` as well, including a leave that drops the last signature. An invalid 0.4 message says `The message is not valid ORP 0.4.` A 0.3 message still says `The message is not valid ORP 0.3.` No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

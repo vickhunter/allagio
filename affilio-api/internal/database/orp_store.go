@@ -178,13 +178,13 @@ INSERT INTO orp_deals(
     $1, NULLIF($2,''), NULLIF($3,'')::uuid, $4::uuid, $5, $6,
     $7, $8, $9, $10, $11, $12, $13, $14, $15
 )`, deal.ID, deal.OfferID, deal.OffererOwner, deal.AcceptorOwner, deal.OffererParty, deal.AcceptorParty,
-			deal.Terms, deal.TermsHash, deal.State, nullJSON(deal.Waiting), deal.Obligations, nullJSON(deal.Bound), deal.UpdatedAt, deal.CreatedAt, nullJSON(deal.Parties)); err != nil {
+			deal.Terms, deal.TermsHash, deal.State, nullJSON(deal.Waiting), JSONList(deal.Obligations), JSONList(deal.Bound), deal.UpdatedAt, deal.CreatedAt, nullJSON(deal.Parties)); err != nil {
 			return err
 		}
 	}
 	if effect.UpdateDealID != "" && len(effect.UpdateObligations) > 0 {
 		if _, err := tx.Exec(ctx, `
-UPDATE orp_deals SET obligations=$2, updated_at=$3 WHERE id=$1`, effect.UpdateDealID, effect.UpdateObligations, effect.UpdatedAt); err != nil {
+UPDATE orp_deals SET obligations=$2, updated_at=$3 WHERE id=$1`, effect.UpdateDealID, JSONList(effect.UpdateObligations), effect.UpdatedAt); err != nil {
 			return err
 		}
 	}
@@ -209,8 +209,8 @@ UPDATE orp_deals SET
     updated_at = $13
 WHERE id = $1 AND terms_hash = $14 AND updated_at = $15`,
 			deal.ID, deal.OffererOwner, deal.AcceptorOwner, deal.OffererParty, deal.AcceptorParty,
-			deal.Terms, deal.TermsHash, deal.State, nullJSON(deal.Waiting), deal.Obligations, nullJSON(deal.Bound),
-			deal.Parties, deal.UpdatedAt, effect.ManyExpectHash, effect.ManyExpectAt)
+			deal.Terms, deal.TermsHash, deal.State, nullJSON(deal.Waiting), JSONList(deal.Obligations), JSONList(deal.Bound),
+			nullJSON(deal.Parties), deal.UpdatedAt, effect.ManyExpectHash, effect.ManyExpectAt)
 		if err != nil {
 			return err
 		}
@@ -259,6 +259,18 @@ INSERT INTO orp_inbox(owner_id, message) VALUES($1,$2)`, item.OwnerID, item.Mess
 func nullJSON(raw json.RawMessage) any {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil
+	}
+	return raw
+}
+
+// JSONList is the stored form of a NOT NULL JSONB list.
+// json.Marshal of a nil slice is null, and nullJSON turns that into SQL NULL.
+// bound and obligations are NOT NULL, so an empty list is stored as [].
+// terms, reply, and inbox message are NOT NULL objects and are written as given.
+// waiting and parties are nullable and stay on nullJSON, which keeps SQL NULL.
+func JSONList(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 || string(raw) == "null" {
+		return json.RawMessage(`[]`)
 	}
 	return raw
 }
@@ -515,7 +527,7 @@ func (d *DB) ActivateORPDeal(ctx context.Context, id string, bound json.RawMessa
 	tag, err := tx.Exec(ctx, `
 UPDATE orp_deals
 SET state='active', waiting=NULL, bound=$2, updated_at=$3
-WHERE id=$1 AND state='awaiting'`, id, bound, updated)
+WHERE id=$1 AND state='awaiting'`, id, JSONList(bound), updated)
 	if err != nil {
 		return false, err
 	}

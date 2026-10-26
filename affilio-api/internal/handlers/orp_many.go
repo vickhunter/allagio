@@ -681,7 +681,26 @@ func (h *ORPHost) refreshMany(deal *database.ORPDeal, terms map[string]any, now 
 	}
 	deal.State = "pending"
 	deal.UpdatedAt = now.UTC()
+	clearSignedWaiting(deal)
 	h.putMany(deal, doc)
+}
+
+// clearSignedWaiting drops waiting once the named party has signed.
+// waiting names a party that still owes a step. A later required seat
+// can still be unsigned; that seat is not this waiting record.
+func clearSignedWaiting(deal *database.ORPDeal) {
+	if len(deal.Waiting) == 0 || string(deal.Waiting) == "null" {
+		return
+	}
+	waiting, err := decodeObject(deal.Waiting)
+	if err != nil {
+		return
+	}
+	party, _ := waiting["party"].(string)
+	if party == "" || !seatSigned(mustMany(*deal).Seats, party) {
+		return
+	}
+	deal.Waiting = nil
 }
 
 func (h *ORPHost) holdMany(deal *database.ORPDeal, party, step string, reasons []any, now time.Time) {
