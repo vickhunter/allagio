@@ -212,7 +212,7 @@ export class ReferenceHost {
       auth: { bearer: true },
       tracking: { links: true, codes: true, base: `${this.origin}/go/` },
       conformance: { levels: this.levels() },
-      capabilities: this.capabilities(),
+      capabilities: this.capabilities('0.4'),
       keys: [publicJwk(this.hostKey)],
       docs: `${this.origin}/docs/orp`,
     };
@@ -226,9 +226,10 @@ export class ReferenceHost {
     return doc;
   }
 
-  capabilities() {
+  capabilities(version = '0.3') {
+    const messages = version === '0.4' ? [...CORE, 'leave', 'seat'] : [...CORE];
     return {
-      messages: [...CORE],
+      messages,
       proofs: ['link', 'proof_url', 'platform_check', 'attestation', 'witness', 'provider'],
       tracking: { links: true, codes: true },
       signatures: { algs: ['EdDSA'], required: false },
@@ -286,7 +287,7 @@ export class ReferenceHost {
     }
     if (req.method === 'GET' && url.pathname === '/.well-known/orp.json') {
       const doc = this.discovery();
-      const verdict = check('discovery', doc);
+      const verdict = check04('discovery', doc);
       if (!verdict.ok) throw new Error(`discovery invalid at ${verdict.field}`);
       this.write(res, 200, doc, { cors: true });
       return;
@@ -358,11 +359,14 @@ export class ReferenceHost {
     const dealPath = url.pathname.match(/^\/orp\/deals\/([^/]+)$/);
     if (req.method === 'GET' && dealPath) {
       const deal = this.deals.get(dealPath[1]);
-      if (!deal || (deal.offerer !== auth.party.id && deal.acceptor !== auth.party.id)) {
+      if (!deal || !partyRole(deal, auth.party.id)) {
         this.write(res, 404, this.plainError('not_found', 'No such deal for this sender.'));
         return;
       }
-      this.write(res, 200, this.snapshot(deal, auth.party.id, ''));
+      const snap = deal.version === '0.4'
+        ? this.snapshotMany(deal, auth.party.id, '')
+        : this.snapshot(deal, auth.party.id, '');
+      this.write(res, 200, snap);
       return;
     }
     const keys = url.pathname.match(/^\/orp\/keys\/([^/]+)$/);
@@ -563,7 +567,7 @@ export class ReferenceHost {
       body: {
         versions: [message.orp === '0.4' ? '0.4' : '0.3'],
         party: party.id,
-        capabilities: this.capabilities(),
+        capabilities: this.capabilities(message.orp === '0.4' ? '0.4' : '0.3'),
         limits: { messages_per_minute: 60, max_body_bytes: 65536 },
       },
     });
@@ -1121,11 +1125,25 @@ export class ReferenceHost {
       this.deliver(other, this.emit({ type: 'consent', to: other, deal: esc.dealId, body: otherBody }));
     }
     esc.resolved = true;
-    if (decision === 'refused') this.refuseEscalation(esc);
-    else this.applyEscalation(esc, consentId);
-    this.save();
     const deal = esc.dealId ? this.deals.get(esc.dealId) : null;
-    return [200, deal ? this.snapshot(deal, esc.party, consent?.id || '') : { ok: true }];
+    const prior = deal ? structuredClone(deal) : null;
+    try {
+      if (decision === 'refused') this.refuseEscalation(esc);
+      else this.applyEscalation(esc, consentId);
+      const payload = !deal
+        ? { ok: true }
+        : deal.version === '0.4'
+          ? this.snapshotMany(deal, esc.party, consent?.id || '')
+          : this.snapshot(deal, esc.party, consent?.id || '');
+      this.save();
+      return [200, payload];
+    } catch (error) {
+      if (deal && prior) {
+        this.deals.set(deal.id, prior);
+        esc.resolved = false;
+      }
+      throw error;
+    }
   }
 
   refuseEscalation(esc) {
@@ -2088,8 +2106,10 @@ export class ReferenceHost {
       seat.signed = true;
       this.bind(deal, partyId, type, ref);
       deal.bound.sort((a, b) => (a.party < b.party ? -1 : a.party > b.party ? 1 : 0));
-      const vacancy = deal.vacancies.indexOf(seat.role);
-      if (vacancy >= 0) deal.vacancies.splice(vacancy, 1);
+      if (seat.required) {
+        const vacancy = deal.vacancies.indexOf(seat.role);
+        if (vacancy >= 0) deal.vacancies.splice(vacancy, 1);
+      }
     }
     this.refreshQuorum(deal);
   }
@@ -2209,7 +2229,10 @@ export class ReferenceHost {
     if (!seat) return this.failure('not_found', 'No such deal for this sender.', message);
     if (!['pending', 'awaiting', 'active'].includes(deal.state)) return this.failure('state_conflict', 'The deal is in the wrong state.', message);
     if (deal.parties.length <= 2) return this.failure('invalid_message', 'A deal keeps at least 2 parties.', message);
-    deal.parties = deal.parties.filter((item) => item.id !== party.id);
+    const remaining = deal.parties.filter((item) => item.id !== party.id);
+    const verdict = validateParties(remaining, { hostId: this.hostId });
+    if (!verdict.ok) return this.failure('invalid_message', verdict.message, message, { field: verdict.field });
+    deal.parties = remaining;
     deal.bound = deal.bound.filter((item) => item.party !== party.id);
     if (seat.required) deal.vacancies.push(seat.role);
     if (deal.offerer === party.id) deal.offerer = '';

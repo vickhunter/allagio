@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { check, digest, generateEd25519, publicJwk, signEnvelope } from '../../sdk/src/index.mjs';
+import { checkMessage, digest, generateEd25519, publicJwk, signEnvelope } from '../../sdk/src/index.mjs';
 import {
   AUTO, OrpClient, ReferenceHost, affiliateTerms, codeOf, inbox, party, tempStore, withHost,
 } from './helpers.mjs';
@@ -78,8 +78,8 @@ test('L0-SCHEMA', async () => {
 
     assert.ok(host.outbound.length > 0);
     for (const message of host.outbound) {
-      const verdict = check('message', message);
-      assert.equal(verdict.ok, true, `${message.type} invalid at ${verdict.field}`);
+      const verdict = checkMessage(message);
+      assert.equal(verdict.ok, true, `${message.orp} ${message.type} invalid at ${verdict.field}`);
     }
   });
 });

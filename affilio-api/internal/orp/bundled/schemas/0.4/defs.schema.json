@@ -178,6 +178,61 @@
         "expires_at": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" },
         "claims": { "$ref": "#/$defs/Claims" }
       }
+    },
+    "MessageType": {
+      "title": "MessageType",
+      "description": "The 0.3 message types plus leave and seat. A 0.3 message cannot name leave or seat.",
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": ["hello", "discover", "results", "space", "request", "offer", "counter", "accept", "decline", "deal", "execute", "receipt", "outcome", "payout", "revoke", "consent", "dispute", "reputation", "error", "leave", "seat"]
+        },
+        { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/ExtName" }
+      ]
+    },
+    "Capabilities": {
+      "title": "Capabilities",
+      "description": "What a 0.4 host advertises. messages may include leave and seat.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "messages": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/MessageType" } },
+        "spaces": { "type": "array", "uniqueItems": true, "items": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/SpaceKind" } },
+        "actions": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)*$" } },
+        "proofs": { "type": "array", "uniqueItems": true, "items": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/ProofMethod" } },
+        "tracking": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "links": { "type": "boolean" },
+            "codes": { "type": "boolean" }
+          }
+        },
+        "signatures": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "algs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "enum": ["EdDSA", "ES256"] } },
+            "required": { "type": "boolean" }
+          }
+        },
+        "inbox": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "poll": { "type": "boolean" },
+            "webhook": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Url" }
+          }
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "claims": { "type": "string", "enum": ["real", "stub", "none"] }
+          }
+        },
+        "ext": { "type": "array", "uniqueItems": true, "items": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/ExtName" } }
+      }
     }
   }
 }

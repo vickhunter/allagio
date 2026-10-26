@@ -255,6 +255,8 @@ An error never changes state. A host MUST NOT apply part of a message.
 
 A party MUST NOT send a type that its counterparty's host did not list in `capabilities.messages`.
 
+A host that speaks 0.4 lists `leave` and `seat` in `capabilities.messages` on its [discovery document](https://offer-rails.onrender.com/orp/schemas/0.4/discovery.schema.json) and on a [`hello`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/hello.schema.json) reply whose version is `0.4`. A `hello` reply of `0.3` lists the 0.3 types only. `leave` and `seat` are valid on a 0.4 message. They are not 0.3 message types.
+
 ---
 
 ## 7. Identity and privacy
@@ -1227,7 +1229,7 @@ ORP 0.4 adds deals with more than two parties. It does not change a valid 0.3 me
 
 A 0.4 deal has 2 to 16 parties ([`deal`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/deal.schema.json)). Each seat has `id`, `role`, and `required`. Roles are `offerer`, `acceptor`, `curator`, `facilitator`, `service`, `signer`, and `member`. A deal has at most one offerer and one acceptor, and at least one required seat.
 
-Seat `terms` are that seat's split. A percent is an integer from 0 to 100. When every money term is a percent, the percents sum to 100. Fixed amounts alone do not use that sum. A mix of percent and fixed amount is valid when every percent term has a `cap` and the percents are not over 100. A sum of 101 is rejected. The host answers `invalid_message`.
+Seat `terms` are that seat's split. A percent is an integer from 0 to 100. When every money term is a percent, and no seat also carries a fixed amount, the percents sum to 100. Fixed amounts alone do not use that sum. A seat that carries both a percent and an amount is mixed, and so is a deal that mixes percent seats with fixed-amount seats. A mix is valid when every percent term has a `cap` and the percents are not over 100. Those percents do not have to sum to 100. A sum of 101 is rejected. A percent without a `cap` in a mix is rejected. The host answers `invalid_message`.
 
 `terms_hash` on a many-party deal is the JCS SHA-256 of `{ terms, parties }`. Each party in that document is `id`, `role`, `required`, plus `terms` and `identity` when they are present. `signed` is not part of the hash. Party order is the order on the offer. Accept order does not change it.
 
@@ -1241,9 +1243,11 @@ A `counter` replaces the shared terms, clears every signature and every vacancy,
 
 ### 20.3 Leave and seat
 
-[`leave`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/leave.schema.json) removes the sender. An optional party can leave and the deal stays valid. If it was `active`, it stays `active`. A required party leaves a vacancy for that role and the deal returns to `pending` until a replacement signs. The other signatures stay. The hash is recomputed. A deal keeps at least 2 parties.
+[`leave`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/leave.schema.json) removes the sender only when the remaining seats are still a valid deal. The host re-checks the split the same way it checks `seat`. If the remaining percents no longer hold, the host rejects the leave with `invalid_message` and changes nothing. An optional party can leave when the remaining split still holds. If the deal was `active`, it stays `active`. A required party, when the leave is accepted, leaves a vacancy for that role and the deal returns to `pending`. The other signatures stay. The hash is recomputed. A deal keeps at least 2 parties.
 
-[`seat`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/seat.schema.json) adds a party that has already joined the host. The sender is already on the deal. The new seat is unsigned. A vacancy stays until that party accepts. Seating the replacement does not by itself make the deal `active`.
+A vacancy clears only when a replacement seated as required for that role signs. An optional seat of the same role does not clear it, and that signature does not make the deal `active`. The deal stays `pending` until every vacated required seat has a required replacement who has signed.
+
+[`seat`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/seat.schema.json) adds a party that has already joined the host. The sender is already on the deal. The new seat is unsigned. A vacancy stays until a required replacement for that role accepts. Seating the replacement does not by itself make the deal `active`.
 
 ### 20.4 Offer freshness
 
@@ -1295,7 +1299,7 @@ That `terms_hash` is the digest of the terms object, including `checked_at` and 
 
 Identity on a party is `hash` and `issuer` only. The deal does not carry a name, an email, or any other personal data.
 
-A deposit is a term that names who holds it. The holder is outside Offer Rails. Offer Rails does not hold money. The proof records the agreed term. It does not move the money.
+A deposit is a term that names who holds it. The holder is outside Offer Rails. Offer Rails does not hold money. The proof records the agreed term. It does not move the money. The host compares the holder after lowercasing it and removing spaces, hyphens, underscores, and dots. A holder that becomes `host`, `offerrails`, or `hostedapi` is rejected, including `OfferRails`, `offer-rails`, and `hosted api`.
 
 ### 20.6 Fixtures
 
@@ -1307,7 +1311,7 @@ These files are illustrative and test mode only. They are not legal advice and t
 - [bad-split.json](https://offer-rails.onrender.com/orp/examples/0.4/bad-split.json) is a schema-valid offer whose percents are 60 and 41. The host rejects it.
 - [mediator-left.json](https://offer-rails.onrender.com/orp/examples/0.4/mediator-left.json) is `pending` with a `facilitator` vacancy.
 
-A facilitator percent of 1 with a cap, beside fixed amounts on the other seats, is a valid mix. If the optional service seat leaves, the deal stays `active`. If the facilitator leaves, the deal returns to `pending` until a replacement signs. Seller and buyer alone are a normal two-party deal: on 0.3 that deal is unchanged, and on 0.4 two required seats still go `active` when both have signed.
+A facilitator percent of 1 with a cap, beside fixed amounts on the other seats, is a valid mix. A seat that carries a percent, an amount, and a cap is mixed too, and those percents need not sum to 100. If the optional service seat leaves, the deal stays `active` because the remaining fixed amounts still hold. If that optional seat's leaving would drop a percent split below 100, the host rejects the leave and the deal is unchanged. If the facilitator leaves, the deal returns to `pending` until a required replacement signs. An optional facilitator does not clear that vacancy. Seller and buyer alone are a normal two-party deal: on 0.3 that deal is unchanged, and on 0.4 two required seats still go `active` when both have signed.
 
 <!-- orp:0.4 -->
 ```json

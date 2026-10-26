@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { foldSigns, validateParties } from '../../sdk/src/index.mjs';
+import { foldSigns, signatureState, validateParties } from '../../sdk/src/index.mjs';
 import { AUTO, codeOf, party, withHost } from './helpers.mjs';
 
 function mulberry32(seed) {
@@ -94,8 +94,11 @@ test('ORP04-PROPERTY', async (t) => {
         body: { terms, parties },
       }));
       assert.equal(opened.status, 200, opened.text);
+      assert.equal(opened.message.body.state, 'pending');
       let snapshot = opened.message;
-      for (const client of shuffle(seated.slice(1), hostRandom)) {
+      const order = shuffle(seated.slice(1), hostRandom);
+      for (let index = 0; index < order.length; index += 1) {
+        const client = order[index];
         const accepted = await client.send(client.msg({
           orp: '0.4',
           type: 'accept',
@@ -104,6 +107,8 @@ test('ORP04-PROPERTY', async (t) => {
         }));
         assert.equal(accepted.status, 200, accepted.text);
         snapshot = accepted.message;
+        const lastRequired = index === order.length - 1;
+        assert.equal(snapshot.body.state, lastRequired ? 'active' : 'pending', `${trial} signed ${index + 1} of ${order.length}`);
       }
       assert.equal(snapshot.body.state, 'active');
       assert.deepEqual(
@@ -128,12 +133,176 @@ test('ORP04-PROPERTY', async (t) => {
     }));
     assert.equal(bad.status, 400);
     assert.equal(codeOf(bad), 'invalid_message');
+
+    const fee = { amount_minor: 1000, currency: 'EUR' };
+    for (let trial = 0; trial < 6; trial += 1) {
+      const offerer = clients[0];
+      const acceptor = clients[1];
+      const facilitator = clients[2];
+      const service = clients[3];
+      const opened = await offerer.send(offerer.msg({
+        orp: '0.4',
+        type: 'offer',
+        body: {
+          terms: {
+            title: `Random seat leave ${trial}`,
+            kind: 'partnership',
+            obligations: [{ id: 'share', by: 'offerer', action: 'share' }],
+          },
+          parties: [
+            { id: offerer.party, role: 'offerer', required: true, terms: { amount: { amount_minor: 0, currency: 'EUR' } } },
+            { id: acceptor.party, role: 'acceptor', required: true, terms: { amount: fee } },
+            { id: facilitator.party, role: 'facilitator', required: true, terms: { amount: fee } },
+            { id: service.party, role: 'service', required: false, terms: { amount: { amount_minor: 20, currency: 'EUR' } } },
+          ],
+        },
+      }));
+      assert.equal(opened.status, 200, opened.text);
+      const seats = opened.message.body.parties.map((seat) => ({ ...seat, signed: seat.signed }));
+      let vacancies = [...(opened.message.body.vacancies || [])];
+      let snapshot = opened.message;
+      const byId = new Map(clients.map((client) => [client.party, client]));
+      let spare = 4;
+      const signers = shuffle([acceptor, facilitator], hostRandom);
+      for (let index = 0; index < signers.length; index += 1) {
+        const client = signers[index];
+        const accepted = await client.send(client.msg({
+          orp: '0.4',
+          type: 'accept',
+          deal: snapshot.deal,
+          body: { terms_hash: snapshot.body.terms_hash },
+        }));
+        assert.equal(accepted.status, 200, accepted.text);
+        const seat = seats.find((item) => item.id === client.party);
+        seat.signed = true;
+        vacancies = clearVacancy(seat, vacancies);
+        snapshot = accepted.message;
+        assert.equal(snapshot.body.state, index === signers.length - 1 ? 'active' : 'pending');
+        assert.deepEqual(snapshot.body.vacancies || [], vacancies);
+      }
+      for (let step = 0; step < 4; step += 1) {
+        const roll = hostRandom();
+        if (roll < 0.34) {
+          const seat = seats[Math.floor(hostRandom() * seats.length)];
+          const remaining = seats.filter((item) => item.id !== seat.id);
+          const allowed = seats.length > 2 && validateParties(remaining).ok;
+          const sent = await byId.get(seat.id).send(byId.get(seat.id).msg({
+            orp: '0.4',
+            type: 'leave',
+            deal: snapshot.deal,
+            body: {},
+          }));
+          if (!allowed) {
+            assert.equal(sent.status, 400, sent.text);
+            assert.equal(codeOf(sent), 'invalid_message');
+            assert.equal(host.deals.get(snapshot.deal).parties.length, seats.length);
+            continue;
+          }
+          assert.equal(sent.status, 200, sent.text);
+          const index = seats.findIndex((item) => item.id === seat.id);
+          seats.splice(index, 1);
+          if (seat.required) vacancies.push(seat.role);
+          snapshot = sent.message;
+        } else if (roll < 0.67 && spare < clients.length) {
+          const client = clients[spare];
+          spare += 1;
+          const needsFacilitator = vacancies.includes('facilitator') && !seats.some((seat) => seat.role === 'facilitator' && seat.required);
+          const seat = needsFacilitator
+            ? { id: client.party, role: 'facilitator', required: true, terms: { amount: fee } }
+            : { id: client.party, role: 'member', required: false, terms: { amount: { amount_minor: 1, currency: 'EUR' } } };
+          const sender = byId.get(seats[0].id);
+          const sent = await sender.send(sender.msg({
+            orp: '0.4',
+            type: 'seat',
+            deal: snapshot.deal,
+            body: { seat },
+          }));
+          const next = [...seats, { ...seat, signed: false }];
+          if (!validateParties(next).ok) {
+            assert.equal(sent.status, 400, sent.text);
+            continue;
+          }
+          assert.equal(sent.status, 200, sent.text);
+          seats.push({ ...seat, signed: false });
+          byId.set(client.party, client);
+          snapshot = sent.message;
+        } else {
+          const unsigned = seats.filter((seat) => !seat.signed);
+          if (!unsigned.length) continue;
+          const seat = unsigned[Math.floor(hostRandom() * unsigned.length)];
+          const sent = await byId.get(seat.id).send(byId.get(seat.id).msg({
+            orp: '0.4',
+            type: 'accept',
+            deal: snapshot.deal,
+            body: { terms_hash: snapshot.body.terms_hash },
+          }));
+          assert.equal(sent.status, 200, sent.text);
+          seat.signed = true;
+          vacancies = clearVacancy(seat, vacancies);
+          snapshot = sent.message;
+        }
+        const expected = signatureState(seats, seats.filter((seat) => seat.signed).map((seat) => seat.id), vacancies);
+        assert.equal(snapshot.body.state, expected.state, `${trial}.${step}`);
+        assert.deepEqual([...(snapshot.body.vacancies || [])].sort(), [...vacancies].sort());
+        assert.deepEqual(
+          snapshot.body.parties.filter((seat) => seat.signed).map((seat) => seat.id).sort(),
+          seats.filter((seat) => seat.signed).map((seat) => seat.id).sort(),
+        );
+        if (vacancies.includes('facilitator')) {
+          assert.equal(snapshot.body.parties.some((seat) => seat.role === 'facilitator' && seat.required && seat.signed), false);
+        }
+      }
+    }
+
+    const percentOpened = await clients[0].send(clients[0].msg({
+      orp: '0.4',
+      type: 'offer',
+      body: {
+        terms: {
+          title: 'Random percent leave',
+          kind: 'partnership',
+          obligations: [{ id: 'share', by: 'offerer', action: 'share' }],
+        },
+        parties: [
+          { id: clients[0].party, role: 'offerer', required: true, terms: { percent: 50 } },
+          { id: clients[1].party, role: 'curator', required: true, terms: { percent: 30 } },
+          { id: clients[2].party, role: 'service', required: false, terms: { percent: 20 } },
+        ],
+      },
+    }));
+    assert.equal(percentOpened.status, 200, percentOpened.text);
+    const percentActive = await clients[1].send(clients[1].msg({
+      orp: '0.4',
+      type: 'accept',
+      deal: percentOpened.message.deal,
+      body: { terms_hash: percentOpened.message.body.terms_hash },
+    }));
+    assert.equal(percentActive.message.body.state, 'active');
+    const percentLeft = await clients[2].send(clients[2].msg({
+      orp: '0.4',
+      type: 'leave',
+      deal: percentActive.message.deal,
+      body: {},
+    }));
+    assert.equal(percentLeft.status, 400);
+    assert.equal(codeOf(percentLeft), 'invalid_message');
+    const percentRead = await clients[0].deal(percentActive.message.deal);
+    assert.equal(percentRead.message.body.state, 'active');
+    assert.equal(percentRead.message.body.parties.length, 3);
   });
 
   const duration = performance.now() - started;
-  t.diagnostic(`property trials=240 host_deals=20 duration_ms=${duration.toFixed(1)} bug=none`);
+  t.diagnostic(`property trials=240 host_deals=20 vacancy_sequences=6 duration_ms=${duration.toFixed(1)} bug=none`);
   assert.ok(duration < 8000, `property test took ${duration.toFixed(1)}ms`);
 });
+
+function clearVacancy(seat, vacancies) {
+  if (!seat.required) return vacancies;
+  const next = [...vacancies];
+  const index = next.indexOf(seat.role);
+  if (index >= 0) next.splice(index, 1);
+  return next;
+}
 
 function eurParties() {
   return [

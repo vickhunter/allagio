@@ -1,11 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { check, dealHash, digest } from '../../sdk/src/index.mjs';
+import { check, check04, dealHash, digest } from '../../sdk/src/index.mjs';
 import {
-  AUTO, DAY, DESTINATION, OrpClient, affiliateTerms, codeOf, directDeal, disclosure, party, withHost,
+  AUTO, DAY, DESTINATION, OrpClient, affiliateTerms, codeOf, directDeal, disclosure, party, tempStore, withHost,
 } from './helpers.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -346,5 +346,318 @@ test('ORP04-N2-UNCHANGED', async () => {
     assert.equal(verdict.ok, true, verdict.field);
     assert.equal(fixture.orp, '0.3');
     assert.equal(fixture.body.parties, undefined);
+  });
+});
+
+const CORE_MESSAGES = ['hello', 'discover', 'results', 'space', 'request', 'offer', 'counter', 'accept', 'decline', 'deal', 'execute', 'receipt', 'outcome', 'payout', 'revoke', 'consent', 'dispute', 'reputation', 'error'];
+
+const ASK = {
+  steps: { ...AUTO.steps, accept: 'ask' },
+  budget: AUTO.budget,
+  approve_over: AUTO.approve_over,
+};
+
+function shareTerms(title) {
+  return {
+    title,
+    kind: 'partnership',
+    obligations: [{ id: 'share', by: 'offerer', action: 'share' }],
+  };
+}
+
+test('ORP04-OPTIONAL-DOES-NOT-CLEAR-VACANCY', async () => {
+  await withHost({}, async (host) => {
+    const offerer = await party(host, AUTO);
+    const acceptor = await party(host, AUTO);
+    const requiredFacilitator = await party(host, AUTO);
+    const optionalFacilitator = await party(host, AUTO);
+    const replacement = await party(host, AUTO);
+    const fee = eur(1000);
+    const opened = await offerMany(offerer, shareTerms('Optional facilitator cannot clear a vacancy'), [
+      { id: offerer.party, role: 'offerer', required: true, terms: { amount: eur(0) } },
+      { id: acceptor.party, role: 'acceptor', required: true, terms: { amount: fee } },
+      { id: requiredFacilitator.party, role: 'facilitator', required: true, terms: { amount: fee } },
+      { id: optionalFacilitator.party, role: 'facilitator', required: false, terms: { amount: eur(1) } },
+    ]);
+    assert.equal(opened.status, 200, opened.text);
+    const acceptorSigned = await acceptDeal(acceptor, opened.message);
+    const active = await acceptDeal(requiredFacilitator, acceptorSigned.message);
+    assert.equal(active.message.body.state, 'active');
+    const left = await requiredFacilitator.send(msg(requiredFacilitator, {
+      type: 'leave',
+      deal: active.message.deal,
+      body: {},
+    }));
+    assert.equal(left.status, 200, left.text);
+    assert.equal(left.message.body.state, 'pending');
+    assert.deepEqual(left.message.body.vacancies, ['facilitator']);
+    const optionalSigned = await acceptDeal(optionalFacilitator, left.message);
+    assert.equal(optionalSigned.status, 200, optionalSigned.text);
+    assert.equal(optionalSigned.message.body.state, 'pending');
+    assert.deepEqual(optionalSigned.message.body.vacancies, ['facilitator']);
+    assert.equal(optionalSigned.message.body.parties.some((seat) => seat.role === 'facilitator' && seat.required), false);
+    assert.equal(optionalSigned.message.body.parties.find((seat) => seat.id === optionalFacilitator.party).signed, true);
+    const seated = await offerer.send(msg(offerer, {
+      type: 'seat',
+      deal: left.message.deal,
+      body: {
+        seat: { id: replacement.party, role: 'facilitator', required: true, terms: { amount: fee } },
+      },
+    }));
+    assert.equal(seated.status, 200, seated.text);
+    assert.equal(seated.message.body.state, 'pending');
+    assert.ok(seated.message.body.vacancies.includes('facilitator'));
+    const replaced = await acceptDeal(replacement, seated.message);
+    assert.equal(replaced.status, 200, replaced.text);
+    assert.equal(replaced.message.body.state, 'active');
+    assert.equal(replaced.message.body.vacancies, undefined);
+    assert.equal(replaced.message.body.parties.find((seat) => seat.id === replacement.party).required, true);
+  });
+});
+
+test('ORP04-LEAVE-KEEPS-SPLIT', async () => {
+  await withHost({}, async (host) => {
+    const offerer = await party(host, AUTO);
+    const curator = await party(host, AUTO);
+    const optional = await party(host, AUTO);
+    const opened = await offerMany(offerer, shareTerms('Percent split must survive a leave'), [
+      { id: offerer.party, role: 'offerer', required: true, terms: { percent: 50 } },
+      { id: curator.party, role: 'curator', required: true, terms: { percent: 30 } },
+      { id: optional.party, role: 'service', required: false, terms: { percent: 20 } },
+    ]);
+    assert.equal(opened.status, 200, opened.text);
+    const active = await acceptDeal(curator, opened.message);
+    assert.equal(active.message.body.state, 'active');
+    const left = await optional.send(msg(optional, { type: 'leave', deal: active.message.deal, body: {} }));
+    assert.equal(left.status, 400);
+    assert.equal(codeOf(left), 'invalid_message');
+    assert.match(left.message.body.message, /100/);
+    const read = await offerer.deal(active.message.deal);
+    assert.equal(read.status, 200, read.text);
+    assert.equal(read.message.body.state, 'active');
+    assert.deepEqual(read.message.body.parties.map((seat) => seat.terms.percent).sort((a, b) => a - b), [20, 30, 50]);
+    assert.equal(read.message.body.parties.length, 3);
+  });
+});
+
+test('ORP04-SEAT-READS-PENDING', async () => {
+  await withHost({}, async (host) => {
+    const creator = await party(host, AUTO);
+    const curator = await party(host, ASK);
+    const newsletter = await party(host, AUTO);
+    const stranger = await party(host, AUTO);
+    const opened = await offerMany(creator, {
+      title: 'Pending referral each seat can read',
+      kind: 'partnership',
+      disclosure,
+      obligations: [place('place', newsletter.party)],
+    }, [
+      { id: creator.party, role: 'offerer', required: true, terms: { percent: 50 } },
+      { id: curator.party, role: 'curator', required: true, terms: { percent: 30 } },
+      { id: newsletter.party, role: 'acceptor', required: true, terms: { percent: 20 } },
+    ]);
+    assert.equal(opened.status, 200, opened.text);
+    assert.equal(opened.message.body.state, 'pending');
+    for (const client of [creator, curator, newsletter]) {
+      const read = await client.deal(opened.message.deal);
+      assert.equal(read.status, 200, read.text);
+      assert.equal(read.message.orp, '0.4');
+      assert.equal(read.message.body.state, 'pending');
+      assert.equal(read.message.body.parties.length, 3);
+    }
+    const hidden = await stranger.deal(opened.message.deal);
+    assert.equal(hidden.status, 404);
+
+    const members = [];
+    for (let index = 0; index < 4; index += 1) members.push(await party(host, AUTO));
+    const ringTerms = {
+      title: 'Link swap ring each member can read',
+      kind: 'link_exchange',
+      disclosure,
+      obligations: members.map((client, index) => place(`place${index + 1}`, client.party)),
+    };
+    const ring = await offerMany(members[0], ringTerms, members.map((client) => ({
+      id: client.party,
+      role: 'member',
+      required: true,
+      terms: { percent: 25 },
+    })));
+    assert.equal(ring.status, 200, ring.text);
+    assert.equal(ring.message.body.offerer, undefined);
+    for (const client of members) {
+      const read = await client.deal(ring.message.deal);
+      assert.equal(read.status, 200, `${client.party} ${read.status} ${read.text}`);
+      assert.equal(read.message.orp, '0.4');
+      assert.equal(read.message.body.state, 'pending');
+    }
+    let snapshot = ring.message;
+    for (const client of members.slice(1)) {
+      const accepted = await acceptDeal(client, snapshot);
+      assert.equal(accepted.status, 200, accepted.text);
+      snapshot = accepted.message;
+    }
+    assert.equal(snapshot.body.state, 'active');
+    for (const client of members) {
+      const read = await client.deal(ring.message.deal);
+      assert.equal(read.status, 200, read.text);
+      assert.equal(read.message.body.state, 'active');
+    }
+
+    const waiting = await acceptDeal(curator, opened.message);
+    assert.equal(waiting.message.body.state, 'awaiting');
+    const approved = await curator.approve(waiting.message.body.waiting.escalation);
+    assert.equal(approved.status, 200, approved.text);
+    assert.equal(approved.message.orp, '0.4');
+    assert.equal(approved.message.body.state, 'pending');
+    assert.equal(approved.message.body.parties.find((seat) => seat.id === curator.party).signed, true);
+
+    const again = await party(host, ASK);
+    const third = await party(host, AUTO);
+    const held = await offerMany(creator, shareTerms('Approve rolls back a failed snapshot'), [
+      { id: creator.party, role: 'offerer', required: true, terms: { amount: eur(0) } },
+      { id: again.party, role: 'curator', required: true, terms: { amount: eur(1) } },
+      { id: third.party, role: 'acceptor', required: true, terms: { amount: eur(1) } },
+    ]);
+    assert.equal(held.status, 200, held.text);
+    const escalated = await acceptDeal(again, held.message);
+    assert.equal(escalated.message.body.state, 'awaiting');
+    host.storePath = tempStore();
+    let dealEmits = 0;
+    const emit = host.emit.bind(host);
+    host.emit = (message, options) => {
+      if (message?.type === 'deal') {
+        dealEmits += 1;
+        if (dealEmits >= 4) throw new Error('snapshot failed');
+      }
+      return emit(message, options);
+    };
+    const failed = await again.approve(escalated.message.body.waiting.escalation);
+    assert.equal(failed.status, 500);
+    assert.equal(existsSync(host.storePath), false);
+    const stored = host.deals.get(held.message.deal);
+    assert.equal(stored.parties.find((seat) => seat.id === again.party).signed, false);
+    assert.equal(stored.bound.some((item) => item.party === again.party), false);
+    host.emit = emit;
+    const reread = await creator.deal(held.message.deal);
+    assert.equal(reread.status, 200, reread.text);
+    assert.equal(reread.message.body.parties.find((seat) => seat.id === again.party).signed, false);
+  });
+});
+
+test('ORP04-CAPABILITIES', async () => {
+  await withHost({}, async (host) => {
+    const maker = await party(host, AUTO);
+    const other = await party(host, AUTO);
+    const extra = await party(host, AUTO);
+    const old = await maker.send(maker.msg({ type: 'hello', body: { versions: ['0.3'] } }));
+    assert.equal(old.status, 200, old.text);
+    assert.equal(old.message.orp, '0.3');
+    assert.deepEqual(old.message.body.capabilities.messages, CORE_MESSAGES);
+    assert.equal(check('message', old.message).ok, true);
+
+    const next = await maker.send(msg(maker, { type: 'hello', body: { versions: ['0.4'] } }));
+    assert.equal(next.status, 200, next.text);
+    assert.equal(next.message.orp, '0.4');
+    assert.ok(next.message.body.capabilities.messages.includes('leave'));
+    assert.ok(next.message.body.capabilities.messages.includes('seat'));
+    assert.equal(check04('message', next.message).ok, true, check04('message', next.message).field);
+    assert.equal(check('message', next.message).ok, false);
+
+    const doc = await OrpClient.discovery(host.origin);
+    assert.equal(doc.status, 200, doc.text);
+    assert.ok(doc.message.capabilities.messages.includes('leave'));
+    assert.ok(doc.message.capabilities.messages.includes('seat'));
+    assert.equal(check04('discovery', doc.message).ok, true, check04('discovery', doc.message).field);
+    assert.equal(check('discovery', doc.message).ok, false);
+
+    const opened = await offerMany(maker, shareTerms('Capabilities allow leave and seat'), [
+      { id: maker.party, role: 'offerer', required: true, terms: { amount: eur(0) } },
+      { id: other.party, role: 'acceptor', required: true, terms: { amount: eur(1) } },
+    ]);
+    assert.equal(opened.status, 200, opened.text);
+    const active = await acceptDeal(other, opened.message);
+    assert.equal(active.message.body.state, 'active');
+    const seated = await maker.send(msg(maker, {
+      type: 'seat',
+      deal: active.message.deal,
+      body: { seat: { id: extra.party, role: 'service', required: false, terms: { amount: eur(1) } } },
+    }));
+    assert.equal(seated.status, 200, seated.text);
+    assert.notEqual(codeOf(seated), 'unsupported_type');
+    const left = await extra.send(msg(extra, { type: 'leave', deal: seated.message.deal, body: {} }));
+    assert.equal(left.status, 200, left.text);
+    assert.equal(left.message.body.parties.some((seat) => seat.id === extra.party), false);
+  });
+});
+
+test('ORP04-MIXED-SPLIT', async () => {
+  await withHost({}, async (host) => {
+    const maker = await party(host, AUTO);
+    const other = await party(host, AUTO);
+    const terms = shareTerms('Mixed percent and amount');
+    const cap = eur(1000);
+    const amount = eur(500);
+    const both = await offerMany(maker, terms, [
+      { id: maker.party, role: 'offerer', required: true, terms: { percent: 40, amount, cap } },
+      { id: other.party, role: 'acceptor', required: true, terms: { percent: 40, amount, cap } },
+    ]);
+    assert.equal(both.status, 200, both.text);
+    assert.equal(both.message.body.parties[0].terms.percent, 40);
+    assert.equal(both.message.body.parties[0].terms.amount.amount_minor, 500);
+
+    const cross = await offerMany(maker, terms, [
+      { id: maker.party, role: 'offerer', required: true, terms: { percent: 40, cap } },
+      { id: other.party, role: 'acceptor', required: true, terms: { amount } },
+    ]);
+    assert.equal(cross.status, 200, cross.text);
+
+    const over = await offerMany(maker, terms, [
+      { id: maker.party, role: 'offerer', required: true, terms: { percent: 60, amount, cap } },
+      { id: other.party, role: 'acceptor', required: true, terms: { percent: 41, amount, cap } },
+    ]);
+    assert.equal(over.status, 400);
+    assert.equal(codeOf(over), 'invalid_message');
+    assert.match(over.message.body.message, /100/);
+
+    const bare = await offerMany(maker, terms, [
+      { id: maker.party, role: 'offerer', required: true, terms: { percent: 40, amount } },
+      { id: other.party, role: 'acceptor', required: true, terms: { amount } },
+    ]);
+    assert.equal(bare.status, 400);
+    assert.equal(codeOf(bare), 'invalid_message');
+    assert.match(bare.message.body.message, /cap/);
+  });
+});
+
+test('ORP04-DEPOSIT-HOLDER', async () => {
+  await withHost({}, async (host) => {
+    const maker = await party(host, AUTO);
+    const other = await party(host, AUTO);
+    const terms = shareTerms('Deposit holder names');
+    const rejected = ['OfferRails', 'offer-rails', 'offer_rails', 'offer rails', 'Offer.Rails', 'hosted api', 'Hosted-API', 'hosted_api', 'hosted.api', 'HOST'];
+    for (const holder of rejected) {
+      const sent = await offerMany(maker, terms, [
+        { id: maker.party, role: 'offerer', required: true, terms: { amount: eur(0) } },
+        {
+          id: other.party,
+          role: 'service',
+          required: true,
+          terms: { deposit: { amount: eur(2000), holder, purpose: 'viewing' } },
+        },
+      ]);
+      assert.equal(sent.status, 400, holder);
+      assert.equal(codeOf(sent), 'invalid_message');
+      assert.match(sent.message.body.message, /does not hold money/);
+    }
+    const allowed = await offerMany(maker, terms, [
+      { id: maker.party, role: 'offerer', required: true, terms: { amount: eur(0) } },
+      {
+        id: other.party,
+        role: 'service',
+        required: true,
+        terms: { deposit: { amount: eur(2000), holder: 'Viewing Desk', purpose: 'viewing' } },
+      },
+    ]);
+    assert.equal(allowed.status, 200, allowed.text);
   });
 });

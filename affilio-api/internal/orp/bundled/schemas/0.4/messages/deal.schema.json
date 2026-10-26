@@ -45,7 +45,7 @@
           }
         },
         "vacancies": {
-          "description": "Roles whose required seat is empty. The deal stays pending until a replacement for each role signs.",
+          "description": "Roles whose required seat is empty. The deal stays pending until a required replacement for each role signs. An optional seat of that role does not clear the vacancy.",
           "type": "array",
           "maxItems": 16,
           "items": { "$ref": "../defs.schema.json#/$defs/Role" }

@@ -1,8 +1,12 @@
 import { digest } from './jcs.mjs';
 
 export const FRESH_MS = 90 * 24 * 60 * 60 * 1000;
-const RESERVED_HOLDERS = new Set(['host', 'offer rails', 'offer-rails', 'offer_rails']);
+const RESERVED_HOLDERS = new Set(['host', 'offerrails', 'hostedapi']);
 const PII_KEYS = new Set(['email', 'name', 'phone', 'address', 'given_name', 'family_name', 'tax_id', 'ssn', 'dob']);
+
+export function holderKey(value) {
+  return String(value || '').toLowerCase().replace(/[\s\-_.]/g, '');
+}
 
 export function expiresFrom(checkedAtIso) {
   return new Date(Date.parse(checkedAtIso) + FRESH_MS).toISOString();
@@ -62,13 +66,13 @@ export function validateParties(parties, { hostId = '' } = {}) {
       if (PII_KEYS.has(key)) return { ok: false, field: `${field}/terms/${key}`, message: 'A deal stores no personal data.' };
     }
     if (terms.deposit) {
-      const holder = String(terms.deposit.holder || '').trim().toLowerCase();
-      if (!holder || RESERVED_HOLDERS.has(holder) || (hostId && holder === String(hostId).toLowerCase())) {
+      const holder = holderKey(terms.deposit.holder);
+      if (!holder || RESERVED_HOLDERS.has(holder) || (hostId && holder === holderKey(hostId))) {
         return { ok: false, field: `${field}/terms/deposit/holder`, message: 'Offer Rails does not hold money. A deposit term names an outside holder.' };
       }
     }
     const percent = hasOwn(terms, 'percent');
-    const fixed = Boolean(terms.amount) || (!percent && (hasOwn(terms, 'per') || hasOwn(terms, 'hours') || Boolean(terms.deposit)));
+    const fixed = Boolean(terms.amount) || hasOwn(terms, 'per') || hasOwn(terms, 'hours') || Boolean(terms.deposit);
     if (percent) {
       if (!Number.isInteger(terms.percent) || terms.percent < 0 || terms.percent > 100) {
         return { ok: false, field: `${field}/terms/percent`, message: 'A percent split is an integer from 0 to 100.' };
@@ -76,7 +80,7 @@ export function validateParties(parties, { hostId = '' } = {}) {
       percentCount += 1;
       percentSum += terms.percent;
     }
-    if (fixed && !percent) fixedCount += 1;
+    if (fixed) fixedCount += 1;
     if (percent && fixed && !terms.cap) {
       return { ok: false, field: `${field}/terms/cap`, message: 'A mixed percent and fixed split needs a cap on each percent term.' };
     }

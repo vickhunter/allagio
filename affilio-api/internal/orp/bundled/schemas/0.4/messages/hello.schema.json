@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/messages/hello.schema.json",
+  "title": "HelloMessage",
+  "description": "Version and capability negotiation for ORP 0.4. The reply lists leave and seat. A 0.3 hello does not.",
+  "type": "object",
+  "allOf": [{ "$ref": "../envelope.schema.json" }],
+  "required": ["type", "body"],
+  "properties": {
+    "type": { "const": "hello" },
+    "body": { "$ref": "#/$defs/HelloBody" }
+  },
+  "$defs": {
+    "HelloBody": {
+      "title": "HelloBody",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["versions"],
+      "properties": {
+        "versions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Version" }
+        },
+        "capabilities": { "$ref": "../defs.schema.json#/$defs/Capabilities" },
+        "party": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/PartyId" },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "messages_per_minute": { "type": "integer", "minimum": 1 },
+            "max_body_bytes": { "type": "integer", "minimum": 1024 }
+          }
+        }
+      }
+    }
+  }
+}

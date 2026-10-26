@@ -56,6 +56,7 @@ export function problemPointer(errors) {
 
 const validators04 = {
   message: validator('0.4/message.schema.json'),
+  discovery: validator('0.4/discovery.schema.json'),
   'suggest-response': validator('0.4/http/suggest-response.schema.json'),
   inbox: validator('0.4/http/inbox.schema.json'),
 };
