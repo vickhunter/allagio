@@ -283,7 +283,7 @@ func (e *ReadinessEngine) fetchPage(ctx context.Context, rawURL string) fetchedP
 	if err != nil {
 		return fetchedPage{Err: "invalid url"}
 	}
-	req.Header.Set("User-Agent", "Distributoor-Readiness/1.0")
+	req.Header.Set("User-Agent", "OfferRails-Readiness/1.0")
 	client := e.httpClient()
 	defer client.CloseIdleConnections()
 	resp, err := client.Do(req)

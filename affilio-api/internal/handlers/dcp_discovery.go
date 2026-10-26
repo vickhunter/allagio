@@ -26,15 +26,15 @@ func ServeDCPDiscovery(publicBase string) gin.HandlerFunc {
 		}
 		c.JSON(200, gin.H{
 			"dcp_version": "0.1",
-			"name":        "distributoor",
-			"description": "Agent-native distribution network: makers publish offers, publishers earn commissions, agents do the operational work.",
+			"name":        dcp.ServerName,
+			"description": "Offer Rails. Makers publish offers, publishers earn commissions, agents do the operational work.",
 			"http_base":   "/v1",
 			"mcp": gin.H{
 				"transport": mcpTransport,
 				"url":       mcpURL,
 				"stdio": gin.H{
-					"command": "distributoor-mcp",
-					"env":     []string{"DISTRIBUTOOR_API_URL", "DISTRIBUTOOR_API_KEY", "DISTRIBUTOOR_SITE_KEY"},
+					"command": dcp.ServerName,
+					"env":     []string{dcp.EnvAPIURL, dcp.EnvAPIKey, dcp.EnvSiteKey},
 				},
 			},
 			"verbs": gin.H{

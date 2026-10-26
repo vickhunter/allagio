@@ -33,7 +33,7 @@ export function App() {
   const connectHref = signInHref('/owner/connect-site', source)
   const saveHref = signInHref('/owner', source)
   const steps: { title: string; body: string; href: string; action: string; status: StepStatus; track: Record<string, string>; extra?: 'mode' }[] = [
-    { title: 'Install the plugin', body: 'Upload it in WordPress and turn it on.', href: '/downloads/affilio.zip', action: 'Download the plugin', status: 'todo', track: { 'data-track': 'zip_download' } },
+    { title: 'Install the plugin', body: 'Upload it in WordPress and turn it on.', href: '/downloads/offer-rails.zip', action: 'Download the plugin', status: 'todo', track: { 'data-track': 'zip_download' } },
     { title: 'Connect your site', body: 'Sign in with Google, then link the site where you installed the plugin.', href: connectHref, action: 'Connect your site', status: 'todo', track: { 'data-track': 'cta_click', 'data-track-cta': 'connect_site', 'data-track-kind': 'sign_in_click' } },
     { title: 'Choose the approval mode', body: 'Manual is selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on. Sign in to save it on your account.', href: saveHref, action: 'Save this mode', status: 'todo', track: { 'data-track': 'cta_click', 'data-track-cta': 'save_mode', 'data-track-kind': 'sign_in_click' }, extra: 'mode' },
   ]

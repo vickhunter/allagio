@@ -5,8 +5,8 @@ import (
 )
 
 // Minimal MCP server core: JSON-RPC 2.0 messages over a line-delimited stdio
-// transport (the loop lives in cmd/distributoor-mcp). Only the methods an MCP
-// client needs to drive tools are implemented.
+// transport (RunStdio). Only the methods an MCP client needs to drive tools
+// are implemented.
 
 const mcpProtocolVersion = "2025-06-18"
 
@@ -50,8 +50,12 @@ func HandleMessage(client *Client, raw []byte) []byte {
 		resp.Result = map[string]interface{}{
 			"protocolVersion": mcpProtocolVersion,
 			"capabilities":    map[string]interface{}{"tools": map[string]interface{}{}},
-			"serverInfo":      map[string]interface{}{"name": "distributoor", "version": "0.2.0"},
-			"instructions":    "Use the owner's existing agent. Makers prepare products and offers for review. Publishers find_opportunities, prepare_placement, wait for separate owner approval, commit_placement, publish approved copy with disclosure through their own tool, then record_placement_receipt. Poll list_agent_tasks to resume. undo_placement calls the API in the same request, with no delay. restore_placement does not call the API; it returns a sign in again link to the dashboard. Approval and payout confirmation are not agent tools. A scoped publisher key cannot join through legacy endpoints. Do not claim a sale, publication or payout is independently verified without evidence.",
+			"serverInfo": map[string]interface{}{
+				"name":    ServerName,
+				"title":   ServerTitle,
+				"version": "0.2.0",
+			},
+			"instructions": "Use the owner's existing agent. Makers prepare products and offers for review. Publishers find_opportunities, prepare_placement, wait for separate owner approval, commit_placement, publish approved copy with disclosure through their own tool, then record_placement_receipt. Poll list_agent_tasks to resume. undo_placement calls the API in the same request, with no delay. restore_placement does not call the API; it returns a sign in again link to the dashboard. Approval and payout confirmation are not agent tools. A scoped publisher key cannot join through legacy endpoints. Do not claim a sale, publication or payout is independently verified without evidence.",
 		}
 	case "ping":
 		resp.Result = map[string]interface{}{}

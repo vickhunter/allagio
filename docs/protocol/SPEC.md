@@ -9,7 +9,7 @@
 >
 > - **Draft PR #68** (the "v0.3.0" prose spec and its schemas) is **superseded as a wire format, in full.** Its envelope (`orp_version`, `message_type`, `sender`, `payload`), its SemVer `0.3.0` version string, its `orp:party:*` ids, its five fixed `deal_type` term shapes, its `sha256:<hex>` hashes, its self-submitted receipts, its agent-sent consent and its provisional tracking links are **not** ORP 0.3. A message in that shape is invalid (see [Appendix B](#appendix-b-pr-68-to-03-mapping)). Some of #68's product ideas are adopted here in the #71 shape: first-class spaces, the named growth deal types, the `via`/`ref` parameter, test clicks, clicks by source, and the "afternoon core" and C1/C2 conformance names.
 > - **Draft PR #71** (schemas and TypeScript SDK) **wins on the wire format.** Its envelope, version rule, party ids, obligation-based terms, host-only consent and receipts, and closed schemas are carried forward. Its `schema/` directory is superseded by `docs/protocol/schema/`, which applies the deltas in [Appendix A](#appendix-a-changes-from-the-pr-71-schemas). The #71 SDK is a reference implementation that still needs those deltas.
-> - **DCP v0.1** ([discovery](https://offer-rails.onrender.com/.well-known/dcp.json)) stays the live affiliate path on the hosted affilio-api. [Appendix C](#appendix-c-hosted-affilio-api-and-orp-03) lists the ORP 0.3 slice that host serves and what it still does not do.
+> - **DCP v0.1** ([discovery](https://offer-rails.onrender.com/.well-known/dcp.json)) stays the live affiliate path on the Offer Rails hosted API. [Appendix C](#appendix-c-the-offer-rails-hosted-api-and-orp-03) lists the ORP 0.3 slice that host serves and what it still does not do.
 >
 > **The hosted service speaks a testing slice of ORP 0.3** (discovery, suggest, join, and the 0.3 message format) and claims no conformance level. Nothing in this document changes `CLAIMS_CHECK`.
 
@@ -38,7 +38,7 @@
 19. [Change control](#19-change-control)
 - [Appendix A: changes from the PR #71 schemas](#appendix-a-changes-from-the-pr-71-schemas)
 - [Appendix B: PR #68 to 0.3 mapping](#appendix-b-pr-68-to-03-mapping)
-- [Appendix C: hosted affilio-api and ORP 0.3](#appendix-c-hosted-affilio-api-and-orp-03)
+- [Appendix C: the Offer Rails hosted API and ORP 0.3](#appendix-c-the-offer-rails-hosted-api-and-orp-03)
 
 ---
 
@@ -1193,7 +1193,7 @@ A host or client states the levels it meets in `conformance.levels`. Each level 
 - **`C1-UNIVERSAL-LINK-NO-ADAPTER`.** Activate an affiliate deal. Without any plugin, adapter, `execute` or receipt, request the link with a browser user agent from three contexts (an email client, a social post, a plain page). Expect three `302`s with fresh `via` ids, three human clicks in the next outcome, and a `link` receipt after the first.
 - **`C2-NO-EMAIL-NO-SIGNUP`.** From a fresh client with no credentials, `POST {suggest}` with draft text and `join: {}`. Expect items with pitches and a `joined` token. Accept one offer with that token. Expect an `awaiting` deal with an approval URL and no request for an email at any point.
 
-**Status.** The suite is `conformance/test/`. From this directory, `npm test` runs the schema checks and that suite against the reference host in `sdk/`. The reference host lists L0 to L3 only as the subject of the suite. A failing suite voids the claim. The hosted affilio-api claims no level. See [Appendix C](#appendix-c-hosted-affilio-api-and-orp-03).
+**Status.** The suite is `conformance/test/`. From this directory, `npm test` runs the schema checks and that suite against the reference host in `sdk/`. The reference host lists L0 to L3 only as the subject of the suite. A failing suite voids the claim. The Offer Rails hosted API claims no level. See [Appendix C](#appendix-c-the-offer-rails-hosted-api-and-orp-03).
 
 ---
 
@@ -1305,7 +1305,7 @@ The same accept in ORP 0.3, on a host called `hub.example`, names the deal and t
 | `clicks_by_source` | `outcome` row `sources` |
 | `private_test` pool and test clicks | `test` click class and test pools (T5) |
 
-## Appendix C: hosted affilio-api and ORP 0.3
+## Appendix C: the Offer Rails hosted API and ORP 0.3
 
 The hosted service now serves a testing slice of ORP 0.3. The discovery name is **In testing**. It claims no conformance level. DCP v0.1 remains the live affiliate path. `CLAIMS_CHECK` is unchanged.
 

@@ -88,7 +88,7 @@ func callPlacementIdentity(c *Client, method, path string, payload interface{}) 
 	if c.MakerKey != "" {
 		return c.Do(method, path, payload)
 	}
-	return nil, fmt.Errorf("publisher verbs need a site key: set DISTRIBUTOOR_SITE_KEY (the Affilio site api key)")
+	return nil, fmt.Errorf("publisher verbs need a site key: set %s (the Offer Rails site api key)", EnvSiteKey)
 }
 
 func placementTool(name, description, method, suffix string, props map[string]interface{}) Tool {

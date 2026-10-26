@@ -59,7 +59,7 @@ const server = createServer((req, res) => {
     res.end()
     return
   }
-  if (path === '/downloads/affilio.zip') {
+  if (path === '/downloads/offer-rails.zip') {
     res.writeHead(200, { 'content-type': 'application/zip' })
     res.end('zip')
     return
@@ -498,7 +498,7 @@ try {
       if (metrics.small.length) throw new Error(slug + ' small targets ' + JSON.stringify(metrics.small))
       if (serious.length) throw new Error(slug + ' axe ' + serious.map((item) => item.id + ' ' + item.nodes.map((node) => node.target.join(' ')).join('; ')).join(' | '))
       if (!signHref.includes('/auth/login') || !signHref.includes('source=cursor')) throw new Error(slug + ' sign-in href ' + signHref)
-      if (zip !== '/downloads/affilio.zip') throw new Error(slug + ' zip ' + zip)
+      if (zip !== '/downloads/offer-rails.zip') throw new Error(slug + ' zip ' + zip)
       if (route === '/' && (metrics.how !== 1 || metrics.publishers !== 1)) throw new Error('home anchors ' + metrics.how + '/' + metrics.publishers)
       if (route === '/' && metrics.preview !== 1) throw new Error('home preview fields ' + metrics.preview)
       if (route !== '/' && metrics.preview) throw new Error(route + ' preview field leaked')
@@ -519,7 +519,7 @@ try {
         await page.waitForURL(/\/publishers\/setup/)
         if (!page.url().includes('source=cursor')) throw new Error('I run a site dropped the source ' + page.url())
         const stepZip = await page.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
-        if (stepZip !== '/downloads/affilio.zip') throw new Error('I run a site step 1 zip ' + stepZip)
+        if (stepZip !== '/downloads/offer-rails.zip') throw new Error('I run a site step 1 zip ' + stepZip)
         await page.goto(base + '/?source=cursor', { waitUntil: 'networkidle' })
         await page.getByRole('button', { name: 'I sell a product' }).click()
         const sellHref = await page.getByRole('link', { name: 'Continue with Google' }).getAttribute('href')
@@ -533,7 +533,7 @@ try {
         await page.waitForURL(/\/publishers\/setup/)
         if (!page.url().includes('source=cursor')) throw new Error('publisher page site choice dropped the source ' + page.url())
         const publisherZip = await page.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
-        if (publisherZip !== '/downloads/affilio.zip') throw new Error('publisher page step 1 zip ' + publisherZip)
+        if (publisherZip !== '/downloads/offer-rails.zip') throw new Error('publisher page step 1 zip ' + publisherZip)
       }
       if (route === '/' && metrics.shader !== 0) throw new Error('reduced motion still mounted a shader canvas')
       if (route === '/' && metrics.hero !== 'fallback') throw new Error('reduced motion hero is ' + metrics.hero)
@@ -544,7 +544,7 @@ try {
     if (!page.url().includes('accounts.google.com') && !page.url().includes('/auth/login')) throw new Error('sign-in entry missing')
     const google = await page.getByRole('link', { name: 'Continue with Google' }).getAttribute('href')
     if (!google.includes('accounts.google.com')) throw new Error('google entry ' + google)
-    const zipResponse = await page.request.get(base + '/downloads/affilio.zip')
+    const zipResponse = await page.request.get(base + '/downloads/offer-rails.zip')
     if (zipResponse.status() !== 200) throw new Error('zip status ' + zipResponse.status())
     const owner = await page.request.get(base + '/owner', { maxRedirects: 0 })
     if (owner.status() !== 302 || !owner.headers().location.includes('/auth/login')) throw new Error('owner did not require sign-in')
@@ -682,7 +682,7 @@ try {
     if (!setupCopy.includes('A new site waits for a person to approve each placement before it is published.') || !setupCopy.includes('That starting choice stays when claim checks are on.')) throw new Error('setup-' + width + ' copy drifted')
     if (!connectHref.includes('/auth/login') || !connectHref.includes('source=cursor') || !connectTo.startsWith('/owner/connect-site') || !connectTo.includes('source=cursor')) throw new Error('setup connect href ' + connectHref)
     const setupZip = await setupPage.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
-    if (setupZip !== '/downloads/affilio.zip') throw new Error('setup zip ' + setupZip)
+    if (setupZip !== '/downloads/offer-rails.zip') throw new Error('setup zip ' + setupZip)
     await setupContext.close()
     await assertAgents(browser, base, width, summary, out)
     await walkPreview(browser, base, width, summary, out)

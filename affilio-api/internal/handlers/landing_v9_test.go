@@ -76,7 +76,7 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	if !strings.Contains(setupBody, "Offer Rails · Publisher setup") || !strings.Contains(setupBody, "Install the plugin") {
 		t.Fatal("publisher setup page is missing its title or first step")
 	}
-	if !strings.Contains(setupBody, `href="/downloads/affilio.zip"`) {
+	if !strings.Contains(setupBody, `href="/downloads/`+pluginZipName+`"`) {
 		t.Fatal("publisher setup is missing the plugin download")
 	}
 	if !strings.Contains(setupBody, `/auth/login?`) || !strings.Contains(setupBody, `return_to=%2Fowner%2Fconnect-site`) || !strings.Contains(setupBody, `source=cursor`) {
@@ -153,6 +153,24 @@ func TestWordPressDownloadHeadMatchesGet(t *testing.T) {
 	}
 	if int(headResp.ContentLength) != len(getBody) {
 		t.Fatalf("HEAD Content-Length %d, GET body %d", headResp.ContentLength, len(getBody))
+	}
+	if got := getResp.Header.Get("Content-Disposition"); got != `attachment; filename="`+pluginZipName+`"` {
+		t.Fatalf("Content-Disposition %q", got)
+	}
+	named, err := http.Get(server.URL + "/downloads/" + pluginZipName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	namedBody, err := io.ReadAll(named.Body)
+	named.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if named.StatusCode != http.StatusOK || !bytes.Equal(namedBody, getBody) {
+		t.Fatalf("named download %d len %d", named.StatusCode, len(namedBody))
+	}
+	if named.Header.Get("Content-Disposition") != `attachment; filename="`+pluginZipName+`"` {
+		t.Fatalf("named Content-Disposition %q", named.Header.Get("Content-Disposition"))
 	}
 }
 

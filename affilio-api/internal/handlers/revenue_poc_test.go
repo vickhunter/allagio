@@ -363,7 +363,7 @@ func startStdioAgent(t *testing.T, binary, apiURL, makerKey, siteKey string) *st
 	t.Helper()
 	cmd := exec.Command(binary)
 	for _, value := range os.Environ() {
-		if !strings.HasPrefix(value, "DISTRIBUTOOR_") {
+		if !strings.HasPrefix(value, "DISTRIBUTOOR_") && !strings.HasPrefix(value, "OFFERRAILS_") {
 			cmd.Env = append(cmd.Env, value)
 		}
 	}
@@ -435,12 +435,7 @@ func TestTwoIndependentStdioAgentsRevenueLoop(t *testing.T) {
 	siteID := createTestSite(t, db, siteKey, "publisher.example.com", "Developer tutorials")
 	linkPublisherOwner(t, db, siteID)
 	_, access := adminJSON(t, r, http.MethodPost, "/v1/offer-review/agent-access/sites/"+siteID, nil)
-	binary := filepath.Join(t.TempDir(), "distributoor-mcp")
-	build := exec.Command("go", "build", "-o", binary, "./cmd/distributoor-mcp")
-	build.Dir = filepath.Join("..", "..")
-	if output, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build MCP: %v %s", err, output)
-	}
+	binary := buildMCP(t, "./cmd/offer-rails-mcp")
 	maker := startStdioAgent(t, binary, server.URL, makerKey, "")
 	publisher := startStdioAgent(t, binary, server.URL, "", access["api_key"].(string))
 	product := maker.call(t, "register_product", map[string]interface{}{"name": "InboxPilot", "website_url": "https://inboxpilot.example.com", "product_type": "saas", "payment_provider": "stripe", "keywords": []string{"email", "inbox", "productivity"}})
