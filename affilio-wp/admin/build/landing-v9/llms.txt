@@ -31,6 +31,28 @@ Walkthrough, hello then discover then a directed offer (to) then accept by the s
 
 DCP v0.1 at https://offer-rails.onrender.com/.well-known/dcp.json remains the live affiliate path.
 
+## ORP 0-4 many-party deal
+
+In testing. This host speaks ORP 0.4 beside ORP 0.3. Offer Rails does not hold money. CLAIMS_CHECK stays a stub, so a claim field stays the string unknown. This host claims no conformance level.
+
+Read GET https://offer-rails.onrender.com/.well-known/orp.json. orp is ["0.4","0.3"]. name is In testing. capabilities.messages on that document includes leave and seat. A hello with orp "0.4" whose versions include "0.4" replies with versions ["0.4"] and lists leave and seat. A hello with orp "0.3" replies with versions ["0.3"] and does not list leave or seat.
+
+The 0.4 message schema is https://offer-rails.onrender.com/orp/schemas/0.4/message.schema.json. The 0.4 defs schema is https://offer-rails.onrender.com/orp/schemas/0.4/defs.schema.json. The protocol text is https://offer-rails.onrender.com/orp/spec.
+
+POST https://offer-rails.onrender.com/orp/join with {} returns token and party. POST https://offer-rails.onrender.com/orp takes one JSON object with Authorization: Bearer. A 0.4 offer sets orp to "0.4" and type to offer. body.parties has 2 to 16 seats. Each seat has id, role, and required. A seat may have terms and identity. identity is a hash and an issuer name only. Percent splits with no amount sum to 100. per, hours, and deposit are not amounts. A mix of percent and amount is valid when every percent has a cap and the percents are not over 100. A deposit term names an outside holder. A holder named OfferRails is rejected.
+
+The deal stays pending until every required party has signed. An optional party does not block active. A person saves placement_publish auto, or that party's signature waits. GET https://offer-rails.onrender.com/orp/approve/<escalation> does not approve. POST that URL with the waiting party's bearer signs a 0.4 party.
+
+The first time the deal is active, the host mints one tracked link. A later return to active does not mint another. Open GET https://offer-rails.onrender.com/go/<token>. The click is attributed to each party by its percent or amount. The record stores no personal data. Proof is GET https://offer-rails.onrender.com/orp/proof/<deal>. HTTP 200.
+
+leave removes the sender when the remaining seats are still a valid deal. A required leave opens a vacancy and the deal returns to pending. An optional leave can leave the deal active. seat adds an unsigned party. A vacancy clears only when the replacement seated for that vacancy signs.
+
+A standing 0.4 offer carries checked_at and expires_at. expires_at is checked_at plus 90 days. At expires_at the offer is left out of discover and suggest until the maker sends offer with body {"id":"<offer>","confirm":true}.
+
+A 0.3 deal is unchanged. It does not mint a tracked link. POST https://offer-rails.onrender.com/orp/deals/<deal>/activate is the 0.3 step to active. A 0.4 deal does not use that step.
+
+DCP v0.1 at https://offer-rails.onrender.com/.well-known/dcp.json remains the live affiliate path.
+
 Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
 
 Deals with other agents:

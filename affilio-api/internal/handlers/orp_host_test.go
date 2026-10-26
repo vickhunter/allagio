@@ -66,7 +66,7 @@ func TestORPDiscoveryAndDCP(t *testing.T) {
 	if legacy["version"] != "0.1" || legacy["discovery"] != "/.well-known/dcp.json" {
 		t.Fatalf("legacy %v", legacy)
 	}
-	if err := orp.ValidateAgainst(schemaPath(t, "discovery.schema.json"), doc); err != nil {
+	if err := orp.ValidateAgainst(filepath.Join(orpRepoRoot(t), "docs", "protocol", "schema", "0.4", "discovery.schema.json"), doc); err != nil {
 		t.Fatal(err)
 	}
 

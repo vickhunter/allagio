@@ -108,7 +108,24 @@ func loadCatalog(root string) (*catalog, error) {
 		byID:     map[string]*schemaDoc{},
 		patterns: map[string]*regexp.Regexp{},
 	}
-	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+	if err := walkSchemaDir(cat, root); err != nil {
+		return nil, err
+	}
+	// 0.4 schemas $ref the 0.3 defs by absolute $id. Index that sibling too.
+	if filepath.Base(root) == "0.4" {
+		sibling := filepath.Join(filepath.Dir(root), "0.3")
+		if info, err := os.Stat(sibling); err == nil && info.IsDir() {
+			if err := walkSchemaDir(cat, sibling); err != nil {
+				return nil, err
+			}
+		}
+	}
+	catalogs[root] = cat
+	return cat, nil
+}
+
+func walkSchemaDir(cat *catalog, root string) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
 			return err
 		}
@@ -133,11 +150,6 @@ func loadCatalog(root string) (*catalog, error) {
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	catalogs[root] = cat
-	return cat, nil
 }
 
 func (cat *catalog) check(file string, schema any, instance any, path string) error {

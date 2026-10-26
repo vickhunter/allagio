@@ -25,6 +25,8 @@ func mountORPDeals(h *ORPHost, r gin.IRouter) {
 	r.POST("/orp/deals/:id/activate", h.Activate)
 	r.GET("/orp/proof/:id", h.Proof)
 	r.GET("/orp/approve/:id", h.Approve)
+	r.POST("/orp/approve/:id", h.ApprovePost)
+	r.GET("/go/:token", h.Go)
 }
 
 // Inbox is GET /orp/inbox. The bearer is the joined agent.
@@ -67,7 +69,7 @@ func (h *ORPHost) Deal(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
-	if !found || (deal.OffererParty != party && deal.AcceptorParty != party) {
+	if !found || !h.onDealParty(party, deal) {
 		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}, false)
 		return
 	}
@@ -110,8 +112,12 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
-	if !found || (deal.OffererParty != party && deal.AcceptorParty != party) {
+	if !found || !h.onDealParty(party, deal) {
 		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}, false)
+		return
+	}
+	if len(deal.Parties) > 0 {
+		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
 		return
 	}
 	if deal.State != "awaiting" {
@@ -175,6 +181,10 @@ func (h *ORPHost) Approve(c *gin.Context) {
 }
 
 func (h *ORPHost) offer(c *gin.Context, dns string, msg orp.Message, hash, ownerID string) {
+	if msg.ORP == orp.Version04 {
+		h.offer04(c, dns, msg, hash, ownerID)
+		return
+	}
 	terms := msg.Body["terms"].(map[string]any)
 	hashOfTerms := orp.TermsHash(terms)
 	if given, _ := msg.Body["terms_hash"].(string); given != "" && given != hashOfTerms {
@@ -286,6 +296,9 @@ func (h *ORPHost) directedOffer(c *gin.Context, dns string, msg orp.Message, has
 }
 
 func (h *ORPHost) accept(c *gin.Context, dns string, msg orp.Message, hash, ownerID string) {
+	if msg.ORP == orp.Version04 && h.accept04(c, dns, msg, hash, ownerID) {
+		return
+	}
 	if msg.Deal != "" {
 		h.acceptDeal(c, dns, msg, hash, ownerID)
 		return
@@ -432,7 +445,7 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 		return
 	}
 	party := orp.MemberParty(dns, ownerID)
-	if !found || (deal.OffererParty != party && deal.AcceptorParty != party) {
+	if !found || !h.onDealParty(party, deal) {
 		h.finish(c, msg, hash, http.StatusNotFound, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}), database.ORPEffect{})
 		return
 	}
@@ -455,7 +468,9 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 	}
 	role, _ := obligation["by"].(string)
 	var obligor string
-	if role == "offerer" {
+	if len(deal.Parties) > 0 {
+		obligor = obligorBy(deal, role)
+	} else if role == "offerer" {
 		obligor = deal.OffererParty
 	} else {
 		obligor = deal.AcceptorParty
@@ -540,7 +555,7 @@ func (h *ORPHost) standingItems(c *gin.Context, text string) ([]any, error) {
 	items := make([]any, 0)
 	for _, offer := range offers {
 		terms, err := decodeObject(offer.Terms)
-		if err != nil || !orp.OfferMatches(terms, text) {
+		if err != nil || orp.OfferExpired(terms, h.now()) || !orp.OfferMatches(terms, text) {
 			continue
 		}
 		reason := "Standing test offer: " + orp.TermsTitle(terms) + "."
@@ -686,10 +701,17 @@ func (h *ORPHost) store(c *gin.Context, msg orp.Message, hash string, status int
 }
 
 func (h *ORPHost) errorDoc(dns string, msg orp.Message, problem orp.Problem) map[string]any {
-	return orp.ErrorDocument(dns, msg.From, msg.ID, problem, h.now())
+	doc := orp.ErrorDocument(dns, msg.From, msg.ID, problem, h.now())
+	if msg.ORP == orp.Version04 {
+		doc["orp"] = orp.Version04
+	}
+	return doc
 }
 
 func (h *ORPHost) dealMessage(dns, viewer, re string, deal database.ORPDeal, now time.Time) (map[string]any, error) {
+	if len(deal.Parties) > 0 {
+		return h.manySnapshot(dns, viewer, re, deal, now)
+	}
 	body, err := dealBody(deal, now)
 	if err != nil {
 		return nil, err
@@ -698,6 +720,9 @@ func (h *ORPHost) dealMessage(dns, viewer, re string, deal database.ORPDeal, now
 }
 
 func (h *ORPHost) dealInbox(dns, re string, deal database.ORPDeal, now time.Time) []database.ORPInboxItem {
+	if len(deal.Parties) > 0 {
+		return h.manyInbox(dns, re, deal, "", "", now)
+	}
 	return []database.ORPInboxItem{
 		h.inboxDeal(dns, deal.OffererParty, deal.OffererOwner, re, deal, now),
 		h.inboxDeal(dns, deal.AcceptorParty, deal.AcceptorOwner, re, deal, now),

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"affilio-api/internal/database"
@@ -13,13 +14,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ORPHost is the hosted ORP 0.3 thin layer. It serves discovery, the protocol
-// text, the schemas, a credential-free suggest (with optional join), and a
-// test-mode offer, accept, activate, and proof. An accepted deal stays
-// awaiting until a party calls POST /orp/deals/:id/activate. The host does
-// not hold money. The discovery name is "In testing". This layer claims no
-// conformance level. DCP v0.1 stays the live affiliate path. CLAIMS_CHECK is
-// only reported.
+// ORPHost is the hosted ORP thin layer. It speaks 0.3 and, for many-party
+// deals, 0.4. It serves discovery, the protocol text, the schemas, a
+// credential-free suggest (with optional join), and a test-mode offer,
+// accept, activate, and proof. A 0.3 deal stays awaiting until a party calls
+// POST /orp/deals/:id/activate. A 0.4 deal becomes active when every required
+// party has signed. The host does not hold money. The discovery name is
+// "In testing". This layer claims no conformance level. DCP v0.1 stays the
+// live affiliate path. CLAIMS_CHECK is only reported.
 type ORPHost struct {
 	Entry          *AgentEntry
 	SuggestLimiter *IPRateLimiter
@@ -117,6 +119,22 @@ func (h *ORPHost) Suggest(c *gin.Context) {
 		}
 	}
 	items, empty := orp.Match(dns, req, rows)
+	fresh, err := h.freshPitches(c, req.Text)
+	if err != nil {
+		h.writeProblem(c, dns, "", "", internalProblem(), true)
+		return
+	}
+	if len(fresh) > 0 {
+		items = append(fresh, items...)
+		limit := req.Limit
+		if limit <= 0 {
+			limit = 3
+		}
+		if len(items) > limit {
+			items = items[:limit]
+		}
+		empty = ""
+	}
 	writeORP(c, http.StatusOK, orp.SuggestResponse(origin, items, empty, joined), true)
 }
 
@@ -166,6 +184,15 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 	}
 	msg, problem, ok := orp.ParseEnvelope(value)
 	if !ok {
+		if sniffedORP(value) == orp.Version04 {
+			if problem.Status == 0 {
+				problem.Status = http.StatusBadRequest
+			}
+			doc := orp.ErrorDocument(dns, "", "", problem, h.now())
+			doc["orp"] = orp.Version04
+			writeORP(c, problem.Status, doc, false)
+			return
+		}
 		h.writeProblem(c, dns, "", "", problem, false)
 		return
 	}
@@ -197,7 +224,7 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 	}
 	switch {
 	case msg.Type == "hello":
-		h.finish(c, msg, hash, http.StatusOK, orp.HelloReply(dns, msg.From, msg.ID, party, h.claimsMode(), h.now()), database.ORPEffect{})
+		h.finish(c, msg, hash, http.StatusOK, orp.HelloReplyFor(msg.ORP, dns, msg.From, msg.ID, party, h.claimsMode(), h.now()), database.ORPEffect{})
 	case msg.Type == "discover":
 		h.discover(c, dns, msg, hash)
 	case msg.Type == "offer":
@@ -206,6 +233,10 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 		h.accept(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "execute":
 		h.execute(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "leave":
+		h.leave04(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "seat":
+		h.seat04(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "receipt":
 		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the host issues a receipt."}), database.ORPEffect{})
 	case orp.IsHostOnly(msg.Type):
@@ -243,7 +274,11 @@ func (h *ORPHost) discover(c *gin.Context, dns string, msg orp.Message, hash str
 	if len(items) > 0 {
 		empty = ""
 	}
-	h.finish(c, msg, hash, http.StatusOK, orp.ResultsReply(dns, msg.From, msg.ID, items, empty, h.now()), database.ORPEffect{})
+	doc := orp.ResultsReply(dns, msg.From, msg.ID, items, empty, h.now())
+	if msg.ORP == orp.Version04 {
+		doc["orp"] = orp.Version04
+	}
+	h.finish(c, msg, hash, http.StatusOK, doc, database.ORPEffect{})
 }
 
 func (h *ORPHost) candidates(c *gin.Context) ([]orp.Candidate, error) {
@@ -334,6 +369,31 @@ func writeORP(c *gin.Context, status int, doc any, cors bool) {
 		c.Header("Access-Control-Allow-Origin", "*")
 	}
 	c.JSON(status, doc)
+}
+
+func sniffedORP(value any) string {
+	obj, ok := value.(map[string]any)
+	if !ok {
+		return ""
+	}
+	version, _ := obj["orp"].(string)
+	return version
+}
+
+func obligorBy(deal database.ORPDeal, by string) string {
+	if strings.HasPrefix(by, "orp:") {
+		return by
+	}
+	doc, err := orp.DecodeMany(deal.Parties)
+	if err != nil {
+		return ""
+	}
+	for _, seat := range doc.Seats {
+		if seat.Role == by {
+			return seat.ID
+		}
+	}
+	return ""
 }
 
 func rateLimited(message string) orp.Problem {

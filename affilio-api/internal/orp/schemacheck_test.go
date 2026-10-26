@@ -71,7 +71,7 @@ func TestDiscoveryDocumentValidates(t *testing.T) {
 	if err := json.Unmarshal(raw, &wire); err != nil {
 		t.Fatal(err)
 	}
-	if err := ValidateAgainst(filepath.Join(schemaRootForTest(t), "discovery.schema.json"), wire); err != nil {
+	if err := ValidateAgainst(filepath.Join(filepath.Dir(schemaRootForTest(t)), "0.4", "discovery.schema.json"), wire); err != nil {
 		t.Fatal(err)
 	}
 }
