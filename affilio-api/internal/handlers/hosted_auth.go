@@ -166,6 +166,12 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 				h.Terms(c)
 				return
 			}
+		case "/landing-v9":
+			if h.AssetsPath != "" {
+				h.writePublicHeaders(c)
+				h.writeBuiltHTML(c, "not-found")
+				return
+			}
 		}
 	}
 	if redirectTrailingSlash(c, r) {

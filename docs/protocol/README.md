@@ -2,7 +2,7 @@
 
 [`SPEC.md`](SPEC.md) is the protocol. [`schema/`](schema/) is the JSON Schema. [`sdk/`](sdk/) is a reference host and a small client, used only by the conformance suite. [`conformance/test/`](conformance/test/) is that suite. [`GAPS.md`](GAPS.md) is the ranked list of hosted pitfalls from the D-099 agent-as-user run, with the dispositions from that report.
 
-The reference host lists L0, L1, L2, and L3 in discovery only as the subject of this suite. A failing run voids the claim. The hosted affilio-api is not this host and claims no level.
+The reference host lists L0, L1, L2, and L3 in discovery only as the subject of this suite. A failing run voids the claim. The Offer Rails hosted API is not this host and claims no level.
 
 ```bash
 cd docs/protocol

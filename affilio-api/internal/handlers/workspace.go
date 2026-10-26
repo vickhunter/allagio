@@ -231,6 +231,9 @@ func (h *HostedHandler) writeBuiltHTML(c *gin.Context, name string) {
 // file server would otherwise send those files with the Go actions intact.
 func (h *HostedHandler) renderLandingShells(c *gin.Context) {
 	switch path.Clean(c.Request.URL.Path) {
+	case "/landing-v9", "/landing-v9/index.html":
+		h.writeBuiltHTML(c, "not-found")
+		c.Abort()
 	case "/landing-v9/not-found", "/landing-v9/not-found/index.html":
 		h.writeBuiltHTML(c, "not-found")
 		c.Abort()

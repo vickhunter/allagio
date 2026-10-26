@@ -72,6 +72,9 @@ func TestLandingStaticShellsRenderTemplates(t *testing.T) {
 	r := gin.New()
 	h.Mount(r)
 	for _, path := range []string{
+		"/landing-v9",
+		"/landing-v9/",
+		"/landing-v9/index.html",
 		"/landing-v9/not-found/index.html",
 		"/landing-v9/not-found/",
 		"/landing-v9/profile/index.html",
@@ -83,8 +86,13 @@ func TestLandingStaticShellsRenderTemplates(t *testing.T) {
 		if strings.Contains(body, "{{") || strings.Contains(body, "InstallerReady") {
 			t.Fatalf("%s still serves template source, status %d", path, rec.Code)
 		}
-		if !strings.Contains(body, `name="or-plugin" content="0"`) {
-			t.Fatalf("%s missing rendered plugin meta, status %d", path, rec.Code)
+		if !strings.Contains(body, `name="or-plugin" content="0"`) || !strings.Contains(body, "That page is not on Offer Rails.") {
+			t.Fatalf("%s missing rendered not-found page, status %d", path, rec.Code)
+		}
+		if path == "/landing-v9" || path == "/landing-v9/" || path == "/landing-v9/index.html" {
+			if rec.Code != http.StatusNotFound || rec.Body.Len() == 0 {
+				t.Fatalf("%s status %d len %d", path, rec.Code, rec.Body.Len())
+			}
 		}
 	}
 }
