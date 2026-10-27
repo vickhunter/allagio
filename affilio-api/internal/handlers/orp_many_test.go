@@ -2069,6 +2069,53 @@ func TestORP04RepeatWindow(t *testing.T) {
 	}
 }
 
+func TestORP04RepeatWindowKeepsSubsecond(t *testing.T) {
+	db, host, r, cleanup := newORP04(t)
+	defer cleanup()
+	dealID, link, offerer := openActivePlace(t, db, r)
+	advance := bindClock(host)
+	advance(100 * time.Millisecond)
+	first := clickClassed(t, r, link, browserUA)
+	if first.Code != http.StatusFound {
+		t.Fatalf("first %d", first.Code)
+	}
+	clicks := storedClicks(t, db, dealID)
+	if len(clicks) != 1 {
+		t.Fatalf("stored %#v", clicks)
+	}
+	row, _ := clicks[0].(map[string]any)
+	at, _ := row["at"].(string)
+	parsed, err := time.Parse(time.RFC3339Nano, at)
+	if err != nil || parsed.Nanosecond() == 0 {
+		t.Fatalf("stored whole seconds %q", at)
+	}
+	advance(4900 * time.Millisecond)
+	inside := clickClassed(t, r, link, browserUA)
+	if inside.Code != http.StatusFound {
+		t.Fatalf("inside %d", inside.Code)
+	}
+	if got := classCounts(t, storedClicks(t, db, dealID)); got["human"] != 1 || got["repeat"] != 1 {
+		t.Fatalf("4.9s counted %#v", storedClicks(t, db, dealID))
+	}
+	readClicks := func() float64 {
+		t.Helper()
+		_, doc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offerer.token))
+		tracked := docBody(t, doc)["tracking"].([]any)[0].(map[string]any)
+		return asFloat(tracked["clicks"])
+	}
+	if readClicks() != 1 {
+		t.Fatal("4.9s counted")
+	}
+	advance(100 * time.Millisecond)
+	edge := clickClassed(t, r, link, browserUA)
+	if edge.Code != http.StatusFound {
+		t.Fatalf("edge %d", edge.Code)
+	}
+	if got := classCounts(t, storedClicks(t, db, dealID)); got["human"] != 2 || got["repeat"] != 1 || readClicks() != 2 {
+		t.Fatalf("exact 5s %#v clicks %v", storedClicks(t, db, dealID), readClicks())
+	}
+}
+
 func classCounts(t *testing.T, clicks []any) map[string]int {
 	t.Helper()
 	got := map[string]int{}
@@ -2163,5 +2210,34 @@ func TestORP04JoinNamesVersion(t *testing.T) {
 	otherMsg, _ := otherInner["message"].(string)
 	if other.Code != http.StatusBadRequest || otherDoc["orp"] != "0.3" || strings.Contains(otherMsg, "ORP 0.4.") {
 		t.Fatalf("other join %d %s", other.Code, other.Body.String())
+	}
+	versioned, versionedDoc := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{
+		"orp":   "0.4",
+		"agent": map[string]any{"name": "Cold Agent (walk)"},
+	}, nil)
+	versionedInner, _ := versionedDoc["body"].(map[string]any)
+	versionedMsg, _ := versionedInner["message"].(string)
+	if versioned.Code != http.StatusBadRequest || versionedDoc["orp"] != "0.4" || versionedMsg != want || versionedInner["field"] != "/agent/name" || versionedMsg == "The join request is not valid." || strings.Contains(versionedMsg, "ORP 0.3.") {
+		t.Fatalf("orp 0.4 join name %d %s", versioned.Code, versioned.Body.String())
+	}
+	_, versionedProblem, versionedOK := orp.ParseJoin(map[string]any{
+		"orp":   "0.4",
+		"agent": map[string]any{"name": "Cold Agent (walk)"},
+	}, "")
+	if versionedOK || versionedProblem.Message != want || versionedProblem.Field != "/agent/name" {
+		t.Fatalf("parse orp %#v ok=%v", versionedProblem, versionedOK)
+	}
+	wrong, wrongDoc := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{
+		"orp":   "0.3",
+		"agent": map[string]any{"name": "Cold Agent (walk)"},
+	}, nil)
+	wrongInner, _ := wrongDoc["body"].(map[string]any)
+	wrongMsg, _ := wrongInner["message"].(string)
+	if wrong.Code != http.StatusBadRequest || wrongDoc["orp"] != "0.3" || wrongInner["field"] != "/orp" || wrongMsg != "The join request is not valid." || strings.Contains(wrongMsg, "ORP 0.4.") {
+		t.Fatalf("orp 0.3 join %d %s", wrong.Code, wrong.Body.String())
+	}
+	plain, plainDoc := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{"orp": "0.4"}, nil)
+	if plain.Code != http.StatusCreated || plainDoc["token"] == "" || plainDoc["party"] == "" {
+		t.Fatalf("orp 0.4 join %d %s", plain.Code, plain.Body.String())
 	}
 }

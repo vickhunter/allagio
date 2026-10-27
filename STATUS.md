@@ -1,3 +1,7 @@
+## October 27 — Join error and exact click window (D-110c)
+
+`POST /orp/join` with `"orp":"0.4"` and an `agent.name` that breaks the pattern names ORP 0.4 and states `^[A-Za-z0-9_. -]{1,64}$`. The field is `/agent/name`. Any other `orp` value stays a generic invalid message on `/orp`. A counted click is stored in the parties JSON with sub-second precision, so a click under 5 seconds after the previous counted click is a repeat and a click at exactly 5 seconds counts. A clock that moves backward still counts. `llms.txt` states both of those sentences. `GET` for a landing file that is missing, other than the limits page, stays HTTP 503, sends `Retry-After: 60`, and links home from the nav. The limits drift check also covers the page heading, the approvals sentence, and the `POST /v1/agent-tokens` line. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 27 — Limits fallback stays aligned (D-110b)
 
 The mode lines in `affilio-wp/admin/build/you.html` and `youLimitsPlain` are the same sentences. A handler test fails when they drift. `GET /you` still serves the built file when it is present. The plain page is only the fallback, and its header links keep `?source=`. `landing()` no longer answers an empty HTTP 500 for another page whose file is missing or cannot be rendered. That response is HTTP 503, names the page, and links home.

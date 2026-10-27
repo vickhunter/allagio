@@ -86,8 +86,8 @@ func assertLandingUnavailable(t *testing.T, page string, rec *httptest.ResponseR
 		t.Fatalf("%s: %d %q", page, rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "<h1>"+page+"</h1>") || !strings.Contains(body, `href="/"`) {
-		t.Fatalf("%s body %q", page, body)
+	if rec.Header().Get("Retry-After") != "60" || !strings.Contains(body, "<h1>"+page+"</h1>") || !strings.Contains(body, `<nav><a href="/">Home</a></nav>`) {
+		t.Fatalf("%s retry %q body %q", page, rec.Header().Get("Retry-After"), body)
 	}
 	lower := strings.ToLower(body)
 	for _, banned := range []string{"distributoor", "affilio-api", "offerrails.com", "open source", "open-source"} {
