@@ -212,6 +212,10 @@ func (h *HostedHandler) directoryProfile(c *gin.Context) {
 // be read or executed. A parse error uses it with HTTP 500.
 var landingNotFoundFallback = []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · Page not found</title></head><body><header><a href="/">Offer Rails</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a><a href="/agents">Agents</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main><h1>That page is not on Offer Rails.</h1><p>The address does not match a page on this site.</p><p><a href="/">Home</a></p><p><a href="/agents">Agents</a></p></main></body></html>`)
 
+// youLimitsPlain is the limits page used when you.html is missing or is not
+// a valid template. A missing asset must not answer HTTP 500.
+var youLimitsPlain = []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · Your limits</title></head><body><header><a href="/">Offer Rails</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a><a href="/agents">Agents</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main id="main"><h1>Your limits, your approvals, a receipt in plain words.</h1><p>This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.</p><p>Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.</p><section id="limits"><h2>Limits</h2><p>Your limits come first. A new site opens on Manual: ask every time.</p><h3>Ask every time</h3><p>Manual. A new site opens here. Each placement waits for you.</p><h3>Approve within your rules</h3><p>Once you set it. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the nine checks</h3><p>Only you can turn this on. While claims are not checked, this also waits for a person.</p></section><section id="approvals"><h2>Approvals</h2><p>A person approves each placement. No agent tool can approve.</p></section><section id="receipts"><h2>Receipts</h2><p>Example wording. Not a live agreement.</p><p>Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.</p></section></main></body></html>`)
+
 func (h *HostedHandler) writeBuiltHTML(c *gin.Context, name string) {
 	body := landingNotFoundFallback
 	if h.AssetsPath != "" {
@@ -312,15 +316,27 @@ func executeLandingTemplate(name string, src []byte, data gin.H) ([]byte, error)
 func (h *HostedHandler) landing(c *gin.Context, name string) {
 	src, err := os.ReadFile(filepath.Join(h.AssetsPath, name))
 	if err != nil {
+		if name == "you.html" {
+			h.writeYouPlain(c)
+			return
+		}
 		c.Status(500)
 		return
 	}
 	body, err := executeLandingTemplate(name, src, h.landingView())
 	if err != nil {
+		if name == "you.html" {
+			h.writeYouPlain(c)
+			return
+		}
 		c.Data(http.StatusInternalServerError, "text/html; charset=utf-8", landingNotFoundFallback)
 		return
 	}
 	c.Data(http.StatusOK, "text/html; charset=utf-8", stampLandingLinks(body, landingSourceFrom(c)))
+}
+
+func (h *HostedHandler) writeYouPlain(c *gin.Context) {
+	c.Data(http.StatusOK, "text/html; charset=utf-8", youLimitsPlain)
 }
 
 func (h *HostedHandler) DownloadWordPress(c *gin.Context) {
