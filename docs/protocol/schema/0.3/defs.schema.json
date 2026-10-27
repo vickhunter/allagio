@@ -505,12 +505,12 @@
         "clicks": {
           "type": "integer",
           "minimum": 0,
-          "description": "Counted human clicks on this entry. Bot, preview, and test clicks are excluded. A 0.3 deal snapshot omits this field."
+          "description": "Counted human clicks on this entry. Bot, preview, test, and repeat clicks are excluded. A repeat is a human click less than 5 seconds after the previous counted click on this entry. A 0.3 deal snapshot omits this field."
         },
         "click_share": {
           "type": "array",
           "maxItems": 16,
-          "description": "Each party's share summed across counted human clicks, in seat order. A percent is an integer from 0 to 100 on the click, and this sum divides that integer by 100, so 50 twice is 1.0. amount_minor stays an integer sum. No address, user agent, or referrer. A 0.3 deal snapshot omits this field.",
+          "description": "Each party's share summed across counted human clicks, in seat order. A percent is an integer from 0 to 100 on the click, and this sum divides that integer by 100, so 50 twice is 1.0. amount_minor stays an integer sum. Repeat clicks are not included. No address, user agent, or referrer. A 0.3 deal snapshot omits this field.",
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -521,6 +521,17 @@
               "amount_minor": { "type": "integer", "minimum": 0, "maximum": 100000000000 },
               "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
             }
+          }
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Set once a counted human click verifies this entry. id is the receipt message. method is link. verified_at is when the host verified it. No address, user agent, or referrer. A 0.3 deal snapshot omits this field.",
+          "required": ["id", "method", "verified_at"],
+          "properties": {
+            "id": { "$ref": "#/$defs/MessageId" },
+            "method": { "const": "link" },
+            "verified_at": { "$ref": "#/$defs/Timestamp" }
           }
         },
         "expires": { "$ref": "#/$defs/Timestamp" }

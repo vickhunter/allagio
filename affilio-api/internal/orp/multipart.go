@@ -44,7 +44,7 @@ var (
 	clientPrefixes = []string{
 		"python-requests", "python-urllib", "go-http-client", "facebookexternalhit",
 		"mediapartners-google", "google-inspectiontool", "google-read-aloud",
-		"chrome-lighthouse", "apache-httpclient", "skypeuripreview",
+		"googleother", "chrome-lighthouse", "apache-httpclient", "skypeuripreview",
 		"adsbot-google", "storebot-google", "headlesschrome", "uptimerobot",
 		"node-fetch", "headless", "lighthouse", "iframely", "pingdom", "datadog",
 		"libwww", "scrapy", "okhttp", "axios", "postman", "wget", "curl",
@@ -94,16 +94,27 @@ type Track struct {
 	Alias       string `json:"alias,omitempty"`
 }
 
-// Click is one redirect. Shares name parties. No address, user agent, or referrer.
+// Click is one redirect. Shares name parties. At is the UTC timestamp of this
+// click. No address, user agent, or referrer.
 type Click struct {
 	ID         string `json:"id"`
 	Obligation string `json:"obligation"`
 	Class      string `json:"class"`
 	Shares     []any  `json:"shares"`
+	At         string `json:"at,omitempty"`
+}
+
+// LinkReceipt is the link verification stored beside the tracking entry.
+// ID is the receipt message. No address, user agent, or referrer.
+type LinkReceipt struct {
+	Obligation string `json:"obligation"`
+	ID         string `json:"id"`
+	Method     string `json:"method"`
+	VerifiedAt string `json:"verified_at"`
 }
 
 // ClickReadout is the counted view of one obligation. clicks is the number of
-// human clicks. Bot, preview, and test clicks are left out. click_share sums
+// human clicks. Bot, preview, test, and repeat clicks are left out. click_share sums
 // each party's percent or amount across the counted clicks, in seat order.
 // A percent is stored as an integer from 0 to 100, and the sum is that
 // integer divided by 100, so 50 twice is 1.0. An amount_minor stays an integer
@@ -218,12 +229,13 @@ func fixedPercent(percentPoints int) json.Number {
 
 // Many is the nullable parties document. A 0.3 row leaves the column NULL.
 type Many struct {
-	Seats     []Seat    `json:"seats"`
-	Vacancies []Vacancy `json:"vacancies,omitempty"`
-	Tracking  []Track   `json:"tracking,omitempty"`
-	Clicks    []Click   `json:"clicks,omitempty"`
-	Live      bool      `json:"live"`
-	Round     int       `json:"round"`
+	Seats        []Seat        `json:"seats"`
+	Vacancies    []Vacancy     `json:"vacancies,omitempty"`
+	Tracking     []Track       `json:"tracking,omitempty"`
+	Clicks       []Click       `json:"clicks,omitempty"`
+	LinkReceipts []LinkReceipt `json:"link_receipts,omitempty"`
+	Live         bool          `json:"live"`
+	Round        int           `json:"round"`
 }
 
 // DecodeMany reads a stored parties document.
@@ -490,7 +502,7 @@ func ClickClass(method, ua, purpose, rawQuery string) string {
 		return "preview"
 	}
 	low := strings.ToLower(purpose)
-	if strings.Contains(low, "prefetch") || strings.Contains(low, "prerender") {
+	if strings.Contains(low, "prefetch") || strings.Contains(low, "prerender") || strings.Contains(low, "preview") {
 		return "preview"
 	}
 	if strings.TrimSpace(ua) == "" {
@@ -504,10 +516,13 @@ func ClickClass(method, ua, purpose, rawQuery string) string {
 
 // automationClient is true for a known automation product token.
 // A top-level token is the name before "/". Inside every parenthesis,
-// including the tail of an unclosed "(", a semicolon entry counts when it
-// has name/version shape, or when the whole entry is one named client.
-// CUBOT NOTE 20, preview, Linux, and U stay comment text.
-// crawler, spider, and slurp match anywhere. The scan is one pass.
+// including nested parentheses and the tail of an unclosed "(", a semicolon
+// entry counts when it has name/version shape, when the whole entry is one
+// named client, or when the entry follows "compatible" and names a crawler
+// or ends in bot. The product token glued to an inner "(" counts, and so
+// does a token after that group. node and undici inside a comment count
+// only as name/version. CUBOT NOTE 20, preview, Linux, and U stay comment
+// text. crawler, spider, and slurp match anywhere. The scan is one pass.
 func automationClient(ua string) bool {
 	low := strings.ToLower(ua)
 	if strings.Contains(low, "crawler") || strings.Contains(low, "spider") || strings.Contains(low, "slurp") {
@@ -579,43 +594,139 @@ func productTokens(ua string) []string {
 	return out
 }
 
-// commentProducts reads one parenthesis body. Entries without name/version
-// shape are ignored, except a named client that is the whole entry.
+// commentProducts reads one parenthesis body. Semicolons split entries only
+// outside an inner parenthesis. A name/version token counts. A slashless
+// token counts when it is the whole entry and a named client, or when the
+// entry follows compatible and the token is a named crawler or ends in bot.
+// The product-character run immediately before an inner "(" counts the same
+// way. node and undici count only when written as name/version.
 func commentProducts(comment string) []string {
 	var out []string
-	start := 0
+	type frame struct {
+		compatible bool
+		entryStart int
+		sole       bool
+		pending    string
+	}
+	stack := []frame{{entryStart: 0, sole: true}}
+	flush := func(end int) {
+		top := &stack[len(stack)-1]
+		entry := comment[top.entryStart:end]
+		if top.sole {
+			if name, ok := soleProduct(strings.TrimSpace(entry)); ok && keepCommentToken(name, false, top.compatible) {
+				out = append(out, name)
+			}
+		}
+		top.compatible = strings.TrimSpace(entry) == "compatible"
+		top.entryStart = end + 1
+		top.sole = true
+		top.pending = ""
+	}
 	for i := 0; i <= len(comment); i++ {
-		if i < len(comment) && comment[i] != ';' {
-			continue
+		if i == len(comment) {
+			for {
+				flush(len(comment))
+				if len(stack) == 1 {
+					break
+				}
+				stack = stack[:len(stack)-1]
+				parent := &stack[len(stack)-1]
+				parent.sole = false
+				parent.pending = ""
+			}
+			break
 		}
-		entry := strings.TrimSpace(comment[start:i])
-		if name, ok := soleProduct(entry); ok && namedClient(name) {
-			out = append(out, name)
+		top := &stack[len(stack)-1]
+		switch comment[i] {
+		case ';':
+			flush(i)
+		case '(':
+			if top.pending != "" && keepCommentToken(top.pending, false, top.compatible) {
+				out = append(out, top.pending)
+			}
+			if head := productRunBefore(comment, i); head != "" && keepCommentToken(head, false, top.compatible) {
+				out = append(out, head)
+			}
+			top.sole = false
+			top.pending = ""
+			stack = append(stack, frame{entryStart: i + 1, sole: true})
+		case ')':
+			if len(stack) > 1 {
+				flush(i)
+				stack = stack[:len(stack)-1]
+				parent := &stack[len(stack)-1]
+				parent.sole = false
+				parent.pending = ""
+			} else {
+				top.sole = false
+				top.pending = ""
+			}
+		default:
+			if comment[i] == ' ' || comment[i] == '\t' {
+				continue
+			}
+			if !isProductChar(comment[i]) {
+				if top.pending != "" && keepCommentToken(top.pending, false, top.compatible) {
+					out = append(out, top.pending)
+				}
+				top.sole = false
+				top.pending = ""
+				continue
+			}
+			j := i + 1
+			for j < len(comment) && isProductChar(comment[j]) {
+				j++
+			}
+			name := comment[i:j]
+			versioned := j < len(comment) && comment[j] == '/'
+			if versioned {
+				top.sole = false
+				top.pending = ""
+				if keepCommentToken(name, true, top.compatible) {
+					out = append(out, name)
+				}
+			} else if top.sole && top.pending == "" {
+				top.pending = name
+			} else {
+				if top.pending != "" && keepCommentToken(top.pending, false, top.compatible) {
+					out = append(out, top.pending)
+				}
+				top.sole = false
+				top.pending = ""
+				if keepCommentToken(name, false, top.compatible) {
+					out = append(out, name)
+				}
+			}
+			i = j - 1
 		}
-		out = append(out, versionedNames(entry)...)
-		start = i + 1
 	}
 	return out
 }
 
-func versionedNames(entry string) []string {
-	var out []string
-	i := 0
-	for i < len(entry) {
-		if !isProductChar(entry[i]) {
-			i++
-			continue
-		}
-		j := i + 1
-		for j < len(entry) && isProductChar(entry[j]) {
-			j++
-		}
-		if j < len(entry) && entry[j] == '/' {
-			out = append(out, entry[i:j])
-		}
-		i = j
+// keepCommentToken decides whether a comment token is an automation client.
+// node and undici match only the slash form, so a device comment can say
+// those words. A compatible entry counts a named crawler or a bot suffix
+// without a slash. Any other slashless comment token must be a named client
+// on its own.
+func keepCommentToken(name string, versioned, compatible bool) bool {
+	if name == "node" || name == "undici" {
+		return versioned
 	}
-	return out
+	if versioned || compatible {
+		return botProduct(name) || namedClient(name)
+	}
+	return namedClient(name)
+}
+
+func productRunBefore(value string, open int) string {
+	j := open
+	for j > 0 && isProductChar(value[j-1]) {
+		j--
+	}
+	if j == open {
+		return ""
+	}
+	return value[j:open]
 }
 
 func soleProduct(entry string) (string, bool) {

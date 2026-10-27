@@ -346,7 +346,11 @@ func (h *ORPHost) writeProblem(c *gin.Context, dns, to, re string, problem orp.P
 	if problem.RetryAfter > 0 {
 		c.Header("Retry-After", strconv.Itoa(problem.RetryAfter))
 	}
-	writeORP(c, problem.Status, orp.ErrorDocument(dns, to, re, problem, h.now()), cors)
+	doc := orp.ErrorDocument(dns, to, re, problem, h.now())
+	if strings.Contains(problem.Message, "ORP 0.4.") {
+		doc["orp"] = orp.Version04
+	}
+	writeORP(c, problem.Status, doc, cors)
 }
 
 func readORPBody(c *gin.Context) ([]byte, orp.Problem, bool) {

@@ -200,6 +200,7 @@ func ParseJoin(value any, prefix string) (JoinRequest, Problem, bool) {
 			path = "/agent"
 		}
 		if problem, bad := checkAgent(agent, path); bad {
+			problem, _ = relabelVersion(Version04, problem, bad)
 			return JoinRequest{}, problem, false
 		}
 		obj := agent.(map[string]any)

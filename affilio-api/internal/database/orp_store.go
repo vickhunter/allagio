@@ -19,6 +19,12 @@ var ErrORPReplay = errors.New("orp replay")
 // The message transaction rolls back, so the accept is not stored.
 var ErrORPState = errors.New("orp state")
 
+// ORPRepeatWindow is how soon a later human click follows the previous
+// counted click on the same tracking entry before it is stored as repeat.
+// A click at exactly this gap still counts. The comparison uses the stored
+// timestamp only. No user agent, address, or client identifier is stored.
+const ORPRepeatWindow = 5 * time.Second
+
 // ORPRecord is the idempotency row for one party message.
 type ORPRecord struct {
 	Party  string
@@ -314,10 +320,12 @@ FROM orp_offers WHERE id=$1 AND owner_id=$2::uuid`, id, ownerID).Scan(
 // of that click. A later click records its own split and does not add those
 // percents onto an earlier click. The first human click that meets a place
 // obligation whose proof includes link marks that obligation verified and
-// writes one receipt. A bot, preview, or test click does not. Verification
-// runs only when the deal is active and the place obligation is pending or
-// claimed. record is false for HEAD: the redirect is returned and nothing is
-// written. It does not store an address, a user agent, or a referrer. No new
+// writes one receipt. A bot, preview, test, or repeat click does not.
+// Verification runs only when the deal is active and the place obligation is
+// pending or claimed. record is false for HEAD. A deal that is not active
+// redirects and writes nothing. A human click less than ORPRepeatWindow after
+// the previous counted click on the same entry is stored as repeat and is not
+// counted. It does not store an address, a user agent, or a referrer. No new
 // column is required: the obligation list and the inbox already hold the receipt.
 func (d *DB) RecordORPClick(ctx context.Context, token, class, clickID string, at time.Time, record bool) (destination, param, alias string, found bool, err error) {
 	tx, err := d.Pool.Begin(ctx)
@@ -381,10 +389,16 @@ FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 	if entry.Status != "live" {
 		return destination, param, alias, true, nil
 	}
-	// HEAD is class preview. The redirect is the same and the row is not written.
-	if !record {
+	// HEAD is class preview. A deal that is not active, including one that
+	// returned to pending after a required party left, redirects and writes nothing.
+	if !record || state != "active" {
 		return destination, param, alias, true, nil
 	}
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	at = at.UTC()
+	class = repeatClass(doc.Clicks, entry.Obligation, class, at)
 	shares := make([]any, 0)
 	for _, seat := range doc.Seats {
 		if len(seat.Terms) == 0 {
@@ -413,6 +427,7 @@ FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 	}
 	click, err := json.Marshal(map[string]any{
 		"id": clickID, "obligation": entry.Obligation, "class": class, "shares": shares,
+		"at": at.Format(time.RFC3339),
 	})
 	if err != nil {
 		return "", "", "", false, err
@@ -431,11 +446,20 @@ FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 		clicks = append(clicks, one)
 	}
 	stored["clicks"] = clicks
+	receiptID, nextObligations, receiptBody := linkReceipt(termsRaw, obligationsRaw, clicks, entry.Obligation, class, state, at)
+	if receiptID != "" {
+		receipts, _ := stored["link_receipts"].([]any)
+		stored["link_receipts"] = append(receipts, map[string]any{
+			"obligation":  entry.Obligation,
+			"id":          receiptID,
+			"method":      "link",
+			"verified_at": at.Format(time.RFC3339),
+		})
+	}
 	raw, err := json.Marshal(stored)
 	if err != nil {
 		return "", "", "", false, err
 	}
-	receiptID, nextObligations, receiptBody := linkReceipt(termsRaw, obligationsRaw, clicks, entry.Obligation, class, state, at)
 	if receiptID == "" {
 		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET parties=$2 WHERE id=$1`, id, raw); err != nil {
 			return "", "", "", false, err
@@ -471,6 +495,43 @@ FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 		return "", "", "", false, err
 	}
 	return destination, param, alias, true, nil
+}
+
+// repeatClass stores a human click as repeat when it falls inside
+// ORPRepeatWindow of the previous counted click on the same obligation.
+// Only class human anchors the window. A clock that moves backward counts.
+func repeatClass(clicks []json.RawMessage, obligation, class string, at time.Time) string {
+	if class != "human" {
+		return class
+	}
+	var latest time.Time
+	found := false
+	for _, raw := range clicks {
+		var row struct {
+			Obligation string `json:"obligation"`
+			Class      string `json:"class"`
+			At         string `json:"at"`
+		}
+		if json.Unmarshal(raw, &row) != nil || row.Class != "human" || row.Obligation != obligation || row.At == "" {
+			continue
+		}
+		prev, err := time.Parse(time.RFC3339, row.At)
+		if err != nil {
+			continue
+		}
+		if !found || prev.After(latest) {
+			latest = prev
+			found = true
+		}
+	}
+	if !found {
+		return class
+	}
+	delta := at.Sub(latest)
+	if delta >= 0 && delta < ORPRepeatWindow {
+		return "repeat"
+	}
+	return class
 }
 
 // linkReceipt verifies a place obligation once the human clicks reach its
