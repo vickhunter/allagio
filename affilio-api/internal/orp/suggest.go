@@ -186,6 +186,13 @@ func ParseJoin(value any, prefix string) (JoinRequest, Problem, bool) {
 		if personalJoinKeys[key] {
 			return JoinRequest{}, Invalid("Join asks for nothing personal.", prefix+"/"+escapePointer(key)), false
 		}
+		if key == "orp" {
+			version, _ := obj[key].(string)
+			if version == Version04 {
+				continue
+			}
+			return JoinRequest{}, Invalid("The join request is not valid.", prefix+"/"+escapePointer(key)), false
+		}
 		if key != "agent" && key != "key" {
 			return JoinRequest{}, Invalid("The join request is not valid.", prefix+"/"+escapePointer(key)), false
 		}

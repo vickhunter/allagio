@@ -347,14 +347,16 @@ func landingPageName(name string) string {
 
 // writeLandingUnavailable answers a known landing route whose file is missing
 // or is not a valid template. you.html has its own page. Every other page
-// gets a short 503 that names the page and links home. The body is never empty.
+// gets a short 503 that names the page, links home from the nav, and sends
+// Retry-After. The body is never empty.
 func (h *HostedHandler) writeLandingUnavailable(c *gin.Context, name string) {
 	if name == "you.html" {
 		h.writeYouPlain(c)
 		return
 	}
 	page := template.HTMLEscapeString(landingPageName(name))
-	body := []byte(fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · %s</title></head><body><main><h1>%s</h1><p><a href="/">Home</a></p></main></body></html>`, page, page))
+	body := []byte(fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · %s</title></head><body><nav><a href="/">Home</a></nav><main><h1>%s</h1></main></body></html>`, page, page))
+	c.Header("Retry-After", "60")
 	c.Data(http.StatusServiceUnavailable, "text/html; charset=utf-8", stampLandingLinks(body, landingSourceFrom(c)))
 }
 

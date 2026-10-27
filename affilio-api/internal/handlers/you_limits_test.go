@@ -96,8 +96,11 @@ func TestYouLimitsSentencesDoNotDrift(t *testing.T) {
 		t.Fatalf("limits modes drifted\nbuilt: %q\nplain: %q", builtModes, plainModes)
 	}
 	for _, sentence := range []string{
+		"Your limits, your approvals, a receipt in plain words.",
 		"This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.",
+		"Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.",
 		"Your limits come first. A new site opens on Manual: ask every time.",
+		"A person approves each placement. No agent tool can approve.",
 		"Example wording. Not a live agreement.",
 		"Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.",
 	} {

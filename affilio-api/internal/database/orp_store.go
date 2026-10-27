@@ -21,8 +21,10 @@ var ErrORPState = errors.New("orp state")
 
 // ORPRepeatWindow is how soon a later human click follows the previous
 // counted click on the same tracking entry before it is stored as repeat.
-// A click at exactly this gap still counts. The comparison uses the stored
-// timestamp only. No user agent, address, or client identifier is stored.
+// A click at exactly this gap still counts. The click instant is stored in
+// the parties JSON with sub-second precision, so the gap is exactly this
+// long. The comparison uses that stored timestamp only. No user agent,
+// address, or client identifier is stored.
 const ORPRepeatWindow = 5 * time.Second
 
 // ORPRecord is the idempotency row for one party message.
@@ -427,7 +429,7 @@ FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 	}
 	click, err := json.Marshal(map[string]any{
 		"id": clickID, "obligation": entry.Obligation, "class": class, "shares": shares,
-		"at": at.Format(time.RFC3339),
+		"at": at.Format(time.RFC3339Nano),
 	})
 	if err != nil {
 		return "", "", "", false, err
@@ -515,7 +517,7 @@ func repeatClass(clicks []json.RawMessage, obligation, class string, at time.Tim
 		if json.Unmarshal(raw, &row) != nil || row.Class != "human" || row.Obligation != obligation || row.At == "" {
 			continue
 		}
-		prev, err := time.Parse(time.RFC3339, row.At)
+		prev, err := time.Parse(time.RFC3339Nano, row.At)
 		if err != nil {
 			continue
 		}
