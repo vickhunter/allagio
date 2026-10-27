@@ -1,3 +1,9 @@
+## October 27 — Limits fallback stays aligned (D-110b)
+
+The mode lines in `affilio-wp/admin/build/you.html` and `youLimitsPlain` are the same sentences. A handler test fails when they drift. `GET /you` still serves the built file when it is present. The plain page is only the fallback, and its header links keep `?source=`. `landing()` no longer answers an empty HTTP 500 for another page whose file is missing or cannot be rendered. That response is HTTP 503, names the page, and links home.
+
+The hosted image is built by the out-of-repo `image/build-image.sh`, which must copy `affilio-wp/admin/build/you.html` into `/app/assets/`. `Dockerfile.mvp` already does. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 27 — Your limits page stays a page (D-110)
 
 `GET /you` and `GET /you/` read `you.html` from the asset directory. A missing or unreadable file used to answer an empty HTTP 500. They now answer the limits page: Ask every time, Approve within your rules, and Approve anything that passes the nine checks, each with what that mode allows. Signed out, that page is the response. Signed in, the same page is the response. `Dockerfile.mvp` already copies `affilio-wp/admin/build/you.html` into `/app/assets/`. A handler test fails when that copy is dropped. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
