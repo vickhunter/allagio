@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://offer-rails.onrender.com/orp/schemas/messages/error.schema.json",
   "title": "ErrorMessage",
-  "description": "A refusal. An error never changes state. Escalation is not an error: a step that needs a person returns a deal snapshot in state awaiting.",
+  "description": "A refusal. An error never changes state. Escalation is not an error: an ask returns a deal snapshot in state awaiting.",
   "type": "object",
   "allOf": [{ "$ref": "../envelope.schema.json" }],
   "required": ["type", "body"],

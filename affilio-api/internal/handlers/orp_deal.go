@@ -94,7 +94,11 @@ func (h *ORPHost) Proof(c *gin.Context) {
 		writeHTML(c, http.StatusNotFound, "not found")
 		return
 	}
-	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms), deal.State, linkObligationVerified(deal.Obligations)))
+	var approvals []orp.Approval
+	if doc, err := orp.DecodeMany(deal.Parties); err == nil {
+		approvals = doc.Approvals
+	}
+	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms), deal.State, linkObligationVerified(deal.Obligations), approvals))
 }
 
 func linkObligationVerified(raw json.RawMessage) bool {
@@ -180,7 +184,9 @@ func (h *ORPHost) Activate(c *gin.Context) {
 	writeORPBytes(c, http.StatusOK, raw)
 }
 
-// Approve shows the terms a person would decide. It does not approve.
+// Approve shows the terms. By default it does not approve.
+// When the waiting owner turned on human approval, the signed-in owner opening
+// this link records approved_by owner. An agent bearer is refused.
 func (h *ORPHost) Approve(c *gin.Context) {
 	deal, found, err := h.Entry.DB.GetORPDealByEscalation(c.Request.Context(), c.Param("id"))
 	if err != nil || !found {
@@ -192,7 +198,57 @@ func (h *ORPHost) Approve(c *gin.Context) {
 		writeHTML(c, http.StatusNotFound, "not found")
 		return
 	}
-	writeHTML(c, http.StatusOK, orp.ApprovePage(orp.TermsTitle(terms), orp.DisclosureLabel(terms)))
+	page := orp.ApprovePage(orp.TermsTitle(terms), orp.DisclosureLabel(terms))
+	if len(deal.Parties) == 0 {
+		writeHTML(c, http.StatusOK, page)
+		return
+	}
+	waiting, err := decodeObject(deal.Waiting)
+	if err != nil || waiting == nil {
+		writeHTML(c, http.StatusOK, page)
+		return
+	}
+	party, _ := waiting["party"].(string)
+	_, dns := h.origin(c)
+	ownerID, ok := orp.OwnerFromParty(dns, party)
+	if !ok {
+		writeHTML(c, http.StatusOK, page)
+		return
+	}
+	steps, err := h.Entry.DB.HumanApprovalSteps(c.Request.Context(), ownerID)
+	if err != nil {
+		writeHTML(c, http.StatusInternalServerError, "unavailable")
+		return
+	}
+	if !humanStepOn(steps, waiting) {
+		writeHTML(c, http.StatusOK, page)
+		return
+	}
+	if strings.TrimSpace(c.GetHeader("Authorization")) != "" {
+		writeOwnerApproval(c)
+		return
+	}
+	owner, signedIn := h.signedInOwner(c)
+	if !signedIn {
+		writeOwnerApproval(c)
+		return
+	}
+	if owner.ID != ownerID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"reason":  "forbidden",
+			"message": "This approval link is for the waiting owner.",
+		})
+		return
+	}
+	expectHash, expectAt := deal.TermsHash, deal.UpdatedAt
+	now := h.now()
+	step, _ := waiting["step"].(string)
+	h.noteApproval(&deal, party, step, "owner")
+	h.signSeat(&deal, party, now)
+	h.refreshMany(&deal, terms, now)
+	msg := orp.Message{ORP: orp.Version04, Type: "accept", ID: orp.NewMessageID(), From: party}
+	bodyHash := orp.ContentHash(map[string]any{"approve": c.Param("id")})
+	h.publishMany(c, dns, msg, bodyHash, deal, mustMany(deal), expectHash, expectAt)
 }
 
 func (h *ORPHost) offer(c *gin.Context, dns string, msg orp.Message, hash, ownerID string) {

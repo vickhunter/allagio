@@ -24,7 +24,8 @@ func ProofURL(origin, dealID string) string {
 	return strings.TrimRight(origin, "/") + "/orp/proof/" + dealID
 }
 
-// ApproveURL is where the waiting party is sent. Opening it does not approve.
+// ApproveURL is where the waiting party is sent. Opening it records the
+// owner's approval only when that owner opted in and is signed in.
 func ApproveURL(origin, escalation string) string {
 	return strings.TrimRight(origin, "/") + "/orp/approve/" + escalation
 }

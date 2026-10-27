@@ -374,6 +374,88 @@ AND conversion_id IN (
 	return payoutID, true, tx.Commit(ctx)
 }
 
+// ErrUnknownHumanStep is a step name this host does not store for human approval.
+var ErrUnknownHumanStep = errors.New("unknown human approval step")
+
+var humanApprovalStepNames = map[string]bool{
+	"ask": true, "list": true, "negotiate": true, "accept": true,
+	"execute": true, "amend": true, "settle": true, "share": true, "revoke": true,
+}
+
+// HumanApprovalSteps returns the steps this owner holds for a signed-in person.
+// No row means the agent approves an ask. The result is never nil.
+func (d *DB) HumanApprovalSteps(ctx context.Context, ownerID string) ([]string, error) {
+	if ownerID == "" {
+		return []string{}, nil
+	}
+	var payload []byte
+	err := d.Pool.QueryRow(ctx, `
+SELECT payload FROM agent_step_approvals
+WHERE owner_id=$1::uuid AND payload->>'kind'='human_approval'
+ORDER BY decided_at DESC NULLS LAST, created_at DESC
+LIMIT 1`, ownerID).Scan(&payload)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return []string{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var doc struct {
+		Steps []string `json:"steps"`
+	}
+	if err = json.Unmarshal(payload, &doc); err != nil {
+		return nil, err
+	}
+	if doc.Steps == nil {
+		return []string{}, nil
+	}
+	return doc.Steps, nil
+}
+
+// SaveHumanApprovalSteps stores the owner's opt-in. An empty list clears it.
+// The row is status approved so it is not an operator queue item.
+// The step column is the placement_publish bucket. The choice lives in payload.
+func (d *DB) SaveHumanApprovalSteps(ctx context.Context, ownerID string, steps []string) error {
+	if ownerID == "" {
+		return errors.New("owner required")
+	}
+	clean := make([]string, 0, len(steps))
+	seen := map[string]bool{}
+	for _, step := range steps {
+		if !humanApprovalStepNames[step] {
+			return ErrUnknownHumanStep
+		}
+		if seen[step] {
+			continue
+		}
+		seen[step] = true
+		clean = append(clean, step)
+	}
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `
+DELETE FROM agent_step_approvals
+WHERE owner_id=$1::uuid AND payload->>'kind'='human_approval'`, ownerID); err != nil {
+		return err
+	}
+	if len(clean) == 0 {
+		return tx.Commit(ctx)
+	}
+	payload, err := json.Marshal(map[string]any{"kind": "human_approval", "steps": clean})
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `
+INSERT INTO agent_step_approvals(step, owner_id, status, payload, result, decided_at)
+VALUES('placement_publish', $1::uuid, 'approved', $2::jsonb, '{"kind":"human_approval"}'::jsonb, NOW())`, ownerID, payload); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (d *DB) FinishStepApproval(ctx context.Context, id string, result []byte) (bool, error) {
 	if len(result) == 0 {
 		result = []byte(`{}`)

@@ -40,7 +40,10 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	for _, path := range []string{"/products", "/placements", "/earnings", "/settings", "/review"} {
 		owner.GET(path, h.Dashboard)
 	}
+	owner.POST("/human-approval", h.SaveHumanApprovalForm)
 	api := owner.Group("/api")
+	api.GET("/human-approval", h.GetHumanApproval)
+	api.PUT("/human-approval", h.PutHumanApproval)
 	api.GET("/agents", func(c *gin.Context) {
 		grants, err := h.DB.OwnerGrants(c.Request.Context(), ownerFrom(c).ID)
 		if err != nil {
