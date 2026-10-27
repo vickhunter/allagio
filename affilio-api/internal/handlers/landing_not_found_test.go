@@ -54,11 +54,46 @@ func TestLandingTemplateErrorServesFallback(t *testing.T) {
 	h.Mount(r)
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	assertLandingUnavailable(t, "Home", rec)
+}
+
+func TestLandingMissingFileIsPlainUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "home.html"), []byte("<!doctype html><title>Offer Rails</title>"), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(rec.Body.String(), "That page is not on Offer Rails.") || rec.Body.Len() == 0 {
-		t.Fatalf("body %q", rec.Body.String())
+	h := &HostedHandler{BaseURL: "http://127.0.0.1:8080", AssetsPath: dir, DownloadsPath: t.TempDir()}
+	r := gin.New()
+	h.Mount(r)
+	for _, tc := range []struct{ path, name string }{
+		{"/makers", "Makers"},
+		{"/makers/", "Makers"},
+		{"/protocol", "Protocol"},
+		{"/protocol/", "Protocol"},
+		{"/publishers/", "Publishers"},
+		{"/publishers/setup/", "Publisher setup"},
+	} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		assertLandingUnavailable(t, tc.name, rec)
+	}
+}
+
+func assertLandingUnavailable(t *testing.T, page string, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if rec.Code != http.StatusServiceUnavailable || rec.Body.Len() == 0 {
+		t.Fatalf("%s: %d %q", page, rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "<h1>"+page+"</h1>") || !strings.Contains(body, `href="/"`) {
+		t.Fatalf("%s body %q", page, body)
+	}
+	lower := strings.ToLower(body)
+	for _, banned := range []string{"distributoor", "affilio-api", "offerrails.com", "open source", "open-source"} {
+		if strings.Contains(lower, banned) {
+			t.Fatalf("%s contains %q", page, banned)
+		}
 	}
 }
 

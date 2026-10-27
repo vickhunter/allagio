@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -24,7 +26,7 @@ func TestYouLimitsSignedOut(t *testing.T) {
 	for _, path := range []string{"/you", "/you/"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
-		assertYouLimitsPage(t, path+" signed out", rec)
+		assertYouLimitsPage(t, path+" signed out", rec, true)
 	}
 }
 
@@ -46,7 +48,7 @@ func TestYouLimitsSignedIn(t *testing.T) {
 		req.AddCookie(cookie)
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
-		assertYouLimitsPage(t, path+" signed in", rec)
+		assertYouLimitsPage(t, path+" signed in", rec, true)
 	}
 }
 
@@ -62,7 +64,15 @@ func TestYouLimitsMissingAssetIsPlainPage(t *testing.T) {
 	for _, path := range []string{"/you", "/you/"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
-		assertYouLimitsPage(t, path+" missing file", rec)
+		assertYouLimitsPage(t, path+" missing file", rec, false)
+	}
+	sourced := httptest.NewRecorder()
+	r.ServeHTTP(sourced, httptest.NewRequest(http.MethodGet, "/you/?source=panel", nil))
+	assertYouLimitsPage(t, "missing file keeps source", sourced, false)
+	for _, href := range []string{`href="/?source=panel"`, `href="/makers/?source=panel"`, `href="/publishers/?source=panel"`, `href="/protocol/?source=panel"`} {
+		if !strings.Contains(sourced.Body.String(), href) {
+			t.Fatalf("plain page dropped %s\n%s", href, sourced.Body.String())
+		}
 	}
 
 	if err := os.WriteFile(filepath.Join(dir, "you.html"), []byte("<html>{{if</html>"), 0o644); err != nil {
@@ -70,7 +80,31 @@ func TestYouLimitsMissingAssetIsPlainPage(t *testing.T) {
 	}
 	broken := httptest.NewRecorder()
 	r.ServeHTTP(broken, httptest.NewRequest(http.MethodGet, "/you/", nil))
-	assertYouLimitsPage(t, "broken template", broken)
+	assertYouLimitsPage(t, "broken template", broken, false)
+}
+
+func TestYouLimitsSentencesDoNotDrift(t *testing.T) {
+	built, err := os.ReadFile(filepath.Join(repoRoot(t), "affilio-wp", "admin", "build", "you.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain := string(youLimitsPlain)
+	modes := regexp.MustCompile(`<h3>([^<]+)</h3><p>([^<]+)</p>`)
+	builtModes := modes.FindAllString(string(built), -1)
+	plainModes := modes.FindAllString(plain, -1)
+	if len(builtModes) == 0 || !reflect.DeepEqual(builtModes, plainModes) {
+		t.Fatalf("limits modes drifted\nbuilt: %q\nplain: %q", builtModes, plainModes)
+	}
+	for _, sentence := range []string{
+		"This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.",
+		"Your limits come first. A new site opens on Manual: ask every time.",
+		"Example wording. Not a live agreement.",
+		"Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.",
+	} {
+		if !strings.Contains(string(built), sentence) || !strings.Contains(plain, sentence) {
+			t.Fatalf("limits sentence is not in both pages: %q", sentence)
+		}
+	}
 }
 
 // TestYouPageIsABuiltImageInput fails when the page served for /you is not
@@ -119,7 +153,7 @@ func TestYouPageIsABuiltImageInput(t *testing.T) {
 	}
 }
 
-func assertYouLimitsPage(t *testing.T, label string, rec *httptest.ResponseRecorder) {
+func assertYouLimitsPage(t *testing.T, label string, rec *httptest.ResponseRecorder, built bool) {
 	t.Helper()
 	if rec.Code >= 500 || rec.Code != http.StatusOK {
 		t.Fatalf("%s: %d %s", label, rec.Code, rec.Body.String())
@@ -128,6 +162,13 @@ func assertYouLimitsPage(t *testing.T, label string, rec *httptest.ResponseRecor
 		t.Fatalf("%s content type %q", label, ct)
 	}
 	body := rec.Body.String()
+	if built {
+		if !strings.Contains(body, `id="static-landing"`) || strings.Contains(body, `data-limits-fallback`) {
+			t.Fatalf("%s served the plain fallback, not you.html", label)
+		}
+	} else if !strings.Contains(body, `data-limits-fallback="1"`) {
+		t.Fatalf("%s did not serve the plain fallback", label)
+	}
 	for _, needle := range []string{
 		"Offer Rails · Your limits",
 		"This page is not a signup form",
