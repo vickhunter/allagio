@@ -482,7 +482,13 @@ func (h *ORPHost) Go(c *gin.Context) {
 	c.Header("X-Robots-Tag", "noindex")
 	origin, _ := h.origin(c)
 	token := c.Param("token")
-	purpose := c.GetHeader("Sec-Purpose") + " " + c.GetHeader("Purpose")
+	purpose := strings.Join([]string{
+		c.GetHeader("Sec-Fetch-Purpose"),
+		c.GetHeader("Sec-Purpose"),
+		c.GetHeader("Purpose"),
+		c.GetHeader("X-Moz"),
+		c.GetHeader("X-Purpose"),
+	}, " ")
 	class := orp.ClickClass(c.Request.Method, c.GetHeader("User-Agent"), purpose, c.Request.URL.RawQuery)
 	clickID := orp.LocalID("clk_")
 	// HEAD is class preview. It redirects with the same headers and does not record.
@@ -853,6 +859,19 @@ func (h *ORPHost) manySnapshot(dns, viewer, re string, deal database.ORPDeal, no
 			}
 			if entry.Alias != "" {
 				item["alias"] = entry.Alias
+			}
+			for _, receipt := range doc.LinkReceipts {
+				if receipt.Obligation != entry.Obligation || receipt.ID == "" || receipt.VerifiedAt == "" {
+					continue
+				}
+				method := receipt.Method
+				if method == "" {
+					method = "link"
+				}
+				item["receipt"] = map[string]any{
+					"id": receipt.ID, "method": method, "verified_at": receipt.VerifiedAt,
+				}
+				break
 			}
 			rows[i] = item
 		}
