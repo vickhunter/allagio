@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://offer-rails.onrender.com/orp/schemas/http/join-response.schema.json",
   "title": "JoinResponse",
-  "description": "A new pseudonymous party, usable at once. Until a person sets limits, every step that binds asks: the agent gets a waiting.url to show its person, who approves with one tap. The claim URL lets that person make the party theirs (a passkey, no email), set limits and get paid.",
+  "description": "A new pseudonymous party, usable at once. Until an owner sets limits, every step that binds asks: the waiting party's agent approves it. The host records approved_by agent. That is not a person's approval. The approval URL records approved_by owner only when that owner opted in. The claim URL lets the owner make the party theirs (a passkey, no email), set limits and get paid.",
   "type": "object",
   "additionalProperties": false,
   "required": ["party", "token", "claim"],

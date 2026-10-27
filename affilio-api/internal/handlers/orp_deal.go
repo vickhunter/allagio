@@ -184,9 +184,10 @@ func (h *ORPHost) Activate(c *gin.Context) {
 	writeORPBytes(c, http.StatusOK, raw)
 }
 
-// Approve shows the terms. By default it does not approve.
-// When the waiting owner turned on human approval, the signed-in owner opening
-// this link records approved_by owner. An agent bearer is refused.
+// Approve shows the terms. It never records an approval.
+// When the waiting owner turned on human approval, the signed-in owner sees
+// the terms and a form. An agent bearer, a prefetch, and a signed-out visit
+// are refused. Submitting the form is ApprovePost.
 func (h *ORPHost) Approve(c *gin.Context) {
 	deal, found, err := h.Entry.DB.GetORPDealByEscalation(c.Request.Context(), c.Param("id"))
 	if err != nil || !found {
@@ -224,6 +225,10 @@ func (h *ORPHost) Approve(c *gin.Context) {
 		writeHTML(c, http.StatusOK, page)
 		return
 	}
+	if purposePreview(c) {
+		writePreview(c)
+		return
+	}
 	if strings.TrimSpace(c.GetHeader("Authorization")) != "" {
 		writeOwnerApproval(c)
 		return
@@ -238,6 +243,75 @@ func (h *ORPHost) Approve(c *gin.Context) {
 			"reason":  "forbidden",
 			"message": "This approval link is for the waiting owner.",
 		})
+		return
+	}
+	page = orp.OwnerApprovePage(orp.TermsTitle(terms), orp.DisclosureLabel(terms), "/orp/approve/"+c.Param("id"), owner.CSRF)
+	writeHTML(c, http.StatusOK, page)
+}
+
+// approveOwnerPost records approved_by owner. The caller has no agent bearer.
+// A prefetch, a missing confirmation token, and the wrong owner do not record.
+func (h *ORPHost) approveOwnerPost(c *gin.Context) {
+	_, dns := h.origin(c)
+	deal, found, err := h.Entry.DB.GetORPDealByEscalation(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"reason": "not_found", "message": "No such deal for this sender."})
+		return
+	}
+	if len(deal.Parties) == 0 {
+		c.JSON(http.StatusForbidden, gin.H{"reason": "forbidden", "message": "This page does not approve."})
+		return
+	}
+	waiting, err := decodeObject(deal.Waiting)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	if waiting == nil {
+		c.JSON(http.StatusForbidden, gin.H{"reason": "forbidden", "message": "This page does not approve."})
+		return
+	}
+	party, _ := waiting["party"].(string)
+	ownerID, ok := orp.OwnerFromParty(dns, party)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"reason": "forbidden", "message": "This page does not approve."})
+		return
+	}
+	steps, err := h.Entry.DB.HumanApprovalSteps(c.Request.Context(), ownerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	if !humanStepOn(steps, waiting) {
+		c.JSON(http.StatusForbidden, gin.H{"reason": "forbidden", "message": "This page does not approve."})
+		return
+	}
+	owner, signedIn := h.signedInOwner(c)
+	if !signedIn {
+		writeOwnerApproval(c)
+		return
+	}
+	if owner.ID != ownerID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"reason":  "forbidden",
+			"message": "This approval link is for the waiting owner.",
+		})
+		return
+	}
+	if !ownerFormCSRF(c, h.Entry.BaseURL, owner.CSRF) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"reason":  "forbidden",
+			"message": "This form needs the owner's confirmation.",
+		})
+		return
+	}
+	terms, err := decodeObject(deal.Terms)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
 		return
 	}
 	expectHash, expectAt := deal.TermsHash, deal.UpdatedAt

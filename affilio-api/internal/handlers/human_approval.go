@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/subtle"
 	"errors"
 	"html/template"
 	"net/http"
@@ -13,9 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const ownerApprovalMessage = "An owner link is needed. Read waiting.url on the deal. Sign in as the owner and open that link."
+const ownerApprovalMessage = "An owner link is needed. Read waiting.url on the deal. Sign in as the owner, open that link, and submit the form."
 
-var humanStepOrder = []string{"ask", "list", "negotiate", "accept", "execute", "amend", "settle", "share", "revoke"}
+// humanStepOrder is the only step this host gates. Approve and ApprovePost
+// call humanStepOn. An ask matches a deal waiting with step_ask, which is the
+// list step on an offer and the accept step.
+var humanStepOrder = []string{"ask"}
 
 func writeOwnerApproval(c *gin.Context) {
 	c.JSON(http.StatusForbidden, gin.H{
@@ -77,25 +81,51 @@ func (h *ORPHost) signedInOwner(c *gin.Context) (*database.Owner, bool) {
 }
 
 func humanApprovalWords(steps []string) string {
-	ask := false
-	named := make([]string, 0, len(steps))
 	for _, step := range steps {
 		if step == "ask" {
-			ask = true
-			continue
+			return "An ask waits for the owner. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The agent cannot approve it. Sign in, open the approval link, and submit the form. Opening the link does not approve it. The host records approved_by owner."
 		}
-		named = append(named, step)
 	}
-	switch {
-	case !ask && len(named) == 0:
-		return "An ask is approved by the agent. The host records approved_by agent. That is not a person's approval."
-	case ask && len(named) == 0:
-		return "An ask waits for the owner. The agent cannot approve it. Sign in and open the approval link on the deal. The host records approved_by owner."
-	case ask:
-		return "An ask waits for the owner. The agent cannot approve it. Sign in and open the approval link on the deal. The host records approved_by owner. These steps also wait for the owner: " + strings.Join(named, ", ") + "."
-	default:
-		return "These steps wait for the owner: " + strings.Join(named, ", ") + ". The agent cannot approve them. Sign in and open the approval link on the deal. The host records approved_by owner. Any other ask is approved by the agent. The host records approved_by agent. That is not a person's approval."
+	return "An ask is approved by the agent. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The host records approved_by agent. That is not a person's approval."
+}
+
+// purposePreview is the prefetch class used for /go. A prefetch does not approve.
+func purposePreview(c *gin.Context) bool {
+	purpose := strings.Join([]string{
+		c.GetHeader("Sec-Fetch-Purpose"),
+		c.GetHeader("Sec-Purpose"),
+		c.GetHeader("Purpose"),
+		c.GetHeader("X-Moz"),
+		c.GetHeader("X-Purpose"),
+	}, " ")
+	return orp.ClickClass(c.Request.Method, "Mozilla", purpose, "") == "preview"
+}
+
+func writePreview(c *gin.Context) {
+	c.JSON(http.StatusForbidden, gin.H{
+		"reason":  "preview",
+		"message": "A prefetch does not approve.",
+	})
+}
+
+// ownerFormCSRF matches the signed-in owner form rule: Origin is this host,
+// and the form field or X-CSRF-Token matches the session token.
+func ownerFormCSRF(c *gin.Context, base, token string) bool {
+	if base == "" || c.GetHeader("Origin") != base {
+		return false
 	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 32768)
+	csrf := c.GetHeader("X-CSRF-Token")
+	if !strings.HasPrefix(c.GetHeader("Content-Type"), "application/json") {
+		if c.Request.ParseForm() != nil {
+			return false
+		}
+		csrf = c.PostForm("csrf")
+	}
+	if csrf == "" || token == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(csrf), []byte(token)) == 1
 }
 
 func (h *HostedHandler) humanApprovalSection(c *gin.Context, o *database.Owner) (template.HTML, error) {
@@ -133,9 +163,9 @@ func (h *HostedHandler) humanApprovalSection(c *gin.Context, o *database.Owner) 
 func humanStepLabel(name string) string {
 	switch name {
 	case "ask":
-		return "Ask: the owner approves an ask. Leave this off and the agent approves it."
+		return "Ask: the owner approves a deal waiting with step_ask. On this host that is the list step on an offer, and the accept step. Leave this off and the agent approves it."
 	default:
-		return name + ": the owner approves this step."
+		return ""
 	}
 }
 

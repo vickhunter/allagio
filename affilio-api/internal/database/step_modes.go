@@ -378,8 +378,7 @@ AND conversion_id IN (
 var ErrUnknownHumanStep = errors.New("unknown human approval step")
 
 var humanApprovalStepNames = map[string]bool{
-	"ask": true, "list": true, "negotiate": true, "accept": true,
-	"execute": true, "amend": true, "settle": true, "share": true, "revoke": true,
+	"ask": true,
 }
 
 // HumanApprovalSteps returns the steps this owner holds for a signed-in person.

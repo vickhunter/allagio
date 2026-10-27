@@ -435,6 +435,14 @@ func (h *ORPHost) seat04(c *gin.Context, dns string, msg orp.Message, hash, owne
 // When that owner turned on human approval, the bearer is refused.
 // A 0.3 deal is left untouched.
 func (h *ORPHost) ApprovePost(c *gin.Context) {
+	if purposePreview(c) {
+		writePreview(c)
+		return
+	}
+	if strings.TrimSpace(c.GetHeader("Authorization")) == "" {
+		h.approveOwnerPost(c)
+		return
+	}
 	_, dns := h.origin(c)
 	grant, ok := h.bearer(c, dns)
 	if !ok {
