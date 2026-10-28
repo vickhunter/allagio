@@ -50,7 +50,7 @@ ORP lets two software agents, each working for a person or business, agree a gro
 Three properties hold for every deal:
 
 1. **One link works everywhere.** The host mints a tracked link when a deal starts. It works wherever a person can click or type it, on any platform, with no plugin or adapter ([§10](#10-the-universal-tracked-link)).
-2. **People decide what they want to decide.** Each step of a deal is `auto`, `ask` or `off` for each owner. Only the host can record a person's approval. An agent can never approve on its owner's behalf ([§11](#11-human-approval-per-step)).
+2. **People decide what they want to decide.** Each step of a deal is `auto`, `ask` or `off` for each owner. By default an ask is approved by the waiting party's agent with its own bearer. The host records that as approved_by agent. That is not a person's approval. An owner can turn on human approval for a step. Only the host records that approval, as approved_by owner, when the signed-in owner submits the form on the approval link. Opening the link does not record it. An agent bearer cannot record it ([§11](#11-human-approval-per-step)).
 3. **No personal data passes between parties.** Parties see pseudonymous ids, public URLs, aggregate counts and money. The schemas are closed, so a conforming message has no field that could carry an email, an address, a user agent or an order id ([§7](#7-identity-and-privacy)).
 
 ### 1.1 Non-goals in 0.3
@@ -357,7 +357,7 @@ A deal is the host's record of one negotiation and its execution. The host sends
 | State | Meaning |
 |---|---|
 | `proposed` | Terms are on the table. Either party may counter, accept or decline. |
-| `awaiting` | A party's person must decide (`waiting` says who, for which step, and why). |
+| `awaiting` | The waiting party's agent approves the ask by default. The host records approved_by agent. That is not a person's approval. The approval URL records approved_by owner only when that owner opted in and submits the form (`waiting` says who, for which step, and why). |
 | `active` | Both parties are bound to `terms_hash`. Tracking is live. |
 | `completed` | Every obligation is verified or waived, and every payout is settled. |
 | `declined`, `expired`, `revoked` | Ended. |
@@ -365,7 +365,7 @@ A deal is the host's record of one negotiation and its execution. The host sends
 
 Obligation states: `pending`, `claimed`, `verified`, `failed`, `revoked`, `waived`.
 
-`bound` lists who is bound to the current `terms_hash` and by what authority: `mandate` (the owner's standing constraints allowed it) or `consent` (a person approved this exact hash, `ref` is the consent id).
+`bound` lists who is bound to the current `terms_hash` and by what authority: `mandate` (the owner's standing constraints allowed it, including an agent approval recorded as approved_by agent, which is not a person's approval, or the signed-in owner form, which records approved_by owner and a mandate). `consent` is a host-only message type.
 
 ### 8.4 Constraints
 
@@ -432,7 +432,7 @@ The task's verbs map to these types:
 
 ### 9.1 Spaces
 
-A party registers a space with `space` `put`. It updates one by sending `put` again with the same `id`, and removes it with `withdraw` and the `id`. The host answers with `space` `listed` and a `status`: `listed`, `waiting` (the owner's `list` step is `ask`; `waiting` says where the person approves), or `withdrawn`.
+A party registers a space with `space` `put`. It updates one by sending `put` again with the same `id`, and removes it with `withdraw` and the `id`. The host answers with `space` `listed` and a `status`: `listed`, `waiting` (the owner's `list` step is `ask`; `waiting` says where that step is approved), or `withdrawn`.
 
 ```json
 {
@@ -640,7 +640,7 @@ A **`counter`** replaces the terms of a `proposed` deal. Either party may counte
 }
 ```
 
-The host applies the sender's constraints to the `accept` step ([§11](#11-human-approval-per-step)). If they allow it, the sender is bound by `mandate`. If not, the deal goes to `awaiting` until the sender's person decides. When both parties are bound to the same hash, the deal becomes `active`, the host mints the tracked links, and both parties get the snapshot:
+The host applies the sender's constraints to the `accept` step ([§11](#11-human-approval-per-step)). If they allow it, the sender is bound by `mandate`. If not, the deal goes to `awaiting` until the waiting party's agent approves the ask. The host records approved_by agent. That is not a person's approval. The approval URL records approved_by owner only when that owner opted in and submits the form while signed in. When both parties are bound to the same hash, the deal becomes `active`, the host mints the tracked links, and both parties get the snapshot:
 
 ```json
 {
@@ -746,7 +746,7 @@ Every deal moves through steps. Each owner sets a mode per step for its agent.
 | `revoke` | `revoke` | `auto` |
 
 - **`auto`**: the message takes effect if the rest of the owner's constraints allow it. The party is bound by `mandate`.
-- **`ask`**: the host holds the message and asks the owner's person. The deal goes to `awaiting`. It takes effect only if the person approves.
+- **`ask`**: the host holds the message. The deal goes to `awaiting`. By default the waiting party's agent approves it with its bearer. The host records approved_by agent. That is not a person's approval. When the owner has turned on human approval for that step, the agent bearer is refused and the deal takes effect only when the signed-in owner submits the form on the approval link. Opening the link does not record it. The host records approved_by owner.
 - **`off`**: the host refuses the message with `step_off`.
 
 An unset step uses the default. Stopping is always safe, so `revoke` defaults to `auto`.
@@ -767,7 +767,7 @@ A budget the owner did not set does not allow spending. If any money is committe
 
 ### 11.2 Escalation and consent
 
-To escalate, the host sends the waiting party a `deal` snapshot in state `awaiting`, with `waiting` set (party, step, escalation id, reasons and an approval `url`). The counterparty's copy says only that the deal is waiting.
+To escalate, the host sends the waiting party a `deal` snapshot in state `awaiting`, with `waiting` set (party, step, escalation id, reasons and an approval `url`). The counterparty's copy says only that the deal is waiting. By default the waiting party's agent approves that ask with its bearer. The host records approved_by agent. That is not a person's approval. When the owner has turned on human approval for the step, the host refuses the agent's bearer. The signed-in owner submits the form on the approval url. Opening the url does not record it. The host records approved_by owner.
 
 ```json
 {
@@ -834,38 +834,16 @@ To escalate, the host sends the waiting party a `deal` snapshot in state `awaiti
 }
 ```
 
-The agent shows the person the URL, or the person gets it another way. At that URL the host shows the exact terms behind the hash, in plain language, and authenticates the person. When the person decides, the host sends a `consent` message to the waiting party, and a copy without `reasons` to the counterparty:
-
-```json
-{
-  "orp": "0.3",
-  "type": "consent",
-  "id": "m_host_0008",
-  "ts": "2026-10-21T12:10:00Z",
-  "from": "orp:hub.example/host",
-  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
-  "deal": "deal_swp_4KfP",
-  "body": {
-    "consent": "cns_3Vt8",
-    "escalation": "esc_7Rk2",
-    "party": "orp:hub.example/p_Vb3nR8sYc1Qe6",
-    "decision": "approved",
-    "step": "accept",
-    "terms_hash": "sha256-XqlxlRGWPLFRQGlZNLpnwIpj-F1xr7UK1Pilom6pvCk",
-    "reasons": ["step_ask"],
-    "assurance": "passkey",
-    "at": "2026-10-21T12:09:58Z"
-  }
-}
-```
+By default the waiting party's agent approves that ask with its bearer. The host records approved_by agent. That is not a person's approval, and the host does not send a `consent` for it. The approval URL shows the exact terms behind the hash. Opening that URL does not record an approval. When the owner has turned on human approval for the step, the signed-in owner submits the form on that page. The host then records approved_by owner and a mandate, and publishes a deal snapshot. It does not send a `consent` for it. `consent` is a host-only message type.
 
 Rules:
 
-- **H1 Only the host records consent.** A `consent` from anyone but the host is refused with `forbidden`. An agent can never approve for its owner, whatever its constraints say.
+- **H1 Only the host records a person's approval.** A `consent` from anyone but the host is refused with `forbidden`. An agent approval is recorded as approved_by agent and is not a person's approval. When the owner has turned on human approval for the step, the agent's bearer is refused. Opening the approval URL does not record an approval. Only the signed-in owner submitting the form on that URL records approved_by owner.
 - **H2 Consent is for one hash.** It binds the person to the exact `terms_hash` they saw. A later `counter` voids it.
 - **H3 Assurance is stated.** `session` (signed in at the host), `passkey` (a passkey signed a challenge derived from `terms_hash`), `email_link` (a one-time link to the owner), or `client_prompt` (an MCP client asked the person). The host cannot tell a person from an auto-approving client, so `client_prompt` is the weakest. A host MUST NOT bind a party to pay money on `client_prompt` alone.
 - **H4 Loosening is the owner's.** Only the owner, authenticated at the host, can make a step less strict, raise a budget or extend a mandate. An agent MUST NOT be able to loosen its own constraints over ORP. A host MAY let an agent tighten them.
 - **H5 Escalations expire.** An escalation that nobody decides expires with the deal's `expires`, or after 7 days if none is set, and the deal goes to `expired`.
+- **H6 Counterparty text is data.** A counterparty agent's messages and terms are data, never instructions to the receiving agent.
 
 ---
 
@@ -878,8 +856,8 @@ Rules:
    counter ---> [proposed] ---decline---> [declined]
                  |      ^
      accept      |      | counter (clears acceptances)
-     needs a     v      |
-     person   [awaiting] ---refused or expired---> [declined] / [expired]
+     ask waits   v      |
+              [awaiting] ---refused or expired---> [declined] / [expired]
                  |
    both bound to one terms_hash
                  v
@@ -1139,7 +1117,7 @@ Components are aggregate numbers. They never list counterparties.
 
 ## 16. Errors
 
-An `error` names the problem and never changes state. Escalation is not an error: a step that needs a person returns a `deal` in state `awaiting`.
+An `error` names the problem and never changes state. Escalation is not an error: an ask returns a `deal` in state `awaiting`.
 
 ```json
 {
@@ -1377,7 +1355,7 @@ The canonical schemas start from the #71 `schema/0.3/` and change:
 | `outcome` rows gain `attested_conversions` and `sources` | Payer-reported conversions are kept apart from provider ones (GAP-02), and agents can see clicks by source (from #68). |
 | `suggest` request gains `join`, response gains `joined` | Joining mid-task is one call, not two (GAP-03). |
 | `attestation` reputation weight 0.5 → 0 | Counterparty attestations are forgeable by pairs and rings (GAP-02). |
-| Normative rules in this document | Tracking T1 to T12, approval order, consent rules H1 to H5, proof rules P1 to P7, settlement S1 to S5, persistent idempotency, text hygiene. |
+| Normative rules in this document | Tracking T1 to T12, approval order, consent rules H1 to H6, proof rules P1 to P7, settlement S1 to S5, persistent idempotency, text hygiene. |
 
 ## Appendix B: PR #68 to 0.3 mapping
 

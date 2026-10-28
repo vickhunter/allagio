@@ -94,7 +94,19 @@ func (h *ORPHost) Proof(c *gin.Context) {
 		writeHTML(c, http.StatusNotFound, "not found")
 		return
 	}
-	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms), deal.State, linkObligationVerified(deal.Obligations)))
+	var approvals []orp.Approval
+	if doc, err := orp.DecodeMany(deal.Parties); err == nil {
+		approvals = doc.Approvals
+	}
+	if h.Entry != nil && h.Entry.DB != nil {
+		rows, err := h.Entry.DB.DealOwnerApprovals(c.Request.Context(), deal.ID)
+		if err == nil {
+			for _, row := range rows {
+				approvals = append(approvals, orp.Approval{Party: row.Party, Step: row.Step, By: row.By})
+			}
+		}
+	}
+	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms), deal.State, linkObligationVerified(deal.Obligations), approvals))
 }
 
 func linkObligationVerified(raw json.RawMessage) bool {
@@ -148,6 +160,10 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
 		return
 	}
+	if h.activateNeedsOwner(c, dns, party, deal) {
+		return
+	}
+	record := h.stepAskRecord(dns, deal, "agent")
 	now := h.now()
 	bound, err := bindMandates(deal.Bound, deal.OffererParty, deal.AcceptorParty, now)
 	if err != nil {
@@ -168,7 +184,7 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
-	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, bound, deal.UpdatedAt, h.dealInbox(dns, "", deal, now))
+	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, bound, deal.UpdatedAt, h.dealInbox(dns, "", deal, now), record)
 	if err != nil {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
@@ -180,8 +196,13 @@ func (h *ORPHost) Activate(c *gin.Context) {
 	writeORPBytes(c, http.StatusOK, raw)
 }
 
-// Approve shows the terms a person would decide. It does not approve.
+// Approve shows the terms. It never records an approval.
+// When the waiting owner turned on human approval, the signed-in owner sees
+// the terms and a form, including a 0.3 deal whose parties column is null.
+// An agent bearer, a prefetch, and a signed-out visit are refused.
+// Submitting the form is ApprovePost.
 func (h *ORPHost) Approve(c *gin.Context) {
+	setApproveFrameHeaders(c)
 	deal, found, err := h.Entry.DB.GetORPDealByEscalation(c.Request.Context(), c.Param("id"))
 	if err != nil || !found {
 		writeHTML(c, http.StatusNotFound, "not found")
@@ -192,7 +213,218 @@ func (h *ORPHost) Approve(c *gin.Context) {
 		writeHTML(c, http.StatusNotFound, "not found")
 		return
 	}
-	writeHTML(c, http.StatusOK, orp.ApprovePage(orp.TermsTitle(terms), orp.DisclosureLabel(terms)))
+	page := orp.ApprovePage(orp.TermsTitle(terms), orp.DisclosureLabel(terms))
+	if h.writeOwnerForm(c, deal, terms) {
+		return
+	}
+	writeHTML(c, http.StatusOK, page)
+}
+
+// writeOwnerForm answers a step_ask wait the owner opted into.
+// It returns false when the public page is the right response.
+func (h *ORPHost) writeOwnerForm(c *gin.Context, deal database.ORPDeal, terms map[string]any) bool {
+	waiting, err := decodeObject(deal.Waiting)
+	if err != nil || waiting == nil {
+		return false
+	}
+	party, _ := waiting["party"].(string)
+	_, dns := h.origin(c)
+	ownerID, ok := orp.OwnerFromParty(dns, party)
+	if !ok {
+		return false
+	}
+	steps, err := h.Entry.DB.HumanApprovalSteps(c.Request.Context(), ownerID)
+	if err != nil {
+		writeHTML(c, http.StatusInternalServerError, "unavailable")
+		return true
+	}
+	if !humanStepOn(steps, waiting) {
+		return false
+	}
+	if len(deal.Parties) == 0 || string(deal.Parties) == "null" {
+		ready, err := h.acceptReady(c, deal)
+		if err != nil {
+			writeHTML(c, http.StatusInternalServerError, "unavailable")
+			return true
+		}
+		if !ready {
+			return false
+		}
+	}
+	if purposePreview(c) {
+		writePreview(c)
+		return true
+	}
+	if strings.TrimSpace(c.GetHeader("Authorization")) != "" {
+		writeOwnerApproval(c)
+		return true
+	}
+	owner, signedIn := h.signedInOwner(c)
+	if !signedIn {
+		writeOwnerApproval(c)
+		return true
+	}
+	if owner.ID != ownerID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"reason":  "forbidden",
+			"message": "This approval link is for the waiting owner.",
+		})
+		return true
+	}
+	writeHTML(c, http.StatusOK, orp.OwnerApprovePage(orp.TermsTitle(terms), orp.DisclosureLabel(terms), "/orp/approve/"+c.Param("id"), owner.CSRF))
+	return true
+}
+
+// approveOwnerPost records approved_by owner. The caller has no agent bearer.
+// A prefetch, a missing confirmation token, and the wrong owner do not record.
+func (h *ORPHost) approveOwnerPost(c *gin.Context) {
+	_, dns := h.origin(c)
+	deal, found, err := h.Entry.DB.GetORPDealByEscalation(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"reason": "not_found", "message": "No such deal for this sender."})
+		return
+	}
+	waiting, err := decodeObject(deal.Waiting)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	if waiting == nil {
+		c.JSON(http.StatusForbidden, gin.H{"reason": "forbidden", "message": "This page does not approve."})
+		return
+	}
+	party, _ := waiting["party"].(string)
+	ownerID, ok := orp.OwnerFromParty(dns, party)
+	if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"reason": "forbidden", "message": "This page does not approve."})
+		return
+	}
+	steps, err := h.Entry.DB.HumanApprovalSteps(c.Request.Context(), ownerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	if !humanStepOn(steps, waiting) {
+		c.JSON(http.StatusForbidden, gin.H{"reason": "forbidden", "message": "This page does not approve."})
+		return
+	}
+	owner, signedIn := h.signedInOwner(c)
+	if !signedIn {
+		writeOwnerApproval(c)
+		return
+	}
+	if owner.ID != ownerID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"reason":  "forbidden",
+			"message": "This approval link is for the waiting owner.",
+		})
+		return
+	}
+	if !ownerFormCSRF(c, h.Entry.BaseURL, owner.CSRF) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"reason":  "forbidden",
+			"message": "This form needs the owner's confirmation.",
+		})
+		return
+	}
+	terms, err := decodeObject(deal.Terms)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	step, _ := waiting["step"].(string)
+	if len(deal.Parties) == 0 || string(deal.Parties) == "null" {
+		h.finishOwner03(c, dns, deal, party)
+		return
+	}
+	expectHash, expectAt := deal.TermsHash, deal.UpdatedAt
+	now := h.now()
+	h.noteApproval(&deal, party, step, "owner")
+	h.signSeat(&deal, party, now)
+	h.refreshMany(&deal, terms, now)
+	msg := orp.Message{ORP: orp.Version04, Type: "accept", ID: orp.NewMessageID(), From: party}
+	bodyHash := orp.ContentHash(map[string]any{"approve": c.Param("id")})
+	h.publishMany(c, dns, msg, bodyHash, deal, mustMany(deal), expectHash, expectAt)
+}
+
+// finishOwner03 binds a 0.3 accept the way Activate does and records
+// approved_by owner in that same transaction. Parties stays null.
+func (h *ORPHost) finishOwner03(c *gin.Context, dns string, deal database.ORPDeal, party string) {
+	ready, err := h.acceptReady(c, deal)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	if !ready {
+		c.JSON(http.StatusConflict, gin.H{"reason": "state_conflict", "message": "The deal is in the wrong state."})
+		return
+	}
+	now := h.now()
+	bound, err := bindMandates(deal.Bound, deal.OffererParty, deal.AcceptorParty, now)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	record := h.stepAskRecord(dns, deal, "owner")
+	deal.State = "active"
+	deal.Waiting = nil
+	deal.Bound = bound
+	deal.Parties = nil
+	deal.UpdatedAt = now.UTC()
+	h.writeActive03(c, dns, party, deal, record)
+}
+
+// acceptReady is the Activate gate: the deal is awaiting and the accept is stored.
+func (h *ORPHost) acceptReady(c *gin.Context, deal database.ORPDeal) (bool, error) {
+	if deal.State != "awaiting" || deal.AcceptorParty == "" {
+		return false, nil
+	}
+	return h.Entry.DB.ORPAcceptStored(c.Request.Context(), deal.AcceptorParty, deal.ID)
+}
+
+// stepAskRecord is the approval row for a step_ask wait. Nil when the wait is not one.
+func (h *ORPHost) stepAskRecord(dns string, deal database.ORPDeal, by string) *database.DealApproval {
+	if len(deal.Waiting) == 0 || string(deal.Waiting) == "null" {
+		return nil
+	}
+	waiting, err := decodeObject(deal.Waiting)
+	if err != nil || waiting == nil || !reasonHas(waiting, "step_ask") {
+		return nil
+	}
+	party, _ := waiting["party"].(string)
+	step, _ := waiting["step"].(string)
+	ownerID, ok := orp.OwnerFromParty(dns, party)
+	if !ok || party == "" || step == "" {
+		return nil
+	}
+	return &database.DealApproval{OwnerID: ownerID, Party: party, Step: step, By: by}
+}
+
+func (h *ORPHost) writeActive03(c *gin.Context, dns, viewer string, deal database.ORPDeal, record *database.DealApproval) {
+	doc, err := h.dealMessage(dns, viewer, "", deal, deal.UpdatedAt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, deal.Bound, deal.UpdatedAt, h.dealInbox(dns, "", deal, deal.UpdatedAt), record)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
+	if !changed {
+		c.JSON(http.StatusConflict, gin.H{"reason": "state_conflict", "message": "The deal is in the wrong state."})
+		return
+	}
+	writeORPBytes(c, http.StatusOK, raw)
 }
 
 func (h *ORPHost) offer(c *gin.Context, dns string, msg orp.Message, hash, ownerID string) {
@@ -944,4 +1176,56 @@ func writeHTML(c *gin.Context, status int, body string) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Robots-Tag", "noindex")
 	c.Data(status, "text/html; charset=utf-8", []byte(body))
+}
+
+// setApproveFrameHeaders keeps the approval document out of a frame.
+// Approve and ApprovePost set it before any return.
+func setApproveFrameHeaders(c *gin.Context) {
+	c.Header("X-Frame-Options", "DENY")
+	c.Header("Content-Security-Policy", "frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
+	c.Header("Referrer-Policy", "no-referrer")
+}
+
+// askHeld reports a step_ask wait whose owner turned ask on.
+// party limits the check to a wait already on that party. An empty party matches any wait.
+func (h *ORPHost) askHeld(c *gin.Context, deal database.ORPDeal, party string) (bool, error) {
+	if len(deal.Waiting) == 0 || string(deal.Waiting) == "null" {
+		return false, nil
+	}
+	waiting, err := decodeObject(deal.Waiting)
+	if err != nil {
+		return false, err
+	}
+	if waiting == nil || !reasonHas(waiting, "step_ask") {
+		return false, nil
+	}
+	waitingParty, _ := waiting["party"].(string)
+	if party != "" && waitingParty != party {
+		return false, nil
+	}
+	_, dns := h.origin(c)
+	ownerID, ok := orp.OwnerFromParty(dns, waitingParty)
+	if !ok {
+		return false, nil
+	}
+	steps, err := h.Entry.DB.HumanApprovalSteps(c.Request.Context(), ownerID)
+	if err != nil {
+		return false, err
+	}
+	return humanStepOn(steps, waiting), nil
+}
+
+// activateNeedsOwner refuses a 0.3 activate when the waiting owner holds ask
+// and the wait is step_ask. The caller has already checked that an accept is stored.
+func (h *ORPHost) activateNeedsOwner(c *gin.Context, dns, caller string, deal database.ORPDeal) bool {
+	held, err := h.askHeld(c, deal, "")
+	if err != nil {
+		h.writeProblem(c, dns, caller, "", internalProblem(), false)
+		return true
+	}
+	if !held {
+		return false
+	}
+	writeOwnerApproval(c)
+	return true
 }

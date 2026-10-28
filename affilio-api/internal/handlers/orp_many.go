@@ -310,6 +310,15 @@ func (h *ORPHost) acceptMany(c *gin.Context, dns string, msg orp.Message, hash, 
 	if mode == database.ModeAsk {
 		h.holdMany(&deal, msg.From, "accept", manyReasons(mode), now)
 	} else {
+		held, heldErr := h.askHeld(c, deal, msg.From)
+		if heldErr != nil {
+			h.failOpen(c, dns, msg, internalProblem())
+			return
+		}
+		if held {
+			writeOwnerApproval(c)
+			return
+		}
 		h.signSeat(&deal, msg.From, now)
 		h.refreshMany(&deal, terms, now)
 	}
@@ -430,9 +439,20 @@ func (h *ORPHost) seat04(c *gin.Context, dns string, msg orp.Message, hash, owne
 	h.publishMany(c, dns, msg, hash, deal, mustMany(deal), expectHash, expectAt)
 }
 
-// ApprovePost signs the waiting party on a 0.4 deal. GET /orp/approve/:id
-// still does not approve. A 0.3 deal is left untouched.
+// ApprovePost signs the waiting party on a 0.4 deal.
+// By default the waiting party's bearer records approved_by agent.
+// When that owner turned on human approval, the bearer is refused.
+// A 0.3 deal is left untouched.
 func (h *ORPHost) ApprovePost(c *gin.Context) {
+	setApproveFrameHeaders(c)
+	if purposePreview(c) {
+		writePreview(c)
+		return
+	}
+	if strings.TrimSpace(c.GetHeader("Authorization")) == "" {
+		h.approveOwnerPost(c)
+		return
+	}
 	_, dns := h.origin(c)
 	grant, ok := h.bearer(c, dns)
 	if !ok {
@@ -447,7 +467,16 @@ func (h *ORPHost) ApprovePost(c *gin.Context) {
 		h.writeProblem(c, dns, "", "", orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}, false)
 		return
 	}
-	if len(deal.Parties) == 0 {
+	if len(deal.Parties) == 0 || string(deal.Parties) == "null" {
+		held, err := h.askHeld(c, deal, "")
+		if err != nil {
+			h.writeProblem(c, dns, "", "", internalProblem(), false)
+			return
+		}
+		if held {
+			writeOwnerApproval(c)
+			return
+		}
 		h.writeProblem(c, dns, "", "", orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "This page does not approve."}, false)
 		return
 	}
@@ -461,6 +490,15 @@ func (h *ORPHost) ApprovePost(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the waiting party may approve."}, false)
 		return
 	}
+	steps, err := h.Entry.DB.HumanApprovalSteps(c.Request.Context(), grant.OwnerID)
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
+	if humanStepOn(steps, waiting) {
+		writeOwnerApproval(c)
+		return
+	}
 	expectHash, expectAt := deal.TermsHash, deal.UpdatedAt
 	now := h.now()
 	terms, err := decodeObject(deal.Terms)
@@ -468,6 +506,8 @@ func (h *ORPHost) ApprovePost(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
+	step, _ := waiting["step"].(string)
+	h.noteApproval(&deal, party, step, "agent")
 	h.signSeat(&deal, party, now)
 	h.refreshMany(&deal, terms, now)
 	msg := orp.Message{ORP: orp.Version04, Type: "accept", ID: orp.NewMessageID(), From: party}

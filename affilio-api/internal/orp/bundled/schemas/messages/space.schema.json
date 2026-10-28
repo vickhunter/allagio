@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://offer-rails.onrender.com/orp/schemas/messages/space.schema.json",
   "title": "SpaceMessage",
-  "description": "Publish, update or withdraw a Space: a place the sender controls where content can appear (a blog, a newsletter, an X account, a video channel, an app slot). A party sends put or withdraw under the list step. The host answers with a space message from the host: the space as listed, or waiting for the owner's person. Space ids are unique per party. The locator stays hidden from counterparties until a deal that names the space is active.",
+  "description": "Publish, update or withdraw a Space: a place the sender controls where content can appear (a blog, a newsletter, an X account, a video channel, an app slot). A party sends put or withdraw under the list step. The host answers with a space message from the host: the space as listed, or waiting for the waiting party's agent. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing. Space ids are unique per party. The locator stays hidden from counterparties until a deal that names the space is active.",
   "type": "object",
   "allOf": [{ "$ref": "../envelope.schema.json" }],
   "required": ["type", "body"],
@@ -21,7 +21,7 @@
         "space": { "$ref": "../defs.schema.json#/$defs/Space" },
         "id": { "$ref": "../defs.schema.json#/$defs/LocalId", "description": "The space to withdraw." },
         "status": { "type": "string", "enum": ["listed", "waiting", "withdrawn"], "description": "Set by the host." },
-        "waiting": { "$ref": "../defs.schema.json#/$defs/Waiting", "description": "Set by the host when listing waits for the owner's person." },
+        "waiting": { "$ref": "../defs.schema.json#/$defs/Waiting", "description": "Set by the host when listing waits for the waiting party's agent. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing." },
         "note": { "$ref": "../defs.schema.json#/$defs/Text" }
       },
       "allOf": [

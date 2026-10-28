@@ -732,7 +732,9 @@ SELECT EXISTS(
 
 // ActivateORPDeal moves one awaiting deal to active and stores the snapshots.
 // changed is false when the row is no longer awaiting.
-func (d *DB) ActivateORPDeal(ctx context.Context, id string, bound json.RawMessage, updated time.Time, inbox []ORPInboxItem) (bool, error) {
+// approval is written in this same transaction, and only after the update
+// matches one row. A later inbox error rolls the approval back with the deal.
+func (d *DB) ActivateORPDeal(ctx context.Context, id string, bound json.RawMessage, updated time.Time, inbox []ORPInboxItem, approval *DealApproval) (bool, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return false, err
@@ -745,8 +747,11 @@ WHERE id=$1 AND state='awaiting'`, id, JSONList(bound), updated)
 	if err != nil {
 		return false, err
 	}
-	if tag.RowsAffected() == 0 {
+	if tag.RowsAffected() != 1 {
 		return false, nil
+	}
+	if err = insertDealApproval(ctx, tx, id, approval); err != nil {
+		return false, err
 	}
 	for _, item := range inbox {
 		if item.OwnerID == "" || len(item.Message) == 0 {
@@ -760,6 +765,22 @@ WHERE id=$1 AND state='awaiting'`, id, JSONList(bound), updated)
 		return false, err
 	}
 	return true, nil
+}
+
+func insertDealApproval(ctx context.Context, tx pgx.Tx, dealID string, row *DealApproval) error {
+	if row == nil || row.By == "" || row.OwnerID == "" {
+		return nil
+	}
+	payload, err := json.Marshal(map[string]any{
+		"kind": "deal_approval", "deal_id": dealID, "party": row.Party, "step": row.Step, "approved_by": row.By,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+INSERT INTO agent_step_approvals(step, owner_id, status, payload, result, decided_at)
+VALUES('placement_publish', $1::uuid, 'approved', $2::jsonb, '{"kind":"deal_approval"}'::jsonb, NOW())`, row.OwnerID, payload)
+	return err
 }
 
 // GetORPDeal reads one deal.

@@ -28,8 +28,14 @@ func AccessLogFormatter(p gin.LogFormatterParams) string {
 			path = p.Request.URL.Path
 		}
 	}
-	line := fmt.Sprintf("%s %d %s %s %s\n", p.TimeStamp.Format(time.RFC3339), p.StatusCode, method, path, p.Latency)
-	if !isGoLinkPath(path) {
+	logged := path
+	scrub := isGoLinkPath(path)
+	if redacted, ok := approvalLogPath(path); ok {
+		logged = redacted
+		scrub = true
+	}
+	line := fmt.Sprintf("%s %d %s %s %s\n", p.TimeStamp.Format(time.RFC3339), p.StatusCode, method, logged, p.Latency)
+	if !scrub {
 		return line
 	}
 	if p.ErrorMessage != "" {
@@ -40,6 +46,20 @@ func AccessLogFormatter(p gin.LogFormatterParams) string {
 
 func isGoLinkPath(path string) bool {
 	return strings.Contains(path, "/v1/go/") || strings.HasSuffix(path, "/v1/go")
+}
+
+// approvalLogPath redacts the escalation id on /orp/approve/<id>. The id is a
+// capability. Those lines are scrubbed the same way as go-link lines.
+func approvalLogPath(path string) (string, bool) {
+	const marker = "/orp/approve/"
+	i := strings.Index(path, marker)
+	if i < 0 {
+		return path, false
+	}
+	if path[i+len(marker):] == "" {
+		return path, false
+	}
+	return path[:i+len(marker)] + "[redacted]", true
 }
 
 // ScrubLoggedIPs replaces raw IP addresses in a log line.

@@ -945,11 +945,28 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 		c.Set("maker_id", o.MakerID)
 	}
 	if h.Page != nil {
-		h.render(c, "Your distribution workspace", "", template.HTML(`<div id="workspace-app" aria-live="polite"></div>`))
+		pageBody := `<div id="workspace-app" aria-live="polite"></div>`
+		if c.Request.URL.Path == "/owner/settings" {
+			section, err := h.humanApprovalSection(c, o)
+			if err != nil {
+				c.Status(500)
+				return
+			}
+			pageBody = string(section) + pageBody
+		}
+		h.render(c, "Your distribution workspace", "", template.HTML(pageBody))
 		return
 	}
 	csrf := template.HTMLEscapeString(o.CSRF)
 	var body strings.Builder
+	if c.Request.URL.Path == "/owner/settings" {
+		section, err := h.humanApprovalSection(c, o)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+		body.WriteString(string(section))
+	}
 	returnTo := c.Query("return_to")
 	if !validAuthorizationReturn(returnTo) {
 		returnTo = ""

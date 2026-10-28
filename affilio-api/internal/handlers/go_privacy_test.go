@@ -96,6 +96,28 @@ func TestGoLinkAccessLogScrubsIPs(t *testing.T) {
 	}
 }
 
+func TestApproveAccessLogRedactsID(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/orp/approve/esc_secretvalue?ref=1", nil)
+	req.RemoteAddr = "203.0.113.77:1000"
+	line := middleware.AccessLogFormatter(gin.LogFormatterParams{
+		TimeStamp:    time.Date(2026, 10, 10, 15, 4, 5, 0, time.UTC),
+		StatusCode:   http.StatusOK,
+		Method:       http.MethodGet,
+		Request:      req,
+		Latency:      time.Millisecond,
+		ErrorMessage: "lookup failed from 203.0.113.77 and 2001:db8:abcd::1",
+		ClientIP:     "203.0.113.77",
+	})
+	for _, secret := range []string{"esc_secretvalue", "203.0.113.77", "2001:db8:abcd::1", "ref=1"} {
+		if strings.Contains(line, secret) {
+			t.Fatalf("access log kept %s: %s", secret, line)
+		}
+	}
+	if !strings.Contains(line, "/orp/approve/[redacted]") || !strings.Contains(line, "200") {
+		t.Fatalf("access log shape: %s", line)
+	}
+}
+
 func TestGoLinkStoresNoRawIP(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

@@ -104,6 +104,15 @@ type Click struct {
 	At         string `json:"at,omitempty"`
 }
 
+// Approval records who approved one waiting step. By is agent or owner.
+// agent is the waiting party's bearer. owner is the signed-in owner.
+// An agent approval is never a person's approval.
+type Approval struct {
+	Party string `json:"party"`
+	Step  string `json:"step"`
+	By    string `json:"approved_by"`
+}
+
 // LinkReceipt is the link verification stored beside the tracking entry.
 // ID is the receipt message. No address, user agent, or referrer.
 type LinkReceipt struct {
@@ -234,6 +243,7 @@ type Many struct {
 	Tracking     []Track       `json:"tracking,omitempty"`
 	Clicks       []Click       `json:"clicks,omitempty"`
 	LinkReceipts []LinkReceipt `json:"link_receipts,omitempty"`
+	Approvals    []Approval    `json:"approvals,omitempty"`
 	Live         bool          `json:"live"`
 	Round        int           `json:"round"`
 }

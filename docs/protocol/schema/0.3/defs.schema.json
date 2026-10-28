@@ -552,7 +552,7 @@
     },
     "Authority": {
       "title": "Authority",
-      "description": "Why a party is bound. mandate: the owner's standing constraints allowed it. consent: a person approved this exact terms_hash.",
+      "description": "Why a party is bound. mandate: the owner's standing constraints allowed it. An agent approval is approved_by agent and is not a person's approval. The signed-in owner form records approved_by owner and a mandate. consent: a host-only message type.",
       "type": "object",
       "additionalProperties": false,
       "required": ["type"],
@@ -573,7 +573,7 @@
         "since": { "$ref": "#/$defs/Timestamp" },
         "escalation": { "$ref": "#/$defs/LocalId" },
         "reasons": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "$ref": "#/$defs/EscalationReason" } },
-        "url": { "$ref": "#/$defs/Url", "description": "Where the owner approves or refuses. The agent shows it to its person; it can never approve by itself." }
+        "url": { "$ref": "#/$defs/Url", "description": "Where the waiting party is sent. By default the waiting party's agent approves an ask with its bearer, and the host records approved_by agent. That is not a person's approval. When the owner turns on human approval for that step, the signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing." }
       }
     },
     "Fit": {
