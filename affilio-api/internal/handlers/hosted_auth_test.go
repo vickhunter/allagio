@@ -520,3 +520,15 @@ func TestHostedClientRegistrationValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSignInWaitsForIssuerDiscovery(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &HostedHandler{BaseURL: "http://127.0.0.1:8080"}
+	r := gin.New()
+	r.GET("/auth/login", h.LoginStart)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/auth/login?return_to=/owner", nil))
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "sign-in is starting") {
+		t.Fatalf("before discovery %d %s", rec.Code, rec.Body.String())
+	}
+}

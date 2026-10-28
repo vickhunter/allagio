@@ -203,11 +203,14 @@ func main() {
 		cfg.PublicBaseURL = strings.TrimRight(cfg.PublicBaseURL, "/")
 		redirects.HomeURL = cfg.PublicBaseURL + "/"
 		assessments.Engine.PublicBaseURL = cfg.PublicBaseURL
-		login, loginErr := services.NewOIDCLogin(ctx, cfg.OIDCIssuer, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.PublicBaseURL+"/auth/callback")
-		if loginErr != nil {
-			log.Fatalf("owner sign-in configuration failed: %v", loginErr)
-		}
-		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Login: login, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments, ClaimsCheck: cfg.ClaimsCheck, TrustedProxies: cfg.TrustedProxies, Render: cfg.Render, TrustedPlatform: cfg.TrustedPlatform}
+		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments, ClaimsCheck: cfg.ClaimsCheck, TrustedProxies: cfg.TrustedProxies, Render: cfg.Render, TrustedPlatform: cfg.TrustedPlatform}
+		go func() {
+			login, loginErr := services.NewOIDCLogin(ctx, cfg.OIDCIssuer, cfg.OIDCClientID, cfg.OIDCClientSecret, cfg.PublicBaseURL+"/auth/callback")
+			if loginErr != nil {
+				log.Fatalf("owner sign-in configuration failed: %v", loginErr)
+			}
+			hosted.SetOwnerLogin(login)
+		}()
 		if err = hosted.LoadWorkspace(); err != nil {
 			log.Fatalf("workspace assets failed: %v", err)
 		}
@@ -254,7 +257,7 @@ func main() {
 	}
 	v1.POST("/mcp", mcp.Receive)
 
-	openSignup := handlers.NewIPRateLimiter(8, time.Minute)
+	openSignup := handlers.NewIPRateLimiter(handlers.OpenSignupPerMinute, time.Minute)
 	addressKey, addressWarning := services.ClientAddressHMACKey(cfg.APIKeySecret)
 	if addressWarning != "" {
 		log.Print(addressWarning)

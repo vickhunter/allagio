@@ -312,6 +312,35 @@ func TestClientAddressHMACUsesAPIKeySecret(t *testing.T) {
 	}
 }
 
+func TestAgentTokenEleventhRapidRequestIs429(t *testing.T) {
+	if OpenSignupPerMinute != 8 {
+		t.Fatalf("per-minute cap is %d; the served text says 8 and must not be raised", OpenSignupPerMinute)
+	}
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	entry := &AgentEntry{
+		DB:           db,
+		BaseURL:      "http://127.0.0.1:8080",
+		TokenLimiter: NewIPRateLimiter(OpenSignupPerMinute, time.Minute),
+		AddressKey:   testAddressKey,
+	}
+	r.POST("/v1/agent-tokens", entry.CreateAgentToken)
+	for i := 1; i <= 11; i++ {
+		rec, _ := postJSON(t, r, http.MethodPost, "/v1/agent-tokens", map[string]any{}, nil)
+		if i <= OpenSignupPerMinute {
+			if rec.Code != http.StatusCreated {
+				t.Fatalf("request %d status %d", i, rec.Code)
+			}
+			continue
+		}
+		if rec.Code != http.StatusTooManyRequests {
+			t.Fatalf("request %d status %d", i, rec.Code)
+		}
+	}
+}
+
 func TestAgentJoinRateLimits(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

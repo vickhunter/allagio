@@ -1,3 +1,7 @@
+## October 28 — Time to first test deal (D-117)
+
+`scripts/cold-path.py` reads `/llms.txt`, then `/skill.md`, joins two parties, walks the directed test deal, and opens the proof page. It prints seconds per step and the total. It does not print tokens. Issuer discovery no longer blocks listen. `GET /auth/login` returns HTTP 503 `sign-in is starting` until that discovery finishes. Database connect and `AUTO_MIGRATE` still finish before listen, because later requests assume the schema. `POST /v1/agent-tokens` stays at 8 a minute and 30 a day, shared with `POST /v1/agent-accounts`. The ninth rapid request from one address is HTTP 429, and the eleventh is too. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 28 — Approval provenance (D-114)
 
 On an ORP 0.4 deal, `GET /orp/deals/{deal}` and the approve reply return `approved_by`. Each entry has `step`, `party`, and `agent` or `owner`. `party` is the seat id already on the deal. A 0.3 deal does not include the field. No new column. Served text does not point at `bound[].authority`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
