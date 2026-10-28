@@ -1,12 +1,16 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -530,5 +534,73 @@ func TestSignInWaitsForIssuerDiscovery(t *testing.T) {
 	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/auth/login?return_to=/owner", nil))
 	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "sign-in is starting") {
 		t.Fatalf("before discovery %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestLoginCallbackKeepsCookieWhileDiscoveryStarts(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &HostedHandler{BaseURL: "http://127.0.0.1:8080"}
+	r := gin.New()
+	r.GET("/auth/callback", h.LoginCallback)
+	req := httptest.NewRequest(http.MethodGet, "/auth/callback?state=abc&code=xyz", nil)
+	req.AddCookie(&http.Cookie{Name: h.loginCookieName(), Value: "abc"})
+	for attempt := 0; attempt < 2; attempt++ {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "sign-in is starting") {
+			t.Fatalf("retry %d status %d %s", attempt, rec.Code, rec.Body.String())
+		}
+		for _, cookie := range rec.Result().Cookies() {
+			if cookie.Name == h.loginCookieName() && cookie.MaxAge < 0 {
+				t.Fatalf("retry %d cleared the login cookie", attempt)
+			}
+		}
+	}
+}
+
+func TestDiscoverOwnerLoginRetriesWithoutExiting(t *testing.T) {
+	var logs bytes.Buffer
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	h := &HostedHandler{}
+	secret := "super-secret-value"
+	var waits []time.Duration
+	attempts := 0
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	discoverOwnerLogin(ctx, h, secret, func() (services.OwnerLogin, error) {
+		attempts++
+		if attempts < 8 {
+			return nil, errors.New("issuer down " + secret)
+		}
+		return &fakeOwnerLogin{}, nil
+	}, func(_ context.Context, delay time.Duration) bool {
+		waits = append(waits, delay)
+		return true
+	})
+	want := []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second, 30 * time.Second, 30 * time.Second}
+	if attempts != 8 || h.ownerLogin() == nil || len(waits) != len(want) {
+		t.Fatalf("attempts %d waits %v login set %v", attempts, waits, h.ownerLogin() != nil)
+	}
+	for i, delay := range want {
+		if waits[i] != delay {
+			t.Fatalf("wait %d got %s want %s", i, waits[i], delay)
+		}
+	}
+	if strings.Contains(logs.String(), secret) || !strings.Contains(logs.String(), "owner sign-in discovery failed") || !strings.Contains(logs.String(), "redacted") {
+		t.Fatalf("log %q", logs.String())
+	}
+
+	stopped := &HostedHandler{}
+	stopCtx, stop := context.WithCancel(context.Background())
+	discoverOwnerLogin(stopCtx, stopped, "", func() (services.OwnerLogin, error) {
+		return nil, errors.New("issuer down")
+	}, func(context.Context, time.Duration) bool {
+		stop()
+		return false
+	})
+	if stopped.ownerLogin() != nil {
+		t.Fatal("shutdown published a login")
 	}
 }

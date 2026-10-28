@@ -579,15 +579,17 @@ func (h *HostedHandler) LoginCallback(c *gin.Context) {
 	if h.limited(c) {
 		return
 	}
+	// Discovery can still be running. Leave the login cookie and the stored
+	// attempt in place so the browser can retry this same callback.
+	if h.ownerLogin() == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "sign-in is starting"})
+		return
+	}
 	state := c.Query("state")
 	cookie, err := c.Cookie(h.loginCookieName())
 	h.cookie(c, h.loginCookieName(), "", -1)
 	if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(state), []byte(cookie)) != 1 || c.Query("code") == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "sign-in state mismatch"})
-		return
-	}
-	if h.ownerLogin() == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "sign-in is starting"})
 		return
 	}
 	a, err := h.DB.ConsumeLoginAttempt(c.Request.Context(), services.HashAPIKey(state))
