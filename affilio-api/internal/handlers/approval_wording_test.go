@@ -5,7 +5,9 @@ import (
 	"testing"
 )
 
-const approvalByMode = "Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode."
+const approvalByMode = "A new site stores placement_publish as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person."
+
+const autoCommit = "only when the domain is verified and claim checks are live"
 
 func TestConnectStatesApprovalByMode(t *testing.T) {
 	if !strings.Contains(skillMD, approvalByMode) {
@@ -50,10 +52,11 @@ func TestYouLimitsStatesApprovalByMode(t *testing.T) {
 		}
 	}
 	for _, kept := range []string{
-		"Manual. A new site opens here. Each placement waits for you.",
+		"Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.",
 		"Once you set it. While claims are not checked, this still waits for a person.",
 		"Only you can turn this on. While claims are not checked, this also waits for a person.",
-		"Your limits come first. A new site opens on Ask me every time.",
+		"Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.",
+		autoCommit,
 	} {
 		if !strings.Contains(you, kept) || !strings.Contains(built, kept) || !strings.Contains(plain, kept) {
 			t.Fatalf("mode line dropped: %s", kept)
@@ -67,8 +70,11 @@ func TestLlmsFullStatesApprovalByMode(t *testing.T) {
 	if disk != llmsFullDocument() {
 		t.Fatal("llms-full.txt drifted from the full document")
 	}
-	if !strings.Contains(disk, approvalByMode) {
+	if !strings.Contains(disk, approvalByMode) || !strings.Contains(disk, autoCommit) {
 		t.Fatal("llms-full.txt does not state approval by mode")
+	}
+	if !strings.Contains(disk, "The hosted MCP wrapper adds owner_approval_url") || strings.Contains(disk, "returns a proposal and owner_approval_url") {
+		t.Fatal("llms-full.txt still says POST /v1/placements returns owner_approval_url")
 	}
 	if !strings.Contains(disk, "A new site waits for a person to approve each placement before it is published.") || !strings.Contains(disk, "a person approves this step") || !strings.Contains(disk, "## ORP 0-3 test deal") || !strings.Contains(disk, "Placing an offer needs approval for now") {
 		t.Fatal("llms-full.txt dropped a manual-scoped or step-modes sentence")
@@ -90,12 +96,20 @@ func TestNoSentenceSaysAgentToolsCannotChangeTheRule(t *testing.T) {
 		{"mcp instructions", hostedMCPInstructions},
 		{"you.md", readRepo(t, root, "affilio-wp/admin/build/landing-v9/you.md")},
 		{"you.html", readRepo(t, root, "affilio-wp/admin/build/you.html")},
-		{"prepare tool", readRepo(t, root, "affilio-api/internal/dcp/revenue_tools.go")},
+		{"revenue tools", readRepo(t, root, "affilio-api/internal/dcp/revenue_tools.go")},
+		{"hosted mcp source", readRepo(t, root, "affilio-api/internal/handlers/hosted_mcp.go")},
+		{"workspace", readRepo(t, root, "affilio-api/internal/handlers/workspace.go")},
+		{"vision", readRepo(t, root, "ui/landing/src/vision.mjs")},
+		{"you app", readRepo(t, root, "ui/landing/src/you/App.tsx")},
+		{"stamp", readRepo(t, root, "ui/landing/scripts/stamp-hosted.mjs")},
 	}
 	for _, item := range bodies {
 		lower := strings.ToLower(item.body)
-		if strings.Contains(lower, "cannot change the rule") || strings.Contains(lower, "cannot change that rule") {
-			t.Fatalf("%s says an agent tool cannot change the rule", item.name)
+		if strings.Contains(lower, "owner's rule decides") || strings.Contains(lower, "only tighten the mode") || strings.Contains(lower, "cannot change the rule") || strings.Contains(lower, "cannot change that rule") {
+			t.Fatalf("%s states an unscoped mode rule", item.name)
+		}
+		if strings.Contains(lower, "placement_publish") && !strings.Contains(item.body, autoCommit) {
+			t.Fatalf("%s names placement_publish without %q", item.name, autoCommit)
 		}
 	}
 }
@@ -110,8 +124,8 @@ func TestPrepareAndCommitNamePlacementPublish(t *testing.T) {
 	if !strings.Contains(commit, "confirm=true cannot replace owner approval") {
 		t.Fatal("commit text dropped confirm=true cannot replace owner approval")
 	}
-	if !strings.Contains(hostedMCPInstructions, "When placement_publish is ask, including on a new site, send its owner approval URL to the human") || !strings.Contains(hostedMCPInstructions, "Agents cannot approve a placement.") {
-		t.Fatal("mcp instructions do not keep the approval URL inside ask, or dropped agents cannot approve a placement")
+	if !strings.Contains(hostedMCPInstructions, "When prepare waits, send its owner approval URL to the human. That wait is placement_publish ask, an unverified domain, or claim checks that are not live.") || !strings.Contains(hostedMCPInstructions, "Agents cannot approve a placement.") || !strings.Contains(hostedMCPInstructions, autoCommit) {
+		t.Fatal("mcp instructions do not send the approval URL on every prepare wait")
 	}
 }
 

@@ -4,7 +4,7 @@
 
 export const visionLine = 'Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent.'
 
-export const visionHonest = 'That is the direction. What works today is an affiliate link. Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode. The other deals on this page are Coming. Nothing here is Verified end to end.'
+export const visionHonest = 'That is the direction. What works today is an affiliate link. A new site stores placement_publish as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person. The other deals on this page are Coming. Nothing here is Verified end to end.'
 
 export const evolutionLine = 'This is affiliate marketing, evolved for agents. The same path, with the finding and the matching handed to the agent you already use.'
 
@@ -19,7 +19,7 @@ export const deals = [
   {
     name: 'Affiliate links',
     status: 'Works today',
-    note: 'Your agent can find an offer and prepare a placement. Ask me every time, a person approves each placement before it is published. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode. A pasted link counts clicks. This is not Verified end to end.',
+    note: 'Your agent can find an offer and prepare a placement. A new site stores placement_publish as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person. A pasted link counts clicks. This is not Verified end to end.',
   },
   {
     name: 'Link swaps',
@@ -46,11 +46,11 @@ export const deals = [
 export const youKeep = [
   {
     t: 'Your limits come first',
-    b: 'A new site opens on Ask me every time. You can later choose Approve within my rules, or Approve anything that passes the checks. While claims are not checked, those two still wait for a person.',
+    b: 'A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person. An agent tool can only tighten a site or offer mode. A site key can set the publish step to auto, which commits only when the domain is verified and claim checks are live.',
   },
   {
     t: 'You approve',
-    b: 'Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode.',
+    b: 'A new site stores placement_publish as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.',
   },
   {
     t: 'No personal data shared with the other agent',
@@ -69,7 +69,7 @@ export const youKeep = [
 export const replaces = [
   {
     t: 'Manual affiliate signups',
-    b: 'Filling in a form on each program site is what this is built to replace. Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode. Your agent joins with POST /v1/agent-tokens and a bearer.',
+    b: 'Filling in a form on each program site is what this is built to replace. A new site stores placement_publish as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. Your agent joins with POST /v1/agent-tokens and a bearer.',
   },
   {
     t: 'Outreach email bots',
@@ -78,7 +78,7 @@ export const replaces = [
 ]
 
 export const limits = [
-  { name: 'Ask me every time', note: 'Manual. A new site opens here. Each placement waits for you.' },
+  { name: 'Ask me every time', note: 'Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.' },
   { name: 'Approve within my rules', note: 'Once you set it. While claims are not checked, this still waits for a person.' },
   { name: 'Approve anything that passes the checks', note: 'Only you can turn this on. While claims are not checked, this also waits for a person.' },
 ]

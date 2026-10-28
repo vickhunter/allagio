@@ -143,7 +143,7 @@ const connectBlock = "## Connect a hosted assistant\n\n" +
 	"POST /orp/join with {}.\n" +
 	"Read tools/list on /mcp.\n" +
 	"No sign-in link.\n" +
-	"Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode.\n" +
+	"A new site stores placement_publish as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.\n" +
 	"On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by.\n" +
 	"Each entry has step, party, and agent or owner.\n" +
 	"A 0.3 deal does not include approved_by.\n" +

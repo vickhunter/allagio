@@ -1,6 +1,6 @@
 ## October 28 — Approval wording by mode (D-119)
 
-Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode. `prepare_placement` and `commit_placement` follow `placement_publish`: ask on a new site, and auto only when the domain is verified and claim checks are live. Agents cannot approve a placement. The test-deal heading stays `ORP 0-3`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+A new site stores `placement_publish` as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. Agents cannot approve a placement. The test-deal heading stays `ORP 0-3`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## October 28 — Time to first test deal (D-117)
 
