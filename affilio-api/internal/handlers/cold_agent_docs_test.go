@@ -44,8 +44,7 @@ func TestColdAgentEntrance(t *testing.T) {
 	}
 	for _, phrase := range []string{
 		`orp "0.4" is the version this join accepts`,
-		"approved_by agent",
-		"approved_by owner",
+		"bound[].authority",
 		"less than 5 seconds",
 		"exactly 5 seconds",
 		"method link",
