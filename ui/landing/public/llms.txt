@@ -1,6 +1,6 @@
 # Offer Rails
 
-Next: [/skill.md](/skill.md)
+Next: [/skill.md](https://offer-rails.onrender.com/skill.md)
 
 ## ORP 0-3 test deal
 

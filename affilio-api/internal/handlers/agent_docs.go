@@ -57,7 +57,7 @@ A 0.3 deal is unchanged. It does not mint a tracked link. POST /orp/deals/{deal}
 DCP v0.1 at https://offer-rails.onrender.com/.well-known/dcp.json remains the live affiliate path.
 `
 
-const llmsText = "# Offer Rails\n\nNext: [/skill.md](/skill.md)\n\n" + orpTestDealSection + "\n" + orpManyPartySection + `
+const llmsText = "# Offer Rails\n\nNext: [/skill.md](https://offer-rails.onrender.com/skill.md)\n\n" + orpTestDealSection + "\n" + orpManyPartySection + `
 > Agents list a product or place an offer. Humans sign in once. Hard checks always apply.
 
 Offer Rails is a publisher and maker workflow. Tools return offers, matches, and previews to the person deciding on their own content. A chat response is never a paid placement.
@@ -83,9 +83,9 @@ const skillMD = `# Offer Rails
 
 This file is a pointer. It is not a second copy of the rules.
 
-Next: [/llms.txt](/llms.txt)
+Next: [/llms.txt](https://offer-rails.onrender.com/llms.txt)
 
-Full text: [/llms-full.txt](/llms-full.txt)
+Full text: [/llms-full.txt](https://offer-rails.onrender.com/llms-full.txt)
 
 ## Connect a hosted assistant
 

@@ -20,7 +20,7 @@ func TestColdAgentEntrance(t *testing.T) {
 
 	llms := httptest.NewRecorder()
 	r.ServeHTTP(llms, httptest.NewRequest(http.MethodGet, "/llms.txt", nil))
-	if llms.Code != http.StatusOK || !strings.Contains(llms.Header().Get("Content-Type"), "text/plain") || !strings.Contains(llms.Body.String(), "](/skill.md)") {
+	if llms.Code != http.StatusOK || !strings.Contains(llms.Header().Get("Content-Type"), "text/plain") || !strings.Contains(llms.Body.String(), "](https://offer-rails.onrender.com/skill.md)") {
 		t.Fatalf("llms %d %q %s", llms.Code, llms.Header().Get("Content-Type"), llms.Body.String()[:80])
 	}
 
@@ -31,7 +31,7 @@ func TestColdAgentEntrance(t *testing.T) {
 	if skill.Code != http.StatusOK || !strings.Contains(skill.Header().Get("Content-Type"), "text/markdown") || len(lines) > 25 || skillBody != skillMD {
 		t.Fatalf("skill %d %q lines %d", skill.Code, skill.Header().Get("Content-Type"), len(lines))
 	}
-	if !strings.Contains(skillBody, "](/llms.txt)") || !strings.Contains(skillBody, "](/llms-full.txt)") || !strings.Contains(skillBody, "## Connect a hosted assistant") {
+	if !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms.txt)") || !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(skillBody, "## Connect a hosted assistant") {
 		t.Fatalf("skill pointer %s", skillBody)
 	}
 

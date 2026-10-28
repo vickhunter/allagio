@@ -2,9 +2,9 @@
 
 This file is a pointer. It is not a second copy of the rules.
 
-Next: [/llms.txt](/llms.txt)
+Next: [/llms.txt](https://offer-rails.onrender.com/llms.txt)
 
-Full text: [/llms-full.txt](/llms-full.txt)
+Full text: [/llms-full.txt](https://offer-rails.onrender.com/llms-full.txt)
 
 ## Connect a hosted assistant
 

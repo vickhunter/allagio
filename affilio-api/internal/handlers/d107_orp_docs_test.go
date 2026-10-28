@@ -158,8 +158,10 @@ func docContentType(t *testing.T, path string) string {
 	switch {
 	case path == "/orp/spec" || path == "/orp/gaps" || strings.HasPrefix(path, "/docs/"):
 		return "text/markdown"
-	case path == "/llms.txt":
+	case path == "/llms.txt" || path == "/llms-full.txt":
 		return "text/plain"
+	case path == "/skill.md":
+		return "text/markdown"
 	case path == "/.well-known/orp.json" || path == "/.well-known/dcp.json" || strings.HasPrefix(path, "/orp/schemas") || strings.HasPrefix(path, "/orp/examples"):
 		return "application/json"
 	case strings.HasPrefix(path, "/landing-v9/"):
