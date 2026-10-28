@@ -139,6 +139,7 @@ func TestMarkdownTwinsMatchHTMLPages(t *testing.T) {
 const connectBlock = "## Connect a hosted assistant\n\n" +
 	"POST /v1/agent-tokens with {}.\n" +
 	"Send the access_token as Authorization: Bearer to /mcp.\n" +
+	"The bearer is not an X-API-Key or X-Admin-Key.\n" +
 	"POST /orp/join with {}.\n" +
 	"Read tools/list on /mcp.\n" +
 	"No sign-in link.\n" +

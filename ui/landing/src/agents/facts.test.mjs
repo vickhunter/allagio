@@ -28,7 +28,7 @@ test('llms.txt matches the agent facts', () => {
   assert.equal(text.includes('](https://offer-rails.onrender.com/llms-full.txt)'), false)
   assert.equal(text.includes('Cold path:'), false)
   assert.equal(text.startsWith('# Offer Rails\n'), true)
-  assert.match(text, /## ORP 0-3 test deal/)
+  assert.match(text, /## ORP 0\.3 test deal/)
   assert.match(text, /In testing\. Start here for a test deal/)
   assert.match(text, /\/\.well-known\/orp\.json/)
   assert.match(text, /message format 0\.3/)
@@ -113,6 +113,7 @@ test('llms.txt matches the agent facts', () => {
   for (const tool of tools) assert.match(text, new RegExp(tool.name))
   for (const href of docLinks) assert.match(text, new RegExp(href))
   assert.equal(banned.test(withoutOfferJoin(file)), false)
+  assert.equal(banned.test(withoutOfferJoin(text)), false)
   assert.equal(/OfferRails|OFFERRAILS/.test(file + text), false)
 })
 

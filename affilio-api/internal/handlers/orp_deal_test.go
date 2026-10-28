@@ -500,7 +500,7 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	origin := "http://127.0.0.1:8080"
 
 	llmsRec, _ := postJSON(t, r, http.MethodGet, "/llms.txt", nil, nil)
-	if llmsRec.Code != http.StatusOK || !strings.Contains(llmsRec.Body.String(), "## ORP 0-3 test deal") || !strings.Contains(llmsFullDocument(), orpTestDealSection) {
+	if llmsRec.Code != http.StatusOK || !strings.Contains(llmsRec.Body.String(), "## ORP 0.3 test deal") || !strings.Contains(llmsFullDocument(), orpTestDealSection) {
 		t.Fatalf("llms %d", llmsRec.Code)
 	}
 	discDocRec, discDoc := postJSON(t, r, http.MethodGet, "/.well-known/orp.json", nil, nil)

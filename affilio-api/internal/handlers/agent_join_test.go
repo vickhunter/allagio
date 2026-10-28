@@ -759,7 +759,7 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		t.Fatal(err)
 	}
 	phrases := []string{
-		"## ORP 0-3 test deal",
+		"## ORP 0.3 test deal",
 		"In testing",
 		"/.well-known/orp.json",
 		"POST /orp",
@@ -798,7 +798,7 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		{"public", string(public)},
 		{"built", string(built)},
 	} {
-		if !strings.Contains(item.body, "## ORP 0-3 test deal") || !strings.Contains(item.body, "Cold path:") || !strings.Contains(item.body, "](https://offer-rails.onrender.com/skill.md)") || strings.Contains(item.body, "](https://offer-rails.onrender.com/llms.txt)") {
+		if !strings.Contains(item.body, "## ORP 0.3 test deal") || !strings.Contains(item.body, "Cold path:") || !strings.Contains(item.body, "](https://offer-rails.onrender.com/skill.md)") || strings.Contains(item.body, "](https://offer-rails.onrender.com/llms.txt)") {
 			t.Errorf("%s is not the cold path", item.name)
 		}
 	}

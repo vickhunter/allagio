@@ -8,6 +8,7 @@ Full text: [/llms-full.txt](https://offer-rails.onrender.com/llms-full.txt)
 
 POST /v1/agent-tokens with {}.
 Send the access_token as Authorization: Bearer to /mcp.
+The bearer is not an X-API-Key or X-Admin-Key.
 POST /orp/join with {}.
 Read tools/list on /mcp.
 No sign-in link.

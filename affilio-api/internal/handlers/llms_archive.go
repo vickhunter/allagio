@@ -6,7 +6,7 @@ const llmsArchive = `# Offer Rails
 
 Next: [/skill.md](https://offer-rails.onrender.com/skill.md)
 
-## ORP 0-3 test deal
+## ORP 0.3 test deal
 
 In testing. Start here for a test deal. Offer Rails does not hold money, and this host claims no conformance level.
 
