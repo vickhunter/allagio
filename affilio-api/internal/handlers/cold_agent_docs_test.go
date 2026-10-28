@@ -3,13 +3,77 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode"
+
+	"affilio-api/internal/orp"
 
 	"github.com/gin-gonic/gin"
 )
+
+// headingAnchor is the fragment a markdown heading gets: lower case, spaces
+// become hyphens, and other punctuation is dropped. "ORP 0-3 test deal" is
+// orp-0-3-test-deal. "ORP 0.3 test deal" is orp-03-test-deal.
+func headingAnchor(title string) string {
+	var b strings.Builder
+	prevHyphen := false
+	for _, r := range strings.ToLower(title) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' {
+			b.WriteRune(r)
+			prevHyphen = r == '-'
+			continue
+		}
+		if r == ' ' && b.Len() > 0 && !prevHyphen {
+			b.WriteByte('-')
+			prevHyphen = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
+func markdownHeadingAnchors(body string) map[string]bool {
+	anchors := map[string]bool{}
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "#") {
+			continue
+		}
+		title := strings.TrimSpace(strings.TrimLeft(line, "#"))
+		if title == "" {
+			continue
+		}
+		anchors[headingAnchor(title)] = true
+	}
+	return anchors
+}
+
+func TestDiscoveryDocsFragmentResolves(t *testing.T) {
+	doc := orp.DiscoveryDocument("http://127.0.0.1:8080", "127.0.0.1", "none")
+	docsURL, _ := doc["docs"].(string)
+	parsed, err := url.Parse(docsURL)
+	if err != nil || parsed.Fragment == "" || parsed.Path != "/llms.txt" {
+		t.Fatalf("docs url %q", docsURL)
+	}
+	dir := filepath.Join(repoRoot(t), "affilio-wp", "admin", "build")
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	(&AgentEntry{AssetsPath: dir}).Mount(r)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, parsed.Path, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("llms %d", rec.Code)
+	}
+	if !markdownHeadingAnchors(rec.Body.String())[parsed.Fragment] {
+		t.Fatalf("served /llms.txt has no heading for #%s", parsed.Fragment)
+	}
+	if !markdownHeadingAnchors(llmsBody())[parsed.Fragment] {
+		t.Fatalf("fallback /llms.txt has no heading for #%s", parsed.Fragment)
+	}
+}
 
 func TestColdAgentEntrance(t *testing.T) {
 	dir := filepath.Join(repoRoot(t), "affilio-wp", "admin", "build")

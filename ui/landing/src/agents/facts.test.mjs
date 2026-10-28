@@ -113,6 +113,7 @@ test('llms.txt matches the agent facts', () => {
   for (const tool of tools) assert.match(text, new RegExp(tool.name))
   for (const href of docLinks) assert.match(text, new RegExp(href))
   assert.equal(banned.test(withoutOfferJoin(file)), false)
+  assert.equal(banned.test(withoutOfferJoin(text)), false)
   assert.equal(/OfferRails|OFFERRAILS/.test(file + text), false)
 })
 

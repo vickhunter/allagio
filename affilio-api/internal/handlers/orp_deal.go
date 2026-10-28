@@ -105,7 +105,7 @@ func (h *ORPHost) attachApprovals(c *gin.Context, deal *database.ORPDeal) {
 // dropping approved_by with no marker.
 func approvalsFromQuery(rows []database.DealApproval, err error) ([]database.DealApproval, bool) {
 	if err != nil {
-		log.Printf("orp deal approvals unavailable")
+		log.Printf("orp deal approvals unavailable: %v", err)
 		return nil, true
 	}
 	return rows, false

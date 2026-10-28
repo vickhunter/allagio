@@ -2,6 +2,10 @@
 
 `scripts/cold-path.py` reads `/llms.txt`, then `/skill.md`, joins two parties, walks the directed test deal, and opens the proof page. It prints seconds per step and the total. It does not print tokens. Issuer discovery no longer blocks listen. A failed discovery is logged without the client secret and retried, from 1 second up to 30 seconds. It does not exit the process. `GET /auth/login` and the sign-in callback return HTTP 503 `sign-in is starting` until discovery finishes. The callback leaves the login cookie in place so the browser can retry. Database connect and `AUTO_MIGRATE` still finish before listen, because later requests assume the schema. `POST /v1/agent-tokens` stays at 8 a minute and 30 a day, shared with `POST /v1/agent-accounts`. The ninth rapid request from one address is HTTP 429, and the eleventh is too. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
+## October 28 — Entrance follow-up
+
+`/skill.md` and `/you.md` say the bearer is not an X-API-Key or X-Admin-Key. A failed approval read logs the error. `/llms-full.txt` says the offer is available where it used to say listed. The test-deal heading stays `ORP 0-3` so `/llms.txt#orp-0-3-test-deal` still lands on that heading. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 28 — Cold-path llms.txt (D-115)
 
 `/llms.txt` is only the cold path: this file, then `/skill.md`, then join, then a test deal, then proof. It links to `/llms-full.txt` and the docs. `/llms-full.txt` starts at the manual and does not link back to `/skill.md` or to itself. The two `llms.txt` copies are the same bytes. A failed approval read on an ORP 0.4 deal stays HTTP 200, sets `approvals_unavailable`, and omits `approved_by`. A 0.3 deal has neither field. No glossary. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

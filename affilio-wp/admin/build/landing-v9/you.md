@@ -38,6 +38,7 @@ Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.
 
 POST /v1/agent-tokens with {}.
 Send the access_token as Authorization: Bearer to /mcp.
+The bearer is not an X-API-Key or X-Admin-Key.
 POST /orp/join with {}.
 Read tools/list on /mcp.
 No sign-in link.
