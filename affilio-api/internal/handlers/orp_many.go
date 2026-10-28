@@ -924,6 +924,11 @@ func (h *ORPHost) manySnapshot(dns, viewer, re string, deal database.ORPDeal, no
 		}
 		body["waiting"] = waiting
 	}
+	if !deal.OmitApprovals {
+		if wire := approvedByWire(deal.WireApprovals, doc.Approvals); len(wire) > 0 {
+			body["approved_by"] = wire
+		}
+	}
 	snap := orp.DealMessage(dns, viewer, re, deal.ID, orp.DealView(body, viewer), now)
 	snap["orp"] = orp.Version04
 	return snap, nil

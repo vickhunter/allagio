@@ -143,6 +143,9 @@ const connectBlock = "## Connect a hosted assistant\n\n" +
 	"Read tools/list on /mcp.\n" +
 	"No sign-in link.\n" +
 	"A person still approves each placement.\n" +
+	"On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by.\n" +
+	"Each entry has step, party, and agent or owner.\n" +
+	"A 0.3 deal does not include approved_by.\n" +
 	"The deal steps are in /llms-full.txt.\n"
 
 func connectSection(text string) (string, bool) {
