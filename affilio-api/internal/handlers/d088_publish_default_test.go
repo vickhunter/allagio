@@ -146,8 +146,7 @@ func TestNewSitePublishDefaultMigrationLeavesRows(t *testing.T) {
 func TestLLMsAndDocsStateNewSitePublishDefault(t *testing.T) {
 	root := filepath.Join("..", "..", "..")
 	for _, path := range []string{
-		filepath.Join(root, "ui", "landing", "public", "llms.txt"),
-		filepath.Join(root, "affilio-wp", "admin", "build", "landing-v9", "llms.txt"),
+		filepath.Join(root, "affilio-wp", "admin", "build", "landing-v9", "llms-full.txt"),
 		filepath.Join(root, "ui", "landing", "src", "publishers", "setup", "App.tsx"),
 	} {
 		body, err := os.ReadFile(path)
@@ -157,7 +156,7 @@ func TestLLMsAndDocsStateNewSitePublishDefault(t *testing.T) {
 		if !strings.Contains(string(body), entry.NewSitePublishDefault) {
 			t.Fatalf("%s does not state the new-site default", path)
 		}
-		if strings.Contains(path, "llms.txt") && !strings.Contains(string(body), entry.MissingRowPublishAsk) {
+		if strings.Contains(path, "llms-full.txt") && !strings.Contains(string(body), entry.MissingRowPublishAsk) {
 			t.Fatalf("%s does not state the missing-row publish default", path)
 		}
 		if strings.Contains(string(body), "still reads as auto") || strings.Contains(string(body), "still reads every step as auto") {
@@ -188,8 +187,8 @@ func TestLLMsAndDocsStateNewSitePublishDefault(t *testing.T) {
 	r := gin.New()
 	(&AgentEntry{AssetsPath: filepath.Join(root, "affilio-wp", "admin", "build")}).Mount(r)
 	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/llms.txt", nil))
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/llms-full.txt", nil))
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Type"), "text/plain") || !strings.Contains(rec.Body.String(), entry.NewSitePublishDefault) || !strings.Contains(rec.Body.String(), entry.MissingRowPublishAsk) {
-		t.Fatalf("/llms.txt: %d %q %s", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
+		t.Fatalf("/llms-full.txt: %d %q %s", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
 	}
 }

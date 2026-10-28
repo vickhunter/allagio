@@ -1534,7 +1534,7 @@ WHERE id=$1`, id); err != nil {
 }
 
 func TestHardCheckDocsFollowTheCatalog(t *testing.T) {
-	llms := llmsBody()
+	llms := llmsFullDocument()
 	modes, ok := agentDoc("modes.md")
 	if !ok {
 		t.Fatal("modes doc missing")

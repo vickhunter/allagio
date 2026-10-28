@@ -144,6 +144,9 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 		owner.POST("/products/:id/connection", h.Payments.Connect)
 	}
 	public.Any("/mcp", h.MCP)
+	// Directory is an API. It stays off the public page group so a miss is
+	// JSON, and a failed load is not the empty list.
+	r.GET("/v1/directory/makers", h.DirectoryMakers)
 	// Gin redirects an extra trailing slash before group middleware, and it
 	// refuses a second /privacy/ route, so /privacy// never reaches headers().
 	// Serve a cleaned /privacy or /terms here. Other routes keep a one-slash redirect.

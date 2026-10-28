@@ -481,10 +481,13 @@ func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 				t.Fatalf("%s does not name the agent record or the counterparty rule", rel)
 			}
 		}
-		if strings.Contains(rel, "llms") {
+		if strings.Contains(rel, "llms-full.txt") {
 			if strings.Contains(body, "bound[].authority") || !strings.Contains(body, "approved_by agent") || !strings.Contains(body, "approved_by owner") || !strings.Contains(body, rule) {
 				t.Fatalf("%s does not name approved_by", rel)
 			}
+		}
+		if strings.HasSuffix(rel, "/llms.txt") && strings.Contains(body, "bound[].authority") {
+			t.Fatalf("%s points at bound[].authority", rel)
 		}
 		if strings.HasSuffix(rel, "defs.schema.json") || strings.Contains(rel, "/messages/offer.schema.json") || strings.Contains(rel, "/messages/space.schema.json") || strings.Contains(rel, "/messages/accept.schema.json") || strings.Contains(rel, "/messages/deal.schema.json") || strings.Contains(rel, "/http/join-response.schema.json") {
 			if !strings.Contains(body, "approved_by agent") || !strings.Contains(body, "approved_by owner") || !strings.Contains(body, "Opening the URL records nothing") || !strings.Contains(body, "submits the form") {
@@ -492,10 +495,11 @@ func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 			}
 		}
 	}
-	if !strings.Contains(llmsBody(), rule) || strings.Contains(llmsBody(), "bound[].authority") || !strings.Contains(llmsBody(), "approved_by agent") || !strings.Contains(llmsBody(), "approved_by owner") {
-		t.Fatal("fallback llms.txt does not name approved_by")
+	if !strings.Contains(llmsFullDocument(), rule) || strings.Contains(llmsFullDocument(), "bound[].authority") || !strings.Contains(llmsFullDocument(), "approved_by agent") || !strings.Contains(llmsFullDocument(), "approved_by owner") {
+		t.Fatal("llms-full.txt does not name approved_by")
 	}
-	assertNoPersonApprovedClaim(t, "fallback llms", llmsBody())
+	assertNoPersonApprovedClaim(t, "fallback llms", llmsFullDocument())
+	assertNoPersonApprovedClaim(t, "cold path llms", llmsBody())
 	assertNoPersonApprovedClaim(t, "approve page", orp.ApprovePage("Notes", "Affiliate link"))
 	assertNoPersonApprovedClaim(t, "agent proof", orp.ProofPage("Affiliate link", "active", false, []orp.Approval{{By: "agent"}}))
 	page := orp.ProofPage("Affiliate link", "active", false, []orp.Approval{{By: "agent"}})

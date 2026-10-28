@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -499,7 +500,7 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	origin := "http://127.0.0.1:8080"
 
 	llmsRec, _ := postJSON(t, r, http.MethodGet, "/llms.txt", nil, nil)
-	if llmsRec.Code != http.StatusOK || !strings.Contains(llmsRec.Body.String(), orpTestDealSection) {
+	if llmsRec.Code != http.StatusOK || !strings.Contains(llmsRec.Body.String(), "## ORP 0-3 test deal") || !strings.Contains(llmsFullDocument(), orpTestDealSection) {
 		t.Fatalf("llms %d", llmsRec.Code)
 	}
 	discDocRec, discDoc := postJSON(t, r, http.MethodGet, "/.well-known/orp.json", nil, nil)
@@ -977,6 +978,88 @@ func TestApprovedByKeepsEachParty(t *testing.T) {
 	okRows, okOmit := approvalsFromQuery([]database.DealApproval{{Step: "accept", Party: "orp:hub.example/p_one", By: "owner"}}, nil)
 	if okOmit || len(okRows) != 1 {
 		t.Fatalf("query success %v %v", okRows, okOmit)
+	}
+
+	terms, err := json.Marshal(testTerms())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	deal := database.ORPDeal{
+		ID:        "deal_testunavailable",
+		State:     "pending",
+		Terms:     terms,
+		TermsHash: "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Parties:   json.RawMessage(`{"round":1,"seats":[{"id":"orp:hub.example/p_one","role":"maker","required":true},{"id":"orp:hub.example/p_two","role":"publisher","required":true}]}`),
+		UpdatedAt: now,
+	}
+	deal.ApprovalsUnavailable = true
+	snap, err := (&ORPHost{}).manySnapshot("orp:hub.example", "orp:hub.example/p_one", "", deal, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := snap["body"].(map[string]any)
+	if body["approvals_unavailable"] != true {
+		t.Fatalf("0.4 marker %#v", body["approvals_unavailable"])
+	}
+	if _, ok := body["approved_by"]; ok {
+		t.Fatal("failed read still sent approved_by")
+	}
+	plain, err := dealBody(deal, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := plain["approvals_unavailable"]; ok {
+		t.Fatal("0.3 body includes approvals_unavailable")
+	}
+	if _, ok := plain["approved_by"]; ok {
+		t.Fatal("0.3 body includes approved_by")
+	}
+}
+
+func TestDealReadMarksApprovalFailure(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	entry := &AgentEntry{
+		DB:           db,
+		BaseURL:      "http://127.0.0.1:8080",
+		AddressKey:   testAddressKey,
+		ClaimsCheck:  "off-local",
+		TokenLimiter: NewIPRateLimiter(8, time.Minute),
+	}
+	r := mountORP(entry, &ORPHost{Entry: entry})
+	offererToken, offerer := joinParty(t, r)
+	_, acceptor := joinParty(t, r)
+	directed := orpEnvelope("offer", "m_d115_unread", offerer, standingOffer())
+	directed["to"] = acceptor
+	created, createdBody := postJSON(t, r, http.MethodPost, "/orp", directed, bearerHeader(offererToken))
+	dealID, _ := createdBody["deal"].(string)
+	if created.Code != http.StatusOK || dealID == "" {
+		t.Fatalf("offer %d %s", created.Code, created.Body.String())
+	}
+	db.ApprovalsReadErr = errors.New("db down")
+	plainRec, plainBody := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offererToken))
+	plainDeal, _ := plainBody["body"].(map[string]any)
+	if plainRec.Code != http.StatusOK {
+		t.Fatalf("0.3 read %d %s", plainRec.Code, plainRec.Body.String())
+	}
+	if _, ok := plainDeal["approvals_unavailable"]; ok {
+		t.Fatal("0.3 body includes approvals_unavailable")
+	}
+	if _, ok := plainDeal["approved_by"]; ok {
+		t.Fatal("0.3 body includes approved_by")
+	}
+	parties := `{"round":1,"seats":[{"id":"` + offerer + `","role":"maker","required":true},{"id":"` + acceptor + `","role":"publisher","required":true}],"approvals":[{"party":"` + offerer + `","step":"accept","approved_by":"agent"}]}`
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET parties=$2::jsonb WHERE id=$1`, dealID, parties); err != nil {
+		t.Fatal(err)
+	}
+	failed, failedBody := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offererToken))
+	failedDeal, _ := failedBody["body"].(map[string]any)
+	if failed.Code != http.StatusOK || failedDeal["approvals_unavailable"] != true {
+		t.Fatalf("0.4 read %d %s", failed.Code, failed.Body.String())
+	}
+	if _, ok := failedDeal["approved_by"]; ok {
+		t.Fatalf("failed read sent approved_by %s", failed.Body.String())
 	}
 }
 

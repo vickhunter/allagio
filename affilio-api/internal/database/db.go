@@ -18,6 +18,9 @@ type DB struct {
 	// back. Production leaves it nil. Tests use it to prove a failed approve
 	// leaves no inbox row and no tracking token.
 	ORPBeforeCommit func(context.Context) error
+	// ApprovalsReadErr, when set, is returned by DealOwnerApprovals.
+	// Production leaves it nil. Tests use it to fail that read only.
+	ApprovalsReadErr error
 }
 
 // Clock returns the injected instant, or the wall clock when none is set.

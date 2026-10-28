@@ -364,7 +364,7 @@ func TestHardChecksAreTheUISource(t *testing.T) {
 			t.Fatalf("check %d: %v", i, item)
 		}
 	}
-	llms := llmsBody()
+	llms := llmsFullDocument()
 	modes, ok := agentDoc("modes.md")
 	if !ok || !containsAll(llms, "GET /v1/policy/hard-checks", "is the single source the UI renders") || !containsAll(modes, "GET /v1/policy/hard-checks", "is the single source the UI renders") {
 		t.Fatal("docs do not name the hard-check endpoint as the UI source")

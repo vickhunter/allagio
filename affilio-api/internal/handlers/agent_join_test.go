@@ -827,6 +827,21 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		{"public", string(public)},
 		{"built", string(built)},
 	} {
+		if !strings.Contains(item.body, "## ORP 0-3 test deal") || !strings.Contains(item.body, "Cold path:") || !strings.Contains(item.body, "](https://offer-rails.onrender.com/skill.md)") || strings.Contains(item.body, "](https://offer-rails.onrender.com/llms.txt)") {
+			t.Errorf("%s is not the cold path", item.name)
+		}
+	}
+	fullBuilt, err := os.ReadFile(filepath.Join(root, "affilio-wp", "admin", "build", "landing-v9", "llms-full.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range []struct {
+		name string
+		body string
+	}{
+		{"full fallback", llmsFullDocument()},
+		{"full built", string(fullBuilt)},
+	} {
 		if !strings.Contains(item.body, orpTestDealSection) {
 			t.Errorf("%s does not contain the ORP test-deal section", item.name)
 		}
@@ -850,7 +865,7 @@ func TestLLMsJoinDoesNotRequireGoogle(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Type"), "text/plain") {
 		t.Fatalf("llms: %d %q", rec.Code, rec.Header().Get("Content-Type"))
 	}
-	if !strings.Contains(rec.Body.String(), AgentJoinCommand) || strings.Contains(rec.Body.String(), "/mcp needs the Google sign-in") || strings.Contains(rec.Body.String(), "This server needs a Google sign-in today") {
+	if !strings.Contains(rec.Body.String(), "Cold path:") || !strings.Contains(rec.Body.String(), "POST /orp/join") || strings.Contains(rec.Body.String(), "/mcp needs the Google sign-in") || strings.Contains(rec.Body.String(), "This server needs a Google sign-in today") {
 		t.Fatalf("fallback llms:\n%s", rec.Body.String())
 	}
 	root := filepath.Join("..", "..", "..")
@@ -862,12 +877,15 @@ func TestLLMsJoinDoesNotRequireGoogle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(public) != string(built) || !strings.Contains(string(public), AgentJoinCommand) || strings.Contains(string(public), "/mcp needs the Google sign-in") {
-		t.Fatal("served llms.txt still sends agents to Google")
+	if string(public) != string(built) {
+		t.Fatal("llms.txt copies differ")
+	}
+	if strings.Contains(string(public), "/mcp needs the Google sign-in") || strings.Contains(llmsFullDocument(), "/mcp needs the Google sign-in") || strings.Contains(llmsFullDocument(), "This server needs a Google sign-in today") {
+		t.Fatal("served llms text still sends agents to Google")
 	}
 	const stdioSentence = "The MCP server name is offer-rails-mcp. The npm package offer-rails is not published yet. It is coming soon. Use the hosted MCP URL in this document. When the hosted installer archive is on this origin, the command is npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>. The environment names are the API URL, the API key, and the site key. Each name is the product name with the space removed, then _API_URL, _API_KEY, and _SITE_KEY."
-	if !strings.Contains(llmsBody(), stdioSentence) || !strings.Contains(string(public), stdioSentence) || !strings.Contains(string(built), stdioSentence) {
-		t.Fatal("llms fallback stdio text does not match the served file")
+	if !strings.Contains(llmsFullDocument(), AgentJoinCommand) || !strings.Contains(llmsFullDocument(), stdioSentence) {
+		t.Fatal("llms-full.txt dropped the join command or the stdio sentence")
 	}
 }
 
