@@ -123,6 +123,59 @@ func TestColdAgentEntrance(t *testing.T) {
 		}
 		assertPublicDocHeaders(t, rec)
 	}
+	headSlash := httptest.NewRecorder()
+	r.ServeHTTP(headSlash, httptest.NewRequest(http.MethodHead, "/skill.md/", nil))
+	if slash.Header().Get("Content-Length") != "0" || headSlash.Header().Get("Content-Length") != slash.Header().Get("Content-Length") || slash.Body.Len() != 0 || headSlash.Body.Len() != 0 || headSlash.Code != http.StatusMovedPermanently || headSlash.Header().Get("Location") != "/skill.md" {
+		t.Fatalf("skill slash length get %q head %q body %d/%d head %d %q", slash.Header().Get("Content-Length"), headSlash.Header().Get("Content-Length"), slash.Body.Len(), headSlash.Body.Len(), headSlash.Code, headSlash.Header().Get("Location"))
+	}
+	for _, path := range []string{"/docs/device-login.md/", "/docs/device-login.md//", "/docs/./device-login.md"} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(method, "http://127.0.0.1/", nil)
+			req.URL.Path = path
+			req.URL.RawQuery = "from=cold"
+			r.ServeHTTP(rec, req)
+			if rec.Code != http.StatusMovedPermanently || rec.Header().Get("Location") != "/docs/device-login.md?from=cold" || rec.Body.Len() != 0 {
+				t.Fatalf("%s %s %d location %q body %d", method, path, rec.Code, rec.Header().Get("Location"), rec.Body.Len())
+			}
+			if strings.Contains(rec.Header().Get("Location"), "://") || strings.HasPrefix(rec.Header().Get("Location"), "//") {
+				t.Fatalf("%s location left the host %q", path, rec.Header().Get("Location"))
+			}
+			assertPublicDocHeaders(t, rec)
+		}
+	}
+	followed := httptest.NewRecorder()
+	r.ServeHTTP(followed, httptest.NewRequest(http.MethodGet, "/docs/device-login.md", nil))
+	if followed.Code != http.StatusOK || followed.Header().Get("Location") != "" || !strings.Contains(followed.Header().Get("Content-Type"), "text/markdown") {
+		t.Fatalf("followed doc %d location %q", followed.Code, followed.Header().Get("Location"))
+	}
+	missingSlash := httptest.NewRecorder()
+	r.ServeHTTP(missingSlash, httptest.NewRequest(http.MethodGet, "/docs/no-such.md/", nil))
+	if missingSlash.Code != http.StatusNotFound || missingSlash.Header().Get("Location") != "" || !strings.Contains(missingSlash.Header().Get("Content-Type"), "text/markdown") || missingSlash.Body.String() != "not found\n" {
+		t.Fatalf("missing slash %d location %q %q %s", missingSlash.Code, missingSlash.Header().Get("Location"), missingSlash.Header().Get("Content-Type"), missingSlash.Body.String())
+	}
+	for _, path := range []string{"/llms.txt/", "/llms-full.txt/"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusMovedPermanently || rec.Header().Get("Location") != strings.TrimSuffix(path, "/") {
+			t.Fatalf("%s %d location %q", path, rec.Code, rec.Header().Get("Location"))
+		}
+		assertPublicDocHeaders(t, rec)
+	}
+	for _, rawPath := range []string{"//evil.com", "/%2f%2fevil.com", "/%2f%2fevil.com/"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "http://127.0.0.1/", nil)
+		req.URL.Path = rawPath
+		req.URL.RawPath = rawPath
+		r.ServeHTTP(rec, req)
+		loc := rec.Header().Get("Location")
+		if loc != "" && (strings.HasPrefix(loc, "//") || strings.Contains(loc, "://") || strings.Contains(strings.ToLower(loc), "evil.com")) {
+			t.Fatalf("%s location %q", rawPath, loc)
+		}
+		if rec.Code == http.StatusMovedPermanently {
+			t.Fatalf("%s redirected %q", rawPath, loc)
+		}
+	}
 	headSkill := httptest.NewRecorder()
 	r.ServeHTTP(headSkill, httptest.NewRequest(http.MethodHead, "/skill.md", nil))
 	if headSkill.Code != http.StatusOK || headSkill.Body.Len() != 0 || !strings.Contains(headSkill.Header().Get("Content-Type"), "text/markdown") || headSkill.Header().Get("Content-Length") != skill.Header().Get("Content-Length") {

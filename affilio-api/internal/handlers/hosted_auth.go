@@ -153,20 +153,26 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 	requestPath := c.Request.URL.Path
 	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
-		cleaned := path.Clean(requestPath)
-		if markdownPage(cleaned) && requestPath != cleaned {
+		if target, ok := cleanedRouteRedirect(c.Request.Method, requestPath, r); ok {
 			setPublicDocHeaders(c)
-			if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(cleaned)) {
+			if target == "/v1/go" || strings.HasPrefix(target, "/v1/go/") {
+				stampGoResponse(c)
+			}
+			if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
 				c.Header("X-Robots-Tag", "noindex")
 			}
-			target := cleaned
 			if q := c.Request.URL.RawQuery; q != "" {
 				target += "?" + q
 			}
-			c.Redirect(http.StatusMovedPermanently, target)
+			// Same empty body for GET and HEAD, so Content-Length does not differ.
+			c.Header("Location", target)
+			c.Header("Content-Length", "0")
+			c.Status(http.StatusMovedPermanently)
+			c.Writer.WriteHeaderNow()
 			return
 		}
-		if strings.HasSuffix(cleaned, ".md") && !markdownPage(cleaned) && landingMiss(requestPath) {
+		cleaned := path.Clean(requestPath)
+		if strings.HasSuffix(cleaned, ".md") && landingMiss(requestPath) && !markdownRoute(c.Request.Method, cleaned, r) {
 			h.writePublicHeaders(c)
 			writeMethodBody(c, http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
 			return
@@ -235,6 +241,7 @@ func redirectTrailingSlash(c *gin.Context, r *gin.Engine) bool {
 	if !ok {
 		return false
 	}
+	setPublicDocHeaders(c)
 	if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
 		c.Header("X-Robots-Tag", "noindex")
 	}
@@ -332,6 +339,83 @@ func setPublicDocHeaders(c *gin.Context) {
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Referrer-Policy", "strict-origin")
 	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+}
+
+// cleanedRouteRedirect is a 301 target when path.Clean changes the path onto
+// a route for this method. A missing /docs file stays a 404. The target is
+// always a single-slash on-host path.
+func cleanedRouteRedirect(method, requestPath string, r *gin.Engine) (string, bool) {
+	if requestPath == "" || !strings.HasPrefix(requestPath, "/") || strings.HasPrefix(requestPath, "//") {
+		return "", false
+	}
+	if strings.Contains(strings.ToLower(requestPath), "%2f%2f") {
+		return "", false
+	}
+	cleaned := path.Clean(requestPath)
+	if cleaned == requestPath || !onHostPath(cleaned) {
+		return "", false
+	}
+	if !routeForMethod(method, cleaned, r) {
+		return "", false
+	}
+	if name, ok := strings.CutPrefix(cleaned, "/docs/"); ok {
+		if strings.Contains(name, "/") {
+			return "", false
+		}
+		if _, exists := agentDoc(name); !exists {
+			return "", false
+		}
+	}
+	// Empty, ".", and ".." segments stay a 404 on API paths. A public doc
+	// whose clean path is a real route still 301s, including /docs/<name>//.
+	if !singleSlashPath(requestPath) && !publicDocCanonical(cleaned) {
+		return "", false
+	}
+	return cleaned, true
+}
+
+func publicDocCanonical(cleaned string) bool {
+	switch cleaned {
+	case "/llms.txt", "/llms-full.txt":
+		return true
+	}
+	if markdownPage(cleaned) {
+		return true
+	}
+	name, ok := strings.CutPrefix(cleaned, "/docs/")
+	if !ok || name == "" || strings.Contains(name, "/") {
+		return false
+	}
+	_, exists := agentDoc(name)
+	return exists
+}
+
+// markdownRoute is a route that serves markdown. A /docs/:name pattern counts
+// only when that file exists, so /docs/no-such.md/ stays a 404.
+func markdownRoute(method, cleaned string, r *gin.Engine) bool {
+	if !routeForMethod(method, cleaned, r) {
+		return false
+	}
+	if strings.HasPrefix(cleaned, "/docs/") {
+		return publicDocCanonical(cleaned)
+	}
+	return true
+}
+
+func onHostPath(cleaned string) bool {
+	return cleaned != "" && cleaned != "/" && strings.HasPrefix(cleaned, "/") && !strings.HasPrefix(cleaned, "//") && !strings.Contains(cleaned, "://") && !strings.Contains(cleaned, "\\")
+}
+
+func routeForMethod(method, cleaned string, r *gin.Engine) bool {
+	if !onHostPath(cleaned) && cleaned != "/" {
+		return false
+	}
+	for _, route := range r.Routes() {
+		if route.Method == method && (route.Path == cleaned || routePatternMatches(route.Path, cleaned)) {
+			return true
+		}
+	}
+	return false
 }
 
 func markdownPage(cleaned string) bool {

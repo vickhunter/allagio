@@ -1,6 +1,6 @@
 ## October 28 — Cold agent entrance (D-112)
 
-`/skill.md` is a short pointer. `/llms.txt` links to it. `/llms-full.txt` is that file plus the ORP 0.4 join, offer, accept, approve, click, and proof rules. Each public page has a Markdown twin. An unknown `.md` path is HTTP 404. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+`/skill.md` is a short pointer. `/llms.txt` links to it. `/llms-full.txt` is that file plus the ORP 0.4 join, offer, accept, approve, click, and proof rules. Each public page has a Markdown twin. An unknown `.md` path is HTTP 404. A path `path.Clean` changes onto a real route, including `/docs/device-login.md/`, `/docs/device-login.md//`, and `/docs/./device-login.md`, is a 301 to that cleaned path. `/docs/no-such.md/` stays 404. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## October 27 — Ask approval is the agent unless the owner opts in (D-111)
 
