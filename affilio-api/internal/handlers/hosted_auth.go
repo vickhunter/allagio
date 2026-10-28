@@ -154,10 +154,8 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 	requestPath := c.Request.URL.Path
 	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
 		if target, ok := cleanedRouteRedirect(c.Request.Method, requestPath, r); ok {
+			// Public docs only. A go-link 301 keeps the headers main sends.
 			setPublicDocHeaders(c)
-			if target == "/v1/go" || strings.HasPrefix(target, "/v1/go/") {
-				stampGoResponse(c)
-			}
 			if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
 				c.Header("X-Robots-Tag", "noindex")
 			}
@@ -172,7 +170,7 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 			return
 		}
 		cleaned := path.Clean(requestPath)
-		if strings.HasSuffix(cleaned, ".md") && landingMiss(requestPath) && !markdownRoute(c.Request.Method, cleaned, r) {
+		if strings.HasSuffix(cleaned, ".md") && landingMiss(cleaned) && !markdownRoute(c.Request.Method, cleaned, r) {
 			h.writePublicHeaders(c)
 			writeMethodBody(c, http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
 			return
@@ -241,7 +239,11 @@ func redirectTrailingSlash(c *gin.Context, r *gin.Engine) bool {
 	if !ok {
 		return false
 	}
-	setPublicDocHeaders(c)
+	// Doc slash redirects send the public cache headers. Every other target,
+	// including /v1/go/<id> and /go/<token>, keeps the header set main sent.
+	if publicDocCanonical(target) {
+		setPublicDocHeaders(c)
+	}
 	if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
 		c.Header("X-Robots-Tag", "noindex")
 	}
@@ -358,17 +360,9 @@ func cleanedRouteRedirect(method, requestPath string, r *gin.Engine) (string, bo
 	if !routeForMethod(method, cleaned, r) {
 		return "", false
 	}
-	if name, ok := strings.CutPrefix(cleaned, "/docs/"); ok {
-		if strings.Contains(name, "/") {
-			return "", false
-		}
-		if _, exists := agentDoc(name); !exists {
-			return "", false
-		}
-	}
-	// Empty, ".", and ".." segments stay a 404 on API paths. A public doc
-	// whose clean path is a real route still 301s, including /docs/<name>//.
-	if !singleSlashPath(requestPath) && !publicDocCanonical(cleaned) {
+	// Only a public doc uses this redirect, including /docs/<name>//.
+	// /owner, /v1, /go, /orp, and /mcp stay on redirectTrailingSlash.
+	if !publicDocCanonical(cleaned) {
 		return "", false
 	}
 	return cleaned, true

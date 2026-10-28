@@ -82,6 +82,14 @@ func TestColdAgentEntrance(t *testing.T) {
 			t.Fatalf("%s %d %q", path, rec.Code, rec.Header().Get("Content-Type"))
 		}
 	}
+	parent := httptest.NewRecorder()
+	parentReq := httptest.NewRequest(http.MethodGet, "http://127.0.0.1/", nil)
+	parentReq.URL.Path = "/v1/../no-such.md"
+	r.ServeHTTP(parent, parentReq)
+	if parent.Code != http.StatusNotFound || !strings.Contains(parent.Header().Get("Content-Type"), "text/markdown") || parent.Body.String() != "not found\n" {
+		t.Fatalf("cleaned miss %d %q %s", parent.Code, parent.Header().Get("Content-Type"), parent.Body.String())
+	}
+	assertPublicDocHeaders(t, parent)
 	for _, path := range []string{"/no-such-page.md", "/publishers/not-a-page.md"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
@@ -211,6 +219,73 @@ func TestColdAgentEntrance(t *testing.T) {
 		if rec.Header().Get("X-Robots-Tag") != "noindex" {
 			t.Fatalf("%s robots %q", path, rec.Header().Get("X-Robots-Tag"))
 		}
+	}
+}
+
+func TestNonDocSlashRedirectKeepsMainHeaders(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	(&HostedHandler{BaseURL: "http://127.0.0.1:8080", AssetsPath: t.TempDir(), DownloadsPath: t.TempDir()}).Mount(r)
+	(&AgentEntry{}).Mount(r)
+	(&ORPHost{}).Mount(r)
+	r.GET("/v1/go/:code", func(c *gin.Context) { c.Status(http.StatusFound) })
+	r.HEAD("/v1/go/:code", func(c *gin.Context) { c.Status(http.StatusFound) })
+
+	cases := []struct {
+		method, path, location string
+		status                 int
+		paidGo                 bool
+	}{
+		{http.MethodGet, "/owner/", "/owner", http.StatusMovedPermanently, false},
+		{http.MethodGet, "/owner/settings/", "/owner/settings", http.StatusMovedPermanently, false},
+		{http.MethodGet, "/owner/api/human-approval/", "/owner/api/human-approval", http.StatusMovedPermanently, false},
+		{http.MethodGet, "/v1/digest/", "/v1/digest", http.StatusMovedPermanently, false},
+		{http.MethodGet, "/v1/placements/abc/", "/v1/placements/abc", http.StatusMovedPermanently, false},
+		{http.MethodPost, "/v1/agent-tokens/", "/v1/agent-tokens", http.StatusTemporaryRedirect, false},
+		{http.MethodGet, "/v1/go/abc/", "/v1/go/abc", http.StatusMovedPermanently, true},
+		{http.MethodHead, "/v1/go/abc/", "/v1/go/abc", http.StatusMovedPermanently, true},
+		{http.MethodGet, "/go/tok/", "/go/tok", http.StatusMovedPermanently, false},
+		{http.MethodHead, "/go/tok/", "/go/tok", http.StatusMovedPermanently, false},
+		{http.MethodGet, "/orp/spec/", "/orp/spec", http.StatusMovedPermanently, false},
+		{http.MethodGet, "/orp/deals/deal-1/", "/orp/deals/deal-1", http.StatusMovedPermanently, false},
+		{http.MethodPost, "/orp/join/", "/orp/join", http.StatusTemporaryRedirect, false},
+		{http.MethodGet, "/mcp/", "/mcp", http.StatusMovedPermanently, false},
+		{http.MethodPost, "/mcp/", "/mcp", http.StatusTemporaryRedirect, false},
+	}
+	for _, tc := range cases {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
+		if rec.Code != tc.status || rec.Header().Get("Location") != tc.location {
+			t.Fatalf("%s %s: %d location %q", tc.method, tc.path, rec.Code, rec.Header().Get("Location"))
+		}
+		if rec.Header().Get("Referrer-Policy") != "" || rec.Header().Get("Content-Security-Policy") != "" || rec.Header().Get("X-Content-Type-Options") != "" {
+			t.Fatalf("%s %s doc headers referrer %q csp %q nosniff %q", tc.method, tc.path, rec.Header().Get("Referrer-Policy"), rec.Header().Get("Content-Security-Policy"), rec.Header().Get("X-Content-Type-Options"))
+		}
+		ct := rec.Header().Get("Content-Type")
+		if tc.method == http.MethodGet || tc.method == http.MethodHead {
+			if ct != "text/html; charset=utf-8" {
+				t.Fatalf("%s %s content-type %q", tc.method, tc.path, ct)
+			}
+		} else if ct != "" {
+			t.Fatalf("%s %s content-type %q", tc.method, tc.path, ct)
+		}
+		if tc.paidGo {
+			if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("X-Robots-Tag") != "noindex, nofollow" {
+				t.Fatalf("%s %s go headers cache %q robots %q", tc.method, tc.path, rec.Header().Get("Cache-Control"), rec.Header().Get("X-Robots-Tag"))
+			}
+			continue
+		}
+		if rec.Header().Get("Cache-Control") != "" || rec.Header().Get("X-Robots-Tag") != "" {
+			t.Fatalf("%s %s extra headers cache %q robots %q", tc.method, tc.path, rec.Header().Get("Cache-Control"), rec.Header().Get("X-Robots-Tag"))
+		}
+	}
+	for _, path := range []string{"/skill.md/", "/llms.txt/", "/llms-full.txt/", "/docs/device-login.md/", "/you.md/"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusMovedPermanently {
+			t.Fatalf("%s %d", path, rec.Code)
+		}
+		assertPublicDocHeaders(t, rec)
 	}
 }
 
