@@ -1,0 +1,10 @@
+home	390	status=200	h1="Affiliate marketing, evolved for agents."	violations=0	hscroll=0
+protocol	390	status=200	h1="Offer Rails Protocol"	violations=0	hscroll=0
+protocol-spec	390	status=200	h1="Message reference"	violations=0	hscroll=0
+protocol-deal	390	status=200	h1="DealMessage"	violations=0	hscroll=0
+protocol-sdk	390	status=200	h1="SDK and examples"	violations=0	hscroll=0
+home	1440	status=200	h1="Affiliate marketing, evolved for agents."	violations=0	hscroll=0
+protocol	1440	status=200	h1="Offer Rails Protocol"	violations=0	hscroll=0
+protocol-spec	1440	status=200	h1="Message reference"	violations=0	hscroll=0
+protocol-deal	1440	status=200	h1="DealMessage"	violations=0	hscroll=0
+protocol-sdk	1440	status=200	h1="SDK and examples"	violations=0	hscroll=0
