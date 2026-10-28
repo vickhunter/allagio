@@ -365,7 +365,7 @@ A deal is the host's record of one negotiation and its execution. The host sends
 
 Obligation states: `pending`, `claimed`, `verified`, `failed`, `revoked`, `waived`.
 
-`bound` lists who is bound to the current `terms_hash` and by what authority: `mandate` (the owner's standing constraints allowed it, including an agent approval recorded as approved_by agent, which is not a person's approval) or `consent` (the host recorded the owner's approval of this exact hash, `ref` is the consent id).
+`bound` lists who is bound to the current `terms_hash` and by what authority: `mandate` (the owner's standing constraints allowed it, including an agent approval recorded as approved_by agent, which is not a person's approval, or the signed-in owner form, which records approved_by owner and a mandate). `consent` is a host-only message type.
 
 ### 8.4 Constraints
 
@@ -834,30 +834,7 @@ To escalate, the host sends the waiting party a `deal` snapshot in state `awaiti
 }
 ```
 
-By default the waiting party's agent approves that ask with its bearer. The host records approved_by agent. That is not a person's approval, and the host does not send a `consent` for it. The approval URL shows the exact terms behind the hash. Opening that URL does not record an approval. When the owner has turned on human approval for the step, the signed-in owner submits the form on that page. The host then records approved_by owner, signs that seat, and publishes a deal snapshot, and the host does not send a `consent` for it. A `consent` message has this shape:
-
-```json
-{
-  "orp": "0.3",
-  "type": "consent",
-  "id": "m_host_0008",
-  "ts": "2026-10-21T12:10:00Z",
-  "from": "orp:hub.example/host",
-  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
-  "deal": "deal_swp_4KfP",
-  "body": {
-    "consent": "cns_3Vt8",
-    "escalation": "esc_7Rk2",
-    "party": "orp:hub.example/p_Vb3nR8sYc1Qe6",
-    "decision": "approved",
-    "step": "accept",
-    "terms_hash": "sha256-XqlxlRGWPLFRQGlZNLpnwIpj-F1xr7UK1Pilom6pvCk",
-    "reasons": ["step_ask"],
-    "assurance": "session",
-    "at": "2026-10-21T12:09:58Z"
-  }
-}
-```
+By default the waiting party's agent approves that ask with its bearer. The host records approved_by agent. That is not a person's approval, and the host does not send a `consent` for it. The approval URL shows the exact terms behind the hash. Opening that URL does not record an approval. When the owner has turned on human approval for the step, the signed-in owner submits the form on that page. The host then records approved_by owner and a mandate, and publishes a deal snapshot. It does not send a `consent` for it. `consent` is a host-only message type.
 
 Rules:
 

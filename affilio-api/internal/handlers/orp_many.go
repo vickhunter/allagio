@@ -310,6 +310,15 @@ func (h *ORPHost) acceptMany(c *gin.Context, dns string, msg orp.Message, hash, 
 	if mode == database.ModeAsk {
 		h.holdMany(&deal, msg.From, "accept", manyReasons(mode), now)
 	} else {
+		held, heldErr := h.askHeld(c, deal, msg.From)
+		if heldErr != nil {
+			h.failOpen(c, dns, msg, internalProblem())
+			return
+		}
+		if held {
+			writeOwnerApproval(c)
+			return
+		}
 		h.signSeat(&deal, msg.From, now)
 		h.refreshMany(&deal, terms, now)
 	}
@@ -435,6 +444,7 @@ func (h *ORPHost) seat04(c *gin.Context, dns string, msg orp.Message, hash, owne
 // When that owner turned on human approval, the bearer is refused.
 // A 0.3 deal is left untouched.
 func (h *ORPHost) ApprovePost(c *gin.Context) {
+	setApproveFrameHeaders(c)
 	if purposePreview(c) {
 		writePreview(c)
 		return
@@ -457,7 +467,16 @@ func (h *ORPHost) ApprovePost(c *gin.Context) {
 		h.writeProblem(c, dns, "", "", orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}, false)
 		return
 	}
-	if len(deal.Parties) == 0 {
+	if len(deal.Parties) == 0 || string(deal.Parties) == "null" {
+		held, err := h.askHeld(c, deal, "")
+		if err != nil {
+			h.writeProblem(c, dns, "", "", internalProblem(), false)
+			return
+		}
+		if held {
+			writeOwnerApproval(c)
+			return
+		}
 		h.writeProblem(c, dns, "", "", orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "This page does not approve."}, false)
 		return
 	}

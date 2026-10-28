@@ -157,6 +157,7 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	if denied.Code != http.StatusForbidden || deniedBody["reason"] != "owner_approval" || deniedBody["message"] != ownerApprovalMessage || deniedBody["orp"] != nil {
 		t.Fatalf("agent post %d %s", denied.Code, denied.Body.String())
 	}
+	assertApproveHeaders(t, denied)
 	if jsonSigned([]byte(partiesText(t, db, dealID)), offerer.party) {
 		t.Fatalf("agent post signed %s", partiesText(t, db, dealID))
 	}
@@ -165,11 +166,13 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	if unsigned.Code != http.StatusForbidden || !strings.Contains(unsigned.Body.String(), `"reason":"owner_approval"`) {
 		t.Fatalf("unsigned get %d %s", unsigned.Code, unsigned.Body.String())
 	}
+	assertApproveHeaders(t, unsigned)
 	wrongCookie := otherOwnerCookie(t, db, base)
 	wrong, wrongBody := serveCookie(t, r, http.MethodGet, link, wrongCookie, nil)
 	if wrong.Code != http.StatusForbidden || wrongBody["reason"] != "forbidden" || wrongBody["message"] != "This approval link is for the waiting owner." {
 		t.Fatalf("wrong account %d %s", wrong.Code, wrong.Body.String())
 	}
+	assertApproveHeaders(t, wrong)
 	agentGet, agentGetBody := serveCookie(t, r, http.MethodGet, link, cookie, bearerHeader(offerer.token))
 	if agentGet.Code != http.StatusForbidden || agentGetBody["reason"] != "owner_approval" {
 		t.Fatalf("agent get %d %s", agentGet.Code, agentGet.Body.String())
@@ -183,9 +186,7 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	if ownerGet.Code != http.StatusOK || !strings.Contains(ownerHTML, "Ask mode notes") || !strings.Contains(ownerHTML, csrf) || !strings.Contains(ownerHTML, `method="post"`) {
 		t.Fatalf("owner form %d %s", ownerGet.Code, ownerHTML)
 	}
-	if ownerGet.Header().Get("X-Frame-Options") != "DENY" || ownerGet.Header().Get("Content-Security-Policy") != "frame-ancestors 'none'; form-action 'self'; base-uri 'none'" || ownerGet.Header().Get("Referrer-Policy") != "no-referrer" {
-		t.Fatalf("owner form headers frame %q csp %q referrer %q", ownerGet.Header().Get("X-Frame-Options"), ownerGet.Header().Get("Content-Security-Policy"), ownerGet.Header().Get("Referrer-Policy"))
-	}
+	assertApproveHeaders(t, ownerGet)
 	if jsonSigned([]byte(partiesText(t, db, dealID)), offerer.party) || strings.Contains(partiesText(t, db, dealID), "approved_by") {
 		t.Fatalf("GET recorded an approval %s", partiesText(t, db, dealID))
 	}
@@ -216,6 +217,10 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	if replay.Code != http.StatusNotFound {
 		t.Fatalf("replay %d %s", replay.Code, replay.Body.String())
 	}
+	assertApproveHeaders(t, prefetchGet)
+	assertApproveHeaders(t, noCSRF)
+	assertApproveHeaders(t, ownerPost)
+	assertApproveHeaders(t, replay)
 	proof, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+dealID, nil, nil)
 	if proof.Code != http.StatusOK || !strings.Contains(proof.Body.String(), "approved_by owner") || !strings.Contains(proof.Body.String(), "The owner approved this step.") || strings.Contains(proof.Body.String(), "approved_by agent") {
 		t.Fatalf("owner proof %d %s", proof.Code, proof.Body.String())
@@ -231,6 +236,20 @@ func TestORP03ActivateAskOptInDoesNotBind(t *testing.T) {
 	acceptor := joinDefault(t, r)
 	setPlacementPublish(t, db, offerer.owner, "auto")
 	openID := acceptDirected03(t, r, offerer, acceptor, "m_d111_open1", "m_d111_oacc1")
+	var openEsc string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT waiting->>'escalation' FROM orp_deals WHERE id=$1`, openID).Scan(&openEsc); err != nil || openEsc == "" {
+		t.Fatal(err)
+	}
+	openGet, _ := postJSON(t, r, http.MethodGet, "/orp/approve/"+openEsc, nil, nil)
+	if openGet.Code != http.StatusOK || !strings.Contains(openGet.Body.String(), "does not approve") || !strings.Contains(openGet.Body.String(), "By default an agent approves an ask with its bearer") || strings.Contains(openGet.Body.String(), `method="post"`) {
+		t.Fatalf("default page %d %s", openGet.Code, openGet.Body.String())
+	}
+	assertApproveHeaders(t, openGet)
+	missing, _ := postJSON(t, r, http.MethodGet, "/orp/approve/esc_missing", nil, nil)
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing %d", missing.Code)
+	}
+	assertApproveHeaders(t, missing)
 	act, actBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+openID+"/activate", nil, bearerHeader(acceptor.token))
 	if act.Code != http.StatusOK || docBody(t, actBody)["state"] != "active" {
 		t.Fatalf("default activate %d %s", act.Code, act.Body.String())
@@ -258,6 +277,63 @@ func TestORP03ActivateAskOptInDoesNotBind(t *testing.T) {
 	if state != "awaiting" || strings.Contains(bound, held.party) {
 		t.Fatalf("opt-in activate bound the wait %s %s", state, bound)
 	}
+	var esc string
+	var partiesNull bool
+	if err := db.Pool.QueryRow(context.Background(), `SELECT waiting->>'escalation', parties IS NULL FROM orp_deals WHERE id=$1`, heldID).Scan(&esc, &partiesNull); err != nil || esc == "" || !partiesNull {
+		t.Fatalf("escalation %s null %v %v", esc, partiesNull, err)
+	}
+	base := "http://127.0.0.1:8080"
+	link := "/orp/approve/" + esc
+	cookie, csrf := sessionForOwner(t, db, held.owner, base)
+	unsigned, _ := postJSON(t, r, http.MethodGet, link, nil, nil)
+	if unsigned.Code != http.StatusForbidden || !strings.Contains(unsigned.Body.String(), `"reason":"owner_approval"`) {
+		t.Fatalf("unsigned %d %s", unsigned.Code, unsigned.Body.String())
+	}
+	agentGet, agentBody := serveCookie(t, r, http.MethodGet, link, cookie, bearerHeader(held.token))
+	if agentGet.Code != http.StatusForbidden || agentBody["reason"] != "owner_approval" {
+		t.Fatalf("agent get %d %s", agentGet.Code, agentGet.Body.String())
+	}
+	wrong, wrongBody := serveCookie(t, r, http.MethodGet, link, otherOwnerCookie(t, db, base), nil)
+	if wrong.Code != http.StatusForbidden || wrongBody["reason"] != "forbidden" {
+		t.Fatalf("wrong owner %d %s", wrong.Code, wrong.Body.String())
+	}
+	ownerGet, _ := serveCookie(t, r, http.MethodGet, link, cookie, nil)
+	if ownerGet.Code != http.StatusOK || !strings.Contains(ownerGet.Body.String(), "zqtestmention") || !strings.Contains(ownerGet.Body.String(), csrf) || !strings.Contains(ownerGet.Body.String(), `method="post"`) || strings.Contains(ownerGet.Body.String(), "By default an agent approves an ask with its bearer") {
+		t.Fatalf("owner form %d %s", ownerGet.Code, ownerGet.Body.String())
+	}
+	noCSRF := postOwnerApprove(t, r, link, cookie, "", base, nil)
+	if noCSRF.Code != http.StatusForbidden {
+		t.Fatalf("no csrf %d %s", noCSRF.Code, noCSRF.Body.String())
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT state FROM orp_deals WHERE id=$1`, heldID).Scan(&state); err != nil || state != "awaiting" {
+		t.Fatalf("csrf refusal bound %s %v", state, err)
+	}
+	ownerPost := postOwnerApprove(t, r, link, cookie, csrf, base, nil)
+	var ownerBody map[string]any
+	if err := json.Unmarshal(ownerPost.Body.Bytes(), &ownerBody); err != nil || ownerPost.Code != http.StatusOK || docBody(t, ownerBody)["state"] != "active" {
+		t.Fatalf("owner post %d %s", ownerPost.Code, ownerPost.Body.String())
+	}
+	if err := db.Pool.QueryRow(context.Background(), `SELECT state, COALESCE(bound::text,''), parties IS NULL FROM orp_deals WHERE id=$1`, heldID).Scan(&state, &bound, &partiesNull); err != nil {
+		t.Fatal(err)
+	}
+	if state != "active" || !partiesNull || !strings.Contains(bound, held.party) || !strings.Contains(bound, `"type": "mandate"`) {
+		t.Fatalf("bound %s %s null %v", state, bound, partiesNull)
+	}
+	proof, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+heldID, nil, nil)
+	if proof.Code != http.StatusOK || !strings.Contains(proof.Body.String(), "approved_by owner") {
+		t.Fatalf("proof %d %s", proof.Code, proof.Body.String())
+	}
+	replay := postOwnerApprove(t, r, link, cookie, csrf, base, nil)
+	if replay.Code != http.StatusNotFound {
+		t.Fatalf("replay %d %s", replay.Code, replay.Body.String())
+	}
+	assertApproveHeaders(t, unsigned)
+	assertApproveHeaders(t, agentGet)
+	assertApproveHeaders(t, wrong)
+	assertApproveHeaders(t, ownerGet)
+	assertApproveHeaders(t, noCSRF)
+	assertApproveHeaders(t, ownerPost)
+	assertApproveHeaders(t, replay)
 }
 
 func acceptDirected03(t *testing.T, r http.Handler, offerer, acceptor party04, offerID, acceptID string) string {
@@ -414,6 +490,47 @@ func postOwnerApprove(t *testing.T, r http.Handler, path string, cookie *http.Co
 	return rec
 }
 
+func TestAcceptAutoDoesNotClearAskHold(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	e := &orp04Env{t: t, r: r}
+	offerer := joinDefault(t, r)
+	acceptor := joinDefault(t, r)
+	if err := db.SaveHumanApprovalSteps(context.Background(), acceptor.owner, []string{"ask"}); err != nil {
+		t.Fatal(err)
+	}
+	code, opened := e.send(offerer, "0.4", "offer", "", map[string]any{
+		"terms": shareTerms04(), "parties": percentParties([]party04{offerer, acceptor}),
+	})
+	if code != http.StatusOK {
+		t.Fatalf("offer %d %s", code, mustJSON(opened))
+	}
+	dealID, _ := opened["deal"].(string)
+	code, waited := acceptSeat(e, acceptor, opened)
+	if code != http.StatusOK || seatSignedDoc(t, waited, acceptor.party) || strings.Contains(partiesText(t, db, dealID), "approved_by") {
+		t.Fatalf("first accept %d %s", code, mustJSON(waited))
+	}
+	setPlacementPublish(t, db, acceptor.owner, "auto")
+	code, again := e.send(acceptor, "0.4", "accept", dealID, map[string]any{"terms_hash": docBody(t, waited)["terms_hash"]})
+	if code != http.StatusForbidden || again["reason"] != "owner_approval" || again["orp"] != nil {
+		t.Fatalf("auto accept %d %s", code, mustJSON(again))
+	}
+	if seatSignedDoc(t, waited, acceptor.party) || strings.Contains(partiesText(t, db, dealID), `"approved_by":"owner"`) {
+		t.Fatalf("accept signed the hold %s", partiesText(t, db, dealID))
+	}
+	var waiting string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT COALESCE(waiting->>'party', '') FROM orp_deals WHERE id=$1`, dealID).Scan(&waiting); err != nil || waiting != acceptor.party {
+		t.Fatalf("wait cleared %s %v", waiting, err)
+	}
+}
+
+func assertApproveHeaders(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if rec.Header().Get("X-Frame-Options") != "DENY" || rec.Header().Get("Content-Security-Policy") != "frame-ancestors 'none'; form-action 'self'; base-uri 'none'" || rec.Header().Get("Referrer-Policy") != "no-referrer" {
+		t.Fatalf("frame headers frame %q csp %q referrer %q", rec.Header().Get("X-Frame-Options"), rec.Header().Get("Content-Security-Policy"), rec.Header().Get("Referrer-Policy"))
+	}
+}
+
 func assertNoPersonApprovedClaim(t *testing.T, label, body string) {
 	t.Helper()
 	lower := strings.ToLower(body)
@@ -430,6 +547,8 @@ func assertNoPersonApprovedClaim(t *testing.T, label, body string) {
 		"opens this link, and the host records approved_by owner",
 		"the approval url records approved_by owner only when that owner opted in.",
 		"sends a `consent` message",
+		"a `consent` message has this shape",
+		"the host recorded the owner's approval of this exact",
 	} {
 		if strings.Contains(lower, phrase) {
 			t.Fatalf("%s claims a person decides the default ask: %s", label, phrase)

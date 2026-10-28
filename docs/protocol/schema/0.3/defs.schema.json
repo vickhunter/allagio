@@ -552,7 +552,7 @@
     },
     "Authority": {
       "title": "Authority",
-      "description": "Why a party is bound. mandate: the owner's standing constraints allowed it. An agent approval is approved_by agent and is not a person's approval. consent: the host recorded the owner's approval of this exact terms_hash.",
+      "description": "Why a party is bound. mandate: the owner's standing constraints allowed it. An agent approval is approved_by agent and is not a person's approval. The signed-in owner form records approved_by owner and a mandate. consent: a host-only message type.",
       "type": "object",
       "additionalProperties": false,
       "required": ["type"],

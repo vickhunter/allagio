@@ -17,7 +17,7 @@ var approvePage = template.Must(template.New("approve").Parse(`<!doctype html>
 <title>Waiting for approval</title>
 <p>{{.Title}}</p>
 <p>{{.Label}}</p>
-<p>This page does not approve it. By default an agent approves an ask with its bearer. That record is approved_by agent, not a person's approval. Offer Rails does not hold money.</p>
+<p>This page does not approve it. By default an agent approves an ask with its bearer. That record is approved_by agent, not a person's approval. When the owner has ask on, this page is not the response: the signed-in owner submits the form, and that records approved_by owner and a mandate. Offer Rails does not hold money.</p>
 `))
 
 var ownerApprovePage = template.Must(template.New("owner-approve").Parse(`<!doctype html>

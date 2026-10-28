@@ -455,6 +455,49 @@ VALUES('placement_publish', $1::uuid, 'approved', $2::jsonb, '{"kind":"human_app
 	return tx.Commit(ctx)
 }
 
+// DealApproval is an owner approval of one deal step. It is not a 0.4 parties document.
+type DealApproval struct {
+	Party string
+	Step  string
+	By    string
+}
+
+// RecordDealOwnerApproval stores approved_by owner for a 0.3 deal.
+// The row is status approved so it is not an operator queue item.
+func (d *DB) RecordDealOwnerApproval(ctx context.Context, ownerID, dealID, party, step string) error {
+	payload, err := json.Marshal(map[string]any{
+		"kind": "deal_approval", "deal_id": dealID, "party": party, "step": step, "approved_by": "owner",
+	})
+	if err != nil {
+		return err
+	}
+	_, err = d.Pool.Exec(ctx, `
+INSERT INTO agent_step_approvals(step, owner_id, status, payload, result, decided_at)
+VALUES('placement_publish', $1::uuid, 'approved', $2::jsonb, '{"kind":"deal_approval"}'::jsonb, NOW())`, ownerID, payload)
+	return err
+}
+
+// DealOwnerApprovals reads owner approvals recorded for one deal.
+func (d *DB) DealOwnerApprovals(ctx context.Context, dealID string) ([]DealApproval, error) {
+	rows, err := d.Pool.Query(ctx, `
+SELECT payload->>'party', payload->>'step', payload->>'approved_by'
+FROM agent_step_approvals
+WHERE status='approved' AND payload->>'kind'='deal_approval' AND payload->>'deal_id'=$1`, dealID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []DealApproval
+	for rows.Next() {
+		var row DealApproval
+		if err = rows.Scan(&row.Party, &row.Step, &row.By); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 func (d *DB) FinishStepApproval(ctx context.Context, id string, result []byte) (bool, error) {
 	if len(result) == 0 {
 		result = []byte(`{}`)
