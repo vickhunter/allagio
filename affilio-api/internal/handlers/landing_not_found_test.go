@@ -38,7 +38,7 @@ func TestLandingUnknownPathIs404(t *testing.T) {
 
 	api := httptest.NewRecorder()
 	r.ServeHTTP(api, httptest.NewRequest(http.MethodGet, "/v1/directory/makers", nil))
-	if api.Code != http.StatusNotFound || strings.Contains(api.Body.String(), "That page is not on Offer Rails.") {
+	if api.Code != http.StatusServiceUnavailable || strings.Contains(api.Body.String(), "That page is not on Offer Rails.") || strings.Contains(api.Body.String(), `"items"`) || !strings.Contains(api.Body.String(), `"error":"directory unavailable"`) {
 		t.Fatalf("api miss %d %s", api.Code, api.Body.String())
 	}
 }

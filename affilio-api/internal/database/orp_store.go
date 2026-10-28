@@ -67,6 +67,14 @@ type ORPDeal struct {
 	Parties   json.RawMessage
 	UpdatedAt time.Time
 	CreatedAt time.Time
+	// WireApprovals is who approved each ask step for this 0.4 response.
+	// It is not a column. The rows already live in agent_step_approvals
+	// or in the parties document.
+	WireApprovals []DealApproval
+	// ApprovalsUnavailable is set on an ORP 0.4 read when the approval
+	// query fails. The response stays HTTP 200 and names that failure.
+	// A 0.3 body never copies this flag.
+	ApprovalsUnavailable bool
 }
 
 // ORPInboxItem is one stored host message for a party.

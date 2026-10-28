@@ -10,11 +10,11 @@ Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.
 
 Limits
 
-Your limits come first. A new site opens on Ask me every time.
+Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.
 
 Ask me every time
 
-Manual. A new site opens here. Each placement waits for you.
+Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.
 
 Approve within my rules
 
@@ -26,7 +26,7 @@ Only you can turn this on. While claims are not checked, this also waits for a p
 
 Approvals
 
-A person approves each placement. No agent tool can approve.
+A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.
 
 Receipts
 
@@ -38,8 +38,15 @@ Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.
 
 POST /v1/agent-tokens with {}.
 Send the access_token as Authorization: Bearer to /mcp.
+The bearer is not an X-API-Key or X-Admin-Key.
 POST /orp/join with {}.
 Read tools/list on /mcp.
 No sign-in link.
-A person still approves each placement.
+A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.
+On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by.
+Each entry has step, party, and agent or owner.
+A 0.3 deal does not include approved_by.
+When that read fails, an ORP 0.4 deal stays HTTP 200 and sets approvals_unavailable to true.
+approved_by is omitted.
+A 0.3 deal does not include approvals_unavailable.
 The deal steps are in /llms-full.txt.

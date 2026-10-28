@@ -26,6 +26,6 @@ test('one approval-mode name set, with no YOLO label', () => {
   const vision = readFileSync(resolve(root, 'src/vision.mjs'), 'utf8')
   const content = readFileSync(resolve(root, 'src/content.ts'), 'utf8')
   assert.match(setup, /approvalModes/)
-  assert.match(vision, /approvalModes/)
   assert.match(content, /approvalModes/)
+  for (const name of names) assert.match(vision, new RegExp(name))
 })

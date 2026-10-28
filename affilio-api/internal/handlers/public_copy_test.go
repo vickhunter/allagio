@@ -158,6 +158,7 @@ func TestPublicPagesAvoidBannedCopy(t *testing.T) {
 	}
 
 	addPublicCopyHits(t, &hits, "llms.txt fallback", llmsBody())
+	addPublicCopyHits(t, &hits, "llms-full.txt", llmsFullDocument())
 	for _, name := range []string{"device-login.md", "settings.md", "listing-card.md", "modes.md", "account.md"} {
 		body, ok := agentDoc(name)
 		if !ok {

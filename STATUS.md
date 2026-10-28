@@ -2,6 +2,30 @@
 
 The home first screen states what a person gets and who pays, then the two role buttons. The agent join line sits under that choice. Agents join with no sign-in. People sign in with Google for the dashboard. That reason is said once on publisher setup. The pink-to-blue hero wash is a flat paper surface. The notebook example is one function: on €24.00 at 10%, the publisher gets €2.40, the maker pays a €0.24 fee, and the maker keeps €21.36. Home, makers, and the how-it-works figure read that function. Approval modes use one name set: Ask me every time, Approve within my rules, Approve anything that passes the checks. A newsletter writer sees “Agent only for now” and a next step, because this page does not mint a tracked link. Makers get one install command per client, and adding a product says it needs an MCP client. The optional post preview is labelled. The protocol docs app reads `/.well-known/orp.json` for the “This host” line. If that read fails, the line stays neutral. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
+## October 28 — Approval wording by mode (D-119)
+
+A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. Agents cannot approve a placement. The test-deal heading stays `ORP 0-3`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 28 — Time to first test deal (D-117)
+
+`scripts/cold-path.py` reads `/llms.txt`, then `/skill.md`, joins two parties, walks the directed test deal, and opens the proof page. It prints seconds per step and the total. It does not print tokens. Issuer discovery no longer blocks listen. A failed discovery is logged without the client secret and retried, from 1 second up to 30 seconds. It does not exit the process. `GET /auth/login` and the sign-in callback return HTTP 503 `sign-in is starting` until discovery finishes. The callback leaves the login cookie in place so the browser can retry. Database connect and `AUTO_MIGRATE` still finish before listen, because later requests assume the schema. `POST /v1/agent-tokens` stays at 8 a minute and 30 a day, shared with `POST /v1/agent-accounts`. The ninth rapid request from one address is HTTP 429, and the eleventh is too. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 28 — Entrance follow-up
+
+`/skill.md` and `/you.md` say the bearer is not an X-API-Key or X-Admin-Key. A failed approval read logs the error. `/llms-full.txt` says the offer is available where it used to say listed. The test-deal heading stays `ORP 0-3` so `/llms.txt#orp-0-3-test-deal` still lands on that heading. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 28 — Cold-path llms.txt (D-115)
+
+`/llms.txt` is only the cold path: this file, then `/skill.md`, then join, then a test deal, then proof. It links to `/llms-full.txt` and the docs. `/llms-full.txt` starts at the manual and does not link back to `/skill.md` or to itself. The two `llms.txt` copies are the same bytes. A failed approval read on an ORP 0.4 deal stays HTTP 200, sets `approvals_unavailable`, and omits `approved_by`. A 0.3 deal has neither field. No glossary. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 28 — Protocol and entrance truth (D-115)
+
+`/llms.txt` still links to `/skill.md`. `/skill.md` links only to `/llms-full.txt`. `GET /v1/directory/makers` returns HTTP 200 `{"items":[],"next_cursor":null,"total":0}` when the database answers. There is no public directory table, and the makers account table is not listed. A failed database read is HTTP 503 `{"error":"directory unavailable"}`. The landing page still shows the empty copy for any non-OK response until that view treats 503 as a failure. A bearer from `POST /v1/agent-tokens` works on `/mcp` and on ORP. It is not an `X-API-Key` and it is not an `X-Admin-Key`. Marketplace, digest, and operator placement approval do not accept it. A header key comes from `POST /v1/agent-accounts` or from a device-code approval sent in `key_header`. On an ORP 0.4 deal, a failed approval read stays HTTP 200 and sets `approvals_unavailable` to true. `approved_by` is omitted. A 0.3 deal does not include that field. The 0.3 schema and example 08 are unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 28 — Approval provenance (D-114)
+
+On an ORP 0.4 deal, `GET /orp/deals/{deal}` and the approve reply return `approved_by`. Each entry has `step`, `party`, and `agent` or `owner`. `party` is the seat id already on the deal. A 0.3 deal does not include the field. No new column. Served text does not point at `bound[].authority`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 28 — Accepted lows (D-113)
 
 A host `consent` in SPEC shows `terms_hash` and `assurance`. A 0.3 list and a 0.4 ask offer wait with `claims_unchecked`. `POST /orp/join` with `"orp":"0.3"` says `Use 0.4.` A missing landing file says the page is temporarily unavailable. Served click text says less than 5 seconds, and exactly 5 seconds after the previous counted click. The two `llms.txt` copies no longer name the banned holder token or the banned environment-variable prefix. `GET` and `HEAD` of a dirty `.md` path under `/makers/` or `/publishers/` both return the markdown 404. `HEAD /publishers/setup` and `HEAD /makers/acme` stay the landing not-found page. Served deal text names `bound[].authority` where a reader can see the binding. `/skill.md` names `POST /orp/join` and `tools/list` and stays within 25 lines. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

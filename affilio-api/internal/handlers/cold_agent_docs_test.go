@@ -3,13 +3,77 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"unicode"
+
+	"affilio-api/internal/orp"
 
 	"github.com/gin-gonic/gin"
 )
+
+// headingAnchor is the fragment a markdown heading gets: lower case, spaces
+// become hyphens, and other punctuation is dropped. "ORP 0-3 test deal" is
+// orp-0-3-test-deal. "ORP 0.3 test deal" is orp-03-test-deal.
+func headingAnchor(title string) string {
+	var b strings.Builder
+	prevHyphen := false
+	for _, r := range strings.ToLower(title) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' {
+			b.WriteRune(r)
+			prevHyphen = r == '-'
+			continue
+		}
+		if r == ' ' && b.Len() > 0 && !prevHyphen {
+			b.WriteByte('-')
+			prevHyphen = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
+func markdownHeadingAnchors(body string) map[string]bool {
+	anchors := map[string]bool{}
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "#") {
+			continue
+		}
+		title := strings.TrimSpace(strings.TrimLeft(line, "#"))
+		if title == "" {
+			continue
+		}
+		anchors[headingAnchor(title)] = true
+	}
+	return anchors
+}
+
+func TestDiscoveryDocsFragmentResolves(t *testing.T) {
+	doc := orp.DiscoveryDocument("http://127.0.0.1:8080", "127.0.0.1", "none")
+	docsURL, _ := doc["docs"].(string)
+	parsed, err := url.Parse(docsURL)
+	if err != nil || parsed.Fragment == "" || parsed.Path != "/llms.txt" {
+		t.Fatalf("docs url %q", docsURL)
+	}
+	dir := filepath.Join(repoRoot(t), "affilio-wp", "admin", "build")
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	(&AgentEntry{AssetsPath: dir}).Mount(r)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, parsed.Path, nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("llms %d", rec.Code)
+	}
+	if !markdownHeadingAnchors(rec.Body.String())[parsed.Fragment] {
+		t.Fatalf("served /llms.txt has no heading for #%s", parsed.Fragment)
+	}
+	if !markdownHeadingAnchors(llmsBody())[parsed.Fragment] {
+		t.Fatalf("fallback /llms.txt has no heading for #%s", parsed.Fragment)
+	}
+}
 
 func TestColdAgentEntrance(t *testing.T) {
 	dir := filepath.Join(repoRoot(t), "affilio-wp", "admin", "build")
@@ -31,20 +95,24 @@ func TestColdAgentEntrance(t *testing.T) {
 	if skill.Code != http.StatusOK || !strings.Contains(skill.Header().Get("Content-Type"), "text/markdown") || len(lines) > 25 || skillBody != skillMD {
 		t.Fatalf("skill %d %q lines %d", skill.Code, skill.Header().Get("Content-Type"), len(lines))
 	}
-	if !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms.txt)") || !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(skillBody, "## Connect a hosted assistant") {
+	if strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms.txt)") || !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(skillBody, "## Connect a hosted assistant") {
 		t.Fatalf("skill pointer %s", skillBody)
+	}
+	if strings.Contains(llms.Body.String(), "](https://offer-rails.onrender.com/llms.txt)") {
+		t.Fatal("llms.txt points at itself")
 	}
 	assertPublicDocHeaders(t, skill)
 
 	full := httptest.NewRecorder()
 	r.ServeHTTP(full, httptest.NewRequest(http.MethodGet, "/llms-full.txt", nil))
 	fullBody := full.Body.String()
-	if full.Code != http.StatusOK || !strings.Contains(full.Header().Get("Content-Type"), "text/plain") || !strings.HasPrefix(fullBody, llms.Body.String()) {
+	if full.Code != http.StatusOK || !strings.Contains(full.Header().Get("Content-Type"), "text/plain") || strings.HasPrefix(fullBody, llms.Body.String()) || strings.Contains(fullBody, "](https://offer-rails.onrender.com/skill.md)") || strings.Contains(fullBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(fullBody, "In testing. Start here for a test deal") {
 		t.Fatalf("llms-full %d %q", full.Code, full.Header().Get("Content-Type"))
 	}
 	for _, phrase := range []string{
 		`orp "0.4" is the version this join accepts`,
-		"bound[].authority",
+		"approved_by agent",
+		"approved_by owner",
 		"less than 5 seconds",
 		"exactly 5 seconds",
 		"method link",
@@ -63,8 +131,18 @@ func TestColdAgentEntrance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(onDisk) != string(llmsFile)+llmsFullSuffix {
-		t.Fatal("llms-full.txt is not llms.txt plus the cold-agent section")
+	if string(llmsFile) != llmsBody() {
+		t.Fatal("llms.txt drifted from the cold-path fallback")
+	}
+	publicLLMs, err := os.ReadFile(filepath.Join(repoRoot(t), "ui", "landing", "public", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(publicLLMs) != string(llmsFile) {
+		t.Fatal("llms.txt copies differ")
+	}
+	if string(onDisk) != llmsFullDocument() {
+		t.Fatal("llms-full.txt drifted from the full document")
 	}
 	assertPublicDocHeaders(t, full)
 

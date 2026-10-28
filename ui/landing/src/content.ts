@@ -29,7 +29,11 @@ export const hardChecks = [
   'Monthly cap respected',
 ]
 
-export const modes = approvalModes.map((mode) => ({ name: mode.name, note: mode.note }))
+export const modes = [
+  { name: approvalModes[0].name, note: 'The decide step waits for a person. A stored publish step of auto commits in prepare once the domain is verified and claim checks are live.' },
+  { name: approvalModes[1].name, note: 'Categories, minimum relevance, positions, and a 30-day cap. While claim checks are not live, this decide step still waits for a person.' },
+  { name: approvalModes[2].name, note: 'While claim checks are not live, this decide step still waits for a person.' },
+]
 
 
 export const feed = [
@@ -64,7 +68,7 @@ export const makerAdvantages = [
   { k: 'pay', t: 'Pay only when a sale is attributed', b: `No listing fee. No paying for clicks. The fee is 10% of the publisher commission: ${example.fee} on the ${example.price} notebook example. The maker keeps ${example.maker}.` },
   { k: 'mcp', t: 'One install, one MCP server', b: 'One install command, pasted as is. Untested: Claude Code and Generic, both MCP over HTTP. Coming: Cursor, VS Code, Windsurf, ChatGPT and Grok.' },
   { k: 'local', t: 'Your code stays on your machine', b: 'Your agent scans pricing, payments and landing locally. It never reads .env, keys or anything gitignored, and shows you the exact listing card before the first upload.' },
-  { k: 'terms', t: 'You set the terms', b: `Pick the commission and how much control you keep: ${modes[0].name}, ${modes[1].name}, or ${modes[2].name}.` },
+  { k: 'terms', t: 'You set the terms', b: `Pick the commission and how much control you keep: ${modes[0].name}, Approve within my rules, or ${modes[2].name}.` },
   { k: 'brand', t: 'Your brand is described honestly', b: 'Copy comes only from your offer data, capped at 140 characters, always labelled and rel="sponsored". Nine hard checks run in every mode.' },
   { k: 'money', t: 'We never touch the money', b: 'Stripe handles checkout. Polar, Lemon Squeezy, and other payment adapters are coming. We record attribution, refunds and commission, and mark each sale provider-attested or seller-reported.' },
   { k: 'digest', t: 'Placements, clicks and refunds in one digest', b: 'See where your offer runs. Revoke works, and a monthly cap keeps spend predictable.' },
@@ -76,7 +80,7 @@ export const publisherAdvantages = [
   { k: 'free', t: `You earn per sale: ${example.publisher} on a ${example.price} sale at ${example.commission}`, b: 'From the content you already make. You pick each step.' },
   { k: 'one', t: 'One honest box per post', b: 'At most one offer in a post that fits, placed in the matching section, labelled and rel="sponsored".' },
   { k: 'fit', t: 'Only offers that fit', b: 'An offer needs a relevance score of 25 or higher and must be live before it can be placed. Some posts get no offer.' },
-  { k: 'switch', t: 'You pick each step', b: `${modes[0].name}, ${modes[1].name} (categories, minimum relevance, positions, a 30-day cap), or ${modes[2].name}.` },
+  { k: 'switch', t: 'You pick each step', b: `${modes[0].name}, Approve within my rules (categories, minimum relevance, positions, a 30-day cap), or ${modes[2].name}.` },
   { k: 'stricter', t: 'Agents can only tighten', b: 'Your agent can make settings stricter. Loosening a mode needs you, signed in.' },
   { k: 'undo', t: 'Undo in one tap', b: 'Clicks stop at the link right away; the box leaves the page at the plugin’s next sync (every 5 minutes) plus any page-cache delay.' },
   { k: 'readers', t: 'Readers aren’t tracked by cookies', b: 'The go link records the click without cookies. No subscriber list is shared.' },

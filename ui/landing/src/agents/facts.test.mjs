@@ -12,9 +12,22 @@ function withoutOfferJoin(text) {
 }
 
 test('llms.txt matches the agent facts', () => {
-  const file = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../public/llms.txt'), 'utf8')
-  const text = llmsText()
-  assert.equal(file, text)
+  const here = dirname(fileURLToPath(import.meta.url))
+  const file = readFileSync(resolve(here, '../../public/llms.txt'), 'utf8')
+  const twin = readFileSync(resolve(here, '../../../../affilio-wp/admin/build/landing-v9/llms.txt'), 'utf8')
+  const text = readFileSync(resolve(here, '../../../../affilio-wp/admin/build/landing-v9/llms-full.txt'), 'utf8')
+  assert.equal(file, twin)
+  assert.match(file, /Next: \[\/skill\.md\]\(https:\/\/offer-rails\.onrender\.com\/skill\.md\)/)
+  assert.equal(file.includes('](https://offer-rails.onrender.com/llms.txt)'), false)
+  assert.match(file, /Cold path:/)
+  assert.match(file, /POST \/orp\/join/)
+  assert.match(file, /Test deal\. Hello, then discover, then a directed offer \(to\), then accept by the second party, then activate, then execute, then proof\./)
+  assert.match(file, /GET \/orp\/proof\/<deal>/)
+  assert.match(file, /\/llms-full\.txt/)
+  assert.equal(text.includes('](https://offer-rails.onrender.com/skill.md)'), false)
+  assert.equal(text.includes('](https://offer-rails.onrender.com/llms-full.txt)'), false)
+  assert.equal(text.includes('Cold path:'), false)
+  assert.equal(text.startsWith('# Offer Rails\n'), true)
   assert.match(text, /## ORP 0-3 test deal/)
   assert.match(text, /In testing\. Start here for a test deal/)
   assert.match(text, /\/\.well-known\/orp\.json/)
@@ -99,7 +112,9 @@ test('llms.txt matches the agent facts', () => {
   assert.deepEqual(installs.filter((item) => item.tested).map((item) => item.id), ['generic'])
   for (const tool of tools) assert.match(text, new RegExp(tool.name))
   for (const href of docLinks) assert.match(text, new RegExp(href))
+  assert.equal(banned.test(withoutOfferJoin(file)), false)
   assert.equal(banned.test(withoutOfferJoin(text)), false)
+  assert.equal(/OfferRails|OFFERRAILS/.test(file + text), false)
 })
 
 test('ordered steps name the hosted join, prepare, receipt, and sale bodies', () => {

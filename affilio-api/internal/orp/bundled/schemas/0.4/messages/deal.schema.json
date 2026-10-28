@@ -72,7 +72,26 @@
           }
         },
         "expires": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" },
-        "updated": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" }
+        "updated": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Timestamp" },
+        "approved_by": {
+          "description": "Who approved each ask step on an ORP 0.4 deal only. A 0.3 deal does not include approved_by. party is the seat id already on the deal, not a name or email. approved_by is agent or owner. agent is the waiting party's bearer and is not a person's approval. owner is the signed-in owner who submitted the form.",
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "party", "approved_by"],
+            "properties": {
+              "step": { "type": "string", "enum": ["list", "negotiate", "accept", "execute", "amend", "settle", "share", "revoke"] },
+              "party": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/PartyId" },
+              "approved_by": { "type": "string", "enum": ["agent", "owner"] }
+            }
+          }
+        },
+        "approvals_unavailable": {
+          "description": "True only on an ORP 0.4 deal read when the host could not load who approved. The response stays HTTP 200. approved_by is omitted. A 0.3 deal does not include approvals_unavailable.",
+          "const": true
+        }
       }
     },
     "DealState": {
