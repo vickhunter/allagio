@@ -67,8 +67,18 @@ func TestColdAgentEntrance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(onDisk) != string(llmsFile)+llmsFullSuffix {
-		t.Fatal("llms-full.txt is not llms.txt plus the cold-agent section")
+	if string(llmsFile) != llmsBody() {
+		t.Fatal("llms.txt drifted from the cold-path fallback")
+	}
+	publicLLMs, err := os.ReadFile(filepath.Join(repoRoot(t), "ui", "landing", "public", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(publicLLMs) != string(llmsFile) {
+		t.Fatal("llms.txt copies differ")
+	}
+	if string(onDisk) != llmsFullDocument() {
+		t.Fatal("llms-full.txt drifted from the full document")
 	}
 	assertPublicDocHeaders(t, full)
 

@@ -1,3 +1,7 @@
+## October 28 — Cold-path llms.txt (D-115)
+
+`/llms.txt` is only the cold path: this file, then `/skill.md`, then join, then a test deal, then proof. It links to `/llms-full.txt` and the docs. The two `llms.txt` copies are the same bytes. The manual that used to be `/llms.txt` is still in `/llms-full.txt`. No glossary. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 28 — Protocol and entrance truth (D-115)
 
 `/llms.txt` still links to `/skill.md`. `/skill.md` links only to `/llms-full.txt`. `GET /v1/directory/makers` returns HTTP 200 `{"items":[],"next_cursor":null,"total":0}` when the database answers. There is no public directory table, and the makers account table is not listed. A failed database read is HTTP 503 `{"error":"directory unavailable"}`. The landing page still shows the empty copy for any non-OK response until that view treats 503 as a failure. A bearer from `POST /v1/agent-tokens` works on `/mcp` and on ORP. It is not an `X-API-Key` and it is not an `X-Admin-Key`. Marketplace, digest, and operator placement approval do not accept it. A header key comes from `POST /v1/agent-accounts` or from a device-code approval sent in `key_header`. On an ORP 0.4 deal, a failed approval read stays HTTP 200 and sets `approvals_unavailable` to true. `approved_by` is omitted. A 0.3 deal does not include that field. The 0.3 schema and example 08 are unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

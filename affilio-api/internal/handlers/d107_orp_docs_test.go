@@ -80,8 +80,10 @@ func TestORPDocumentLinks(t *testing.T) {
 	}
 
 	scan("fallback llms", llmsBody())
+	scan("full llms", llmsFullDocument())
 	scan("public llms", readRepo(t, root, "ui/landing/public/llms.txt"))
 	scan("plugin llms", readRepo(t, root, "affilio-wp/admin/build/landing-v9/llms.txt"))
+	scan("plugin llms full", readRepo(t, root, "affilio-wp/admin/build/landing-v9/llms-full.txt"))
 	scan("spec", readRepo(t, root, "docs/protocol/SPEC.md"))
 	scan("gaps", readRepo(t, root, "docs/protocol/GAPS.md"))
 	err := fs.WalkDir(os.DirFS(filepath.Join(root, "docs/protocol/schema/0.3")), ".", func(name string, entry fs.DirEntry, err error) error {
