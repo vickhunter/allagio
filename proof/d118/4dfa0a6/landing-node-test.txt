@@ -1,0 +1,45 @@
+not ok 1 - llms.txt matches the agent facts
+ok 2 - ordered steps name the hosted join, prepare, receipt, and sale bodies
+ok 3 - only page preview and digest are coming soon
+ok 4 - public agent copy stays on the documented words
+ok 5 - the join prompt and the Copy button render
+ok 6 - list URLs match the directory contract
+ok 7 - empty, results, and 404 follow the contract
+ok 8 - the client rejects a body the contract does not allow
+ok 9 - fixtures are TEST data and are not imported by the page
+ok 10 - a failed directory load names the status and is not the empty list
+ok 11 - an empty directory hides the search and the heading
+ok 12 - the home first screen is the in-write offer, the join line, and your limits
+ok 13 - privacy shows the draft line and is not indexed
+ok 14 - terms shows the draft line and is not indexed
+ok 15 - no sitemap lists the draft privacy or terms pages
+ok 16 - the notebook split is 24, publisher 2.40, fee 0.24, maker keeps 21.36
+ok 17 - home, makers, and the how-it-works figure do not type the maker figure
+ok 18 - one approval-mode name set, with no YOLO label
+ok 19 - home, makers and publishers copy avoids ads, revolution, pilot, every post, best-converting, and open source
+ok 20 - groups a verified offer ahead of topic-matched unverified programs
+ok 21 - defaults an existing offer to verified and leaves the fixture out
+ok 22 - names unreadable, private, and empty pages and never calls them no match
+ok 23 - shows closest programs and stores a local notify intent when nothing matches
+ok 24 - drops go links and tracking params without caring about case, and strips userinfo
+ok 25 - dedupes notify urls ignoring case and a trailing slash, and a blank field changes nothing
+ok 26 - keeps the newest notify urls and drops the oldest past the cap
+ok 27 - maps every preview slot to a plain label and a bar
+ok 28 - maps every preview error status to its own line and next step
+ok 29 - reads a no-match body and ignores a card with no summary
+ok 30 - rendered public landing copy has no ad, ads, fully automatic, pilot, revolutionary, best-converting, or open source
+ok 31 - every 0.3 and 0.4 schema file has one generated page
+ok 32 - the five-party and leave fixtures match the files
+not ok 33 - the committed catalog matches the spec files
+ok 34 - quickstart names the hosted thin layer
+ok 35 - protocol docs do not say open source, affilio, distributoor, or offerrails.com
+ok 36 - conformance names come from the suite
+# tests 36
+# pass 34
+# fail 2
+# skipped 0
+# duration_ms 3025.514972
+
+The two failures are the ones already failing on main. This change does not edit llms.txt, facts.mjs, catalog.mjs, or docs/protocol/sdk/README.md.
+- llms.txt matches the agent facts
+- the committed catalog matches the spec files
