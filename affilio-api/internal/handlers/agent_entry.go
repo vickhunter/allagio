@@ -119,7 +119,9 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.GET("/from/:source", h.FromSource)
 	r.GET("/llms.txt", h.LLMs)
 	r.GET("/llms-full.txt", h.LLMsFull)
+	r.HEAD("/llms-full.txt", h.LLMsFull)
 	r.GET("/skill.md", h.Skill)
+	r.HEAD("/skill.md", h.Skill)
 	r.GET("/docs/:name", h.Doc)
 }
 
@@ -1880,18 +1882,18 @@ func (h *AgentEntry) Skill(c *gin.Context) {
 }
 
 func (h *AgentEntry) serveLandingFile(c *gin.Context, name, contentType, fallback string) {
+	setPublicDocHeaders(c)
+	body := []byte(fallback)
 	if h.AssetsPath != "" {
-		body, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", name))
+		file, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", name))
 		if err == nil {
-			c.Data(http.StatusOK, contentType, body)
-			return
-		}
-		if !os.IsNotExist(err) {
+			body = file
+		} else if !os.IsNotExist(err) {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
 	}
-	c.Data(http.StatusOK, contentType, []byte(fallback))
+	writeMethodBody(c, http.StatusOK, contentType, body)
 }
 
 func (h *AgentEntry) Doc(c *gin.Context) {

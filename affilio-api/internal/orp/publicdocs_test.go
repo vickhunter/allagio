@@ -101,6 +101,27 @@ func TestMarkdownTwinsMatchHTMLPages(t *testing.T) {
 				t.Fatalf("%s dropped %q", page.md, phrase)
 			}
 		}
+		check := text
+		if strings.HasSuffix(page.md, "you.md") {
+			check = strings.Split(text, "## Connect a hosted assistant")[0]
+		}
+		allowed := strings.Join(pagePhrases(string(body)), "\n")
+		if strings.HasSuffix(page.md, "privacy.md") || strings.HasSuffix(page.md, "terms.md") {
+			legal, err := os.ReadFile(filepath.Join(repo, "ui/landing/src/legal/copy.ts"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			allowed += "\n" + string(legal)
+		}
+		for _, line := range strings.Split(check, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			if !strings.Contains(allowed, line) {
+				t.Fatalf("%s has a sentence that is not on the page: %q", page.md, line)
+			}
+		}
 	}
 }
 

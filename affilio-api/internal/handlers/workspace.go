@@ -100,6 +100,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/publishers/setup", h.PublisherSetup)
 		public.GET("/publishers/setup/", h.PublisherSetup)
 		public.GET("/publishers/setup.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "publishers-setup.md") })
+		public.HEAD("/publishers/setup.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "publishers-setup.md") })
 		public.GET("/makers/:slug", h.directoryProfile)
 		public.GET("/makers/:slug/", h.directoryProfile)
 		public.GET("/publishers/:slug", h.directoryProfile)
@@ -109,13 +110,21 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/you", h.You)
 		public.GET("/you/", h.You)
 		public.GET("/home.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "home.md") })
+		public.HEAD("/home.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "home.md") })
 		public.GET("/makers.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "makers.md") })
+		public.HEAD("/makers.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "makers.md") })
 		public.GET("/publishers.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "publishers.md") })
+		public.HEAD("/publishers.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "publishers.md") })
 		public.GET("/protocol.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "protocol.md") })
+		public.HEAD("/protocol.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "protocol.md") })
 		public.GET("/you.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "you.md") })
+		public.HEAD("/you.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "you.md") })
 		public.GET("/privacy.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "privacy.md") })
+		public.HEAD("/privacy.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "privacy.md") })
 		public.GET("/terms.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "terms.md") })
+		public.HEAD("/terms.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "terms.md") })
 		public.GET("/agents.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "agents.md") })
+		public.HEAD("/agents.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "agents.md") })
 		public.GET("/privacy", h.Privacy)
 		public.GET("/privacy/", h.Privacy)
 		public.GET("/terms", h.Terms)
@@ -214,7 +223,8 @@ func (h *HostedHandler) writeLandingNotFound(c *gin.Context) {
 
 func (h *HostedHandler) directoryProfile(c *gin.Context) {
 	if strings.HasSuffix(c.Param("slug"), ".md") {
-		c.Data(http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
+		h.writePublicHeaders(c)
+		writeMethodBody(c, http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
 		return
 	}
 	if c.Param("slug") == "setup" && strings.HasPrefix(c.Request.URL.Path, "/publishers/") {
@@ -228,13 +238,14 @@ func (h *HostedHandler) serveMarkdownTwin(c *gin.Context, name string) {
 	body, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", name))
 	if err != nil {
 		if os.IsNotExist(err) {
-			c.Data(http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
+			h.writePublicHeaders(c)
+			writeMethodBody(c, http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
 			return
 		}
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-	c.Data(http.StatusOK, "text/markdown; charset=utf-8", body)
+	writeMethodBody(c, http.StatusOK, "text/markdown; charset=utf-8", body)
 }
 
 // landingNotFoundFallback is the page served for an unknown address, and when
@@ -296,10 +307,10 @@ var LEGAL_PAGES_APPROVED = false
 
 func draftLegalPath(requestPath string) bool {
 	switch path.Clean(requestPath) {
-	case "/privacy", "/privacy/index.html",
-		"/terms", "/terms/index.html",
-		"/landing-v9/privacy", "/landing-v9/privacy/index.html",
-		"/landing-v9/terms", "/landing-v9/terms/index.html":
+	case "/privacy", "/privacy/index.html", "/privacy.md",
+		"/terms", "/terms/index.html", "/terms.md",
+		"/landing-v9/privacy", "/landing-v9/privacy/index.html", "/landing-v9/privacy.md",
+		"/landing-v9/terms", "/landing-v9/terms/index.html", "/landing-v9/terms.md":
 		return true
 	default:
 		return false

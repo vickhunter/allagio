@@ -152,9 +152,24 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 
 func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 	requestPath := c.Request.URL.Path
-	if (c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead) && strings.HasSuffix(path.Clean(requestPath), ".md") && landingMiss(requestPath) {
-		c.Data(http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
-		return
+	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+		cleaned := path.Clean(requestPath)
+		if markdownPage(cleaned) && requestPath != cleaned {
+			if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(cleaned)) {
+				c.Header("X-Robots-Tag", "noindex")
+			}
+			target := cleaned
+			if q := c.Request.URL.RawQuery; q != "" {
+				target += "?" + q
+			}
+			c.Redirect(http.StatusMovedPermanently, target)
+			return
+		}
+		if strings.HasSuffix(cleaned, ".md") && !markdownPage(cleaned) && landingMiss(requestPath) {
+			h.writePublicHeaders(c)
+			writeMethodBody(c, http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
+			return
+		}
 	}
 	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
 		cleaned := path.Clean(requestPath)
@@ -303,13 +318,38 @@ func (h *HostedHandler) headers(c *gin.Context) {
 }
 
 func (h *HostedHandler) writePublicHeaders(c *gin.Context) {
+	setPublicDocHeaders(c)
+	if !LEGAL_PAGES_APPROVED && draftLegalPath(c.Request.URL.Path) {
+		c.Header("X-Robots-Tag", "noindex")
+	}
+}
+
+// setPublicDocHeaders is what / and /you send. Skill and full-text files are
+// outside that group, so they set the same four headers themselves.
+func setPublicDocHeaders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Referrer-Policy", "strict-origin")
 	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
-	if !LEGAL_PAGES_APPROVED && draftLegalPath(c.Request.URL.Path) {
-		c.Header("X-Robots-Tag", "noindex")
+}
+
+func markdownPage(cleaned string) bool {
+	switch cleaned {
+	case "/skill.md", "/home.md", "/makers.md", "/publishers.md", "/publishers/setup.md",
+		"/protocol.md", "/you.md", "/privacy.md", "/terms.md", "/agents.md":
+		return true
+	default:
+		return false
 	}
+}
+
+func writeMethodBody(c *gin.Context, status int, contentType string, body []byte) {
+	if c.Request.Method == http.MethodHead {
+		c.Header("Content-Type", contentType)
+		c.Status(status)
+		return
+	}
+	c.Data(status, contentType, body)
 }
 
 func (h *HostedHandler) limited(c *gin.Context) bool {
