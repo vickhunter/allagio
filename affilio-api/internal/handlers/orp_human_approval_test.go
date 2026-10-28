@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
@@ -250,9 +251,30 @@ func TestORP03ActivateAskOptInDoesNotBind(t *testing.T) {
 		t.Fatalf("missing %d", missing.Code)
 	}
 	assertApproveHeaders(t, missing)
+	var openBound []byte
+	if err := db.Pool.QueryRow(context.Background(), `SELECT bound FROM orp_deals WHERE id=$1`, openID).Scan(&openBound); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := db.ActivateORPDeal(context.Background(), openID, openBound, time.Now().UTC(), []database.ORPInboxItem{{
+		OwnerID: "00000000-0000-4000-8000-000000000099", Message: []byte(`{"type":"deal"}`),
+	}}, &database.DealApproval{OwnerID: acceptor.owner, Party: acceptor.party, Step: "accept", By: "agent"})
+	if err == nil || changed || countDealApprovals(t, db, openID, "") != 0 {
+		t.Fatalf("inbox error left a row changed %v err %v", changed, err)
+	}
+	var openState string
+	if err = db.Pool.QueryRow(context.Background(), `SELECT state FROM orp_deals WHERE id=$1`, openID).Scan(&openState); err != nil || openState != "awaiting" {
+		t.Fatalf("inbox error activated %s %v", openState, err)
+	}
 	act, actBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+openID+"/activate", nil, bearerHeader(acceptor.token))
 	if act.Code != http.StatusOK || docBody(t, actBody)["state"] != "active" {
 		t.Fatalf("default activate %d %s", act.Code, act.Body.String())
+	}
+	if countDealApprovals(t, db, openID, "agent") != 1 || countDealApprovals(t, db, openID, "owner") != 0 {
+		t.Fatalf("agent rows %d", countDealApprovals(t, db, openID, "agent"))
+	}
+	openProof, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+openID, nil, nil)
+	if openProof.Code != http.StatusOK || !strings.Contains(openProof.Body.String(), "approved_by agent") || strings.Contains(openProof.Body.String(), "approved_by owner") {
+		t.Fatalf("agent proof %d %s", openProof.Code, openProof.Body.String())
 	}
 
 	heldOfferer := joinDefault(t, r)
@@ -261,7 +283,28 @@ func TestORP03ActivateAskOptInDoesNotBind(t *testing.T) {
 	if err := db.SaveHumanApprovalSteps(context.Background(), held.owner, []string{"ask"}); err != nil {
 		t.Fatal(err)
 	}
-	heldID := acceptDirected03(t, r, heldOfferer, held, "m_d111_held1", "m_d111_hacc1")
+	heldID, heldHash, heldEsc := proposeDirected03(t, db, r, heldOfferer, held, "m_d111_held1")
+	base := "http://127.0.0.1:8080"
+	cookie, csrf := sessionForOwner(t, db, held.owner, base)
+	earlyGet, _ := postJSON(t, r, http.MethodGet, "/orp/approve/"+heldEsc, nil, nil)
+	if earlyGet.Code != http.StatusOK || !strings.Contains(earlyGet.Body.String(), "does not approve") || strings.Contains(earlyGet.Body.String(), `method="post"`) {
+		t.Fatalf("proposed page %d %s", earlyGet.Code, earlyGet.Body.String())
+	}
+	earlyPost := postOwnerApprove(t, r, "/orp/approve/"+heldEsc, cookie, csrf, base, nil)
+	retryPost := postOwnerApprove(t, r, "/orp/approve/"+heldEsc, cookie, csrf, base, nil)
+	if earlyPost.Code == http.StatusOK || retryPost.Code == http.StatusOK || countDealApprovals(t, db, heldID, "") != 0 {
+		t.Fatalf("proposed post %d %d rows %d", earlyPost.Code, retryPost.Code, countDealApprovals(t, db, heldID, ""))
+	}
+	earlyProof, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+heldID, nil, nil)
+	if strings.Contains(earlyProof.Body.String(), "approved_by owner") || strings.Contains(earlyProof.Body.String(), "approved_by agent") {
+		t.Fatalf("proposed proof %s", earlyProof.Body.String())
+	}
+	acceptMsg := orpEnvelope("accept", "m_d111_hacc1", held.party, map[string]any{"terms_hash": heldHash})
+	acceptMsg["deal"] = heldID
+	accepted, acceptedDoc := postJSON(t, r, http.MethodPost, "/orp", acceptMsg, bearerHeader(held.token))
+	if accepted.Code != http.StatusOK || docBody(t, acceptedDoc)["state"] != "awaiting" {
+		t.Fatalf("accept %d %s", accepted.Code, accepted.Body.String())
+	}
 	denied, deniedBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+heldID+"/activate", nil, bearerHeader(held.token))
 	if denied.Code != http.StatusForbidden || deniedBody["reason"] != "owner_approval" || deniedBody["message"] != ownerApprovalMessage || deniedBody["orp"] != nil {
 		t.Fatalf("opt-in activate %d %s", denied.Code, denied.Body.String())
@@ -282,9 +325,7 @@ func TestORP03ActivateAskOptInDoesNotBind(t *testing.T) {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT waiting->>'escalation', parties IS NULL FROM orp_deals WHERE id=$1`, heldID).Scan(&esc, &partiesNull); err != nil || esc == "" || !partiesNull {
 		t.Fatalf("escalation %s null %v %v", esc, partiesNull, err)
 	}
-	base := "http://127.0.0.1:8080"
 	link := "/orp/approve/" + esc
-	cookie, csrf := sessionForOwner(t, db, held.owner, base)
 	unsigned, _ := postJSON(t, r, http.MethodGet, link, nil, nil)
 	if unsigned.Code != http.StatusForbidden || !strings.Contains(unsigned.Body.String(), `"reason":"owner_approval"`) {
 		t.Fatalf("unsigned %d %s", unsigned.Code, unsigned.Body.String())
@@ -320,12 +361,12 @@ func TestORP03ActivateAskOptInDoesNotBind(t *testing.T) {
 		t.Fatalf("bound %s %s null %v", state, bound, partiesNull)
 	}
 	proof, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+heldID, nil, nil)
-	if proof.Code != http.StatusOK || !strings.Contains(proof.Body.String(), "approved_by owner") {
-		t.Fatalf("proof %d %s", proof.Code, proof.Body.String())
+	if proof.Code != http.StatusOK || !strings.Contains(proof.Body.String(), "approved_by owner") || countDealApprovals(t, db, heldID, "owner") != 1 {
+		t.Fatalf("proof %d rows %d %s", proof.Code, countDealApprovals(t, db, heldID, "owner"), proof.Body.String())
 	}
 	replay := postOwnerApprove(t, r, link, cookie, csrf, base, nil)
-	if replay.Code != http.StatusNotFound {
-		t.Fatalf("replay %d %s", replay.Code, replay.Body.String())
+	if replay.Code != http.StatusNotFound || countDealApprovals(t, db, heldID, "owner") != 1 {
+		t.Fatalf("replay %d rows %d %s", replay.Code, countDealApprovals(t, db, heldID, "owner"), replay.Body.String())
 	}
 	assertApproveHeaders(t, unsigned)
 	assertApproveHeaders(t, agentGet)
@@ -334,6 +375,40 @@ func TestORP03ActivateAskOptInDoesNotBind(t *testing.T) {
 	assertApproveHeaders(t, noCSRF)
 	assertApproveHeaders(t, ownerPost)
 	assertApproveHeaders(t, replay)
+}
+
+func proposeDirected03(t *testing.T, db *database.DB, r http.Handler, offerer, acceptor party04, offerID string) (dealID, termsHash, esc string) {
+	t.Helper()
+	env := orpEnvelope("offer", offerID, offerer.party, map[string]any{"terms": testTerms()})
+	env["to"] = acceptor.party
+	rec, doc := postJSON(t, r, http.MethodPost, "/orp", env, bearerHeader(offerer.token))
+	body := docBody(t, doc)
+	dealID, _ = doc["deal"].(string)
+	termsHash, _ = body["terms_hash"].(string)
+	if rec.Code != http.StatusOK || body["state"] != "proposed" || dealID == "" || termsHash == "" {
+		t.Fatalf("directed %d %s", rec.Code, rec.Body.String())
+	}
+	var state string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT state, COALESCE(waiting->>'escalation','') FROM orp_deals WHERE id=$1`, dealID).Scan(&state, &esc); err != nil || state != "proposed" || esc == "" {
+		t.Fatalf("proposed stored %s %s %v", state, esc, err)
+	}
+	return dealID, termsHash, esc
+}
+
+func countDealApprovals(t *testing.T, db *database.DB, dealID, by string) int {
+	t.Helper()
+	var n int
+	q := `SELECT COUNT(*) FROM agent_step_approvals WHERE payload->>'kind'='deal_approval' AND payload->>'deal_id'=$1`
+	var err error
+	if by == "" {
+		err = db.Pool.QueryRow(context.Background(), q, dealID).Scan(&n)
+	} else {
+		err = db.Pool.QueryRow(context.Background(), q+` AND payload->>'approved_by'=$2`, dealID, by).Scan(&n)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
 }
 
 func acceptDirected03(t *testing.T, r http.Handler, offerer, acceptor party04, offerID, acceptID string) string {
