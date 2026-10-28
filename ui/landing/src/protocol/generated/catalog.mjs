@@ -308,7 +308,7 @@ export const catalog = {
               "name": "name",
               "required": true,
               "type": "string, pattern",
-              "description": ""
+              "description": "1 to 64 characters: letters, digits, underscore, dot, space, or hyphen. Parentheses are not allowed."
             },
             {
               "name": "version",
@@ -1082,6 +1082,24 @@ export const catalog = {
               "description": "A second parameter, such as ref, that carries the same click id for checkouts that read it."
             },
             {
+              "name": "clicks",
+              "required": false,
+              "type": "integer, min 0",
+              "description": "Counted human clicks on this entry. Bot, preview, test, and repeat clicks are excluded. A repeat is a human click less than 5 seconds after the previous counted click on this entry. A 0.3 deal snapshot omits this field."
+            },
+            {
+              "name": "click_share",
+              "required": false,
+              "type": "array of object, closed",
+              "description": "Each party's share summed across counted human clicks, in seat order. A percent is an integer from 0 to 100 on the click, and this sum divides that integer by 100, so 50 twice is 1.0. amount_minor stays an integer sum. Repeat clicks are not included. No address, user agent, or referrer. A 0.3 deal snapshot omits this field."
+            },
+            {
+              "name": "receipt",
+              "required": false,
+              "type": "object, closed",
+              "description": "Set once a counted human click verifies this entry. id is the receipt message. method is link. verified_at is when the host verified it. No address, user agent, or referrer. A 0.3 deal snapshot omits this field."
+            },
+            {
               "name": "expires",
               "required": false,
               "type": "Timestamp",
@@ -1122,7 +1140,7 @@ export const catalog = {
         },
         {
           "name": "Authority",
-          "description": "Why a party is bound. mandate: the owner's standing constraints allowed it. consent: a person approved this exact terms_hash.",
+          "description": "Why a party is bound. mandate: the owner's standing constraints allowed it. An agent approval is approved_by agent and is not a person's approval. The signed-in owner form records approved_by owner and a mandate. consent: a host-only message type.",
           "closed": true,
           "fields": [
             {
@@ -1178,7 +1196,7 @@ export const catalog = {
               "name": "url",
               "required": false,
               "type": "Url",
-              "description": "Where the owner approves or refuses. The agent shows it to its person; it can never approve by itself."
+              "description": "Where the waiting party is sent. By default the waiting party's agent approves an ask with its bearer, and the host records approved_by agent. That is not a person's approval. When the owner turns on human approval for that step, the signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing."
             }
           ]
         },
@@ -1693,7 +1711,7 @@ export const catalog = {
       "slug": "join-response",
       "href": "/protocol/spec/0.3/join-response/",
       "title": "JoinResponse",
-      "description": "A new pseudonymous party, usable at once. Until a person sets limits, every step that binds asks: the agent gets a waiting.url to show its person, who approves with one tap. The claim URL lets that person make the party theirs (a passkey, no email), set limits and get paid.",
+      "description": "A new pseudonymous party, usable at once. Until an owner sets limits, every step that binds asks: the waiting party's agent approves it. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing. The claim URL lets the owner make the party theirs (a passkey, no email), set limits and get paid.",
       "kind": "http",
       "type": "",
       "required": [
@@ -1705,7 +1723,7 @@ export const catalog = {
       "sections": [
         {
           "name": "JoinResponse",
-          "description": "A new pseudonymous party, usable at once. Until a person sets limits, every step that binds asks: the agent gets a waiting.url to show its person, who approves with one tap. The claim URL lets that person make the party theirs (a passkey, no email), set limits and get paid.",
+          "description": "A new pseudonymous party, usable at once. Until an owner sets limits, every step that binds asks: the waiting party's agent approves it. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing. The claim URL lets the owner make the party theirs (a passkey, no email), set limits and get paid.",
           "closed": true,
           "fields": [
             {
@@ -2253,7 +2271,7 @@ export const catalog = {
       "slug": "accept",
       "href": "/protocol/spec/0.3/accept/",
       "title": "AcceptMessage",
-      "description": "Agree to exact terms, named by terms_hash. Accept an open deal (deal set) or a standing offer (body.offer set, which opens a new deal). The host binds the sender only if the owner's constraints allow it; otherwise the deal waits for a person and the reply says so.",
+      "description": "Agree to exact terms, named by terms_hash. Accept an open deal (deal set) or a standing offer (body.offer set, which opens a new deal). The host binds the sender only if the owner's constraints allow it; otherwise the deal waits for the waiting party's agent and the reply says so. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing.",
       "kind": "message",
       "type": "accept",
       "required": [
@@ -2360,7 +2378,7 @@ export const catalog = {
         },
         {
           "name": "AcceptMessage",
-          "description": "Agree to exact terms, named by terms_hash. Accept an open deal (deal set) or a standing offer (body.offer set, which opens a new deal). The host binds the sender only if the owner's constraints allow it; otherwise the deal waits for a person and the reply says so.",
+          "description": "Agree to exact terms, named by terms_hash. Accept an open deal (deal set) or a standing offer (body.offer set, which opens a new deal). The host binds the sender only if the owner's constraints allow it; otherwise the deal waits for the waiting party's agent and the reply says so. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing.",
           "closed": false,
           "fields": [
             {
@@ -3616,7 +3634,7 @@ export const catalog = {
       "slug": "error",
       "href": "/protocol/spec/0.3/error/",
       "title": "ErrorMessage",
-      "description": "A refusal. An error never changes state. Escalation is not an error: a step that needs a person returns a deal snapshot in state awaiting.",
+      "description": "A refusal. An error never changes state. Escalation is not an error: an ask returns a deal snapshot in state awaiting.",
       "kind": "message",
       "type": "error",
       "required": [
@@ -3718,7 +3736,7 @@ export const catalog = {
         },
         {
           "name": "ErrorMessage",
-          "description": "A refusal. An error never changes state. Escalation is not an error: a step that needs a person returns a deal snapshot in state awaiting.",
+          "description": "A refusal. An error never changes state. Escalation is not an error: an ask returns a deal snapshot in state awaiting.",
           "closed": false,
           "fields": [
             {
@@ -4311,7 +4329,7 @@ export const catalog = {
               "name": "waiting",
               "required": false,
               "type": "Waiting",
-              "description": "Set by the host when listing waits for the owner's person. The offer is listed once approved."
+              "description": "Set by the host when listing waits for the waiting party's agent. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing. The offer is listed once approved."
             },
             {
               "name": "note",
@@ -5622,7 +5640,7 @@ export const catalog = {
       "slug": "space",
       "href": "/protocol/spec/0.3/space/",
       "title": "SpaceMessage",
-      "description": "Publish, update or withdraw a Space: a place the sender controls where content can appear (a blog, a newsletter, an X account, a video channel, an app slot). A party sends put or withdraw under the list step. The host answers with a space message from the host: the space as listed, or waiting for the owner's person. Space ids are unique per party. The locator stays hidden from counterparties until a deal that names the space is active.",
+      "description": "Publish, update or withdraw a Space: a place the sender controls where content can appear (a blog, a newsletter, an X account, a video channel, an app slot). A party sends put or withdraw under the list step. The host answers with a space message from the host: the space as listed, or waiting for the waiting party's agent. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing. Space ids are unique per party. The locator stays hidden from counterparties until a deal that names the space is active.",
       "kind": "message",
       "type": "space",
       "required": [
@@ -5724,7 +5742,7 @@ export const catalog = {
         },
         {
           "name": "SpaceMessage",
-          "description": "Publish, update or withdraw a Space: a place the sender controls where content can appear (a blog, a newsletter, an X account, a video channel, an app slot). A party sends put or withdraw under the list step. The host answers with a space message from the host: the space as listed, or waiting for the owner's person. Space ids are unique per party. The locator stays hidden from counterparties until a deal that names the space is active.",
+          "description": "Publish, update or withdraw a Space: a place the sender controls where content can appear (a blog, a newsletter, an X account, a video channel, an app slot). A party sends put or withdraw under the list step. The host answers with a space message from the host: the space as listed, or waiting for the waiting party's agent. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing. Space ids are unique per party. The locator stays hidden from counterparties until a deal that names the space is active.",
           "closed": false,
           "fields": [
             {
@@ -5774,7 +5792,7 @@ export const catalog = {
               "name": "waiting",
               "required": false,
               "type": "Waiting",
-              "description": "Set by the host when listing waits for the owner's person."
+              "description": "Set by the host when listing waits for the waiting party's agent. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing."
             },
             {
               "name": "note",
@@ -7030,6 +7048,18 @@ export const catalog = {
               "required": true,
               "type": "Timestamp",
               "description": ""
+            },
+            {
+              "name": "approved_by",
+              "required": false,
+              "type": "array of object, closed",
+              "description": "Who approved each ask step on an ORP 0.4 deal only. A 0.3 deal does not include approved_by. party is the seat id already on the deal, not a name or email. approved_by is agent or owner. agent is the waiting party's bearer and is not a person's approval. owner is the signed-in owner who submitted the form."
+            },
+            {
+              "name": "approvals_unavailable",
+              "required": false,
+              "type": "const true",
+              "description": "True only on an ORP 0.4 deal read when the host could not load who approved. The response stays HTTP 200. approved_by is omitted. A 0.3 deal does not include approvals_unavailable."
             }
           ]
         }
@@ -7049,7 +7079,7 @@ export const catalog = {
         },
         {
           "name": "referral-chain.json",
-          "json": "{\n  \"orp\": \"0.4\",\n  \"type\": \"deal\",\n  \"id\": \"m_host_referral\",\n  \"ts\": \"2026-10-26T12:00:00.000Z\",\n  \"from\": \"orp:hub.example/host\",\n  \"to\": \"orp:hub.example/p_creator01\",\n  \"deal\": \"deal_referral\",\n  \"body\": {\n    \"state\": \"active\",\n    \"parties\": [\n      {\n        \"id\": \"orp:hub.example/p_creator01\",\n        \"role\": \"offerer\",\n        \"required\": true,\n        \"signed\": true,\n        \"terms\": {\n          \"percent\": 50\n        }\n      },\n      {\n        \"id\": \"orp:hub.example/p_curator01\",\n        \"role\": \"curator\",\n        \"required\": true,\n        \"signed\": true,\n        \"terms\": {\n          \"percent\": 30\n        }\n      },\n      {\n        \"id\": \"orp:hub.example/p_news01\",\n        \"role\": \"acceptor\",\n        \"required\": true,\n        \"signed\": true,\n        \"terms\": {\n          \"percent\": 20\n        }\n      }\n    ],\n    \"terms\": {\n      \"title\": \"Referral notes chain\",\n      \"kind\": \"partnership\",\n      \"disclosure\": {\n        \"label\": \"Affiliate link\",\n        \"lang\": \"en\"\n      },\n      \"obligations\": [\n        {\n          \"id\": \"place\",\n          \"by\": \"orp:hub.example/p_news01\",\n          \"action\": \"place\",\n          \"content\": {\n            \"link\": true,\n            \"brief\": \"Mention the notes app.\"\n          },\n          \"destination\": \"https://notes.example/pricing?plan=pro\",\n          \"proof\": [\n            \"link\"\n          ]\n        }\n      ]\n    },\n    \"terms_hash\": \"sha256-lx3RaehTPOZnKQISKqCAJWIiwbJ1U51oHl0gN791ukU\",\n    \"updated\": \"2026-10-26T12:00:00.000Z\",\n    \"offerer\": \"orp:hub.example/p_creator01\",\n    \"acceptor\": \"orp:hub.example/p_news01\",\n    \"round\": 1\n  }\n}"
+          "json": "{\n  \"orp\": \"0.4\",\n  \"type\": \"deal\",\n  \"id\": \"m_host_referral\",\n  \"ts\": \"2026-10-26T12:00:00.000Z\",\n  \"from\": \"orp:hub.example/host\",\n  \"to\": \"orp:hub.example/p_creator01\",\n  \"deal\": \"deal_referral\",\n  \"body\": {\n    \"state\": \"active\",\n    \"parties\": [\n      {\n        \"id\": \"orp:hub.example/p_creator01\",\n        \"role\": \"offerer\",\n        \"required\": true,\n        \"signed\": true,\n        \"terms\": {\n          \"percent\": 50\n        }\n      },\n      {\n        \"id\": \"orp:hub.example/p_curator01\",\n        \"role\": \"curator\",\n        \"required\": true,\n        \"signed\": true,\n        \"terms\": {\n          \"percent\": 30\n        }\n      },\n      {\n        \"id\": \"orp:hub.example/p_news01\",\n        \"role\": \"acceptor\",\n        \"required\": true,\n        \"signed\": true,\n        \"terms\": {\n          \"percent\": 20\n        }\n      }\n    ],\n    \"terms\": {\n      \"title\": \"Referral notes chain\",\n      \"kind\": \"partnership\",\n      \"disclosure\": {\n        \"label\": \"Affiliate link\",\n        \"lang\": \"en\"\n      },\n      \"obligations\": [\n        {\n          \"id\": \"place\",\n          \"by\": \"orp:hub.example/p_news01\",\n          \"action\": \"place\",\n          \"content\": {\n            \"link\": true,\n            \"brief\": \"Mention the notes app.\"\n          },\n          \"destination\": \"https://notes.example/pricing?plan=pro\",\n          \"proof\": [\n            \"link\"\n          ]\n        }\n      ]\n    },\n    \"terms_hash\": \"sha256-lx3RaehTPOZnKQISKqCAJWIiwbJ1U51oHl0gN791ukU\",\n    \"approved_by\": [\n      {\n        \"step\": \"accept\",\n        \"party\": \"orp:hub.example/p_creator01\",\n        \"approved_by\": \"agent\"\n      },\n      {\n        \"step\": \"accept\",\n        \"party\": \"orp:hub.example/p_news01\",\n        \"approved_by\": \"owner\"\n      }\n    ],\n    \"updated\": \"2026-10-26T12:00:00.000Z\",\n    \"offerer\": \"orp:hub.example/p_creator01\",\n    \"acceptor\": \"orp:hub.example/p_news01\",\n    \"round\": 1\n  }\n}"
         }
       ],
       "invalid": []
@@ -7897,7 +7927,7 @@ export const catalog = {
     "sdk/src/sign.mjs",
     "sdk/src/validate.mjs"
   ],
-  "sdkReadme": "# ORP reference host\n\nIn-process host and a thin client for the conformance suite. Party behavior is HTTP. The scheduler hooks (`advanceBusiness`, `runDueChecks`, `registerPage`, `markTestPool`, `failNextRecheck`, `resolveDispute`) are in-process on the reference host. The host speaks ORP 0.4 and 0.3. The Offer Rails hosted API does not speak 0.4.\n\n`claims: \"real\"` checks destinations against the in-memory page catalog. It does not fetch a page and it is not the hosted `CLAIMS_CHECK` setting. `stub` and `none` leave an offer unchecked.\n\nThe provider test token and owner tokens are generated per host and kept in the local store. They are not production secrets.",
+  "sdkReadme": "# ORP reference host\n\nIn-process host and a thin client for the conformance suite. Party behavior is HTTP. The scheduler hooks (`advanceBusiness`, `runDueChecks`, `registerPage`, `markTestPool`, `failNextRecheck`, `resolveDispute`) are in-process on the reference host. The host speaks ORP 0.4 and 0.3. The Offer Rails hosted API speaks 0.4 and 0.3. `CLAIMS_CHECK` on that host stays a stub, so claim fields stay `unknown`.\n\n`claims: \"real\"` checks destinations against the in-memory page catalog. It does not fetch a page and it is not the hosted `CLAIMS_CHECK` setting. `stub` and `none` leave an offer unchecked.\n\nThe provider test token and owner tokens are generated per host and kept in the local store. They are not production secrets.",
   "exampleCount": 51,
   "invalidCount": 56
 }
