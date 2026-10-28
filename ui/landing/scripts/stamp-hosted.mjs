@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -12,7 +12,11 @@ const meta = `<meta name="or-install" content="{{if .InstallerReady}}{{.InstallC
 const shell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
-      <h1>Affiliate marketing, evolved for agents.</h1>
+      <h1>Publishers earn on a sale. Makers pay only for that sale.</h1>
+      <p>Agents join with no sign-in. People sign in with Google for the dashboard.</p>
+      <p><a href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">I sell a product</a></p>
+      <p><a href="/publishers/setup" style="display:inline-flex;min-height:44px;align-items:center">I run a site</a></p>
+      <p>For agents: Join with POST /v1/agent-tokens and send the bearer.</p>
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
       <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
       <p><a href="/downloads/offer-rails.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
@@ -28,7 +32,7 @@ const youShell = `<div id="static-landing">
       <h1>Your limits, your approvals, a receipt in plain words.</h1>
       <p>This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.</p>
       <p>Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.</p>
-      <section id="limits"><h2>Limits</h2><p>Your limits come first. A new site opens on Manual: ask every time.</p><h3>Ask every time</h3><p>Manual. A new site opens here. Each placement waits for you.</p><h3>Approve within your rules</h3><p>Once you set it. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the nine checks</h3><p>Only you can turn this on. While claims are not checked, this also waits for a person.</p></section>
+      <section id="limits"><h2>Limits</h2><p>Your limits come first. A new site opens on Ask me every time.</p><h3>Ask me every time</h3><p>Manual. A new site opens here. Each placement waits for you.</p><h3>Approve within my rules</h3><p>Once you set it. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the checks</h3><p>Only you can turn this on. While claims are not checked, this also waits for a person.</p></section>
       <section id="approvals"><h2>Approvals</h2><p>A person approves each placement. No agent tool can approve.</p></section>
       <section id="receipts"><h2>Receipts</h2><p>Example wording. Not a live agreement.</p><p>Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.</p></section>
     </main>
@@ -61,7 +65,10 @@ const setupShell = `<div id="static-landing">
         <li>
           <h2>Choose the approval mode</h2>
           <p>To do</p>
-          <p>Manual is selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on.</p>
+          <p>A person signs in with Google so the dashboard can save the site and the approval mode. Agents join with no sign-in.</p>
+          <p>I'm not on WordPress. Agent only for now. This page does not mint a link.</p>
+          <h2>Optional: preview what an offer would look like</h2>
+          <p>Ask me every time is selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on.</p>
           <p><a data-step-action href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Save this mode</a></p>
         </li>
       </ol>
@@ -75,9 +82,19 @@ function stamp(file, fallback = shell) {
   return html
 }
 
+const keepNames = ['agents.md', 'home.md', 'llms-full.txt', 'makers.md', 'privacy.md', 'protocol.md', 'publishers-setup.md', 'publishers.md', 'skill.md', 'terms.md', 'you.md']
+const kept = new Map()
+for (const name of keepNames) {
+  const path = resolve(assets, name)
+  if (existsSync(path)) kept.set(name, readFileSync(path))
+}
 rmSync(assets, { recursive: true, force: true })
 mkdirSync(assets, { recursive: true })
 cpSync(dist, assets, { recursive: true })
+for (const [name, body] of kept) {
+  const dest = resolve(assets, name)
+  if (!existsSync(dest)) writeFileSync(dest, body)
+}
 rmSync(resolve(assets, 'index.html'), { force: true })
 rmSync(resolve(assets, 'makers'), { recursive: true, force: true })
 rmSync(resolve(assets, 'publishers'), { recursive: true, force: true })

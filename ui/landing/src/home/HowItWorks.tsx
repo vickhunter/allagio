@@ -10,7 +10,7 @@ const steps = [
   { n: 2, icon: Bot, tone: 'setup', title: 'An agent checks the fit', body: 'It reads the product and the publisher’s posts, finds a post where the product really fits, and runs the checks.' },
   { n: 3, icon: PanelTop, tone: 'pub', title: 'One labelled box in a matching post', body: 'Their site shows one offer box, clearly marked as sponsored, inside that post.' },
   { n: 4, icon: ShoppingCart, tone: 'pub', title: 'A reader buys', body: 'A reader clicks the box and buys the product on the maker’s own site.' },
-  { n: 5, icon: Coins, tone: 'maker', title: 'The sale is credited', body: `The sale is linked to that post. The publisher earns the commission. The maker pays only when a sale happens: on ${example.price}, ${example.publisher} goes to the publisher.` },
+  { n: 5, icon: Coins, tone: 'maker', title: 'The sale is credited', body: `The sale is linked to that post. On ${example.price} at ${example.commission}, the publisher gets ${example.publisher}. A ${example.fee} fee is paid by the maker, so the maker keeps ${example.maker}.` },
 ] as const
 
 const toneCls = { maker: 'text-maker bg-maker-soft', pub: 'text-pub bg-pub-soft', setup: 'text-setup bg-s2' } as const

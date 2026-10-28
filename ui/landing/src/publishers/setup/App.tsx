@@ -2,12 +2,7 @@ import { useState } from 'react'
 import { PostPreview } from '@/components/PostPreview'
 import { Page } from '@/site/Page'
 import { signInHref, useSource } from '@/lib/source'
-
-const approvalModes = [
-  { id: 'manual', name: 'Manual', note: 'You approve each placement.' },
-  { id: 'auto', name: 'Auto', note: 'Placements that pass your rules go live.' },
-  { id: 'yolo', name: 'YOLO', note: 'Anything that passes the checks goes live. Undo is one tap.' },
-] as const
+import { approvalModes, personSignsInBecause } from '@/lib/modes.mjs'
 
 type ModeId = (typeof approvalModes)[number]['id']
 
@@ -35,7 +30,7 @@ export function App() {
   const steps: { title: string; body: string; href: string; action: string; status: StepStatus; track: Record<string, string>; extra?: 'mode' }[] = [
     { title: 'Install the plugin', body: 'Upload it in WordPress and turn it on.', href: '/downloads/offer-rails.zip', action: 'Download the plugin', status: 'todo', track: { 'data-track': 'zip_download' } },
     { title: 'Connect your site', body: 'Sign in with Google, then link the site where you installed the plugin.', href: connectHref, action: 'Connect your site', status: 'todo', track: { 'data-track': 'cta_click', 'data-track-cta': 'connect_site', 'data-track-kind': 'sign_in_click' } },
-    { title: 'Choose the approval mode', body: 'Manual is selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on. Sign in to save it on your account.', href: saveHref, action: 'Save this mode', status: 'todo', track: { 'data-track': 'cta_click', 'data-track-cta': 'save_mode', 'data-track-kind': 'sign_in_click' }, extra: 'mode' },
+    { title: 'Choose the approval mode', body: `${approvalModes[0].name} is selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on. Sign in to save it on your account.`, href: saveHref, action: 'Save this mode', status: 'todo', track: { 'data-track': 'cta_click', 'data-track-cta': 'save_mode', 'data-track-kind': 'sign_in_click' }, extra: 'mode' },
   ]
   const primary = steps.findIndex((step) => step.status === 'todo')
   return (
@@ -43,10 +38,23 @@ export function App() {
       <section aria-labelledby="setup-h" className="mx-auto max-w-3xl px-5 pb-16 pt-12 md:pt-16">
         <p className="eyebrow">Publisher setup</p>
         <h1 id="setup-h" className="h-display mt-4 text-[40px] sm:text-6xl">Set up your site.</h1>
-        <p className="mt-5 text-lg leading-relaxed text-t2">Three steps. Then Offer Rails can place offers on your posts.</p>
-        <div className="mt-10">
-          <PostPreview titleLevel={2} />
-        </div>
+        <p className="mt-5 text-lg leading-relaxed text-t2">Three steps if you use WordPress. Then Offer Rails can place offers on your posts.</p>
+        <p className="mt-3 text-[15px] leading-relaxed text-t2">{personSignsInBecause}</p>
+        <details className="mt-6 rounded-2xl border border-line bg-s1 p-5">
+          <summary className="cursor-pointer text-[15px] font-semibold">I'm not on WordPress</summary>
+          <div className="mt-3 text-[15px] leading-relaxed text-t2">
+            <p>Agent only for now. A newsletter, Substack, Ghost, or any other place you can paste a link does not use this plugin, and this page does not mint a link.</p>
+            <p className="mt-2">Your agent prepares a placement. You sign in with Google to approve it on the dashboard. Then you paste the tracked link. Click counts are in testing.</p>
+            <p className="mt-3"><a className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4" href="/publishers/#add-yours">Add your site or newsletter</a></p>
+          </div>
+        </details>
+        <section aria-labelledby="preview-optional" className="mt-8">
+          <h2 id="preview-optional" className="font-display text-2xl font-bold">Optional: preview what an offer would look like</h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-t2">This is not a setup step. It does not place an offer.</p>
+          <div className="mt-4">
+            <PostPreview titleLevel={3} />
+          </div>
+        </section>
         <ol className="mt-6 space-y-4">
           {steps.map((step, index) => (
             <li key={step.title} className="rounded-2xl border border-line bg-s1 p-5">

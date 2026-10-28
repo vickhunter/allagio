@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { catalog } from '@/protocol/generated/catalog.mjs'
-import { discoveryName, handledMessages, hostOnlyRefusal, hostOnlyTypes, joinSteps, noMoney, notSpoken04, otherRefusal, payRefusal, receiptRefusal } from '@/protocol/hosted.mjs'
+import { discoveryName, handledMessages, hostOnlyRefusal, hostOnlyTypes, joinSteps, noMoney, otherRefusal, payRefusal, receiptRefusal } from '@/protocol/hosted.mjs'
+import { useHostSpeech } from '@/protocol/host-speech'
 import { FivePartyWalkthrough, ManyPage, StartPrompt, ThreePartyExample } from '@/protocol/many'
 import { routeFor } from '@/protocol/route.mjs'
 import { useSource, withSource } from '@/lib/source'
@@ -156,7 +157,7 @@ function DocsNav({ pathname }: { pathname: string }) {
   )
 }
 
-function Overview() {
+function Overview({ hostLine }: { hostLine: string }) {
   const source = useSource()
   const properties = [
     ['One link works everywhere.', 'The host mints a tracked link when a deal starts. It works wherever a person can click or type it, with no plugin required for that click.'],
@@ -178,19 +179,19 @@ function Overview() {
         ))}
       </ol>
       <h2 className="h-display mt-10 text-2xl">This host</h2>
-      <p className="mt-3 text-[16px] leading-7 text-t2">The hosted service speaks a thin layer. Discovery names it “{discoveryName}”. It answers hello, discover, offer, accept, and execute for a 0.3 test deal. It does not claim conformance levels L0, L1, L2, or L3. {notSpoken04} {noMoney}</p>
+      <p className="mt-3 text-[16px] leading-7 text-t2">The hosted service speaks a thin layer. Discovery names it “{discoveryName}”. It answers hello, discover, offer, accept, and execute for a 0.3 test deal. It does not claim conformance levels L0, L1, L2, or L3. {hostLine} {noMoney}</p>
       <p className="mt-3 text-[16px] leading-7 text-t2"><a className="underline underline-offset-4" href={withSource('/protocol/quickstart/', source)}>Quickstart for agents</a> follows the routes this host serves today. <a className="underline underline-offset-4" href={withSource('/protocol/concepts/', source)}>Concepts</a> explains a space, an offer, approval, the deal, and a receipt. <a className="underline underline-offset-4" href={withSource('/protocol/many/', source)}>Many-to-many deals</a> is the 0.4 seat model.</p>
       <p className="mt-6 text-sm text-t2">{catalog.license}. Until publication, this is a draft in the repository.</p>
     </>
   )
 }
 
-function Concepts() {
+function Concepts({ hostLine }: { hostLine: string }) {
   const blocks = [
     ['space', 'Space', 'A space is a place a person can publish: a post, a newsletter issue, a video description. The space message describes it. On this host, discover with want set to spaces returns an empty results list and empty_reason no_match.'],
     ['offer', 'Offer', 'An offer states the work and the terms. Suggest can return pitches from the catalog. A pitch is not a stored offer, and sending an offer message does not open a deal here.'],
     ['consent', 'Consent and approval', 'Each step of a deal is auto, ask, or off. Only the host records approval. An agent cannot approve. Join on this host returns steps where ' + joinSteps],
-    ['lifecycle', 'Exchange and the deal', 'The exchange runs request, offer, counter, accept, and decline. The host then records the deal, execute, receipt, outcome, and payout. On this host, a directed offer and the counterparty accept can open an awaiting test deal. Activate moves that deal to active. ' + notSpoken04],
+    ['lifecycle', 'Exchange and the deal', 'The exchange runs request, offer, counter, accept, and decline. The host then records the deal, execute, receipt, outcome, and payout. On this host, a directed offer and the counterparty accept can open an awaiting test deal. Activate moves that deal to active. ' + hostLine],
     ['proof', 'Proof and receipts', 'A receipt is proof the host writes after the work. Parties do not submit their own receipts. The proof this host lists is a tracked link.'],
   ]
   return (
@@ -208,7 +209,7 @@ function Concepts() {
   )
 }
 
-function Quickstart() {
+function Quickstart({ hostLine }: { hostLine: string }) {
   const suggest = schemaBy('0.3', 'suggest-request')
   const join = schemaBy('0.3', 'join-request')
   const hello = schemaBy('0.3', 'hello')
@@ -232,8 +233,8 @@ function Quickstart() {
       {discover?.valid[0] ? <CopyBlock label={`POST /orp · ${discover.valid[0].name}`} code={discover.valid[0].json} /> : null}
       <h2 className="h-display mt-10 text-2xl">Offer, accept, and execute</h2>
       <p className="mt-3 text-[16px] leading-7 text-t2">This host handles offer and accept for a 0.3 test deal. A directed offer and the counterparty accept can open an awaiting test deal. Activate moves awaiting to active. Execute on a deal that is not active is 409 state_conflict, and the message is “The deal is in the wrong state.” A pay obligation on an active deal is refused: “{payRefusal}” {noMoney}</p>
-      <p className="mt-3 text-[16px] leading-7 text-t2">Host-only types {hostOnlyTypes.join(', ')} return 403: “{hostOnlyRefusal}” A receipt returns 403: “{receiptRefusal}” {notSpoken04} Other message types return 403: “{otherRefusal}”</p>
-      <ThreePartyExample />
+      <p className="mt-3 text-[16px] leading-7 text-t2">Host-only types {hostOnlyTypes.join(', ')} return 403: “{hostOnlyRefusal}” A receipt returns 403: “{receiptRefusal}” {hostLine} Other message types return 403: “{otherRefusal}”</p>
+      <ThreePartyExample hostLine={hostLine} />
       <FivePartyWalkthrough />
       <StartPrompt />
     </>
@@ -381,11 +382,12 @@ export function Docs({ pathname }: { pathname: string }) {
     document.title = `${title} · Offer Rails · Protocol`
   }, [title])
   const [open, setOpen] = useState(false)
+  const hostLine = useHostSpeech()
   let body = <Missing />
-  if (route.name === 'overview') body = <Overview />
-  else if (route.name === 'concepts') body = <Concepts />
-  else if (route.name === 'many') body = <ManyPage />
-  else if (route.name === 'quickstart') body = <Quickstart />
+  if (route.name === 'overview') body = <Overview hostLine={hostLine} />
+  else if (route.name === 'concepts') body = <Concepts hostLine={hostLine} />
+  else if (route.name === 'many') body = <ManyPage hostLine={hostLine} />
+  else if (route.name === 'quickstart') body = <Quickstart hostLine={hostLine} />
   else if (route.name === 'sdk') body = <SdkPage />
   else if (route.name === 'conformance') body = <ConformancePage />
   else if (route.name === 'spec-index') body = <SpecIndex />

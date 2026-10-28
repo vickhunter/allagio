@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Terminal } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
 import { Runs } from '@/components/Runs'
@@ -10,15 +9,13 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { runsLead, runsTitle } from '@/surfaces.mjs'
 import { example, faq, feed, joinLine, makerAdvantages, painLine } from '@/content'
-import { useOfferConfig } from '@/lib/source'
+import { installs } from '@/agents/facts.mjs'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
 import { DirectorySection } from '@/directory/Directory'
 
 // /makers: built from A (bento). Accent: maker terracotta. Every cell is one concrete advantage.
 export function App() {
-  const { install } = useOfferConfig()
-  const command = install || 'the install command from this site'
   const [featured, ...rest] = makerAdvantages
   const spans = ['lg:col-span-2', 'lg:col-span-2', 'lg:col-span-2', 'lg:col-span-3', 'lg:col-span-3', 'lg:col-span-2', 'lg:col-span-2']
   return (
@@ -36,10 +33,30 @@ export function App() {
           <dl className="mt-4 grid grid-cols-3 gap-3 font-mono tabular">
             <div><dt className="text-[11px] uppercase text-t2">You keep</dt><dd className="text-2xl font-medium text-maker">{example.maker}</dd></div>
             <div><dt className="text-[11px] uppercase text-t2">Publisher</dt><dd className="text-2xl font-medium text-pub">{example.publisher}</dd></div>
-            <div><dt className="text-[11px] uppercase text-t2">Fee</dt><dd className="text-2xl font-medium">€0.24</dd></div>
+            <div><dt className="text-[11px] uppercase text-t2">Fee</dt><dd className="text-2xl font-medium">{example.fee}</dd></div>
           </dl>
           <p className="mt-3 text-[12px] text-t2">Fee: 10% of the publisher commission, paid by the maker.</p>
         </Card>
+      </section>
+
+      <section id="install" aria-labelledby="install-h" className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
+          <p className="eyebrow">One command per client</p>
+          <h2 id="install-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">Add your product from an MCP client.</h2>
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">There is no add-product form on this page. Paste the command for the client you use. Each client has one command.</p>
+          <ul className="mt-8 grid gap-3">
+            {installs.map((item) => (
+              <li key={item.id} className="min-w-0 rounded-2xl border border-line bg-s1 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-display text-lg font-semibold">{item.label}</h3>
+                  <p className="text-sm text-t2">{item.tested ? 'Checked' : 'Untested'}</p>
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-t2">{item.proof}</p>
+                <pre className="mt-3 max-w-full whitespace-pre-wrap break-all rounded-xl border border-line bg-s0 p-4 font-mono text-sm leading-relaxed text-t1">{item.snippet}</pre>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       <DirectorySection kind="maker" />
@@ -55,7 +72,7 @@ export function App() {
           </Card>
           <Card className="flex flex-col justify-between bg-inv p-6 text-tinv lg:col-span-2">
             <p className="eyebrow !text-tinv2">02 · {rest[1].t}</p>
-            <div><p className="flex items-center gap-2 break-all font-mono text-lg"><Terminal className="size-4 shrink-0" aria-hidden /> {command}</p><p className="mt-2 text-sm text-tinv2">{rest[1].b}</p></div>
+            <div><p className="text-sm text-tinv2">One command per client is in the install list above. Adding a product needs an MCP client. There is no add-product form on this page.</p><p className="mt-2 text-sm text-tinv2">{rest[1].b}</p><a href="#install" className="mt-3 inline-flex min-h-11 items-center font-semibold text-tinv underline underline-offset-4">Install commands</a></div>
           </Card>
           <Adv n={3} a={rest[0]} className="lg:col-span-2" />
           {rest.slice(2).map((a, i) => <Adv key={a.k} n={i + 4} a={a} className={spans[i]} />)}

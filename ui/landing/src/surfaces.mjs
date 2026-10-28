@@ -11,7 +11,7 @@ const recorded = '2026-10-21'
 export const surfaces = [
   { name: 'WordPress', audience: 'both', adapterTests: false, e2e: false, date: recorded, note: 'A plugin can place one labelled box in a post that fits. The link counts clicks without that plugin.' },
   { name: 'X', audience: 'both', adapterTests: false, e2e: false, date: recorded, note: 'Paste a link you approve. Posting stays with you.' },
-  { name: 'Newsletter', audience: 'publisher', adapterTests: false, e2e: false, date: recorded, note: 'Paste the link in an email.' },
+  { name: 'Newsletter', audience: 'publisher', adapterTests: false, e2e: false, date: recorded, note: 'Agent only for now. Your agent prepares the link. Then paste it in an email.', href: '/publishers/#add-yours' },
   { name: 'YouTube', audience: 'publisher', adapterTests: false, e2e: false, date: recorded, note: 'Paste the link where the description allows.' },
   { name: 'Instagram', audience: 'publisher', adapterTests: false, e2e: false, date: recorded, note: 'Paste the link where the caption or bio allows.' },
   { name: 'TikTok', audience: 'publisher', adapterTests: false, e2e: false, date: recorded, note: 'Paste the link where the caption or bio allows.' },

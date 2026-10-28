@@ -10,7 +10,7 @@ test('the join prompt and the Copy button render', () => {
   assert.match(html, /<button[^>]*>Copy<\/button>/)
   assert.match(html, /href="\/llms.txt"/)
   assert.match(html, new RegExp(joinLead))
-  assert.equal(joinHeading, 'Tell your agent: Join with POST /v1/agent-tokens and send the bearer. No Google sign-in.')
+  assert.equal(joinHeading, 'Tell your agent: Join with POST /v1/agent-tokens and send the bearer.')
   assert.match(html, /POST \/v1\/agent-tokens/)
   assert.equal(html.includes('one sign-in link'), false)
   assert.doesNotMatch(html, /Sell something|Earn from my posts|Your agent can connect you|on their own/)

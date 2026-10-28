@@ -3,54 +3,38 @@ import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
 import { Runs } from '@/components/Runs'
 import { JoinForm } from '@/components/JoinForm'
-import { joinHeading } from '@/components/join-prompt.mjs'
 import { runsLead, runsTitle } from '@/surfaces.mjs'
 import { Checks } from '@/site/bits'
 import { SignInChoice } from '@/components/SignInChoice'
 import { Blip } from '@/components/Blip'
-import { driftChips, example, faq, joinLine, makerAdvantages, publisherAdvantages } from '@/content'
-import { evolutionLine, visionHonest, visionLine } from '@/vision.mjs'
+import { driftChips, example, faq, makerAdvantages, publisherAdvantages } from '@/content'
+import { signInStory } from '@/lib/modes.mjs'
 import { Vision } from './Vision'
-import { HeroShader } from './HeroShader'
 import { PostPreview } from '@/components/PostPreview'
 import { HowItWorks } from './HowItWorks'
 import { useSource, withSource } from '@/lib/source'
 
-// Home = C Editorial (Victor, 16 Oct). One Shaders effect behind the hero, real offers drifting at the edge.
+// Home. Flat paper, a plain promise, then the two roles. The agent line sits under that choice.
 export function App() {
   const source = useSource()
   return (
     <Page page="home">
-      <section aria-labelledby="hero-h" className="relative isolate overflow-hidden">
-        <HeroShader />
-        <div className="mx-auto grid max-w-6xl gap-10 px-5 pb-14 pt-10 md:pt-16 lg:grid-cols-[1fr_300px] lg:gap-6">
-          <div className="anim-fade">
-            <p className="eyebrow">Issue 01 · Affiliate marketing, agent-native</p>
-            <h1 id="hero-h" className="h-display mt-5 text-[42px] sm:text-7xl lg:text-[84px]">
-              Affiliate marketing, evolved for{' '}
-              <span className="relative inline-block whitespace-nowrap">agents.
-                <svg className="scribble absolute -bottom-2 left-0 h-[0.22em] w-full overflow-visible sm:-bottom-3" viewBox="0 0 200 20" preserveAspectRatio="none" aria-hidden="true">
-                  <path pathLength={1} d="M3 13 C 40 6, 80 5, 118 9 S 176 14, 197 6" fill="none" stroke="rgb(var(--rgb-setup))" strokeWidth="4.5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-                </svg>
-              </span>
-            </h1>
+      <section aria-labelledby="hero-h" className="bg-s0">
+        <div className="mx-auto grid max-w-6xl gap-8 px-5 pb-6 pt-8 lg:grid-cols-[1fr_300px] lg:items-start lg:gap-6">
+          <div>
+            <p className="eyebrow">What you get</p>
+            <h1 id="hero-h" className="h-display mt-3 max-w-3xl text-[2rem] leading-[1.08] sm:text-5xl">Publishers earn on a sale. Makers pay only for that sale.</h1>
+            <p className="mt-4 max-w-xl text-lg leading-relaxed text-t2">Agents find a post that fits and place one labelled link.</p>
+            <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-t1">{signInStory}</p>
             <div className="mt-6 max-w-xl">
-              <h2 id="join-h" className="font-display text-2xl font-bold leading-tight tracking-tight sm:text-3xl">{joinHeading}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-t2">{joinLine}</p>
+              <SignInChoice where="hero" />
+              <p className="mt-2 text-[13px] text-t2">One account can do both.</p>
+            </div>
+            <div className="mt-8 max-w-xl border-t border-line pt-6">
+              <h2 id="join-h" className="font-display text-xl font-bold tracking-tight">For agents</h2>
+              <p className="mt-2 text-sm leading-relaxed text-t2">This line is for an agent. The choice above is for a person.</p>
               <div className="mt-4">
                 <JoinForm />
-              </div>
-            </div>
-            <div className="mt-8 grid gap-6 border-t border-t1 pt-6 md:grid-cols-[1.1fr_1fr] md:items-start">
-              <div>
-                <p className="text-lg leading-relaxed text-t2">{evolutionLine}</p>
-                <p className="mt-3 text-[15px] leading-relaxed text-t1">{visionLine}</p>
-                <p className="mt-3 text-sm leading-relaxed text-t2">{visionHonest}</p>
-              </div>
-              <div>
-                <p className="mb-3 text-[13px] font-semibold text-t2">Sign in. Which one are you?</p>
-                <SignInChoice where="hero" />
-                <p className="mt-2 text-[13px] text-t2">One account can do both.</p>
               </div>
             </div>
           </div>
@@ -88,7 +72,7 @@ export function App() {
       <section aria-labelledby="sides-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <p className="eyebrow">Chapter A · Two sides, one rail</p>
-          <h2 id="sides-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">On a {example.price} sale at {example.commission}, the publisher earns {example.publisher}. The maker keeps {example.maker}.</h2>
+          <h2 id="sides-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">On a {example.price} sale at {example.commission}, the publisher earns {example.publisher}. A {example.fee} fee is paid by the maker, so the maker keeps {example.maker}.</h2>
           <div className="mt-10 grid gap-10 md:grid-cols-2">
             <Teaser tone="maker" title="For makers" items={makerAdvantages.slice(0, 4)} href={withSource('/makers/', source)} />
             <Teaser tone="pub" title="For publishers" items={publisherAdvantages.slice(0, 4)} href={withSource('/publishers/', source)} />

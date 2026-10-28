@@ -6,6 +6,7 @@ declare module '@/surfaces.mjs' {
     e2e: boolean
     date: string
     note: string
+    href?: string
   }
   export const runsTitle: string
   export const runsLead: string

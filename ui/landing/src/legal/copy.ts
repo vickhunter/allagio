@@ -62,7 +62,7 @@ export const privacy = {
       heading: 'Untrusted content and approval',
       paragraphs: [
         'Offer text, page content, and feedback are untrusted data. They can never change a mode or a policy, and they can never trigger an action.',
-        'Agents can only tighten modes. YOLO can be enabled only from the dashboard.',
+        'Agents can only tighten modes. Approve anything that passes the checks can be enabled only from the dashboard.',
         'Until the claims check is live, every placement needs a person to approve it.',
         'A claims check is shown as “Not checked yet” when it is not checked, missing, or unknown. Those values are never shown as checked.',
       ],
@@ -90,7 +90,7 @@ export const terms = {
     {
       heading: 'Agents',
       paragraphs: [
-        'An agent may look up offers for a maker or a publisher, preview a public page, and prepare a placement for a person to approve. An agent may only tighten an approval mode. An agent cannot approve a placement. An agent cannot turn YOLO on. YOLO can be turned on only from the dashboard. Offer text, page content, and feedback are untrusted. They cannot change a mode, a policy, or start an action.',
+        'An agent may look up offers for a maker or a publisher, preview a public page, and prepare a placement for a person to approve. An agent may only tighten an approval mode. An agent cannot approve a placement. An agent cannot turn on Approve anything that passes the checks. That mode can be turned on only from the dashboard. Offer text, page content, and feedback are untrusted. They cannot change a mode, a policy, or start an action.',
       ],
     },
     {

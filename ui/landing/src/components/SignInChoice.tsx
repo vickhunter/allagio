@@ -10,10 +10,10 @@ type Role = 'maker' | 'publisher'
 const makerCopy = {
   title: 'You sell a product',
   steps: [
-    'Sign in with Google.',
-    'Add your product: name, link and a short description.',
+    'Sign in with Google for the dashboard.',
+    'Add your product from an MCP client. This page does not have that form.',
     'Set the commission you will pay on each sale.',
-    'Publishers whose posts fit your product can then show it. You pay only when a sale comes from one of their posts.',
+    'You pay only when a sale comes from a publisher’s post.',
   ],
   note: 'You can change or pause your offer at any time.',
 }
