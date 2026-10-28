@@ -1,0 +1,86 @@
+Landing node --test from ui/landing (src/**/*.test.mjs).
+34 pass, 2 fail. Both failures are already on main. This delivery does not edit ui/landing/public/llms.txt, ui/landing/src/agents/facts.mjs, ui/landing/src/protocol/generated/catalog.mjs, or docs/protocol/sdk/README.md.
+- llms.txt matches the agent facts: the served llms.txt and the facts generator already disagree.
+- the committed catalog matches the spec files: catalog.mjs still says the hosted API does not speak 0.4; the SDK readme says it does.
+
+# Subtest: llms.txt matches the agent facts
+not ok 1 - llms.txt matches the agent facts
+# Subtest: ordered steps name the hosted join, prepare, receipt, and sale bodies
+ok 2 - ordered steps name the hosted join, prepare, receipt, and sale bodies
+# Subtest: only page preview and digest are coming soon
+ok 3 - only page preview and digest are coming soon
+# Subtest: public agent copy stays on the documented words
+ok 4 - public agent copy stays on the documented words
+# Subtest: the join prompt and the Copy button render
+ok 5 - the join prompt and the Copy button render
+# Subtest: list URLs match the directory contract
+ok 6 - list URLs match the directory contract
+# Subtest: empty, results, and 404 follow the contract
+ok 7 - empty, results, and 404 follow the contract
+# Subtest: the client rejects a body the contract does not allow
+ok 8 - the client rejects a body the contract does not allow
+# Subtest: fixtures are TEST data and are not imported by the page
+ok 9 - fixtures are TEST data and are not imported by the page
+# Subtest: the home role buttons sit above the fold and the agent line sits under them
+ok 10 - the home role buttons sit above the fold and the agent line sits under them
+# Subtest: privacy shows the draft line and is not indexed
+ok 11 - privacy shows the draft line and is not indexed
+# Subtest: terms shows the draft line and is not indexed
+ok 12 - terms shows the draft line and is not indexed
+# Subtest: no sitemap lists the draft privacy or terms pages
+ok 13 - no sitemap lists the draft privacy or terms pages
+# Subtest: the notebook split is 24, publisher 2.40, fee 0.24, maker keeps 21.36
+ok 14 - the notebook split is 24, publisher 2.40, fee 0.24, maker keeps 21.36
+# Subtest: home, makers, and the how-it-works figure do not type the maker figure
+ok 15 - home, makers, and the how-it-works figure do not type the maker figure
+# Subtest: one approval-mode name set, with no YOLO label
+ok 16 - one approval-mode name set, with no YOLO label
+# Subtest: home, makers and publishers copy avoids ads, revolution, pilot, every post, best-converting, and open source
+ok 17 - home, makers and publishers copy avoids ads, revolution, pilot, every post, best-converting, and open source
+# Subtest: groups a verified offer ahead of topic-matched unverified programs
+ok 18 - groups a verified offer ahead of topic-matched unverified programs
+# Subtest: defaults an existing offer to verified and leaves the fixture out
+ok 19 - defaults an existing offer to verified and leaves the fixture out
+# Subtest: names unreadable, private, and empty pages and never calls them no match
+ok 20 - names unreadable, private, and empty pages and never calls them no match
+# Subtest: shows closest programs and stores a local notify intent when nothing matches
+ok 21 - shows closest programs and stores a local notify intent when nothing matches
+# Subtest: drops go links and tracking params without caring about case, and strips userinfo
+ok 22 - drops go links and tracking params without caring about case, and strips userinfo
+# Subtest: dedupes notify urls ignoring case and a trailing slash, and a blank field changes nothing
+ok 23 - dedupes notify urls ignoring case and a trailing slash, and a blank field changes nothing
+# Subtest: keeps the newest notify urls and drops the oldest past the cap
+ok 24 - keeps the newest notify urls and drops the oldest past the cap
+# Subtest: maps every preview slot to a plain label and a bar
+ok 25 - maps every preview slot to a plain label and a bar
+# Subtest: maps every preview error status to its own line and next step
+ok 26 - maps every preview error status to its own line and next step
+# Subtest: reads a no-match body and ignores a card with no summary
+ok 27 - reads a no-match body and ignores a card with no summary
+# Subtest: rendered public landing copy has no ad, ads, fully automatic, pilot, revolutionary, best-converting, or open source
+ok 28 - rendered public landing copy has no ad, ads, fully automatic, pilot, revolutionary, best-converting, or open source
+# Subtest: every 0.3 and 0.4 schema file has one generated page
+ok 29 - every 0.3 and 0.4 schema file has one generated page
+# Subtest: the five-party and leave fixtures match the files
+ok 30 - the five-party and leave fixtures match the files
+# Subtest: the committed catalog matches the spec files
+not ok 31 - the committed catalog matches the spec files
+# Subtest: quickstart names the hosted thin layer
+ok 32 - quickstart names the hosted thin layer
+# Subtest: protocol docs do not say open source, affilio, distributoor, or offerrails.com
+ok 33 - protocol docs do not say open source, affilio, distributoor, or offerrails.com
+# Subtest: conformance names come from the suite
+ok 34 - conformance names come from the suite
+# Subtest: a surface is verified end to end only when both checks passed
+ok 35 - a surface is verified end to end only when both checks passed
+# Subtest: deal labels stay honest
+ok 36 - deal labels stay honest
+1..36
+# tests 36
+# suites 0
+# pass 34
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3205.987418
