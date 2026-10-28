@@ -7,9 +7,9 @@ const coming = ['Suggest an offer while you write', 'Link swaps', 'Cross-sells',
 test('deal labels stay honest', () => {
   for (const deal of deals) {
     assert.notEqual(deal.status, 'Verified end to end')
-    assert.equal(deal.status === 'Coming' || deal.status === 'A person approves', true)
+    assert.equal(deal.status === 'Coming' || deal.status === 'Works today', true)
   }
-  assert.equal(deals.find((deal) => deal.name === 'Affiliate links').status, 'A person approves')
+  assert.equal(deals.find((deal) => deal.name === 'Affiliate links').status, 'Works today')
   for (const name of coming) {
     assert.equal(deals.find((deal) => deal.name === name).status, 'Coming')
   }

@@ -1,3 +1,7 @@
+## October 28 — Approval wording by mode (D-119)
+
+A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. Agents cannot approve a placement. The test-deal heading stays `ORP 0-3`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 28 — Time to first test deal (D-117)
 
 `scripts/cold-path.py` reads `/llms.txt`, then `/skill.md`, joins two parties, walks the directed test deal, and opens the proof page. It prints seconds per step and the total. It does not print tokens. Issuer discovery no longer blocks listen. A failed discovery is logged without the client secret and retried, from 1 second up to 30 seconds. It does not exit the process. `GET /auth/login` and the sign-in callback return HTTP 503 `sign-in is starting` until discovery finishes. The callback leaves the login cookie in place so the browser can retry. Database connect and `AUTO_MIGRATE` still finish before listen, because later requests assume the schema. `POST /v1/agent-tokens` stays at 8 a minute and 30 a day, shared with `POST /v1/agent-accounts`. The ninth rapid request from one address is HTTP 429, and the eleventh is too. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
