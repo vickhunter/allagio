@@ -1,6 +1,6 @@
 ## October 28 — Mode names and a real directory error (D-118)
 
-The agents page and the landing no longer say Manual, Auto, or YOLO. The three modes are Ask me every time, Approve within my rules, and Approve anything that passes the checks. Each one says who approves. The honest line is that a person approves each placement unless they set limits for their agent. No approval default is claimed. A directory response that is not 200 says “Couldn't load the directory” and the status, including 503. “No makers listed yet” and a hidden search box are only for a 200 whose total is 0. `/llms.txt`, `skill.md`, and the Go API are unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+The agents page “Placing an offer” line uses the merged wording: a person still approves each placement, and the bearer is not an X-API-Key and not an X-Admin-Key. The agents page and the landing no longer say Manual, Auto, or YOLO. The three modes are Ask me every time, Approve within my rules, and Approve anything that passes the checks. Each one says who approves. The honest line is that a person approves each placement unless they set limits for their agent. No approval default is claimed. A directory response that is not 200 says “Couldn't load the directory” and the status, including 503. “No makers listed yet” and a hidden search box are only for a 200 whose total is 0. `/llms.txt`, `skill.md`, and the Go API are unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## October 28 — The first screen is the try (D-118)
 
