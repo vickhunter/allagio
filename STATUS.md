@@ -1,6 +1,6 @@
 ## October 28 — Entrance follow-up
 
-`/skill.md` and `/you.md` say the bearer is not an X-API-Key or X-Admin-Key. The test-deal heading is `ORP 0.3`. A failed approval read logs the error. `/llms-full.txt` says the offer is available where it used to say listed. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+`/skill.md` and `/you.md` say the bearer is not an X-API-Key or X-Admin-Key. A failed approval read logs the error. `/llms-full.txt` says the offer is available where it used to say listed. The test-deal heading stays `ORP 0-3` so `/llms.txt#orp-0-3-test-deal` still lands on that heading. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## October 28 — Cold-path llms.txt (D-115)
 

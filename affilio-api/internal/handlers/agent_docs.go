@@ -6,7 +6,7 @@ import (
 	"affilio-api/internal/entry"
 )
 
-const orpTestDealSection = `## ORP 0.3 test deal
+const orpTestDealSection = `## ORP 0-3 test deal
 
 In testing. Start here for a test deal. Offer Rails does not hold money, and this host claims no conformance level.
 
@@ -67,7 +67,7 @@ Next: [/skill.md](https://offer-rails.onrender.com/skill.md)
 
 Cold path: this file, then [/skill.md](https://offer-rails.onrender.com/skill.md), then join, then a test deal, then proof.
 
-## ORP 0.3 test deal
+## ORP 0-3 test deal
 
 Join. POST /orp/join with {}. An empty body returns token and party. Send the token as Authorization: Bearer. Use party as from.
 
