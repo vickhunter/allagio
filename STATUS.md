@@ -1,3 +1,11 @@
+## October 28 — Cold-path llms.txt (D-115)
+
+`/llms.txt` is only the cold path: this file, then `/skill.md`, then join, then a test deal, then proof. It links to `/llms-full.txt` and the docs. `/llms-full.txt` starts at the manual and does not link back to `/skill.md` or to itself. The two `llms.txt` copies are the same bytes. A failed approval read on an ORP 0.4 deal stays HTTP 200, sets `approvals_unavailable`, and omits `approved_by`. A 0.3 deal has neither field. No glossary. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 28 — Protocol and entrance truth (D-115)
+
+`/llms.txt` still links to `/skill.md`. `/skill.md` links only to `/llms-full.txt`. `GET /v1/directory/makers` returns HTTP 200 `{"items":[],"next_cursor":null,"total":0}` when the database answers. There is no public directory table, and the makers account table is not listed. A failed database read is HTTP 503 `{"error":"directory unavailable"}`. The landing page still shows the empty copy for any non-OK response until that view treats 503 as a failure. A bearer from `POST /v1/agent-tokens` works on `/mcp` and on ORP. It is not an `X-API-Key` and it is not an `X-Admin-Key`. Marketplace, digest, and operator placement approval do not accept it. A header key comes from `POST /v1/agent-accounts` or from a device-code approval sent in `key_header`. On an ORP 0.4 deal, a failed approval read stays HTTP 200 and sets `approvals_unavailable` to true. `approved_by` is omitted. A 0.3 deal does not include that field. The 0.3 schema and example 08 are unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 28 — Approval provenance (D-114)
 
 On an ORP 0.4 deal, `GET /orp/deals/{deal}` and the approve reply return `approved_by`. Each entry has `step`, `party`, and `agent` or `owner`. `party` is the seat id already on the deal. A 0.3 deal does not include the field. No new column. Served text does not point at `bound[].authority`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

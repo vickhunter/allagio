@@ -92,16 +92,17 @@ func (h *ORPHost) attachApprovals(c *gin.Context, deal *database.ORPDeal) {
 		return
 	}
 	rows, err := h.Entry.DB.DealOwnerApprovals(c.Request.Context(), deal.ID)
-	loaded, omit := approvalsFromQuery(rows, err)
-	if omit {
-		deal.OmitApprovals = true
+	loaded, unavailable := approvalsFromQuery(rows, err)
+	if unavailable {
+		deal.ApprovalsUnavailable = true
 		return
 	}
 	deal.WireApprovals = loaded
 }
 
-// approvalsFromQuery keeps a failed approval read off the response.
-// The deal is still served, without approved_by.
+// approvalsFromQuery reports a failed approval read. The deal is still
+// served. On ORP 0.4 the snapshot sets approvals_unavailable instead of
+// dropping approved_by with no marker.
 func approvalsFromQuery(rows []database.DealApproval, err error) ([]database.DealApproval, bool) {
 	if err != nil {
 		log.Printf("orp deal approvals unavailable")

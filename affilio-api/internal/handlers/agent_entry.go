@@ -1876,7 +1876,7 @@ func (h *AgentEntry) LLMs(c *gin.Context) {
 }
 
 func (h *AgentEntry) LLMsFull(c *gin.Context) {
-	h.serveLandingFile(c, "llms-full.txt", "text/plain; charset=utf-8", llmsBody()+llmsFullSuffix)
+	h.serveLandingFile(c, "llms-full.txt", "text/plain; charset=utf-8", llmsFullDocument())
 }
 
 func (h *AgentEntry) Skill(c *gin.Context) {
