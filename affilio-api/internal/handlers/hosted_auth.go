@@ -170,7 +170,7 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 			return
 		}
 		cleaned := path.Clean(requestPath)
-		if strings.HasSuffix(cleaned, ".md") && landingMiss(cleaned) && !markdownRoute(c.Request.Method, cleaned, r) {
+		if strings.HasSuffix(cleaned, ".md") && landingMiss(cleaned) && (directoryMarkdownMiss(cleaned) || !markdownRoute(c.Request.Method, cleaned, r)) {
 			h.writePublicHeaders(c)
 			writeMethodBody(c, http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
 			return
@@ -410,6 +410,20 @@ func routeForMethod(method, cleaned string, r *gin.Engine) bool {
 		}
 	}
 	return false
+}
+
+// directoryMarkdownMiss is a .md slug under /makers or /publishers that is not a
+// public page. GET and HEAD both answer the markdown 404. A slash or dot
+// segment does not redirect one method and 404 the other.
+func directoryMarkdownMiss(cleaned string) bool {
+	if cleaned == "/publishers/setup.md" {
+		return false
+	}
+	rest, ok := strings.CutPrefix(cleaned, "/makers/")
+	if !ok {
+		rest, ok = strings.CutPrefix(cleaned, "/publishers/")
+	}
+	return ok && rest != "" && !strings.Contains(rest, "/") && strings.HasSuffix(rest, ".md")
 }
 
 func markdownPage(cleaned string) bool {

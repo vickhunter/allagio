@@ -44,9 +44,8 @@ func TestColdAgentEntrance(t *testing.T) {
 	}
 	for _, phrase := range []string{
 		`orp "0.4" is the version this join accepts`,
-		"approved_by agent",
-		"approved_by owner",
-		"within 5 seconds",
+		"bound[].authority",
+		"less than 5 seconds",
 		"exactly 5 seconds",
 		"method link",
 		"verified_at",
@@ -90,6 +89,23 @@ func TestColdAgentEntrance(t *testing.T) {
 		t.Fatalf("cleaned miss %d %q %s", parent.Code, parent.Header().Get("Content-Type"), parent.Body.String())
 	}
 	assertPublicDocHeaders(t, parent)
+	for _, path := range []string{"/makers/no-such.md/", "/makers/./no-such.md", "/publishers/no-such.md/", "/publishers/no-such.md//"} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(method, "http://127.0.0.1/", nil)
+			req.URL.Path = path
+			r.ServeHTTP(rec, req)
+			if rec.Code != http.StatusNotFound || rec.Header().Get("Location") != "" || !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") || rec.Header().Get("Content-Length") != "10" {
+				t.Fatalf("%s %s %d location %q type %q length %q body %q", method, path, rec.Code, rec.Header().Get("Location"), rec.Header().Get("Content-Type"), rec.Header().Get("Content-Length"), rec.Body.String())
+			}
+			if method == http.MethodGet && rec.Body.String() != "not found\n" {
+				t.Fatalf("%s body %q", path, rec.Body.String())
+			}
+			if method == http.MethodHead && rec.Body.Len() != 0 {
+				t.Fatalf("head %s body %d", path, rec.Body.Len())
+			}
+		}
+	}
 	for _, path := range []string{"/no-such-page.md", "/publishers/not-a-page.md"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))

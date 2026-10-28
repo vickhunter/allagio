@@ -86,7 +86,7 @@ func assertLandingUnavailable(t *testing.T, page string, rec *httptest.ResponseR
 		t.Fatalf("%s: %d %q", page, rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	if rec.Header().Get("Retry-After") != "60" || !strings.Contains(body, "<h1>"+page+"</h1>") || !strings.Contains(body, `<nav><a href="/">Home</a></nav>`) {
+	if rec.Header().Get("Retry-After") != "60" || !strings.Contains(body, "<h1>"+page+"</h1>") || !strings.Contains(body, "This page is temporarily unavailable.") || !strings.Contains(body, `<nav><a href="/">Home</a></nav>`) {
 		t.Fatalf("%s retry %q body %q", page, rec.Header().Get("Retry-After"), body)
 	}
 	lower := strings.ToLower(body)

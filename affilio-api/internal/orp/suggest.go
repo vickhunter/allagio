@@ -191,7 +191,7 @@ func ParseJoin(value any, prefix string) (JoinRequest, Problem, bool) {
 			if version == Version04 {
 				continue
 			}
-			return JoinRequest{}, Invalid("The join request is not valid.", prefix+"/"+escapePointer(key)), false
+			return JoinRequest{}, Invalid("Use 0.4.", prefix+"/"+escapePointer(key)), false
 		}
 		if key != "agent" && key != "key" {
 			return JoinRequest{}, Invalid("The join request is not valid.", prefix+"/"+escapePointer(key)), false

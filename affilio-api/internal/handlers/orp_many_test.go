@@ -931,7 +931,7 @@ func assertAskWait(t *testing.T, db *database.DB, code int, opened map[string]an
 	}
 	waiting, _ := body["waiting"].(map[string]any)
 	reasons, _ := waiting["reasons"].([]any)
-	if waiting["step"] != "list" || len(reasons) != 1 || reasons[0] != "step_ask" || waiting["url"] == "" || waiting["escalation"] == "" {
+	if waiting["step"] != "list" || len(reasons) != 2 || !messagesHave(reasons, "step_ask") || !messagesHave(reasons, "claims_unchecked") || waiting["url"] == "" || waiting["escalation"] == "" {
 		t.Fatalf("waiting %v", waiting)
 	}
 	dealID, _ := opened["deal"].(string)
@@ -2233,7 +2233,7 @@ func TestORP04JoinNamesVersion(t *testing.T) {
 	}, nil)
 	wrongInner, _ := wrongDoc["body"].(map[string]any)
 	wrongMsg, _ := wrongInner["message"].(string)
-	if wrong.Code != http.StatusBadRequest || wrongDoc["orp"] != "0.3" || wrongInner["field"] != "/orp" || wrongMsg != "The join request is not valid." || strings.Contains(wrongMsg, "ORP 0.4.") {
+	if wrong.Code != http.StatusBadRequest || wrongDoc["orp"] != "0.3" || wrongInner["field"] != "/orp" || wrongMsg != "Use 0.4." {
 		t.Fatalf("orp 0.3 join %d %s", wrong.Code, wrong.Body.String())
 	}
 	plain, plainDoc := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{"orp": "0.4"}, nil)

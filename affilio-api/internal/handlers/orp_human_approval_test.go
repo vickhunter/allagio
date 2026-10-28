@@ -443,6 +443,7 @@ func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 		"docs/protocol/schema/0.3/messages/error.schema.json",
 		"ui/landing/public/llms.txt",
 		"affilio-wp/admin/build/landing-v9/llms.txt",
+		"affilio-wp/admin/build/landing-v9/llms-full.txt",
 		"docs/protocol/schema/0.3/messages/offer.schema.json",
 		"docs/protocol/schema/0.3/messages/space.schema.json",
 		"docs/protocol/schema/0.3/messages/accept.schema.json",
@@ -453,9 +454,14 @@ func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 	for _, rel := range files {
 		body := readRepo(t, root, rel)
 		assertNoPersonApprovedClaim(t, rel, body)
-		if strings.Contains(rel, "llms.txt") || strings.HasSuffix(rel, "SPEC.md") {
+		if strings.HasSuffix(rel, "SPEC.md") {
 			if !strings.Contains(body, "approved_by agent") || !strings.Contains(body, rule) {
 				t.Fatalf("%s does not name the agent record or the counterparty rule", rel)
+			}
+		}
+		if strings.Contains(rel, "llms") {
+			if strings.Contains(body, "approved_by") || !strings.Contains(body, "bound[].authority") || !strings.Contains(body, rule) {
+				t.Fatalf("%s does not show bound[].authority", rel)
 			}
 		}
 		if strings.HasSuffix(rel, "defs.schema.json") || strings.Contains(rel, "/messages/offer.schema.json") || strings.Contains(rel, "/messages/space.schema.json") || strings.Contains(rel, "/messages/accept.schema.json") || strings.Contains(rel, "/messages/deal.schema.json") || strings.Contains(rel, "/http/join-response.schema.json") {
@@ -464,8 +470,8 @@ func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 			}
 		}
 	}
-	if !strings.Contains(llmsBody(), rule) || !strings.Contains(llmsBody(), "approved_by agent") {
-		t.Fatal("fallback llms.txt does not name the agent record")
+	if !strings.Contains(llmsBody(), rule) || strings.Contains(llmsBody(), "approved_by") || !strings.Contains(llmsBody(), "bound[].authority") {
+		t.Fatal("fallback llms.txt does not show bound[].authority")
 	}
 	assertNoPersonApprovedClaim(t, "fallback llms", llmsBody())
 	assertNoPersonApprovedClaim(t, "approve page", orp.ApprovePage("Notes", "Affiliate link"))

@@ -474,7 +474,7 @@ func (h *ORPHost) offer(c *gin.Context, dns string, msg orp.Message, hash, owner
 	listed := mode == database.ModeAuto
 	if !listed {
 		origin, _ := h.origin(c)
-		body["waiting"] = waitingOn(msg.From, "list", []any{"step_ask"}, origin, now)
+		body["waiting"] = waitingOn(msg.From, "list", []any{"step_ask", "claims_unchecked"}, origin, now)
 	}
 	doc := orp.ListedOffer(dns, msg.From, msg.ID, body, now)
 	termsRaw, err := json.Marshal(terms)

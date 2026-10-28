@@ -11,6 +11,45 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func TestHeadDirectoryRoutesMatchMain(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	for _, name := range []string{"profile", "not-found"} {
+		pageDir := filepath.Join(dir, "landing-v9", name)
+		if err := os.MkdirAll(pageDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		body := "<!doctype html><main><h1>" + name + "-marker</h1></main>"
+		if err := os.WriteFile(filepath.Join(pageDir, "index.html"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "publishers-setup.html"), []byte("<!doctype html><title>Publisher setup</title>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h := &HostedHandler{AssetsPath: dir, BaseURL: "http://127.0.0.1:8080"}
+	r := gin.New()
+	h.Mount(r)
+
+	getMaker := httptest.NewRecorder()
+	r.ServeHTTP(getMaker, httptest.NewRequest(http.MethodGet, "/makers/acme", nil))
+	headMaker := httptest.NewRecorder()
+	r.ServeHTTP(headMaker, httptest.NewRequest(http.MethodHead, "/makers/acme", nil))
+	if getMaker.Code != http.StatusNotFound || !strings.Contains(getMaker.Body.String(), "profile-marker") {
+		t.Fatalf("get maker %d %s", getMaker.Code, getMaker.Body.String())
+	}
+	if headMaker.Code != http.StatusNotFound || !strings.Contains(headMaker.Body.String(), "not-found-marker") || strings.Contains(headMaker.Body.String(), "profile-marker") {
+		t.Fatalf("head maker %d %s", headMaker.Code, headMaker.Body.String())
+	}
+	for _, path := range []string{"/publishers/setup", "/publishers/setup/"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, path, nil))
+		if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "not-found-marker") || strings.Contains(rec.Body.String(), "Publisher setup") {
+			t.Fatalf("head %s %d %s", path, rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestDirectoryUnknownSlugIs404(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	dir := t.TempDir()

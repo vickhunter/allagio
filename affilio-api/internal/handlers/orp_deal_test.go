@@ -325,6 +325,10 @@ func TestORPTestDealProof(t *testing.T) {
 	if counterRec.Code != http.StatusOK || counterBody["type"] != "deal" || counterBody["body"].(map[string]any)["state"] != "awaiting" {
 		t.Fatalf("counterparty accept %d %s", counterRec.Code, counterRec.Body.String())
 	}
+	counterWaiting, _ := counterBody["body"].(map[string]any)["waiting"].(map[string]any)
+	if !hasAll(stringList(counterWaiting["reasons"]), "claims_unchecked") {
+		t.Fatalf("0.3 accept reasons %v", counterWaiting["reasons"])
+	}
 	if err := db.Pool.QueryRow(context.Background(), `SELECT state FROM orp_deals WHERE id=$1`, dirID).Scan(&directedState); err != nil || directedState != "awaiting" {
 		t.Fatalf("accept stored %s %v", directedState, err)
 	}
@@ -606,7 +610,7 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	waiting, _ := waitingOffer["waiting"].(map[string]any)
 	waitID, _ := waitingOffer["id"].(string)
 	waitHash, _ := waitingOffer["terms_hash"].(string)
-	if waitID == "" || waiting["step"] != "list" || !hasAll(stringList(waiting["reasons"]), "step_ask") {
+	if waitID == "" || waiting["step"] != "list" || !hasAll(stringList(waiting["reasons"]), "step_ask", "claims_unchecked") {
 		t.Fatalf("waiting %s", waitRec.Body.String())
 	}
 	hiddenRec, hiddenBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "m_d105_find02", acceptor, map[string]any{
