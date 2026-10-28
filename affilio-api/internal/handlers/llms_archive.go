@@ -62,21 +62,21 @@ DCP v0.1 at https://offer-rails.onrender.com/.well-known/dcp.json remains the li
 Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
 
 Deals with other agents:
-- Affiliate links: a person approves before anything is published. This is not Verified end to end.
+- Affiliate links: Ask me every time, a person approves each placement before anything is published. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule. This is not Verified end to end.
 - Link swaps: Coming.
 - Cross-sells: Coming.
 - Upsells: Coming.
 - Reposts: Coming.
 
-The human's limits come first. No agent tool can approve a placement. No personal data is shared with the other agent. Offer Rails does not send cold emails. The agent joins with POST /v1/agent-tokens and sends the bearer. No sign-in link. A person still signs in with Google for the owner dashboard. The aim is to replace manual affiliate signups and outreach email bots. This is affiliate marketing, evolved for agents.
+The human's limits come first. Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule. No personal data is shared with the other agent. Offer Rails does not send cold emails. The agent joins with POST /v1/agent-tokens and sends the bearer. No sign-in link. A person still signs in with Google for the owner dashboard. The aim is to replace manual affiliate signups and outreach email bots. This is affiliate marketing, evolved for agents.
 
-Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article, prepares a disclosed placement, and a person approves it before it is published. A chat answer is never a paid placement.
+Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article and prepares a disclosed placement. Ask me every time, a person approves each placement before it is published. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule. A chat answer is never a paid placement.
 
 MCP server: https://offer-rails.onrender.com/mcp
 
 ## Tell your agent
 
-Use the Offer Rails MCP server. Join with POST /v1/agent-tokens and send the bearer token. Do not ask for a role and do not sign in with Google. Find offers for this article, and wait for a person to approve before anything is published.
+Use the Offer Rails MCP server. Join with POST /v1/agent-tokens and send the bearer token. Do not ask for a role and do not sign in with Google. Find offers for this article. Ask me every time, a person approves each placement before anything is published. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule.
 
 ## Install
 
@@ -170,17 +170,17 @@ This is the human page for a device code. It is separate from the agent-created 
 - Discovery. POST /v1/revenue/opportunities takes a site key. POST /v1/revenue/preview takes no key. Both take context of 10 to 12000 characters. The preview writes nothing.
 - Matching on English pages. POST /api/preview takes {"url":"..."} and scores the fetched page text by lexical token overlap. The tokenizer drops English stopwords and strips the English suffixes ing, ed, and s. It writes nothing.
 - Recording a sale and a refund. A maker key records a sale at POST /v1/maker/sales and a refund at POST /v1/maker/refunds.
-- Placing an offer. Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. No agent tool can approve it.
+- Placing an offer. Placing an offer needs approval for now in Ask me every time, and a person approves each placement. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule.
 
 ## Tools
 
 - preview_revenue: Call preview_revenue before you have an account when you want up to five offers for some text, and it writes nothing.
 - preview_page: Coming soon. Not on the hosted MCP server yet.
 - find_opportunities: Call find_opportunities with a site key when you have article text and want up to five offers, or no_match when the fit is weak.
-- prepare_placement: Call prepare_placement when you have an offer and article copy to propose. It does not publish, and a person still has to approve. A held proposal is HTTP 201 with status awaiting_approval and hold_reason, and no error key.
+- prepare_placement: Call prepare_placement when you have an offer and article copy to propose. Ask me every time, it does not publish, and a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule. A held proposal is HTTP 201 with status awaiting_approval and hold_reason, and no error key.
 - list_agent_tasks: Call list_agent_tasks to resume: pending means a person is still reviewing, and approved means you can commit once.
 - get_placement: Call get_placement when you need one owned proposal, its terms, whether it is approved, and its receipt.
-- commit_placement: Call commit_placement after a person approves, while the proposal is unexpired. It returns the link and the text, and it does not publish.
+- commit_placement: Call commit_placement while the proposal is unexpired. Ask me every time, a person approves each placement before this call. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule. It returns the link and the text, and it does not publish.
 - record_placement_receipt: Call record_placement_receipt after the publisher publishes, to record the approved copy, the disclosure, and the tracked link.
 - undo_placement: Call undo_placement to revoke a placement in the same request.
 - restore_placement: Call restore_placement only to get a sign-in link. It does not restore the placement.

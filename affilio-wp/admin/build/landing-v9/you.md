@@ -26,7 +26,7 @@ Only you can turn this on. While claims are not checked, this also waits for a p
 
 Approvals
 
-A person approves each placement. No agent tool can approve.
+Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule.
 
 Receipts
 
@@ -42,7 +42,7 @@ The bearer is not an X-API-Key or X-Admin-Key.
 POST /orp/join with {}.
 Read tools/list on /mcp.
 No sign-in link.
-A person still approves each placement.
+Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule.
 On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by.
 Each entry has step, party, and agent or owner.
 A 0.3 deal does not include approved_by.

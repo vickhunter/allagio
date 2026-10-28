@@ -4,7 +4,7 @@
 
 export const visionLine = 'Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent.'
 
-export const visionHonest = 'That is the direction. What works today is an affiliate link a person approves. The other deals on this page are Coming. Nothing here is Verified end to end.'
+export const visionHonest = 'That is the direction. What works today is an affiliate link. Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner\'s rule decides, and agent tools still cannot change that rule. The other deals on this page are Coming. Nothing here is Verified end to end.'
 
 export const evolutionLine = 'This is affiliate marketing, evolved for agents. The same path, with the finding and the matching handed to the agent you already use.'
 
@@ -18,8 +18,8 @@ export const deals = [
   },
   {
     name: 'Affiliate links',
-    status: 'A person approves',
-    note: 'Your agent can find an offer and prepare a placement. You approve it before it is published. A pasted link counts clicks. This is not Verified end to end.',
+    status: 'Owner\'s rule',
+    note: 'Your agent can find an offer and prepare a placement. Ask me every time, a person approves each placement before it is published. In Approve within my rules and Approve anything that passes the checks, the owner\'s rule decides, and agent tools still cannot change that rule. A pasted link counts clicks. This is not Verified end to end.',
   },
   {
     name: 'Link swaps',
@@ -50,7 +50,7 @@ export const youKeep = [
   },
   {
     t: 'You approve',
-    b: 'A person approves each placement. No agent tool can approve.',
+    b: 'Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner\'s rule decides, and agent tools still cannot change that rule.',
   },
   {
     t: 'No personal data shared with the other agent',
@@ -69,7 +69,7 @@ export const youKeep = [
 export const replaces = [
   {
     t: 'Manual affiliate signups',
-    b: 'Filling in a form on each program site is what this is built to replace. Today you still approve the placement. Your agent joins with POST /v1/agent-tokens and a bearer.',
+    b: 'Filling in a form on each program site is what this is built to replace. Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner\'s rule decides, and agent tools still cannot change that rule. Your agent joins with POST /v1/agent-tokens and a bearer.',
   },
   {
     t: 'Outreach email bots',

@@ -100,7 +100,7 @@ func TestYouLimitsSentencesDoNotDrift(t *testing.T) {
 		"This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.",
 		"Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.",
 		"Your limits come first. A new site opens on Manual: ask every time.",
-		"A person approves each placement. No agent tool can approve.",
+		"Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule.",
 		"Example wording. Not a live agreement.",
 		"Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.",
 	} {
