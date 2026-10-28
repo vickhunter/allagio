@@ -329,7 +329,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
       headings: ['No-browser account', 'Device code', 'Find offers'].filter((name) => [...document.querySelectorAll('h2, h3')].some((el) => el.textContent.trim() === name)),
       soon: [...document.querySelectorAll('[data-tool][data-soon="true"]')].map((el) => el.getAttribute('data-tool')),
       livePreview: document.querySelector('[data-tool="preview_page"]')?.innerText.includes('Coming soon') && !document.querySelector('[data-tool="find_opportunities"]')?.innerText.includes('Coming soon'),
-      modes: ['Manual', 'Auto', 'YOLO'].every((name) => text.includes(name)),
+      modes: ['Ask me every time', 'Approve within my rules', 'Approve anything that passes the checks'].every((name) => text.includes(name)),
       stub: text.includes('claim_check_unavailable') && text.includes('Not checked yet'),
       url: document.querySelector('[data-mcp-url]')?.textContent || '',
       alternate: document.querySelector('link[rel="alternate"]')?.getAttribute('href') || '',

@@ -1,3 +1,5 @@
+import { approvalModes } from '../lib/modes.mjs'
+
 export const mcpUrl = 'https://offer-rails.onrender.com/mcp'
 export const pagePath = '/landing-v9/agents/'
 export const aliasPath = '/agents'
@@ -28,15 +30,15 @@ export const steps = [
 
 export const modes = [
   {
-    name: 'Manual',
+    name: approvalModes[0].name,
     body: 'After the place call, the placement waits. A person approves it on the dashboard. No agent tool can approve.',
   },
   {
-    name: 'Auto',
+    name: approvalModes[1].name,
     body: 'Within rules the owner set, hard checks still run. While claims are not checked, the effective mode is forced to manual (approval_reason: claim_check_unavailable), so the placement still waits for a person.',
   },
   {
-    name: 'YOLO',
+    name: approvalModes[2].name,
     body: 'Only the dashboard can turn this on. An agent can only tighten a mode. While claims are not checked, this is also forced to manual, so the placement still waits for a person. not_checked, missing, or unknown shows as Not checked yet.',
   },
 ]

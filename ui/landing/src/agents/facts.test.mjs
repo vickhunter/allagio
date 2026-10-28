@@ -157,7 +157,7 @@ test('public agent copy stays on the documented words', () => {
   const blob = JSON.stringify({ steps, modes, tools, rates, errors, deviceSignIn, agentAccount, aloneToday, installs, signInNote, agentPrompt, orderedSteps })
   assert.equal(banned.test(withoutOfferJoin(blob)), false)
   assert.equal(banned.test(withoutOfferJoin(llmsText())), false)
-  for (const name of ['Manual', 'Auto', 'YOLO']) assert.match(blob, new RegExp(name))
+  for (const name of ['Ask me every time', 'Approve within my rules', 'Approve anything that passes the checks']) assert.match(blob, new RegExp(name))
   assert.match(blob, /rate limit exceeded/)
   assert.match(blob, /preview rate limit exceeded/)
   assert.match(blob, /invalid payload/)

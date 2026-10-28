@@ -9,7 +9,7 @@ import { getMember, httpsUrl, listDirectory, logoSrc, memberRoute, wantsFixtures
 import { agentPrompt, installLead, installUrl, makerPrompt } from '@/directory/prompt.mjs'
 import type { DirectoryCard, DirectoryKind } from '@/directory/types'
 
-type View = 'loading' | 'empty' | 'nomatch' | 'results'
+type View = 'loading' | 'empty' | 'nomatch' | 'results' | 'error'
 type Query = { q: string; category: string; topic: string; lang: string }
 
 function readQuery(): Query {
@@ -134,7 +134,7 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
       setItems([])
       setCursor(null)
       setTotal(0)
-      setView('empty')
+      setView('error')
     })
   }
 
@@ -159,6 +159,12 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
           <Button type="submit" variant="outline">Search</Button>
         </form>
         {view === 'loading' ? <p className="mt-8 text-t2" role="status">Loading the directory.</p> : null}
+        {view === 'error' ? (
+          <div className="mt-8">
+            <p className="text-t1" role="alert">The list could not load.</p>
+            <Button type="button" variant="outline" className="mt-4" onClick={() => load(applied.current, '', false)}>Retry</Button>
+          </div>
+        ) : null}
         {view === 'empty' ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers listed yet. Yours can be first. Add your product below. That step needs an MCP client.' : 'No publishers listed yet. Add your site or newsletter below. An agent does that step for now.'}</p> : null}
         {view === 'nomatch' ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers match this search.' : 'No sites match this search.'}</p> : null}
         {view === 'results' ? (
