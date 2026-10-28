@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { catalog } from '@/protocol/generated/catalog.mjs'
-import { discoveryName, handledMessages, hostOnlyRefusal, hostOnlyTypes, joinSteps, noMoney, otherRefusal, payRefusal, receiptRefusal } from '@/protocol/hosted.mjs'
+import { hostDiscovery, hostOnlyRefusal, hostOnlyTypes, hostOverview, hostQuickstartDiscover, hostQuickstartHello, hostQuickstartOffer, hostSpeechSpeaks, hostSpeechUnknown, joinSteps, noMoney, otherRefusal, payRefusal, receiptRefusal } from '@/protocol/hosted.mjs'
 import { useHostSpeech } from '@/protocol/host-speech'
 import { FivePartyWalkthrough, ManyPage, StartPrompt, ThreePartyExample } from '@/protocol/many'
 import { routeFor } from '@/protocol/route.mjs'
@@ -157,7 +157,7 @@ function DocsNav({ pathname }: { pathname: string }) {
   )
 }
 
-function Overview({ hostLine }: { hostLine: string }) {
+function Overview({ doc }: { doc: unknown }) {
   const source = useSource()
   const properties = [
     ['One link works everywhere.', 'The host mints a tracked link when a deal starts. It works wherever a person can click or type it, with no plugin required for that click.'],
@@ -166,9 +166,11 @@ function Overview({ hostLine }: { hostLine: string }) {
   ]
   return (
     <>
-      <p className="eyebrow">ORP {catalog.version}</p>
+      <p className="eyebrow">Protocol</p>
       <h1 id="proto-h" className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">Offer Rails Protocol</h1>
-      <p className="mt-4 text-lg leading-8">ORP lets agents, each working for a person, find each other, agree a growth deal, and carry it out. An affiliate placement is one kind of deal. ORP 0.3 is frozen: a plain deal is still two parties. ORP 0.4 adds seats. These pages are generated from the schema files.</p>
+      <h2 className="h-display mt-8 text-2xl">This host</h2>
+      <p className="mt-3 text-[16px] leading-7 text-t2">{hostOverview(doc)}</p>
+      <p className="mt-4 text-lg leading-8">ORP lets agents, each working for a person, find each other, agree a growth deal, and carry it out. An affiliate placement is one kind of deal. A plain deal is still two parties. Seats are on the many-to-many page. These pages are generated from the schema files.</p>
       <h2 className="h-display mt-10 text-2xl">Three properties</h2>
       <ol className="mt-4 grid gap-3">
         {properties.map(([title, body]) => (
@@ -178,26 +180,36 @@ function Overview({ hostLine }: { hostLine: string }) {
           </li>
         ))}
       </ol>
-      <h2 className="h-display mt-10 text-2xl">This host</h2>
-      <p className="mt-3 text-[16px] leading-7 text-t2">The hosted service speaks a thin layer. Discovery names it “{discoveryName}”. It answers hello, discover, offer, accept, and execute for a 0.3 test deal. It does not claim conformance levels L0, L1, L2, or L3. {hostLine} {noMoney}</p>
-      <p className="mt-3 text-[16px] leading-7 text-t2"><a className="underline underline-offset-4" href={withSource('/protocol/quickstart/', source)}>Quickstart for agents</a> follows the routes this host serves today. <a className="underline underline-offset-4" href={withSource('/protocol/concepts/', source)}>Concepts</a> explains a space, an offer, approval, the deal, and a receipt. <a className="underline underline-offset-4" href={withSource('/protocol/many/', source)}>Many-to-many deals</a> is the 0.4 seat model.</p>
+      <p className="mt-3 text-[16px] leading-7 text-t2"><a className="underline underline-offset-4" href={withSource('/protocol/quickstart/', source)}>Quickstart for agents</a>{hostDiscovery(doc) ? ' follows the routes named in /.well-known/orp.json.' : '.'} <a className="underline underline-offset-4" href={withSource('/protocol/concepts/', source)}>Concepts</a> explains a space, an offer, approval, the deal, and a receipt. <a className="underline underline-offset-4" href={withSource('/protocol/many/', source)}>Many-to-many deals</a> is the 0.4 seat model.</p>
       <p className="mt-6 text-sm text-t2">{catalog.license}. Until publication, this is a draft in the repository.</p>
     </>
   )
 }
 
-function Concepts({ hostLine }: { hostLine: string }) {
+function Concepts({ doc }: { doc: unknown }) {
+  const found = hostDiscovery(doc)
+  const known = Boolean(found)
+  const speech = found && found.speaks04 ? `${hostSpeechSpeaks} ` : ''
   const blocks = [
-    ['space', 'Space', 'A space is a place a person can publish: a post, a newsletter issue, a video description. The space message describes it. On this host, discover with want set to spaces returns an empty results list and empty_reason no_match.'],
+    ['space', 'Space', known
+      ? 'A space is a place a person can publish: a post, a newsletter issue, a video description. The space message describes it. On this host, discover with want set to spaces returns an empty results list and empty_reason no_match.'
+      : 'A space is a place a person can publish: a post, a newsletter issue, a video description. The space message describes it.'],
     ['offer', 'Offer', 'An offer states the work and the terms. Suggest can return pitches from the catalog. A pitch is not a stored offer, and sending an offer message does not open a deal here.'],
-    ['consent', 'Consent and approval', 'Each step of a deal is auto, ask, or off. Only the host records approval. An agent cannot approve. Join on this host returns steps where ' + joinSteps],
-    ['lifecycle', 'Exchange and the deal', 'The exchange runs request, offer, counter, accept, and decline. The host then records the deal, execute, receipt, outcome, and payout. On this host, a directed offer and the counterparty accept can open an awaiting test deal. Activate moves that deal to active. ' + hostLine],
-    ['proof', 'Proof and receipts', 'A receipt is proof the host writes after the work. Parties do not submit their own receipts. The proof this host lists is a tracked link.'],
+    ['consent', 'Consent and approval', known
+      ? 'Each step of a deal is auto, ask, or off. Only the host records approval. An agent cannot approve. Join on this host returns steps where ' + joinSteps
+      : 'Each step of a deal is auto, ask, or off. Only the host records approval. An agent cannot approve.'],
+    ['lifecycle', 'Exchange and the deal', known
+      ? 'The exchange runs request, offer, counter, accept, and decline. The host then records the deal, execute, receipt, outcome, and payout. On this host, a directed offer and the counterparty accept can open an awaiting test deal. Activate moves that deal to active. ' + speech
+      : 'The exchange runs request, offer, counter, accept, and decline. The host then records the deal, execute, receipt, outcome, and payout.'],
+    ['proof', 'Proof and receipts', known
+      ? 'A receipt is proof the host writes after the work. Parties do not submit their own receipts. The proof this host lists is a tracked link.'
+      : 'A receipt is proof the host writes after the work. Parties do not submit their own receipts.'],
   ]
   return (
     <>
       <p className="eyebrow">Concepts</p>
       <h1 className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">How a deal is put together</h1>
+      {known ? null : <p className="mt-4 text-[16px] leading-7 text-t2">{hostSpeechUnknown}</p>}
       <p className="mt-4 text-lg leading-8">The words below are the objects in ORP 0.3. A plain 0.3 deal is still two parties. Seats are on the many-to-many page.</p>
       {blocks.map(([id, title, body]) => (
         <section key={id} id={id} className="mt-10 scroll-mt-28">
@@ -209,18 +221,21 @@ function Concepts({ hostLine }: { hostLine: string }) {
   )
 }
 
-function Quickstart({ hostLine }: { hostLine: string }) {
-  const suggest = schemaBy('0.3', 'suggest-request')
-  const join = schemaBy('0.3', 'join-request')
-  const hello = schemaBy('0.3', 'hello')
-  const discover = schemaBy('0.3', 'discover')
+function Quickstart({ doc }: { doc: unknown }) {
+  const found = hostDiscovery(doc)
+  const helloVersion = found && found.versions.includes('0.4') ? '0.4' : '0.3'
+  const suggest = found ? schemaBy('0.3', 'suggest-request') : undefined
+  const join = found ? schemaBy('0.3', 'join-request') : undefined
+  const hello = found ? schemaBy(helloVersion, 'hello') || schemaBy('0.3', 'hello') : undefined
+  const discover = found ? schemaBy('0.3', 'discover') : undefined
+  const hostLine = found && found.speaks04 ? hostSpeechSpeaks : ''
   return (
     <>
       <p className="eyebrow">Quickstart</p>
       <h1 className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">Quickstart for agents</h1>
       <p className="mt-4 text-lg leading-8">Use the hosted routes in this order. Discovery, suggest, and join need no prior account. Hello and discover need the bearer from join.</p>
       <h2 className="h-display mt-10 text-2xl">1. Discover</h2>
-      <p className="mt-3 text-[16px] leading-7 text-t2">GET /.well-known/orp.json needs no credential. The name is “{discoveryName}”. orp lists 0.3. endpoint is /orp, suggest is /orp/suggest, and join is /orp/join. auth.bearer is true. capabilities.messages is {handledMessages.join(', ')}. conformance is omitted, so this host claims no level. legacy.dcp points at /.well-known/dcp.json and /v1. DCP v0.1 remains the live affiliate path.</p>
+      <p className="mt-3 text-[16px] leading-7 text-t2">{hostQuickstartDiscover(doc)}</p>
       <h2 className="h-display mt-10 text-2xl">2. Suggest, then join</h2>
       <p className="mt-3 text-[16px] leading-7 text-t2">POST /orp/suggest needs a text field. The draft is not stored. An optional join object mints the same bearer as POST /v1/agent-tokens. The response carries items and the join URL.</p>
       {suggest?.valid.map((example) => <CopyBlock key={example.name} label={`POST /orp/suggest · ${example.name}`} code={example.json} />)}
@@ -228,13 +243,14 @@ function Quickstart({ hostLine }: { hostLine: string }) {
       <CopyBlock label="POST /orp/join · smallest body" code="{}" />
       {join?.valid.map((example) => <CopyBlock key={example.name} label={`POST /orp/join · ${example.name}`} code={example.json} />)}
       <h2 className="h-display mt-10 text-2xl">3. Hello, then discover</h2>
-      <p className="mt-3 text-[16px] leading-7 text-t2">POST /orp with Authorization: Bearer and the token from join. Set from to that same party, or the host answers 403 “from does not match the credential.” Hello returns one version, 0.3. Discover returns results. Discover with want set to spaces returns no items. The samples below are valid requests from the spec.</p>
+      <p className="mt-3 text-[16px] leading-7 text-t2">{hostQuickstartHello(doc)}</p>
       {hello?.valid[0] ? <CopyBlock label={`POST /orp · ${hello.valid[0].name}`} code={hello.valid[0].json} /> : null}
       {discover?.valid[0] ? <CopyBlock label={`POST /orp · ${discover.valid[0].name}`} code={discover.valid[0].json} /> : null}
       <h2 className="h-display mt-10 text-2xl">Offer, accept, and execute</h2>
-      <p className="mt-3 text-[16px] leading-7 text-t2">This host handles offer and accept for a 0.3 test deal. A directed offer and the counterparty accept can open an awaiting test deal. Activate moves awaiting to active. Execute on a deal that is not active is 409 state_conflict, and the message is “The deal is in the wrong state.” A pay obligation on an active deal is refused: “{payRefusal}” {noMoney}</p>
-      <p className="mt-3 text-[16px] leading-7 text-t2">Host-only types {hostOnlyTypes.join(', ')} return 403: “{hostOnlyRefusal}” A receipt returns 403: “{receiptRefusal}” {hostLine} Other message types return 403: “{otherRefusal}”</p>
-      <ThreePartyExample hostLine={hostLine} />
+      <p className="mt-3 text-[16px] leading-7 text-t2">{hostQuickstartOffer(doc)}</p>
+      {found ? <p className="mt-3 text-[16px] leading-7 text-t2">A directed offer and the counterparty accept can open an awaiting test deal. Activate moves awaiting to active. Execute on a deal that is not active is 409 state_conflict, and the message is “The deal is in the wrong state.” A pay obligation on an active deal is refused: “{payRefusal}” {noMoney}</p> : null}
+      {found ? <p className="mt-3 text-[16px] leading-7 text-t2">Host-only types {hostOnlyTypes.join(', ')} return 403: “{hostOnlyRefusal}” A receipt returns 403: “{receiptRefusal}” {hostLine} Other message types return 403: “{otherRefusal}”</p> : null}
+      {found ? <ThreePartyExample hostLine={hostLine} /> : null}
       <FivePartyWalkthrough />
       <StartPrompt />
     </>
@@ -382,12 +398,14 @@ export function Docs({ pathname }: { pathname: string }) {
     document.title = `${title} · Offer Rails · Protocol`
   }, [title])
   const [open, setOpen] = useState(false)
-  const hostLine = useHostSpeech()
+  const { doc } = useHostSpeech()
+  const found = hostDiscovery(doc)
+  const hostLine = found && found.speaks04 ? hostSpeechSpeaks : found ? '' : hostSpeechUnknown
   let body = <Missing />
-  if (route.name === 'overview') body = <Overview hostLine={hostLine} />
-  else if (route.name === 'concepts') body = <Concepts hostLine={hostLine} />
+  if (route.name === 'overview') body = <Overview doc={doc} />
+  else if (route.name === 'concepts') body = <Concepts doc={doc} />
   else if (route.name === 'many') body = <ManyPage hostLine={hostLine} />
-  else if (route.name === 'quickstart') body = <Quickstart hostLine={hostLine} />
+  else if (route.name === 'quickstart') body = <Quickstart doc={doc} />
   else if (route.name === 'sdk') body = <SdkPage />
   else if (route.name === 'conformance') body = <ConformancePage />
   else if (route.name === 'spec-index') body = <SpecIndex />

@@ -12,6 +12,8 @@ export const evolutionLine = 'This is affiliate marketing, evolved for agents. T
 
 export const agentDoesLead = 'While you write a blog post, a social post, or a newsletter, your agent can suggest a matching offer: "this fits your post, want to monetize it?" That suggestion is Coming. The agent does not write the post, and it does not choose the offer.'
 
+export const inWriteOffer = 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.'
+
 export const deals = [
   {
     name: 'Suggest an offer while you write',

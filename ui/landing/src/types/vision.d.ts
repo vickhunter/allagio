@@ -3,6 +3,7 @@ declare module '@/vision.mjs' {
   export const visionHonest: string
   export const evolutionLine: string
   export const agentDoesLead: string
+  export const inWriteOffer: string
   export const deals: readonly { name: string; status: string; note: string }[]
   export const youKeep: readonly { t: string; b: string }[]
   export const replaces: readonly { t: string; b: string }[]

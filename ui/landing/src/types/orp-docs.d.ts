@@ -46,6 +46,11 @@ declare module '@/protocol/hosted.mjs' {
   export const hostSpeechSpeaks: string
   export const hostSpeechUnknown: string
   export function hostSpeech(doc: unknown): string
+  export function hostDiscovery(doc: unknown): { versions: string[]; messages: string[]; name: string; bearer: boolean; conformance: boolean; speaks04: boolean; endpoint: string; suggest: string; join: string; dcp: { discovery?: string; http_base?: string; version?: string } | null } | null
+  export function hostOverview(doc: unknown): string
+  export function hostQuickstartDiscover(doc: unknown): string
+  export function hostQuickstartHello(doc: unknown): string
+  export function hostQuickstartOffer(doc: unknown): string
   export const receiptRefusal: string
   export const otherRefusal: string
   export const payRefusal: string

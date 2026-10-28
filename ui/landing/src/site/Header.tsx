@@ -32,6 +32,7 @@ export function Header({ page }: { page: PageKey }) {
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-2.5 sm:px-5">
         <Logo />
         <nav aria-label="Main" className="order-last flex w-full flex-wrap gap-0.5 text-sm sm:order-none sm:w-auto">
+          {link('/you/', 'Your limits', 'you', 'text-t1 hover:bg-s2')}
           {link('/makers/', 'Makers', 'makers', 'text-maker hover:bg-maker-soft')}
           {link('/publishers/', 'Publishers', 'publishers', 'text-pub hover:bg-pub-soft')}
           {link('/protocol/', 'Protocol', 'protocol', 'text-t1 hover:bg-s2')}

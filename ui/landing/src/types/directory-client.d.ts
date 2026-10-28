@@ -1,3 +1,16 @@
+declare module '@/directory/state.mjs' {
+  export function directoryFailureStatus(error: { status?: number; message?: string } | null): string
+  export function directoryFailureCopy(error: { status?: number; message?: string } | null): string
+  export function directoryChrome(view: string, total: number): {
+    heading: boolean
+    search: boolean
+    error: boolean
+    list: boolean
+    nomatch: boolean
+    add: boolean
+  }
+}
+
 declare module '@/directory/client.mjs' {
   export class DirectoryFailure extends Error {
     status: number
