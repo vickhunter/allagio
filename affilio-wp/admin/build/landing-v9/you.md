@@ -42,4 +42,6 @@ POST /orp/join with {}.
 Read tools/list on /mcp.
 No sign-in link.
 A person still approves each placement.
+GET /orp/deals/{deal} returns approved_by.
+The value is agent or owner.
 The deal steps are in /llms-full.txt.

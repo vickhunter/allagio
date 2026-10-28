@@ -56,6 +56,13 @@ func TestORP04DefaultAskIsTheAgent(t *testing.T) {
 	if code != http.StatusOK || docBody(t, opened)["state"] != "active" {
 		t.Fatalf("activate %d %s", code, mustJSON(opened))
 	}
+	if !strings.Contains(mustJSON(docBody(t, opened)), `"approved_by":"agent"`) || strings.Contains(mustJSON(docBody(t, opened)), `"approved_by":"owner"`) {
+		t.Fatalf("approve reply %s", mustJSON(opened))
+	}
+	read, readBody := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(acceptor.token))
+	if read.Code != http.StatusOK || !strings.Contains(mustJSON(docBody(t, readBody)), `"approved_by":"agent"`) || strings.Contains(mustJSON(docBody(t, readBody)), `"approved_by":"owner"`) {
+		t.Fatalf("deal read %d %s", read.Code, read.Body.String())
+	}
 	proof, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+dealID, nil, nil)
 	proofHTML := proof.Body.String()
 	if proof.Code != http.StatusOK || !strings.Contains(proofHTML, "approved_by agent") || !strings.Contains(proofHTML, "An agent approved this step.") || strings.Contains(proofHTML, "approved_by owner") {
@@ -86,7 +93,7 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	settingsReq.AddCookie(cookie)
 	ownerRouter.ServeHTTP(settings, settingsReq)
 	settingsHTML := html.UnescapeString(settings.Body.String())
-	if settings.Code != http.StatusOK || !strings.Contains(settingsHTML, "An ask is approved by the agent. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The host records approved_by agent. That is not a person's approval.") {
+	if settings.Code != http.StatusOK || !strings.Contains(settingsHTML, "An ask is approved by the agent. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. GET /orp/deals/{deal} returns approved_by agent. That is not a person's approval.") {
 		t.Fatalf("settings default %d %s", settings.Code, settings.Body.String())
 	}
 	if strings.Contains(settings.Body.String(), `name="execute"`) || strings.Contains(settings.Body.String(), `name="list"`) || strings.Contains(settings.Body.String(), `name="accept"`) || !strings.Contains(settings.Body.String(), `name="ask"`) {
@@ -118,7 +125,7 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	settingsReq = httptest.NewRequest(http.MethodGet, "/owner/settings", nil)
 	settingsReq.AddCookie(cookie)
 	ownerRouter.ServeHTTP(opted, settingsReq)
-	if opted.Code != http.StatusOK || !strings.Contains(html.UnescapeString(opted.Body.String()), "An ask waits for the owner. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The agent cannot approve it. Sign in, open the approval link, and submit the form. Opening the link does not approve it. The host records approved_by owner.") {
+	if opted.Code != http.StatusOK || !strings.Contains(html.UnescapeString(opted.Body.String()), "An ask waits for the owner. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The agent cannot approve it. Sign in, open the approval link, and submit the form. Opening the link does not approve it. GET /orp/deals/{deal} returns approved_by owner.") {
 		t.Fatalf("settings opted in %d %s", opted.Code, opted.Body.String())
 	}
 	assertNoPersonApprovedClaim(t, "settings opted in", opted.Body.String())
@@ -205,10 +212,21 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	if jsonSigned([]byte(partiesText(t, db, dealID)), offerer.party) || strings.Contains(partiesText(t, db, dealID), "approved_by") {
 		t.Fatalf("refused post recorded %s", partiesText(t, db, dealID))
 	}
+	before, beforeBody := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(acceptor.token))
+	if before.Code != http.StatusOK || strings.Contains(mustJSON(docBody(t, beforeBody)), `"approved_by":"owner"`) {
+		t.Fatalf("deal before owner post %d %s", before.Code, before.Body.String())
+	}
 	ownerPost := postOwnerApprove(t, r, link, cookie, csrf, base, nil)
 	var ownerBody map[string]any
 	if err := json.Unmarshal(ownerPost.Body.Bytes(), &ownerBody); err != nil || ownerPost.Code != http.StatusOK || !seatSignedDoc(t, ownerBody, offerer.party) {
 		t.Fatalf("owner post %d %s", ownerPost.Code, ownerPost.Body.String())
+	}
+	if !strings.Contains(mustJSON(docBody(t, ownerBody)), `"approved_by":"owner"`) || strings.Contains(mustJSON(docBody(t, ownerBody)), `"approved_by":"agent"`) {
+		t.Fatalf("owner approve reply %s", ownerPost.Body.String())
+	}
+	after, afterBody := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(acceptor.token))
+	if after.Code != http.StatusOK || !strings.Contains(mustJSON(docBody(t, afterBody)), `"approved_by":"owner"`) || strings.Contains(mustJSON(docBody(t, afterBody)), `"approved_by":"agent"`) {
+		t.Fatalf("deal after owner post %d %s", after.Code, after.Body.String())
 	}
 	stored := partiesText(t, db, dealID)
 	if !strings.Contains(stored, `"approved_by":"owner"`) || strings.Contains(stored, `"approved_by":"agent"`) {
@@ -460,8 +478,8 @@ func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 			}
 		}
 		if strings.Contains(rel, "llms") {
-			if strings.Contains(body, "approved_by") || !strings.Contains(body, "bound[].authority") || !strings.Contains(body, rule) {
-				t.Fatalf("%s does not show bound[].authority", rel)
+			if strings.Contains(body, "bound[].authority") || !strings.Contains(body, "approved_by agent") || !strings.Contains(body, "approved_by owner") || !strings.Contains(body, rule) {
+				t.Fatalf("%s does not name approved_by", rel)
 			}
 		}
 		if strings.HasSuffix(rel, "defs.schema.json") || strings.Contains(rel, "/messages/offer.schema.json") || strings.Contains(rel, "/messages/space.schema.json") || strings.Contains(rel, "/messages/accept.schema.json") || strings.Contains(rel, "/messages/deal.schema.json") || strings.Contains(rel, "/http/join-response.schema.json") {
@@ -470,8 +488,8 @@ func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 			}
 		}
 	}
-	if !strings.Contains(llmsBody(), rule) || strings.Contains(llmsBody(), "approved_by") || !strings.Contains(llmsBody(), "bound[].authority") {
-		t.Fatal("fallback llms.txt does not show bound[].authority")
+	if !strings.Contains(llmsBody(), rule) || strings.Contains(llmsBody(), "bound[].authority") || !strings.Contains(llmsBody(), "approved_by agent") || !strings.Contains(llmsBody(), "approved_by owner") {
+		t.Fatal("fallback llms.txt does not name approved_by")
 	}
 	assertNoPersonApprovedClaim(t, "fallback llms", llmsBody())
 	assertNoPersonApprovedClaim(t, "approve page", orp.ApprovePage("Notes", "Affiliate link"))

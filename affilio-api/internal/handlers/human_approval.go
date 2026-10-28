@@ -83,10 +83,10 @@ func (h *ORPHost) signedInOwner(c *gin.Context) (*database.Owner, bool) {
 func humanApprovalWords(steps []string) string {
 	for _, step := range steps {
 		if step == "ask" {
-			return "An ask waits for the owner. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The agent cannot approve it. Sign in, open the approval link, and submit the form. Opening the link does not approve it. The host records approved_by owner."
+			return "An ask waits for the owner. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The agent cannot approve it. Sign in, open the approval link, and submit the form. Opening the link does not approve it. GET /orp/deals/{deal} returns approved_by owner."
 		}
 	}
-	return "An ask is approved by the agent. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The host records approved_by agent. That is not a person's approval."
+	return "An ask is approved by the agent. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. GET /orp/deals/{deal} returns approved_by agent. That is not a person's approval."
 }
 
 // purposePreview is the prefetch class used for /go. A prefetch does not approve.

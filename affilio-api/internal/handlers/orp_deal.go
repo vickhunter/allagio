@@ -74,12 +74,28 @@ func (h *ORPHost) Deal(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}, false)
 		return
 	}
+	if err = h.attachApprovals(c, &deal); err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
 	doc, err := h.dealMessage(dns, party, "", deal, h.now())
 	if err != nil {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
 	writeORP(c, http.StatusOK, doc, false)
+}
+
+func (h *ORPHost) attachApprovals(c *gin.Context, deal *database.ORPDeal) error {
+	if h.Entry == nil || h.Entry.DB == nil || deal == nil {
+		return nil
+	}
+	rows, err := h.Entry.DB.DealOwnerApprovals(c.Request.Context(), deal.ID)
+	if err != nil {
+		return err
+	}
+	deal.WireApprovals = rows
+	return nil
 }
 
 // Proof is the public test page named by an execute proof_url.
@@ -164,6 +180,9 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		return
 	}
 	record := h.stepAskRecord(dns, deal, "agent")
+	if record != nil {
+		deal.WireApprovals = []database.DealApproval{*record}
+	}
 	now := h.now()
 	bound, err := bindMandates(deal.Bound, deal.OffererParty, deal.AcceptorParty, now)
 	if err != nil {
@@ -370,6 +389,9 @@ func (h *ORPHost) finishOwner03(c *gin.Context, dns string, deal database.ORPDea
 		return
 	}
 	record := h.stepAskRecord(dns, deal, "owner")
+	if record != nil {
+		deal.WireApprovals = []database.DealApproval{*record}
+	}
 	deal.State = "active"
 	deal.Waiting = nil
 	deal.Bound = bound
@@ -1077,7 +1099,44 @@ func dealBody(deal database.ORPDeal, now time.Time) (map[string]any, error) {
 		}
 		body["waiting"] = waiting
 	}
+	if wire := approvedByWire(deal.WireApprovals, nil); len(wire) > 0 {
+		body["approved_by"] = wire
+	}
 	return body, nil
+}
+
+// approvedByWire is the read-only list a counterparty can fetch.
+// It names the step and whether the waiting party's bearer or the signed-in
+// owner approved it. It has no name, email, or owner id.
+func approvedByWire(rows []database.DealApproval, extra []orp.Approval) []any {
+	type pair struct{ step, by string }
+	var ordered []pair
+	seen := map[string]bool{}
+	add := func(step, by string) {
+		if step == "" || (by != "agent" && by != "owner") {
+			return
+		}
+		key := step + "\x00" + by
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		ordered = append(ordered, pair{step, by})
+	}
+	for _, row := range rows {
+		add(row.Step, row.By)
+	}
+	for _, row := range extra {
+		add(row.Step, row.By)
+	}
+	if len(ordered) == 0 {
+		return nil
+	}
+	out := make([]any, len(ordered))
+	for i, row := range ordered {
+		out[i] = map[string]any{"step": row.step, "approved_by": row.by}
+	}
+	return out
 }
 
 func waitingOn(party, step string, reasons []any, origin string, now time.Time) map[string]any {

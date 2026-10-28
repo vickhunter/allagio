@@ -365,7 +365,7 @@ A deal is the host's record of one negotiation and its execution. The host sends
 
 Obligation states: `pending`, `claimed`, `verified`, `failed`, `revoked`, `waived`.
 
-`bound` lists who is bound to the current `terms_hash` and by what authority: `mandate` (the owner's standing constraints allowed it, including an agent approval recorded as approved_by agent, which is not a person's approval, or the signed-in owner form, which records approved_by owner and a mandate). `consent` is a host-only message type.
+`bound` lists who is bound to the current `terms_hash`. Each row's authority type is `mandate`. Who approved is not on that row. The approve reply and `GET /orp/deals/{deal}` return `approved_by` for each step. The value is `agent` or `owner`. `agent` is the waiting party's bearer and is not a person's approval. `owner` is the signed-in owner who submitted the form. `consent` is a host-only message type.
 
 ### 8.4 Constraints
 
@@ -834,7 +834,7 @@ To escalate, the host sends the waiting party a `deal` snapshot in state `awaiti
 }
 ```
 
-By default the waiting party's agent approves that ask with its bearer. The host records approved_by agent. That is not a person's approval, and the host does not send a `consent` for it. The approval URL shows the exact terms behind the hash. Opening that URL does not record an approval. When the owner has turned on human approval for the step, the signed-in owner submits the form on that page. The host then records approved_by owner and a mandate, and publishes a deal snapshot. It does not send a `consent` for it. `consent` is a host-only message type.
+By default the waiting party's agent approves that ask with its bearer. The host records approved_by agent. That is not a person's approval, and the host does not send a `consent` for it. The approval URL shows the exact terms behind the hash. Opening that URL does not record an approval. When the owner has turned on human approval for the step, the signed-in owner submits the form on that page. The host then records approved_by owner and a mandate, and publishes a deal snapshot. It does not send a `consent` for it. The approve reply and `GET /orp/deals/{deal}` return `approved_by` for each step. The value is `agent` or `owner`. `consent` is a host-only message type.
 
 Rules:
 

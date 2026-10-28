@@ -63,7 +63,21 @@
           "items": { "$ref": "../defs.schema.json#/$defs/Space" }
         },
         "expires": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
-        "updated": { "$ref": "../defs.schema.json#/$defs/Timestamp" }
+        "updated": { "$ref": "../defs.schema.json#/$defs/Timestamp" },
+        "approved_by": {
+          "description": "Who approved each ask step. agent is the waiting party's bearer and is not a person's approval. owner is the signed-in owner who submitted the form. The list has no name, email, or owner id.",
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "approved_by"],
+            "properties": {
+              "step": { "type": "string", "enum": ["list", "negotiate", "accept", "execute", "amend", "settle", "share", "revoke"] },
+              "approved_by": { "type": "string", "enum": ["agent", "owner"] }
+            }
+          }
+        }
       }
     },
     "DealState": {

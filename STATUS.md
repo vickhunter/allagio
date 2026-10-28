@@ -1,3 +1,7 @@
+## October 28 — Approval provenance (D-114)
+
+`GET /orp/deals/{deal}` and the approve reply return `approved_by` for each ask step. The value is `agent` or `owner`. It is read from the approval the host already stores. No new column. A counterparty can tell a person's approval from an agent's. Served text names that field and does not point at `bound[].authority`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 28 — Accepted lows (D-113)
 
 A host `consent` in SPEC shows `terms_hash` and `assurance`. A 0.3 list and a 0.4 ask offer wait with `claims_unchecked`. `POST /orp/join` with `"orp":"0.3"` says `Use 0.4.` A missing landing file says the page is temporarily unavailable. Served click text says less than 5 seconds, and exactly 5 seconds after the previous counted click. The two `llms.txt` copies no longer name the banned holder token or the banned environment-variable prefix. `GET` and `HEAD` of a dirty `.md` path under `/makers/` or `/publishers/` both return the markdown 404. `HEAD /publishers/setup` and `HEAD /makers/acme` stay the landing not-found page. Served deal text names `bound[].authority` where a reader can see the binding. `/skill.md` names `POST /orp/join` and `tools/list` and stays within 25 lines. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
