@@ -147,6 +147,8 @@ const connectBlock = "## Connect a hosted assistant\n\n" +
 	"Each entry has step, party, and agent or owner.\n" +
 	"A 0.3 deal does not include approved_by.\n" +
 	"When that read fails, an ORP 0.4 deal stays HTTP 200 and sets approvals_unavailable to true.\n" +
+	"approved_by is omitted.\n" +
+	"A 0.3 deal does not include approvals_unavailable.\n" +
 	"The deal steps are in /llms-full.txt.\n"
 
 func connectSection(text string) (string, bool) {

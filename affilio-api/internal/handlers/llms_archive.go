@@ -1,7 +1,7 @@
 package handlers
 
 // llmsArchive is the manual previously served at /llms.txt.
-// /llms-full.txt still includes it, after the cold path.
+// /llms-full.txt starts here. The served copy drops the Next link to /skill.md.
 const llmsArchive = `# Offer Rails
 
 Next: [/skill.md](https://offer-rails.onrender.com/skill.md)

@@ -1017,6 +1017,52 @@ func TestApprovedByKeepsEachParty(t *testing.T) {
 	}
 }
 
+func TestDealReadMarksApprovalFailure(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	entry := &AgentEntry{
+		DB:           db,
+		BaseURL:      "http://127.0.0.1:8080",
+		AddressKey:   testAddressKey,
+		ClaimsCheck:  "off-local",
+		TokenLimiter: NewIPRateLimiter(8, time.Minute),
+	}
+	r := mountORP(entry, &ORPHost{Entry: entry})
+	offererToken, offerer := joinParty(t, r)
+	_, acceptor := joinParty(t, r)
+	directed := orpEnvelope("offer", "m_d115_unread", offerer, standingOffer())
+	directed["to"] = acceptor
+	created, createdBody := postJSON(t, r, http.MethodPost, "/orp", directed, bearerHeader(offererToken))
+	dealID, _ := createdBody["deal"].(string)
+	if created.Code != http.StatusOK || dealID == "" {
+		t.Fatalf("offer %d %s", created.Code, created.Body.String())
+	}
+	db.ApprovalsReadErr = errors.New("db down")
+	plainRec, plainBody := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offererToken))
+	plainDeal, _ := plainBody["body"].(map[string]any)
+	if plainRec.Code != http.StatusOK {
+		t.Fatalf("0.3 read %d %s", plainRec.Code, plainRec.Body.String())
+	}
+	if _, ok := plainDeal["approvals_unavailable"]; ok {
+		t.Fatal("0.3 body includes approvals_unavailable")
+	}
+	if _, ok := plainDeal["approved_by"]; ok {
+		t.Fatal("0.3 body includes approved_by")
+	}
+	parties := `{"round":1,"seats":[{"id":"` + offerer + `","role":"maker","required":true},{"id":"` + acceptor + `","role":"publisher","required":true}],"approvals":[{"party":"` + offerer + `","step":"accept","approved_by":"agent"}]}`
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE orp_deals SET parties=$2::jsonb WHERE id=$1`, dealID, parties); err != nil {
+		t.Fatal(err)
+	}
+	failed, failedBody := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(offererToken))
+	failedDeal, _ := failedBody["body"].(map[string]any)
+	if failed.Code != http.StatusOK || failedDeal["approvals_unavailable"] != true {
+		t.Fatalf("0.4 read %d %s", failed.Code, failed.Body.String())
+	}
+	if _, ok := failedDeal["approved_by"]; ok {
+		t.Fatalf("failed read sent approved_by %s", failed.Body.String())
+	}
+}
+
 func hasAll(got []string, want ...string) bool {
 	have := map[string]bool{}
 	for _, item := range got {

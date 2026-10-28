@@ -1,33 +1,5 @@
 # Offer Rails
 
-Next: [/skill.md](https://offer-rails.onrender.com/skill.md)
-
-Cold path: this file, then [/skill.md](https://offer-rails.onrender.com/skill.md), then join, then a test deal, then proof.
-
-## ORP 0-3 test deal
-
-Join. POST /orp/join with {}. An empty body returns token and party. Send the token as Authorization: Bearer. Use party as from.
-
-Test deal. Hello, then discover, then a directed offer (to), then accept by the second party, then activate, then execute, then proof.
-
-Proof. Open GET /orp/proof/<deal>. HTTP 200.
-
-Message rules for that walk: [/llms-full.txt](https://offer-rails.onrender.com/llms-full.txt)
-
-## Docs
-
-- [Device login](https://offer-rails.onrender.com/docs/device-login.md): device-code sign-in and project-scoped keys
-- [Settings](https://offer-rails.onrender.com/docs/settings.md): the setup questions and default modes
-- [Listing card](https://offer-rails.onrender.com/docs/listing-card.md): the only scan payload that may be uploaded
-- [Modes](https://offer-rails.onrender.com/docs/modes.md): manual, auto, and yolo
-- [Account](https://offer-rails.onrender.com/docs/account.md): account keys and the account digest
-
-Full text: [/llms-full.txt](https://offer-rails.onrender.com/llms-full.txt)
-
-# Offer Rails
-
-Next: [/skill.md](https://offer-rails.onrender.com/skill.md)
-
 ## ORP 0-3 test deal
 
 In testing. Start here for a test deal. Offer Rails does not hold money, and this host claims no conformance level.

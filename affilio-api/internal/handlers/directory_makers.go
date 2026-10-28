@@ -17,7 +17,7 @@ import (
 // A failed database read is 503. That is not an empty list.
 func (h *HostedHandler) DirectoryMakers(c *gin.Context) {
 	if err := directoryMakersReady(c.Request.Context(), h.DB); err != nil {
-		log.Printf("directory makers unavailable")
+		log.Printf("directory makers unavailable: %v", err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "directory unavailable"})
 		return
 	}

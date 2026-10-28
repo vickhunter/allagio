@@ -42,7 +42,7 @@ func TestColdAgentEntrance(t *testing.T) {
 	full := httptest.NewRecorder()
 	r.ServeHTTP(full, httptest.NewRequest(http.MethodGet, "/llms-full.txt", nil))
 	fullBody := full.Body.String()
-	if full.Code != http.StatusOK || !strings.Contains(full.Header().Get("Content-Type"), "text/plain") || !strings.HasPrefix(fullBody, llms.Body.String()) {
+	if full.Code != http.StatusOK || !strings.Contains(full.Header().Get("Content-Type"), "text/plain") || strings.HasPrefix(fullBody, llms.Body.String()) || strings.Contains(fullBody, "](https://offer-rails.onrender.com/skill.md)") || strings.Contains(fullBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(fullBody, "In testing. Start here for a test deal") {
 		t.Fatalf("llms-full %d %q", full.Code, full.Header().Get("Content-Type"))
 	}
 	for _, phrase := range []string{
