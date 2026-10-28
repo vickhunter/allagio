@@ -27,7 +27,7 @@ var RevenueTools = []Tool{
 	},
 	{
 		Name:        "prepare_placement",
-		Description: "Prepare exact copy and mandatory disclosure for a publisher's HTTPS article. Creates an expiring proposal. Ask me every time, a person approves each placement before commit, and the call does not publish. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule. A held proposal is HTTP 201 with status awaiting_approval and hold_reason, and no error key.",
+		Description: "Prepare exact copy and mandatory disclosure for a publisher's HTTPS article. Creates an expiring proposal. placement_publish is ask on a new site, so the call waits and does not publish. placement_publish auto commits in this call only when the domain is verified and claim checks are live. While claim checks are not live, a stored auto still waits. A held proposal is HTTP 201 with status awaiting_approval and hold_reason, and no error key.",
 		InputSchema: schema([]string{"offer_id", "surface_url", "context", "copy"}, map[string]interface{}{
 			"offer_id": str("Eligible offer ID"), "surface_url": str("HTTPS article on the publisher's registered domain"), "context": str("Article content used to check relevance"), "copy": str("Proposed recommendation, without invented product claims")}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
@@ -43,7 +43,7 @@ var RevenueTools = []Tool{
 		},
 	},
 	placementTool("get_placement", "Read an owned proposal, its frozen terms, approval status and receipt.", http.MethodGet, "", nil),
-	placementTool("commit_placement", "Idempotently commit an unexpired placement. Ask me every time, a person approves each placement before this call. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule. Returns an attribution link and the text. Does not publish. confirm=true cannot replace that rule.", http.MethodPost, "/commit", nil),
+	placementTool("commit_placement", "Idempotently commit an unexpired placement. placement_publish ask waits until a person approves it. placement_publish auto is committed by prepare when the domain is verified and claim checks are live. Returns an attribution link and the text. Does not publish. confirm=true cannot replace owner approval.", http.MethodPost, "/commit", nil),
 	placementTool("record_placement_receipt", "Record publisher-reported publication evidence after publishing through the owner's existing tool. Requires exact approved copy, disclosure and tracked link. This is not independent publication verification.", http.MethodPost, "/receipt", map[string]interface{}{
 		"surface_url": str("Approved article URL"), "published_text": str("Published text including exact copy, disclosure and tracked link"), "evidence": str("Evidence reference or local artifact description")}),
 	{

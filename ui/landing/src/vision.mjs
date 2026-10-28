@@ -4,7 +4,7 @@
 
 export const visionLine = 'Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent.'
 
-export const visionHonest = 'That is the direction. What works today is an affiliate link. Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner\'s rule decides, and agent tools still cannot change that rule. The other deals on this page are Coming. Nothing here is Verified end to end.'
+export const visionHonest = 'That is the direction. What works today is an affiliate link. Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode. The other deals on this page are Coming. Nothing here is Verified end to end.'
 
 export const evolutionLine = 'This is affiliate marketing, evolved for agents. The same path, with the finding and the matching handed to the agent you already use.'
 
@@ -18,8 +18,8 @@ export const deals = [
   },
   {
     name: 'Affiliate links',
-    status: 'Owner\'s rule',
-    note: 'Your agent can find an offer and prepare a placement. Ask me every time, a person approves each placement before it is published. In Approve within my rules and Approve anything that passes the checks, the owner\'s rule decides, and agent tools still cannot change that rule. A pasted link counts clicks. This is not Verified end to end.',
+    status: 'Works today',
+    note: 'Your agent can find an offer and prepare a placement. Ask me every time, a person approves each placement before it is published. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode. A pasted link counts clicks. This is not Verified end to end.',
   },
   {
     name: 'Link swaps',
@@ -46,11 +46,11 @@ export const deals = [
 export const youKeep = [
   {
     t: 'Your limits come first',
-    b: 'A new site opens on Manual: ask every time. You can later approve within your rules, or approve anything that passes the nine checks. While claims are not checked, those two still wait for a person.',
+    b: 'A new site opens on Ask me every time. You can later choose Approve within my rules, or Approve anything that passes the checks. While claims are not checked, those two still wait for a person.',
   },
   {
     t: 'You approve',
-    b: 'Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner\'s rule decides, and agent tools still cannot change that rule.',
+    b: 'Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode.',
   },
   {
     t: 'No personal data shared with the other agent',
@@ -69,7 +69,7 @@ export const youKeep = [
 export const replaces = [
   {
     t: 'Manual affiliate signups',
-    b: 'Filling in a form on each program site is what this is built to replace. Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner\'s rule decides, and agent tools still cannot change that rule. Your agent joins with POST /v1/agent-tokens and a bearer.',
+    b: 'Filling in a form on each program site is what this is built to replace. Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode. Your agent joins with POST /v1/agent-tokens and a bearer.',
   },
   {
     t: 'Outreach email bots',
@@ -78,9 +78,9 @@ export const replaces = [
 ]
 
 export const limits = [
-  { name: 'Ask every time', note: 'Manual. A new site opens here. Each placement waits for you.' },
-  { name: 'Approve within your rules', note: 'Once you set it. While claims are not checked, this still waits for a person.' },
-  { name: 'Approve anything that passes the nine checks', note: 'Only you can turn this on. While claims are not checked, this also waits for a person.' },
+  { name: 'Ask me every time', note: 'Manual. A new site opens here. Each placement waits for you.' },
+  { name: 'Approve within my rules', note: 'Once you set it. While claims are not checked, this still waits for a person.' },
+  { name: 'Approve anything that passes the checks', note: 'Only you can turn this on. While claims are not checked, this also waits for a person.' },
 ]
 
 export const youPageLead = 'This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.'

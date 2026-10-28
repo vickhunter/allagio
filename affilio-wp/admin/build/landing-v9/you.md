@@ -10,23 +10,23 @@ Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.
 
 Limits
 
-Your limits come first. A new site opens on Manual: ask every time.
+Your limits come first. A new site opens on Ask me every time.
 
-Ask every time
+Ask me every time
 
 Manual. A new site opens here. Each placement waits for you.
 
-Approve within your rules
+Approve within my rules
 
 Once you set it. While claims are not checked, this still waits for a person.
 
-Approve anything that passes the nine checks
+Approve anything that passes the checks
 
 Only you can turn this on. While claims are not checked, this also waits for a person.
 
 Approvals
 
-Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule.
+Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode.
 
 Receipts
 
@@ -42,7 +42,7 @@ The bearer is not an X-API-Key or X-Admin-Key.
 POST /orp/join with {}.
 Read tools/list on /mcp.
 No sign-in link.
-Ask me every time, a person approves each placement. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule.
+Ask me every time, a person approves each placement. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode.
 On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by.
 Each entry has step, party, and agent or owner.
 A 0.3 deal does not include approved_by.

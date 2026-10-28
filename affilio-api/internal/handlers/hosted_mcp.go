@@ -57,7 +57,7 @@ func hostedToolList(g *database.AgentGrant) []dcp.Tool {
 	return tools
 }
 
-const hostedMCPInstructions = "Use existing products and publishing tools. Prepare a placement. Ask me every time, send its owner approval URL to the human, and a person approves each placement before committing. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule. Never ask for payment secrets in chat. Agent tools cannot connect Stripe or confirm receipt of money. suggest_monetization takes a draft and returns up to three offers with a tracked link and a disclosure line. It does not publish."
+const hostedMCPInstructions = "Use existing products and publishing tools. Prepare a placement. When placement_publish is ask, including on a new site, send its owner approval URL to the human and a person approves each placement before committing. placement_publish auto commits in that prepare call only when the domain is verified and claim checks are live. While claim checks are not live, a stored auto still waits for a person. Agents cannot approve a placement. An agent tool can only tighten the mode. Never ask for payment secrets in chat. Agent tools cannot connect Stripe or confirm receipt of money. suggest_monetization takes a draft and returns up to three offers with a tracked link and a disclosure line. It does not publish."
 
 func newHostedMCPServer(grant *database.AgentGrant, loopbackURL, baseURL, bearer string) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: dcp.ServerName, Title: dcp.ServerTitle, Version: "0.3.0"}, &mcp.ServerOptions{Instructions: hostedMCPInstructions})

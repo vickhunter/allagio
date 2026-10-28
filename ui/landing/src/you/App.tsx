@@ -27,7 +27,7 @@ export function App() {
 
         <section id="approvals" aria-labelledby="approvals-h" className="mt-12">
           <h2 id="approvals-h" className="font-display text-2xl font-bold tracking-tight">Approvals</h2>
-          <p className="mt-2 text-sm leading-relaxed text-t2">Ask me every time, a person approves each placement before it is published. In Approve within my rules and Approve anything that passes the checks, the owner's rule decides, and agent tools still cannot change that rule. Your agent can prepare the placement and show you the terms.</p>
+          <p className="mt-2 text-sm leading-relaxed text-t2">Ask me every time, a person approves each placement before it is published. Approve within my rules and Approve anything that passes the checks still wait for a person while claims are not checked. An agent tool can only tighten the mode. Your agent can prepare the placement and show you the terms.</p>
         </section>
 
         <section id="receipts" aria-labelledby="receipts-h" className="mt-12">
