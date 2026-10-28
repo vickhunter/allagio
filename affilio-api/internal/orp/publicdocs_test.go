@@ -139,6 +139,8 @@ func TestMarkdownTwinsMatchHTMLPages(t *testing.T) {
 const connectBlock = "## Connect a hosted assistant\n\n" +
 	"POST /v1/agent-tokens with {}.\n" +
 	"Send the access_token as Authorization: Bearer to /mcp.\n" +
+	"POST /orp/join with {}.\n" +
+	"Read tools/list on /mcp.\n" +
 	"No sign-in link.\n" +
 	"A person still approves each placement.\n" +
 	"The deal steps are in /llms-full.txt.\n"

@@ -10,6 +10,8 @@ Full text: [/llms-full.txt](https://offer-rails.onrender.com/llms-full.txt)
 
 POST /v1/agent-tokens with {}.
 Send the access_token as Authorization: Bearer to /mcp.
+POST /orp/join with {}.
+Read tools/list on /mcp.
 No sign-in link.
 A person still approves each placement.
 The deal steps are in /llms-full.txt.

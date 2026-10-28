@@ -102,9 +102,13 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/publishers/setup.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "publishers-setup.md") })
 		public.HEAD("/publishers/setup.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "publishers-setup.md") })
 		public.GET("/makers/:slug", h.directoryProfile)
+		public.HEAD("/makers/:slug", h.directoryProfile)
 		public.GET("/makers/:slug/", h.directoryProfile)
+		public.HEAD("/makers/:slug/", h.directoryProfile)
 		public.GET("/publishers/:slug", h.directoryProfile)
+		public.HEAD("/publishers/:slug", h.directoryProfile)
 		public.GET("/publishers/:slug/", h.directoryProfile)
+		public.HEAD("/publishers/:slug/", h.directoryProfile)
 		public.GET("/protocol", h.Protocol)
 		public.GET("/protocol/", h.Protocol)
 		public.GET("/you", h.You)
@@ -395,7 +399,7 @@ func (h *HostedHandler) writeLandingUnavailable(c *gin.Context, name string) {
 		return
 	}
 	page := template.HTMLEscapeString(landingPageName(name))
-	body := []byte(fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · %s</title></head><body><nav><a href="/">Home</a></nav><main><h1>%s</h1></main></body></html>`, page, page))
+	body := []byte(fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · %s</title></head><body><nav><a href="/">Home</a></nav><main><h1>%s</h1><p>This page is temporarily unavailable.</p></main></body></html>`, page, page))
 	c.Header("Retry-After", "60")
 	c.Data(http.StatusServiceUnavailable, "text/html; charset=utf-8", stampLandingLinks(body, landingSourceFrom(c)))
 }

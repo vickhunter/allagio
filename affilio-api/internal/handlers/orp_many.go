@@ -171,7 +171,7 @@ func (h *ORPHost) offerMany(c *gin.Context, dns string, msg orp.Message, hash, o
 		// That is the 0.3 list path: the offer waits, the offerer is not
 		// signed, and nothing is bound. Step negotiate signed nobody and
 		// left bound nil, which the NOT NULL column rejected.
-		h.holdMany(&deal, msg.From, "list", []any{"step_ask"}, now)
+		h.holdMany(&deal, msg.From, "list", []any{"step_ask", "claims_unchecked"}, now)
 	}
 	h.insertMany(c, dns, msg, hash, deal, now)
 }

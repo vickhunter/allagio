@@ -120,7 +120,7 @@ func TestD104ListAskWaitsUntilApproved(t *testing.T) {
 	body := offerBody["body"].(map[string]any)
 	offerID, _ := body["id"].(string)
 	waiting, _ := body["waiting"].(map[string]any)
-	if offerID == "" || waiting["party"] != maker || waiting["step"] != "list" || !hasAll(stringList(waiting["reasons"]), "step_ask") {
+	if offerID == "" || waiting["party"] != maker || waiting["step"] != "list" || !hasAll(stringList(waiting["reasons"]), "step_ask", "claims_unchecked") {
 		t.Fatalf("waiting %s", offerRec.Body.String())
 	}
 	if _, ok := body["bound"]; ok || strings.Contains(offerRec.Body.String(), "mandate") {
