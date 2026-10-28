@@ -236,7 +236,7 @@ export const aloneToday = [
   },
   {
     title: 'Placing an offer',
-    body: 'Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. No agent tool can approve it.',
+    body: 'Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. A person still approves each placement. That access_token is a bearer for /mcp and for ORP. It is not an X-API-Key and it is not an X-Admin-Key.',
   },
 ]
 

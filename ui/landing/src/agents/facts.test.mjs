@@ -166,4 +166,8 @@ test('public agent copy stays on the documented words', () => {
   assert.match(blob, /fetch failed/)
   assert.match(blob, /claim_check_unavailable/)
   assert.match(blob, /Not checked yet/)
+  const placing = aloneToday.find((item) => item.title === 'Placing an offer')
+  assert.equal(placing.body.includes('No agent tool can approve'), false)
+  assert.match(placing.body, /A person still approves each placement\./)
+  assert.match(placing.body, /It is not an X-API-Key and it is not an X-Admin-Key\./)
 })
