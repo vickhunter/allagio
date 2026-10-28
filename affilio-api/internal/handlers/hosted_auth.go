@@ -155,6 +155,7 @@ func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
 		cleaned := path.Clean(requestPath)
 		if markdownPage(cleaned) && requestPath != cleaned {
+			setPublicDocHeaders(c)
 			if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(cleaned)) {
 				c.Header("X-Robots-Tag", "noindex")
 			}
@@ -344,12 +345,14 @@ func markdownPage(cleaned string) bool {
 }
 
 func writeMethodBody(c *gin.Context, status int, contentType string, body []byte) {
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Length", fmt.Sprintf("%d", len(body)))
+	c.Status(status)
 	if c.Request.Method == http.MethodHead {
-		c.Header("Content-Type", contentType)
-		c.Status(status)
+		c.Writer.WriteHeaderNow()
 		return
 	}
-	c.Data(status, contentType, body)
+	_, _ = c.Writer.Write(body)
 }
 
 func (h *HostedHandler) limited(c *gin.Context) bool {

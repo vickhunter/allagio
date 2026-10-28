@@ -85,11 +85,29 @@ func TestColdAgentEntrance(t *testing.T) {
 	for _, path := range []string{"/no-such-page.md", "/publishers/not-a-page.md"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
-		if rec.Code != http.StatusNotFound || !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") {
+		if rec.Code != http.StatusNotFound || !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") || rec.Body.String() != "not found\n" {
 			t.Fatalf("%s %d %q %s", path, rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
 		}
 		assertPublicDocHeaders(t, rec)
 	}
+	for _, path := range []string{"/no-such-page.md", "/x.md", "/docs/no-such.md"} {
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, path, nil))
+		if path == "/docs/no-such.md" {
+			if rec.Code != http.StatusNotFound || rec.Body.Len() != 0 || !strings.Contains(rec.Header().Get("Content-Type"), "application/json") {
+				t.Fatalf("head %s %d %q body %d", path, rec.Code, rec.Header().Get("Content-Type"), rec.Body.Len())
+			}
+			assertPublicDocHeaders(t, rec)
+			continue
+		}
+		if rec.Code != http.StatusNotFound || rec.Body.Len() != 0 || !strings.Contains(rec.Header().Get("Content-Type"), "text/markdown") || rec.Header().Get("Content-Length") != "10" {
+			t.Fatalf("head %s %d %q body %d length %q", path, rec.Code, rec.Header().Get("Content-Type"), rec.Body.Len(), rec.Header().Get("Content-Length"))
+		}
+		assertPublicDocHeaders(t, rec)
+	}
+	slash := httptest.NewRecorder()
+	r.ServeHTTP(slash, httptest.NewRequest(http.MethodGet, "/skill.md/", nil))
+	assertPublicDocHeaders(t, slash)
 	for _, path := range []string{"/skill.md/", "/you.md/", "/publishers/setup.md/", "/foo/../skill.md"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
@@ -103,13 +121,25 @@ func TestColdAgentEntrance(t *testing.T) {
 		if rec.Code != http.StatusMovedPermanently || rec.Header().Get("Location") != want {
 			t.Fatalf("%s %d location %q", path, rec.Code, rec.Header().Get("Location"))
 		}
+		assertPublicDocHeaders(t, rec)
 	}
 	headSkill := httptest.NewRecorder()
 	r.ServeHTTP(headSkill, httptest.NewRequest(http.MethodHead, "/skill.md", nil))
-	if headSkill.Code != http.StatusOK || headSkill.Body.Len() != 0 || !strings.Contains(headSkill.Header().Get("Content-Type"), "text/markdown") {
-		t.Fatalf("head skill %d %q body %d", headSkill.Code, headSkill.Header().Get("Content-Type"), headSkill.Body.Len())
+	if headSkill.Code != http.StatusOK || headSkill.Body.Len() != 0 || !strings.Contains(headSkill.Header().Get("Content-Type"), "text/markdown") || headSkill.Header().Get("Content-Length") != skill.Header().Get("Content-Length") {
+		t.Fatalf("head skill %d %q body %d length %q", headSkill.Code, headSkill.Header().Get("Content-Type"), headSkill.Body.Len(), headSkill.Header().Get("Content-Length"))
 	}
 	assertPublicDocHeaders(t, headSkill)
+	headLLMs := httptest.NewRecorder()
+	r.ServeHTTP(headLLMs, httptest.NewRequest(http.MethodHead, "/llms.txt", nil))
+	if headLLMs.Code != http.StatusOK || headLLMs.Body.Len() != 0 || !strings.Contains(headLLMs.Header().Get("Content-Type"), "text/plain") {
+		t.Fatalf("head llms %d %q body %d", headLLMs.Code, headLLMs.Header().Get("Content-Type"), headLLMs.Body.Len())
+	}
+	headDoc := httptest.NewRecorder()
+	r.ServeHTTP(headDoc, httptest.NewRequest(http.MethodHead, "/docs/device-login.md", nil))
+	if headDoc.Code != http.StatusOK || headDoc.Body.Len() != 0 || !strings.Contains(headDoc.Header().Get("Content-Type"), "text/markdown") {
+		t.Fatalf("head doc %d %q body %d", headDoc.Code, headDoc.Header().Get("Content-Type"), headDoc.Body.Len())
+	}
+	assertPublicDocHeaders(t, headDoc)
 	for _, path := range []string{"/you.md", "/privacy.md"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, path, nil))
