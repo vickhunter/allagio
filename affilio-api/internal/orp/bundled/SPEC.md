@@ -834,7 +834,7 @@ To escalate, the host sends the waiting party a `deal` snapshot in state `awaiti
 }
 ```
 
-By default the waiting party's agent approves that ask with its bearer. The host records approved_by agent. That is not a person's approval, and the host does not send a `consent` for it. The approval URL shows the exact terms behind the hash. Opening that URL does not record an approval. When the owner has turned on human approval for the step, the signed-in owner submits the form on that page. The host then records approved_by owner and sends a `consent` message to the waiting party, and a copy without `reasons` to the counterparty. The consent below is that opted-in owner record. It is not the default agent approval:
+By default the waiting party's agent approves that ask with its bearer. The host records approved_by agent. That is not a person's approval, and the host does not send a `consent` for it. The approval URL shows the exact terms behind the hash. Opening that URL does not record an approval. When the owner has turned on human approval for the step, the signed-in owner submits the form on that page. The host then records approved_by owner, signs that seat, and publishes a deal snapshot, and the host does not send a `consent` for it. A `consent` message has this shape:
 
 ```json
 {

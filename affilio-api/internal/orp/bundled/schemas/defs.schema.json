@@ -573,7 +573,7 @@
         "since": { "$ref": "#/$defs/Timestamp" },
         "escalation": { "$ref": "#/$defs/LocalId" },
         "reasons": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "$ref": "#/$defs/EscalationReason" } },
-        "url": { "$ref": "#/$defs/Url", "description": "Where the waiting party is sent. By default the waiting party's agent approves an ask with its bearer, and the host records approved_by agent. That is not a person's approval. When the owner turns on human approval for that step, the signed-in owner opens this link, and the host records approved_by owner." }
+        "url": { "$ref": "#/$defs/Url", "description": "Where the waiting party is sent. By default the waiting party's agent approves an ask with its bearer, and the host records approved_by agent. That is not a person's approval. When the owner turns on human approval for that step, the signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing." }
       }
     },
     "Fit": {

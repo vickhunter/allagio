@@ -183,6 +183,9 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	if ownerGet.Code != http.StatusOK || !strings.Contains(ownerHTML, "Ask mode notes") || !strings.Contains(ownerHTML, csrf) || !strings.Contains(ownerHTML, `method="post"`) {
 		t.Fatalf("owner form %d %s", ownerGet.Code, ownerHTML)
 	}
+	if ownerGet.Header().Get("X-Frame-Options") != "DENY" || ownerGet.Header().Get("Content-Security-Policy") != "frame-ancestors 'none'; form-action 'self'; base-uri 'none'" || ownerGet.Header().Get("Referrer-Policy") != "no-referrer" {
+		t.Fatalf("owner form headers frame %q csp %q referrer %q", ownerGet.Header().Get("X-Frame-Options"), ownerGet.Header().Get("Content-Security-Policy"), ownerGet.Header().Get("Referrer-Policy"))
+	}
 	if jsonSigned([]byte(partiesText(t, db, dealID)), offerer.party) || strings.Contains(partiesText(t, db, dealID), "approved_by") {
 		t.Fatalf("GET recorded an approval %s", partiesText(t, db, dealID))
 	}
@@ -221,6 +224,65 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	t.Logf("opt-in walk agent_post=%d unsigned_get=%d wrong_account=%d agent_get=%d owner_get=%d owner_post_no_csrf=%d owner_post=%d replay=%d proof=%d approved_by=owner", denied.Code, unsigned.Code, wrong.Code, agentGet.Code, ownerGet.Code, noCSRF.Code, ownerPost.Code, replay.Code, proof.Code)
 }
 
+func TestORP03ActivateAskOptInDoesNotBind(t *testing.T) {
+	db, _, r, cleanup := newORP04(t)
+	defer cleanup()
+	offerer := joinDefault(t, r)
+	acceptor := joinDefault(t, r)
+	setPlacementPublish(t, db, offerer.owner, "auto")
+	openID := acceptDirected03(t, r, offerer, acceptor, "m_d111_open1", "m_d111_oacc1")
+	act, actBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+openID+"/activate", nil, bearerHeader(acceptor.token))
+	if act.Code != http.StatusOK || docBody(t, actBody)["state"] != "active" {
+		t.Fatalf("default activate %d %s", act.Code, act.Body.String())
+	}
+
+	heldOfferer := joinDefault(t, r)
+	held := joinDefault(t, r)
+	setPlacementPublish(t, db, heldOfferer.owner, "auto")
+	if err := db.SaveHumanApprovalSteps(context.Background(), held.owner, []string{"ask"}); err != nil {
+		t.Fatal(err)
+	}
+	heldID := acceptDirected03(t, r, heldOfferer, held, "m_d111_held1", "m_d111_hacc1")
+	denied, deniedBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+heldID+"/activate", nil, bearerHeader(held.token))
+	if denied.Code != http.StatusForbidden || deniedBody["reason"] != "owner_approval" || deniedBody["message"] != ownerApprovalMessage || deniedBody["orp"] != nil {
+		t.Fatalf("opt-in activate %d %s", denied.Code, denied.Body.String())
+	}
+	other, otherBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+heldID+"/activate", nil, bearerHeader(heldOfferer.token))
+	if other.Code != http.StatusForbidden || otherBody["reason"] != "owner_approval" {
+		t.Fatalf("offerer activate %d %s", other.Code, other.Body.String())
+	}
+	var state, bound string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT state, COALESCE(bound::text, '') FROM orp_deals WHERE id=$1`, heldID).Scan(&state, &bound); err != nil {
+		t.Fatal(err)
+	}
+	if state != "awaiting" || strings.Contains(bound, held.party) {
+		t.Fatalf("opt-in activate bound the wait %s %s", state, bound)
+	}
+}
+
+func acceptDirected03(t *testing.T, r http.Handler, offerer, acceptor party04, offerID, acceptID string) string {
+	t.Helper()
+	env := orpEnvelope("offer", offerID, offerer.party, map[string]any{"terms": testTerms()})
+	env["to"] = acceptor.party
+	rec, doc := postJSON(t, r, http.MethodPost, "/orp", env, bearerHeader(offerer.token))
+	body := docBody(t, doc)
+	dealID, _ := doc["deal"].(string)
+	termsHash, _ := body["terms_hash"].(string)
+	if rec.Code != http.StatusOK || body["state"] != "proposed" || dealID == "" || termsHash == "" {
+		t.Fatalf("directed %d %s", rec.Code, rec.Body.String())
+	}
+	acceptMsg := orpEnvelope("accept", acceptID, acceptor.party, map[string]any{"terms_hash": termsHash})
+	acceptMsg["deal"] = dealID
+	accepted, acceptedDoc := postJSON(t, r, http.MethodPost, "/orp", acceptMsg, bearerHeader(acceptor.token))
+	acceptedBody := docBody(t, acceptedDoc)
+	waiting, _ := acceptedBody["waiting"].(map[string]any)
+	reasons, _ := waiting["reasons"].([]any)
+	if accepted.Code != http.StatusOK || acceptedBody["state"] != "awaiting" || waiting["step"] != "accept" || !messagesHave(reasons, "step_ask") {
+		t.Fatalf("accept %d %s", accepted.Code, accepted.Body.String())
+	}
+	return dealID
+}
+
 func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 	root := repoRoot(t)
 	files := []string{
@@ -245,9 +307,9 @@ func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 				t.Fatalf("%s does not name the agent record or the counterparty rule", rel)
 			}
 		}
-		if strings.Contains(rel, "/messages/offer.schema.json") || strings.Contains(rel, "/messages/space.schema.json") || strings.Contains(rel, "/messages/accept.schema.json") || strings.Contains(rel, "/messages/deal.schema.json") || strings.Contains(rel, "/http/join-response.schema.json") {
-			if !strings.Contains(body, "approved_by agent") || !strings.Contains(body, "approved_by owner") {
-				t.Fatalf("%s does not name both approval records", rel)
+		if strings.HasSuffix(rel, "defs.schema.json") || strings.Contains(rel, "/messages/offer.schema.json") || strings.Contains(rel, "/messages/space.schema.json") || strings.Contains(rel, "/messages/accept.schema.json") || strings.Contains(rel, "/messages/deal.schema.json") || strings.Contains(rel, "/http/join-response.schema.json") {
+			if !strings.Contains(body, "approved_by agent") || !strings.Contains(body, "approved_by owner") || !strings.Contains(body, "Opening the URL records nothing") || !strings.Contains(body, "submits the form") {
+				t.Fatalf("%s does not say the form records the owner and opening records nothing", rel)
 			}
 		}
 	}
@@ -365,6 +427,9 @@ func assertNoPersonApprovedClaim(t *testing.T, label, body string) {
 		"owner's person",
 		"approves with one tap",
 		"a person must decide",
+		"opens this link, and the host records approved_by owner",
+		"the approval url records approved_by owner only when that owner opted in.",
+		"sends a `consent` message",
 	} {
 		if strings.Contains(lower, phrase) {
 			t.Fatalf("%s claims a person decides the default ask: %s", label, phrase)

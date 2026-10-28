@@ -152,6 +152,9 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
 		return
 	}
+	if h.activateNeedsOwner(c, dns, party, deal) {
+		return
+	}
 	now := h.now()
 	bound, err := bindMandates(deal.Bound, deal.OffererParty, deal.AcceptorParty, now)
 	if err != nil {
@@ -246,7 +249,7 @@ func (h *ORPHost) Approve(c *gin.Context) {
 		return
 	}
 	page = orp.OwnerApprovePage(orp.TermsTitle(terms), orp.DisclosureLabel(terms), "/orp/approve/"+c.Param("id"), owner.CSRF)
-	writeHTML(c, http.StatusOK, page)
+	writeOwnerApproveHTML(c, page)
 }
 
 // approveOwnerPost records approved_by owner. The caller has no agent bearer.
@@ -1074,4 +1077,44 @@ func writeHTML(c *gin.Context, status int, body string) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Robots-Tag", "noindex")
 	c.Data(status, "text/html; charset=utf-8", []byte(body))
+}
+
+// writeOwnerApproveHTML is the signed-in owner form. It cannot be framed,
+// and the form can only post back to this host.
+func writeOwnerApproveHTML(c *gin.Context, body string) {
+	c.Header("X-Frame-Options", "DENY")
+	c.Header("Content-Security-Policy", "frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
+	c.Header("Referrer-Policy", "no-referrer")
+	writeHTML(c, http.StatusOK, body)
+}
+
+// activateNeedsOwner refuses a 0.3 activate when the waiting owner holds ask
+// and the wait is step_ask. The caller has already checked that an accept is stored.
+func (h *ORPHost) activateNeedsOwner(c *gin.Context, dns, caller string, deal database.ORPDeal) bool {
+	if len(deal.Waiting) == 0 || string(deal.Waiting) == "null" {
+		return false
+	}
+	waiting, err := decodeObject(deal.Waiting)
+	if err != nil {
+		h.writeProblem(c, dns, caller, "", internalProblem(), false)
+		return true
+	}
+	if waiting == nil || !reasonHas(waiting, "step_ask") {
+		return false
+	}
+	party, _ := waiting["party"].(string)
+	ownerID, ok := orp.OwnerFromParty(dns, party)
+	if !ok {
+		return false
+	}
+	steps, err := h.Entry.DB.HumanApprovalSteps(c.Request.Context(), ownerID)
+	if err != nil {
+		h.writeProblem(c, dns, caller, "", internalProblem(), false)
+		return true
+	}
+	if !humanStepOn(steps, waiting) {
+		return false
+	}
+	writeOwnerApproval(c)
+	return true
 }

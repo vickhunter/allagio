@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://offer-rails.onrender.com/orp/schemas/messages/accept.schema.json",
   "title": "AcceptMessage",
-  "description": "Agree to exact terms, named by terms_hash. Accept an open deal (deal set) or a standing offer (body.offer set, which opens a new deal). The host binds the sender only if the owner's constraints allow it; otherwise the deal waits for the waiting party's agent and the reply says so. The host records approved_by agent. That is not a person's approval. The approval URL records approved_by owner only when that owner opted in.",
+  "description": "Agree to exact terms, named by terms_hash. Accept an open deal (deal set) or a standing offer (body.offer set, which opens a new deal). The host binds the sender only if the owner's constraints allow it; otherwise the deal waits for the waiting party's agent and the reply says so. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing.",
   "type": "object",
   "allOf": [{ "$ref": "../envelope.schema.json" }],
   "required": ["type", "body"],

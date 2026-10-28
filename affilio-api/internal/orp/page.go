@@ -17,8 +17,6 @@ var approvePage = template.Must(template.New("approve").Parse(`<!doctype html>
 <title>Waiting for approval</title>
 <p>{{.Title}}</p>
 <p>{{.Label}}</p>
-<p>{{.Title}}</p>
-<p>{{.Label}}</p>
 <p>This page does not approve it. By default an agent approves an ask with its bearer. That record is approved_by agent, not a person's approval. Offer Rails does not hold money.</p>
 `))
 
