@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -74,10 +75,7 @@ func (h *ORPHost) Deal(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}, false)
 		return
 	}
-	if err = h.attachApprovals(c, &deal); err != nil {
-		h.writeProblem(c, dns, party, "", internalProblem(), false)
-		return
-	}
+	h.attachApprovals(c, &deal)
 	doc, err := h.dealMessage(dns, party, "", deal, h.now())
 	if err != nil {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
@@ -86,16 +84,30 @@ func (h *ORPHost) Deal(c *gin.Context) {
 	writeORP(c, http.StatusOK, doc, false)
 }
 
-func (h *ORPHost) attachApprovals(c *gin.Context, deal *database.ORPDeal) error {
-	if h.Entry == nil || h.Entry.DB == nil || deal == nil {
-		return nil
+func (h *ORPHost) attachApprovals(c *gin.Context, deal *database.ORPDeal) {
+	if deal == nil || len(deal.Parties) == 0 || string(deal.Parties) == "null" {
+		return
+	}
+	if h.Entry == nil || h.Entry.DB == nil {
+		return
 	}
 	rows, err := h.Entry.DB.DealOwnerApprovals(c.Request.Context(), deal.ID)
-	if err != nil {
-		return err
+	loaded, omit := approvalsFromQuery(rows, err)
+	if omit {
+		deal.OmitApprovals = true
+		return
 	}
-	deal.WireApprovals = rows
-	return nil
+	deal.WireApprovals = loaded
+}
+
+// approvalsFromQuery keeps a failed approval read off the response.
+// The deal is still served, without approved_by.
+func approvalsFromQuery(rows []database.DealApproval, err error) ([]database.DealApproval, bool) {
+	if err != nil {
+		log.Printf("orp deal approvals unavailable")
+		return nil, true
+	}
+	return rows, false
 }
 
 // Proof is the public test page named by an execute proof_url.
@@ -180,9 +192,6 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		return
 	}
 	record := h.stepAskRecord(dns, deal, "agent")
-	if record != nil {
-		deal.WireApprovals = []database.DealApproval{*record}
-	}
 	now := h.now()
 	bound, err := bindMandates(deal.Bound, deal.OffererParty, deal.AcceptorParty, now)
 	if err != nil {
@@ -389,9 +398,6 @@ func (h *ORPHost) finishOwner03(c *gin.Context, dns string, deal database.ORPDea
 		return
 	}
 	record := h.stepAskRecord(dns, deal, "owner")
-	if record != nil {
-		deal.WireApprovals = []database.DealApproval{*record}
-	}
 	deal.State = "active"
 	deal.Waiting = nil
 	deal.Bound = bound
@@ -1099,42 +1105,39 @@ func dealBody(deal database.ORPDeal, now time.Time) (map[string]any, error) {
 		}
 		body["waiting"] = waiting
 	}
-	if wire := approvedByWire(deal.WireApprovals, nil); len(wire) > 0 {
-		body["approved_by"] = wire
-	}
 	return body, nil
 }
 
-// approvedByWire is the read-only list a counterparty can fetch.
-// It names the step and whether the waiting party's bearer or the signed-in
-// owner approved it. It has no name, email, or owner id.
+// approvedByWire is the 0.4 list a counterparty can fetch.
+// party is the seat id already on the deal. Two accepts stay two entries.
+// It has no name, email, or owner id.
 func approvedByWire(rows []database.DealApproval, extra []orp.Approval) []any {
-	type pair struct{ step, by string }
+	type pair struct{ step, party, by string }
 	var ordered []pair
 	seen := map[string]bool{}
-	add := func(step, by string) {
-		if step == "" || (by != "agent" && by != "owner") {
+	add := func(step, party, by string) {
+		if step == "" || party == "" || (by != "agent" && by != "owner") {
 			return
 		}
-		key := step + "\x00" + by
+		key := step + "\x00" + party + "\x00" + by
 		if seen[key] {
 			return
 		}
 		seen[key] = true
-		ordered = append(ordered, pair{step, by})
+		ordered = append(ordered, pair{step, party, by})
 	}
 	for _, row := range rows {
-		add(row.Step, row.By)
+		add(row.Step, row.Party, row.By)
 	}
 	for _, row := range extra {
-		add(row.Step, row.By)
+		add(row.Step, row.Party, row.By)
 	}
 	if len(ordered) == 0 {
 		return nil
 	}
 	out := make([]any, len(ordered))
 	for i, row := range ordered {
-		out[i] = map[string]any{"step": row.step, "approved_by": row.by}
+		out[i] = map[string]any{"step": row.step, "party": row.party, "approved_by": row.by}
 	}
 	return out
 }

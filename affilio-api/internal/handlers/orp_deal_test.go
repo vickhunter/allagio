@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -756,6 +757,16 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	if err := orp.ValidateAgainst(schemaPath(t, "messages/deal.schema.json"), actBody); err != nil {
 		t.Fatalf("activate schema: %v\n%s", err, actRec.Body.String())
 	}
+	if _, present := actDeal["approved_by"]; present || strings.Contains(actRec.Body.String(), "approved_by") {
+		t.Fatalf("0.3 snapshot includes approved_by %s", actRec.Body.String())
+	}
+	read03, read03Body := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(acceptorToken))
+	if read03.Code != http.StatusOK || strings.Contains(read03.Body.String(), "approved_by") {
+		t.Fatalf("0.3 deal read %d %s", read03.Code, read03.Body.String())
+	}
+	if err := orp.ValidateAgainst(schemaPath(t, "messages/deal.schema.json"), read03Body); err != nil {
+		t.Fatalf("0.3 read schema: %v\n%s", err, read03.Body.String())
+	}
 	if countRows(t, db, `SELECT COUNT(*) FROM orp_inbox WHERE message->'body'->>'state'='active'`) != 2 {
 		t.Fatal("activate inbox")
 	}
@@ -949,6 +960,24 @@ VALUES('owner:' || $1::text, $1::uuid, $2)`, ownerID, mode); err != nil {
 
 func ownerOfParty(party string) string {
 	return party[strings.LastIndex(party, "/")+1:]
+}
+
+func TestApprovedByKeepsEachParty(t *testing.T) {
+	wire := approvedByWire(nil, []orp.Approval{
+		{Party: "orp:hub.example/p_one", Step: "accept", By: "agent"},
+		{Party: "orp:hub.example/p_two", Step: "accept", By: "agent"},
+	})
+	if len(wire) != 2 {
+		t.Fatalf("collapsed accepts %v", wire)
+	}
+	rows, omit := approvalsFromQuery(nil, errors.New("db down"))
+	if !omit || rows != nil {
+		t.Fatalf("query failure rows %v omit %v", rows, omit)
+	}
+	okRows, okOmit := approvalsFromQuery([]database.DealApproval{{Step: "accept", Party: "orp:hub.example/p_one", By: "owner"}}, nil)
+	if okOmit || len(okRows) != 1 {
+		t.Fatalf("query success %v %v", okRows, okOmit)
+	}
 }
 
 func hasAll(got []string, want ...string) bool {

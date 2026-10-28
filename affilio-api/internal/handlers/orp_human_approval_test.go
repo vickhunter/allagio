@@ -56,11 +56,13 @@ func TestORP04DefaultAskIsTheAgent(t *testing.T) {
 	if code != http.StatusOK || docBody(t, opened)["state"] != "active" {
 		t.Fatalf("activate %d %s", code, mustJSON(opened))
 	}
-	if !strings.Contains(mustJSON(docBody(t, opened)), `"approved_by":"agent"`) || strings.Contains(mustJSON(docBody(t, opened)), `"approved_by":"owner"`) {
-		t.Fatalf("approve reply %s", mustJSON(opened))
+	reply := mustJSON(docBody(t, opened))
+	if !strings.Contains(reply, `"approved_by":"agent"`) || strings.Contains(reply, `"approved_by":"owner"`) || !strings.Contains(reply, `"party":"`+offerer.party+`"`) || !strings.Contains(reply, `"party":"`+acceptor.party+`"`) {
+		t.Fatalf("approve reply %s", reply)
 	}
 	read, readBody := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(acceptor.token))
-	if read.Code != http.StatusOK || !strings.Contains(mustJSON(docBody(t, readBody)), `"approved_by":"agent"`) || strings.Contains(mustJSON(docBody(t, readBody)), `"approved_by":"owner"`) {
+	readJSON := mustJSON(docBody(t, readBody))
+	if read.Code != http.StatusOK || !strings.Contains(readJSON, `"approved_by":"agent"`) || strings.Contains(readJSON, `"approved_by":"owner"`) || !strings.Contains(readJSON, `"party":"`+offerer.party+`"`) || !strings.Contains(readJSON, `"party":"`+acceptor.party+`"`) {
 		t.Fatalf("deal read %d %s", read.Code, read.Body.String())
 	}
 	proof, _ := postJSON(t, r, http.MethodGet, "/orp/proof/"+dealID, nil, nil)
@@ -93,7 +95,7 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	settingsReq.AddCookie(cookie)
 	ownerRouter.ServeHTTP(settings, settingsReq)
 	settingsHTML := html.UnescapeString(settings.Body.String())
-	if settings.Code != http.StatusOK || !strings.Contains(settingsHTML, "An ask is approved by the agent. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. GET /orp/deals/{deal} returns approved_by agent. That is not a person's approval.") {
+	if settings.Code != http.StatusOK || !strings.Contains(settingsHTML, "An ask is approved by the agent. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by agent. That is not a person's approval. A 0.3 deal does not include approved_by.") {
 		t.Fatalf("settings default %d %s", settings.Code, settings.Body.String())
 	}
 	if strings.Contains(settings.Body.String(), `name="execute"`) || strings.Contains(settings.Body.String(), `name="list"`) || strings.Contains(settings.Body.String(), `name="accept"`) || !strings.Contains(settings.Body.String(), `name="ask"`) {
@@ -125,7 +127,7 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	settingsReq = httptest.NewRequest(http.MethodGet, "/owner/settings", nil)
 	settingsReq.AddCookie(cookie)
 	ownerRouter.ServeHTTP(opted, settingsReq)
-	if opted.Code != http.StatusOK || !strings.Contains(html.UnescapeString(opted.Body.String()), "An ask waits for the owner. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The agent cannot approve it. Sign in, open the approval link, and submit the form. Opening the link does not approve it. GET /orp/deals/{deal} returns approved_by owner.") {
+	if opted.Code != http.StatusOK || !strings.Contains(html.UnescapeString(opted.Body.String()), "An ask waits for the owner. On this host that is a deal waiting with step_ask: the list step on an offer, and the accept step. The agent cannot approve it. Sign in, open the approval link, and submit the form. Opening the link does not approve it. On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by owner.") {
 		t.Fatalf("settings opted in %d %s", opted.Code, opted.Body.String())
 	}
 	assertNoPersonApprovedClaim(t, "settings opted in", opted.Body.String())
@@ -221,11 +223,13 @@ func TestORP04OwnerOptInApproval(t *testing.T) {
 	if err := json.Unmarshal(ownerPost.Body.Bytes(), &ownerBody); err != nil || ownerPost.Code != http.StatusOK || !seatSignedDoc(t, ownerBody, offerer.party) {
 		t.Fatalf("owner post %d %s", ownerPost.Code, ownerPost.Body.String())
 	}
-	if !strings.Contains(mustJSON(docBody(t, ownerBody)), `"approved_by":"owner"`) || strings.Contains(mustJSON(docBody(t, ownerBody)), `"approved_by":"agent"`) {
-		t.Fatalf("owner approve reply %s", ownerPost.Body.String())
+	ownerJSON := mustJSON(docBody(t, ownerBody))
+	if !strings.Contains(ownerJSON, `"approved_by":"owner"`) || strings.Contains(ownerJSON, `"approved_by":"agent"`) || !strings.Contains(ownerJSON, `"party":"`+offerer.party+`"`) {
+		t.Fatalf("owner approve reply %s", ownerJSON)
 	}
 	after, afterBody := postJSON(t, r, http.MethodGet, "/orp/deals/"+dealID, nil, bearerHeader(acceptor.token))
-	if after.Code != http.StatusOK || !strings.Contains(mustJSON(docBody(t, afterBody)), `"approved_by":"owner"`) || strings.Contains(mustJSON(docBody(t, afterBody)), `"approved_by":"agent"`) {
+	afterJSON := mustJSON(docBody(t, afterBody))
+	if after.Code != http.StatusOK || !strings.Contains(afterJSON, `"approved_by":"owner"`) || strings.Contains(afterJSON, `"approved_by":"agent"`) || !strings.Contains(afterJSON, `"party":"`+offerer.party+`"`) {
 		t.Fatalf("deal after owner post %d %s", after.Code, after.Body.String())
 	}
 	stored := partiesText(t, db, dealID)

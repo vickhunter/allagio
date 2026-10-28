@@ -1,6 +1,6 @@
 ## October 28 — Approval provenance (D-114)
 
-`GET /orp/deals/{deal}` and the approve reply return `approved_by` for each ask step. The value is `agent` or `owner`. It is read from the approval the host already stores. No new column. A counterparty can tell a person's approval from an agent's. Served text names that field and does not point at `bound[].authority`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+On an ORP 0.4 deal, `GET /orp/deals/{deal}` and the approve reply return `approved_by`. Each entry has `step`, `party`, and `agent` or `owner`. `party` is the seat id already on the deal. A 0.3 deal does not include the field. No new column. Served text does not point at `bound[].authority`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## October 28 — Accepted lows (D-113)
 

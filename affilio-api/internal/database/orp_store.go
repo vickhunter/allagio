@@ -67,10 +67,12 @@ type ORPDeal struct {
 	Parties   json.RawMessage
 	UpdatedAt time.Time
 	CreatedAt time.Time
-	// WireApprovals is who approved each ask step for this response.
+	// WireApprovals is who approved each ask step for this 0.4 response.
 	// It is not a column. The rows already live in agent_step_approvals
 	// or in the parties document.
 	WireApprovals []DealApproval
+	// OmitApprovals drops approved_by when that extra read fails.
+	OmitApprovals bool
 }
 
 // ORPInboxItem is one stored host message for a party.

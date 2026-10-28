@@ -89,12 +89,6 @@
         "state": "pending"
       }
     ],
-    "approved_by": [
-      {
-        "step": "accept",
-        "approved_by": "agent"
-      }
-    ],
     "updated": "2026-10-21T10:02:01Z"
   }
 }
