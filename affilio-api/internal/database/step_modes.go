@@ -465,6 +465,9 @@ type DealApproval struct {
 
 // DealOwnerApprovals reads approvals recorded for one deal.
 func (d *DB) DealOwnerApprovals(ctx context.Context, dealID string) ([]DealApproval, error) {
+	if d != nil && d.ApprovalsReadErr != nil {
+		return nil, d.ApprovalsReadErr
+	}
 	rows, err := d.Pool.Query(ctx, `
 SELECT payload->>'party', payload->>'step', payload->>'approved_by'
 FROM agent_step_approvals

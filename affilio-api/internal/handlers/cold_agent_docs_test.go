@@ -31,20 +31,24 @@ func TestColdAgentEntrance(t *testing.T) {
 	if skill.Code != http.StatusOK || !strings.Contains(skill.Header().Get("Content-Type"), "text/markdown") || len(lines) > 25 || skillBody != skillMD {
 		t.Fatalf("skill %d %q lines %d", skill.Code, skill.Header().Get("Content-Type"), len(lines))
 	}
-	if !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms.txt)") || !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(skillBody, "## Connect a hosted assistant") {
+	if strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms.txt)") || !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(skillBody, "## Connect a hosted assistant") {
 		t.Fatalf("skill pointer %s", skillBody)
+	}
+	if strings.Contains(llms.Body.String(), "](https://offer-rails.onrender.com/llms.txt)") {
+		t.Fatal("llms.txt points at itself")
 	}
 	assertPublicDocHeaders(t, skill)
 
 	full := httptest.NewRecorder()
 	r.ServeHTTP(full, httptest.NewRequest(http.MethodGet, "/llms-full.txt", nil))
 	fullBody := full.Body.String()
-	if full.Code != http.StatusOK || !strings.Contains(full.Header().Get("Content-Type"), "text/plain") || !strings.HasPrefix(fullBody, llms.Body.String()) {
+	if full.Code != http.StatusOK || !strings.Contains(full.Header().Get("Content-Type"), "text/plain") || strings.HasPrefix(fullBody, llms.Body.String()) || strings.Contains(fullBody, "](https://offer-rails.onrender.com/skill.md)") || strings.Contains(fullBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(fullBody, "In testing. Start here for a test deal") {
 		t.Fatalf("llms-full %d %q", full.Code, full.Header().Get("Content-Type"))
 	}
 	for _, phrase := range []string{
 		`orp "0.4" is the version this join accepts`,
-		"bound[].authority",
+		"approved_by agent",
+		"approved_by owner",
 		"less than 5 seconds",
 		"exactly 5 seconds",
 		"method link",
@@ -63,8 +67,18 @@ func TestColdAgentEntrance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(onDisk) != string(llmsFile)+llmsFullSuffix {
-		t.Fatal("llms-full.txt is not llms.txt plus the cold-agent section")
+	if string(llmsFile) != llmsBody() {
+		t.Fatal("llms.txt drifted from the cold-path fallback")
+	}
+	publicLLMs, err := os.ReadFile(filepath.Join(repoRoot(t), "ui", "landing", "public", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(publicLLMs) != string(llmsFile) {
+		t.Fatal("llms.txt copies differ")
+	}
+	if string(onDisk) != llmsFullDocument() {
+		t.Fatal("llms-full.txt drifted from the full document")
 	}
 	assertPublicDocHeaders(t, full)
 

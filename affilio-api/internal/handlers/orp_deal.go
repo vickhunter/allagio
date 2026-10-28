@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -74,12 +75,40 @@ func (h *ORPHost) Deal(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}, false)
 		return
 	}
+	h.attachApprovals(c, &deal)
 	doc, err := h.dealMessage(dns, party, "", deal, h.now())
 	if err != nil {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
 	writeORP(c, http.StatusOK, doc, false)
+}
+
+func (h *ORPHost) attachApprovals(c *gin.Context, deal *database.ORPDeal) {
+	if deal == nil || len(deal.Parties) == 0 || string(deal.Parties) == "null" {
+		return
+	}
+	if h.Entry == nil || h.Entry.DB == nil {
+		return
+	}
+	rows, err := h.Entry.DB.DealOwnerApprovals(c.Request.Context(), deal.ID)
+	loaded, unavailable := approvalsFromQuery(rows, err)
+	if unavailable {
+		deal.ApprovalsUnavailable = true
+		return
+	}
+	deal.WireApprovals = loaded
+}
+
+// approvalsFromQuery reports a failed approval read. The deal is still
+// served. On ORP 0.4 the snapshot sets approvals_unavailable instead of
+// dropping approved_by with no marker.
+func approvalsFromQuery(rows []database.DealApproval, err error) ([]database.DealApproval, bool) {
+	if err != nil {
+		log.Printf("orp deal approvals unavailable")
+		return nil, true
+	}
+	return rows, false
 }
 
 // Proof is the public test page named by an execute proof_url.
@@ -1078,6 +1107,40 @@ func dealBody(deal database.ORPDeal, now time.Time) (map[string]any, error) {
 		body["waiting"] = waiting
 	}
 	return body, nil
+}
+
+// approvedByWire is the 0.4 list a counterparty can fetch.
+// party is the seat id already on the deal. Two accepts stay two entries.
+// It has no name, email, or owner id.
+func approvedByWire(rows []database.DealApproval, extra []orp.Approval) []any {
+	type pair struct{ step, party, by string }
+	var ordered []pair
+	seen := map[string]bool{}
+	add := func(step, party, by string) {
+		if step == "" || party == "" || (by != "agent" && by != "owner") {
+			return
+		}
+		key := step + "\x00" + party + "\x00" + by
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		ordered = append(ordered, pair{step, party, by})
+	}
+	for _, row := range rows {
+		add(row.Step, row.Party, row.By)
+	}
+	for _, row := range extra {
+		add(row.Step, row.Party, row.By)
+	}
+	if len(ordered) == 0 {
+		return nil
+	}
+	out := make([]any, len(ordered))
+	for i, row := range ordered {
+		out[i] = map[string]any{"step": row.step, "party": row.party, "approved_by": row.by}
+	}
+	return out
 }
 
 func waitingOn(party, step string, reasons []any, origin string, now time.Time) map[string]any {

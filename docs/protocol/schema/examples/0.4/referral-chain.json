@@ -61,6 +61,18 @@
       ]
     },
     "terms_hash": "sha256-lx3RaehTPOZnKQISKqCAJWIiwbJ1U51oHl0gN791ukU",
+    "approved_by": [
+      {
+        "step": "accept",
+        "party": "orp:hub.example/p_creator01",
+        "approved_by": "agent"
+      },
+      {
+        "step": "accept",
+        "party": "orp:hub.example/p_news01",
+        "approved_by": "owner"
+      }
+    ],
     "updated": "2026-10-26T12:00:00.000Z",
     "offerer": "orp:hub.example/p_creator01",
     "acceptor": "orp:hub.example/p_news01",
