@@ -14,7 +14,7 @@ export function App() {
 
         <section id="limits" aria-labelledby="limits-h" className="mt-12">
           <h2 id="limits-h" className="font-display text-2xl font-bold tracking-tight">Limits</h2>
-          <p className="mt-2 text-sm leading-relaxed text-t2">Your limits come first. Pick how much the agent may do. A new site starts on the first one.</p>
+          <p className="mt-2 text-sm leading-relaxed text-t2">Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.</p>
           <ul className="mt-4 grid gap-3">
             {limits.map((item) => (
               <li key={item.name} className="rounded-2xl border border-line bg-s1 p-4">

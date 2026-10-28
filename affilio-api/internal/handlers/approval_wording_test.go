@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -73,8 +75,8 @@ func TestLlmsFullStatesApprovalByMode(t *testing.T) {
 	if !strings.Contains(disk, approvalByMode) || !strings.Contains(disk, autoCommit) {
 		t.Fatal("llms-full.txt does not state approval by mode")
 	}
-	if !strings.Contains(disk, "The hosted MCP wrapper adds owner_approval_url") || strings.Contains(disk, "returns a proposal and owner_approval_url") {
-		t.Fatal("llms-full.txt still says POST /v1/placements returns owner_approval_url")
+	if !strings.Contains(disk, "The hosted MCP wrapper adds owner_approval_url whenever prepare_placement or get_placement returns a placement id, including a committed auto prepare. Send that URL to the owner when the status is awaiting_approval.") || strings.Contains(disk, "returns a proposal and owner_approval_url") || strings.Contains(disk, "when prepare waits") {
+		t.Fatal("llms-full.txt does not say when owner_approval_url is added")
 	}
 	if !strings.Contains(disk, "A new site waits for a person to approve each placement before it is published.") || !strings.Contains(disk, "a person approves this step") || !strings.Contains(disk, "## ORP 0-3 test deal") || !strings.Contains(disk, "Placing an offer needs approval for now") {
 		t.Fatal("llms-full.txt dropped a manual-scoped or step-modes sentence")
@@ -124,8 +126,28 @@ func TestPrepareAndCommitNamePlacementPublish(t *testing.T) {
 	if !strings.Contains(commit, "confirm=true cannot replace owner approval") {
 		t.Fatal("commit text dropped confirm=true cannot replace owner approval")
 	}
-	if !strings.Contains(hostedMCPInstructions, "When prepare waits, send its owner approval URL to the human. That wait is placement_publish ask, an unverified domain, or claim checks that are not live.") || !strings.Contains(hostedMCPInstructions, "Agents cannot approve a placement.") || !strings.Contains(hostedMCPInstructions, autoCommit) {
-		t.Fatal("mcp instructions do not send the approval URL on every prepare wait")
+	if !strings.Contains(hostedMCPInstructions, "The wrapper adds owner_approval_url whenever prepare_placement or get_placement returns a placement id, including a committed auto prepare. Send that URL to the owner when the status is awaiting_approval.") || !strings.Contains(hostedMCPInstructions, "Agents cannot approve a placement.") || !strings.Contains(hostedMCPInstructions, autoCommit) || strings.Contains(hostedMCPInstructions, "When prepare waits") {
+		t.Fatal("mcp instructions do not attach owner_approval_url for every placement id")
+	}
+}
+
+func TestYouAppIntroMatchesPublishStep(t *testing.T) {
+	root := repoRoot(t)
+	const intro = "A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on."
+	app := readRepo(t, root, "ui/landing/src/you/App.tsx")
+	if !strings.Contains(app, intro) || strings.Contains(app, "starts on the first one") {
+		t.Fatal("you app intro does not match the publish step")
+	}
+	matches, err := filepath.Glob(filepath.Join(root, "affilio-wp/admin/build/landing-v9/assets/you-*.js"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("you bundle: %v %v", matches, err)
+	}
+	built, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(built), intro) || strings.Contains(string(built), "starts on the first one") {
+		t.Fatalf("%s intro does not match the publish step", filepath.Base(matches[0]))
 	}
 }
 

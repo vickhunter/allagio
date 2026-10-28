@@ -170,7 +170,7 @@ This is the human page for a device code. It is separate from the agent-created 
 - Discovery. POST /v1/revenue/opportunities takes a site key. POST /v1/revenue/preview takes no key. Both take context of 10 to 12000 characters. The preview writes nothing.
 - Matching on English pages. POST /api/preview takes {"url":"..."} and scores the fetched page text by lexical token overlap. The tokenizer drops English stopwords and strips the English suffixes ing, ed, and s. It writes nothing.
 - Recording a sale and a refund. A maker key records a sale at POST /v1/maker/sales and a refund at POST /v1/maker/refunds.
-- Placing an offer. Placing an offer needs approval for now when placement_publish is ask, including on a new site. POST /v1/placements returns a proposal. The hosted MCP wrapper adds owner_approval_url when prepare waits: ask, an unverified domain, or claim checks that are not live. placement_publish auto commits in that call only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Agents cannot approve a placement.
+- Placing an offer. Placing an offer needs approval for now when placement_publish is ask, including on a new site. POST /v1/placements returns a proposal. The hosted MCP wrapper adds owner_approval_url whenever prepare_placement or get_placement returns a placement id, including a committed auto prepare. Send that URL to the owner when the status is awaiting_approval. placement_publish auto commits in that call only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Agents cannot approve a placement.
 
 ## Tools
 
