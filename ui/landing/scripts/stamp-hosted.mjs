@@ -31,7 +31,7 @@ const youShell = `<div id="static-landing">
       <p>This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.</p>
       <p><a href="/auth/login?return_to=%2Fyou%2F" style="display:inline-flex;min-height:44px;align-items:center">Sign in to set your limits</a></p>
       <section id="limits"><h2>Limits</h2><p>Your limits come first. Pick how much the agent may do.</p><h3>Ask me every time</h3><p>A person approves each placement. The agent can prepare it and show the terms.</p><h3>Approve within my rules</h3><p>A person set limits. Within those limits, the agent may approve. Outside them, a person approves. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the checks</h3><p>Only a person can turn this on. While claims are not checked, this also waits for a person.</p></section>
-      <section id="approvals"><h2>Approvals</h2><p>A person approves each placement unless they set limits for their agent.</p></section>
+      <section id="approvals"><h2>Approvals</h2><p>With Ask me every time, a person approves each placement, and with Approve within my rules and Approve anything that passes the checks, the agent does.</p></section>
       <section id="receipts"><h2>Receipts</h2><p>No deals yet.</p></section>
     </main>
   </div>`
@@ -68,7 +68,7 @@ const setupShell = `<div id="static-landing">
           <p>A person signs in with Google so the dashboard can save the site and the approval mode. Agents join with no sign-in.</p>
           <p>I'm not on WordPress. Agent only for now. This page does not mint a link.</p>
           <h2>Optional: preview what an offer would look like</h2>
-          <p>Ask me every time is selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on.</p>
+          <p>Ask me every time is selected. With Ask me every time, a person approves each placement, and with Approve within my rules and Approve anything that passes the checks, the agent does.</p>
           <p><a data-step-action href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Save this mode</a></p>
         </li>
       </ol>

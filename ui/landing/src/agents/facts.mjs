@@ -2,6 +2,10 @@ import { approvalModes, personApprovesLine } from '../lib/modes.mjs'
 
 export { personApprovesLine }
 
+const placingLead = 'Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. '
+const placingBearer = 'That access_token is a bearer for /mcp and for ORP. It is not an X-API-Key and it is not an X-Admin-Key.'
+export const placingPageBody = `${placingLead}${personApprovesLine} ${placingBearer}`
+
 export const mcpUrl = 'https://offer-rails.onrender.com/mcp'
 export const pagePath = '/landing-v9/agents/'
 export const aliasPath = '/agents'

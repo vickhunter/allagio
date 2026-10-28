@@ -24,5 +24,5 @@ test('deal labels stay honest', () => {
   assert.match(you, /Sign in to set your limits/)
   assert.match(you, /No deals yet\./)
   assert.equal(you.includes('POST /v1/agent-tokens'), false)
-  assert.match(you, /A person approves each placement unless they set limits for their agent/)
+  assert.match(you, /personApprovesLine/)
 })

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, docLinks, errors, installs, joinCommand, llmsText, mcpUrl, modes, orderedSteps, pagePath, personApprovesLine, rates, signInNote, steps, tools } from './facts.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, docLinks, errors, installs, joinCommand, llmsText, mcpUrl, modes, orderedSteps, pagePath, personApprovesLine, placingPageBody, rates, signInNote, steps, tools } from './facts.mjs'
 
 const banned = /grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i
 
@@ -159,7 +159,7 @@ test('public agent copy stays on the documented words', () => {
   for (const name of ['Ask me every time', 'Approve within my rules', 'Approve anything that passes the checks']) assert.match(blob, new RegExp(name))
   assert.equal(blob.includes('YO' + 'LO'), false)
   assert.equal(/\bManual\b/.test(blob), false)
-  assert.match(blob, /A person approves each placement unless they set limits for their agent/)
+  assert.match(blob, /With Ask me every time, a person approves each placement, and with Approve within my rules and Approve anything that passes the checks, the agent does\./)
   assert.match(blob, /rate limit exceeded/)
   assert.match(blob, /preview rate limit exceeded/)
   assert.match(blob, /invalid payload/)
@@ -167,7 +167,9 @@ test('public agent copy stays on the documented words', () => {
   assert.match(blob, /claim_check_unavailable/)
   assert.match(blob, /Not checked yet/)
   const placing = aloneToday.find((item) => item.title === 'Placing an offer')
-  assert.equal(placing.body.includes('No agent tool can approve'), false)
   assert.match(placing.body, /A person still approves each placement\./)
-  assert.match(placing.body, /It is not an X-API-Key and it is not an X-Admin-Key\./)
+  assert.match(llmsText(), /A person still approves each placement\./)
+  assert.equal(placingPageBody.includes('A person still approves each placement.'), false)
+  assert.match(placingPageBody, /With Ask me every time, a person approves each placement, and with Approve within my rules and Approve anything that passes the checks, the agent does\./)
+  assert.match(placingPageBody, /That access_token is a bearer for \/mcp and for ORP\. It is not an X-API-Key and it is not an X-Admin-Key\./)
 })

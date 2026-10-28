@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, errors, installs, mcpUrl, modes, orderedSteps, personApprovesLine, rates, signInNote, tools } from '@/agents/facts.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, errors, installs, mcpUrl, modes, orderedSteps, personApprovesLine, placingPageBody, rates, signInNote, tools } from '@/agents/facts.mjs'
 import { Page } from '@/site/Page'
 
 const primaryClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-t1 px-5 font-semibold text-s0 transition-colors duration-150 hover:bg-[rgb(60_66_55)] sm:w-auto'
@@ -126,10 +126,13 @@ function FactList({ caption, rows }: { caption: string; rows: { a: string; b: st
   )
 }
 
+const flatNewSite = 'A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on.'
+
 export function App() {
   const publisherTools = tools.filter((tool) => !tool.maker)
   const makerTools = tools.filter((tool) => tool.maker)
   const signup = orderedSteps[0]
+  const pagePrompt = agentPrompt.replace(', and wait for a person to approve before anything is published.', '. ' + personApprovesLine)
   return (
     <Page page="agents">
       <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] md:grid-cols-[11rem_minmax(0,1fr)] md:gap-8">
@@ -145,7 +148,7 @@ export function App() {
           <section id="agents-hero" aria-labelledby="agents-h" className={sectionClass}>
             <p className="eyebrow">MCP server</p>
             <h1 id="agents-h" className="h-display mt-3 text-[40px] sm:text-6xl">Find an offer, preview the page, place it.</h1>
-            <p className="mt-4 text-lg leading-relaxed text-t2">Offer Rails is an MCP server. Three steps. A person still approves what gets published. A chat answer is never a paid placement.</p>
+            <p className="mt-4 text-lg leading-relaxed text-t2">Offer Rails is an MCP server. Three steps. {personApprovesLine} A chat answer is never a paid placement.</p>
             <p className="mt-4 break-all font-mono text-[15px] text-t1" data-mcp-url>{mcpUrl}</p>
             <p className="mt-2 text-[15px] leading-relaxed text-t2">Scopes are publisher and maker. A call with no bearer is 401.</p>
             <CopyButton value={mcpUrl} label="Copy endpoint" statusName="endpoint" primary />
@@ -153,8 +156,8 @@ export function App() {
 
           <section id="tell" aria-labelledby="tell-h" className={sectionClass}>
             <h2 id="tell-h" className="h-display text-2xl sm:text-3xl">Tell your agent</h2>
-            <pre className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{agentPrompt}</pre>
-            <CopyButton value={agentPrompt} label="Copy prompt" statusName="prompt" />
+            <pre className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{pagePrompt}</pre>
+            <CopyButton value={pagePrompt} label="Copy prompt" statusName="prompt" />
           </section>
 
           <section id="install" aria-labelledby="install-h" className={sectionClass}>
@@ -174,7 +177,7 @@ export function App() {
                   {step.n === 4 || step.n === 7 || step.n === 10 ? (
                     <details className="mt-1">
                       <summary className="inline-flex min-h-11 cursor-pointer items-center text-sm font-semibold">What the server expects</summary>
-                      <p className="pb-2 text-[15px] leading-relaxed text-t2">{step.body}</p>
+                      <p className="pb-2 text-[15px] leading-relaxed text-t2">{step.body.replace(flatNewSite, personApprovesLine)}</p>
                     </details>
                   ) : null}
                   {step.n === 1 ? (
@@ -217,7 +220,7 @@ export function App() {
             <h2 id="alone-h" className="h-display text-2xl sm:text-3xl">What an agent can do alone today</h2>
             <ul data-alone className="mt-3 space-y-2">
               {aloneToday.map((item) => (
-                <li key={item.title} className="text-[14px] leading-snug text-t2"><span className="font-semibold text-t1">{item.title}.</span> {item.body}</li>
+                <li key={item.title} className="text-[14px] leading-snug text-t2"><span className="font-semibold text-t1">{item.title}.</span> {item.title === 'Placing an offer' ? placingPageBody : item.body}</li>
               ))}
             </ul>
           </section>
