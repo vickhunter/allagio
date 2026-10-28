@@ -21,6 +21,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// OpenSignupPerMinute is the shared per-address cap for POST /v1/agent-tokens
+// and POST /v1/agent-accounts. Eight requests in a minute are allowed. The
+// ninth is HTTP 429, and so is the eleventh. The daily cap stays 30.
+const OpenSignupPerMinute = 8
+
 // AgentJoinCommand is the one line a stranger's agent runs from a clean folder.
 // OFFER_RAILS_URL is the API origin, with no trailing slash.
 const AgentJoinCommand = `curl -fsS -X POST "$OFFER_RAILS_URL/v1/agent-tokens" -H 'Content-Type: application/json' -d '{}'`
