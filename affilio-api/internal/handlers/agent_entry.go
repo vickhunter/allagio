@@ -118,6 +118,8 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.POST("/v1/digest/undo", h.Undo)
 	r.GET("/from/:source", h.FromSource)
 	r.GET("/llms.txt", h.LLMs)
+	r.GET("/llms-full.txt", h.LLMsFull)
+	r.GET("/skill.md", h.Skill)
 	r.GET("/docs/:name", h.Doc)
 }
 
@@ -1866,10 +1868,22 @@ func (h *AgentEntry) FromSource(c *gin.Context) {
 }
 
 func (h *AgentEntry) LLMs(c *gin.Context) {
+	h.serveLandingFile(c, "llms.txt", "text/plain; charset=utf-8", llmsBody())
+}
+
+func (h *AgentEntry) LLMsFull(c *gin.Context) {
+	h.serveLandingFile(c, "llms-full.txt", "text/plain; charset=utf-8", llmsBody()+llmsFullSuffix)
+}
+
+func (h *AgentEntry) Skill(c *gin.Context) {
+	h.serveLandingFile(c, "skill.md", "text/markdown; charset=utf-8", skillMD)
+}
+
+func (h *AgentEntry) serveLandingFile(c *gin.Context, name, contentType, fallback string) {
 	if h.AssetsPath != "" {
-		body, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", "llms.txt"))
+		body, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", name))
 		if err == nil {
-			c.Data(http.StatusOK, "text/plain; charset=utf-8", body)
+			c.Data(http.StatusOK, contentType, body)
 			return
 		}
 		if !os.IsNotExist(err) {
@@ -1877,7 +1891,7 @@ func (h *AgentEntry) LLMs(c *gin.Context) {
 			return
 		}
 	}
-	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(llmsBody()))
+	c.Data(http.StatusOK, contentType, []byte(fallback))
 }
 
 func (h *AgentEntry) Doc(c *gin.Context) {

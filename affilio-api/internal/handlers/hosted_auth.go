@@ -152,6 +152,10 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 
 func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 	requestPath := c.Request.URL.Path
+	if (c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead) && strings.HasSuffix(path.Clean(requestPath), ".md") && landingMiss(requestPath) {
+		c.Data(http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
+		return
+	}
 	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
 		cleaned := path.Clean(requestPath)
 		if h.AssetsPath != "" && strings.HasPrefix(cleaned, "/protocol/") {

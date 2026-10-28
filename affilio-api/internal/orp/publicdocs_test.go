@@ -2,7 +2,12 @@ package orp
 
 import (
 	"bytes"
+	"html"
 	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -61,4 +66,89 @@ func TestPublicBundleMatchesRepo(t *testing.T) {
 			t.Fatalf("served doc %s points at the unpicked domain or says open source", name)
 		}
 	}
+}
+
+// TestMarkdownTwinsMatchHTMLPages fails when a public page's visible words
+// leave its Markdown twin.
+func TestMarkdownTwinsMatchHTMLPages(t *testing.T) {
+	repo := filepath.Dir(filepath.Dir(mustProtocolRoot(t)))
+	pages := []struct{ html, md string }{
+		{"affilio-wp/admin/build/home.html", "affilio-wp/admin/build/landing-v9/home.md"},
+		{"affilio-wp/admin/build/makers.html", "affilio-wp/admin/build/landing-v9/makers.md"},
+		{"affilio-wp/admin/build/publishers.html", "affilio-wp/admin/build/landing-v9/publishers.md"},
+		{"affilio-wp/admin/build/publishers-setup.html", "affilio-wp/admin/build/landing-v9/publishers-setup.md"},
+		{"affilio-wp/admin/build/protocol.html", "affilio-wp/admin/build/landing-v9/protocol.md"},
+		{"affilio-wp/admin/build/you.html", "affilio-wp/admin/build/landing-v9/you.md"},
+		{"affilio-wp/admin/build/landing-v9/privacy/index.html", "affilio-wp/admin/build/landing-v9/privacy.md"},
+		{"affilio-wp/admin/build/landing-v9/terms/index.html", "affilio-wp/admin/build/landing-v9/terms.md"},
+		{"affilio-wp/admin/build/landing-v9/agents/index.html", "affilio-wp/admin/build/landing-v9/agents.md"},
+	}
+	for _, page := range pages {
+		body, err := os.ReadFile(filepath.Join(repo, page.html))
+		if err != nil {
+			t.Fatal(err)
+		}
+		twin, err := os.ReadFile(filepath.Join(repo, page.md))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(twin)
+		if strings.HasSuffix(page.md, "you.md") && !strings.Contains(text, "## Connect a hosted assistant") {
+			t.Fatal("you.md is missing Connect a hosted assistant")
+		}
+		for _, phrase := range pagePhrases(string(body)) {
+			if !strings.Contains(text, phrase) {
+				t.Fatalf("%s dropped %q", page.md, phrase)
+			}
+		}
+	}
+}
+
+func mustProtocolRoot(t *testing.T) string {
+	t.Helper()
+	root, ok := protocolRoot()
+	if !ok {
+		t.Fatal("docs/protocol not found")
+	}
+	return root
+}
+
+func pagePhrases(src string) []string {
+	chunk := ""
+	if i := strings.Index(src, `id="static-landing"`); i >= 0 {
+		chunk = src[i:]
+		if j := strings.Index(chunk, `<div id="root"`); j >= 0 {
+			chunk = chunk[:j]
+		}
+	}
+	var out []string
+	seen := map[string]bool{}
+	add := func(s string) {
+		s = html.UnescapeString(regexp.MustCompile(`<[^>]+>`).ReplaceAllString(s, ""))
+		s = strings.Join(strings.Fields(s), " ")
+		if s == "" || s == "Skip to content" || strings.Contains(s, "{{") || seen[s] {
+			return
+		}
+		seen[s] = true
+		out = append(out, s)
+	}
+	if m := regexp.MustCompile(`(?s)<title>(.*?)</title>`).FindStringSubmatch(src); m != nil {
+		add(m[1])
+	}
+	if m := regexp.MustCompile(`name="description" content="([^"]*)"`).FindStringSubmatch(src); m != nil {
+		add(m[1])
+	}
+	if m := regexp.MustCompile(`(?s)data-draft-banner[^>]*>(.*?)</`).FindStringSubmatch(src); m != nil {
+		add(m[1])
+	}
+	chunk = regexp.MustCompile(`(?s)\{\{if .*?\}\}(.*?)\{\{else\}\}(.*?)\{\{end\}\}`).ReplaceAllString(chunk, "$1\n$2")
+	for _, tag := range []string{"h1", "h2", "h3", "p", "a"} {
+		re := regexp.MustCompile(`(?s)<` + tag + `\b[^>]*>(.*?)</` + tag + `>`)
+		for _, m := range re.FindAllStringSubmatch(chunk, -1) {
+			for _, part := range strings.Split(m[1], "\n") {
+				add(part)
+			}
+		}
+	}
+	return out
 }
