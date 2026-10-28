@@ -329,7 +329,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
       headings: ['No-browser account', 'Device code', 'Find offers'].filter((name) => [...document.querySelectorAll('h2, h3')].some((el) => el.textContent.trim() === name)),
       soon: [...document.querySelectorAll('[data-tool][data-soon="true"]')].map((el) => el.getAttribute('data-tool')),
       livePreview: document.querySelector('[data-tool="preview_page"]')?.innerText.includes('Coming soon') && !document.querySelector('[data-tool="find_opportunities"]')?.innerText.includes('Coming soon'),
-      modes: ['Manual', 'Auto', 'YOLO'].every((name) => text.includes(name)),
+      modes: ['Ask me every time', 'Approve within my rules', 'Approve anything that passes the checks'].every((name) => text.includes(name)) && !text.includes('YOLO'),
       stub: text.includes('claim_check_unavailable') && text.includes('Not checked yet'),
       url: document.querySelector('[data-mcp-url]')?.textContent || '',
       alternate: document.querySelector('link[rel="alternate"]')?.getAttribute('href') || '',
@@ -569,7 +569,7 @@ try {
       if (banned.test(text)) throw new Error(legal + '-' + width + ' banned copy')
       const need = legal === 'privacy'
         ? ['Draft. This text is not final and has not been approved yet.', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', '10 to 12000', 'surface URL', 'not followed', 'signed-out caller', 'frozen copy', 'approved by', 'pass or fail signals', 'We never store source code, environment files or secrets.', '/24', '/48', 'daily salt', 'raw IP is never stored', '30 days', 'Render hosts', 'Neon provides Postgres', 'Cloudflare sits in front of Render', 'Stripe processes payments', 'If AI copy generation is turned on, page text you send is processed by Anthropic (Claude) to classify and draft copy.', 'no telemetry', 'train models', 'not sold', 'not transferred', 'untrusted data', 'only tighten modes', 'Until the claims check is live, every placement needs a person to approve it.', 'Not checked yet']
-        : ['Draft. This text is not final and has not been approved yet.', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', 'A maker may publish an offer', 'sale and a refund', 'does not hold the money', 'approve or refuse', 'until a person approves', 'only tighten an approval mode', 'cannot approve a placement', 'cannot turn YOLO on', 'test mode', 'not a live charge', 'no warranty', 'as is']
+        : ['Draft. This text is not final and has not been approved yet.', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', 'A maker may publish an offer', 'sale and a refund', 'does not hold the money', 'approve or refuse', 'until a person approves', 'only tighten an approval mode', 'cannot approve a placement', 'cannot turn on Approve anything that passes the checks', 'test mode', 'not a live charge', 'no warranty', 'as is']
       for (const needle of need) {
         if (!text.includes(needle)) throw new Error(legal + '-' + width + ' missing ' + needle)
       }
@@ -654,7 +654,7 @@ try {
     await setupPage.screenshot({ path: join(out, 'setup-' + width + '.png'), fullPage: true })
     const connectHref = await setupPage.getByRole('link', { name: 'Connect your site' }).getAttribute('href')
     const connectTo = new URL(connectHref, base).searchParams.get('return_to') || ''
-    const manual = await setupPage.getByRole('radio', { name: /Manual/ }).isChecked()
+    const manual = await setupPage.getByRole('radio', { name: /Ask me every time/ }).isChecked()
     const setupCopy = await setupPage.locator('body').innerText()
     summary.push({ slug: 'setup-' + width, ...setupMetrics, serious: setupSerious.map((item) => item.id), connectHref, manual })
     await assertHeaderSignIn(setupPage, 'setup-' + width)

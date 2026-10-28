@@ -30,8 +30,8 @@ const youShell = `<div id="static-landing">
       <h1>Your limits, your approvals, a receipt in plain words.</h1>
       <p>This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.</p>
       <p><a href="/auth/login?return_to=%2Fyou%2F" style="display:inline-flex;min-height:44px;align-items:center">Sign in to set your limits</a></p>
-      <section id="limits"><h2>Limits</h2><p>Your limits come first. A new site opens on Ask me every time.</p><h3>Ask me every time</h3><p>Manual. A new site opens here. Each placement waits for you.</p><h3>Approve within my rules</h3><p>Once you set it. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the checks</h3><p>Only you can turn this on. While claims are not checked, this also waits for a person.</p></section>
-      <section id="approvals"><h2>Approvals</h2><p>A person approves each placement. No agent tool can approve.</p></section>
+      <section id="limits"><h2>Limits</h2><p>Your limits come first. Pick how much the agent may do.</p><h3>Ask me every time</h3><p>A person approves each placement. The agent can prepare it and show the terms.</p><h3>Approve within my rules</h3><p>A person set limits. Within those limits, the agent may approve. Outside them, a person approves. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the checks</h3><p>Only a person can turn this on. While claims are not checked, this also waits for a person.</p></section>
+      <section id="approvals"><h2>Approvals</h2><p>A person approves each placement unless they set limits for their agent.</p></section>
       <section id="receipts"><h2>Receipts</h2><p>No deals yet.</p></section>
     </main>
   </div>`

@@ -1,32 +1,52 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { DirectoryFailure } from './client.mjs'
-import { directoryChrome, directoryFailureCopy, directoryFailureStatus } from './state.mjs'
+import { DirectoryFailure, listDirectory } from './client.mjs'
+import { directoryChrome, directoryEmptyCopy, directoryFailureCopy, directoryFailureStatus } from './state.mjs'
 
-test('a failed directory load names the status and is not the empty list', () => {
+function jsonResponse(status, body) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body }
+}
+
+test('a 503 names the status and a 200 with total 0 is the empty list', async () => {
+  await assert.rejects(
+    listDirectory('maker', {}, async () => jsonResponse(503, { error: 'database' })),
+    (error) => error instanceof DirectoryFailure && error.status === 503,
+  )
+  const empty = await listDirectory('maker', {}, async () => jsonResponse(200, { items: [], next_cursor: null, total: 0 }))
+  assert.deepEqual(empty, { items: [], next_cursor: null, total: 0 })
+
+  const failed = directoryChrome('error', 0)
+  assert.equal(failed.error, true)
+  assert.equal(failed.empty, false)
+  assert.equal(failed.search, true)
+  assert.equal(directoryFailureCopy(new DirectoryFailure(503, 'directory')), "Couldn't load the directory. 503")
+  assert.equal(directoryFailureCopy(new DirectoryFailure(503, 'directory')).includes('No makers listed yet'), false)
   assert.equal(directoryFailureCopy(new DirectoryFailure(404, 'not found')), "Couldn't load the directory. 404")
   assert.equal(directoryFailureCopy(new DirectoryFailure(0, 'network')), "Couldn't load the directory. network")
   assert.equal(directoryFailureStatus(new DirectoryFailure(502, 'json')), '502')
+
+  const blank = directoryChrome('empty', 0)
+  assert.equal(blank.search, false)
+  assert.equal(blank.heading, false)
+  assert.equal(blank.empty, true)
+  assert.equal(blank.error, false)
+  assert.match(directoryEmptyCopy('maker'), /^No makers listed yet/)
+  assert.match(directoryEmptyCopy('publisher'), /^No publishers listed yet/)
+
   const page = readFileSync(new URL('./Directory.tsx', import.meta.url), 'utf8')
-  assert.equal(page.includes('No makers listed yet'), false)
-  assert.equal(page.includes('No publishers listed yet'), false)
   assert.match(page, /directoryFailureCopy/)
-  assert.equal(directoryChrome('error', 0).error, true)
-  assert.equal(directoryChrome('error', 0).search, false)
-  assert.equal(directoryChrome('error', 0).heading, false)
-  assert.equal(directoryFailureCopy(new DirectoryFailure(404, 'not found')).includes('No makers listed yet'), false)
+  assert.match(page, /directoryEmptyCopy/)
 })
 
-test('an empty directory hides the search and the heading', () => {
+test('an empty directory hides the search and a live list shows it', () => {
   const empty = directoryChrome('empty', 0)
   assert.equal(empty.search, false)
-  assert.equal(empty.heading, false)
-  assert.equal(empty.list, false)
   assert.equal(empty.add, true)
   const live = directoryChrome('results', 3)
   assert.equal(live.search, true)
   assert.equal(live.heading, true)
   assert.equal(live.list, true)
   assert.equal(directoryChrome('loading', 0).add, false)
+  assert.equal(directoryChrome('error', 0).search, true)
 })

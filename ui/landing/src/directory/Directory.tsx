@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useSource, withSource } from '@/lib/source'
 import { DirectoryFailure, getMember, httpsUrl, listDirectory, logoSrc, memberRoute, wantsFixtures } from '@/directory/client.mjs'
-import { directoryChrome, directoryFailureCopy } from '@/directory/state.mjs'
+import { directoryChrome, directoryEmptyCopy, directoryFailureCopy } from '@/directory/state.mjs'
 import { agentPrompt, installLead, installUrl, makerPrompt } from '@/directory/prompt.mjs'
 import type { DirectoryCard, DirectoryKind } from '@/directory/types'
 
@@ -175,6 +175,7 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
         ) : null}
         {view === 'loading' ? <p className="mt-8 text-t2" role="status">Loading the directory.</p> : null}
         {chrome.error ? <p className="mt-8 text-t1" role="status">{directoryFailureCopy(failure)}</p> : null}
+        {chrome.empty ? <p className="mt-8 text-t1" role="status">{directoryEmptyCopy(kind)}</p> : null}
         {chrome.nomatch ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers match this search.' : 'No sites match this search.'}</p> : null}
         {chrome.list ? (
           <>

@@ -1,4 +1,4 @@
-import { approvalModes } from './lib/modes.mjs'
+import { approvalModes, personApprovesLine } from './lib/modes.mjs'
 
 // D-098. The vision may name any agent, any platform, and any post.
 // A status says Coming unless that deal works today. Nothing is Verified end to end
@@ -50,11 +50,11 @@ export const deals = [
 export const youKeep = [
   {
     t: 'Your limits come first',
-    b: `A new site opens on ${approvalModes[0].name}. You can later choose ${approvalModes[1].name}, or ${approvalModes[2].name}. While claims are not checked, those two still wait for a person.`,
+    b: `The modes are ${approvalModes[0].name}, ${approvalModes[1].name}, and ${approvalModes[2].name}. ${personApprovesLine} While claims are not checked, the last two still wait for a person.`,
   },
   {
     t: 'You approve',
-    b: 'A person approves each placement. No agent tool can approve.',
+    b: personApprovesLine,
   },
   {
     t: 'No personal data shared with the other agent',
@@ -82,9 +82,9 @@ export const replaces = [
 ]
 
 export const limits = [
-  { name: approvalModes[0].name, note: 'Manual. A new site opens here. Each placement waits for you.' },
-  { name: approvalModes[1].name, note: 'Once you set it. While claims are not checked, this still waits for a person.' },
-  { name: approvalModes[2].name, note: 'Only you can turn this on. While claims are not checked, this also waits for a person.' },
+  { name: approvalModes[0].name, note: 'A person approves each placement. The agent can prepare it and show the terms.' },
+  { name: approvalModes[1].name, note: 'A person set limits. Within those limits, the agent may approve. Outside them, a person approves. While claims are not checked, this still waits for a person.' },
+  { name: approvalModes[2].name, note: 'Only a person can turn this on. While claims are not checked, this also waits for a person.' },
 ]
 
 export const youPageLead = 'This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.'

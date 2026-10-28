@@ -1,5 +1,6 @@
 import { Page } from '@/site/Page'
 import { signInHref, useSource, withSource } from '@/lib/source'
+import { personApprovesLine } from '@/lib/modes.mjs'
 import { limits, youPageLead } from '@/vision.mjs'
 
 export function App() {
@@ -16,7 +17,7 @@ export function App() {
 
         <section id="limits" aria-labelledby="limits-h" className="mt-12">
           <h2 id="limits-h" className="font-display text-2xl font-bold tracking-tight">Limits</h2>
-          <p className="mt-2 text-sm leading-relaxed text-t2">Your limits come first. Pick how much the agent may do. A new site starts on the first one.</p>
+          <p className="mt-2 text-sm leading-relaxed text-t2">Your limits come first. Pick how much the agent may do.</p>
           <ul className="mt-4 grid gap-3">
             {limits.map((item) => (
               <li key={item.name} className="rounded-2xl border border-line bg-s1 p-4">
@@ -29,7 +30,7 @@ export function App() {
 
         <section id="approvals" aria-labelledby="approvals-h" className="mt-12">
           <h2 id="approvals-h" className="font-display text-2xl font-bold tracking-tight">Approvals</h2>
-          <p className="mt-2 text-sm leading-relaxed text-t2">A person approves each placement before it is published. No agent tool can approve. Your agent can prepare the placement and show you the terms.</p>
+          <p className="mt-2 text-sm leading-relaxed text-t2">{personApprovesLine} Your agent can prepare the placement and show you the terms.</p>
         </section>
 
         <section id="receipts" aria-labelledby="receipts-h" className="mt-12">

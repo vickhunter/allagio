@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, docLinks, errors, installs, joinCommand, llmsText, mcpUrl, modes, orderedSteps, pagePath, rates, signInNote, steps, tools } from './facts.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, docLinks, errors, installs, joinCommand, llmsText, mcpUrl, modes, orderedSteps, pagePath, personApprovesLine, rates, signInNote, steps, tools } from './facts.mjs'
 
 const banned = /grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i
 
@@ -139,10 +139,13 @@ test('only page preview and digest are coming soon', () => {
 })
 
 test('public agent copy stays on the documented words', () => {
-  const blob = JSON.stringify({ steps, modes, tools, rates, errors, deviceSignIn, agentAccount, aloneToday, installs, signInNote, agentPrompt, orderedSteps })
+  const blob = JSON.stringify({ steps, modes, tools, rates, errors, deviceSignIn, agentAccount, aloneToday, installs, signInNote, agentPrompt, orderedSteps, personApprovesLine })
   assert.equal(banned.test(withoutOfferJoin(blob)), false)
   assert.equal(banned.test(withoutOfferJoin(llmsText())), false)
-  for (const name of ['Manual', 'Auto', 'YOLO']) assert.match(blob, new RegExp(name))
+  for (const name of ['Ask me every time', 'Approve within my rules', 'Approve anything that passes the checks']) assert.match(blob, new RegExp(name))
+  assert.equal(blob.includes('YO' + 'LO'), false)
+  assert.equal(/\bManual\b/.test(blob), false)
+  assert.match(blob, /A person approves each placement unless they set limits for their agent/)
   assert.match(blob, /rate limit exceeded/)
   assert.match(blob, /preview rate limit exceeded/)
   assert.match(blob, /invalid payload/)

@@ -7,6 +7,8 @@ export const approvalModes = [
   { id: 'checks', name: 'Approve anything that passes the checks', note: 'Anything that passes the checks can go live. Undo is one tap.' },
 ]
 
+export const personApprovesLine = 'A person approves each placement unless they set limits for their agent.'
+
 export const signInStory = 'Agents join with no sign-in. People sign in with Google for the dashboard.'
 
 export const personSignsInBecause = 'A person signs in with Google so the dashboard can save the site and the approval mode. Agents join with no sign-in.'

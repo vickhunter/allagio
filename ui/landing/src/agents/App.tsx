@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, errors, installs, mcpUrl, modes, orderedSteps, rates, signInNote, tools } from '@/agents/facts.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, errors, installs, mcpUrl, modes, orderedSteps, personApprovesLine, rates, signInNote, tools } from '@/agents/facts.mjs'
 import { Page } from '@/site/Page'
 
 const primaryClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-t1 px-5 font-semibold text-s0 transition-colors duration-150 hover:bg-[rgb(60_66_55)] sm:w-auto'
@@ -224,6 +224,7 @@ export function App() {
 
           <section id="modes" aria-labelledby="modes-h" className={sectionClass}>
             <h2 id="modes-h" className="h-display text-2xl sm:text-3xl">What happens after the place call</h2>
+            <p className="mt-3 text-[15px] leading-relaxed text-t2">{personApprovesLine}</p>
             <dl className="mt-3 space-y-2">
               {modes.map((mode) => (
                 <div key={mode.name}>

@@ -1,3 +1,7 @@
+import { approvalModes, personApprovesLine } from '../lib/modes.mjs'
+
+export { personApprovesLine }
+
 export const mcpUrl = 'https://offer-rails.onrender.com/mcp'
 export const pagePath = '/landing-v9/agents/'
 export const aliasPath = '/agents'
@@ -28,16 +32,16 @@ export const steps = [
 
 export const modes = [
   {
-    name: 'Manual',
-    body: 'After the place call, the placement waits. A person approves it on the dashboard. No agent tool can approve.',
+    name: approvalModes[0].name,
+    body: 'A person approves each placement. The agent can prepare it and show the terms. It does not publish.',
   },
   {
-    name: 'Auto',
-    body: 'Within rules the owner set, hard checks still run. While claims are not checked, the effective mode is forced to manual (approval_reason: claim_check_unavailable), so the placement still waits for a person.',
+    name: approvalModes[1].name,
+    body: 'A person set limits. Within those limits, the agent may approve. That record is the agent\'s approval, a mandate on bound[].authority, and it is not a person\'s approval. Outside those limits, a person approves. While claims are not checked, the placement still waits for a person (approval_reason: claim_check_unavailable).',
   },
   {
-    name: 'YOLO',
-    body: 'Only the dashboard can turn this on. An agent can only tighten a mode. While claims are not checked, this is also forced to manual, so the placement still waits for a person. not_checked, missing, or unknown shows as Not checked yet.',
+    name: approvalModes[2].name,
+    body: 'Only a person can turn this on. A placement that passes the checks can go on. An agent cannot turn this on. While claims are not checked, the placement still waits for a person. not_checked, missing, or unknown shows as Not checked yet.',
   },
 ]
 

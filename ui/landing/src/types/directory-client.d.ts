@@ -1,10 +1,12 @@
 declare module '@/directory/state.mjs' {
   export function directoryFailureStatus(error: { status?: number; message?: string } | null): string
   export function directoryFailureCopy(error: { status?: number; message?: string } | null): string
+  export function directoryEmptyCopy(kind: 'maker' | 'publisher'): string
   export function directoryChrome(view: string, total: number): {
     heading: boolean
     search: boolean
     error: boolean
+    empty: boolean
     list: boolean
     nomatch: boolean
     add: boolean
