@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-const approvalByMode = "A new site stores placement_publish as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person."
+const approvalByMode = publishStepParagraph
 
 const autoCommit = "only when the domain is verified and claim checks are live"
 
@@ -58,7 +58,9 @@ func TestYouLimitsStatesApprovalByMode(t *testing.T) {
 		"Once you set it. While claims are not checked, this still waits for a person.",
 		"Only you can turn this on. While claims are not checked, this also waits for a person.",
 		"Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.",
-		autoCommit,
+		"still waits",
+		"domain is verified",
+		"claim checks are live",
 	} {
 		if !strings.Contains(you, kept) || !strings.Contains(built, kept) || !strings.Contains(plain, kept) {
 			t.Fatalf("mode line dropped: %s", kept)
@@ -75,7 +77,7 @@ func TestLlmsFullStatesApprovalByMode(t *testing.T) {
 	if !strings.Contains(disk, approvalByMode) || !strings.Contains(disk, autoCommit) {
 		t.Fatal("llms-full.txt does not state approval by mode")
 	}
-	if !strings.Contains(disk, "The hosted MCP wrapper adds owner_approval_url whenever prepare_placement or get_placement returns a placement id, including a committed auto prepare. Send that URL to the owner when the status is awaiting_approval.") || strings.Contains(disk, "returns a proposal and owner_approval_url") || strings.Contains(disk, "when prepare waits") {
+	if !strings.Contains(disk, ownerApprovalURL) || strings.Contains(disk, "returns a proposal and owner_approval_url") || strings.Contains(disk, "get_placement returns a placement id") || strings.Contains(disk, "whenever prepare_placement or get_placement") {
 		t.Fatal("llms-full.txt does not say when owner_approval_url is added")
 	}
 	if !strings.Contains(disk, "A new site waits for a person to approve each placement before it is published.") || !strings.Contains(disk, "a person approves this step") || !strings.Contains(disk, "## ORP 0-3 test deal") || !strings.Contains(disk, "Placing an offer needs approval for now") {
@@ -107,8 +109,11 @@ func TestNoSentenceSaysAgentToolsCannotChangeTheRule(t *testing.T) {
 	}
 	for _, item := range bodies {
 		lower := strings.ToLower(item.body)
-		if strings.Contains(lower, "owner's rule decides") || strings.Contains(lower, "only tighten the mode") || strings.Contains(lower, "cannot change the rule") || strings.Contains(lower, "cannot change that rule") {
+		if strings.Contains(lower, "owner's rule decides") || strings.Contains(lower, "only tighten the mode") || strings.Contains(lower, "cannot change the rule") || strings.Contains(lower, "cannot change that rule") || strings.Contains(item.body, "until that step is auto") {
 			t.Fatalf("%s states an unscoped mode rule", item.name)
+		}
+		if strings.Contains(item.body, publishStepParagraph) && (!strings.Contains(publishStepParagraph, "domain is verified") || !strings.Contains(publishStepParagraph, "claim checks are live") || !strings.Contains(publishStepParagraph, "still waits")) {
+			t.Fatal("canonical paragraph dropped a hold")
 		}
 		if strings.Contains(lower, "placement_publish") && !strings.Contains(item.body, autoCommit) {
 			t.Fatalf("%s names placement_publish without %q", item.name, autoCommit)
@@ -126,8 +131,11 @@ func TestPrepareAndCommitNamePlacementPublish(t *testing.T) {
 	if !strings.Contains(commit, "confirm=true cannot replace owner approval") {
 		t.Fatal("commit text dropped confirm=true cannot replace owner approval")
 	}
-	if !strings.Contains(hostedMCPInstructions, "The wrapper adds owner_approval_url whenever prepare_placement or get_placement returns a placement id, including a committed auto prepare. Send that URL to the owner when the status is awaiting_approval.") || !strings.Contains(hostedMCPInstructions, "Agents cannot approve a placement.") || !strings.Contains(hostedMCPInstructions, autoCommit) || strings.Contains(hostedMCPInstructions, "When prepare waits") {
-		t.Fatal("mcp instructions do not attach owner_approval_url for every placement id")
+	if !strings.Contains(hostedMCPInstructions, ownerApprovalURL) || !strings.Contains(hostedMCPInstructions, publishStepParagraph) || !strings.Contains(hostedMCPInstructions, "Agents cannot approve a placement.") || strings.Contains(hostedMCPInstructions, "get_placement returns a placement id") {
+		t.Fatal("mcp instructions do not attach owner_approval_url only for prepare_placement")
+	}
+	if !strings.Contains(ownerApprovalURL, "prepare_placement") || !strings.Contains(ownerApprovalURL, "does not get the URL") {
+		t.Fatal("owner approval URL sentence does not keep get_placement off the link")
 	}
 }
 

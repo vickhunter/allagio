@@ -27,7 +27,7 @@ var RevenueTools = []Tool{
 	},
 	{
 		Name:        "prepare_placement",
-		Description: "Prepare exact copy and mandatory disclosure for a publisher's HTTPS article. Creates an expiring proposal. placement_publish is ask on a new site, so the call waits and does not publish. placement_publish auto commits in this call only when the domain is verified and claim checks are live. While claim checks are not live, a stored auto still waits. A site key can set that publish step to auto. A held proposal is HTTP 201 with status awaiting_approval and hold_reason, and no error key.",
+		Description: "Prepare exact copy and mandatory disclosure for a publisher's HTTPS article. Creates an expiring proposal. placement_publish is ask on a new site, so prepare waits for a person and does not publish. A stored auto still waits for a person when the domain is unverified or claim checks are not live. It commits in this call only when the domain is verified and claim checks are live. A site key can set that publish step to auto. A held proposal is HTTP 201 with status awaiting_approval and hold_reason, and no error key. hold_reason is domain_unverified, step_ask, or claim_check_unavailable.",
 		InputSchema: schema([]string{"offer_id", "surface_url", "context", "copy"}, map[string]interface{}{
 			"offer_id": str("Eligible offer ID"), "surface_url": str("HTTPS article on the publisher's registered domain"), "context": str("Article content used to check relevance"), "copy": str("Proposed recommendation, without invented product claims")}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {

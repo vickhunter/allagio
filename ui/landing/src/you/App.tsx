@@ -1,6 +1,6 @@
 import { Page } from '@/site/Page'
 import { useSource, withSource } from '@/lib/source'
-import { limits, receiptExample, receiptLabel, youPageLead } from '@/vision.mjs'
+import { limits, publishStepParagraph, receiptExample, receiptLabel, youPageLead } from '@/vision.mjs'
 
 export function App() {
   const source = useSource()
@@ -27,7 +27,7 @@ export function App() {
 
         <section id="approvals" aria-labelledby="approvals-h" className="mt-12">
           <h2 id="approvals-h" className="font-display text-2xl font-bold tracking-tight">Approvals</h2>
-          <p className="mt-2 text-sm leading-relaxed text-t2">A new site stores placement_publish as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person. Your agent can prepare the placement and show you the terms.</p>
+          <p className="mt-2 text-sm leading-relaxed text-t2">{publishStepParagraph} Your agent can prepare the placement and show you the terms.</p>
         </section>
 
         <section id="receipts" aria-labelledby="receipts-h" className="mt-12">

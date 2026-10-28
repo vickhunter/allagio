@@ -100,7 +100,7 @@ func TestYouLimitsSentencesDoNotDrift(t *testing.T) {
 		"This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.",
 		"Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.",
 		"Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.",
-		"A new site stores placement_publish as ask, so a person approves each placement until that step is auto. Auto commits only when the domain is verified and claim checks are live. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.",
+		publishStepParagraph,
 		"Example wording. Not a live agreement.",
 		"Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.",
 	} {
