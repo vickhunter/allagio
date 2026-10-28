@@ -10,17 +10,17 @@ Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.
 
 Limits
 
-Your limits come first. A new site opens on Manual: ask every time.
+Your limits come first. A new site opens on Ask me every time.
 
-Ask every time
+Ask me every time
 
 Manual. A new site opens here. Each placement waits for you.
 
-Approve within your rules
+Approve within my rules
 
 Once you set it. While claims are not checked, this still waits for a person.
 
-Approve anything that passes the nine checks
+Approve anything that passes the checks
 
 Only you can turn this on. While claims are not checked, this also waits for a person.
 
