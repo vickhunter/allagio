@@ -31,8 +31,11 @@ func TestColdAgentEntrance(t *testing.T) {
 	if skill.Code != http.StatusOK || !strings.Contains(skill.Header().Get("Content-Type"), "text/markdown") || len(lines) > 25 || skillBody != skillMD {
 		t.Fatalf("skill %d %q lines %d", skill.Code, skill.Header().Get("Content-Type"), len(lines))
 	}
-	if !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms.txt)") || !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(skillBody, "## Connect a hosted assistant") {
+	if strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms.txt)") || !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(skillBody, "## Connect a hosted assistant") {
 		t.Fatalf("skill pointer %s", skillBody)
+	}
+	if strings.Contains(llms.Body.String(), "](https://offer-rails.onrender.com/llms.txt)") {
+		t.Fatal("llms.txt points at itself")
 	}
 	assertPublicDocHeaders(t, skill)
 

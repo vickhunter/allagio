@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -977,6 +978,42 @@ func TestApprovedByKeepsEachParty(t *testing.T) {
 	okRows, okOmit := approvalsFromQuery([]database.DealApproval{{Step: "accept", Party: "orp:hub.example/p_one", By: "owner"}}, nil)
 	if okOmit || len(okRows) != 1 {
 		t.Fatalf("query success %v %v", okRows, okOmit)
+	}
+
+	terms, err := json.Marshal(testTerms())
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	deal := database.ORPDeal{
+		ID:        "deal_testunavailable",
+		State:     "pending",
+		Terms:     terms,
+		TermsHash: "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Parties:   json.RawMessage(`{"round":1,"seats":[{"id":"orp:hub.example/p_one","role":"maker","required":true},{"id":"orp:hub.example/p_two","role":"publisher","required":true}]}`),
+		UpdatedAt: now,
+	}
+	deal.ApprovalsUnavailable = true
+	snap, err := (&ORPHost{}).manySnapshot("orp:hub.example", "orp:hub.example/p_one", "", deal, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := snap["body"].(map[string]any)
+	if body["approvals_unavailable"] != true {
+		t.Fatalf("0.4 marker %#v", body["approvals_unavailable"])
+	}
+	if _, ok := body["approved_by"]; ok {
+		t.Fatal("failed read still sent approved_by")
+	}
+	plain, err := dealBody(deal, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := plain["approvals_unavailable"]; ok {
+		t.Fatal("0.3 body includes approvals_unavailable")
+	}
+	if _, ok := plain["approved_by"]; ok {
+		t.Fatal("0.3 body includes approved_by")
 	}
 }
 

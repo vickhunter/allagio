@@ -71,8 +71,10 @@ type ORPDeal struct {
 	// It is not a column. The rows already live in agent_step_approvals
 	// or in the parties document.
 	WireApprovals []DealApproval
-	// OmitApprovals drops approved_by when that extra read fails.
-	OmitApprovals bool
+	// ApprovalsUnavailable is set on an ORP 0.4 read when the approval
+	// query fails. The response stays HTTP 200 and names that failure.
+	// A 0.3 body never copies this flag.
+	ApprovalsUnavailable bool
 }
 
 // ORPInboxItem is one stored host message for a party.
