@@ -118,7 +118,13 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.POST("/v1/digest/undo", h.Undo)
 	r.GET("/from/:source", h.FromSource)
 	r.GET("/llms.txt", h.LLMs)
+	r.HEAD("/llms.txt", h.LLMs)
+	r.GET("/llms-full.txt", h.LLMsFull)
+	r.HEAD("/llms-full.txt", h.LLMsFull)
+	r.GET("/skill.md", h.Skill)
+	r.HEAD("/skill.md", h.Skill)
 	r.GET("/docs/:name", h.Doc)
+	r.HEAD("/docs/:name", h.Doc)
 }
 
 func (h *AgentEntry) claims() entry.ClaimChecker {
@@ -1866,27 +1872,41 @@ func (h *AgentEntry) FromSource(c *gin.Context) {
 }
 
 func (h *AgentEntry) LLMs(c *gin.Context) {
+	h.serveLandingFile(c, "llms.txt", "text/plain; charset=utf-8", llmsBody())
+}
+
+func (h *AgentEntry) LLMsFull(c *gin.Context) {
+	h.serveLandingFile(c, "llms-full.txt", "text/plain; charset=utf-8", llmsBody()+llmsFullSuffix)
+}
+
+func (h *AgentEntry) Skill(c *gin.Context) {
+	h.serveLandingFile(c, "skill.md", "text/markdown; charset=utf-8", skillMD)
+}
+
+func (h *AgentEntry) serveLandingFile(c *gin.Context, name, contentType, fallback string) {
+	setPublicDocHeaders(c)
+	body := []byte(fallback)
 	if h.AssetsPath != "" {
-		body, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", "llms.txt"))
+		file, err := os.ReadFile(filepath.Join(h.AssetsPath, "landing-v9", name))
 		if err == nil {
-			c.Data(http.StatusOK, "text/plain; charset=utf-8", body)
-			return
-		}
-		if !os.IsNotExist(err) {
+			body = file
+		} else if !os.IsNotExist(err) {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
 	}
-	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(llmsBody()))
+	writeMethodBody(c, http.StatusOK, contentType, body)
 }
 
 func (h *AgentEntry) Doc(c *gin.Context) {
+	setPublicDocHeaders(c)
 	body, ok := agentDoc(c.Param("name"))
 	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": "document not found"})
+		raw, _ := json.Marshal(gin.H{"error": "document not found"})
+		writeMethodBody(c, http.StatusNotFound, "application/json; charset=utf-8", raw)
 		return
 	}
-	c.Data(http.StatusOK, "text/markdown; charset=utf-8", []byte(body))
+	writeMethodBody(c, http.StatusOK, "text/markdown; charset=utf-8", []byte(body))
 }
 
 func (h *AgentEntry) sessionOwner(c *gin.Context) (*database.Owner, bool) {

@@ -153,6 +153,30 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 func (h *HostedHandler) unmatched(c *gin.Context, r *gin.Engine) {
 	requestPath := c.Request.URL.Path
 	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
+		if target, ok := cleanedRouteRedirect(c.Request.Method, requestPath, r); ok {
+			// Public docs only. A go-link 301 keeps the headers main sends.
+			setPublicDocHeaders(c)
+			if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
+				c.Header("X-Robots-Tag", "noindex")
+			}
+			if q := c.Request.URL.RawQuery; q != "" {
+				target += "?" + q
+			}
+			// Same empty body for GET and HEAD, so Content-Length does not differ.
+			c.Header("Location", target)
+			c.Header("Content-Length", "0")
+			c.Status(http.StatusMovedPermanently)
+			c.Writer.WriteHeaderNow()
+			return
+		}
+		cleaned := path.Clean(requestPath)
+		if strings.HasSuffix(cleaned, ".md") && landingMiss(cleaned) && !markdownRoute(c.Request.Method, cleaned, r) {
+			h.writePublicHeaders(c)
+			writeMethodBody(c, http.StatusNotFound, "text/markdown; charset=utf-8", []byte("not found\n"))
+			return
+		}
+	}
+	if c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead {
 		cleaned := path.Clean(requestPath)
 		if h.AssetsPath != "" && strings.HasPrefix(cleaned, "/protocol/") {
 			h.writePublicHeaders(c)
@@ -214,6 +238,11 @@ func redirectTrailingSlash(c *gin.Context, r *gin.Engine) bool {
 	target, ok := trailingSlashTarget(c.Request.Method, requestPath, r)
 	if !ok {
 		return false
+	}
+	// Doc slash redirects send the public cache headers. Every other target,
+	// including /v1/go/<id> and /go/<token>, keeps the header set main sent.
+	if publicDocCanonical(target) {
+		setPublicDocHeaders(c)
 	}
 	if !LEGAL_PAGES_APPROVED && (draftLegalPath(requestPath) || draftLegalPath(target)) {
 		c.Header("X-Robots-Tag", "noindex")
@@ -299,13 +328,109 @@ func (h *HostedHandler) headers(c *gin.Context) {
 }
 
 func (h *HostedHandler) writePublicHeaders(c *gin.Context) {
+	setPublicDocHeaders(c)
+	if !LEGAL_PAGES_APPROVED && draftLegalPath(c.Request.URL.Path) {
+		c.Header("X-Robots-Tag", "noindex")
+	}
+}
+
+// setPublicDocHeaders is what / and /you send. Skill and full-text files are
+// outside that group, so they set the same four headers themselves.
+func setPublicDocHeaders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Referrer-Policy", "strict-origin")
 	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
-	if !LEGAL_PAGES_APPROVED && draftLegalPath(c.Request.URL.Path) {
-		c.Header("X-Robots-Tag", "noindex")
+}
+
+// cleanedRouteRedirect is a 301 target when path.Clean changes the path onto
+// a route for this method. A missing /docs file stays a 404. The target is
+// always a single-slash on-host path.
+func cleanedRouteRedirect(method, requestPath string, r *gin.Engine) (string, bool) {
+	if requestPath == "" || !strings.HasPrefix(requestPath, "/") || strings.HasPrefix(requestPath, "//") {
+		return "", false
 	}
+	if strings.Contains(strings.ToLower(requestPath), "%2f%2f") {
+		return "", false
+	}
+	cleaned := path.Clean(requestPath)
+	if cleaned == requestPath || !onHostPath(cleaned) {
+		return "", false
+	}
+	if !routeForMethod(method, cleaned, r) {
+		return "", false
+	}
+	// Only a public doc uses this redirect, including /docs/<name>//.
+	// /owner, /v1, /go, /orp, and /mcp stay on redirectTrailingSlash.
+	if !publicDocCanonical(cleaned) {
+		return "", false
+	}
+	return cleaned, true
+}
+
+func publicDocCanonical(cleaned string) bool {
+	switch cleaned {
+	case "/llms.txt", "/llms-full.txt":
+		return true
+	}
+	if markdownPage(cleaned) {
+		return true
+	}
+	name, ok := strings.CutPrefix(cleaned, "/docs/")
+	if !ok || name == "" || strings.Contains(name, "/") {
+		return false
+	}
+	_, exists := agentDoc(name)
+	return exists
+}
+
+// markdownRoute is a route that serves markdown. A /docs/:name pattern counts
+// only when that file exists, so /docs/no-such.md/ stays a 404.
+func markdownRoute(method, cleaned string, r *gin.Engine) bool {
+	if !routeForMethod(method, cleaned, r) {
+		return false
+	}
+	if strings.HasPrefix(cleaned, "/docs/") {
+		return publicDocCanonical(cleaned)
+	}
+	return true
+}
+
+func onHostPath(cleaned string) bool {
+	return cleaned != "" && cleaned != "/" && strings.HasPrefix(cleaned, "/") && !strings.HasPrefix(cleaned, "//") && !strings.Contains(cleaned, "://") && !strings.Contains(cleaned, "\\")
+}
+
+func routeForMethod(method, cleaned string, r *gin.Engine) bool {
+	if !onHostPath(cleaned) && cleaned != "/" {
+		return false
+	}
+	for _, route := range r.Routes() {
+		if route.Method == method && (route.Path == cleaned || routePatternMatches(route.Path, cleaned)) {
+			return true
+		}
+	}
+	return false
+}
+
+func markdownPage(cleaned string) bool {
+	switch cleaned {
+	case "/skill.md", "/home.md", "/makers.md", "/publishers.md", "/publishers/setup.md",
+		"/protocol.md", "/you.md", "/privacy.md", "/terms.md", "/agents.md":
+		return true
+	default:
+		return false
+	}
+}
+
+func writeMethodBody(c *gin.Context, status int, contentType string, body []byte) {
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Length", fmt.Sprintf("%d", len(body)))
+	c.Status(status)
+	if c.Request.Method == http.MethodHead {
+		c.Writer.WriteHeaderNow()
+		return
+	}
+	_, _ = c.Writer.Write(body)
 }
 
 func (h *HostedHandler) limited(c *gin.Context) bool {
