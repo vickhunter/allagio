@@ -2968,7 +2968,7 @@ export const catalog = {
               "name": "state",
               "required": true,
               "type": "DealState",
-              "description": ""
+              "description": "proposed: terms on the table. awaiting: the waiting party's agent approves the ask by default. The host records approved_by agent. That is not a person's approval. The signed-in owner submits the form and the host records approved_by owner. Opening the URL records nothing. active: both bound, tracking live. completed: every obligation verified or waived. declined, expired, revoked: ended before or after activation. disputed: a dispute is open."
             },
             {
               "name": "offerer",
@@ -6963,7 +6963,7 @@ export const catalog = {
               "name": "state",
               "required": true,
               "type": "DealState",
-              "description": ""
+              "description": "pending: a required signature is missing. active: every required party has signed. The other states match 0.3."
             },
             {
               "name": "parties",
