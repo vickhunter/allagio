@@ -47,13 +47,23 @@ function summarize(node) {
   return bits.join(', ') || 'value'
 }
 
-function rows(schema) {
+function fieldDescription(prop, owner) {
+  if (typeof prop.description === 'string' && prop.description) return prop.description
+  // DealState's meaning is on the definition. The field that points at it has no description of its own.
+  if (typeof prop.$ref === 'string' && prop.$ref.endsWith('/DealState')) {
+    const def = localDef(owner, prop.$ref)
+    if (def && typeof def.description === 'string' && def.description) return def.description
+  }
+  return ''
+}
+
+function rows(schema, owner = schema) {
   const required = new Set(schema.required || [])
   return Object.entries(schema.properties || {}).map(([name, prop]) => ({
     name,
     required: required.has(name),
     type: summarize(prop),
-    description: typeof prop.description === 'string' ? prop.description : '',
+    description: fieldDescription(prop, owner),
   }))
 }
 
@@ -104,7 +114,7 @@ function sectionsFor(schema) {
       name: def.title || name,
       description: def.description || '',
       closed: def.additionalProperties === false,
-      fields: rows(def),
+      fields: rows(def, schema),
     })
   }
   if (!sections.length && Array.isArray(schema.allOf)) {
@@ -126,7 +136,7 @@ function sectionsFor(schema) {
         name: def.title || name,
         description: def.description || '',
         closed: def.additionalProperties === false,
-        fields: rows(def),
+        fields: rows(def, schema),
       })
     }
   }
