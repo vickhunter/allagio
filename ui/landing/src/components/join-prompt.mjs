@@ -1,6 +1,6 @@
 import { createElement, useState } from 'react'
 
-export const joinPrompt = 'Join with POST /v1/agent-tokens and send the bearer. No Google sign-in.'
+export const joinPrompt = 'Join with POST /v1/agent-tokens and send the bearer.'
 export const joinLead = 'Give your agent this line to start'
 export const joinHeading = `Tell your agent: ${joinPrompt}`
 

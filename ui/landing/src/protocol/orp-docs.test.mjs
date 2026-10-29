@@ -5,7 +5,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { buildCatalog } from '../../scripts/build-orp-docs.mjs'
 import { catalog } from './generated/catalog.mjs'
-import { noMoney, notSpoken04, otherRefusal, payRefusal } from './hosted.mjs'
+import { hostSpeech, hostSpeechSpeaks, hostSpeechUnknown, noMoney, otherRefusal, payRefusal } from './hosted.mjs'
 import { routeFor } from './route.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -85,11 +85,20 @@ test('quickstart names the hosted thin layer', () => {
   assert.equal(otherRefusal, 'This host is in testing and does not run this message.')
   assert.equal(payRefusal, 'This testing host does not settle money.')
   assert.equal(noMoney, 'Offer Rails does not hold money.')
-  assert.equal(notSpoken04, 'This host does not speak ORP 0.4 leave or seat.')
+  assert.equal(hostSpeechSpeaks, 'This host speaks ORP 0.4 (leave and seat).')
+  const speaks = hostSpeech({ orp: ['0.4', '0.3'], capabilities: { messages: ['hello', 'leave', 'seat'] } })
+  assert.equal(speaks, hostSpeechSpeaks)
+  assert.equal(hostSpeech(null), hostSpeechUnknown)
+  assert.equal(hostSpeech({ orp: ['0.3'] }), hostSpeechUnknown)
+  assert.equal(hostSpeech({ orp: ['0.4'], capabilities: { messages: ['hello'] } }), hostSpeechUnknown)
+  assert.equal(hostSpeechUnknown.includes('does not speak'), false)
+  assert.equal(hostSpeechSpeaks.includes('does not speak'), false)
   const page = readFileSync(join(here, 'Docs.tsx'), 'utf8')
   assert.match(page, /otherRefusal/)
   assert.match(page, /FivePartyWalkthrough/)
   assert.match(page, /ThreePartyExample/)
+  assert.equal(page.includes('does not speak ORP 0.4'), false)
+  assert.match(page, /useHostSpeech|hostLine/)
   assert.equal(page.includes('hostedRefusal'), false)
   assert.equal(page.includes('refusedTypes'), false)
   assert.equal(routeFor('/protocol/many/').name, 'many')

@@ -1,0 +1,114 @@
+=== TZ=UTC 2026-10-28T09:26:33Z ===
+go: downloading go1.23.4 (linux/amd64)
+go: downloading github.com/gin-gonic/gin v1.9.1
+go: downloading github.com/jackc/pgx/v5 v5.5.5
+go: downloading github.com/coreos/go-oidc/v3 v3.12.0
+go: downloading golang.org/x/oauth2 v0.21.0
+go: downloading golang.org/x/text v0.16.0
+go: downloading github.com/modelcontextprotocol/go-sdk v1.0.0
+go: downloading github.com/go-jose/go-jose/v4 v4.0.2
+go: downloading github.com/gin-contrib/sse v0.1.0
+go: downloading github.com/mattn/go-isatty v0.0.19
+go: downloading golang.org/x/net v0.27.0
+go: downloading github.com/jackc/puddle/v2 v2.2.1
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a
+go: downloading golang.org/x/crypto v0.25.0
+go: downloading github.com/go-playground/validator/v10 v10.14.0
+go: downloading github.com/pelletier/go-toml/v2 v2.0.8
+go: downloading github.com/ugorji/go/codec v1.2.11
+go: downloading google.golang.org/protobuf v1.30.0
+go: downloading gopkg.in/yaml.v3 v3.0.1
+go: downloading golang.org/x/sys v0.26.0
+go: downloading github.com/google/jsonschema-go v0.3.0
+go: downloading github.com/yosida95/uritemplate/v3 v3.0.2
+go: downloading golang.org/x/sync v0.7.0
+go: downloading github.com/gabriel-vasile/mimetype v1.4.2
+go: downloading github.com/go-playground/universal-translator v0.18.1
+go: downloading github.com/leodido/go-urn v1.2.4
+go: downloading github.com/go-playground/locales v0.14.1
+?   	affilio-api/cmd/distributoor	[no test files]
+?   	affilio-api/cmd/distributoor-mcp	[no test files]
+?   	affilio-api/cmd/offer-rails-mcp	[no test files]
+ok  	affilio-api/cmd/server	0.023s
+ok  	affilio-api/internal/config	0.001s
+ok  	affilio-api/internal/database	0.003s
+ok  	affilio-api/internal/dcp	0.005s
+ok  	affilio-api/internal/entry	0.003s
+ok  	affilio-api/internal/handlers	132.012s
+ok  	affilio-api/internal/middleware	0.006s
+ok  	affilio-api/internal/migrations	0.026s
+--- FAIL: TestMarkdownTwinsMatchHTMLPages (0.00s)
+    publicdocs_test.go:101: affilio-wp/admin/build/landing-v9/home.md dropped "Publishers earn on a sale. Makers pay only for that sale."
+FAIL
+FAIL	affilio-api/internal/orp	0.102s
+ok  	affilio-api/internal/preview	0.057s
+ok  	affilio-api/internal/services	0.265s
+ok  	affilio-api/internal/services/providers	0.002s
+ok  	affilio-api/internal/version	0.001s
+FAIL
+UTC_EXIT:1
+=== TZ=Europe/Rome ===
+?   	affilio-api/cmd/distributoor	[no test files]
+?   	affilio-api/cmd/distributoor-mcp	[no test files]
+?   	affilio-api/cmd/offer-rails-mcp	[no test files]
+ok  	affilio-api/cmd/server	0.015s
+ok  	affilio-api/internal/config	(cached)
+ok  	affilio-api/internal/database	(cached)
+ok  	affilio-api/internal/dcp	(cached)
+ok  	affilio-api/internal/entry	0.003s
+ok  	affilio-api/internal/handlers	138.579s
+ok  	affilio-api/internal/middleware	(cached)
+ok  	affilio-api/internal/migrations	(cached)
+--- FAIL: TestMarkdownTwinsMatchHTMLPages (0.00s)
+    publicdocs_test.go:101: affilio-wp/admin/build/landing-v9/home.md dropped "Publishers earn on a sale. Makers pay only for that sale."
+FAIL
+FAIL	affilio-api/internal/orp	0.108s
+ok  	affilio-api/internal/preview	0.033s
+ok  	affilio-api/internal/services	(cached)
+ok  	affilio-api/internal/services/providers	(cached)
+ok  	affilio-api/internal/version	(cached)
+FAIL
+ROME_EXIT:1
+=== rerun orp TZ=UTC ===
+ok  	affilio-api/internal/orp	0.058s
+UTC_ORP:0
+=== rerun orp TZ=Europe/Rome ===
+ok  	affilio-api/internal/orp	0.054s
+ROME_ORP:0
+=== full suite TZ=UTC ===
+?   	affilio-api/cmd/distributoor	[no test files]
+?   	affilio-api/cmd/distributoor-mcp	[no test files]
+?   	affilio-api/cmd/offer-rails-mcp	[no test files]
+ok  	affilio-api/cmd/server	(cached)
+ok  	affilio-api/internal/config	(cached)
+ok  	affilio-api/internal/database	(cached)
+ok  	affilio-api/internal/dcp	(cached)
+ok  	affilio-api/internal/entry	(cached)
+ok  	affilio-api/internal/handlers	131.497s
+ok  	affilio-api/internal/middleware	(cached)
+ok  	affilio-api/internal/migrations	(cached)
+ok  	affilio-api/internal/orp	0.079s
+ok  	affilio-api/internal/preview	(cached)
+ok  	affilio-api/internal/services	(cached)
+ok  	affilio-api/internal/services/providers	(cached)
+ok  	affilio-api/internal/version	(cached)
+UTC_FULL:0
+=== full suite TZ=Europe/Rome ===
+?   	affilio-api/cmd/distributoor	[no test files]
+?   	affilio-api/cmd/distributoor-mcp	[no test files]
+?   	affilio-api/cmd/offer-rails-mcp	[no test files]
+ok  	affilio-api/cmd/server	(cached)
+ok  	affilio-api/internal/config	(cached)
+ok  	affilio-api/internal/database	(cached)
+ok  	affilio-api/internal/dcp	(cached)
+ok  	affilio-api/internal/entry	(cached)
+ok  	affilio-api/internal/handlers	129.704s
+ok  	affilio-api/internal/middleware	(cached)
+ok  	affilio-api/internal/migrations	(cached)
+ok  	affilio-api/internal/orp	(cached)
+ok  	affilio-api/internal/preview	(cached)
+ok  	affilio-api/internal/services	(cached)
+ok  	affilio-api/internal/services/providers	(cached)
+ok  	affilio-api/internal/version	(cached)
+ROME_FULL:0

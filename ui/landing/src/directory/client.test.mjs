@@ -113,7 +113,7 @@ test('fixtures are TEST data and are not imported by the page', () => {
     assert.equal(source.includes('fixtures.mjs'), false)
     assert.equal(source.includes('TEST Vibe'), false)
   }
-  assert.match(agentPrompt, /Add my site to the Offer Rails directory/)
+  assert.match(agentPrompt, /Add my site or newsletter to the Offer Rails directory/)
   assert.match(makerPrompt, /Add my product to the Offer Rails directory/)
   assert.equal(agentPrompt.includes(installCommand), true)
   assert.equal(makerPrompt.includes(installCommand), true)

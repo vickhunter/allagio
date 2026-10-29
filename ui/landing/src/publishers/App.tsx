@@ -28,7 +28,6 @@ export function App() {
   return (
     <Page page="publishers">
       <section aria-labelledby="hero-h" className="relative isolate overflow-hidden border-b border-line">
-        <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(60%_70%_at_85%_20%,rgb(var(--rgb-pub-soft))_0%,transparent_70%),radial-gradient(50%_60%_at_10%_90%,rgb(var(--rgb-surface-2))_0%,transparent_70%)]" />
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-14 pt-10 md:pt-16 lg:grid-cols-[1fr_1.1fr]">
           <div className="anim-fade">
             <Badge variant="pub">For publishers · {publisherAdvantages.length} advantages</Badge>

@@ -329,7 +329,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
       headings: ['No-browser account', 'Device code', 'Find offers'].filter((name) => [...document.querySelectorAll('h2, h3')].some((el) => el.textContent.trim() === name)),
       soon: [...document.querySelectorAll('[data-tool][data-soon="true"]')].map((el) => el.getAttribute('data-tool')),
       livePreview: document.querySelector('[data-tool="preview_page"]')?.innerText.includes('Coming soon') && !document.querySelector('[data-tool="find_opportunities"]')?.innerText.includes('Coming soon'),
-      modes: ['Manual', 'Auto', 'YOLO'].every((name) => text.includes(name)),
+      modes: ['Ask me every time', 'Approve within my rules', 'Approve anything that passes the checks'].every((name) => text.includes(name)),
       stub: text.includes('claim_check_unavailable') && text.includes('Not checked yet'),
       url: document.querySelector('[data-mcp-url]')?.textContent || '',
       alternate: document.querySelector('link[rel="alternate"]')?.getAttribute('href') || '',
@@ -505,7 +505,7 @@ try {
       if (metrics.primary !== 1) throw new Error(slug + ' primary count ' + metrics.primary)
       const mcpHrefs = await page.getByRole('link', { name: 'MCP and setup' }).evaluateAll((links) => links.map((link) => link.getAttribute('href') || ''))
       if (!mcpHrefs.length || mcpHrefs.some((href) => !href.includes('/landing-v9/agents/') || !href.includes('source=cursor'))) throw new Error(slug + ' MCP href ' + mcpHrefs.join(','))
-      const positioning = route === '/' ? /Affiliate marketing, evolved for agents/ : route === '/makers' ? /Pay only for sales/ : /Earn from more of your posts/
+      const positioning = route === '/' ? /Publishers earn on a sale/ : route === '/makers' ? /Pay only for sales/ : /Earn from more of your posts/
       if (!(await page.getByRole('heading', { level: 1, name: positioning }).count())) throw new Error(slug + ' missing the positioning heading')
       const spoken = await page.locator('body').innerText()
       if (/\bads\b/i.test(spoken) || /revolution/i.test(spoken) || /\bpilot\b/i.test(spoken) || /every post/i.test(spoken)) throw new Error(slug + ' banned positioning word')

@@ -43,7 +43,9 @@ declare module '@/protocol/hosted.mjs' {
   export const hostOnlyRefusal: string
   export const joinSteps: string
   export const noMoney: string
-  export const notSpoken04: string
+  export const hostSpeechSpeaks: string
+  export const hostSpeechUnknown: string
+  export function hostSpeech(doc: unknown): string
   export const receiptRefusal: string
   export const otherRefusal: string
   export const payRefusal: string

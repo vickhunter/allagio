@@ -1,0 +1,232 @@
+TAP version 13
+# Subtest: llms.txt matches the agent facts
+ok 1 - llms.txt matches the agent facts
+  ---
+  duration_ms: 26.835825
+  type: 'test'
+  ...
+# Subtest: ordered steps name the hosted join, prepare, receipt, and sale bodies
+ok 2 - ordered steps name the hosted join, prepare, receipt, and sale bodies
+  ---
+  duration_ms: 1.18844
+  type: 'test'
+  ...
+# Subtest: only page preview and digest are coming soon
+ok 3 - only page preview and digest are coming soon
+  ---
+  duration_ms: 0.188497
+  type: 'test'
+  ...
+# Subtest: public agent copy stays on the documented words
+ok 4 - public agent copy stays on the documented words
+  ---
+  duration_ms: 0.70171
+  type: 'test'
+  ...
+# Subtest: the join prompt and the Copy button render
+ok 5 - the join prompt and the Copy button render
+  ---
+  duration_ms: 34.232533
+  type: 'test'
+  ...
+# Subtest: list URLs match the directory contract
+ok 6 - list URLs match the directory contract
+  ---
+  duration_ms: 16.300752
+  type: 'test'
+  ...
+# Subtest: empty, results, and 404 follow the contract
+ok 7 - empty, results, and 404 follow the contract
+  ---
+  duration_ms: 2.282254
+  type: 'test'
+  ...
+# Subtest: the client rejects a body the contract does not allow
+ok 8 - the client rejects a body the contract does not allow
+  ---
+  duration_ms: 1.131669
+  type: 'test'
+  ...
+# Subtest: fixtures are TEST data and are not imported by the page
+ok 9 - fixtures are TEST data and are not imported by the page
+  ---
+  duration_ms: 3.827442
+  type: 'test'
+  ...
+# Subtest: a failed directory load is an error, and an empty list stays empty
+ok 10 - a failed directory load is an error, and an empty list stays empty
+  ---
+  duration_ms: 3014.783962
+  type: 'test'
+  ...
+# Subtest: the home role buttons sit above the fold and the agent line sits under them
+ok 11 - the home role buttons sit above the fold and the agent line sits under them
+  ---
+  duration_ms: 3900.909914
+  type: 'test'
+  ...
+# Subtest: privacy shows the draft line and is not indexed
+ok 12 - privacy shows the draft line and is not indexed
+  ---
+  duration_ms: 2.698028
+  type: 'test'
+  ...
+# Subtest: terms shows the draft line and is not indexed
+ok 13 - terms shows the draft line and is not indexed
+  ---
+  duration_ms: 3.857132
+  type: 'test'
+  ...
+# Subtest: no sitemap lists the draft privacy or terms pages
+ok 14 - no sitemap lists the draft privacy or terms pages
+  ---
+  duration_ms: 16.680511
+  type: 'test'
+  ...
+# Subtest: the notebook split is 24, publisher 2.40, fee 0.24, maker keeps 21.36
+ok 15 - the notebook split is 24, publisher 2.40, fee 0.24, maker keeps 21.36
+  ---
+  duration_ms: 2.136452
+  type: 'test'
+  ...
+# Subtest: home, makers, and the how-it-works figure do not type the maker figure
+ok 16 - home, makers, and the how-it-works figure do not type the maker figure
+  ---
+  duration_ms: 14.440899
+  type: 'test'
+  ...
+# Subtest: one approval-mode name set, with no YOLO label
+ok 17 - one approval-mode name set, with no YOLO label
+  ---
+  duration_ms: 5.904218
+  type: 'test'
+  ...
+# Subtest: home, makers and publishers copy avoids ads, revolution, pilot, every post, best-converting, and open source
+ok 18 - home, makers and publishers copy avoids ads, revolution, pilot, every post, best-converting, and open source
+  ---
+  duration_ms: 8.016766
+  type: 'test'
+  ...
+# Subtest: groups a verified offer ahead of topic-matched unverified programs
+ok 19 - groups a verified offer ahead of topic-matched unverified programs
+  ---
+  duration_ms: 2.134318
+  type: 'test'
+  ...
+# Subtest: defaults an existing offer to verified and leaves the fixture out
+ok 20 - defaults an existing offer to verified and leaves the fixture out
+  ---
+  duration_ms: 0.762149
+  type: 'test'
+  ...
+# Subtest: names unreadable, private, and empty pages and never calls them no match
+ok 21 - names unreadable, private, and empty pages and never calls them no match
+  ---
+  duration_ms: 0.468587
+  type: 'test'
+  ...
+# Subtest: shows closest programs and stores a local notify intent when nothing matches
+ok 22 - shows closest programs and stores a local notify intent when nothing matches
+  ---
+  duration_ms: 0.644545
+  type: 'test'
+  ...
+# Subtest: drops go links and tracking params without caring about case, and strips userinfo
+ok 23 - drops go links and tracking params without caring about case, and strips userinfo
+  ---
+  duration_ms: 0.510015
+  type: 'test'
+  ...
+# Subtest: dedupes notify urls ignoring case and a trailing slash, and a blank field changes nothing
+ok 24 - dedupes notify urls ignoring case and a trailing slash, and a blank field changes nothing
+  ---
+  duration_ms: 0.234065
+  type: 'test'
+  ...
+# Subtest: keeps the newest notify urls and drops the oldest past the cap
+ok 25 - keeps the newest notify urls and drops the oldest past the cap
+  ---
+  duration_ms: 0.69546
+  type: 'test'
+  ...
+# Subtest: maps every preview slot to a plain label and a bar
+ok 26 - maps every preview slot to a plain label and a bar
+  ---
+  duration_ms: 1.314382
+  type: 'test'
+  ...
+# Subtest: maps every preview error status to its own line and next step
+ok 27 - maps every preview error status to its own line and next step
+  ---
+  duration_ms: 0.416957
+  type: 'test'
+  ...
+# Subtest: reads a no-match body and ignores a card with no summary
+ok 28 - reads a no-match body and ignores a card with no summary
+  ---
+  duration_ms: 0.244711
+  type: 'test'
+  ...
+# Subtest: rendered public landing copy has no ad, ads, fully automatic, pilot, revolutionary, best-converting, or open source
+ok 29 - rendered public landing copy has no ad, ads, fully automatic, pilot, revolutionary, best-converting, or open source
+  ---
+  duration_ms: 15.34116
+  type: 'test'
+  ...
+# Subtest: every 0.3 and 0.4 schema file has one generated page
+ok 30 - every 0.3 and 0.4 schema file has one generated page
+  ---
+  duration_ms: 24.984314
+  type: 'test'
+  ...
+# Subtest: the five-party and leave fixtures match the files
+ok 31 - the five-party and leave fixtures match the files
+  ---
+  duration_ms: 0.550829
+  type: 'test'
+  ...
+# Subtest: the committed catalog matches the spec files
+ok 32 - the committed catalog matches the spec files
+  ---
+  duration_ms: 14.842306
+  type: 'test'
+  ...
+# Subtest: quickstart names the hosted thin layer
+ok 33 - quickstart names the hosted thin layer
+  ---
+  duration_ms: 0.559594
+  type: 'test'
+  ...
+# Subtest: protocol docs do not say open source, affilio, distributoor, or offerrails.com
+ok 34 - protocol docs do not say open source, affilio, distributoor, or offerrails.com
+  ---
+  duration_ms: 2.568801
+  type: 'test'
+  ...
+# Subtest: conformance names come from the suite
+ok 35 - conformance names come from the suite
+  ---
+  duration_ms: 0.166847
+  type: 'test'
+  ...
+# Subtest: a surface is verified end to end only when both checks passed
+ok 36 - a surface is verified end to end only when both checks passed
+  ---
+  duration_ms: 1.675527
+  type: 'test'
+  ...
+# Subtest: deal labels stay honest
+ok 37 - deal labels stay honest
+  ---
+  duration_ms: 0.884028
+  type: 'test'
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5207.930052

@@ -9,7 +9,7 @@ import { getMember, httpsUrl, listDirectory, logoSrc, memberRoute, wantsFixtures
 import { agentPrompt, installLead, installUrl, makerPrompt } from '@/directory/prompt.mjs'
 import type { DirectoryCard, DirectoryKind } from '@/directory/types'
 
-type View = 'loading' | 'empty' | 'nomatch' | 'results'
+type View = 'loading' | 'empty' | 'nomatch' | 'results' | 'error'
 type Query = { q: string; category: string; topic: string; lang: string }
 
 function readQuery(): Query {
@@ -53,12 +53,16 @@ function Mark({ name, logo }: { name: string; logo: string | null }) {
 function AddYours({ source, kind }: { source: string; kind: DirectoryKind }) {
   const [copied, setCopied] = useState(false)
   const prompt = kind === 'maker' ? makerPrompt : agentPrompt
-  const heading = kind === 'maker' ? 'Add your product' : 'Add your site'
-  const lead = kind === 'maker' ? 'Add my product to the Offer Rails directory\n' : 'Add my site to the Offer Rails directory\n'
+  const heading = kind === 'maker' ? 'Add your product' : 'Add your site or newsletter'
+  const lead = kind === 'maker' ? 'Add my product to the Offer Rails directory\n' : 'Add my site or newsletter to the Offer Rails directory\n'
   return (
-    <div className="mt-8 max-w-3xl rounded-2xl border border-line bg-s1 p-5">
+    <div id="add-yours" className="mt-8 max-w-3xl rounded-2xl border border-line bg-s1 p-5">
       <h3 className="font-display text-lg font-semibold">{heading}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-t2">Paste this to an agent. It uses the install command from the agents page.</p>
+      {kind === 'maker' ? (
+        <p className="mt-2 text-sm leading-relaxed text-t2">This needs an MCP client. There is no add-product form on this page. Paste this to Claude Code. The same command is in the install list above, one command per client.</p>
+      ) : (
+        <p className="mt-2 text-sm leading-relaxed text-t2">Agent only for now. There is no form here that saves a newsletter or a site, and this page does not mint a link. Paste this to an MCP client. Your agent prepares a placement. You approve it, then paste the tracked link.</p>
+      )}
       <pre className="mt-4 min-w-0 whitespace-pre-wrap break-normal rounded-xl border border-line bg-s0 p-4 font-mono text-sm leading-relaxed text-t1">{lead}{installLead}<span className="[overflow-wrap:anywhere]">{installUrl}</span></pre>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button type="button" variant="outline" onClick={() => {
@@ -130,7 +134,7 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
       setItems([])
       setCursor(null)
       setTotal(0)
-      setView('empty')
+      setView('error')
     })
   }
 
@@ -155,7 +159,13 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
           <Button type="submit" variant="outline">Search</Button>
         </form>
         {view === 'loading' ? <p className="mt-8 text-t2" role="status">Loading the directory.</p> : null}
-        {view === 'empty' ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers listed yet. Yours can be first.' : 'No publishers listed yet. Yours can be first.'}</p> : null}
+        {view === 'error' ? (
+          <div className="mt-8">
+            <p className="text-t1" role="alert">The list could not load.</p>
+            <Button type="button" variant="outline" className="mt-4" onClick={() => load(applied.current, '', false)}>Retry</Button>
+          </div>
+        ) : null}
+        {view === 'empty' ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers listed yet. Yours can be first. Add your product below. That step needs an MCP client.' : 'No publishers listed yet. Add your site or newsletter below. An agent does that step for now.'}</p> : null}
         {view === 'nomatch' ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers match this search.' : 'No sites match this search.'}</p> : null}
         {view === 'results' ? (
           <>

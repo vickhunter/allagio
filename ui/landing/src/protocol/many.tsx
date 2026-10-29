@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { catalog } from '@/protocol/generated/catalog.mjs'
-import { noMoney, notSpoken04 } from '@/protocol/hosted.mjs'
+import { noMoney } from '@/protocol/hosted.mjs'
 import { useSource, withSource } from '@/lib/source'
 
 type Money = { amount_minor: number; currency: string }
@@ -104,7 +104,7 @@ function Seats({ parties }: { parties: Seat[] }) {
   )
 }
 
-export function ManyPage() {
+export function ManyPage({ hostLine }: { hostLine: string }) {
   const source = useSource()
   const chain = deal('referral-chain.json')
   const ring = deal('link-swap-ring.json')
@@ -113,7 +113,7 @@ export function ManyPage() {
     <>
       <p className="eyebrow">ORP 0.4</p>
       <h1 className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">Many-to-many deals</h1>
-      <p className="mt-4 text-lg leading-8">ORP 0.4 adds seats. A valid 0.3 message stays valid. A plain 0.3 deal is still two parties. {notSpoken04} {noMoney}</p>
+      <p className="mt-4 text-lg leading-8">ORP 0.4 adds seats. A valid 0.3 message stays valid. A plain 0.3 deal is still two parties. {hostLine} {noMoney}</p>
       <p className="mt-3 text-sm text-t2">{label}</p>
       <h2 className="h-display mt-10 text-2xl">Three parties</h2>
       <p className="mt-3 text-[16px] leading-7 text-t2">The referral example is three required seats. The deal state in the file is {chain.body.state}. All three are signed.</p>
@@ -140,13 +140,13 @@ export function ManyPage() {
   )
 }
 
-export function ThreePartyExample() {
+export function ThreePartyExample({ hostLine }: { hostLine: string }) {
   const found = example('deal', 'referral-chain.json')
   const parsed = JSON.parse(found.json) as DealExample
   return (
     <section className="mt-10" id="three-party">
       <h2 className="h-display text-2xl">A 3-party deal</h2>
-      <p className="mt-3 text-sm text-t2">{label} {notSpoken04}</p>
+      <p className="mt-3 text-sm text-t2">{label} {hostLine}</p>
       <p className="mt-3 text-[16px] leading-7 text-t2">Title in the file: {parsed.body.terms?.title}. State: {parsed.body.state}. The required seats that have signed are {parsed.body.parties.filter((seat) => seat.required && seat.signed).map((seat) => seat.role).join(', ')}.</p>
       <Seats parties={parsed.body.parties} />
       <CopyBlock label={found.name} code={found.json} />
