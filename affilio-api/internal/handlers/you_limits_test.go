@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -108,6 +109,66 @@ func TestYouLimitsSentencesDoNotDrift(t *testing.T) {
 		if !strings.Contains(string(built), sentence) || !strings.Contains(plain, sentence) {
 			t.Fatalf("limits sentence is not in both pages: %q", sentence)
 		}
+	}
+}
+
+func TestYouLimitsSignInReturnIsAllowed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	built := &HostedHandler{
+		BaseURL:       "http://127.0.0.1:8080",
+		AssetsPath:    filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"),
+		DownloadsPath: t.TempDir(),
+	}
+	builtRouter := gin.New()
+	built.Mount(builtRouter)
+	for _, path := range []string{"/you", "/you/"} {
+		rec := httptest.NewRecorder()
+		builtRouter.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		assertLimitsSignInReturnAllowed(t, path+" built", rec.Body.String())
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "home.html"), []byte("<!doctype html><title>Offer Rails</title>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plain := &HostedHandler{BaseURL: "http://127.0.0.1:8080", AssetsPath: dir, DownloadsPath: t.TempDir()}
+	plainRouter := gin.New()
+	plain.Mount(plainRouter)
+	rec := httptest.NewRecorder()
+	plainRouter.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/you/", nil))
+	assertLimitsSignInReturnAllowed(t, "fallback", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), `data-limits-fallback="1"`) {
+		t.Fatal("fallback case did not serve youLimitsPlain")
+	}
+}
+
+func assertLimitsSignInReturnAllowed(t *testing.T, label, body string) {
+	t.Helper()
+	const marker = ">Sign in to set your limits</a>"
+	at := strings.Index(body, marker)
+	if at < 0 {
+		t.Fatalf("%s has no limits sign-in link", label)
+	}
+	hrefAt := strings.LastIndex(body[:at], `href="`)
+	if hrefAt < 0 {
+		t.Fatalf("%s limits sign-in link has no href", label)
+	}
+	hrefAt += len(`href="`)
+	end := strings.Index(body[hrefAt:], `"`)
+	if end < 0 {
+		t.Fatalf("%s limits sign-in href is unterminated", label)
+	}
+	href := body[hrefAt : hrefAt+end]
+	parsed, err := url.Parse(href)
+	if err != nil {
+		t.Fatalf("%s href %q: %v", label, href, err)
+	}
+	returnTo := href
+	if parsed.Path == "/auth/login" {
+		returnTo = parsed.Query().Get("return_to")
+	}
+	if _, ok := loginReturnPathAllowed(returnTo); !ok {
+		t.Fatalf("%s href %q return %q is not an allowed login return path", label, href, returnTo)
 	}
 }
 

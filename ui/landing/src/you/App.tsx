@@ -11,7 +11,7 @@ export function App() {
         <h1 id="you-h" className="h-display mt-4 text-[40px] sm:text-6xl">Your limits, your approvals, a receipt in plain words.</h1>
         <p className="mt-5 text-lg leading-relaxed text-t2">{youPageLead}</p>
         <p className="mt-6">
-          <a href={signInHref('/you/', source)} className="inline-flex min-h-11 min-w-11 items-center rounded-[10px] bg-t1 px-5 text-sm font-semibold text-s0">Sign in to set your limits</a>
+          <a href={signInHref('/owner', source)} className="inline-flex min-h-11 min-w-11 items-center rounded-[10px] bg-t1 px-5 text-sm font-semibold text-s0">Sign in to set your limits</a>
         </p>
 
         <section id="limits" aria-labelledby="limits-h" className="mt-12">
