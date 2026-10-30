@@ -63,7 +63,7 @@ export function HowItWorks() {
             <div className="md:w-[42%]">
               <span className="inline-flex size-10 items-center justify-center rounded-xl bg-s2 text-setup"><UserCheck className="size-5" aria-hidden /></span>
               <h3 className="mt-4 font-display text-xl font-bold tracking-tight">Why an AI agent does the matching</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-t2">An agent can read a product page and the posts on a site, so finding a post that fits happens with the agent, not by hand. It does not write the post, and it does not choose the offer. You pick each step: ask every time, approve within your rules, or approve anything that passes the nine checks.</p>
+              <p className="mt-2 text-[15px] leading-relaxed text-t2">An agent can read a product page and the posts on a site, so finding a post that fits happens with the agent, not by hand. It does not write the post, and it does not choose the offer. You pick each step: Ask me every time, Approve within my rules, or Approve anything that passes the checks. While claim checks are not live, the last two still wait for a person.</p>
               <a href={`${assetBase}how-it-works/`} className="mt-4 inline-flex min-h-11 items-center gap-1 font-semibold text-setup underline underline-offset-4 hover:no-underline">See the animated railway figure <ArrowRight className="size-4" aria-hidden /></a>
             </div>
             <figure className="md:flex-1">

@@ -21,12 +21,12 @@ export function Checks({ id = 'checks', eyebrow }: { id?: string; eyebrow: strin
   return (
     <section id={id} aria-labelledby={`${id}-h`} className="border-t border-line">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-16 md:grid-cols-[1fr_2fr] md:py-20">
-        <div><p className="eyebrow">{eyebrow}</p><h2 id={`${id}-h`} className="h-display mt-3 text-3xl sm:text-4xl">Nine checks no agent can skip.</h2></div>
+        <div><p className="eyebrow">{eyebrow}</p><h2 id={`${id}-h`} className="h-display mt-3 text-3xl sm:text-4xl">Nine checks. They are not live.</h2></div>
         <div className="grid gap-10 sm:grid-cols-2">
           <ol className="space-y-2.5 text-[15px]">{hardChecks.map((c, n) => <li key={c} className="flex gap-3 border-b border-line pb-2.5"><span className="w-5 font-mono text-xs leading-6 text-t2">{n + 1}</span><Check className="mt-1 size-4 shrink-0 text-pub" aria-hidden />{c}</li>)}</ol>
           <div className="space-y-6">
             {modes.map((m, n) => <div key={m.name}><p className="font-mono text-xs text-t2">Mode {n + 1}</p><h3 className="mt-1 font-display text-lg font-semibold">{m.name}</h3><p className="mt-1 text-sm leading-relaxed text-t2">{m.note}</p></div>)}
-            <p className="rounded-xl border border-line bg-s1 p-4 text-sm leading-relaxed text-t2">Agents can only make settings stricter. Loosening a mode needs you, signed in.</p>
+            <p className="rounded-xl border border-line bg-s1 p-4 text-sm leading-relaxed text-t2">An agent tool can only make Ask me every time, Approve within my rules, or Approve anything that passes the checks stricter on a site or an offer. set_step_modes is separate: a site key can set a step to auto, ask, or off.</p>
           </div>
         </div>
       </div>

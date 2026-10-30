@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, docLinks, errors, installs, joinCommand, llmsText, mcpUrl, modes, orderedSteps, pagePath, personApprovesLine, placingPageBody, rates, signInNote, steps, tools } from './facts.mjs'
+import { publishStepParagraph } from '../vision.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, docLinks, errors, installs, joinCommand, llmsText, mcpUrl, modes, orderedSteps, pagePath, rates, signInNote, steps, tools } from './facts.mjs'
 
 const banned = /grok|marketplace|\blisted\b|github\.com|distributoor|affilio|connector/i
 
@@ -113,6 +114,7 @@ test('llms.txt matches the agent facts', () => {
   for (const tool of tools) assert.match(text, new RegExp(tool.name))
   for (const href of docLinks) assert.match(text, new RegExp(href))
   assert.equal(banned.test(withoutOfferJoin(file)), false)
+  assert.equal(banned.test(withoutOfferJoin(text)), false)
   assert.equal(/OfferRails|OFFERRAILS/.test(file + text), false)
 })
 
@@ -153,13 +155,13 @@ test('only page preview and digest are coming soon', () => {
 })
 
 test('public agent copy stays on the documented words', () => {
-  const blob = JSON.stringify({ steps, modes, tools, rates, errors, deviceSignIn, agentAccount, aloneToday, installs, signInNote, agentPrompt, orderedSteps, personApprovesLine })
+  const blob = JSON.stringify({ steps, modes, tools, rates, errors, deviceSignIn, agentAccount, aloneToday, installs, signInNote, agentPrompt, orderedSteps })
+  const text = llmsText()
   assert.equal(banned.test(withoutOfferJoin(blob)), false)
-  assert.equal(banned.test(withoutOfferJoin(llmsText())), false)
+  assert.equal(banned.test(withoutOfferJoin(text)), false)
   for (const name of ['Ask me every time', 'Approve within my rules', 'Approve anything that passes the checks']) assert.match(blob, new RegExp(name))
   assert.equal(blob.includes('YO' + 'LO'), false)
   assert.equal(/\bManual\b/.test(blob), false)
-  assert.match(blob, /With Ask me every time, a person approves each placement, and with Approve within my rules and Approve anything that passes the checks, the agent does\./)
   assert.match(blob, /rate limit exceeded/)
   assert.match(blob, /preview rate limit exceeded/)
   assert.match(blob, /invalid payload/)
@@ -167,9 +169,10 @@ test('public agent copy stays on the documented words', () => {
   assert.match(blob, /claim_check_unavailable/)
   assert.match(blob, /Not checked yet/)
   const placing = aloneToday.find((item) => item.title === 'Placing an offer')
-  assert.match(placing.body, /A person still approves each placement\./)
-  assert.match(llmsText(), /A person still approves each placement\./)
-  assert.equal(placingPageBody.includes('A person still approves each placement.'), false)
-  assert.match(placingPageBody, /With Ask me every time, a person approves each placement, and with Approve within my rules and Approve anything that passes the checks, the agent does\./)
-  assert.match(placingPageBody, /That access_token is a bearer for \/mcp and for ORP\. It is not an X-API-Key and it is not an X-Admin-Key\./)
+  assert.equal(text.includes(placing.body), true)
+  assert.equal(placing.body.includes(publishStepParagraph), true)
+  assert.match(placing.body, /That access_token is a bearer for \/mcp and for ORP\. It is not an X-API-Key and it is not an X-Admin-Key\./)
+  const page = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8')
+  assert.equal(page.includes('placingPageBody'), false)
+  assert.equal(page.includes("title === 'Placing an offer'"), false)
 })

@@ -1,10 +1,7 @@
-import { approvalModes, personApprovesLine } from '../lib/modes.mjs'
+import { approvalModes } from '../lib/modes.mjs'
+import { publishStepParagraph } from '../vision.mjs'
 
-export { personApprovesLine }
-
-const placingLead = 'Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. '
 const placingBearer = 'That access_token is a bearer for /mcp and for ORP. It is not an X-API-Key and it is not an X-Admin-Key.'
-export const placingPageBody = `${placingLead}${personApprovesLine} ${placingBearer}`
 
 export const mcpUrl = 'https://offer-rails.onrender.com/mcp'
 export const pagePath = '/landing-v9/agents/'
@@ -240,7 +237,7 @@ export const aloneToday = [
   },
   {
     title: 'Placing an offer',
-    body: 'Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. A person still approves each placement. That access_token is a bearer for /mcp and for ORP. It is not an X-API-Key and it is not an X-Admin-Key.',
+    body: `Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. ${publishStepParagraph} ${placingBearer}`,
   },
 ]
 
@@ -306,15 +303,15 @@ ${orpTestDealSection()}
 Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
 
 Deals with other agents:
-- Affiliate links: a person approves before anything is published. This is not Verified end to end.
+- Affiliate links: ${publishStepParagraph} This is not Verified end to end.
 - Link swaps: Coming.
 - Cross-sells: Coming.
 - Upsells: Coming.
 - Reposts: Coming.
 
-The human's limits come first. No agent tool can approve a placement. No personal data is shared with the other agent. Offer Rails does not send cold emails. The agent joins with POST /v1/agent-tokens and sends the bearer. No sign-in link. A person still signs in with Google for the owner dashboard. The aim is to replace manual affiliate signups and outreach email bots. This is affiliate marketing, evolved for agents.
+The human's limits come first. ${publishStepParagraph} No personal data is shared with the other agent. Offer Rails does not send cold emails. The agent joins with POST /v1/agent-tokens and sends the bearer. No sign-in link. A person still signs in with Google for the owner dashboard. The aim is to replace manual affiliate signups and outreach email bots. This is affiliate marketing, evolved for agents.
 
-Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article, prepares a disclosed placement, and a person approves it before it is published. A chat answer is never a paid placement.
+Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article and prepares a disclosed placement. ${publishStepParagraph} A chat answer is never a paid placement.
 
 MCP server: ${mcpUrl}
 

@@ -35,6 +35,7 @@ type HostedHandler struct {
 	DownloadsPath   string
 	OperatorID      string
 	Assessments     *AssessmentsHandler
+	loginMu         sync.RWMutex
 	DemoCheckoutURL string
 	ClaimsCheck     string
 	EventLimiter    *IPRateLimiter
@@ -514,6 +515,20 @@ func (h *HostedHandler) requirePublisher(c *gin.Context) {
 	c.Next()
 }
 
+// SetOwnerLogin publishes the issuer client after discovery. Listen does not
+// wait on that network call. Sign-in returns 503 until this is set.
+func (h *HostedHandler) SetOwnerLogin(login services.OwnerLogin) {
+	h.loginMu.Lock()
+	h.Login = login
+	h.loginMu.Unlock()
+}
+
+func (h *HostedHandler) ownerLogin() services.OwnerLogin {
+	h.loginMu.RLock()
+	defer h.loginMu.RUnlock()
+	return h.Login
+}
+
 func (h *HostedHandler) LoginStart(c *gin.Context) {
 	if h.limited(c) {
 		return
@@ -550,16 +565,27 @@ func (h *HostedHandler) LoginStart(c *gin.Context) {
 		c.Status(500)
 		return
 	}
+	login := h.ownerLogin()
+	if login == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "sign-in is starting"})
+		return
+	}
 	if err = h.DB.SaveLoginAttempt(c.Request.Context(), services.HashAPIKey(state), database.LoginAttempt{Nonce: nonce, Verifier: verifier, ReturnTo: returnTo}); err != nil {
 		c.Status(500)
 		return
 	}
 	h.cookie(c, h.loginCookieName(), state, 600)
-	c.Redirect(http.StatusFound, h.Login.AuthorizationURL(state, nonce, verifier))
+	c.Redirect(http.StatusFound, login.AuthorizationURL(state, nonce, verifier))
 }
 
 func (h *HostedHandler) LoginCallback(c *gin.Context) {
 	if h.limited(c) {
+		return
+	}
+	// Discovery can still be running. Leave the login cookie and the stored
+	// attempt in place so the browser can retry this same callback.
+	if h.ownerLogin() == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "sign-in is starting"})
 		return
 	}
 	state := c.Query("state")
@@ -574,7 +600,7 @@ func (h *HostedHandler) LoginCallback(c *gin.Context) {
 		c.JSON(400, gin.H{"error": "sign-in attempt expired"})
 		return
 	}
-	o, err := h.Login.Verify(c.Request.Context(), c.Query("code"), a.Nonce, a.Verifier)
+	o, err := h.ownerLogin().Verify(c.Request.Context(), c.Query("code"), a.Nonce, a.Verifier)
 	if err != nil {
 		c.JSON(401, gin.H{"error": "sign-in identity could not be verified"})
 		return

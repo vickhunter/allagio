@@ -16,8 +16,6 @@ declare module '@/agents/facts.mjs' {
   }
   export const docLinks: readonly string[]
   export const steps: readonly { title: string; body: string }[]
-  export const personApprovesLine: string
-  export const placingPageBody: string
   export const modes: readonly { name: string; body: string }[]
   export const tools: readonly { name: string; soon: boolean; maker: boolean; line: string }[]
   export const rates: readonly { route: string; limit: string; over: string }[]

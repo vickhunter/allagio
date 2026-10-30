@@ -88,6 +88,13 @@ Message rules for that walk: [/llms-full.txt](https://offer-rails.onrender.com/l
 Full text: [/llms-full.txt](https://offer-rails.onrender.com/llms-full.txt)
 `
 
+// publishStepParagraph is the publish step and the separate decide-step modes.
+// skill, llms, MCP instructions, and the limits fallback all use this text.
+const publishStepParagraph = "A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person."
+
+// ownerApprovalURL is how the hosted MCP wrapper attaches the approval link.
+const ownerApprovalURL = "The hosted MCP wrapper adds owner_approval_url when prepare_placement returns a placement object with an id, including a committed auto prepare. Send it to the owner when that prepare result's status is awaiting_approval. get_placement returns the id at the top level and does not get the URL. POST /v1/placements itself does not add the field."
+
 const skillMD = `# Offer Rails
 
 This file is a pointer. It is not a second copy of the rules.
@@ -98,10 +105,11 @@ Full text: [/llms-full.txt](https://offer-rails.onrender.com/llms-full.txt)
 
 POST /v1/agent-tokens with {}.
 Send the access_token as Authorization: Bearer to /mcp.
+The bearer is not an X-API-Key or X-Admin-Key.
 POST /orp/join with {}.
 Read tools/list on /mcp.
 No sign-in link.
-A person still approves each placement.
+` + publishStepParagraph + `
 On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by.
 Each entry has step, party, and agent or owner.
 A 0.3 deal does not include approved_by.
@@ -133,6 +141,8 @@ func llmsBody() string { return llmsText }
 // The cold-path pointer to /skill.md stays only in /llms.txt.
 func llmsFullDocument() string {
 	manual := strings.Replace(llmsArchive, "Next: [/skill.md](https://offer-rails.onrender.com/skill.md)\n\n", "", 1)
+	manual = strings.ReplaceAll(manual, "«publishStepParagraph»", publishStepParagraph)
+	manual = strings.ReplaceAll(manual, "«ownerApprovalURL»", ownerApprovalURL)
 	return manual + llmsFullSuffix + "\n" + agentJoinDoc() + "\n" + entry.HardCheckDoc() + "\n" + entry.RestoreRefusalDoc() + "\n" + entry.PluginRetryDoc()
 }
 

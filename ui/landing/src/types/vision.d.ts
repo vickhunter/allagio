@@ -1,5 +1,6 @@
 declare module '@/vision.mjs' {
   export const visionLine: string
+  export const publishStepParagraph: string
   export const visionHonest: string
   export const evolutionLine: string
   export const agentDoesLead: string

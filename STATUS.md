@@ -1,3 +1,7 @@
+## October 28 — D-118 sits on main
+
+The home first screen stays the in-write offer. Directory errors still say “Couldn't load the directory” and the status. Mode names stay Ask me every time, Approve within my rules, and Approve anything that passes the checks. The nine-checks heading stays “Nine checks. They are not live.” The brand line no longer says those checks run. The agents page and its llms text use one placing sentence. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 28 — Mode names and a real directory error (D-118)
 
 The agents page says who approves by mode: with Ask me every time, a person approves each placement, and with the other two modes, the agent does. The bearer line is unchanged. The agents page “Placing an offer” line keeps the bearer wording from the llms text. The agents page and the landing no longer say Manual, Auto, or YOLO. The three modes are Ask me every time, Approve within my rules, and Approve anything that passes the checks. Each one says who approves. The honest line is that a person approves each placement unless they set limits for their agent. No approval default is claimed. A directory response that is not 200 says “Couldn't load the directory” and the status, including 503. “No makers listed yet” and a hidden search box are only for a 200 whose total is 0. `/llms.txt`, `skill.md`, and the Go API are unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
@@ -9,6 +13,18 @@ The home first screen is one sentence of the in-write offer, the agent join line
 ## October 28 — Plain first screen and one sale split (D-116)
 
 The home first screen states what a person gets and who pays, then the two role buttons. The agent join line sits under that choice. Agents join with no sign-in. People sign in with Google for the dashboard. That reason is said once on publisher setup. The pink-to-blue hero wash is a flat paper surface. The notebook example is one function: on €24.00 at 10%, the publisher gets €2.40, the maker pays a €0.24 fee, and the maker keeps €21.36. Home, makers, and the how-it-works figure read that function. Approval modes use one name set: Ask me every time, Approve within my rules, Approve anything that passes the checks. A newsletter writer sees “Agent only for now” and a next step, because this page does not mint a tracked link. Makers get one install command per client, and adding a product says it needs an MCP client. The optional post preview is labelled. The protocol docs app reads `/.well-known/orp.json` for the “This host” line. If that read fails, the line stays neutral. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 28 — Approval wording by mode (D-119)
+
+A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. Agents cannot approve a placement. The test-deal heading stays `ORP 0-3`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 28 — Time to first test deal (D-117)
+
+`scripts/cold-path.py` reads `/llms.txt`, then `/skill.md`, joins two parties, walks the directed test deal, and opens the proof page. It prints seconds per step and the total. It does not print tokens. Issuer discovery no longer blocks listen. A failed discovery is logged without the client secret and retried, from 1 second up to 30 seconds. It does not exit the process. `GET /auth/login` and the sign-in callback return HTTP 503 `sign-in is starting` until discovery finishes. The callback leaves the login cookie in place so the browser can retry. Database connect and `AUTO_MIGRATE` still finish before listen, because later requests assume the schema. `POST /v1/agent-tokens` stays at 8 a minute and 30 a day, shared with `POST /v1/agent-accounts`. The ninth rapid request from one address is HTTP 429, and the eleventh is too. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
+## October 28 — Entrance follow-up
+
+`/skill.md` and `/you.md` say the bearer is not an X-API-Key or X-Admin-Key. A failed approval read logs the error. `/llms-full.txt` says the offer is available where it used to say listed. The test-deal heading stays `ORP 0-3` so `/llms.txt#orp-0-3-test-deal` still lands on that heading. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## October 28 — Cold-path llms.txt (D-115)
 

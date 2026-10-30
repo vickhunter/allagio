@@ -1,0 +1,2 @@
+npx tsc -b in ui/landing: exit 0
+landing node --test: 33 pass, 0 fail

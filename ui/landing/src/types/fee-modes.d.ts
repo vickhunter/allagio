@@ -20,7 +20,6 @@ declare module '@/lib/fee.mjs' {
 
 declare module '@/lib/modes.mjs' {
   export const approvalModes: readonly { id: string; name: string; note: string }[]
-  export const personApprovesLine: string
   export const signInStory: string
   export const personSignsInBecause: string
 }

@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { modes as agentModes } from '../agents/facts.mjs'
 import { approvalModes } from './modes.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -18,6 +19,8 @@ test('one approval-mode name set, with no retired mode label', () => {
     'src/vision.mjs',
     'src/you/App.tsx',
     'src/legal/copy.ts',
+    'src/agents/facts.mjs',
+    'src/agents/App.tsx',
   ]
   for (const file of files) {
     const text = readFileSync(resolve(root, file), 'utf8')
@@ -29,6 +32,12 @@ test('one approval-mode name set, with no retired mode label', () => {
   assert.match(setup, /approvalModes/)
   assert.match(vision, /approvalModes/)
   assert.match(content, /approvalModes/)
+  const facts = readFileSync(resolve(root, 'src/agents/facts.mjs'), 'utf8')
+  const agents = readFileSync(resolve(root, 'src/agents/App.tsx'), 'utf8')
+  assert.match(facts, /approvalModes/)
+  assert.match(agents, /modes\.map/)
+  assert.deepEqual(agentModes.map((mode) => mode.name), names)
+  for (const name of names) assert.match(vision, new RegExp(name))
 })
 
 function filesUnder(dir, out = []) {

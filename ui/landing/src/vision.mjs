@@ -1,4 +1,4 @@
-import { approvalModes, personApprovesLine } from './lib/modes.mjs'
+import { approvalModes } from './lib/modes.mjs'
 
 // D-098. The vision may name any agent, any platform, and any post.
 // A status says Coming unless that deal works today. Nothing is Verified end to end
@@ -6,7 +6,9 @@ import { approvalModes, personApprovesLine } from './lib/modes.mjs'
 
 export const visionLine = 'Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent.'
 
-export const visionHonest = 'That is the direction. What works today is an affiliate link a person approves. The other deals on this page are Coming. Nothing here is Verified end to end.'
+export const publishStepParagraph = 'A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.'
+
+export const visionHonest = 'That is the direction. What works today is an affiliate link. ' + publishStepParagraph + ' The other deals on this page are Coming. Nothing here is Verified end to end.'
 
 export const evolutionLine = 'This is affiliate marketing, evolved for agents. The same path, with the finding and the matching handed to the agent you already use.'
 
@@ -22,8 +24,8 @@ export const deals = [
   },
   {
     name: 'Affiliate links',
-    status: 'A person approves',
-    note: 'Your agent can find an offer and prepare a placement. You approve it before it is published. A pasted link counts clicks. This is not Verified end to end.',
+    status: 'Works today',
+    note: 'Your agent can find an offer and prepare a placement. ' + publishStepParagraph + ' A pasted link counts clicks. This is not Verified end to end.',
   },
   {
     name: 'Link swaps',
@@ -50,11 +52,11 @@ export const deals = [
 export const youKeep = [
   {
     t: 'Your limits come first',
-    b: `The modes are ${approvalModes[0].name}, ${approvalModes[1].name}, and ${approvalModes[2].name}. ${personApprovesLine} While claims are not checked, the last two still wait for a person.`,
+    b: 'A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on. ' + publishStepParagraph,
   },
   {
     t: 'You approve',
-    b: personApprovesLine,
+    b: publishStepParagraph,
   },
   {
     t: 'No personal data shared with the other agent',
@@ -73,7 +75,7 @@ export const youKeep = [
 export const replaces = [
   {
     t: 'Manual affiliate signups',
-    b: 'Filling in a form on each program site is what this is built to replace. Today you still approve the placement. Your agent joins with POST /v1/agent-tokens and a bearer.',
+    b: 'Filling in a form on each program site is what this is built to replace. ' + publishStepParagraph + ' Your agent joins with POST /v1/agent-tokens and a bearer.',
   },
   {
     t: 'Outreach email bots',
@@ -82,9 +84,9 @@ export const replaces = [
 ]
 
 export const limits = [
-  { name: approvalModes[0].name, note: 'A person approves each placement. The agent can prepare it and show the terms.' },
-  { name: approvalModes[1].name, note: 'A person set limits. Within those limits, the agent may approve. Outside them, a person approves. While claims are not checked, this still waits for a person.' },
-  { name: approvalModes[2].name, note: 'Only a person can turn this on. While claims are not checked, this also waits for a person.' },
+  { name: approvalModes[0].name, note: 'Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.' },
+  { name: approvalModes[1].name, note: 'Once you set it. While claims are not checked, this still waits for a person.' },
+  { name: approvalModes[2].name, note: 'Only you can turn this on. While claims are not checked, this also waits for a person.' },
 ]
 
 export const youPageLead = 'This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.'

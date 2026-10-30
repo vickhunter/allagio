@@ -671,7 +671,7 @@ try {
     if (!primaryName.includes('Download the plugin')) throw new Error('setup-' + width + ' primary ' + primaryName)
     if (setupMetrics.pills.length !== 3 || setupMetrics.pills.some((pill) => pill.size < 12 || !pill.sameLine || !pill.aboveTitle)) throw new Error('setup-' + width + ' status pills ' + JSON.stringify(setupMetrics.pills))
     if (!manual) throw new Error('setup-' + width + ' does not preselect Manual')
-    if (!setupCopy.includes('With Ask me every time, a person approves each placement, and with Approve within my rules and Approve anything that passes the checks, the agent does.')) throw new Error('setup-' + width + ' copy drifted')
+    if (!setupCopy.includes('A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on.')) throw new Error('setup-' + width + ' copy drifted')
     if (!connectHref.includes('/auth/login') || !connectHref.includes('source=cursor') || !connectTo.startsWith('/owner/connect-site') || !connectTo.includes('source=cursor')) throw new Error('setup connect href ' + connectHref)
     const setupZip = await setupPage.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
     if (setupZip !== '/downloads/offer-rails.zip') throw new Error('setup zip ' + setupZip)
