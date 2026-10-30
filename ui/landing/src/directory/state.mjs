@@ -8,8 +8,8 @@ export function directoryFailureStatus(error) {
   return 'network'
 }
 
-export function directoryFailureCopy(error) {
-  return `Couldn't load the directory. ${directoryFailureStatus(error)}`
+export function directoryFailureCopy() {
+  return 'The list could not load.'
 }
 
 export function directoryEmptyCopy(kind) {
@@ -19,7 +19,7 @@ export function directoryEmptyCopy(kind) {
 
 export function directoryChrome(view, total) {
   if (view === 'loading') return { heading: false, search: false, error: false, empty: false, list: false, nomatch: false, add: false }
-  if (view === 'error') return { heading: false, search: true, error: true, empty: false, list: false, nomatch: false, add: true }
+  if (view === 'error') return { heading: true, search: true, error: true, empty: false, list: false, nomatch: false, add: true }
   if (view === 'empty') return { heading: false, search: false, error: false, empty: true, list: false, nomatch: false, add: true }
   return {
     heading: view === 'results' || view === 'nomatch',

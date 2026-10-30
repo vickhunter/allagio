@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { hostSpeech } from '@/protocol/hosted.mjs'
+import { hostSpeech, hostSpeechUnknown } from '@/protocol/hosted.mjs'
 
 // Reads this origin's discovery document. A failed or unreadable check stays
-// null. Callers show the unknown line and do not guess a version.
+// neutral. It does not guess that the host is silent.
 export function useHostSpeech() {
-  const [doc, setDoc] = useState<unknown>(null)
+  const [line, setLine] = useState(hostSpeechUnknown)
   useEffect(() => {
     const ac = new AbortController()
     fetch('/.well-known/orp.json', { headers: { accept: 'application/json' }, cache: 'no-store', signal: ac.signal })
@@ -12,13 +12,13 @@ export function useHostSpeech() {
         if (!res.ok) throw new Error(String(res.status))
         return res.json()
       })
-      .then((body) => {
-        if (!ac.signal.aborted) setDoc(body)
+      .then((doc) => {
+        if (!ac.signal.aborted) setLine(hostSpeech(doc))
       })
       .catch(() => {
-        if (!ac.signal.aborted) setDoc(null)
+        if (!ac.signal.aborted) setLine(hostSpeechUnknown)
       })
     return () => ac.abort()
   }, [])
-  return { doc, line: hostSpeech(doc) }
+  return line
 }

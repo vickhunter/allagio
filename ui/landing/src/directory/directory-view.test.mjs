@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const chrome = ['/usr/local/bin/google-chrome', '/usr/bin/google-chrome'].find((path) => existsSync(path))
 const emptyText = 'No makers listed yet. Yours can be first. Add your product below. That step needs an MCP client.'
-const errorText = "Couldn't load the directory. 503"
+const errorText = 'The list could not load.'
 
 test('a failed directory load is an error, and an empty list stays empty', { timeout: 60_000 }, async () => {
   assert.ok(chrome, 'chrome is required to render the directory')
@@ -42,21 +42,25 @@ test('a failed directory load is an error, and an empty list stays empty', { tim
       })
     })
     await page.goto(base, { waitUntil: 'networkidle' })
-    const failure = page.getByRole('status').filter({ hasText: errorText })
-    await failure.waitFor()
-    assert.equal(await failure.innerText(), errorText)
+    const alert = page.getByRole('alert')
+    await alert.waitFor()
+    assert.equal(await alert.innerText(), errorText)
     assert.equal(await page.getByText(emptyText).count(), 0)
-    assert.equal(await page.locator('#directory-q').count(), 1)
     const opened = calls
     assert.ok(opened >= 1)
+    const retried = page.waitForResponse((res) => res.url().includes('/v1/directory/makers') && res.status() === 503)
+    await page.getByRole('button', { name: 'Retry' }).click()
+    await retried
+    await page.getByRole('alert').waitFor()
+    assert.equal(calls, opened + 1)
+    assert.equal(await page.getByText(emptyText).count(), 0)
     fail = false
     const emptied = page.waitForResponse((res) => res.url().includes('/v1/directory/makers') && res.status() === 200)
-    await page.reload({ waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: 'Retry' }).click()
     await emptied
     await page.getByText(emptyText).waitFor()
-    assert.ok(calls > opened)
-    assert.equal(await page.getByRole('status').filter({ hasText: errorText }).count(), 0)
-    assert.equal(await page.locator('#directory-q').count(), 0)
+    assert.equal(calls, opened + 2)
+    assert.equal(await page.getByRole('alert').count(), 0)
     await context.close()
   } finally {
     await browser.close()

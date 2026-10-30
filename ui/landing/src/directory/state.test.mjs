@@ -8,7 +8,7 @@ function jsonResponse(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body }
 }
 
-test('a 503 names the status and a 200 with total 0 is the empty list', async () => {
+test('a 503 is an error and a 200 with total 0 is the empty list', async () => {
   await assert.rejects(
     listDirectory('maker', {}, async () => jsonResponse(503, { error: 'database' })),
     (error) => error instanceof DirectoryFailure && error.status === 503,
@@ -19,12 +19,11 @@ test('a 503 names the status and a 200 with total 0 is the empty list', async ()
   const failed = directoryChrome('error', 0)
   assert.equal(failed.error, true)
   assert.equal(failed.empty, false)
+  assert.equal(failed.heading, true)
   assert.equal(failed.search, true)
-  assert.equal(directoryFailureCopy(new DirectoryFailure(503, 'directory')), "Couldn't load the directory. 503")
+  assert.equal(directoryFailureCopy(new DirectoryFailure(503, 'directory')), 'The list could not load.')
   assert.equal(directoryFailureCopy(new DirectoryFailure(503, 'directory')).includes('No makers listed yet'), false)
-  assert.equal(directoryFailureCopy(new DirectoryFailure(404, 'not found')), "Couldn't load the directory. 404")
-  assert.equal(directoryFailureCopy(new DirectoryFailure(0, 'network')), "Couldn't load the directory. network")
-  assert.equal(directoryFailureStatus(new DirectoryFailure(502, 'json')), '502')
+  assert.equal(directoryFailureStatus(new DirectoryFailure(503, 'directory')), '503')
 
   const blank = directoryChrome('empty', 0)
   assert.equal(blank.search, false)
@@ -35,7 +34,8 @@ test('a 503 names the status and a 200 with total 0 is the empty list', async ()
   assert.match(directoryEmptyCopy('publisher'), /^No publishers listed yet/)
 
   const page = readFileSync(new URL('./Directory.tsx', import.meta.url), 'utf8')
-  assert.match(page, /directoryFailureCopy/)
+  assert.match(page, /role="alert"/)
+  assert.match(page, /Retry/)
   assert.match(page, /directoryEmptyCopy/)
 })
 
@@ -49,4 +49,5 @@ test('an empty directory hides the search and a live list shows it', () => {
   assert.equal(live.list, true)
   assert.equal(directoryChrome('loading', 0).add, false)
   assert.equal(directoryChrome('error', 0).search, true)
+  assert.equal(directoryChrome('error', 0).heading, true)
 })

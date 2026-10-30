@@ -174,7 +174,12 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
           </form>
         ) : null}
         {view === 'loading' ? <p className="mt-8 text-t2" role="status">Loading the directory.</p> : null}
-        {chrome.error ? <p className="mt-8 text-t1" role="status">{directoryFailureCopy(failure)}</p> : null}
+        {chrome.error ? (
+          <div className="mt-8">
+            <p className="text-t1" role="alert">{directoryFailureCopy(failure)}</p>
+            <Button type="button" variant="outline" className="mt-4" onClick={() => load(applied.current, '', false)}>Retry</Button>
+          </div>
+        ) : null}
         {chrome.empty ? <p className="mt-8 text-t1" role="status">{directoryEmptyCopy(kind)}</p> : null}
         {chrome.nomatch ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers match this search.' : 'No sites match this search.'}</p> : null}
         {chrome.list ? (

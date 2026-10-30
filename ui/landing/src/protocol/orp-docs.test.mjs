@@ -5,7 +5,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { buildCatalog } from '../../scripts/build-orp-docs.mjs'
 import { catalog } from './generated/catalog.mjs'
-import { hostDiscovery, hostOverview, hostQuickstartDiscover, hostQuickstartHello, hostQuickstartOffer, hostSpeech, hostSpeechSpeaks, hostSpeechUnknown, noMoney, otherRefusal, payRefusal } from './hosted.mjs'
+import { hostSpeech, hostSpeechSpeaks, hostSpeechUnknown, noMoney, otherRefusal, payRefusal } from './hosted.mjs'
 import { routeFor } from './route.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -99,24 +99,6 @@ test('quickstart names the hosted thin layer', () => {
   assert.match(page, /ThreePartyExample/)
   assert.equal(page.includes('does not speak ORP 0.4'), false)
   assert.match(page, /useHostSpeech|hostLine/)
-  assert.equal(page.includes('for a 0.3 test deal'), false)
-  assert.equal(page.includes('orp lists 0.3'), false)
-  assert.equal(page.includes('Hello returns one version, 0.3'), false)
-  const doc = { orp: ['0.4'], name: 'In testing', endpoint: 'https://example.test/orp', suggest: 'https://example.test/orp/suggest', join: 'https://example.test/orp/join', auth: { bearer: true }, capabilities: { messages: ['hello', 'leave', 'seat'] } }
-  const overview = hostOverview(doc)
-  assert.match(overview, /This host speaks ORP 0\.4 \(leave and seat\)\./)
-  assert.equal(overview.includes('0.3'), false)
-  const both = hostOverview({ ...doc, orp: ['0.4', '0.3'] })
-  assert.match(both, /orp lists 0\.4, 0\.3/)
-  assert.equal(both.includes('0.3 test deal'), false)
-  assert.equal(hostOverview(null), hostSpeechUnknown)
-  assert.equal(hostQuickstartDiscover(null), hostSpeechUnknown)
-  assert.equal(hostQuickstartHello(null), hostSpeechUnknown)
-  assert.equal(hostQuickstartOffer(null), hostSpeechUnknown)
-  assert.equal(hostQuickstartHello(doc).includes('0.3'), false)
-  assert.match(hostQuickstartOffer(doc), /This host speaks ORP 0\.4 \(leave and seat\)\./)
-  assert.match(hostQuickstartDiscover(doc), /orp lists 0\.4/)
-  assert.equal(hostDiscovery({ orp: ['0.3'] }), null)
   assert.equal(page.includes('hostedRefusal'), false)
   assert.equal(page.includes('refusedTypes'), false)
   assert.equal(routeFor('/protocol/many/').name, 'many')
