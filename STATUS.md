@@ -1,3 +1,7 @@
+## October 30 — D-118 review fixes
+
+The directory error is the accepted line again: “The list could not load.” with an alert and a Retry button. A failed load stays separate from an empty list. The protocol overview again says “ORP 0.3 is frozen” and uses the “ORP {version}” eyebrow. The static /you/ shell matches the page: sign in, the limits, “No deals yet.” No example receipt and no agent-token line in that shell. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 28 — D-118 sits on main
 
 The home first screen stays the in-write offer. Directory errors still say “Couldn't load the directory” and the status. Mode names stay Ask me every time, Approve within my rules, and Approve anything that passes the checks. The nine-checks heading stays “Nine checks. They are not live.” The brand line no longer says those checks run. The agents page and its llms text use one placing sentence. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

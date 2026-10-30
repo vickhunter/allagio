@@ -31,10 +31,10 @@ const youShell = `<div id="static-landing">
       <h1>Your limits, your approvals, a receipt in plain words.</h1>
       <p>This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.</p>
       <p><a href="/auth/login?return_to=%2Fyou%2F" style="display:inline-flex;min-height:44px;align-items:center">Sign in to set your limits</a></p>
-      <p>Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.</p>
       <section id="limits"><h2>Limits</h2><p>Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.</p><h3>Ask me every time</h3><p>Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.</p><h3>Approve within my rules</h3><p>Once you set it. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the checks</h3><p>Only you can turn this on. While claims are not checked, this also waits for a person.</p></section>
-      <section id="approvals"><h2>Approvals</h2><p>${publishStepParagraph}</p></section>
-      <section id="receipts"><h2>Receipts</h2><p>No deals yet.</p><p>Example wording. Not a live agreement.</p><p>Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.</p></section>
+      <section id="approvals"><h2>Approvals</h2><p>${publishStepParagraph} Your agent can prepare the placement and show you the terms.</p></section>
+      <section id="receipts"><h2>Receipts</h2><p>No deals yet.</p></section>
+      <p><a href="/#join" style="display:inline-flex;min-height:44px;align-items:center">Give your agent the join line</a></p>
     </main>
   </div>`
 
@@ -42,9 +42,7 @@ const protocolShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
       <h1>Offer Rails Protocol</h1>
-      <h2>This host</h2>
-      <p>What this host speaks is not shown here until /.well-known/orp.json loads.</p>
-      <p>A plain deal is still two parties. Seats are on the many-to-many page. These pages are generated from the schema files.</p>
+      <p>ORP 0.3 is frozen: a plain deal is still two parties. ORP 0.4 adds seats. These pages are generated from the schema files.</p>
       <p>Apache-2.0 planned. Until publication, this is a draft in the repository.</p>
     </main>
   </div>`

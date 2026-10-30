@@ -131,7 +131,6 @@ export function App() {
   const publisherTools = tools.filter((tool) => !tool.maker)
   const makerTools = tools.filter((tool) => tool.maker)
   const signup = orderedSteps[0]
-  const pagePrompt = agentPrompt
   return (
     <Page page="agents">
       <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] md:grid-cols-[11rem_minmax(0,1fr)] md:gap-8">
@@ -155,8 +154,8 @@ export function App() {
 
           <section id="tell" aria-labelledby="tell-h" className={sectionClass}>
             <h2 id="tell-h" className="h-display text-2xl sm:text-3xl">Tell your agent</h2>
-            <pre className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{pagePrompt}</pre>
-            <CopyButton value={pagePrompt} label="Copy prompt" statusName="prompt" />
+            <pre className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{agentPrompt}</pre>
+            <CopyButton value={agentPrompt} label="Copy prompt" statusName="prompt" />
           </section>
 
           <section id="install" aria-labelledby="install-h" className={sectionClass}>
