@@ -98,11 +98,12 @@ func TestYouLimitsSentencesDoNotDrift(t *testing.T) {
 	for _, sentence := range []string{
 		"Your limits, your approvals, a receipt in plain words.",
 		"This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.",
-		"Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.",
+		"Sign in to set your limits",
 		"Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.",
 		publishStepParagraph,
-		"Example wording. Not a live agreement.",
-		"Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.",
+		"Your agent can prepare the placement and show you the terms.",
+		"No deals yet.",
+		"Give your agent the join line",
 	} {
 		if !strings.Contains(string(built), sentence) || !strings.Contains(plain, sentence) {
 			t.Fatalf("limits sentence is not in both pages: %q", sentence)
@@ -181,8 +182,9 @@ func assertYouLimitsPage(t *testing.T, label string, rec *httptest.ResponseRecor
 		"Once you set it. While claims are not checked, this still waits for a person.",
 		"Approve anything that passes the checks",
 		"Only you can turn this on. While claims are not checked, this also waits for a person.",
-		"POST /v1/agent-tokens",
-		"Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.",
+		"Sign in to set your limits",
+		"No deals yet.",
+		"Give your agent the join line",
 	} {
 		if !strings.Contains(body, needle) {
 			t.Fatalf("%s missing %q", label, needle)

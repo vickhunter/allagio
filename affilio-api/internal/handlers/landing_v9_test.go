@@ -64,11 +64,11 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	if !strings.Contains(youBody, "Offer Rails · Your limits") || !strings.Contains(youBody, "This page is not a signup form") {
 		t.Fatal("human limits page is missing its title or the not-a-signup line")
 	}
-	if !strings.Contains(youBody, "Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.") || !strings.Contains(youBody, "Example wording. Not a live agreement.") {
-		t.Fatal("human limits page is missing the example receipt")
+	if !strings.Contains(youBody, "No deals yet.") || strings.Contains(youBody, "Example wording. Not a live agreement.") || strings.Contains(youBody, "Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.") {
+		t.Fatal("human limits page is missing the empty receipts line")
 	}
-	if !strings.Contains(youBody, "POST /v1/agent-tokens") || strings.Contains(youBody, "one sign-in link") {
-		t.Fatal("human limits page does not describe the token join")
+	if !strings.Contains(youBody, "Give your agent the join line") || !strings.Contains(youBody, "Sign in to set your limits") || strings.Contains(youBody, "one sign-in link") {
+		t.Fatal("human limits page does not describe the join line")
 	}
 	setup := httptest.NewRecorder()
 	r.ServeHTTP(setup, httptest.NewRequest(http.MethodGet, "/publishers/setup?source=cursor", nil))
