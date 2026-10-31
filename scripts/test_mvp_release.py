@@ -708,8 +708,12 @@ class ReleaseTests(unittest.TestCase):
                 with self.subTest(path=path), patch.object(release, "fetch", side_effect=lambda path, *args: responses[path]), self.assertRaises(release.ReleaseError):
                     release.verify()
 
-    def test_installer_package_is_offer_rails_with_old_command_aliases(self):
-        self.assertEqual(release.INSTALLER, "offer-rails-0.1.0.tgz")
+    def test_installer_package_is_allagio_with_old_command_aliases(self):
+        self.assertEqual(release.INSTALLER, "allagio-0.1.0.tgz")
+        root = Path(release.__file__).resolve().parent.parent
+        for rel in ("scripts/mvp_release.py", ".github/workflows/mvp-release.yml"):
+            text = (root / rel).read_text()
+            self.assertNotIn("offer-rails-0.1.0.tgz", text, rel)
         self.assertIn("protocol.html", release.ASSETS)
         self.assertIn("protocol.html", release.TEMPLATE_ASSETS)
 
@@ -729,12 +733,16 @@ class ReleaseTests(unittest.TestCase):
             return output.getvalue()
 
         bins = {
+            "allagio": "bin/setup.mjs",
             "offer-rails": "bin/setup.mjs",
             "affilio": "bin/setup.mjs",
             "distributoor": "bin/setup.mjs",
             "distributoor-setup": "bin/setup.mjs",
         }
-        release.validate_installer(archive({"name": "offer-rails", "version": "0.1.0", "bin": bins}))
+        release.validate_installer(archive({"name": "allagio", "version": "0.1.0", "bin": bins}))
+        old_name = archive({"name": "offer-rails", "version": "0.1.0", "bin": bins})
+        with self.assertRaisesRegex(release.ReleaseError, "Installer package metadata"):
+            release.validate_installer(old_name)
         stale = archive({"name": "@distributoor/setup", "version": "0.1.0", "bin": {"distributoor-setup": "bin/setup.mjs"}})
         with self.assertRaisesRegex(release.ReleaseError, "Installer package metadata"):
             release.validate_installer(stale)

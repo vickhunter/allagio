@@ -47,6 +47,12 @@ test('https is required unless the host is localhost', () => {
   assert.throws(() => apiBase({ OFFER_RAILS_API_URL: 'http://example.com' }), /https/);
 });
 
+test('OFFER_RAILS_API_URL is used only after ALLAGIO_URL and OFFER_RAILS_URL', () => {
+  assert.equal(apiBase({ OFFER_RAILS_API_URL: 'https://api.example' }), 'https://api.example');
+  assert.equal(apiBase({ OFFER_RAILS_URL: 'https://legacy.example', OFFER_RAILS_API_URL: 'https://api.example' }), 'https://legacy.example');
+  assert.equal(apiBase({ ALLAGIO_URL: 'https://allagio.example', OFFER_RAILS_URL: 'https://legacy.example', OFFER_RAILS_API_URL: 'https://api.example', PUBLIC_BASE_URL: 'https://ignored.example' }), 'https://allagio.example');
+});
+
 test('login stores the project key at mode 0600 and logs a person approval', async () => {
   const { io, stdout } = tempIO({
     fetch: async (url, opts) => {

@@ -29,9 +29,10 @@ jobs:
           docker cp "$container:/app/downloads" /tmp/distributoor-release/downloads
           python3 scripts/mvp_release.py bundle /tmp/distributoor-release
           mkdir -p /tmp/distributoor-product
-          npm exec --yes --package=/tmp/distributoor-release/downloads/offer-rails-0.1.0.tgz -- offer-rails --api-url https://distributoor-production.up.railway.app --client skill --project /tmp/distributoor-product --offline --install-only
-          npm exec --yes --package=/tmp/distributoor-release/downloads/offer-rails-0.1.0.tgz -- affilio --help >/tmp/offer-rails-alias.txt
-          npm exec --yes --package=/tmp/distributoor-release/downloads/offer-rails-0.1.0.tgz -- distributoor --help >>/tmp/offer-rails-alias.txt
+          npm exec --yes --package=/tmp/distributoor-release/downloads/allagio-0.1.0.tgz -- offer-rails --api-url https://distributoor-production.up.railway.app --client skill --project /tmp/distributoor-product --offline --install-only
+          npm exec --yes --package=/tmp/distributoor-release/downloads/allagio-0.1.0.tgz -- allagio --help >/tmp/offer-rails-alias.txt
+          npm exec --yes --package=/tmp/distributoor-release/downloads/allagio-0.1.0.tgz -- affilio --help >>/tmp/offer-rails-alias.txt
+          npm exec --yes --package=/tmp/distributoor-release/downloads/allagio-0.1.0.tgz -- distributoor --help >>/tmp/offer-rails-alias.txt
           grep -q offer-rails /tmp/offer-rails-alias.txt
           test -s /tmp/distributoor-product/.agents/skills/distributoor-onboard/SKILL.md
           test -s /tmp/distributoor-product/.agents/skills/distributoor-instrument/SKILL.md

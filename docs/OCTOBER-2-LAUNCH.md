@@ -68,7 +68,7 @@ origin. npm accepts remote tarball package specifications, so the landing page
 can provide one copyable command without waiting for ownership of an npm scope:
 
 ```sh
-npx --yes --package=https://PILOT_ORIGIN/downloads/offer-rails-0.1.0.tgz offer-rails --api-url https://PILOT_ORIGIN
+npx --yes --package=https://PILOT_ORIGIN/downloads/allagio-0.1.0.tgz offer-rails --api-url https://PILOT_ORIGIN
 ```
 
 This is a proposed release command. Replace `PILOT_ORIGIN`, implement the

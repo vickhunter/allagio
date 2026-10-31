@@ -71,7 +71,7 @@ files are immutable after application; add a new numbered migration for changes.
 When the service is healthy, run inside a builder's product repository:
 
 ```sh
-npx --yes --package=https://distributoor-production.up.railway.app/downloads/offer-rails-0.1.0.tgz offer-rails --api-url https://distributoor-production.up.railway.app
+npx --yes --package=https://distributoor-production.up.railway.app/downloads/allagio-0.1.0.tgz offer-rails --api-url https://distributoor-production.up.railway.app
 ```
 
 Publishers download `/downloads/affilio.zip` from that same origin, upload and
