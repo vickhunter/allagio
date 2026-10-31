@@ -20,8 +20,8 @@ export function configuredServers() {
   const cursor = JSON.parse(fenced('## Cursor', 'json'));
   const claude = JSON.parse(fenced('JSON form', 'json'));
   const claudeLine = fenced('## Claude Code', 'bash').trim();
-  assert.equal(claudeLine, 'node cli/bin/offer-rails.mjs mcp');
-  const fromLine = claudeLine.trim().split(/\s+/);
+  assert.equal(claudeLine, 'claude mcp add allagio -- node cli/bin/offer-rails.mjs mcp');
+  const fromLine = claudeLine.split(' -- ')[1].trim().split(/\s+/);
   assert.deepEqual(fromLine, [claude.mcpServers.allagio.command, ...claude.mcpServers.allagio.args]);
   return [
     { label: 'cursor .cursor/mcp.json', server: cursor.mcpServers.allagio },

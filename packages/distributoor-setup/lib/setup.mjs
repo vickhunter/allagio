@@ -2,6 +2,7 @@ import { readFile, writeFile, mkdir, lstat, realpath } from 'node:fs/promises';
 import { resolve, dirname, relative, delimiter } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { offerRailsSkillBodies } from './offer-rails-skills.mjs';
 import { previousSkillBodies } from './previous-skills.mjs';
 
 export function validateAPI(value) {
@@ -68,13 +69,26 @@ export async function mergeMCP(root, client, resource) {
   const config = raw === null ? {} : JSON.parse(raw);
   if (!config || Array.isArray(config) || typeof config !== 'object' || config.mcpServers && (typeof config.mcpServers !== 'object' || Array.isArray(config.mcpServers))) throw new Error(`Invalid MCP configuration: ${path}`);
   config.mcpServers ??= {};
-  const existing = config.mcpServers[mcpConnectionName] || config.mcpServers.distributoor;
+  const current = config.mcpServers[mcpConnectionName];
+  const legacy = config.mcpServers.distributoor;
   const expected = client === 'claude' ? { type: 'http', url: resource } : { url: resource };
-  if (existing && (existing.url !== resource || existing.command || existing.headers || existing.env || existing.type && existing.type !== 'http')) {
+  const differs = (entry) => Boolean(entry && (entry.url !== resource || entry.command || entry.headers || entry.env || entry.type && entry.type !== 'http'));
+  if (differs(current) || differs(legacy)) {
     throw new Error(`An existing Allagio connection differs in ${path}. Resolve it before running setup; it has been preserved.`);
   }
-  if (!existing) {
+  let changed = false;
+  if (!current && legacy) {
+    config.mcpServers[mcpConnectionName] = legacy;
+    changed = true;
+  } else if (!current) {
     config.mcpServers[mcpConnectionName] = expected;
+    changed = true;
+  }
+  if (legacy) {
+    delete config.mcpServers.distributoor;
+    changed = true;
+  }
+  if (changed) {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
   }
@@ -89,7 +103,7 @@ function acceptsInstalledSkill(existing, source, name) {
   if (index === -1) return false;
   const body = existing.slice(0, index);
   const context = existing.slice(index + SKILL_CONTEXT_MARKER.length);
-  const canonical = body === source.trim() || body === previousSkillBodies[name];
+  const canonical = body === source.trim() || body === previousSkillBodies[name] || body === offerRailsSkillBodies[name];
   return canonical && INSTALLER_CONTEXT.test(context);
 }
 

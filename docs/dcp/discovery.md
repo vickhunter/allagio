@@ -33,9 +33,9 @@ Fields:
 - `mcp` — how to reach the network's MCP server: the hosted `streamable-http`
   transport at `url` (relative to the endpoint's origin), with the `stdio`
   block describing the locally spawned server. The server name is
-  `allagio-mcp`. The npm package is coming soon. From this repository, run
-  `node cli/bin/offer-rails.mjs --api-url <origin>`. Older binaries
-  `offer-rails-mcp` and `distributoor-mcp` still start the same server.
+  `allagio-mcp`. The npm package is coming soon. Run
+  `npx --yes --package=<origin>/downloads/allagio-0.1.0.tgz offer-rails --api-url <origin>`.
+  Older binaries `offer-rails-mcp` and `distributoor-mcp` still start the same server.
 - `verbs` — the verb names actually served; agents SHOULD treat missing verbs
   as unsupported rather than failing the whole endpoint.
 - `payout_methods` — how publishers get paid (`manual`, `stripe_connect`,

@@ -182,7 +182,9 @@ const (
 )
 
 func (h *HostedHandler) installCommand() string {
-	return "node cli/bin/offer-rails.mjs --api-url " + h.BaseURL
+	// The package is the tarball on this host, not a name in the npm registry.
+	// The bin inside that archive is offer-rails.
+	return "npx --yes --package=" + h.BaseURL + "/downloads/" + installerArchive + " offer-rails --api-url " + h.BaseURL
 }
 
 func (h *HostedHandler) installerPath() (string, bool) {

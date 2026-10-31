@@ -47,7 +47,7 @@ Copy this into `.cursor/mcp.json`:
 ## Claude Code
 
 ```bash
-node cli/bin/offer-rails.mjs mcp
+claude mcp add allagio -- node cli/bin/offer-rails.mjs mcp
 ```
 
 JSON form, for `.mcp.json` or `~/.claude.json`:

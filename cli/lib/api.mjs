@@ -6,12 +6,12 @@ export function apiBase(env = process.env) {
   try {
     url = new URL(raw);
   } catch {
-    throw new Error('ALLAGIO_API_URL is not a URL');
+    throw new Error('ALLAGIO_URL is not a URL');
   }
   const host = url.hostname.replace(/^\[|\]$/g, '');
   const local = host === 'localhost' || host === '127.0.0.1' || host === '::1';
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) {
-    throw new Error('ALLAGIO_API_URL must use https unless the host is localhost');
+    throw new Error('ALLAGIO_URL must use https unless the host is localhost');
   }
   return raw.replace(/\/+$/, '');
 }

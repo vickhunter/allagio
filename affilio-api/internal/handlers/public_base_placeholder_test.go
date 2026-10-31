@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
+	"affilio-api/internal/config"
 )
 
 func TestServedCopyHasNoPublicBasePlaceholder(t *testing.T) {
@@ -42,9 +44,17 @@ func TestServedCopyHasNoPublicBasePlaceholder(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(body), "{{PUBLIC_BASE_URL}}") && ext != ".md" {
-			t.Errorf("%s contains {{PUBLIC_BASE_URL}}", path)
+		if !strings.Contains(string(body), config.PublicBasePlaceholder) {
+			return nil
 		}
+		if ext == ".md" {
+			expanded := config.ExpandPublicBase(string(body), "https://allagio.example")
+			if strings.Contains(expanded, config.PublicBasePlaceholder) || !strings.Contains(expanded, "https://allagio.example/") {
+				t.Errorf("%s markdown placeholder did not expand", path)
+			}
+			return nil
+		}
+		t.Errorf("%s contains {{PUBLIC_BASE_URL}}", path)
 		return nil
 	})
 	if err != nil {

@@ -887,7 +887,7 @@ func TestLLMsJoinDoesNotRequireGoogle(t *testing.T) {
 	if strings.Contains(string(public), "/mcp needs the Google sign-in") || strings.Contains(llmsFullDocument(), "/mcp needs the Google sign-in") || strings.Contains(llmsFullDocument(), "This server needs a Google sign-in today") {
 		t.Fatal("served llms text still sends agents to Google")
 	}
-	const stdioSentence = "The MCP server name is allagio-mcp. The npm package is coming soon. From this repository, run node cli/bin/offer-rails.mjs --api-url <origin>. Older binary names still start the same server. Set ALLAGIO_API_URL, ALLAGIO_API_KEY, and ALLAGIO_SITE_KEY. The previous names still work when the new name is unset."
+	const stdioSentence = "The MCP server name is allagio-mcp. The npm package is coming soon. Run npx --yes --package=<origin>/downloads/allagio-0.1.0.tgz offer-rails --api-url <origin>. Older binary names still start the same server. Set ALLAGIO_API_URL, ALLAGIO_API_KEY, and ALLAGIO_SITE_KEY. The previous names still work when the new name is unset."
 	if !strings.Contains(llmsFullDocument(), AgentJoinCommand) || !strings.Contains(llmsFullDocument(), stdioSentence) {
 		t.Fatal("llms-full.txt dropped the join command or the stdio sentence")
 	}

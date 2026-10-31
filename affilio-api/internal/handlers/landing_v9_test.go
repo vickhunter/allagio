@@ -613,7 +613,7 @@ func TestMakersInstallCommandUsesOfferRails(t *testing.T) {
 		t.Fatalf("makers: %d", makers.Code)
 	}
 	body := makers.Body.String()
-	want := "node cli/bin/offer-rails.mjs --api-url https://offer-rails.example"
+	want := "npx --yes --package=https://offer-rails.example/downloads/" + installerArchive + " offer-rails --api-url https://offer-rails.example"
 	if !strings.Contains(body, want) {
 		t.Fatalf("makers install command missing %q", want)
 	}
