@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"affilio-api/internal/config"
+
 	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
 	"affilio-api/internal/middleware"
@@ -827,7 +829,8 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		{"public", string(public)},
 		{"built", string(built)},
 	} {
-		if !strings.Contains(item.body, "## ORP 0-3 test deal") || !strings.Contains(item.body, "Cold path:") || !strings.Contains(item.body, "](https://offer-rails.onrender.com/skill.md)") || strings.Contains(item.body, "](https://offer-rails.onrender.com/llms.txt)") {
+		body := config.ExpandPublicBase(item.body, "")
+		if !strings.Contains(body, "## ORP 0-3 test deal") || !strings.Contains(body, "Cold path:") || !strings.Contains(body, "](https://offer-rails.onrender.com/skill.md)") || strings.Contains(body, "](https://offer-rails.onrender.com/llms.txt)") {
 			t.Errorf("%s is not the cold path", item.name)
 		}
 	}
@@ -848,8 +851,9 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		if strings.Contains(item.body, "PR #83 lands") || strings.Contains(item.body, "not claimed as live") || strings.Contains(orpTestDealSection, "The deal stays awaiting") {
 			t.Errorf("%s still describes the pre-D-104 host", item.name)
 		}
+		expanded := config.ExpandPublicBase(item.body, "")
 		for _, phrase := range phrases {
-			if !strings.Contains(item.body, phrase) {
+			if !strings.Contains(expanded, phrase) {
 				t.Errorf("%s missing %q", item.name, phrase)
 			}
 		}
@@ -883,7 +887,7 @@ func TestLLMsJoinDoesNotRequireGoogle(t *testing.T) {
 	if strings.Contains(string(public), "/mcp needs the Google sign-in") || strings.Contains(llmsFullDocument(), "/mcp needs the Google sign-in") || strings.Contains(llmsFullDocument(), "This server needs a Google sign-in today") {
 		t.Fatal("served llms text still sends agents to Google")
 	}
-	const stdioSentence = "The MCP server name is offer-rails-mcp. The npm package offer-rails is not published yet. It is coming soon. Use the hosted MCP URL in this document. When the hosted installer archive is on this origin, the command is npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>. The environment names are the API URL, the API key, and the site key. Each name is the product name with the space removed, then _API_URL, _API_KEY, and _SITE_KEY."
+	const stdioSentence = "The MCP server name is allagio-mcp. The npm package allagio is not published yet. It is coming soon. Use the hosted MCP URL in this document. When the hosted installer archive is on this origin, the command is npx --yes --package=<origin>/downloads/allagio-0.1.0.tgz allagio --api-url <origin>. The environment names are the API URL, the API key, and the site key. Each name is the product name with the space removed, then _API_URL, _API_KEY, and _SITE_KEY."
 	if !strings.Contains(llmsFullDocument(), AgentJoinCommand) || !strings.Contains(llmsFullDocument(), stdioSentence) {
 		t.Fatal("llms-full.txt dropped the join command or the stdio sentence")
 	}
@@ -904,7 +908,7 @@ func TestJoinOneLinerFromCleanFolder(t *testing.T) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "sh", "-c", AgentJoinCommand)
 	cmd.Dir = dir
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + dir, "OFFER_RAILS_URL=" + h.BaseURL}
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + dir, "ALLAGIO_URL=" + h.BaseURL}
 	cmd.Stdin = nil
 	out, err := cmd.CombinedOutput()
 	if err != nil {

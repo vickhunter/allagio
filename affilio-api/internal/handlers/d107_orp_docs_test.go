@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"affilio-api/internal/config"
 	"affilio-api/internal/orp"
 
 	"github.com/gin-gonic/gin"
@@ -56,6 +57,7 @@ func TestORPDocumentLinks(t *testing.T) {
 	}
 	scan := func(label, body string) {
 		t.Helper()
+		body = config.ExpandPublicBase(body, "")
 		lower := strings.ToLower(body)
 		if strings.Contains(body, "offerrails.com") || strings.Contains(lower, "open source") || strings.Contains(lower, "open-source") {
 			t.Fatalf("%s points at the unpicked domain or says open source", label)

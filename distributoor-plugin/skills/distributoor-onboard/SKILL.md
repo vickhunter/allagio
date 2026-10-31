@@ -3,7 +3,7 @@ name: distributoor-onboard
 description: Set up product distribution end to end in the builder's existing coding agent. Detect the stack and checkout, connect hosted MCP, reuse or register the product, wire attribution, test it, and report verified readiness. Use when a builder asks to monetize, distribute, or make a product distribution-ready.
 ---
 
-# Offer Rails setup
+# Allagio setup
 
 Carry the integration through in this repository. Use the user's current agent,
 tools and model account. The user should not have to assemble SDK snippets,

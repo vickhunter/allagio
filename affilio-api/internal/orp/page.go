@@ -17,7 +17,7 @@ var approvePage = template.Must(template.New("approve").Parse(`<!doctype html>
 <title>Waiting for approval</title>
 <p>{{.Title}}</p>
 <p>{{.Label}}</p>
-<p>This page does not approve it. By default an agent approves an ask with its bearer. On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by agent. That is not a person's approval. When the owner has ask on, this page is not the response: the signed-in owner submits the form, and that 0.4 read returns approved_by owner. A 0.3 deal does not include approved_by. Offer Rails does not hold money.</p>
+<p>This page does not approve it. By default an agent approves an ask with its bearer. On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by agent. That is not a person's approval. When the owner has ask on, this page is not the response: the signed-in owner submits the form, and that 0.4 read returns approved_by owner. A 0.3 deal does not include approved_by. Allagio does not hold money.</p>
 `))
 
 var ownerApprovePage = template.Must(template.New("owner-approve").Parse(`<!doctype html>
@@ -37,11 +37,11 @@ var ownerApprovePage = template.Must(template.New("owner-approve").Parse(`<!doct
 // An active deal says so. A verified tracked link says so, which changes the
 // page from the active line. Every other state still says the deal stays awaiting.
 func ProofPage(label, state string, linkVerified bool, approvals []Approval) string {
-	line := "This is a test proof. The deal stays awaiting. Offer Rails does not hold money."
+	line := "This is a test proof. The deal stays awaiting. Allagio does not hold money."
 	if linkVerified {
-		line = "This is a test proof. The tracked link is verified. Offer Rails does not hold money."
+		line = "This is a test proof. The tracked link is verified. Allagio does not hold money."
 	} else if state == "active" {
-		line = "This is a test proof. The deal is active. Offer Rails does not hold money."
+		line = "This is a test proof. The deal is active. Allagio does not hold money."
 	}
 	line += approvalLine(approvals)
 	var b strings.Builder

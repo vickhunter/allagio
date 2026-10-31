@@ -43,7 +43,7 @@ func (c *Client) Do(method, path string, payload interface{}) (map[string]interf
 // DoSite performs one publisher-authenticated API call (site key).
 func (c *Client) DoSite(method, path string, payload interface{}) (map[string]interface{}, error) {
 	if c.SiteKey == "" && c.Bearer == "" {
-		return nil, fmt.Errorf("publisher verbs need a site key: set %s (the Offer Rails site api key)", EnvSiteKey)
+		return nil, fmt.Errorf("publisher verbs need a site key: set %s (the Allagio site api key)", EnvSiteKey)
 	}
 	return c.request(method, path, payload, "X-API-Key", c.SiteKey)
 }

@@ -1,9 +1,9 @@
 ---
 name: distributoor-launch
-description: Define and submit an Offer Rails offer - commission terms, cookie and refund windows, offer copy - and track it after listing. Use when a ready product needs an offer created, submitted for review, paused, or when the maker asks how their offers are earning.
+description: Define and submit an Allagio offer - commission terms, cookie and refund windows, offer copy - and track it after listing. Use when a ready product needs an offer created, submitted for review, paused, or when the maker asks how their offers are earning.
 ---
 
-# Offer Rails offer launch
+# Allagio offer launch
 
 An offer is the monetizable unit publishers see: commission terms plus the
 landing page. It rides the network's rails into publisher content once listed.

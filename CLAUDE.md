@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Affilio is an AI-powered affiliate monetization tool for WordPress. It consists of a **Go backend API** (`affilio-api/`) and a **WordPress plugin** (`affilio-wp/`). The system scans blog posts, detects existing affiliate links, recommends relevant affiliate programs, and enables one-click link insertion with FTC disclosure.
+Allagio is an AI-powered affiliate monetization tool for WordPress. The repository and Go module stay `affilio`. It consists of a **Go backend API** (`affilio-api/`) and a **WordPress plugin** (`affilio-wp/`). The system scans blog posts, detects existing affiliate links, recommends relevant affiliate programs, and enables one-click link insertion with FTC disclosure.
 
 **Core flow:** Scan → Detect → Recommend → Insert → Track
 
@@ -74,7 +74,7 @@ go run ./cmd/server                 # Starts API on :8080
 | `ALLOWED_ORIGINS`  | No       | `*`                                              | CORS allowlist (comma-separated) |
 | `API_KEY_SECRET`   | No       | `dev-secret`                                     | Secret for site API key generation |
 | `ADMIN_API_KEY`    | No       | (empty)                                          | Admin-only endpoint auth key   |
-| `STRIPE_WEBHOOK_SECRET` | No  | (empty)                                          | Stripe webhook signature secret (Distributoor conversions) |
+| `STRIPE_WEBHOOK_SECRET` | No  | (empty)                                          | Stripe webhook signature secret (Allagio conversions) |
 | `LEMONSQUEEZY_WEBHOOK_SECRET` | No | (empty)                                     | Lemon Squeezy webhook signature secret |
 | `POLAR_WEBHOOK_SECRET` | No   | (empty)                                          | Polar webhook signature secret |
 | `CLAIMS_CHECK`     | No       | `stub` when `GIN_MODE=release`, otherwise `off-local` | `stub` holds an untrusted offer in review. `off-local` is local and dev only and keeps the four listing checks. `real` compares the listing card with the merchant page and is allowed in release. A hosted server with an empty value stays on `stub`. |
@@ -140,10 +140,10 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 - `POST /detect/links` — Affiliate link detection
 - `GET|POST|DELETE /user-programs/*` — User program management
 - `POST /track/click`, `GET /track/*` — Analytics (summary, trends, attribution, funnel, cohorts, etc.)
-- `GET /marketplace/offers`, `POST /marketplace/offers/:id/join` — Distributoor offer marketplace
+- `GET /marketplace/offers`, `POST /marketplace/offers/:id/join` — Allagio offer marketplace
 - `GET /payouts/balance`, `GET /payouts/history` — Publisher commission ledger
 
-**Maker** (requires `X-Maker-Key` header, Distributoor supply side):
+**Maker** (requires `X-Maker-Key` header, Allagio supply side):
 - `GET|POST|PATCH /maker/products[/:id]`, `POST /maker/products/:id/assess`, `GET /maker/products/:id/assessments`
 - `GET|POST|PATCH /maker/offers[/:id]`, `POST /maker/offers/:id/submit`, `GET /maker/offers/:id/matches`
 - `GET /maker/earnings`
@@ -152,7 +152,7 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 - `GET /program-discovery/queue` — Discovery queue
 - `POST /program-discovery/queue/:id/review|promote` — Review/promote programs
 - `POST /sites/rotate-key` — Rotate site API key
-- `GET /offer-review/queue`, `POST /offer-review/:id/approve|reject` — Distributoor offer review
+- `GET /offer-review/queue`, `POST /offer-review/:id/approve|reject` — Allagio offer review
 - `POST /payout-batches/run`, `POST /payout-batches/:id/mark-paid` — Manual payout batches
 - `POST /offer-review/makers/rotate-key` — Rotate maker API key
 - `POST /offer-review/makers/:id/trust` — Trusted-maker fast path (submit lists directly)
@@ -175,7 +175,7 @@ GitHub Actions (`.github/workflows/affilio-api-tests.yml`):
 
 ### Database
 
-PostgreSQL with pgcrypto extension. Key tables: `affiliate_programs`, `sites`, `articles`, `recommendations`, `clicks`, `link_detections`, `user_programs`, `scan_jobs`, `program_discovery_queue`, `program_discovery_reviews`. Distributoor tables: `makers`, `products`, `readiness_assessments`, `offers`, `campaigns`, `conversions`, `ledger_entries`, `payouts`, `webhook_events`.
+PostgreSQL with pgcrypto extension. Key tables: `affiliate_programs`, `sites`, `articles`, `recommendations`, `clicks`, `link_detections`, `user_programs`, `scan_jobs`, `program_discovery_queue`, `program_discovery_reviews`. Allagio tables: `makers`, `products`, `readiness_assessments`, `offers`, `campaigns`, `conversions`, `ledger_entries`, `payouts`, `webhook_events`.
 
 Migrations are in `affilio-api/internal/migrations/` and must be applied in numeric order (001-009).
 

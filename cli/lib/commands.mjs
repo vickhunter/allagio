@@ -289,7 +289,7 @@ export async function digestCommand(io) {
 export async function undoCommand(io) {
   const config = loadConfig(io);
   if (!config.undo_token) {
-    io.stderr('No undo token. Run offer-rails digest first.\n');
+    io.stderr('No undo token. Run allagio digest first.\n');
     return { exitCode: 1 };
   }
   const res = await apiRequest(io, '/v1/digest/undo', {

@@ -1,3 +1,9 @@
+## October 31 — D-120 product name Allagio
+
+The public name in the Go API, CLI, SDK, docs, and MCP server is Allagio. The MCP server name is `allagio-mcp`. The CLI command is `allagio`. `offer-rails`, `affilio`, `distributoor`, and `distributoor-setup` stay as installer command aliases. Download aliases that stay: `affilio.zip`, `offer-rails.zip`, `offer-rails-0.1.0.tgz`, and `distributoor-setup-0.1.0.tgz`. Environment names an agent should set are `ALLAGIO_API_URL`, `ALLAGIO_API_KEY`, and `ALLAGIO_SITE_KEY`. `OFFERRAILS_*` and `DISTRIBUTOOR_*` are still read.
+
+The public origin is `PUBLIC_BASE_URL`, or `config.DefaultPublicBaseURL` when that is unset. That default is the Render host. Served docs, `/llms.txt`, and `/sitemap.xml` fill `{{PUBLIC_BASE_URL}}` from it. ORP 0.3 schemas, examples, and their `$id` values are unchanged. ORP 0.4 `$id` values are unchanged. Nothing is published, and the registry names `io.github.allagio/allagio-mcp` and `dev.allagio/allagio-mcp` are only a TODO. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 30 — D-118 review fixes
 
 The directory error is the accepted line again: “The list could not load.” with an alert and a Retry button. A failed load stays separate from an empty list. The protocol overview again says “ORP 0.3 is frozen” and uses the “ORP {version}” eyebrow. The static /you/ shell matches the page: sign in, the limits, “No deals yet.” No example receipt and no agent-token line in that shell. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

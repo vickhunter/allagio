@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"affilio-api/internal/config"
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
 )
@@ -445,7 +446,7 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		"Any other string that does not match that hash is HTTP 409 terms_mismatch",
 		"terms_hash does not match the terms.",
 	} {
-		if !strings.Contains(orpTestDealSection, phrase) {
+		if !strings.Contains(config.ExpandPublicBase(orpTestDealSection, ""), phrase) {
 			t.Fatalf("section missing %q", phrase)
 		}
 	}

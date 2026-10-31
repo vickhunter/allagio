@@ -1,13 +1,13 @@
 ---
 name: distributoor-instrument
-description: Wire Offer Rails attribution into a product - the ref-capture snippet, passing the click id into Stripe / Lemon Squeezy / Polar checkout, and registering conversion webhooks. Use when a maker needs attribution set up, the ref_param_survives check fails, or conversions are arriving unattributed.
+description: Wire Allagio attribution into a product - the ref-capture snippet, passing the click id into Stripe / Lemon Squeezy / Polar checkout, and registering conversion webhooks. Use when a maker needs attribution set up, the ref_param_survives check fails, or conversions are arriving unattributed.
 ---
 
-# Offer Rails attribution instrumentation
+# Allagio attribution instrumentation
 
 Attribution is a relay: tracked link → `?via=<click_id>` on the landing page →
 persisted client-side → passed into checkout metadata → returned to
-Offer Rails by the provider's webhook. You are wiring the middle of that
+Allagio by the provider's webhook. You are wiring the middle of that
 relay inside the maker's product.
 
 ## 1. Capture the ref parameter

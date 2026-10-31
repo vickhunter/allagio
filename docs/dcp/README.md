@@ -7,7 +7,7 @@ exposes and what its attribution guarantees mean. An agent that speaks DCP can
 take a product from zero → assessed → listed → earning on any compliant
 network without learning a proprietary dashboard.
 
-v0.1 is **extracted from the working Offer Rails network in this repository**
+v0.1 is **extracted from the working Allagio network in this repository**
 (spec follows implementation). Every verb, schema, and semantic documented here
 is implemented and tested in `affilio-api/`. The name an agent sees is
 `offer-rails-mcp`.

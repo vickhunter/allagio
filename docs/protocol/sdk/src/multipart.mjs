@@ -68,7 +68,7 @@ export function validateParties(parties, { hostId = '' } = {}) {
     if (terms.deposit) {
       const holder = holderKey(terms.deposit.holder);
       if (!holder || RESERVED_HOLDERS.has(holder) || (hostId && holder === holderKey(hostId))) {
-        return { ok: false, field: `${field}/terms/deposit/holder`, message: 'Offer Rails does not hold money. A deposit term names an outside holder.' };
+        return { ok: false, field: `${field}/terms/deposit/holder`, message: 'Allagio does not hold money. A deposit term names an outside holder.' };
       }
     }
     const percent = hasOwn(terms, 'percent');

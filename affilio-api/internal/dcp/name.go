@@ -7,29 +7,34 @@ import (
 
 // ServerName is the MCP server name an outside agent sees. Discovery, stdio,
 // and both initialize responses use this one value.
-const ServerName = "offer-rails-mcp"
+const ServerName = "allagio-mcp"
 
 // ServerTitle is the human-readable serverInfo title.
-const ServerTitle = "Offer Rails"
+const ServerTitle = "Allagio"
 
-// Environment names the stdio server reads. The OFFERRAILS_* name is preferred.
-// The DISTRIBUTOOR_* name remains so a host that still sets the old variable
-// keeps working.
+// Environment names the stdio server reads. ALLAGIO_* is preferred.
+// OFFERRAILS_* and DISTRIBUTOOR_* remain so a host that still sets an old
+// variable keeps working. Discovery advertises only ALLAGIO_*.
 const (
-	EnvAPIURL  = "OFFERRAILS_API_URL"
-	EnvAPIKey  = "OFFERRAILS_API_KEY"
-	EnvSiteKey = "OFFERRAILS_SITE_KEY"
+	EnvAPIURL  = "ALLAGIO_API_URL"
+	EnvAPIKey  = "ALLAGIO_API_KEY"
+	EnvSiteKey = "ALLAGIO_SITE_KEY"
 
-	LegacyEnvAPIURL  = "DISTRIBUTOOR_API_URL"
-	LegacyEnvAPIKey  = "DISTRIBUTOOR_API_KEY"
-	LegacyEnvSiteKey = "DISTRIBUTOOR_SITE_KEY"
+	LegacyEnvAPIURL  = "OFFERRAILS_API_URL"
+	LegacyEnvAPIKey  = "OFFERRAILS_API_KEY"
+	LegacyEnvSiteKey = "OFFERRAILS_SITE_KEY"
+
+	OlderEnvAPIURL  = "DISTRIBUTOOR_API_URL"
+	OlderEnvAPIKey  = "DISTRIBUTOOR_API_KEY"
+	OlderEnvSiteKey = "DISTRIBUTOOR_SITE_KEY"
 )
 
-// Getenv returns the trimmed primary value, or the legacy value when the
-// primary is unset or blank.
-func Getenv(primary, legacy string) string {
-	if value := strings.TrimSpace(os.Getenv(primary)); value != "" {
-		return value
+// Getenv returns the first non-blank trimmed value.
+func Getenv(names ...string) string {
+	for _, name := range names {
+		if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+			return value
+		}
 	}
-	return strings.TrimSpace(os.Getenv(legacy))
+	return ""
 }

@@ -91,7 +91,7 @@ func (f Fetcher) Fetch(ctx context.Context, rawURL string) (Page, error) {
 	if err != nil {
 		return Page{}, ErrInvalidURL
 	}
-	req.Header.Set("User-Agent", "OfferRails-Preview/1.0")
+	req.Header.Set("User-Agent", "Allagio-Preview/1.0")
 	if kind == kindHTML {
 		req.Header.Set("Accept", "text/html")
 	} else {
@@ -158,7 +158,7 @@ func (f Fetcher) FetchDocument(ctx context.Context, rawURL string) (Document, er
 	if err != nil {
 		return Document{}, ErrInvalidURL
 	}
-	req.Header.Set("User-Agent", "OfferRails-Verify/1.0")
+	req.Header.Set("User-Agent", "Allagio-Verify/1.0")
 	req.Header.Set("Accept", "text/plain, text/html;q=0.9")
 
 	resp, err := client.Do(req)

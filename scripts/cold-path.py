@@ -106,7 +106,7 @@ def main():
         status, raw = request("GET", "/llms.txt")
         doc = expect(status, raw, 200)
         text = doc.get("text", "")
-        if "https://offer-rails.onrender.com/skill.md" not in text and "/skill.md" not in text:
+        if "/skill.md" not in text:
             raise SystemExit("llms.txt has no skill pointer")
 
     def skill():

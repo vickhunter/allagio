@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"affilio-api/internal/config"
 	"affilio-api/internal/orp"
 
 	"github.com/gin-gonic/gin"
@@ -62,6 +63,13 @@ func (h *ORPHost) publicFile(c *gin.Context, name, contentType string) {
 	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": "document not found"})
 		return
+	}
+	if strings.HasSuffix(name, ".md") {
+		base := ""
+		if h.Entry != nil {
+			base = h.Entry.BaseURL
+		}
+		body = []byte(config.ExpandPublicBase(string(body), base))
 	}
 	writePublic(c, body, contentType)
 }

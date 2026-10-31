@@ -25,7 +25,7 @@ var (
 		"given_name": true, "family_name": true, "tax_id": true, "ssn": true, "dob": true,
 	}
 	reservedHolders = map[string]bool{
-		"host": true, "offerrails": true, "hostedapi": true,
+		"host": true, "offerrails": true, "allagio": true, "hostedapi": true,
 	}
 	offerV4Keys = map[string]bool{
 		"id": true, "terms": true, "terms_hash": true, "limit": true, "note": true,
@@ -367,7 +367,7 @@ func ValidateParties(parties []any, hostID string) (Problem, bool) {
 			holder, _ := obj["holder"].(string)
 			key := HolderKey(holder)
 			if obj == nil || key == "" || reservedHolders[key] || (hostKey != "" && key == hostKey) {
-				return Invalid("Offer Rails does not hold money. A deposit term names an outside holder.", field+"/terms/deposit/holder"), true
+				return Invalid("Allagio does not hold money. A deposit term names an outside holder.", field+"/terms/deposit/holder"), true
 			}
 		}
 		_, percent := terms["percent"]

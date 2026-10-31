@@ -638,8 +638,8 @@ class ReleaseTests(unittest.TestCase):
         values = configuration()
         del values["RAILWAY_DOCKERFILE_PATH"]
         values.update({
-            "PUBLIC_BASE_URL": "https://affilio-mvp.onrender.com",
-            "ALLOWED_ORIGINS": "https://affilio-mvp.onrender.com",
+            "PUBLIC_BASE_URL": "https://allagio.example",
+            "ALLOWED_ORIGINS": "https://allagio.example",
             "PORT": "10000",
             "API_KEY_SECRET": "c" * 32,
             "GIN_MODE": "release",
@@ -678,7 +678,7 @@ class ReleaseTests(unittest.TestCase):
             release.validate_config(values | {"API_KEY_SECRET": "short"}, origin=values["PUBLIC_BASE_URL"])
 
     def test_verify_accepts_any_https_base_url(self):
-        origin = "https://affilio-mvp.onrender.com"
+        origin = "https://allagio.example"
         responses = public_responses()
         responses["/.well-known/oauth-protected-resource/mcp"] = response(body=json.dumps({"resource": origin + "/mcp", "authorization_servers": [origin], "scopes_supported": ["maker", "publisher"]}).encode())
         responses["/.well-known/oauth-authorization-server"] = response(body=json.dumps({"issuer": origin, "authorization_endpoint": origin + "/oauth/authorize", "token_endpoint": origin + "/oauth/token", "registration_endpoint": origin + "/oauth/register", "code_challenge_methods_supported": ["S256"]}).encode())

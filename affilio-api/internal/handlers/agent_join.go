@@ -27,8 +27,8 @@ import (
 const OpenSignupPerMinute = 8
 
 // AgentJoinCommand is the one line a stranger's agent runs from a clean folder.
-// OFFER_RAILS_URL is the API origin, with no trailing slash.
-const AgentJoinCommand = `curl -fsS -X POST "$OFFER_RAILS_URL/v1/agent-tokens" -H 'Content-Type: application/json' -d '{}'`
+// ALLAGIO_URL is the API origin, with no trailing slash.
+const AgentJoinCommand = `curl -fsS -X POST "$ALLAGIO_URL/v1/agent-tokens" -H 'Content-Type: application/json' -d '{}'`
 
 // CreateAgentToken mints a role-less agent account and a bearer token.
 // The body is {} or empty. A role field is refused. The plaintext token is

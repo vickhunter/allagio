@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://offer-rails.onrender.com/orp/schemas/0.4/defs.schema.json",
   "title": "ORP 0.4 shared definitions",
-  "description": "Types added for many-party deals. A 0.3 message does not use this file. Identity is a hash and an issuer name. A deposit term names an outside holder. Offer Rails does not hold money.",
+  "description": "Types added for many-party deals. A 0.3 message does not use this file. Identity is a hash and an issuer name. A deposit term names an outside holder. Allagio does not hold money.",
   "$defs": {
     "Role": {
       "title": "PartyRole",
@@ -12,7 +12,7 @@
     },
     "PartyTerms": {
       "title": "PartyTerms",
-      "description": "What this seat is paid or owes. Percent splits are integers. An amount is the amount field. per, hours, and a deposit are not amounts for the split rule. A deposit names who holds it outside Offer Rails.",
+      "description": "What this seat is paid or owes. Percent splits are integers. An amount is the amount field. per, hours, and a deposit are not amounts for the split rule. A deposit names who holds it outside Allagio.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -26,7 +26,7 @@
     },
     "Deposit": {
       "title": "Deposit",
-      "description": "A term that records who holds a deposit. The holder is outside Offer Rails. The proof records the agreed term and does not move money.",
+      "description": "A term that records who holds a deposit. The holder is outside Allagio. The proof records the agreed term and does not move money.",
       "type": "object",
       "additionalProperties": false,
       "required": ["amount", "holder"],

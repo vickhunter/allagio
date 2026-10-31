@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"affilio-api/internal/config"
 	"affilio-api/internal/database"
 	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
@@ -16,7 +17,7 @@ import (
 type RedirectsHandler struct {
 	DB          *database.DB
 	RateLimiter *IPRateLimiter
-	// HomeURL is the Offer Rails home page. Unknown campaign codes land here.
+	// HomeURL is the Allagio home page. Unknown campaign codes land here.
 	// An unknown placement id is a 404 page instead of a redirect.
 	HomeURL string
 	// IPSaltSecret is mixed into the daily server salt for direct go links.
@@ -27,7 +28,7 @@ type RedirectsHandler struct {
 const (
 	// OfferRailsHome is the public host. An unknown /v1/go code lands here
 	// when HomeURL is empty. PUBLIC_BASE_URL, stored in HomeURL, wins when set.
-	OfferRailsHome             = "https://offer-rails.onrender.com/"
+	OfferRailsHome             = config.DefaultPublicBaseURL + "/"
 	placementClickDedupSeconds = 45
 )
 
@@ -99,7 +100,7 @@ func campaignOfferLive(link *database.CampaignLink) bool {
 }
 
 // campaignFallback is where a reader goes when the offer itself is not live:
-// the placement's post, then the site home, then the Offer Rails home.
+// the placement's post, then the site home, then the Allagio home.
 func (h *RedirectsHandler) campaignFallback(c *gin.Context, link *database.CampaignLink, placementID string) string {
 	if uuidPattern.MatchString(placementID) {
 		post, err := h.DB.PlacementPostURL(c.Request.Context(), placementID, link.CampaignID)
@@ -380,7 +381,7 @@ func (h *RedirectsHandler) postOrHome(link database.PlacementRedirect) string {
 }
 
 func writeUnknownGoLink(c *gin.Context) {
-	c.Data(http.StatusNotFound, "text/html; charset=utf-8", []byte("<!DOCTYPE html><html><head><title>Not found</title></head><body><p>This link is not on Offer Rails.</p></body></html>\n"))
+	c.Data(http.StatusNotFound, "text/html; charset=utf-8", []byte("<!DOCTYPE html><html><head><title>Not found</title></head><body><p>This link is not on Allagio.</p></body></html>\n"))
 }
 
 func (h *RedirectsHandler) offerRailsHome() string {

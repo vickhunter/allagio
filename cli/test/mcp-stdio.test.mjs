@@ -20,11 +20,11 @@ export function configuredServers() {
   const cursor = JSON.parse(fenced('## Cursor', 'json'));
   const claude = JSON.parse(fenced('JSON form', 'json'));
   const claudeLine = fenced('## Claude Code', 'bash').trim();
-  assert.equal(claudeLine, 'claude mcp add offer-rails -- npx offer-rails mcp');
+  assert.equal(claudeLine, 'claude mcp add allagio -- npx allagio mcp');
   const fromLine = claudeLine.split(' -- ')[1].trim().split(/\s+/);
-  assert.deepEqual(fromLine, [claude.mcpServers['offer-rails'].command, ...claude.mcpServers['offer-rails'].args]);
+  assert.deepEqual(fromLine, [claude.mcpServers.allagio.command, ...claude.mcpServers.allagio.args]);
   return [
-    { label: 'cursor .cursor/mcp.json', server: cursor.mcpServers['offer-rails'] },
+    { label: 'cursor .cursor/mcp.json', server: cursor.mcpServers.allagio },
     { label: 'claude mcp add', server: { command: fromLine[0], args: fromLine.slice(1) } },
   ];
 }
@@ -90,7 +90,7 @@ async function checkServer(label, server) {
       capabilities: {},
       clientInfo: { name: 'offer-rails-paste', version: '0' },
     });
-    assert.equal(init.result.serverInfo.name, 'offer-rails', label);
+    assert.equal(init.result.serverInfo.name, 'allagio', label);
     child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
     const listed = await request(2, 'tools/list', {});
     const names = listed.result.tools.map((tool) => tool.name);

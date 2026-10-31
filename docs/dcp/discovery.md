@@ -7,7 +7,7 @@ and qualify distribution networks the way MCP clients find servers.
 {
   "dcp_version": "0.1",
   "name": "offer-rails-mcp",
-  "description": "Offer Rails. Makers publish offers, publishers earn commissions, agents do the operational work.",
+  "description": "Allagio. Makers publish offers, publishers earn commissions, agents do the operational work.",
   "http_base": "/v1",
   "mcp": {
     "transport": "streamable-http",

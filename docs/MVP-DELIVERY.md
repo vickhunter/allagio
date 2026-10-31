@@ -1,4 +1,4 @@
-# Distributoor MVP delivery
+# Allagio MVP delivery
 
 October 1, 2026. The release target is a usable product. A presentation, sample
 product or recruited publisher is not a prerequisite for releasing the software.

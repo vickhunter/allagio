@@ -1,8 +1,11 @@
 {
   "mcpServers": {
-    "distributoor": {
-      "command": "offer-rails-mcp",
+    "allagio": {
+      "command": "allagio-mcp",
       "env": {
+        "ALLAGIO_API_URL": "${ALLAGIO_API_URL}",
+        "ALLAGIO_API_KEY": "${ALLAGIO_API_KEY}",
+        "ALLAGIO_SITE_KEY": "${ALLAGIO_SITE_KEY}",
         "OFFERRAILS_API_URL": "${OFFERRAILS_API_URL}",
         "OFFERRAILS_API_KEY": "${OFFERRAILS_API_KEY}",
         "OFFERRAILS_SITE_KEY": "${OFFERRAILS_SITE_KEY}",

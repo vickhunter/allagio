@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -181,5 +182,51 @@ func TestWorkspaceDownloadsUseActualOrigin(t *testing.T) {
 	rewritten := servedPlugin(t, h, baked)
 	if !bytes.Contains(rewritten, []byte("https://distribution.example/v1")) || bytes.Contains(rewritten, []byte("railway.app")) || bytes.Contains(rewritten, []byte("affilio-production")) {
 		t.Fatal("download did not retarget affilio-wp/affilio.php to the service origin")
+	}
+}
+
+func TestPluginZipCarriesNonRenderPublicBase(t *testing.T) {
+	assets := filepath.Join(repoRoot(t), "affilio-wp", "admin", "build")
+	baked := releasePluginZip(t, func(main []byte) []byte {
+		return append(main, []byte("\ndefine('AFFILIO_API_URL', 'https://affilio-production.up.railway.app/v1');\n")...)
+	})
+	carried := servedPlugin(t, &HostedHandler{BaseURL: "https://allagio.example", AssetsPath: assets, DownloadsPath: t.TempDir()}, baked)
+	if !bytes.Contains(carried, []byte("https://allagio.example/v1")) || bytes.Contains(carried, []byte("onrender.com")) || bytes.Contains(carried, []byte("railway.app")) {
+		t.Fatalf("non-onrender public base was not written into the plugin:\n%s", carried)
+	}
+	blank := func(base string) {
+		t.Helper()
+		body := servedPlugin(t, &HostedHandler{BaseURL: base, AssetsPath: assets, DownloadsPath: t.TempDir()}, baked)
+		if !bytes.Contains(body, []byte("define('AFFILIO_API_URL', '');")) || bytes.Contains(body, []byte("railway.app")) || bytes.Contains(body, []byte("onrender.com")) {
+			t.Fatalf("%s baked an API URL:\n%s", base, body)
+		}
+	}
+	blank("http://127.0.0.1:8080")
+	blank("https://offer-rails.onrender.com")
+}
+
+func TestSitemapUsesConfiguredOrigin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	h := &HostedHandler{BaseURL: "https://allagio.example", AssetsPath: t.TempDir(), DownloadsPath: t.TempDir()}
+	r := gin.New()
+	h.Mount(r)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/sitemap.xml", nil))
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Type"), "application/xml") {
+		t.Fatalf("sitemap %d %s", rec.Code, body)
+	}
+	for _, loc := range []string{"https://allagio.example/", "https://allagio.example/agents/", "https://allagio.example/llms.txt"} {
+		if !strings.Contains(body, "<loc>"+loc+"</loc>") {
+			t.Fatalf("missing %s\n%s", loc, body)
+		}
+	}
+	if strings.Contains(body, "/privacy") || strings.Contains(body, "/terms") || strings.Contains(body, "agent-card") {
+		t.Fatalf("sitemap lists a held path\n%s", body)
+	}
+	card := httptest.NewRecorder()
+	r.ServeHTTP(card, httptest.NewRequest(http.MethodGet, "/.well-known/agent-card.json", nil))
+	if card.Code == http.StatusOK {
+		t.Fatal("agent card is served")
 	}
 }

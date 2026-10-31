@@ -1,4 +1,4 @@
-Offer Rails for publishers · Earn from more of your posts
+Allagio for publishers · Earn from more of your posts
 
 Earn from more of your posts. Agents find offers that fit the content you already make.
 

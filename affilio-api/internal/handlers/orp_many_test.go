@@ -429,7 +429,7 @@ func TestORP04BadSplitAndHolder(t *testing.T) {
 		map[string]any{"id": maker.party, "role": "offerer", "required": true, "terms": map[string]any{"percent": 40, "hours": 2, "cap": eur(1000)}},
 		map[string]any{"id": other.party, "role": "acceptor", "required": true, "terms": map[string]any{"percent": 40}},
 	}, "100")
-	for _, holder := range []string{"OfferRails", "offer-rails", "offer_rails", "offer rails", "Offer.Rails", "hosted api", "HOST"} {
+	for _, holder := range []string{"OfferRails", "offer-rails", "offer_rails", "offer rails", "Offer.Rails", "Allagio", "hosted api", "HOST"} {
 		reject([]any{
 			map[string]any{"id": maker.party, "role": "offerer", "required": true, "terms": map[string]any{"amount": eur(0)}},
 			map[string]any{"id": other.party, "role": "service", "required": true, "terms": map[string]any{"deposit": map[string]any{"amount": eur(2000), "holder": holder, "purpose": "viewing"}}},

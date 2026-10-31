@@ -97,7 +97,7 @@ export async function handleMcpMessage(raw, io) {
       return ok({
         protocolVersion: '2025-06-18',
         capabilities: { tools: {} },
-        serverInfo: { name: 'offer-rails', version: VERSION },
+        serverInfo: { name: 'allagio', version: VERSION },
         instructions: 'restore_placement does not call the API. It returns a sign in again link to the dashboard. The other session-only tools do the same.',
       });
     }

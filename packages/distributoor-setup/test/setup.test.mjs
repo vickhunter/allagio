@@ -93,9 +93,9 @@ test('re-running setup upgrades the previous canonical skill text', async t => {
   const paths = await installSkills(root, 'skill', context);
   const marker = '\n\n<!-- distributoor-setup-context -->\n';
   const titles = {
-    'distributoor-onboard': ['# Distributoor setup', '# Offer Rails setup'],
-    'distributoor-instrument': ['# Distributoor attribution instrumentation', '# Offer Rails attribution instrumentation'],
-    'distributoor-launch': ['# Distributoor offer launch', '# Offer Rails offer launch'],
+    'distributoor-onboard': ['# Distributoor setup', '# Allagio setup'],
+    'distributoor-instrument': ['# Distributoor attribution instrumentation', '# Allagio attribution instrumentation'],
+    'distributoor-launch': ['# Distributoor offer launch', '# Allagio offer launch'],
   };
   const oldContext = '## This installation\n\nHosted API: https://old.example\n\nDetected dependencies (hints to verify): {"frameworks":["go"],"providers":[]}\n\nRequested product URL: "https://old.example"\n';
   const legacy = paths.filter(path => previousSkillBodies[path.split('/').at(-2)]);
@@ -146,15 +146,15 @@ test('offline CLI prepares a real project without invoking or claiming a connect
   const { stdout } = await execute(process.execPath, [cli, '--project', root, '--client', 'cursor', '--api-url', 'http://127.0.0.1:8086', '--offline']);
   assert.match(stdout, /connection has not been verified/);
   assert.match(stdout, /integration and paid conversion verification are still pending/);
-  assert.equal(JSON.parse(await readFile(resolve(root, '.cursor/mcp.json'), 'utf8')).mcpServers.distributoor.url, 'http://127.0.0.1:8086/mcp');
+  assert.equal(JSON.parse(await readFile(resolve(root, '.cursor/mcp.json'), 'utf8')).mcpServers.allagio.url, 'http://127.0.0.1:8086/mcp');
   assert.deepEqual((await readdir(resolve(root, '.agents/skills'))).sort(), [...skillNames].sort());
 });
 
-test('package command is offer-rails and keeps the old names', async () => {
+test('package command is allagio and keeps the old names', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(pkg.name, 'offer-rails');
+  assert.equal(pkg.name, 'allagio');
   assert.equal(pkg.version, '0.1.0');
-  for (const name of ['offer-rails', 'affilio', 'distributoor', 'distributoor-setup']) {
+  for (const name of ['allagio', 'offer-rails', 'affilio', 'distributoor', 'distributoor-setup']) {
     assert.equal(pkg.bin[name], 'bin/setup.mjs');
   }
 });

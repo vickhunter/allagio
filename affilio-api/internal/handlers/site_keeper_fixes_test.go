@@ -242,7 +242,7 @@ func TestUnknownGoLinkKeepsPort(t *testing.T) {
 	if rec.Code != http.StatusNotFound || rec.Header().Get("Location") != "" {
 		t.Fatalf("unknown id: %d location %q", rec.Code, rec.Header().Get("Location"))
 	}
-	if !strings.Contains(rec.Header().Get("Content-Type"), "text/html") || !strings.Contains(rec.Body.String(), "This link is not on Offer Rails.") {
+	if !strings.Contains(rec.Header().Get("Content-Type"), "text/html") || !strings.Contains(rec.Body.String(), "This link is not on Allagio.") {
 		t.Fatalf("404 page: %q %s", rec.Header().Get("Content-Type"), rec.Body.String())
 	}
 	if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("X-Robots-Tag") != "noindex, nofollow" {

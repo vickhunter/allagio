@@ -1,4 +1,4 @@
-# Offer Rails setup
+# Allagio setup
 
 One entry point installs MCP and skills, detects framework/payment dependencies
 and uses the builder's existing coding agent for attribution wiring, tests and
@@ -43,7 +43,7 @@ Non-interactive runs also stop after installation.
 
 `--offline` prepares files without checking the server. Authentication and actual
 product integration remain pending. Existing unrelated MCP entries are preserved;
-conflicting Offer Rails entries, malformed JSON, custom skills and symbolic-link
+conflicting Allagio entries, malformed JSON, custom skills and symbolic-link
 write paths cause a clear error. The installer uploads no source or secrets.
 Once launched, the user's agent follows its provider's data processing settings.
 
