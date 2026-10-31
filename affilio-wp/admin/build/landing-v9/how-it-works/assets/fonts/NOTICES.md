@@ -1,6 +1,6 @@
 # Third-party notices
 
-The optional landing illustration bundles Three.js 0.186.1. The scene and fallback artwork are original Allagio code. No ThreeUI code, assets or fonts are redistributed.
+The optional landing illustration bundles Three.js 0.186.1. The scene and fallback artwork are original Offer Rails code. No ThreeUI code, assets or fonts are redistributed.
 
 The owner workspace offer rail embeds two SIL Open Font License families, subset to Latin and stored as data URIs in `workspace.css` so the page does not request another asset. Archivo is used for the rail title and station names. IBM Plex Mono is used for the station flags.
 

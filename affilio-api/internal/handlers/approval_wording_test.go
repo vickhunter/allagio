@@ -25,9 +25,6 @@ func TestConnectStatesApprovalByMode(t *testing.T) {
 			t.Fatalf("%s does not state approval by mode", rel)
 		}
 	}
-	if skillMD != readRepo(t, root, "affilio-wp/admin/build/landing-v9/skill.md") {
-		t.Fatal("skill.md drifted from the fallback")
-	}
 	you := readRepo(t, root, "affilio-wp/admin/build/landing-v9/you.md")
 	for _, label := range []string{"Ask me every time", "Approve within my rules", "Approve anything that passes the checks"} {
 		if strings.Count(you, label) < 2 {

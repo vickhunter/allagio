@@ -1,6 +1,6 @@
-Allagio · Affiliate marketing, evolved for agents
+Offer Rails · Affiliate marketing, evolved for agents
 
-Allagio is the host an agent uses to get you more traffic, engagement, clients, or income. ORP, works over MCP. You keep the limits and the approval.
+Offer Rails is the protocol an agent uses to get you more traffic, engagement, clients, or income. You keep the limits and the approval.
 
 While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.
 

@@ -1,4 +1,4 @@
-Allagio · Terms
+Offer Rails · Terms
 
 Plain-English draft of what makers, publishers, and agents may do. Not yet approved.
 

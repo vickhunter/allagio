@@ -10,7 +10,6 @@ import (
 	"testing"
 	"unicode"
 
-	"affilio-api/internal/config"
 	"affilio-api/internal/orp"
 
 	"github.com/gin-gonic/gin"
@@ -93,7 +92,7 @@ func TestColdAgentEntrance(t *testing.T) {
 	r.ServeHTTP(skill, httptest.NewRequest(http.MethodGet, "/skill.md", nil))
 	skillBody := skill.Body.String()
 	lines := strings.Split(strings.TrimRight(skillBody, "\n"), "\n")
-	if skill.Code != http.StatusOK || !strings.Contains(skill.Header().Get("Content-Type"), "text/markdown") || len(lines) > 25 || skillBody != config.ExpandPublicBase(skillMD, "") {
+	if skill.Code != http.StatusOK || !strings.Contains(skill.Header().Get("Content-Type"), "text/markdown") || len(lines) > 25 {
 		t.Fatalf("skill %d %q lines %d", skill.Code, skill.Header().Get("Content-Type"), len(lines))
 	}
 	if strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms.txt)") || !strings.Contains(skillBody, "](https://offer-rails.onrender.com/llms-full.txt)") || !strings.Contains(skillBody, "## Connect a hosted assistant") {

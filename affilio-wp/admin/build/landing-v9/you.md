@@ -1,4 +1,4 @@
-Allagio · Your limits
+Offer Rails · Your limits
 
 Your limits, your approvals, and a plain-word receipt of what your agent agreed to. This page is not a signup form.
 

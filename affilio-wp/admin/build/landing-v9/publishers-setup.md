@@ -1,4 +1,4 @@
-Allagio · Publisher setup
+Offer Rails · Publisher setup
 
 Install the plugin, connect your site, and choose how placements get approved.
 

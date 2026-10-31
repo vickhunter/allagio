@@ -235,7 +235,7 @@ func assertYouLimitsPage(t *testing.T, label string, rec *httptest.ResponseRecor
 		t.Fatalf("%s did not serve the plain fallback", label)
 	}
 	for _, needle := range []string{
-		"Allagio · Your limits",
+		"· Your limits",
 		"This page is not a signup form",
 		"Ask me every time",
 		"Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.",

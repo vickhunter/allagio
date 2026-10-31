@@ -1,8 +1,8 @@
-# Allagio
+# Offer Rails
 
 This file is a pointer. It is not a second copy of the rules.
 
-Full text: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
+Full text: [/llms-full.txt](https://offer-rails.onrender.com/llms-full.txt)
 
 ## Connect a hosted assistant
 

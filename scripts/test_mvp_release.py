@@ -718,6 +718,15 @@ class ReleaseTests(unittest.TestCase):
 
         self.assertEqual(assignment("installer_tarball"), release.INSTALLER)
         self.assertEqual(assignment("package_name"), release.INSTALLER_PACKAGE)
+        dockerfile = (release.ROOT / "Dockerfile.mvp").read_text()
+
+        def docker_default(name):
+            found = re.search(r"(?m)^ARG %s=(\S+)\s*$" % re.escape(name), dockerfile)
+            self.assertIsNotNone(found, name)
+            return found.group(1)
+
+        self.assertEqual(docker_default("INSTALLER_TGZ"), release.INSTALLER)
+        self.assertEqual(docker_default("PACKAGE_NAME"), release.INSTALLER_PACKAGE)
 
     def test_installer_package_is_allagio_with_old_command_aliases(self):
         self.assertEqual(release.INSTALLER, "allagio-0.1.0.tgz")
