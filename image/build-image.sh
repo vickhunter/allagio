@@ -19,4 +19,11 @@ if [ -n "$missing" ]; then
   echo "image/build-image.sh: $landing is missing:$missing" >&2
   exit 1
 fi
-exec docker build -f Dockerfile.mvp -t allagio:local .
+# installer_tarball and package_name are the archive this image writes.
+# scripts/mvp_release.py must use the same two values.
+installer_tarball=allagio-0.1.0.tgz
+package_name=allagio
+exec docker build -f Dockerfile.mvp -t allagio:local \
+  --build-arg INSTALLER_TGZ="$installer_tarball" \
+  --build-arg PACKAGE_NAME="$package_name" \
+  .

@@ -3,7 +3,11 @@ RUN apk add --no-cache zip
 WORKDIR /source
 COPY packages/distributoor-setup ./packages/distributoor-setup
 COPY distributoor-plugin/skills ./distributoor-plugin/skills
-RUN mkdir /release && cd packages/distributoor-setup && npm pack --pack-destination /release
+ARG PACKAGE_NAME=allagio
+ARG INSTALLER_TGZ=allagio-0.1.0.tgz
+RUN mkdir /release && cd packages/distributoor-setup && npm pack --pack-destination /release \
+ && test "$(node -p "require('./package.json').name")" = "$PACKAGE_NAME" \
+ && test -f "/release/$INSTALLER_TGZ"
 COPY affilio-wp/affilio.php ./wordpress/affilio-wp/affilio.php
 COPY affilio-wp/readme.txt ./wordpress/affilio-wp/readme.txt
 COPY affilio-wp/includes ./wordpress/affilio-wp/includes

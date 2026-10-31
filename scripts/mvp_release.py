@@ -21,6 +21,7 @@ ENVIRONMENT = "2534a1db-d231-45ae-868e-680c48b11dfb"
 SERVICE = "c3a5be47-e442-4ff4-8dda-ee808944c233"
 ORIGIN = "https://distributoor-production.up.railway.app"
 INSTALLER = "allagio-0.1.0.tgz"
+INSTALLER_PACKAGE = "allagio"
 CHECKS = {"onboarding", "affilio-api-tests", "mvp-release-package"}
 ASSETS = (
     "home.html", "workspace.html", "protocol.html", "workspace.css", "workspace.js",
@@ -764,7 +765,7 @@ def validate_installer(data):
         package = json.load(archive.extractfile("package/package.json"))
         bins = package.get("bin") or {}
         require(
-            package.get("name") == "allagio"
+            package.get("name") == INSTALLER_PACKAGE
             and package.get("version") == "0.1.0"
             and bins.get("allagio") == "bin/setup.mjs"
             and bins.get("offer-rails") == "bin/setup.mjs"

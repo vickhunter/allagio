@@ -708,6 +708,17 @@ class ReleaseTests(unittest.TestCase):
                 with self.subTest(path=path), patch.object(release, "fetch", side_effect=lambda path, *args: responses[path]), self.assertRaises(release.ReleaseError):
                     release.verify()
 
+    def test_image_build_and_release_script_agree_on_the_installer(self):
+        script = (release.ROOT / "image/build-image.sh").read_text()
+
+        def assignment(name):
+            found = re.search(r"(?m)^%s=(['\"]?)([^'\"\s]+)\1\s*$" % re.escape(name), script)
+            self.assertIsNotNone(found, name)
+            return found.group(2)
+
+        self.assertEqual(assignment("installer_tarball"), release.INSTALLER)
+        self.assertEqual(assignment("package_name"), release.INSTALLER_PACKAGE)
+
     def test_installer_package_is_allagio_with_old_command_aliases(self):
         self.assertEqual(release.INSTALLER, "allagio-0.1.0.tgz")
         root = Path(release.__file__).resolve().parent.parent
