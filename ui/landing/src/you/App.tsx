@@ -1,6 +1,6 @@
 import { Page } from '@/site/Page'
-import { useSource, withSource } from '@/lib/source'
-import { limits, publishStepParagraph, receiptExample, receiptLabel, youPageLead } from '@/vision.mjs'
+import { signInHref, useSource, withSource } from '@/lib/source'
+import { limits, publishStepParagraph, youPageLead } from '@/vision.mjs'
 
 export function App() {
   const source = useSource()
@@ -10,7 +10,9 @@ export function App() {
         <p className="eyebrow">For the human</p>
         <h1 id="you-h" className="h-display mt-4 text-[40px] sm:text-6xl">Your limits, your approvals, a receipt in plain words.</h1>
         <p className="mt-5 text-lg leading-relaxed text-t2">{youPageLead}</p>
-        <p className="mt-3 text-sm leading-relaxed text-t2">Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link. Google sign-in stays on the owner dashboard.</p>
+        <p className="mt-6">
+          <a href={signInHref('/owner', source)} className="inline-flex min-h-11 min-w-11 items-center rounded-[10px] bg-t1 px-5 text-sm font-semibold text-s0">Sign in to set your limits</a>
+        </p>
 
         <section id="limits" aria-labelledby="limits-h" className="mt-12">
           <h2 id="limits-h" className="font-display text-2xl font-bold tracking-tight">Limits</h2>
@@ -32,9 +34,7 @@ export function App() {
 
         <section id="receipts" aria-labelledby="receipts-h" className="mt-12">
           <h2 id="receipts-h" className="font-display text-2xl font-bold tracking-tight">Receipts</h2>
-          <p className="mt-2 text-sm leading-relaxed text-t2">When a placement is published, the receipt names the offer, the post, the commission, and the end date, in a sentence like this.</p>
-          <p className="mt-4 text-sm font-semibold text-t2">{receiptLabel}</p>
-          <blockquote className="mt-2 rounded-2xl border border-line bg-s1 p-4 text-[15px] leading-relaxed text-t1">{receiptExample}</blockquote>
+          <p className="mt-2 text-sm leading-relaxed text-t1">No deals yet.</p>
         </section>
 
         <p className="mt-10 text-sm text-t2">

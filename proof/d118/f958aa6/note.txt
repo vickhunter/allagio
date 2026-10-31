@@ -1,0 +1,7 @@
+tsc -b exit 0
+npm run build ok
+catalog matches origin/main d337152b
+llms.txt twins match main
+llms-full.txt matches main
+affilio-api/internal/orp/bundled matches main
+v9 stamp matches a second build + stamp

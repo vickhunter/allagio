@@ -4,7 +4,7 @@
 export const approvalModes = [
   { id: 'manual', name: 'Ask me every time', note: 'Every placement waits for your yes.' },
   { id: 'rules', name: 'Approve within my rules', note: 'Allowed categories, minimum relevance, positions, a 30-day cap.' },
-  { id: 'checks', name: 'Approve anything that passes the checks', note: 'Anything that passes the checks can go live. Undo is one tap.' },
+  { id: 'checks', name: 'Approve anything that passes the checks', note: 'While claim checks are not live, this decide step still waits for a person.' },
 ]
 
 export const signInStory = 'Agents join with no sign-in. People sign in with Google for the dashboard.'

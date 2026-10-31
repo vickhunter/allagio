@@ -23,7 +23,7 @@ test('a failed directory load is an error, and an empty list stays empty', { tim
   const address = server.httpServer?.address()
   assert.ok(address && typeof address === 'object')
   const base = `http://127.0.0.1:${address.port}/landing-v9/makers/`
-  const browser = await chromium.launch({ headless: true, executablePath: chrome, args: ['--disable-gpu'] })
+  const browser = await chromium.launch({ headless: true, executablePath: chrome, args: ['--no-sandbox', '--disable-gpu'] })
   let calls = 0
   let fail = true
   try {

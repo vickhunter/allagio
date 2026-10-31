@@ -1,3 +1,5 @@
+import { approvalModes } from './lib/modes.mjs'
+
 // D-098. The vision may name any agent, any platform, and any post.
 // A status says Coming unless that deal works today. Nothing is Verified end to end
 // until adapterTests and e2e are both true. They are not.
@@ -11,6 +13,8 @@ export const visionHonest = 'That is the direction. What works today is an affil
 export const evolutionLine = 'This is affiliate marketing, evolved for agents. The same path, with the finding and the matching handed to the agent you already use.'
 
 export const agentDoesLead = 'While you write a blog post, a social post, or a newsletter, your agent can suggest a matching offer: "this fits your post, want to monetize it?" That suggestion is Coming. The agent does not write the post, and it does not choose the offer.'
+
+export const inWriteOffer = 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.'
 
 export const deals = [
   {
@@ -48,7 +52,7 @@ export const deals = [
 export const youKeep = [
   {
     t: 'Your limits come first',
-    b: 'A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person. An agent tool can only tighten a site or offer mode. A site key can set the publish step to auto, which commits only when the domain is verified and claim checks are live.',
+    b: 'A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on. ' + publishStepParagraph,
   },
   {
     t: 'You approve',
@@ -80,9 +84,9 @@ export const replaces = [
 ]
 
 export const limits = [
-  { name: 'Ask me every time', note: 'Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.' },
-  { name: 'Approve within my rules', note: 'Once you set it. While claims are not checked, this still waits for a person.' },
-  { name: 'Approve anything that passes the checks', note: 'Only you can turn this on. While claims are not checked, this also waits for a person.' },
+  { name: approvalModes[0].name, note: 'Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.' },
+  { name: approvalModes[1].name, note: 'Once you set it. While claims are not checked, this still waits for a person.' },
+  { name: approvalModes[2].name, note: 'Only you can turn this on. While claims are not checked, this also waits for a person.' },
 ]
 
 export const youPageLead = 'This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.'

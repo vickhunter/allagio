@@ -329,7 +329,7 @@ async function assertAgents(browser, origin, width, summary, outDir) {
       headings: ['No-browser account', 'Device code', 'Find offers'].filter((name) => [...document.querySelectorAll('h2, h3')].some((el) => el.textContent.trim() === name)),
       soon: [...document.querySelectorAll('[data-tool][data-soon="true"]')].map((el) => el.getAttribute('data-tool')),
       livePreview: document.querySelector('[data-tool="preview_page"]')?.innerText.includes('Coming soon') && !document.querySelector('[data-tool="find_opportunities"]')?.innerText.includes('Coming soon'),
-      modes: ['Ask me every time', 'Approve within my rules', 'Approve anything that passes the checks'].every((name) => text.includes(name)),
+      modes: ['Ask me every time', 'Approve within my rules', 'Approve anything that passes the checks'].every((name) => text.includes(name)) && !text.includes('YOLO'),
       stub: text.includes('claim_check_unavailable') && text.includes('Not checked yet'),
       url: document.querySelector('[data-mcp-url]')?.textContent || '',
       alternate: document.querySelector('link[rel="alternate"]')?.getAttribute('href') || '',
@@ -499,33 +499,25 @@ try {
       if (serious.length) throw new Error(slug + ' axe ' + serious.map((item) => item.id + ' ' + item.nodes.map((node) => node.target.join(' ')).join('; ')).join(' | '))
       if (!signHref.includes('/auth/login') || !signHref.includes('source=cursor')) throw new Error(slug + ' sign-in href ' + signHref)
       if (zip !== '/downloads/offer-rails.zip') throw new Error(slug + ' zip ' + zip)
-      if (route === '/' && (metrics.how !== 1 || metrics.publishers !== 1)) throw new Error('home anchors ' + metrics.how + '/' + metrics.publishers)
+      if (route === '/' && metrics.how !== 0) throw new Error('home still has the how-it-works anchor')
       if (route === '/' && metrics.preview !== 1) throw new Error('home preview fields ' + metrics.preview)
       if (route !== '/' && metrics.preview) throw new Error(route + ' preview field leaked')
-      if (metrics.primary !== 1) throw new Error(slug + ' primary count ' + metrics.primary)
+      const expectPrimary = route === '/' ? 0 : 1
+      if (metrics.primary !== expectPrimary) throw new Error(slug + ' primary count ' + metrics.primary)
       const mcpHrefs = await page.getByRole('link', { name: 'MCP and setup' }).evaluateAll((links) => links.map((link) => link.getAttribute('href') || ''))
       if (!mcpHrefs.length || mcpHrefs.some((href) => !href.includes('/landing-v9/agents/') || !href.includes('source=cursor'))) throw new Error(slug + ' MCP href ' + mcpHrefs.join(','))
-      const positioning = route === '/' ? /Publishers earn on a sale/ : route === '/makers' ? /Pay only for sales/ : /Earn from more of your posts/
+      const positioning = route === '/' ? /this fits your post, want to monetize it/ : route === '/makers' ? /Pay only for sales/ : /Earn from more of your posts/
       if (!(await page.getByRole('heading', { level: 1, name: positioning }).count())) throw new Error(slug + ' missing the positioning heading')
       const spoken = await page.locator('body').innerText()
       if (/\bads\b/i.test(spoken) || /revolution/i.test(spoken) || /\bpilot\b/i.test(spoken) || /every post/i.test(spoken)) throw new Error(slug + ' banned positioning word')
       if (route === '/') {
-        if (!(await page.getByRole('heading', { name: 'From a product to a paid sale, in five steps.' }).count())) throw new Error('how it works bento missing')
-        const folded = (await page.locator('main').innerText()).toLowerCase()
-        const howAt = folded.indexOf('from a product to a paid sale')
-        const chapterAt = folded.indexOf('chapter a')
-        if (howAt < 0 || chapterAt < 0 || howAt > chapterAt) throw new Error('how it works is not before Chapter A ' + howAt + '/' + chapterAt)
-        await page.getByRole('link', { name: 'I run a site' }).click()
-        await page.waitForURL(/\/publishers\/setup/)
-        if (!page.url().includes('source=cursor')) throw new Error('I run a site dropped the source ' + page.url())
-        const stepZip = await page.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
-        if (stepZip !== '/downloads/offer-rails.zip') throw new Error('I run a site step 1 zip ' + stepZip)
-        await page.goto(base + '/?source=cursor', { waitUntil: 'networkidle' })
-        await page.getByRole('button', { name: 'I sell a product' }).click()
-        const sellHref = await page.getByRole('link', { name: 'Continue with Google' }).getAttribute('href')
-        const sellTo = new URL(sellHref, base).searchParams.get('return_to') || ''
-        if (!sellHref.includes('source=cursor') || !sellTo.includes('setup=maker')) throw new Error('I sell a product href ' + sellHref)
-        await page.keyboard.press('Escape')
+        if (await page.getByRole('button', { name: 'I sell a product' }).count()) throw new Error('home still asks who you are')
+        if (await page.getByRole('link', { name: 'I run a site' }).count()) throw new Error('home still asks who you are')
+        const limitsHref = await page.getByRole('link', { name: 'Your limits' }).first().getAttribute('href')
+        if (!limitsHref || !limitsHref.includes('/you')) throw new Error('home limits href ' + limitsHref)
+        await page.locator('#join summary').click()
+        const google = await page.getByRole('link', { name: 'Sign in with Google' }).getAttribute('href')
+        if (!google || !google.includes('/auth/login')) throw new Error('home google href ' + google)
       }
       if (route === '/makers' && await page.getByRole('link', { name: 'I run a site' }).count()) throw new Error('makers page offers the site choice')
       if (route === '/publishers') {
@@ -577,7 +569,7 @@ try {
       if (banned.test(text)) throw new Error(legal + '-' + width + ' banned copy')
       const need = legal === 'privacy'
         ? ['Draft. This text is not final and has not been approved yet.', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', '10 to 12000', 'surface URL', 'not followed', 'signed-out caller', 'frozen copy', 'approved by', 'pass or fail signals', 'We never store source code, environment files or secrets.', '/24', '/48', 'daily salt', 'raw IP is never stored', '30 days', 'Render hosts', 'Neon provides Postgres', 'Cloudflare sits in front of Render', 'Stripe processes payments', 'If AI copy generation is turned on, page text you send is processed by Anthropic (Claude) to classify and draft copy.', 'no telemetry', 'train models', 'not sold', 'not transferred', 'untrusted data', 'only tighten modes', 'Until the claims check is live, every placement needs a person to approve it.', 'Not checked yet']
-        : ['Draft. This text is not final and has not been approved yet.', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', 'A maker may publish an offer', 'sale and a refund', 'does not hold the money', 'approve or refuse', 'until a person approves', 'only tighten an approval mode', 'cannot approve a placement', 'cannot turn YOLO on', 'test mode', 'not a live charge', 'no warranty', 'as is']
+        : ['Draft. This text is not final and has not been approved yet.', '18 October 2026', '[OPERATOR NAME]', '[CONTACT EMAIL]', 'A maker may publish an offer', 'sale and a refund', 'does not hold the money', 'approve or refuse', 'until a person approves', 'only tighten an approval mode', 'cannot approve a placement', 'cannot turn on Approve anything that passes the checks', 'test mode', 'not a live charge', 'no warranty', 'as is']
       for (const needle of need) {
         if (!text.includes(needle)) throw new Error(legal + '-' + width + ' missing ' + needle)
       }
@@ -662,7 +654,7 @@ try {
     await setupPage.screenshot({ path: join(out, 'setup-' + width + '.png'), fullPage: true })
     const connectHref = await setupPage.getByRole('link', { name: 'Connect your site' }).getAttribute('href')
     const connectTo = new URL(connectHref, base).searchParams.get('return_to') || ''
-    const manual = await setupPage.getByRole('radio', { name: /Manual/ }).isChecked()
+    const manual = await setupPage.getByRole('radio', { name: /Ask me every time/ }).isChecked()
     const setupCopy = await setupPage.locator('body').innerText()
     summary.push({ slug: 'setup-' + width, ...setupMetrics, serious: setupSerious.map((item) => item.id), connectHref, manual })
     await assertHeaderSignIn(setupPage, 'setup-' + width)
@@ -679,7 +671,7 @@ try {
     if (!primaryName.includes('Download the plugin')) throw new Error('setup-' + width + ' primary ' + primaryName)
     if (setupMetrics.pills.length !== 3 || setupMetrics.pills.some((pill) => pill.size < 12 || !pill.sameLine || !pill.aboveTitle)) throw new Error('setup-' + width + ' status pills ' + JSON.stringify(setupMetrics.pills))
     if (!manual) throw new Error('setup-' + width + ' does not preselect Manual')
-    if (!setupCopy.includes('A new site waits for a person to approve each placement before it is published.') || !setupCopy.includes('That starting choice stays when claim checks are on.')) throw new Error('setup-' + width + ' copy drifted')
+    if (!setupCopy.includes('A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on.')) throw new Error('setup-' + width + ' copy drifted')
     if (!connectHref.includes('/auth/login') || !connectHref.includes('source=cursor') || !connectTo.startsWith('/owner/connect-site') || !connectTo.includes('source=cursor')) throw new Error('setup connect href ' + connectHref)
     const setupZip = await setupPage.getByRole('link', { name: 'Download the plugin' }).getAttribute('href')
     if (setupZip !== '/downloads/offer-rails.zip') throw new Error('setup zip ' + setupZip)

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -98,15 +99,76 @@ func TestYouLimitsSentencesDoNotDrift(t *testing.T) {
 	for _, sentence := range []string{
 		"Your limits, your approvals, a receipt in plain words.",
 		"This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.",
-		"Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.",
+		"Sign in to set your limits",
 		"Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.",
 		publishStepParagraph,
-		"Example wording. Not a live agreement.",
-		"Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.",
+		"Your agent can prepare the placement and show you the terms.",
+		"No deals yet.",
+		"Give your agent the join line",
 	} {
 		if !strings.Contains(string(built), sentence) || !strings.Contains(plain, sentence) {
 			t.Fatalf("limits sentence is not in both pages: %q", sentence)
 		}
+	}
+}
+
+func TestYouLimitsSignInReturnIsAllowed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	built := &HostedHandler{
+		BaseURL:       "http://127.0.0.1:8080",
+		AssetsPath:    filepath.Join(repoRoot(t), "affilio-wp", "admin", "build"),
+		DownloadsPath: t.TempDir(),
+	}
+	builtRouter := gin.New()
+	built.Mount(builtRouter)
+	for _, path := range []string{"/you", "/you/"} {
+		rec := httptest.NewRecorder()
+		builtRouter.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		assertLimitsSignInReturnAllowed(t, path+" built", rec.Body.String())
+	}
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "home.html"), []byte("<!doctype html><title>Offer Rails</title>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plain := &HostedHandler{BaseURL: "http://127.0.0.1:8080", AssetsPath: dir, DownloadsPath: t.TempDir()}
+	plainRouter := gin.New()
+	plain.Mount(plainRouter)
+	rec := httptest.NewRecorder()
+	plainRouter.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/you/", nil))
+	assertLimitsSignInReturnAllowed(t, "fallback", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), `data-limits-fallback="1"`) {
+		t.Fatal("fallback case did not serve youLimitsPlain")
+	}
+}
+
+func assertLimitsSignInReturnAllowed(t *testing.T, label, body string) {
+	t.Helper()
+	const marker = ">Sign in to set your limits</a>"
+	at := strings.Index(body, marker)
+	if at < 0 {
+		t.Fatalf("%s has no limits sign-in link", label)
+	}
+	hrefAt := strings.LastIndex(body[:at], `href="`)
+	if hrefAt < 0 {
+		t.Fatalf("%s limits sign-in link has no href", label)
+	}
+	hrefAt += len(`href="`)
+	end := strings.Index(body[hrefAt:], `"`)
+	if end < 0 {
+		t.Fatalf("%s limits sign-in href is unterminated", label)
+	}
+	href := body[hrefAt : hrefAt+end]
+	parsed, err := url.Parse(href)
+	if err != nil {
+		t.Fatalf("%s href %q: %v", label, href, err)
+	}
+	returnTo := href
+	if parsed.Path == "/auth/login" {
+		returnTo = parsed.Query().Get("return_to")
+	}
+	if _, ok := loginReturnPathAllowed(returnTo); !ok {
+		t.Fatalf("%s href %q return %q is not an allowed login return path", label, href, returnTo)
 	}
 }
 
@@ -181,8 +243,9 @@ func assertYouLimitsPage(t *testing.T, label string, rec *httptest.ResponseRecor
 		"Once you set it. While claims are not checked, this still waits for a person.",
 		"Approve anything that passes the checks",
 		"Only you can turn this on. While claims are not checked, this also waits for a person.",
-		"POST /v1/agent-tokens",
-		"Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.",
+		"Sign in to set your limits",
+		"No deals yet.",
+		"Give your agent the join line",
 	} {
 		if !strings.Contains(body, needle) {
 			t.Fatalf("%s missing %q", label, needle)

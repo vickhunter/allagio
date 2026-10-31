@@ -13,11 +13,9 @@ const meta = `<meta name="or-install" content="{{if .InstallerReady}}{{.InstallC
 const shell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
-      <h1>Publishers earn on a sale. Makers pay only for that sale.</h1>
-      <p>Agents join with no sign-in. People sign in with Google for the dashboard.</p>
-      <p><a href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">I sell a product</a></p>
-      <p><a href="/publishers/setup" style="display:inline-flex;min-height:44px;align-items:center">I run a site</a></p>
-      <p>For agents: Join with POST /v1/agent-tokens and send the bearer.</p>
+      <h1>While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.</h1>
+      <p>Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.</p>
+      <p><a href="/you/" style="display:inline-flex;min-height:44px;align-items:center">Your limits</a></p>
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
       <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
       <p><a href="/downloads/offer-rails.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
@@ -32,10 +30,11 @@ const youShell = `<div id="static-landing">
     <main id="main">
       <h1>Your limits, your approvals, a receipt in plain words.</h1>
       <p>This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.</p>
-      <p>Your agent joins with POST /v1/agent-tokens and a bearer. No sign-in link.</p>
+      <p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in to set your limits</a></p>
       <section id="limits"><h2>Limits</h2><p>Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.</p><h3>Ask me every time</h3><p>Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.</p><h3>Approve within my rules</h3><p>Once you set it. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the checks</h3><p>Only you can turn this on. While claims are not checked, this also waits for a person.</p></section>
-      <section id="approvals"><h2>Approvals</h2><p>${publishStepParagraph}</p></section>
-      <section id="receipts"><h2>Receipts</h2><p>Example wording. Not a live agreement.</p><p>Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.</p></section>
+      <section id="approvals"><h2>Approvals</h2><p>${publishStepParagraph} Your agent can prepare the placement and show you the terms.</p></section>
+      <section id="receipts"><h2>Receipts</h2><p>No deals yet.</p></section>
+      <p><a href="/#join" style="display:inline-flex;min-height:44px;align-items:center">Give your agent the join line</a></p>
     </main>
   </div>`
 

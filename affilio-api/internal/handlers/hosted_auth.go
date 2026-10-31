@@ -529,14 +529,34 @@ func (h *HostedHandler) ownerLogin() services.OwnerLogin {
 	return h.Login
 }
 
+// loginReturnPathAllowed is the return-path check LoginStart uses. A path is
+// allowed when it is /owner (including the owner sections), /oauth/authorize,
+// or /device. An absolute URL, a host, or a fragment is refused.
+func loginReturnPathAllowed(returnTo string) (*url.URL, bool) {
+	u, err := url.Parse(returnTo)
+	if err != nil || u == nil || u.IsAbs() || u.Host != "" || u.Fragment != "" {
+		return u, false
+	}
+	switch u.Path {
+	case "/owner", "/owner/products", "/owner/placements", "/owner/earnings", "/owner/settings", "/owner/review", "/owner/connect-site", "/oauth/authorize":
+		return u, true
+	}
+	if deviceSignInReturn(u) {
+		return u, true
+	}
+	if strings.HasPrefix(u.Path, "/owner/placements/") && uuidPattern.MatchString(strings.TrimPrefix(u.Path, "/owner/placements/")) {
+		return u, true
+	}
+	return u, false
+}
+
 func (h *HostedHandler) LoginStart(c *gin.Context) {
 	if h.limited(c) {
 		return
 	}
 	returnTo := c.DefaultQuery("return_to", "/owner")
-	u, err := url.Parse(returnTo)
-	validPath := u != nil && (u.Path == "/owner" || u.Path == "/owner/products" || u.Path == "/owner/placements" || u.Path == "/owner/earnings" || u.Path == "/owner/settings" || u.Path == "/owner/review" || u.Path == "/owner/connect-site" || u.Path == "/oauth/authorize" || deviceSignInReturn(u) || strings.HasPrefix(u.Path, "/owner/placements/") && uuidPattern.MatchString(strings.TrimPrefix(u.Path, "/owner/placements/")))
-	if err != nil || !validPath || u.IsAbs() || u.Host != "" || u.Fragment != "" {
+	u, ok := loginReturnPathAllowed(returnTo)
+	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid return path"})
 		return
 	}

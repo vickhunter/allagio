@@ -1,62 +1,40 @@
-import { ArrowRight } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
-import { Runs } from '@/components/Runs'
 import { JoinForm } from '@/components/JoinForm'
-import { runsLead, runsTitle } from '@/surfaces.mjs'
-import { Checks } from '@/site/bits'
-import { SignInChoice } from '@/components/SignInChoice'
-import { Blip } from '@/components/Blip'
-import { driftChips, example, faq, makerAdvantages, publisherAdvantages } from '@/content'
-import { signInStory } from '@/lib/modes.mjs'
+import { example, faq } from '@/content'
 import { Vision } from './Vision'
 import { PostPreview } from '@/components/PostPreview'
-import { HowItWorks } from './HowItWorks'
 import { useSource, withSource } from '@/lib/source'
+import { inWriteOffer } from '@/vision.mjs'
 
-// Home. Flat paper, a plain promise, then the two roles. The agent line sits under that choice.
+// Home. The first screen is the in-write offer, the agent line, and a link to limits.
 export function App() {
   const source = useSource()
   return (
     <Page page="home">
-      <section aria-labelledby="hero-h" className="bg-s0">
-        <div className="mx-auto grid max-w-6xl gap-8 px-5 pb-6 pt-8 lg:grid-cols-[1fr_300px] lg:items-start lg:gap-6">
-          <div>
-            <p className="eyebrow">What you get</p>
-            <h1 id="hero-h" className="h-display mt-3 max-w-3xl text-[2rem] leading-[1.08] sm:text-5xl">Publishers earn on a sale. Makers pay only for that sale.</h1>
-            <p className="mt-4 max-w-xl text-lg leading-relaxed text-t2">Agents find a post that fits and place one labelled link.</p>
-            <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-t1">{signInStory}</p>
-            <div className="mt-6 max-w-xl">
-              <SignInChoice where="hero" />
-              <p className="mt-2 text-[13px] text-t2">One account can do both.</p>
-            </div>
-            <div className="mt-8 max-w-xl border-t border-line pt-6">
-              <h2 id="join-h" className="font-display text-xl font-bold tracking-tight">For agents</h2>
-              <p className="mt-2 text-sm leading-relaxed text-t2">This line is for an agent. The choice above is for a person.</p>
-              <div className="mt-4">
-                <JoinForm />
-              </div>
-            </div>
+      <section aria-labelledby="hero-h" className="bg-s0" data-hero-bg="fallback">
+        <div className="mx-auto max-w-3xl px-5 pb-8 pt-8">
+          <h1 id="hero-h" className="h-display max-w-3xl text-[1.65rem] leading-[1.15] sm:text-4xl">{inWriteOffer}</h1>
+          <div className="mt-6 max-w-xl">
+            <JoinForm />
           </div>
-          <Drift />
-        </div>
-        <div className="mx-auto max-w-6xl px-5 pb-16">
-          <Vision />
-          <p className="eyebrow mb-3 mt-12">Pick your side. Each page lists every advantage.</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SideLink href={withSource('/makers/', source)} tone="maker" n="A" title="I sell something." text="Publishers’ agents find you. You pay only for sales." cta={`All ${makerAdvantages.length} maker advantages`} />
-            <SideLink id="publishers" href={withSource('/publishers/', source)} tone="pub" n="B" title="I publish." text="Earn from more of your posts. Agents find offers that fit the content you already make." cta={`All ${publisherAdvantages.length} publisher advantages`} />
-          </div>
-          <p className="mt-3 text-[13px] text-t2">Both? One account does both. Press <kbd className="font-mono">M</kbd> or <kbd className="font-mono">P</kbd>.</p>
-          <div className="mt-8">
-            <h2 className="font-display text-2xl font-bold tracking-tight">{runsTitle}</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-t2">{runsLead}</p>
-            <div className="mt-4"><Runs audience="publisher" /></div>
-          </div>
+          <p className="mt-2">
+            <a className="inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline" href={withSource('/you/', source)}>Your limits</a>
+          </p>
         </div>
       </section>
 
-      <HowItWorks />
+      <div className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-12 md:py-16">
+          <Vision />
+        </div>
+      </div>
+
+      <section aria-labelledby="money-h" className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
+          <h2 id="money-h" className="h-display max-w-3xl text-3xl sm:text-4xl">On a {example.price} sale at {example.commission}, the publisher earns {example.publisher}. A {example.fee} fee is paid by the maker, so the maker keeps {example.maker}.</h2>
+        </div>
+      </section>
 
       <section id="post-preview" aria-labelledby="preview-h" className="border-t border-line">
         <div className="mx-auto max-w-3xl px-5 py-16 md:py-20">
@@ -69,70 +47,15 @@ export function App() {
         </div>
       </section>
 
-      <section aria-labelledby="sides-h" className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
-          <p className="eyebrow">Chapter A · Two sides, one rail</p>
-          <h2 id="sides-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">On a {example.price} sale at {example.commission}, the publisher earns {example.publisher}. A {example.fee} fee is paid by the maker, so the maker keeps {example.maker}.</h2>
-          <div className="mt-10 grid gap-10 md:grid-cols-2">
-            <Teaser tone="maker" title="For makers" items={makerAdvantages.slice(0, 4)} href={withSource('/makers/', source)} />
-            <Teaser tone="pub" title="For publishers" items={publisherAdvantages.slice(0, 4)} href={withSource('/publishers/', source)} />
-          </div>
-        </div>
-      </section>
-
-      <Checks eyebrow="Chapter B · The rules" />
-
       <section id="faq" aria-labelledby="faq-h" className="border-t border-line">
-        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-16 md:grid-cols-[1fr_2fr] md:py-20">
-          <div><p className="eyebrow">Chapter C · Money, plainly</p><h2 id="faq-h" className="h-display mt-3 text-3xl sm:text-4xl">Straight answers.</h2><Blip className="mt-8 hidden md:inline-flex" say="Money questions get plain answers." /></div>
+        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-16 md:py-20">
+          <div>
+            <p className="eyebrow">Money, plainly</p>
+            <h2 id="faq-h" className="h-display mt-3 text-3xl sm:text-4xl">Straight answers.</h2>
+          </div>
           <Accordion items={faq} />
         </div>
       </section>
-
     </Page>
-  )
-}
-
-function Drift() {
-  const tone = { maker: 'text-maker', pub: 'text-pub', agent: 'text-setup' } as const
-  const depth = ['lg:translate-x-6 lg:scale-[.94]', 'lg:-translate-x-4', 'lg:translate-x-10 lg:scale-[.97]', 'lg:-translate-x-2 lg:scale-[1.03]', 'lg:translate-x-4 lg:scale-[.95]', 'lg:-translate-x-6']
-  return (
-    <div className="relative z-10 lg:pt-6">
-      <p id="drift-l" className="sr-only">Example activity for one offer</p>
-      <ul aria-labelledby="drift-l" className="flex flex-wrap gap-2 lg:flex-col lg:gap-4">
-        {driftChips.map((c, i) => (
-          <li key={c.label} className={depth[i]}>
-            <div className="drift rounded-xl border border-line bg-s1/95 px-3 py-2 text-[13px] shadow-[0_6px_18px_-10px_rgb(var(--rgb-text-1)/.35)]" style={{ animationDelay: `${-i * 1.7}s` }}>
-              <span className={`font-mono text-[11px] uppercase ${tone[c.who]}`}>{c.label}</span> <span>{c.text}</span>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function SideLink({ href, tone, n, title, text, cta, id }: { href: string; tone: 'maker' | 'pub'; n: string; title: string; text: string; cta: string; id?: string }) {
-  const c = tone === 'maker' ? 'bg-maker-soft hover:border-maker text-maker' : 'bg-pub-soft hover:border-pub text-pub'
-  return (
-    <a id={id} href={href} data-track="path_pick" data-track-path={tone === 'maker' ? 'maker' : 'publisher'} className={`group flex flex-col rounded-2xl border border-line p-5 transition-colors duration-150 ${c}`}>
-      <span className="font-mono text-xs">Path {n}</span>
-      <span className="mt-4 font-display text-2xl font-bold tracking-tight text-t1">{title}</span>
-      <span className="mt-2 text-[15px] leading-relaxed text-t2">{text}</span>
-      <span className="mt-4 flex items-center gap-1 text-sm font-semibold">{cta} <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-1" aria-hidden /></span>
-    </a>
-  )
-}
-
-function Teaser({ tone, title, items, href }: { tone: 'maker' | 'pub'; title: string; items: readonly { k: string; t: string; b: string }[]; href: string }) {
-  const c = tone === 'maker' ? 'text-maker' : 'text-pub'
-  return (
-    <div>
-      <h3 className={`font-display text-xl font-bold ${c}`}>{title}</h3>
-      <ol className="mt-4">
-        {items.map((a, i) => <li key={a.k} className="grid grid-cols-[2.25rem_1fr] gap-3 border-b border-line py-4"><span className={`font-display text-2xl font-bold ${c}`}>{i + 1}</span><div><p className="font-semibold">{a.t}</p><p className="mt-1 text-sm leading-relaxed text-t2">{a.b}</p></div></li>)}
-      </ol>
-      <a href={href} data-track="secondary_click" data-track-to={tone} className={`mt-4 inline-flex min-h-11 min-w-11 items-center gap-1 font-semibold underline underline-offset-4 hover:no-underline ${c}`}>Read every {tone === 'maker' ? 'maker' : 'publisher'} advantage <ArrowRight className="size-4" aria-hidden /></a>
-    </div>
   )
 }

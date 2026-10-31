@@ -165,7 +165,8 @@ try {
     await page.locator('#directory').screenshot({ path: join(shots, `d060-makers-list-${width}.png`) })
 
     await page.goto(base + '/makers/', { waitUntil: 'networkidle' })
-    await page.locator('#directory').getByText('No makers listed yet. Yours can be first.').waitFor()
+    await page.locator('#directory').getByText("Couldn't load the directory").waitFor()
+    if (await page.locator('#directory').getByText('No makers listed yet').count()) throw new Error('a failed directory load used the empty sentence')
     const intact = await page.evaluate(() => {
       const pre = document.querySelector('#directory pre')
       if (!pre) return false

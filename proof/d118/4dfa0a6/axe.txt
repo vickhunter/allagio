@@ -1,0 +1,12 @@
+D-118 axe-core on the landing dev server. Viewports 390x844 and 1440x900. Reduced motion on. Violations means the full axe violations array, not only serious or critical.
+
+home	390	violations=0	hscroll=0
+you	390	violations=0	hscroll=0
+makers	390	violations=0	hscroll=0
+publishers	390	violations=0	hscroll=0
+protocol	390	violations=0	hscroll=0
+home	1440	violations=0	hscroll=0
+you	1440	violations=0	hscroll=0
+makers	1440	violations=0	hscroll=0
+publishers	1440	violations=0	hscroll=0
+protocol	1440	violations=0	hscroll=0

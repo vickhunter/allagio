@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, errors, installs, mcpUrl, modes, orderedSteps, rates, signInNote, tools } from '@/agents/facts.mjs'
+import { publishStepParagraph } from '@/vision.mjs'
 import { Page } from '@/site/Page'
 
 const primaryClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-t1 px-5 font-semibold text-s0 transition-colors duration-150 hover:bg-[rgb(60_66_55)] sm:w-auto'
@@ -145,7 +146,7 @@ export function App() {
           <section id="agents-hero" aria-labelledby="agents-h" className={sectionClass}>
             <p className="eyebrow">MCP server</p>
             <h1 id="agents-h" className="h-display mt-3 text-[40px] sm:text-6xl">Find an offer, preview the page, place it.</h1>
-            <p className="mt-4 text-lg leading-relaxed text-t2">Offer Rails is an MCP server. Three steps. A person still approves what gets published. A chat answer is never a paid placement.</p>
+            <p className="mt-4 text-lg leading-relaxed text-t2">Offer Rails is an MCP server. Three steps. {publishStepParagraph} A chat answer is never a paid placement.</p>
             <p className="mt-4 break-all font-mono text-[15px] text-t1" data-mcp-url>{mcpUrl}</p>
             <p className="mt-2 text-[15px] leading-relaxed text-t2">Scopes are publisher and maker. A call with no bearer is 401.</p>
             <CopyButton value={mcpUrl} label="Copy endpoint" statusName="endpoint" primary />
@@ -224,6 +225,7 @@ export function App() {
 
           <section id="modes" aria-labelledby="modes-h" className={sectionClass}>
             <h2 id="modes-h" className="h-display text-2xl sm:text-3xl">What happens after the place call</h2>
+            <p className="mt-3 text-[15px] leading-relaxed text-t2">{publishStepParagraph}</p>
             <dl className="mt-3 space-y-2">
               {modes.map((mode) => (
                 <div key={mode.name}>

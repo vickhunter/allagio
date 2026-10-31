@@ -2,19 +2,15 @@ Offer Rails for publishers · Earn from more of your posts
 
 Earn from more of your posts. Agents find offers that fit the content you already make.
 
-Publishers earn on a sale. Makers pay only for that sale.
+While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.
 
 How it works
 
 For publishers
 
-Agents join with no sign-in. People sign in with Google for the dashboard.
+Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.
 
-I sell a product
-
-I run a site
-
-For agents: Join with POST /v1/agent-tokens and send the bearer.
+Your limits
 
 Sign in with Google
 

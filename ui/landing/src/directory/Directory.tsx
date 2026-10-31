@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useSource, withSource } from '@/lib/source'
-import { getMember, httpsUrl, listDirectory, logoSrc, memberRoute, wantsFixtures } from '@/directory/client.mjs'
+import { DirectoryFailure, getMember, httpsUrl, listDirectory, logoSrc, memberRoute, wantsFixtures } from '@/directory/client.mjs'
+import { directoryChrome, directoryEmptyCopy, directoryFailureCopy } from '@/directory/state.mjs'
 import { agentPrompt, installLead, installUrl, makerPrompt } from '@/directory/prompt.mjs'
 import type { DirectoryCard, DirectoryKind } from '@/directory/types'
 
@@ -50,14 +51,15 @@ function Mark({ name, logo }: { name: string; logo: string | null }) {
   return <img src={logo} alt="" width={48} height={48} className="size-12 shrink-0 rounded-xl border border-line object-cover" onError={() => setFailed(true)} />
 }
 
-function AddYours({ source, kind }: { source: string; kind: DirectoryKind }) {
+function AddYours({ source, kind, level = 'h3' }: { source: string; kind: DirectoryKind; level?: 'h2' | 'h3' }) {
   const [copied, setCopied] = useState(false)
   const prompt = kind === 'maker' ? makerPrompt : agentPrompt
   const heading = kind === 'maker' ? 'Add your product' : 'Add your site or newsletter'
   const lead = kind === 'maker' ? 'Add my product to the Offer Rails directory\n' : 'Add my site or newsletter to the Offer Rails directory\n'
+  const Title = level === 'h2' ? 'h2' : 'h3'
   return (
     <div id="add-yours" className="mt-8 max-w-3xl rounded-2xl border border-line bg-s1 p-5">
-      <h3 className="font-display text-lg font-semibold">{heading}</h3>
+      <Title className="font-display text-lg font-semibold">{heading}</Title>
       {kind === 'maker' ? (
         <p className="mt-2 text-sm leading-relaxed text-t2">This needs an MCP client. There is no add-product form on this page. Paste this to Claude Code. The same command is in the install list above, one command per client.</p>
       ) : (
@@ -108,6 +110,7 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
   const [items, setItems] = useState<DirectoryCard[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
+  const [failure, setFailure] = useState<DirectoryFailure | null>(null)
   const ticket = useRef(0)
   const applied = useRef<Query>(readQuery())
   const shown = useRef<DirectoryCard[]>([])
@@ -118,7 +121,10 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
     const used = append ? applied.current : query
     if (!append) applied.current = used
     const id = ++ticket.current
-    if (!append) setView('loading')
+    if (!append) {
+      setView('loading')
+      setFailure(null)
+    }
     const limit = wantsFixtures() ? 1 : 24
     listDirectory(kind, { q: used.q, lang: used.lang, cursor: next, limit, [facetKey]: used[facetKey] }).then((page) => {
       if (id !== ticket.current) return
@@ -127,47 +133,56 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
       setItems(rows)
       setCursor(page.next_cursor)
       setTotal(page.total)
+      setFailure(null)
       setView(!rows.length && filtered(kind, used) ? 'nomatch' : rows.length ? 'results' : 'empty')
-    }).catch(() => {
+    }).catch((err) => {
       if (id !== ticket.current || append) return
       shown.current = []
       setItems([])
       setCursor(null)
       setTotal(0)
+      setFailure(err instanceof DirectoryFailure ? err : new DirectoryFailure(0, 'network'))
       setView('error')
     })
   }
 
   useEffect(() => { load(readQuery(), '', false) }, [kind])
 
+  const chrome = directoryChrome(view, total)
   return (
-    <section id="directory" aria-labelledby="directory-h" data-directory-view={view} data-directory-kind={kind} className="border-t border-line">
+    <section id="directory" aria-labelledby={chrome.heading ? 'directory-h' : undefined} aria-label={chrome.heading ? undefined : 'Directory'} data-directory-view={view} data-directory-kind={kind} className="border-t border-line">
       <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
-        <h2 id="directory-h" className="h-display text-3xl sm:text-4xl">{kind === 'maker' ? 'Makers on Offer Rails' : 'Publishers on Offer Rails'}</h2>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">{kind === 'maker' ? 'Makers add a product through their AI agent. Each maker is listed by its owner.' : 'Sites add themselves through their AI agent. Each one is listed by its owner.'}</p>
-        {preview ? <p className="mt-4 inline-flex min-h-11 items-center rounded-md border border-line-strong bg-s2 px-3 font-mono text-sm text-t1">TEST data</p> : null}
-        <form className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end" onSubmit={(event) => { event.preventDefault(); load(draft, '', false) }}>
-          <label className="block text-sm font-semibold" htmlFor="directory-q">Search
-            <Input id="directory-q" className="mt-1 font-normal" name="q" value={draft.q} onChange={(event) => setDraft({ ...draft, q: event.target.value })} />
-          </label>
-          <label className="block text-sm font-semibold" htmlFor="directory-facet">{facet}
-            <Input id="directory-facet" className="mt-1 font-normal" name={facetKey} value={draft[facetKey]} onChange={(event) => setDraft({ ...draft, [facetKey]: event.target.value })} />
-          </label>
-          <label className="block text-sm font-semibold" htmlFor="directory-lang">Language
-            <Input id="directory-lang" className="mt-1 font-normal" name="lang" value={draft.lang} onChange={(event) => setDraft({ ...draft, lang: event.target.value })} />
-          </label>
-          <Button type="submit" variant="outline">Search</Button>
-        </form>
+        {chrome.heading ? (
+          <>
+            <h2 id="directory-h" className="h-display text-3xl sm:text-4xl">{kind === 'maker' ? 'Makers on Offer Rails' : 'Publishers on Offer Rails'}</h2>
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">{kind === 'maker' ? 'Makers add a product through their AI agent. Each maker is listed by its owner.' : 'Sites add themselves through their AI agent. Each one is listed by its owner.'}</p>
+          </>
+        ) : null}
+        {preview && chrome.heading ? <p className="mt-4 inline-flex min-h-11 items-center rounded-md border border-line-strong bg-s2 px-3 font-mono text-sm text-t1">TEST data</p> : null}
+        {chrome.search ? (
+          <form className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end" onSubmit={(event) => { event.preventDefault(); load(draft, '', false) }}>
+            <label className="block text-sm font-semibold" htmlFor="directory-q">Search
+              <Input id="directory-q" className="mt-1 font-normal" name="q" value={draft.q} onChange={(event) => setDraft({ ...draft, q: event.target.value })} />
+            </label>
+            <label className="block text-sm font-semibold" htmlFor="directory-facet">{facet}
+              <Input id="directory-facet" className="mt-1 font-normal" name={facetKey} value={draft[facetKey]} onChange={(event) => setDraft({ ...draft, [facetKey]: event.target.value })} />
+            </label>
+            <label className="block text-sm font-semibold" htmlFor="directory-lang">Language
+              <Input id="directory-lang" className="mt-1 font-normal" name="lang" value={draft.lang} onChange={(event) => setDraft({ ...draft, lang: event.target.value })} />
+            </label>
+            <Button type="submit" variant="outline">Search</Button>
+          </form>
+        ) : null}
         {view === 'loading' ? <p className="mt-8 text-t2" role="status">Loading the directory.</p> : null}
-        {view === 'error' ? (
+        {chrome.error ? (
           <div className="mt-8">
-            <p className="text-t1" role="alert">The list could not load.</p>
+            <p className="text-t1" role="alert">{directoryFailureCopy(failure)}</p>
             <Button type="button" variant="outline" className="mt-4" onClick={() => load(applied.current, '', false)}>Retry</Button>
           </div>
         ) : null}
-        {view === 'empty' ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers listed yet. Yours can be first. Add your product below. That step needs an MCP client.' : 'No publishers listed yet. Add your site or newsletter below. An agent does that step for now.'}</p> : null}
-        {view === 'nomatch' ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers match this search.' : 'No sites match this search.'}</p> : null}
-        {view === 'results' ? (
+        {chrome.empty ? <p className="mt-8 text-t1" role="status">{directoryEmptyCopy(kind)}</p> : null}
+        {chrome.nomatch ? <p className="mt-8 text-t1" role="status">{kind === 'maker' ? 'No makers match this search.' : 'No sites match this search.'}</p> : null}
+        {chrome.list ? (
           <>
             <p className="mt-8 text-sm text-t2">{total} {kind === 'maker' ? (total === 1 ? 'maker' : 'makers') : (total === 1 ? 'site' : 'sites')}</p>
             <ul className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -176,7 +191,7 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
             {cursor ? <Button type="button" variant="outline" className="mt-4" onClick={() => load(applied.current, cursor, true)}>Load more</Button> : null}
           </>
         ) : null}
-        {view !== 'loading' ? <AddYours source={source} kind={kind} /> : null}
+        {chrome.add ? <AddYours source={source} kind={kind} level={chrome.heading ? 'h3' : 'h2'} /> : null}
       </div>
     </section>
   )

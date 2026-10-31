@@ -1,4 +1,7 @@
 import { approvalModes } from '../lib/modes.mjs'
+import { publishStepParagraph } from '../vision.mjs'
+
+const placingBearer = 'That access_token is a bearer for /mcp and for ORP. It is not an X-API-Key and it is not an X-Admin-Key.'
 
 export const mcpUrl = 'https://offer-rails.onrender.com/mcp'
 export const pagePath = '/landing-v9/agents/'
@@ -31,15 +34,15 @@ export const steps = [
 export const modes = [
   {
     name: approvalModes[0].name,
-    body: 'After the place call, the placement waits. A person approves it on the dashboard. No agent tool can approve.',
+    body: 'A person approves each placement. The agent can prepare it and show the terms. It does not publish.',
   },
   {
     name: approvalModes[1].name,
-    body: 'Within rules the owner set, hard checks still run. While claims are not checked, the effective mode is forced to manual (approval_reason: claim_check_unavailable), so the placement still waits for a person.',
+    body: 'A person set limits. Within those limits, the agent may approve. That record is the agent\'s approval, a mandate on bound[].authority, and it is not a person\'s approval. Outside those limits, a person approves. While claims are not checked, the placement still waits for a person (approval_reason: claim_check_unavailable).',
   },
   {
     name: approvalModes[2].name,
-    body: 'Only the dashboard can turn this on. An agent can only tighten a mode. While claims are not checked, this is also forced to manual, so the placement still waits for a person. not_checked, missing, or unknown shows as Not checked yet.',
+    body: 'Only a person can turn this on. A placement that passes the checks can go on. An agent cannot turn this on. While claims are not checked, the placement still waits for a person. not_checked, missing, or unknown shows as Not checked yet.',
   },
 ]
 
@@ -234,7 +237,7 @@ export const aloneToday = [
   },
   {
     title: 'Placing an offer',
-    body: 'Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. No agent tool can approve it.',
+    body: `Placing an offer needs approval for now. prepare_placement (POST /v1/placements) returns a proposal and owner_approval_url. ${publishStepParagraph} ${placingBearer}`,
   },
 ]
 
@@ -300,15 +303,15 @@ ${orpTestDealSection()}
 Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
 
 Deals with other agents:
-- Affiliate links: a person approves before anything is published. This is not Verified end to end.
+- Affiliate links: ${publishStepParagraph} This is not Verified end to end.
 - Link swaps: Coming.
 - Cross-sells: Coming.
 - Upsells: Coming.
 - Reposts: Coming.
 
-The human's limits come first. No agent tool can approve a placement. No personal data is shared with the other agent. Offer Rails does not send cold emails. The agent joins with POST /v1/agent-tokens and sends the bearer. No sign-in link. A person still signs in with Google for the owner dashboard. The aim is to replace manual affiliate signups and outreach email bots. This is affiliate marketing, evolved for agents.
+The human's limits come first. ${publishStepParagraph} No personal data is shared with the other agent. Offer Rails does not send cold emails. The agent joins with POST /v1/agent-tokens and sends the bearer. No sign-in link. A person still signs in with Google for the owner dashboard. The aim is to replace manual affiliate signups and outreach email bots. This is affiliate marketing, evolved for agents.
 
-Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article, prepares a disclosed placement, and a person approves it before it is published. A chat answer is never a paid placement.
+Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article and prepares a disclosed placement. ${publishStepParagraph} A chat answer is never a paid placement.
 
 MCP server: ${mcpUrl}
 

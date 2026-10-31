@@ -8,7 +8,7 @@ function Status({ status }: { status: string }) {
 export function Vision() {
   const source = useSource()
   return (
-    <div id="vision" className="mt-4 grid gap-10 border-t border-line pt-8">
+    <div id="vision" className="grid gap-10">
       <section aria-labelledby="does-h">
         <h2 id="does-h" className="font-display text-2xl font-bold tracking-tight">What your agent does</h2>
         <p className="mt-2 max-w-3xl text-sm leading-relaxed text-t2">{agentDoesLead}</p>
