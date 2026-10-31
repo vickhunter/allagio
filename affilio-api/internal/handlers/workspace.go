@@ -182,7 +182,7 @@ const (
 )
 
 func (h *HostedHandler) installCommand() string {
-	return "npx --yes --package=" + h.BaseURL + "/downloads/" + installerArchive + " allagio --api-url " + h.BaseURL
+	return "node cli/bin/offer-rails.mjs --api-url " + h.BaseURL
 }
 
 func (h *HostedHandler) installerPath() (string, bool) {
@@ -527,31 +527,35 @@ func buildWordPressZip(raw []byte, baseURL string) ([]byte, int) {
 }
 
 // pluginAPIBase is the API origin written into a downloaded plugin.
-// Loopback and the Render default stay blank. Any other public origin from
-// the configured base is written as <origin>/v1.
+// Loopback stays blank. Any other http(s) origin, including Render and
+// Railway, is written as <origin>/v1.
 func pluginAPIBase(baseURL string) string {
 	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	parsed, err := url.Parse(base)
-	if base == "" || err != nil {
+	if base == "" || err != nil || parsed.Hostname() == "" {
 		return ""
 	}
-	host := strings.ToLower(parsed.Hostname())
-	switch host {
-	case "", "localhost", "127.0.0.1", "::1":
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return ""
 	}
-	def, err := url.Parse(config.DefaultPublicBaseURL)
-	if err == nil && strings.EqualFold(def.Hostname(), host) {
+	switch strings.ToLower(parsed.Hostname()) {
+	case "localhost", "127.0.0.1", "::1":
 		return ""
 	}
 	return base + "/v1"
 }
 
 func rewriteDownloadedPlugin(name string, data []byte, baseURL string) []byte {
+	replacement := pluginAPIBase(baseURL)
 	if name == "affilio-wp/affilio.php" {
-		data = bytes.ReplaceAll(data, []byte("https://affilio-production.up.railway.app/v1"), []byte(pluginAPIBase(baseURL)))
+		data = bytes.ReplaceAll(data, []byte("https://affilio-production.up.railway.app/v1"), []byte(replacement))
 	}
-	return bytes.ReplaceAll(data, []byte("railway.app"), nil)
+	// Drop a leftover railway.app host only when this download is not itself
+	// aimed at Railway. Stripping after the write would mangle that base.
+	if !strings.Contains(strings.ToLower(replacement), "railway.app") {
+		data = bytes.ReplaceAll(data, []byte("railway.app"), nil)
+	}
+	return data
 }
 
 func (h *HostedHandler) placementReceiptHTML(p *database.Placement) template.HTML {

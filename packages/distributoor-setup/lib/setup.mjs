@@ -58,6 +58,9 @@ async function writablePath(root, path) {
   }
 }
 
+// mcpConnectionName is the MCP connection key every client config uses.
+export const mcpConnectionName = 'allagio'
+
 export async function mergeMCP(root, client, resource) {
   const path = resolve(root, client === 'cursor' ? '.cursor/mcp.json' : '.mcp.json');
   await writablePath(root, path);
@@ -65,13 +68,13 @@ export async function mergeMCP(root, client, resource) {
   const config = raw === null ? {} : JSON.parse(raw);
   if (!config || Array.isArray(config) || typeof config !== 'object' || config.mcpServers && (typeof config.mcpServers !== 'object' || Array.isArray(config.mcpServers))) throw new Error(`Invalid MCP configuration: ${path}`);
   config.mcpServers ??= {};
-  const existing = config.mcpServers.allagio || config.mcpServers.distributoor;
+  const existing = config.mcpServers[mcpConnectionName] || config.mcpServers.distributoor;
   const expected = client === 'claude' ? { type: 'http', url: resource } : { url: resource };
   if (existing && (existing.url !== resource || existing.command || existing.headers || existing.env || existing.type && existing.type !== 'http')) {
     throw new Error(`An existing Allagio connection differs in ${path}. Resolve it before running setup; it has been preserved.`);
   }
   if (!existing) {
-    config.mcpServers.allagio = expected;
+    config.mcpServers[mcpConnectionName] = expected;
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
   }
@@ -147,5 +150,5 @@ export function run(command, args, root, stdio = 'inherit') {
 }
 
 export function codexConfig(resource) {
-  return ['-c', `mcp_servers.allagio={url=${JSON.stringify(resource)}}`];
+  return ['-c', `mcp_servers.${mcpConnectionName}={url=${JSON.stringify(resource)}}`];
 }

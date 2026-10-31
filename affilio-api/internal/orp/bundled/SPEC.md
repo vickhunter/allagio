@@ -1,7 +1,7 @@
-# Allagio Protocol (ORP) 0.3
+# Offer Rails Protocol (ORP) 0.3
 
 **Status:** canonical draft, frozen 2026-10-23 (D-099). This is the one ORP 0.3 wire format. Changes after the freeze follow [§19](#19-change-control). [§20](#20-many-party-deals-orp-04) specifies ORP 0.4. A valid 0.3 message stays valid and means what it meant.
-**Schemas:** [`schema/0.3/`]({{PUBLIC_BASE_URL}}/orp/schemas/) (JSON Schema 2020-12). Valid and invalid examples are in [`schema/examples/`]({{PUBLIC_BASE_URL}}/orp/examples/), checked by `npm test` in `schema/`.
+**Schemas:** [`schema/0.3/`](https://offer-rails.onrender.com/orp/schemas/) (JSON Schema 2020-12). Valid and invalid examples are in [`schema/examples/`](https://offer-rails.onrender.com/orp/examples/), checked by `npm test` in `schema/`.
 **License:** this specification and its schemas will be published under Apache-2.0. Until then it is a draft in this repository.
 **Decision log:** `briefs/offer-rails-protocol-canonical-20261023.md`.
 
@@ -9,7 +9,7 @@
 >
 > - **Draft PR #68** (the "v0.3.0" prose spec and its schemas) is **superseded as a wire format, in full.** Its envelope (`orp_version`, `message_type`, `sender`, `payload`), its SemVer `0.3.0` version string, its `orp:party:*` ids, its five fixed `deal_type` term shapes, its `sha256:<hex>` hashes, its self-submitted receipts, its agent-sent consent and its provisional tracking links are **not** ORP 0.3. A message in that shape is invalid (see [Appendix B](#appendix-b-pr-68-to-03-mapping)). Some of #68's product ideas are adopted here in the #71 shape: first-class spaces, the named growth deal types, the `via`/`ref` parameter, test clicks, clicks by source, and the "afternoon core" and C1/C2 conformance names.
 > - **Draft PR #71** (schemas and TypeScript SDK) **wins on the wire format.** Its envelope, version rule, party ids, obligation-based terms, host-only consent and receipts, and closed schemas are carried forward. Its `schema/` directory is superseded by `docs/protocol/schema/`, which applies the deltas in [Appendix A](#appendix-a-changes-from-the-pr-71-schemas). The #71 SDK is a reference implementation that still needs those deltas.
-> - **DCP v0.1** ([discovery]({{PUBLIC_BASE_URL}}/.well-known/dcp.json)) stays the live affiliate path on the Allagio hosted API. [Appendix C](#appendix-c-the-allagio-hosted-api-and-orp-03) lists the ORP 0.3 slice that host serves and what it still does not do.
+> - **DCP v0.1** ([discovery](https://offer-rails.onrender.com/.well-known/dcp.json)) stays the live affiliate path on the Offer Rails hosted API. [Appendix C](#appendix-c-the-offer-rails-hosted-api-and-orp-03) lists the ORP 0.3 slice that host serves and what it still does not do.
 >
 > **The hosted service speaks a testing slice of ORP 0.3 and ORP 0.4** (discovery, suggest, join, many-party deals, `leave`, `seat`, and the message format) and claims no conformance level. Nothing in this document changes `CLAIMS_CHECK`.
 
@@ -39,7 +39,7 @@
 20. [Many-party deals (ORP 0.4)](#20-many-party-deals-orp-04)
 - [Appendix A: changes from the PR #71 schemas](#appendix-a-changes-from-the-pr-71-schemas)
 - [Appendix B: PR #68 to 0.3 mapping](#appendix-b-pr-68-to-03-mapping)
-- [Appendix C: the Allagio hosted API and ORP 0.3](#appendix-c-the-allagio-hosted-api-and-orp-03)
+- [Appendix C: the Offer Rails hosted API and ORP 0.3](#appendix-c-the-offer-rails-hosted-api-and-orp-03)
 
 ---
 
@@ -96,7 +96,7 @@ In a deal, the **offerer** proposed the terms and the **acceptor** accepted them
 
 ### 4.1 Discovery document
 
-A host MUST serve `GET https://<host>/.well-known/orp.json` without authentication, with `Access-Control-Allow-Origin: *`. The body validates against [`discovery.schema.json`]({{PUBLIC_BASE_URL}}/orp/schemas/discovery.schema.json):
+A host MUST serve `GET https://<host>/.well-known/orp.json` without authentication, with `Access-Control-Allow-Origin: *`. The body validates against [`discovery.schema.json`](https://offer-rails.onrender.com/orp/schemas/discovery.schema.json):
 
 ```json
 {
@@ -180,7 +180,7 @@ An MCP client cannot change its headers in the middle of a conversation, so the 
 
 ## 5. Envelope
 
-Every message is one JSON object, defined in [`envelope.schema.json`]({{PUBLIC_BASE_URL}}/orp/schemas/envelope.schema.json). The full rules for each type are in [`message.schema.json`]({{PUBLIC_BASE_URL}}/orp/schemas/message.schema.json) and `messages/<type>.schema.json`.
+Every message is one JSON object, defined in [`envelope.schema.json`](https://offer-rails.onrender.com/orp/schemas/envelope.schema.json). The full rules for each type are in [`message.schema.json`](https://offer-rails.onrender.com/orp/schemas/message.schema.json) and `messages/<type>.schema.json`.
 
 | Field | Required | Meaning |
 |---|---|---|
@@ -240,7 +240,7 @@ An error never changes state. A host MUST NOT apply part of a message.
 }
 ```
 
-**Capabilities** (`Capabilities` in [`defs.schema.json`]({{PUBLIC_BASE_URL}}/orp/schemas/defs.schema.json)):
+**Capabilities** (`Capabilities` in [`defs.schema.json`](https://offer-rails.onrender.com/orp/schemas/defs.schema.json)):
 
 | Field | Meaning |
 |---|---|
@@ -255,7 +255,7 @@ An error never changes state. A host MUST NOT apply part of a message.
 
 A party MUST NOT send a type that its counterparty's host did not list in `capabilities.messages`.
 
-A host that speaks 0.4 lists `leave` and `seat` in `capabilities.messages` on its [discovery document]({{PUBLIC_BASE_URL}}/orp/schemas/0.4/discovery.schema.json) and on a [`hello`]({{PUBLIC_BASE_URL}}/orp/schemas/0.4/messages/hello.schema.json) reply whose version is `0.4`. A `hello` reply of `0.3` lists the 0.3 types only. `leave` and `seat` are valid on a 0.4 message. They are not 0.3 message types.
+A host that speaks 0.4 lists `leave` and `seat` in `capabilities.messages` on its [discovery document](https://offer-rails.onrender.com/orp/schemas/0.4/discovery.schema.json) and on a [`hello`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/hello.schema.json) reply whose version is `0.4`. A `hello` reply of `0.3` lists the 0.3 types only. `leave` and `seat` are valid on a 0.4 message. They are not 0.3 message types.
 
 ---
 
@@ -297,7 +297,7 @@ This section is a protocol rule, not legal advice. A host also needs a lawful ba
 
 ## 8. Core objects
 
-All of these are defined in [`defs.schema.json`]({{PUBLIC_BASE_URL}}/orp/schemas/defs.schema.json).
+All of these are defined in [`defs.schema.json`](https://offer-rails.onrender.com/orp/schemas/defs.schema.json).
 
 ### 8.1 Space
 
@@ -369,7 +369,7 @@ Obligation states: `pending`, `claimed`, `verified`, `failed`, `revoked`, `waive
 
 ### 8.4 Constraints
 
-Constraints are the owner's standing rules for an agent ([`constraints.schema.json`]({{PUBLIC_BASE_URL}}/orp/schemas/constraints.schema.json)): a mode per step, budgets, an approval threshold, allowed kinds, categories and spaces, counterparty rules, brand rules, the longest deal it may agree to, and when the mandate expires. The owner sets them at the host. [§11](#11-human-approval-per-step) says how the host applies them.
+Constraints are the owner's standing rules for an agent ([`constraints.schema.json`](https://offer-rails.onrender.com/orp/schemas/constraints.schema.json)): a mode per step, budgets, an approval threshold, allowed kinds, categories and spaces, counterparty rules, brand rules, the longest deal it may agree to, and when the mandate expires. The owner sets them at the host. [§11](#11-human-approval-per-step) says how the host applies them.
 
 ```json
 {
@@ -1202,7 +1202,7 @@ A host or client states the levels it meets in `conformance.levels`. Each level 
 - **`C1-UNIVERSAL-LINK-NO-ADAPTER`.** Activate an affiliate deal. Without any plugin, adapter, `execute` or receipt, request the link with a browser user agent from three contexts (an email client, a social post, a plain page). Expect three `302`s with fresh `via` ids, three human clicks in the next outcome, and a `link` receipt after the first.
 - **`C2-NO-EMAIL-NO-SIGNUP`.** From a fresh client with no credentials, `POST {suggest}` with draft text and `join: {}`. Expect items with pitches and a `joined` token. Accept one offer with that token. Expect an `awaiting` deal with an approval URL and no request for an email at any point.
 
-**Status.** The suite is `conformance/test/`. From this directory, `npm test` runs the schema checks and that suite against the reference host in `sdk/`. The reference host lists L0 to L3 only as the subject of the suite. A failing suite voids the claim. The Allagio hosted API claims no level. See [Appendix C](#appendix-c-the-allagio-hosted-api-and-orp-03).
+**Status.** The suite is `conformance/test/`. From this directory, `npm test` runs the schema checks and that suite against the reference host in `sdk/`. The reference host lists L0 to L3 only as the subject of the suite. A failing suite voids the claim. The Offer Rails hosted API claims no level. See [Appendix C](#appendix-c-the-offer-rails-hosted-api-and-orp-03).
 
 ---
 
@@ -1220,7 +1220,7 @@ A host or client states the levels it meets in `conformance.levels`. Each level 
 
 ## 19. Change control
 
-- This document and the schemas at [`{{PUBLIC_BASE_URL}}/orp/schemas/`]({{PUBLIC_BASE_URL}}/orp/schemas/) are the canonical ORP 0.3. Where they disagree, the schema wins for shape and this document wins for behavior, and the disagreement is a bug to fix in both.
+- This document and the schemas at [`https://offer-rails.onrender.com/orp/schemas/`](https://offer-rails.onrender.com/orp/schemas/) are the canonical ORP 0.3. Where they disagree, the schema wins for shape and this document wins for behavior, and the disagreement is a bug to fix in both.
 - After the freeze, a 0.3 change may only fix an error, clarify text, or add an optional field that no existing receiver would refuse. Each change updates this document, the schema, the examples and the decision log together, and `npm test` must pass.
 - Anything that changes what a valid message means goes to 0.4. Candidates: federation between hosts, mandatory signatures, settlement profiles, A2A and x402 bindings, and verifiable party keys (DID or domain JWKS). Many-party deals are specified in [§20](#20-many-party-deals-orp-04).
 - Extension names are reverse-DNS under a domain the author controls. An extension MUST NOT redefine a core field.
@@ -1229,11 +1229,11 @@ A host or client states the levels it meets in `conformance.levels`. Each level 
 
 ## 20. Many-party deals (ORP 0.4)
 
-ORP 0.4 adds deals with more than two parties. It does not change a valid 0.3 message. A 0.3 deal is still `offerer` and `acceptor`, and it still becomes `active` when both are bound. The reference host and the hosted API speak `0.4` and `0.3`. Discovery lists `0.4` first. Schemas live under [`0.4/message.schema.json`]({{PUBLIC_BASE_URL}}/orp/schemas/0.4/message.schema.json) and [`0.4/defs.schema.json`]({{PUBLIC_BASE_URL}}/orp/schemas/0.4/defs.schema.json). `leave` and `seat` are 0.4 message types. The hosted API speaks them. A `hello` of `0.3` does not list them. `CLAIMS_CHECK` is unchanged. On this host a claim field nobody checked stays the string `unknown`, including `destination`.
+ORP 0.4 adds deals with more than two parties. It does not change a valid 0.3 message. A 0.3 deal is still `offerer` and `acceptor`, and it still becomes `active` when both are bound. The reference host and the hosted API speak `0.4` and `0.3`. Discovery lists `0.4` first. Schemas live under [`0.4/message.schema.json`](https://offer-rails.onrender.com/orp/schemas/0.4/message.schema.json) and [`0.4/defs.schema.json`](https://offer-rails.onrender.com/orp/schemas/0.4/defs.schema.json). `leave` and `seat` are 0.4 message types. The hosted API speaks them. A `hello` of `0.3` does not list them. `CLAIMS_CHECK` is unchanged. On this host a claim field nobody checked stays the string `unknown`, including `destination`.
 
 ### 20.1 Seats and splits
 
-A 0.4 deal has 2 to 16 parties ([`deal`]({{PUBLIC_BASE_URL}}/orp/schemas/0.4/messages/deal.schema.json)). Each seat has `id`, `role`, and `required`. Roles are `offerer`, `acceptor`, `curator`, `facilitator`, `service`, `signer`, and `member`. A deal has at most one offerer and one acceptor, and at least one required seat.
+A 0.4 deal has 2 to 16 parties ([`deal`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/deal.schema.json)). Each seat has `id`, `role`, and `required`. Roles are `offerer`, `acceptor`, `curator`, `facilitator`, `service`, `signer`, and `member`. A deal has at most one offerer and one acceptor, and at least one required seat.
 
 Seat `terms` are that seat's split. A percent is an integer from 0 to 100. An amount is the seat's `amount` field. `per`, `hours`, and `deposit` are not amounts. When no seat carries an amount, the percents sum to 100. Percents that sum to something other than 100 are rejected even when a seat has `hours`, `per`, `deposit`, or a `cap`. Fixed amounts alone do not use that sum. A mix exists only when a seat carries both a percent and an amount, or when percent seats sit beside seats that carry an amount. A mix is valid when every percent term has a `cap` and the percents are not over 100. Those percents do not have to sum to 100. A sum of 101 is rejected. A percent without a `cap` in a mix is rejected. The host answers `invalid_message`.
 
@@ -1251,11 +1251,11 @@ A `counter` replaces the shared terms, clears every signature and every vacancy,
 
 ### 20.3 Leave and seat
 
-[`leave`]({{PUBLIC_BASE_URL}}/orp/schemas/0.4/messages/leave.schema.json) removes the sender only when the remaining seats are still a valid deal. The host re-checks the split the same way it checks `seat`. If the remaining percents no longer hold, the host rejects the leave with `invalid_message` and changes nothing. An optional party can leave when the remaining split still holds. If the deal was `active`, it stays `active`. A required party, when the leave is accepted, leaves a vacancy for that role and the deal returns to `pending`. The other signatures stay. The hash is recomputed. A deal keeps at least 2 parties.
+[`leave`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/leave.schema.json) removes the sender only when the remaining seats are still a valid deal. The host re-checks the split the same way it checks `seat`. If the remaining percents no longer hold, the host rejects the leave with `invalid_message` and changes nothing. An optional party can leave when the remaining split still holds. If the deal was `active`, it stays `active`. A required party, when the leave is accepted, leaves a vacancy for that role and the deal returns to `pending`. The other signatures stay. The hash is recomputed. A deal keeps at least 2 parties.
 
 A vacancy clears only when the replacement seated as required for that vacancy signs. The replacement is a new required seat added after the vacancy opened, and that seat is the one that fills it. An original seat of the same role does not clear it, even when that seat is required and signs later. An optional seat of the same role does not clear it, and that signature does not make the deal `active`. The deal stays `pending` until every vacated required seat has its required replacement who has signed.
 
-[`seat`]({{PUBLIC_BASE_URL}}/orp/schemas/0.4/messages/seat.schema.json) adds a party that has already joined the host. The sender is already on the deal. The new seat is unsigned. A vacancy stays until a required replacement for that role accepts. Seating the replacement does not by itself make the deal `active`.
+[`seat`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/seat.schema.json) adds a party that has already joined the host. The sender is already on the deal. The new seat is unsigned. A vacancy stays until a required replacement for that role accepts. Seating the replacement does not by itself make the deal `active`.
 
 ### 20.4 Offer freshness
 
@@ -1307,17 +1307,17 @@ That `terms_hash` is the digest of the terms object, including `checked_at` and 
 
 Identity on a party is `hash` and `issuer` only. The deal does not carry a name, an email, or any other personal data.
 
-A deposit is a term that names who holds it. The holder is outside Allagio. Allagio does not hold money. The proof records the agreed term. It does not move the money. The host compares the holder after lowercasing it and removing spaces, hyphens, underscores, and dots. A holder that becomes `host`, `offerrails`, or `hostedapi` is rejected, including `OfferRails`, `offer-rails`, and `hosted api`.
+A deposit is a term that names who holds it. The holder is outside Offer Rails. Offer Rails does not hold money. The proof records the agreed term. It does not move the money. The host compares the holder after lowercasing it and removing spaces, hyphens, underscores, and dots. A holder that becomes `host`, `offerrails`, or `hostedapi` is rejected, including `OfferRails`, `offer-rails`, and `hosted api`.
 
 ### 20.6 Fixtures
 
 These files are illustrative and test mode only. They are not legal advice and they are not a product.
 
-- [referral-chain.json]({{PUBLIC_BASE_URL}}/orp/examples/0.4/referral-chain.json) is a creator, a curator, and a newsletter. Percents are 50, 30, and 20. All three are required. The deal is `active` only after all three have signed.
-- [link-swap-ring.json]({{PUBLIC_BASE_URL}}/orp/examples/0.4/link-swap-ring.json) is four `member` seats at 25 percent each.
-- [five-party-home-sale.json]({{PUBLIC_BASE_URL}}/orp/examples/0.4/five-party-home-sale.json) is five seats: an offerer with a fixed zero amount, an acceptor with a fixed fee, a required facilitator with an identity attestation who receives that fee, an optional service seat paid a fixed amount per hour, and a required signer whose own fee is outside the deal. The service seat's viewing deposit names an outside holder. The optional seat is unsigned in the fixture, and the deal is still `active`.
-- [bad-split.json]({{PUBLIC_BASE_URL}}/orp/examples/0.4/bad-split.json) is a schema-valid offer whose percents are 60 and 41. The host rejects it.
-- [mediator-left.json]({{PUBLIC_BASE_URL}}/orp/examples/0.4/mediator-left.json) is `pending` with a `facilitator` vacancy.
+- [referral-chain.json](https://offer-rails.onrender.com/orp/examples/0.4/referral-chain.json) is a creator, a curator, and a newsletter. Percents are 50, 30, and 20. All three are required. The deal is `active` only after all three have signed.
+- [link-swap-ring.json](https://offer-rails.onrender.com/orp/examples/0.4/link-swap-ring.json) is four `member` seats at 25 percent each.
+- [five-party-home-sale.json](https://offer-rails.onrender.com/orp/examples/0.4/five-party-home-sale.json) is five seats: an offerer with a fixed zero amount, an acceptor with a fixed fee, a required facilitator with an identity attestation who receives that fee, an optional service seat paid a fixed amount per hour, and a required signer whose own fee is outside the deal. The service seat's viewing deposit names an outside holder. The optional seat is unsigned in the fixture, and the deal is still `active`.
+- [bad-split.json](https://offer-rails.onrender.com/orp/examples/0.4/bad-split.json) is a schema-valid offer whose percents are 60 and 41. The host rejects it.
+- [mediator-left.json](https://offer-rails.onrender.com/orp/examples/0.4/mediator-left.json) is `pending` with a `facilitator` vacancy.
 
 A facilitator percent of 1 with a cap, beside fixed amounts on the other seats, is a valid mix. A seat that carries a percent, an amount, and a cap is mixed too, and those percents need not sum to 100. If the optional service seat leaves, the deal stays `active` because the remaining fixed amounts still hold. If that optional seat's leaving would drop a percent split below 100, the host rejects the leave and the deal is unchanged. If the facilitator leaves, the deal returns to `pending` until a required replacement signs. An optional facilitator does not clear that vacancy. Seller and buyer alone are a normal two-party deal: on 0.3 that deal is unchanged, and on 0.4 two required seats still go `active` when both have signed.
 
@@ -1453,7 +1453,7 @@ The same accept in ORP 0.3, on a host called `hub.example`, names the deal and t
 | `clicks_by_source` | `outcome` row `sources` |
 | `private_test` pool and test clicks | `test` click class and test pools (T5) |
 
-## Appendix C: the Allagio hosted API and ORP 0.3
+## Appendix C: the Offer Rails hosted API and ORP 0.3
 
 The hosted service now serves a testing slice of ORP 0.3 and ORP 0.4. The discovery name is **In testing**. It claims no conformance level. DCP v0.1 remains the live affiliate path. `CLAIMS_CHECK` is unchanged. The hosted API speaks ORP 0.4. Many-party deals, `leave`, `seat`, and offer freshness are served. A 0.3 message stays a 0.3 message. Discovery `orp` is `["0.4", "0.3"]`. A 0.4 hello lists `leave` and `seat`. A 0.3 hello does not.
 
@@ -1463,12 +1463,12 @@ The hosted service now serves a testing slice of ORP 0.3 and ORP 0.4. The discov
 | Message format over `POST /orp` | Served. A message is ORP 0.3 (`orp` `"0.3"`) or ORP 0.4 (`orp` `"0.4"`): `type`, `id`, `ts`, `from`, and `body`. This testing host answers `hello`, `discover`, `offer`, `accept`, and `execute` on both, and `leave` and `seat` on 0.4. A #68-shaped body is `invalid_message`. Bearer auth is the join token. `from` must be `orp:<host>/<owner_id>`. A 0.3 hello reply `versions` is exactly `["0.3"]` and does not list `leave` or `seat`. A 0.4 hello reply `versions` is exactly `["0.4"]` and lists them. |
 | `terms_hash` on `offer` and `accept` | On `accept`, a missing or empty `terms_hash` is HTTP 400 `invalid_message` and the message names `sha256-<b64url43>`. Any other string that does not match the terms is HTTP 409 `terms_mismatch` (`terms_hash does not match the terms.`). On `offer`, `terms_hash` is optional and the host computes it. An empty or malformed hash is a generic HTTP 400 `invalid_message` and the message is `The message is not valid ORP 0.3.` Only a well-formed hash that does not match the terms is HTTP 409 `terms_mismatch`. |
 | `suggest` and `join` | Served with no credentials. `POST /orp/suggest` and `POST /orp/join` (an empty object is a complete join). `POST /v1/agent-tokens` with `{}` mints the same kind of bearer. Suggest `platform` and monetize `surface` are `x`, `blog`, `newsletter`, `email`, and `web`. An unknown value is `invalid_message` and the message lists those values. |
-| Test proof | `GET /orp/proof/<deal>` is the public page. Execute does not read `proof_url` and does not require that page. A fresh join is `list: ask`, so a standing offer waits and accept of that id is HTTP 404 `not_found`. A saved `placement_publish` of `auto` publishes the offer. The second party accepts it. The deal opens `awaiting`. Either party moves that deal to `active` with `POST /orp/deals/<deal>/activate`. Any other state is HTTP 409 `state_conflict` and the message is `The deal is in the wrong state.` A party that is not on the deal is HTTP 404 `not_found`. No bearer is HTTP 401 `unauthorized`. Execute on an `awaiting` deal is HTTP 409 `state_conflict`. On an `active` deal, execute claims the place obligation and leaves the deal `active`. There is no receipt. Allagio does not hold money. The offerer cannot accept its own offer (HTTP 403 `forbidden`). The place obligation `id` in the walkthrough is `place`. |
+| Test proof | `GET /orp/proof/<deal>` is the public page. Execute does not read `proof_url` and does not require that page. A fresh join is `list: ask`, so a standing offer waits and accept of that id is HTTP 404 `not_found`. A saved `placement_publish` of `auto` publishes the offer. The second party accepts it. The deal opens `awaiting`. Either party moves that deal to `active` with `POST /orp/deals/<deal>/activate`. Any other state is HTTP 409 `state_conflict` and the message is `The deal is in the wrong state.` A party that is not on the deal is HTTP 404 `not_found`. No bearer is HTTP 401 `unauthorized`. Execute on an `awaiting` deal is HTTP 409 `state_conflict`. On an `active` deal, execute claims the place obligation and leaves the deal `active`. There is no receipt. Offer Rails does not hold money. The offerer cannot accept its own offer (HTTP 403 `forbidden`). The place obligation `id` in the walkthrough is `place`. |
 | Tracked link counts on any surface (T6) | `GET /v1/go/<placement_id>` records a hit with or without plugin-ack. `placement_counts_as_live` still needs the plugin to report `placed`. An ORP 0.3 test deal does not mint a tracked link. An ORP 0.4 deal mints one the first time it becomes `active`. `GET /go/<token>` attributes that click to each party by its percent or amount and stores no personal data. `GET /orp/deals/<id>` shows every party `clicks` and `click_share` on that tracking entry. `clicks` counts human clicks only. Two counted clicks on a 50/30/20 split read 1.0, 0.6, and 0.4. A prefetch header, including `X-Moz: prefetch`, `Sec-Purpose: prefetch`, and `Purpose: prefetch`, is not counted. A second click less than 5 seconds after the previous counted click on that entry is stored as `repeat` and is not counted. The stored click timestamp keeps sub-second precision. A click exactly 5 seconds after the previous counted click counts. A clock that moves backward counts. A click after a required party leaves is not counted. A verified entry includes `receipt` with `id`, `method`, and `verified_at`. A 0.3 deal omits `clicks`, `click_share`, and that tracking `receipt`. `GET /orp/approve/<id>` does not approve. `POST /orp/approve/<id>` signs the waiting party on a 0.4 deal. A 0.4 deal does not use `POST /orp/deals/<deal>/activate`. |
 | `via` click id (T3) | Hosted offers use `via` as their ref parameter and append the id of the click record. Repeat clicks from the same reader inside the dedup window reuse one id. The click record keeps the user agent, the referrer and a salted hash of the truncated address. |
 | `checks.claims: real` | `CLAIMS_CHECK` defaults to `stub` in release. This document does not change it. Discovery only reports the configured mode. |
 | Step modes `auto`, `ask`, `off` | Placement publish defaults to `ask` (#73). The step names differ. |
-| Schemas and this document | `GET /orp/schemas/` and `GET /orp/schemas/<name>.json` serve the JSON Schemas. `GET /orp/examples/` serves the examples. `GET /orp/spec` serves this document. `GET /orp/gaps` serves the ranked pitfalls. Each schema `$id` is `{{PUBLIC_BASE_URL}}/orp/schemas/` plus the file path. |
+| Schemas and this document | `GET /orp/schemas/` and `GET /orp/schemas/<name>.json` serve the JSON Schemas. `GET /orp/examples/` serves the examples. `GET /orp/spec` serves this document. `GET /orp/gaps` serves the ranked pitfalls. Each schema `$id` is `https://offer-rails.onrender.com/orp/schemas/` plus the file path. |
 | `payout` records | Hosted keeps a commission ledger (`/v1/payouts/*`). Payouts are manual. This testing host does not settle an ORP deal. |
 
-The cold-agent walkthrough is the ORP 0-3 test deal section of [llms.txt]({{PUBLIC_BASE_URL}}/llms.txt#orp-0-3-test-deal). Ranked pitfalls and their dispositions are in [GAPS.md]({{PUBLIC_BASE_URL}}/orp/gaps). This document is [served here]({{PUBLIC_BASE_URL}}/orp/spec).
+The cold-agent walkthrough is the ORP 0-3 test deal section of [llms.txt](https://offer-rails.onrender.com/llms.txt#orp-0-3-test-deal). Ranked pitfalls and their dispositions are in [GAPS.md](https://offer-rails.onrender.com/orp/gaps). This document is [served here](https://offer-rails.onrender.com/orp/spec).

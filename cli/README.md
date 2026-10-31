@@ -2,9 +2,9 @@
 
 Local CLI and stdio MCP server for Allagio. The package name and the command are `allagio`. The `offer-rails` command is a legacy alias of the same program.
 
-`ALLAGIO_API_URL` is the API origin. `OFFER_RAILS_API_URL` and `PUBLIC_BASE_URL` are still read when `ALLAGIO_API_URL` is unset. When none of those is set, the CLI uses the same default as `config.DefaultPublicBaseURL` in the Go API (`cli/lib/public-base.mjs`). Use https. http is accepted only for `localhost`, `127.0.0.1`, and `::1`.
+`ALLAGIO_URL` is the API origin. `OFFER_RAILS_URL` and `OFFER_RAILS_API_URL` are still read when `ALLAGIO_URL` is unset. When those are unset, the CLI uses the same default as `config.DefaultPublicBaseURL` in the Go API (`cli/lib/public-base.mjs`). Use https. http is accepted only for `localhost`, `127.0.0.1`, and `::1`.
 
-TODO: nothing is published to a registry. When a public registry exists, the server name will be `io.github.allagio/allagio-mcp` or `dev.allagio/allagio-mcp`. Do not register either name yet.
+The npm package is coming soon. Nothing is registered. Until then, run the program from this repository.
 
 `login` stores a project-scoped key in `./.offer-rails/config.json` (file mode 0600). It prints whether a person approved the device code or an agent alone created the account. The key itself is not printed.
 
@@ -18,16 +18,16 @@ These actions are not available here: loosen the approval mode, raise a cap or l
 
 <!-- paste:begin -->
 ```bash
-npx allagio login
-npx allagio scan .
-npx allagio list
-npx allagio digest
-npx allagio undo
-npx allagio kill
+node cli/bin/offer-rails.mjs login
+node cli/bin/offer-rails.mjs scan .
+node cli/bin/offer-rails.mjs list
+node cli/bin/offer-rails.mjs digest
+node cli/bin/offer-rails.mjs undo
+node cli/bin/offer-rails.mjs kill
 ```
 <!-- paste:end -->
 
-`scan` prints the payload and asks `Send this listing card? [y/N]` the first time. An agent-only account, with no person approving a device code, is `npx allagio login --agent --role maker --name "Example" --email you@example.com`.
+`scan` prints the payload and asks `Send this listing card? [y/N]` the first time. An agent-only account, with no person approving a device code, is `node cli/bin/offer-rails.mjs login --agent --role maker --name "Example" --email you@example.com`.
 
 ## Cursor
 
@@ -37,8 +37,8 @@ Copy this into `.cursor/mcp.json`:
 {
   "mcpServers": {
     "allagio": {
-      "command": "npx",
-      "args": ["-y", "allagio", "mcp"]
+      "command": "node",
+      "args": ["cli/bin/offer-rails.mjs", "mcp"]
     }
   }
 }
@@ -47,7 +47,7 @@ Copy this into `.cursor/mcp.json`:
 ## Claude Code
 
 ```bash
-claude mcp add allagio -- npx allagio mcp
+node cli/bin/offer-rails.mjs mcp
 ```
 
 JSON form, for `.mcp.json` or `~/.claude.json`:
@@ -56,11 +56,11 @@ JSON form, for `.mcp.json` or `~/.claude.json`:
 {
   "mcpServers": {
     "allagio": {
-      "command": "npx",
-      "args": ["allagio", "mcp"]
+      "command": "node",
+      "args": ["cli/bin/offer-rails.mjs", "mcp"]
     }
   }
 }
 ```
 
-`npx allagio mcp` speaks MCP over stdio. The `offer-rails` command is the same program. The tools are the same commands. `scan` uploads only when `confirm` is true. `restore_placement` and the other session-only tools return a sign-in link and do not call the API.
+`node cli/bin/offer-rails.mjs mcp` speaks MCP over stdio. The npm package is coming soon. The tools are the same commands. `scan` uploads only when `confirm` is true. `restore_placement` and the other session-only tools return a sign-in link and do not call the API.

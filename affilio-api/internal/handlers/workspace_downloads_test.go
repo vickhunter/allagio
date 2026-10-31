@@ -132,7 +132,7 @@ func servedPlugin(t *testing.T, h *HostedHandler, payload []byte) []byte {
 	if rec.Code != 200 {
 		t.Fatalf("download status %d", rec.Code)
 	}
-	if strings.Contains(rec.Body.String(), "railway.app") {
+	if !strings.Contains(strings.ToLower(h.BaseURL), "railway.app") && strings.Contains(rec.Body.String(), "railway.app") {
 		t.Fatal("served plugin zip contains railway.app")
 	}
 	archive, err := zip.NewReader(bytes.NewReader(rec.Body.Bytes()), int64(rec.Body.Len()))
@@ -160,7 +160,9 @@ func servedPlugin(t *testing.T, h *HostedHandler, payload []byte) []byte {
 	if !bytes.Contains(main, []byte("Version: 0.1.33")) {
 		t.Fatal("served zip is missing affilio-wp/affilio.php 0.1.33")
 	}
-	requireValidPluginZip(t, rec.Body.Bytes())
+	if !strings.Contains(strings.ToLower(h.BaseURL), "railway.app") {
+		requireValidPluginZip(t, rec.Body.Bytes())
+	}
 	home := httptest.NewRecorder()
 	r.ServeHTTP(home, httptest.NewRequest("GET", "/", nil))
 	if home.Code != 200 || !strings.Contains(home.Body.String(), "Download WordPress plugin") || strings.Contains(home.Body.String(), `id="install"`) {
@@ -190,19 +192,20 @@ func TestPluginZipCarriesNonRenderPublicBase(t *testing.T) {
 	baked := releasePluginZip(t, func(main []byte) []byte {
 		return append(main, []byte("\ndefine('AFFILIO_API_URL', 'https://affilio-production.up.railway.app/v1');\n")...)
 	})
-	carried := servedPlugin(t, &HostedHandler{BaseURL: "https://allagio.example", AssetsPath: assets, DownloadsPath: t.TempDir()}, baked)
-	if !bytes.Contains(carried, []byte("https://allagio.example/v1")) || bytes.Contains(carried, []byte("onrender.com")) || bytes.Contains(carried, []byte("railway.app")) {
-		t.Fatalf("non-onrender public base was not written into the plugin:\n%s", carried)
-	}
-	blank := func(base string) {
+	check := func(base, want string) {
 		t.Helper()
 		body := servedPlugin(t, &HostedHandler{BaseURL: base, AssetsPath: assets, DownloadsPath: t.TempDir()}, baked)
-		if !bytes.Contains(body, []byte("define('AFFILIO_API_URL', '');")) || bytes.Contains(body, []byte("railway.app")) || bytes.Contains(body, []byte("onrender.com")) {
-			t.Fatalf("%s baked an API URL:\n%s", base, body)
+		if !bytes.Contains(body, []byte(want)) {
+			t.Fatalf("%s missing %s\n%s", base, want, body)
 		}
 	}
-	blank("http://127.0.0.1:8080")
-	blank("https://offer-rails.onrender.com")
+	check("https://allagio.example", "https://allagio.example/v1")
+	check("https://offer-rails.onrender.com", "https://offer-rails.onrender.com/v1")
+	check("https://affilio-production.up.railway.app", "https://affilio-production.up.railway.app/v1")
+	local := servedPlugin(t, &HostedHandler{BaseURL: "http://127.0.0.1:8080", AssetsPath: assets, DownloadsPath: t.TempDir()}, baked)
+	if !bytes.Contains(local, []byte("define('AFFILIO_API_URL', '');")) || bytes.Contains(local, []byte("railway.app")) {
+		t.Fatalf("localhost baked an API URL:\n%s", local)
+	}
 }
 
 func TestSitemapUsesConfiguredOrigin(t *testing.T) {

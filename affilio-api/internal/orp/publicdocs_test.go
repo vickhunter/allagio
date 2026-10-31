@@ -2,9 +2,11 @@ package orp
 
 import (
 	"bytes"
+	"encoding/json"
 	"html"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -208,4 +210,71 @@ func pagePhrases(src string) []string {
 		}
 	}
 	return out
+}
+
+// TestSchemaIDsUseOneHost fails when ORP $id values use more than one host,
+// or a host other than SchemaIDHost.
+func TestSchemaIDsUseOneHost(t *testing.T) {
+	repo := filepath.Dir(filepath.Dir(mustProtocolRoot(t)))
+	roots := []string{
+		filepath.Join(repo, "docs", "protocol", "schema"),
+		filepath.Join(repo, "affilio-api", "internal", "orp", "bundled", "schemas"),
+	}
+	hosts := map[string][]string{}
+	idRe := regexp.MustCompile(`"\$id"\s*:\s*"(https?://[^"/]+)`)
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
+				return err
+			}
+			body, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			var doc map[string]any
+			if json.Unmarshal(body, &doc) != nil {
+				return nil
+			}
+			for _, match := range idRe.FindAllSubmatch(body, -1) {
+				host := string(match[1])
+				hosts[host] = append(hosts[host], path)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(hosts) != 1 {
+		t.Fatalf("ORP $id hosts = %v", hosts)
+	}
+	for host := range hosts {
+		if host != SchemaIDHost {
+			t.Fatalf("$id host %s, want %s", host, SchemaIDHost)
+		}
+	}
+}
+
+// TestORP03MatchesFrozenCommit fails when SPEC, 0.3 schemas, or examples
+// differ from the frozen main commit.
+func TestORP03MatchesFrozenCommit(t *testing.T) {
+	repo := filepath.Dir(filepath.Dir(mustProtocolRoot(t)))
+	cmd := exec.Command("git", "diff", "--exit-code", "f203ca97", "--",
+		"docs/protocol/SPEC.md",
+		"docs/protocol/schema/0.3",
+		"docs/protocol/schema/examples",
+		"affilio-api/internal/orp/bundled/SPEC.md",
+		"affilio-api/internal/orp/bundled/schemas/messages",
+		"affilio-api/internal/orp/bundled/schemas/http",
+		"affilio-api/internal/orp/bundled/schemas/envelope.schema.json",
+		"affilio-api/internal/orp/bundled/schemas/message.schema.json",
+		"affilio-api/internal/orp/bundled/schemas/defs.schema.json",
+		"affilio-api/internal/orp/bundled/schemas/discovery.schema.json",
+		"affilio-api/internal/orp/bundled/schemas/constraints.schema.json",
+	)
+	cmd.Dir = repo
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("ORP 0.3 drifted from f203ca97: %v\n%s", err, out)
+	}
 }

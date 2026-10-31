@@ -3,7 +3,7 @@ name: distributoor-revenue
 description: Find relevant revenue opportunities and prepare owner-approved placements using the publisher's existing agent and publishing tools.
 ---
 
-Use the Allagio MCP connection (`distributoor`). Keep the owner's existing runtime and publishing tools.
+Use the Allagio MCP connection (`allagio`). Keep the owner's existing runtime and publishing tools.
 
 1. Use `find_opportunities` with the article's actual context. Accept `no_match`; commission never compensates for an irrelevant recommendation. Use approved personal affiliate links through the existing Allagio workflow when available; this native-offer POC does not enroll the owner in external programs.
 2. Verify product claims with the owner. Call `prepare_placement` with exact copy and an HTTPS article URL on the publisher's registered domain.

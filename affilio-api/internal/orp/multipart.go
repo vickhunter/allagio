@@ -25,7 +25,7 @@ var (
 		"given_name": true, "family_name": true, "tax_id": true, "ssn": true, "dob": true,
 	}
 	reservedHolders = map[string]bool{
-		"host": true, "offerrails": true, "allagio": true, "hostedapi": true,
+		"host": true, "offerrails": true, "hostedapi": true,
 	}
 	offerV4Keys = map[string]bool{
 		"id": true, "terms": true, "terms_hash": true, "limit": true, "note": true,

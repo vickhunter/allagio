@@ -1,7 +1,7 @@
 import { defaultPublicBaseURL } from './public-base.mjs';
 
 export function apiBase(env = process.env) {
-  const raw = String(env.ALLAGIO_API_URL || env.OFFER_RAILS_API_URL || env.PUBLIC_BASE_URL || defaultPublicBaseURL).trim();
+  const raw = String(env.ALLAGIO_URL || env.OFFER_RAILS_URL || env.OFFER_RAILS_API_URL || defaultPublicBaseURL).trim();
   let url;
   try {
     url = new URL(raw);

@@ -37,9 +37,10 @@ function jsonResponse(status, body) {
 }
 
 test('https is required unless the host is localhost', () => {
-  assert.equal(apiBase({ ALLAGIO_API_URL: defaultPublicBaseURL }), defaultPublicBaseURL);
+  assert.equal(apiBase({ ALLAGIO_URL: defaultPublicBaseURL }), defaultPublicBaseURL);
   assert.equal(apiBase({}), defaultPublicBaseURL);
-  assert.equal(apiBase({ OFFER_RAILS_API_URL: 'https://legacy.example' }), 'https://legacy.example');
+  assert.equal(apiBase({ OFFER_RAILS_URL: 'https://legacy.example' }), 'https://legacy.example');
+  assert.equal(apiBase({ ALLAGIO_URL: 'https://allagio.example', OFFER_RAILS_URL: 'https://legacy.example', PUBLIC_BASE_URL: 'https://ignored.example' }), 'https://allagio.example');
   assert.equal(apiBase({ OFFER_RAILS_API_URL: 'http://127.0.0.1:18081' }), 'http://127.0.0.1:18081');
   assert.equal(apiBase({ OFFER_RAILS_API_URL: 'http://localhost:8080/' }), 'http://localhost:8080');
   assert.equal(apiBase({ OFFER_RAILS_API_URL: 'http://[::1]:8080' }), 'http://[::1]:8080');
@@ -442,20 +443,19 @@ test('digest says when the list was cut and when claims are not checked yet', as
 test('the readme paste block is the six CLI lines', () => {
   const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const block = readme.split('<!-- paste:begin -->')[1].split('<!-- paste:end -->')[0];
-  const lines = block.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('npx '));
+  const lines = block.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('node '));
   assert.deepEqual(lines, [
-    'npx allagio login',
-    'npx allagio scan .',
-    'npx allagio list',
-    'npx allagio digest',
-    'npx allagio undo',
-    'npx allagio kill',
+    'node cli/bin/offer-rails.mjs login',
+    'node cli/bin/offer-rails.mjs scan .',
+    'node cli/bin/offer-rails.mjs list',
+    'node cli/bin/offer-rails.mjs digest',
+    'node cli/bin/offer-rails.mjs undo',
+    'node cli/bin/offer-rails.mjs kill',
   ]);
   assert.match(readme, /\.cursor\/mcp\.json/);
-  assert.match(readme, /claude mcp add allagio -- npx allagio mcp/);
-  assert.match(readme, /"command": "npx"/);
-  assert.match(readme, /"-y", "allagio", "mcp"/);
-  assert.match(readme, /"allagio", "mcp"/);
+  assert.match(readme, /node cli\/bin\/offer-rails\.mjs mcp/);
+  assert.match(readme, /"command": "node"/);
+  assert.match(readme, /"cli\/bin\/offer-rails\.mjs", "mcp"/);
   assert.match(readme, /in review/);
   assert.match(readme, /review_reason/);
   assert.match(readme, /does not set an approval mode/);

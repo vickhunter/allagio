@@ -9,15 +9,17 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"affilio-api/internal/config"
 )
 
-// PublicHost is the host baked into ORP schema $id values.
-// It is the current default public origin. Frozen 0.3 $id files keep this
-// host even after DefaultPublicBaseURL changes. Document links use
-// config.ExpandPublicBase instead of copying the host.
-const PublicHost = config.DefaultPublicBaseURL
+// SchemaIDHost is the only host used in ORP schema $id values.
+// It is a literal, not the public site default. ORP 0.3 files keep this
+// host byte for byte. Change this one string the day a domain is bought,
+// then update every $id together so they stay on one host.
+const SchemaIDHost = "https://offer-rails.onrender.com"
+
+// PublicHost is that same $id host. Served document links use
+// config.ExpandPublicBase and do not copy this constant.
+const PublicHost = SchemaIDHost
 
 // ReadPublic returns one served document. name is SPEC.md, GAPS.md,
 // schemas/<file>, or examples/<file>. A missing file returns false.

@@ -48,13 +48,13 @@ tools (site key via `OFFERRAILS_SITE_KEY` on the stdio server, or the
 ## Transports
 
 Both verb sets are served two ways: a **stdio** MCP server whose command and
-reported name are `offer-rails-mcp` (`affilio-api/cmd/offer-rails-mcp`;
-`affilio-api/cmd/distributoor-mcp` is the same process under the previous
-binary name; env `OFFERRAILS_API_URL`, `OFFERRAILS_API_KEY`,
-`OFFERRAILS_SITE_KEY`, with the previous `DISTRIBUTOOR_*` names still read
+reported name are `allagio-mcp` (`affilio-api/cmd/allagio-mcp`;
+`affilio-api/cmd/offer-rails-mcp` and `affilio-api/cmd/distributoor-mcp` start
+the same process; env `ALLAGIO_API_URL`, `ALLAGIO_API_KEY`,
+`ALLAGIO_SITE_KEY`, with `OFFERRAILS_*` and `DISTRIBUTOOR_*` still read
 when the new name is blank) and a **hosted
 streamable-HTTP** endpoint at `POST /mcp` when a public base is set, or
 `POST /v1/mcp` otherwise (one JSON-RPC message per POST;
 maker auth via `X-Maker-Key` or `Authorization: Bearer`, publisher auth via
 `X-API-Key`; notifications are acknowledged with 202). The npm package
-`offer-rails` is not published yet. Use the hosted MCP URL.
+is coming soon. Use the hosted MCP URL.

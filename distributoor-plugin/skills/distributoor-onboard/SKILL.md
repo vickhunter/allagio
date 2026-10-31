@@ -17,7 +17,7 @@ configuration and documentation. Installer detection is a hint, not proof.
 Ask only for information the repository cannot establish. Never read or upload
 `.env` files, private keys or payment secrets to discover the stack.
 
-Use the configured `distributoor` hosted MCP server. Authenticate with **maker**
+Use the configured `allagio` hosted MCP server. Authenticate with **maker**
 access using the client's browser OAuth flow. Verified sign-in creates a new
 maker automatically when no existing account conflicts. An existing maker
 requires its owner's account connection; matching an email never proves access.

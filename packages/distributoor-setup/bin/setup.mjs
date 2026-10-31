@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from 'node:util';
 import { resolve } from 'node:path';
-import { validateAPI, detectProject, checkServer, mergeMCP, installSkills, chooseClient, available, run, codexConfig } from '../lib/setup.mjs';
+import { validateAPI, detectProject, checkServer, mergeMCP, installSkills, chooseClient, available, run, codexConfig, mcpConnectionName } from '../lib/setup.mjs';
 
 try {
   const { values } = parseArgs({ options: {
@@ -31,13 +31,13 @@ try {
     console.log(`Installed ${paths.length} skills for ${client}. Source files and secrets have not been uploaded by this installer.`);
     if (values.offline || values['install-only'] || !process.stdin.isTTY) {
       console.log('Agent setup installed. Product integration and paid conversion verification are still pending.');
-      if (client === 'codex') console.log(`Launch: codex -c 'mcp_servers.distributoor={url=${JSON.stringify(resource)}}' 'Use distributoor-onboard to set up this product.'`);
+      if (client === 'codex') console.log(`Launch: codex -c 'mcp_servers.${mcpConnectionName}={url=${JSON.stringify(resource)}}' 'Use distributoor-onboard to set up this product.'`);
       else console.log(`In your agent, connect ${resource} with maker access and ask: Use distributoor-onboard to set up this product.`);
       if (values.offline) console.log('Offline preparation only: the hosted connection has not been verified.');
     } else if (client === 'codex') {
       const configuration = codexConfig(resource);
       console.log('Sign in once and allow maker access. Your existing Codex account powers the integration.');
-      await run('codex', [...configuration, 'mcp', 'login', 'distributoor', '--scopes', 'maker', '--oauth-client-registration', 'dcr', '--oauth-resource', resource], root);
+      await run('codex', [...configuration, 'mcp', 'login', mcpConnectionName, '--scopes', 'maker', '--oauth-client-registration', 'dcr', '--oauth-resource', resource], root);
       await run('codex', [...configuration, 'Use distributoor-onboard to set up this product. Continue through detection, registration, attribution wiring, tests and assessment; report any remaining owner action.'], root);
     } else if (client === 'claude' && await available('claude')) {
       await run('claude', ['Use distributoor-onboard to set up this product. Connect the Allagio MCP server with maker access, then perform integration and verification.'], root);

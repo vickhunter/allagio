@@ -49,6 +49,12 @@ func TestDefaultPublicBaseURLIsTheOnlyGoLiteral(t *testing.T) {
 		if rel == "internal/config/public_base.go" {
 			return nil
 		}
+		if rel == "internal/orp/publicdocs.go" {
+			if strings.Contains(string(body), "DefaultPublicBaseURL") {
+				t.Fatal("schema id host must be its own literal, not the public default")
+			}
+			return nil
+		}
 		hits = append(hits, rel)
 		return nil
 	})
@@ -61,11 +67,16 @@ func TestDefaultPublicBaseURLIsTheOnlyGoLiteral(t *testing.T) {
 }
 
 func TestCLIDefaultMatchesTheGoConstant(t *testing.T) {
-	body, err := os.ReadFile(filepath.Join("..", "..", "..", "cli", "lib", "public-base.mjs"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(body), `'`+DefaultPublicBaseURL+`'`) {
-		t.Fatalf("cli default is not %s\n%s", DefaultPublicBaseURL, body)
+	for _, rel := range []string{
+		filepath.Join("..", "..", "..", "cli", "lib", "public-base.mjs"),
+		filepath.Join("..", "..", "..", "ui", "landing", "src", "public-base.mjs"),
+	} {
+		body, err := os.ReadFile(rel)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(body), `'`+DefaultPublicBaseURL+`'`) {
+			t.Fatalf("%s default is not %s\n%s", rel, DefaultPublicBaseURL, body)
+		}
 	}
 }

@@ -887,7 +887,7 @@ func TestLLMsJoinDoesNotRequireGoogle(t *testing.T) {
 	if strings.Contains(string(public), "/mcp needs the Google sign-in") || strings.Contains(llmsFullDocument(), "/mcp needs the Google sign-in") || strings.Contains(llmsFullDocument(), "This server needs a Google sign-in today") {
 		t.Fatal("served llms text still sends agents to Google")
 	}
-	const stdioSentence = "The MCP server name is allagio-mcp. The npm package allagio is not published yet. It is coming soon. Use the hosted MCP URL in this document. When the hosted installer archive is on this origin, the command is npx --yes --package=<origin>/downloads/allagio-0.1.0.tgz allagio --api-url <origin>. The environment names are the API URL, the API key, and the site key. Each name is the product name with the space removed, then _API_URL, _API_KEY, and _SITE_KEY."
+	const stdioSentence = "The MCP server name is allagio-mcp. The npm package is coming soon. From this repository, run node cli/bin/offer-rails.mjs --api-url <origin>. Older binary names still start the same server. Set ALLAGIO_API_URL, ALLAGIO_API_KEY, and ALLAGIO_SITE_KEY. The previous names still work when the new name is unset."
 	if !strings.Contains(llmsFullDocument(), AgentJoinCommand) || !strings.Contains(llmsFullDocument(), stdioSentence) {
 		t.Fatal("llms-full.txt dropped the join command or the stdio sentence")
 	}
@@ -908,7 +908,7 @@ func TestJoinOneLinerFromCleanFolder(t *testing.T) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "sh", "-c", AgentJoinCommand)
 	cmd.Dir = dir
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + dir, "ALLAGIO_URL=" + h.BaseURL}
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + dir, "OFFER_RAILS_URL=" + h.BaseURL}
 	cmd.Stdin = nil
 	out, err := cmd.CombinedOutput()
 	if err != nil {

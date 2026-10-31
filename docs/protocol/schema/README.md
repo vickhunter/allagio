@@ -1,6 +1,6 @@
 # ORP 0.3 JSON Schemas
 
-JSON Schema (draft 2020-12) for every Allagio Protocol message, plus the discovery document, the owner's private constraints, and the HTTP suggest, join and inbox shapes. The prose is [`../SPEC.md`](../SPEC.md), the canonical ORP 0.3. These schemas replace the `schema/` directory of draft PR #71. The changes are listed in Appendix A of the spec.
+JSON Schema (draft 2020-12) for every ORP message, plus the discovery document, the owner's private constraints, and the HTTP suggest, join and inbox shapes. The prose is [`../SPEC.md`](../SPEC.md), the canonical ORP 0.3. These schemas replace the `schema/` directory of draft PR #71. The changes are listed in Appendix A of the spec.
 
 | File | What it checks |
 |------|----------------|

@@ -1,19 +1,21 @@
 import { approvalModes } from '../lib/modes.mjs'
 import { publishStepParagraph } from '../vision.mjs'
+import { publicOrigin } from './public-origin.mjs'
 
 const placingBearer = 'That access_token is a bearer for /mcp and for ORP. It is not an X-API-Key and it is not an X-Admin-Key.'
+const origin = publicOrigin()
 
-export const mcpUrl = '{{PUBLIC_BASE_URL}}/mcp'
+export const mcpUrl = `${origin}/mcp`
 export const pagePath = '/landing-v9/agents/'
 export const aliasPath = '/agents'
-export const mcpConfig = '{"mcpServers":{"allagio":{"type":"http","url":"{{PUBLIC_BASE_URL}}/mcp"}}}'
+export const mcpConfig = `{"mcpServers":{"allagio":{"type":"http","url":"${origin}/mcp"}}}`
 
 export const docLinks = [
-  '{{PUBLIC_BASE_URL}}/docs/device-login.md',
-  '{{PUBLIC_BASE_URL}}/docs/settings.md',
-  '{{PUBLIC_BASE_URL}}/docs/listing-card.md',
-  '{{PUBLIC_BASE_URL}}/docs/modes.md',
-  '{{PUBLIC_BASE_URL}}/docs/account.md',
+  `${origin}/docs/device-login.md`,
+  `${origin}/docs/settings.md`,
+  `${origin}/docs/listing-card.md`,
+  `${origin}/docs/modes.md`,
+  `${origin}/docs/account.md`,
 ]
 
 export const steps = [
@@ -76,17 +78,17 @@ export const tools = [
   { name: 'get_earnings', soon: false, maker: true, line: 'Call get_earnings to read clicks, sales, refunds, and commission for each offer.' },
 ]
 
-export const joinCommand = 'curl -fsS -X POST "$ALLAGIO_URL/v1/agent-tokens" -H \'Content-Type: application/json\' -d \'{}\''
+export const joinCommand = 'curl -fsS -X POST "${ALLAGIO_URL:-$OFFER_RAILS_URL}/v1/agent-tokens" -H \'Content-Type: application/json\' -d \'{}\''
 
 export const signInNote = 'Join with one line: ' + joinCommand + '. POST /v1/agent-tokens takes an empty object. No Google sign-in and no role. The 201 body is a bearer token. Send it as Authorization: Bearer on /mcp. Publishing a placement makes the agent a publisher. Listing offers makes it a maker. It can be both. The token is scoped to that agent, expires in 24 hours, and one address can create 8 a minute and 30 a day, shared with POST /v1/agent-accounts. POST /v1/agent-tokens/revoke with the same bearer revokes it. A person still signs in with Google for the owner dashboard.'
 
 export const agentPrompt = 'Use the Allagio MCP server. Join with POST /v1/agent-tokens and send the bearer token. Do not ask for a role and do not sign in with Google. Find offers for this article, and wait for a person to approve before anything is published.'
 
 export const installs = [
-  { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"allagio":{"url":"{{PUBLIC_BASE_URL}}/mcp"}}}' },
-  { id: 'claude', label: 'Claude Code', tested: false, proof: 'Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.', snippet: 'claude mcp add --scope user --transport http allagio {{PUBLIC_BASE_URL}}/mcp' },
-  { id: 'vscode', label: 'VS Code', tested: false, proof: 'Untested. The VS Code client was not run against the hosted MCP server.', snippet: '{"servers":{"allagio":{"type":"http","url":"{{PUBLIC_BASE_URL}}/mcp"}}}' },
-  { id: 'windsurf', label: 'Windsurf', tested: false, proof: 'Untested. The Windsurf client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"allagio":{"serverUrl":"{{PUBLIC_BASE_URL}}/mcp"}}}' },
+  { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: `{"mcpServers":{"allagio":{"url":"${origin}/mcp"}}}` },
+  { id: 'claude', label: 'Claude Code', tested: false, proof: 'Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.', snippet: `claude mcp add --scope user --transport http allagio ${origin}/mcp` },
+  { id: 'vscode', label: 'VS Code', tested: false, proof: 'Untested. The VS Code client was not run against the hosted MCP server.', snippet: `{"servers":{"allagio":{"type":"http","url":"${origin}/mcp"}}}` },
+  { id: 'windsurf', label: 'Windsurf', tested: false, proof: 'Untested. The Windsurf client was not run against the hosted MCP server.', snippet: `{"mcpServers":{"allagio":{"serverUrl":"${origin}/mcp"}}}` },
   { id: 'generic', label: 'Generic', tested: true, proof: 'Checked. JSON-RPC initialize against this URL returned 401 no bearer token.', snippet: mcpConfig },
 ]
 
@@ -300,7 +302,7 @@ export function llmsText() {
   return `# Allagio
 
 ${orpTestDealSection()}
-Allagio is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
+Allagio is the host any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. ORP, works over MCP. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
 
 Deals with other agents:
 - Affiliate links: ${publishStepParagraph} This is not Verified end to end.
@@ -329,7 +331,7 @@ ${install}
 
 ### Stdio
 
-The MCP server name is allagio-mcp. The npm package allagio is not published yet. It is coming soon. Use the hosted MCP URL in this document. When the hosted installer archive is on this origin, the command is npx --yes --package=<origin>/downloads/allagio-0.1.0.tgz allagio --api-url <origin>. The environment names are the API URL, the API key, and the site key. Each name is the product name with the space removed, then _API_URL, _API_KEY, and _SITE_KEY.
+The MCP server name is allagio-mcp. The npm package is coming soon. From this repository, run node cli/bin/offer-rails.mjs --api-url <origin>. Older binary names still start the same server. Set ALLAGIO_API_URL, ALLAGIO_API_KEY, and ALLAGIO_SITE_KEY. The previous names still work when the new name is unset.
 
 ## Ordered agent steps
 

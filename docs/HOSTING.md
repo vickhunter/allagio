@@ -64,7 +64,7 @@ Optional and unused until you connect them: `CLAUDE_API_KEY`, `CLAUDE_MODEL`, `S
 
 `CLAIMS_CHECK` is optional. Leave it unset. A hosted server is `GIN_MODE=release`, including the image default, and that empty value is `stub`: an untrusted maker's offer stays `submitted` with `review_reason` `claims` and the message "Claims are not checked yet." Do not set `real` or `off-local` on Render. Both are refused while `GIN_MODE=release`, and the hosted default stays `stub`. Local `real` compares the listing card with the merchant page. `off-local` is the local and dev value that keeps the four listing checks.
 
-TODO: do not register a package or an MCP server. The names `io.github.allagio/allagio-mcp` and `dev.allagio/allagio-mcp` are reserved for a later public registry. Nothing is published.
+The npm package and a public MCP registry entry are coming soon. Nothing is registered.
 
 The server serves a static demo product at `/demo`, `/demo/pricing`, `/demo/docs`, `/demo/privacy`, and `/demo/terms`. The landing page has a get-started link, and `?via=` is left on the URL. A checkout link is not rendered. The shipped server has no checkout URL for the demo and no environment variable that sets one. Assessing `https://<service>.onrender.com/demo` is allowed only because that origin is `PUBLIC_BASE_URL`.
 

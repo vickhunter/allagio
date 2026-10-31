@@ -10,7 +10,7 @@ network without learning a proprietary dashboard.
 v0.1 is **extracted from the working Allagio network in this repository**
 (spec follows implementation). Every verb, schema, and semantic documented here
 is implemented and tested in `affilio-api/`. The name an agent sees is
-`offer-rails-mcp`.
+`allagio-mcp`.
 
 | Document | Contents |
 |---|---|
@@ -33,7 +33,7 @@ A DCP endpoint MUST:
    machine-actionable `remediation` strings.
 
 Reference implementation: this repository. Reference client + MCP server:
-`affilio-api/internal/dcp`, `affilio-api/cmd/offer-rails-mcp`. The binary name
-is `offer-rails-mcp`. `affilio-api/cmd/distributoor-mcp` is the same process
-under the previous binary name. The server reports `offer-rails-mcp`. The npm
-package `offer-rails` is not published yet.
+`affilio-api/internal/dcp`, `affilio-api/cmd/allagio-mcp`. The binary name
+is `allagio-mcp`. `affilio-api/cmd/offer-rails-mcp` and
+`affilio-api/cmd/distributoor-mcp` start that same process. The server reports
+`allagio-mcp`. The npm package is coming soon.
