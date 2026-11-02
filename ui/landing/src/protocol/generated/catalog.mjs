@@ -5828,7 +5828,7 @@ export const catalog = {
       "slug": "defs",
       "href": "/protocol/spec/0.4/defs/",
       "title": "ORP 0.4 shared definitions",
-      "description": "Types added for many-party deals. A 0.3 message does not use this file. Identity is a hash and an issuer name. A deposit term names an outside holder. Offer Rails does not hold money.",
+      "description": "Types added for many-party deals. A 0.3 message does not use this file. Identity is a hash and an issuer name. A deposit term names an outside holder. Allagio does not hold money.",
       "kind": "schema",
       "type": "",
       "required": [],
@@ -5842,7 +5842,7 @@ export const catalog = {
         },
         {
           "name": "PartyTerms",
-          "description": "What this seat is paid or owes. Percent splits are integers. An amount is the amount field. per, hours, and a deposit are not amounts for the split rule. A deposit names who holds it outside Offer Rails.",
+          "description": "What this seat is paid or owes. Percent splits are integers. An amount is the amount field. per, hours, and a deposit are not amounts for the split rule. A deposit names who holds it outside Allagio.",
           "closed": true,
           "fields": [
             {
@@ -5885,7 +5885,7 @@ export const catalog = {
         },
         {
           "name": "Deposit",
-          "description": "A term that records who holds a deposit. The holder is outside Offer Rails. The proof records the agreed term and does not move money.",
+          "description": "A term that records who holds a deposit. The holder is outside Allagio. The proof records the agreed term and does not move money.",
           "closed": true,
           "fields": [
             {
@@ -7927,7 +7927,7 @@ export const catalog = {
     "sdk/src/sign.mjs",
     "sdk/src/validate.mjs"
   ],
-  "sdkReadme": "# ORP reference host\n\nIn-process host and a thin client for the conformance suite. Party behavior is HTTP. The scheduler hooks (`advanceBusiness`, `runDueChecks`, `registerPage`, `markTestPool`, `failNextRecheck`, `resolveDispute`) are in-process on the reference host. The host speaks ORP 0.4 and 0.3. The Offer Rails hosted API speaks 0.4 and 0.3. `CLAIMS_CHECK` on that host stays a stub, so claim fields stay `unknown`.\n\n`claims: \"real\"` checks destinations against the in-memory page catalog. It does not fetch a page and it is not the hosted `CLAIMS_CHECK` setting. `stub` and `none` leave an offer unchecked.\n\nThe provider test token and owner tokens are generated per host and kept in the local store. They are not production secrets.",
+  "sdkReadme": "# ORP reference host\n\nIn-process host and a thin client for the conformance suite. Party behavior is HTTP. The scheduler hooks (`advanceBusiness`, `runDueChecks`, `registerPage`, `markTestPool`, `failNextRecheck`, `resolveDispute`) are in-process on the reference host. The host speaks ORP 0.4 and 0.3. The Allagio hosted API speaks 0.4 and 0.3. `CLAIMS_CHECK` on that host stays a stub, so claim fields stay `unknown`.\n\n`claims: \"real\"` checks destinations against the in-memory page catalog. It does not fetch a page and it is not the hosted `CLAIMS_CHECK` setting. `stub` and `none` leave an offer unchecked.\n\nThe provider test token and owner tokens are generated per host and kept in the local store. They are not production secrets.",
   "exampleCount": 51,
   "invalidCount": 56
 }
