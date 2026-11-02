@@ -161,7 +161,8 @@ def main():
     def proof():
         status, raw = request("GET", "/orp/proof/" + deal["id"])
         doc = expect(status, raw, 200)
-        if "Offer Rails" not in doc.get("text", ""):
+        text = doc.get("text", "")
+        if "Allagio" not in text and "does not hold money" not in text:
             raise SystemExit("proof page was empty")
 
     step("llms.txt", llms)
