@@ -1,0 +1,1 @@
+var e=`https://offer-rails.onrender.com`;export{e as t};

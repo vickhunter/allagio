@@ -38,7 +38,7 @@ export function App() {
       <section aria-labelledby="setup-h" className="mx-auto max-w-3xl px-5 pb-16 pt-12 md:pt-16">
         <p className="eyebrow">Publisher setup</p>
         <h1 id="setup-h" className="h-display mt-4 text-[40px] sm:text-6xl">Set up your site.</h1>
-        <p className="mt-5 text-lg leading-relaxed text-t2">Three steps if you use WordPress. Then Offer Rails can place offers on your posts.</p>
+        <p className="mt-5 text-lg leading-relaxed text-t2">Three steps if you use WordPress. Then Allagio can place offers on your posts.</p>
         <p className="mt-3 text-[15px] leading-relaxed text-t2">{personSignsInBecause}</p>
         <details className="mt-6 rounded-2xl border border-line bg-s1 p-5">
           <summary className="cursor-pointer text-[15px] font-semibold">I'm not on WordPress</summary>

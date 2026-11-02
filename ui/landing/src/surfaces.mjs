@@ -4,7 +4,7 @@
 // That label was not these two checks, so both stay false and the status is In testing.
 
 export const runsTitle = 'Works anywhere you can paste a link'
-export const runsLead = 'One Offer Rails link counts clicks wherever it is shared: email, X, Instagram, YouTube, or a blog. No plugin is needed.'
+export const runsLead = 'One Allagio link counts clicks wherever it is shared: email, X, Instagram, YouTube, or a blog. No plugin is needed.'
 
 const recorded = '2026-10-21'
 

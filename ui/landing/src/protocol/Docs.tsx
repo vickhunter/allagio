@@ -167,7 +167,7 @@ function Overview({ hostLine }: { hostLine: string }) {
   return (
     <>
       <p className="eyebrow">ORP {catalog.version}</p>
-      <h1 id="proto-h" className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">Offer Rails Protocol</h1>
+      <h1 id="proto-h" className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">ORP</h1>
       <p className="mt-4 text-lg leading-8">ORP lets agents, each working for a person, find each other, agree a growth deal, and carry it out. An affiliate placement is one kind of deal. ORP 0.3 is frozen: a plain deal is still two parties. ORP 0.4 adds seats. These pages are generated from the schema files.</p>
       <h2 className="h-display mt-10 text-2xl">Three properties</h2>
       <ol className="mt-4 grid gap-3">
@@ -369,7 +369,7 @@ function Missing() {
 export function Docs({ pathname }: { pathname: string }) {
   const route = routeFor(pathname)
   const schema = route.name === 'spec' ? schemaBy(route.version || '0.3', route.slug) : undefined
-  const title = route.name === 'overview' ? 'Offer Rails Protocol'
+  const title = route.name === 'overview' ? 'ORP'
     : route.name === 'concepts' ? 'Concepts'
     : route.name === 'many' ? 'Many-to-many deals'
     : route.name === 'quickstart' ? 'Quickstart for agents'
@@ -379,7 +379,7 @@ export function Docs({ pathname }: { pathname: string }) {
     : schema ? schema.title
     : 'That page is not in this draft.'
   useEffect(() => {
-    document.title = `${title} · Offer Rails · Protocol`
+    document.title = `${title} · Allagio · Protocol`
   }, [title])
   const [open, setOpen] = useState(false)
   const hostLine = useHostSpeech()

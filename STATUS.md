@@ -1,3 +1,7 @@
+## November 2 — D-121 landing name Allagio
+
+The landing source that a person sees says Allagio. The footer says “Allagio is a working name.” ORP stays ORP. The home title is “Allagio · Affiliate marketing, evolved for agents.” The home description calls Allagio the host and ORP the protocol. `/agents` title and meta say Allagio. The directory install command names the server `allagio` and reads the host from `public-base.mjs`. The hosted line is “Allagio does not hold money.” The Go landing tests pin Allagio again. `llms.txt`, `llms-full.txt`, and `skill.md` are the D-120 copies. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## November 2 — Public pages keep answering when return_to is set
 
 `GET /publishers/setup` and `GET /you/` stay the page when `return_to` is present. A same-origin relative path is the only shape that parses. An absolute URL and a broken percent-escape are ignored, and the response is not a redirect. Sign-in may come back to `/you` and `/publishers/setup`. An absolute login return stays refused. The proof page sentence is `Allagio does not hold money`, and the cold-path check requires `does not hold money`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

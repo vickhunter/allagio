@@ -84,7 +84,7 @@ test('the committed catalog matches the spec files', () => {
 test('quickstart names the hosted thin layer', () => {
   assert.equal(otherRefusal, 'This host is in testing and does not run this message.')
   assert.equal(payRefusal, 'This testing host does not settle money.')
-  assert.equal(noMoney, 'Offer Rails does not hold money.')
+  assert.equal(noMoney, 'Allagio does not hold money.')
   assert.equal(hostSpeechSpeaks, 'This host speaks ORP 0.4 (leave and seat).')
   const speaks = hostSpeech({ orp: ['0.4', '0.3'], capabilities: { messages: ['hello', 'leave', 'seat'] } })
   assert.equal(speaks, hostSpeechSpeaks)

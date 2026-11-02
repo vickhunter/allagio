@@ -27,7 +27,7 @@ func TestLandingUnknownPathIs404(t *testing.T) {
 		t.Fatalf("status %d", rec.Code)
 	}
 	body := rec.Body.String()
-	for _, needle := range []string{"That page is not on ", `aria-label="Main"`, `href="/agents"`, ">Home<"} {
+	for _, needle := range []string{"That page is not on Allagio.", `aria-label="Main"`, `href="/agents"`, ">Home<"} {
 		if !strings.Contains(body, needle) {
 			t.Fatalf("missing %s", needle)
 		}
@@ -121,7 +121,7 @@ func TestLandingStaticShellsRenderTemplates(t *testing.T) {
 		if strings.Contains(body, "{{") || strings.Contains(body, "InstallerReady") {
 			t.Fatalf("%s still serves template source, status %d", path, rec.Code)
 		}
-		if !strings.Contains(body, `name="or-plugin" content="0"`) || !strings.Contains(body, "That page is not on ") {
+		if !strings.Contains(body, `name="or-plugin" content="0"`) || !strings.Contains(body, "That page is not on Allagio.") {
 			t.Fatalf("%s missing rendered not-found page, status %d", path, rec.Code)
 		}
 		if path == "/landing-v9" || path == "/landing-v9/" || path == "/landing-v9/index.html" {

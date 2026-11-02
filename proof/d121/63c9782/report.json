@@ -1,0 +1,114 @@
+[
+  {
+    "name": "home",
+    "route": "/",
+    "width": 390,
+    "title": "Offer Rails · Affiliate marketing, evolved for agents",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "you",
+    "route": "/you/",
+    "width": 390,
+    "title": "Allagio · Your limits",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "agents",
+    "route": "/agents",
+    "width": 390,
+    "title": "Allagio · MCP server",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "makers",
+    "route": "/makers/",
+    "width": 390,
+    "title": "Allagio for makers · Pay only for sales",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "publishers",
+    "route": "/publishers/",
+    "width": 390,
+    "title": "Allagio for publishers · Earn from more of your posts",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "setup",
+    "route": "/publishers/setup",
+    "width": 390,
+    "title": "Allagio · Publisher setup",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "protocol",
+    "route": "/protocol/",
+    "width": 390,
+    "title": "ORP · Allagio · Protocol",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "home",
+    "route": "/",
+    "width": 1440,
+    "title": "Offer Rails · Affiliate marketing, evolved for agents",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "you",
+    "route": "/you/",
+    "width": 1440,
+    "title": "Allagio · Your limits",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "agents",
+    "route": "/agents",
+    "width": 1440,
+    "title": "Allagio · MCP server",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "makers",
+    "route": "/makers/",
+    "width": 1440,
+    "title": "Allagio for makers · Pay only for sales",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "publishers",
+    "route": "/publishers/",
+    "width": 1440,
+    "title": "Allagio for publishers · Earn from more of your posts",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "setup",
+    "route": "/publishers/setup",
+    "width": 1440,
+    "title": "Allagio · Publisher setup",
+    "overflow": false,
+    "axe": []
+  },
+  {
+    "name": "protocol",
+    "route": "/protocol/",
+    "width": 1440,
+    "title": "ORP · Allagio · Protocol",
+    "overflow": false,
+    "axe": []
+  }
+]

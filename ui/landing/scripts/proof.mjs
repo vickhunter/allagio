@@ -151,7 +151,7 @@ async function showPreview(page, origin, route, fixture, width, summary, outDir,
     await page.getByRole('heading', { name: 'How to start a journal' }).waitFor()
     await page.getByText('Field Notes', { exact: true }).waitFor()
     await page.getByText(slot[0], { exact: true }).waitFor()
-    await page.getByText('Sponsored, via Offer Rails', { exact: true }).waitFor()
+    await page.getByText('Sponsored, via Allagio', { exact: true }).waitFor()
     if (!await page.evaluate(offerFollowsBar, slot[1])) throw new Error(fixture + ' offer is not in its slot')
     const approve = page.getByRole('link', { name: 'Approve your placements' })
     const href = await approve.getAttribute('href') || ''
@@ -261,8 +261,8 @@ async function capturePreviewGroups(browser, origin) {
       if (name === 'groups') {
         await page.getByRole('heading', { name: 'Suggested programs' }).waitFor()
         await page.getByText('Unverified', { exact: true }).first().waitFor()
-        await page.getByText("Not on Offer Rails yet. Payouts go through the company's own affiliate program.").waitFor()
-        await page.getByText('Sponsored, via Offer Rails', { exact: true }).waitFor()
+        await page.getByText("Not on Allagio yet. Payouts go through the company's own affiliate program.").waitFor()
+        await page.getByText('Sponsored, via Allagio', { exact: true }).waitFor()
         const hrefs = await page.locator('[data-suggested]').evaluateAll((els) => els.map((el) => el.getAttribute('href') || ''))
         if (hrefs.length < 2 || hrefs.some((href) => /\/v1\/go|[?&]via=|utm_/.test(href))) throw new Error('groups href ' + hrefs.join(','))
         if (/commission|earnings/i.test(shown)) throw new Error('groups showed an earnings estimate')
@@ -270,7 +270,7 @@ async function capturePreviewGroups(browser, origin) {
       if (name === 'nomatch') {
         if (await page.locator('[data-offer]').count()) throw new Error('nomatch rendered a verified offer')
         await page.getByRole('heading', { name: 'Closest programs' }).waitFor()
-        if (/Sponsored, via Offer Rails/.test(shown)) throw new Error('nomatch showed a verified card')
+        if (/Sponsored, via Allagio/.test(shown)) throw new Error('nomatch showed a verified card')
       }
       const scroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)
       if (!scroll) throw new Error(name + ' ' + width + ' scrolls sideways')
@@ -555,7 +555,7 @@ try {
     summary.push({ slug: 'protocol-' + width, ...protocolOk, serious: protocolSerious.map((item) => item.id) })
     await assertHeaderSignIn(protocolPage, 'protocol-' + width)
     if (!protocolOk.scroll) throw new Error('protocol-' + width + ' scrolls sideways')
-    if (protocolOk.title !== 'Offer Rails Protocol') throw new Error('protocol heading ' + protocolOk.title)
+    if (protocolOk.title !== 'ORP') throw new Error('protocol heading ' + protocolOk.title)
     if (!protocolOk.nav.includes('/protocol/') || !protocolOk.nav.includes('source=cursor')) throw new Error('protocol nav ' + protocolOk.nav)
     if (protocolSerious.length) throw new Error('protocol-' + width + ' axe ' + protocolSerious.map((item) => item.id).join(' '))
     await protocolContext.close()

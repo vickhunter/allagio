@@ -87,7 +87,7 @@ function OfferCard({ offer, label }: { offer: VerifiedOffer; label: string }) {
       <p className="text-[13px] font-semibold text-pub">{label}</p>
       <p className="mt-1 break-words font-display text-lg font-bold text-t1">{offer.name}</p>
       <p className="mt-1 break-words text-[15px] leading-relaxed text-t1">{offer.blurb}</p>
-      <p className="mt-2 text-[13px] text-t1">Sponsored, via Offer Rails</p>
+      <p className="mt-2 text-[13px] text-t1">Sponsored, via Allagio</p>
     </div>
   )
 }
