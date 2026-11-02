@@ -3,9 +3,9 @@ name: distributoor-revenue
 description: Find relevant revenue opportunities and prepare owner-approved placements using the publisher's existing agent and publishing tools.
 ---
 
-Use the Offer Rails MCP connection (`distributoor`). Keep the owner's existing runtime and publishing tools.
+Use the Allagio MCP connection (`allagio`). Keep the owner's existing runtime and publishing tools.
 
-1. Use `find_opportunities` with the article's actual context. Accept `no_match`; commission never compensates for an irrelevant recommendation. Use approved personal affiliate links through the existing Offer Rails workflow when available; this native-offer POC does not enroll the owner in external programs.
+1. Use `find_opportunities` with the article's actual context. Accept `no_match`; commission never compensates for an irrelevant recommendation. Use approved personal affiliate links through the existing Allagio workflow when available; this native-offer POC does not enroll the owner in external programs.
 2. Verify product claims with the owner. Call `prepare_placement` with exact copy and an HTTPS article URL on the publisher's registered domain.
 3. Show the owner copy, disclosure, destination, commission, attribution window, refund hold, direct merchant payout terms and service fee. The pilot operator records their approval through the separate admin endpoint. Never request or handle the admin key, webhook secret or encryption key in an agent conversation. `confirm=true` does not authorize publication.
 4. Poll `list_agent_tasks` using the owner's existing scheduler. Continue only for an approved, unexpired proposal. Call `commit_placement` once; retries return the same receipt.

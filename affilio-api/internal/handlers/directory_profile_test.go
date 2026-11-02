@@ -57,13 +57,13 @@ func TestDirectoryUnknownSlugIs404(t *testing.T) {
 	if err := os.MkdirAll(pageDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	const marker = "That page is not on Offer Rails."
+	const marker = "That page is not on Allagio."
 	body := "<!doctype html><header><nav aria-label=\"Main\"><a href=\"/makers/\">Makers</a></nav></header><main><h1>" + marker + "</h1><a href=\"/\">Home</a><a href=\"/agents\">Agents</a></main>"
 	if err := os.WriteFile(filepath.Join(pageDir, "index.html"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	setupHTML := filepath.Join(dir, "publishers-setup.html")
-	if err := os.WriteFile(setupHTML, []byte("<!doctype html><title>Offer Rails · Publisher setup</title>"), 0o644); err != nil {
+	if err := os.WriteFile(setupHTML, []byte("<!doctype html><title>Allagio · Publisher setup</title>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	h := &HostedHandler{AssetsPath: dir, BaseURL: "http://127.0.0.1:8080"}

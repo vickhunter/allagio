@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { apiBase } from '../lib/api.mjs';
+import { defaultPublicBaseURL } from '../lib/public-base.mjs';
 import { configPath, saveConfig } from '../lib/config.mjs';
 import { handleMcpMessage, toolDefs } from '../lib/mcp.mjs';
 import { run } from '../lib/main.mjs';
@@ -36,12 +37,20 @@ function jsonResponse(status, body) {
 }
 
 test('https is required unless the host is localhost', () => {
-  assert.equal(apiBase({ OFFER_RAILS_API_URL: 'https://offer-rails.onrender.com' }), 'https://offer-rails.onrender.com');
-  assert.equal(apiBase({}), 'https://offer-rails.onrender.com');
+  assert.equal(apiBase({ ALLAGIO_URL: defaultPublicBaseURL }), defaultPublicBaseURL);
+  assert.equal(apiBase({}), defaultPublicBaseURL);
+  assert.equal(apiBase({ OFFER_RAILS_URL: 'https://legacy.example' }), 'https://legacy.example');
+  assert.equal(apiBase({ ALLAGIO_URL: 'https://allagio.example', OFFER_RAILS_URL: 'https://legacy.example', PUBLIC_BASE_URL: 'https://ignored.example' }), 'https://allagio.example');
   assert.equal(apiBase({ OFFER_RAILS_API_URL: 'http://127.0.0.1:18081' }), 'http://127.0.0.1:18081');
   assert.equal(apiBase({ OFFER_RAILS_API_URL: 'http://localhost:8080/' }), 'http://localhost:8080');
   assert.equal(apiBase({ OFFER_RAILS_API_URL: 'http://[::1]:8080' }), 'http://[::1]:8080');
   assert.throws(() => apiBase({ OFFER_RAILS_API_URL: 'http://example.com' }), /https/);
+});
+
+test('OFFER_RAILS_API_URL is used only after ALLAGIO_URL and OFFER_RAILS_URL', () => {
+  assert.equal(apiBase({ OFFER_RAILS_API_URL: 'https://api.example' }), 'https://api.example');
+  assert.equal(apiBase({ OFFER_RAILS_URL: 'https://legacy.example', OFFER_RAILS_API_URL: 'https://api.example' }), 'https://legacy.example');
+  assert.equal(apiBase({ ALLAGIO_URL: 'https://allagio.example', OFFER_RAILS_URL: 'https://legacy.example', OFFER_RAILS_API_URL: 'https://api.example', PUBLIC_BASE_URL: 'https://ignored.example' }), 'https://allagio.example');
 });
 
 test('login stores the project key at mode 0600 and logs a person approval', async () => {
@@ -440,20 +449,19 @@ test('digest says when the list was cut and when claims are not checked yet', as
 test('the readme paste block is the six CLI lines', () => {
   const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   const block = readme.split('<!-- paste:begin -->')[1].split('<!-- paste:end -->')[0];
-  const lines = block.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('npx '));
+  const lines = block.split('\n').map((line) => line.trim()).filter((line) => line.startsWith('node '));
   assert.deepEqual(lines, [
-    'npx offer-rails login',
-    'npx offer-rails scan .',
-    'npx offer-rails list',
-    'npx offer-rails digest',
-    'npx offer-rails undo',
-    'npx offer-rails kill',
+    'node cli/bin/offer-rails.mjs login',
+    'node cli/bin/offer-rails.mjs scan .',
+    'node cli/bin/offer-rails.mjs list',
+    'node cli/bin/offer-rails.mjs digest',
+    'node cli/bin/offer-rails.mjs undo',
+    'node cli/bin/offer-rails.mjs kill',
   ]);
   assert.match(readme, /\.cursor\/mcp\.json/);
-  assert.match(readme, /claude mcp add offer-rails -- npx offer-rails mcp/);
-  assert.match(readme, /"command": "npx"/);
-  assert.match(readme, /"-y", "offer-rails", "mcp"/);
-  assert.match(readme, /"offer-rails", "mcp"/);
+  assert.match(readme, /node cli\/bin\/offer-rails\.mjs mcp/);
+  assert.match(readme, /"command": "node"/);
+  assert.match(readme, /"cli\/bin\/offer-rails\.mjs", "mcp"/);
   assert.match(readme, /in review/);
   assert.match(readme, /review_reason/);
   assert.match(readme, /does not set an approval mode/);

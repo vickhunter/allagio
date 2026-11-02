@@ -49,7 +49,7 @@ Set these in Render. Values stay in the dashboard.
 | `OIDC_ISSUER` | `https://accounts.google.com` |
 | `OIDC_CLIENT_ID` | Google web client id |
 | `OIDC_CLIENT_SECRET` | Google web client secret |
-| `PUBLIC_BASE_URL` | `https://<service>.onrender.com` with no path or trailing slash. Readiness refuses private and loopback hosts. This origin is the only exception, so the server can assess its own demo product. No other host is allowed. |
+| `PUBLIC_BASE_URL` | Public origin with no path or trailing slash. When unset, the server uses the single Go default `config.DefaultPublicBaseURL`, which is the Render host until a domain is bought. Document links, `/sitemap.xml`, and the CLI default all read this one value. Readiness refuses private and loopback hosts. This origin is the only exception, so the server can assess its own demo product. |
 | `ALLOWED_ORIGINS` | The same origin, and nothing else |
 | `HOST` | `0.0.0.0` |
 | `PORT` | Render's `PORT` (default `10000`) |
@@ -63,6 +63,8 @@ Set these in Render. Values stay in the dashboard.
 Optional and unused until you connect them: `CLAUDE_API_KEY`, `CLAUDE_MODEL`, `STRIPE_WEBHOOK_SECRET`, `LEMONSQUEEZY_WEBHOOK_SECRET`, `POLAR_WEBHOOK_SECRET`.
 
 `CLAIMS_CHECK` is optional. Leave it unset. A hosted server is `GIN_MODE=release`, including the image default, and that empty value is `stub`: an untrusted maker's offer stays `submitted` with `review_reason` `claims` and the message "Claims are not checked yet." Do not set `real` or `off-local` on Render. Both are refused while `GIN_MODE=release`, and the hosted default stays `stub`. Local `real` compares the listing card with the merchant page. `off-local` is the local and dev value that keeps the four listing checks.
+
+The npm package and a public MCP registry entry are coming soon. Nothing is registered.
 
 The server serves a static demo product at `/demo`, `/demo/pricing`, `/demo/docs`, `/demo/privacy`, and `/demo/terms`. The landing page has a get-started link, and `?via=` is left on the URL. A checkout link is not rendered. The shipped server has no checkout URL for the demo and no environment variable that sets one. Assessing `https://<service>.onrender.com/demo` is allowed only because that origin is `PUBLIC_BASE_URL`.
 

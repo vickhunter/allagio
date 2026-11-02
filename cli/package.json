@@ -1,9 +1,10 @@
 {
-  "name": "offer-rails",
+  "name": "allagio",
   "version": "0.1.0",
-  "description": "Offer Rails CLI and local stdio MCP server",
+  "description": "Allagio CLI and local stdio MCP server",
   "type": "module",
   "bin": {
+    "allagio": "./bin/offer-rails.mjs",
     "offer-rails": "./bin/offer-rails.mjs"
   },
   "files": [

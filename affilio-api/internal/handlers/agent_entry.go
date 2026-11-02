@@ -16,6 +16,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"affilio-api/internal/config"
 	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
 	"affilio-api/internal/middleware"
@@ -1895,7 +1896,7 @@ func (h *AgentEntry) serveLandingFile(c *gin.Context, name, contentType, fallbac
 			return
 		}
 	}
-	writeMethodBody(c, http.StatusOK, contentType, body)
+	writeMethodBody(c, http.StatusOK, contentType, []byte(config.ExpandPublicBase(string(body), h.BaseURL)))
 }
 
 func (h *AgentEntry) Doc(c *gin.Context) {
@@ -1906,7 +1907,7 @@ func (h *AgentEntry) Doc(c *gin.Context) {
 		writeMethodBody(c, http.StatusNotFound, "application/json; charset=utf-8", raw)
 		return
 	}
-	writeMethodBody(c, http.StatusOK, "text/markdown; charset=utf-8", []byte(body))
+	writeMethodBody(c, http.StatusOK, "text/markdown; charset=utf-8", []byte(config.ExpandPublicBase(body, h.BaseURL)))
 }
 
 func (h *AgentEntry) sessionOwner(c *gin.Context) (*database.Owner, bool) {

@@ -2,11 +2,18 @@ package orp
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"html"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -208,4 +215,143 @@ func pagePhrases(src string) []string {
 		}
 	}
 	return out
+}
+
+// TestSchemaIDsUseOneHost fails when ORP $id values use more than one host,
+// or a host other than SchemaIDHost.
+func TestSchemaIDsUseOneHost(t *testing.T) {
+	repo := filepath.Dir(filepath.Dir(mustProtocolRoot(t)))
+	roots := []string{
+		filepath.Join(repo, "docs", "protocol", "schema"),
+		filepath.Join(repo, "affilio-api", "internal", "orp", "bundled", "schemas"),
+	}
+	hosts := map[string][]string{}
+	idRe := regexp.MustCompile(`"\$id"\s*:\s*"(https?://[^"/]+)`)
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".json") {
+				return err
+			}
+			body, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			var doc map[string]any
+			if json.Unmarshal(body, &doc) != nil {
+				return nil
+			}
+			for _, match := range idRe.FindAllSubmatch(body, -1) {
+				host := string(match[1])
+				hosts[host] = append(hosts[host], path)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(hosts) != 1 {
+		t.Fatalf("ORP $id hosts = %v", hosts)
+	}
+	for host := range hosts {
+		if host != SchemaIDHost {
+			t.Fatalf("$id host %s, want %s", host, SchemaIDHost)
+		}
+	}
+}
+
+// frozenORP03Roots are the ORP 0.3 files that stay byte-identical to main
+// f203ca97, including SPEC.md and GAPS.md in the repo and the bundle.
+var frozenORP03Roots = []string{
+	"docs/protocol/SPEC.md",
+	"docs/protocol/GAPS.md",
+	"docs/protocol/schema/0.3",
+	"docs/protocol/schema/examples",
+	"affilio-api/internal/orp/bundled/SPEC.md",
+	"affilio-api/internal/orp/bundled/GAPS.md",
+	"affilio-api/internal/orp/bundled/schemas/messages",
+	"affilio-api/internal/orp/bundled/schemas/http",
+	"affilio-api/internal/orp/bundled/schemas/envelope.schema.json",
+	"affilio-api/internal/orp/bundled/schemas/message.schema.json",
+	"affilio-api/internal/orp/bundled/schemas/defs.schema.json",
+	"affilio-api/internal/orp/bundled/schemas/discovery.schema.json",
+	"affilio-api/internal/orp/bundled/schemas/constraints.schema.json",
+}
+
+// frozenORP03SHA256 is sha256 over those files at f203ca97, sorted by
+// repo-relative path. Each file contributes "<path>\n<len>\n" and its bytes.
+// A shallow checkout has no f203ca97 object, so the test uses this digest
+// and does not require git history.
+const frozenORP03SHA256 = "aa9b0650d323f46a0bfdf04d18180f22019eda2c86a4ee88330cc04a3d805005"
+
+func frozenORP03Digest(repo string) (string, error) {
+	var files []string
+	for _, rel := range frozenORP03Roots {
+		abs := filepath.Join(repo, filepath.FromSlash(rel))
+		info, err := os.Stat(abs)
+		if err != nil {
+			return "", err
+		}
+		if !info.IsDir() {
+			files = append(files, rel)
+			continue
+		}
+		err = filepath.WalkDir(abs, func(path string, entry os.DirEntry, err error) error {
+			if err != nil || entry.IsDir() {
+				return err
+			}
+			item, err := filepath.Rel(repo, path)
+			if err != nil {
+				return err
+			}
+			files = append(files, filepath.ToSlash(item))
+			return nil
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+	sort.Strings(files)
+	if len(files) != 145 {
+		return "", fmt.Errorf("frozen ORP 0.3 file count %d, want 145", len(files))
+	}
+	sum := sha256.New()
+	for _, rel := range files {
+		body, err := os.ReadFile(filepath.Join(repo, filepath.FromSlash(rel)))
+		if err != nil {
+			return "", err
+		}
+		if _, err := sum.Write([]byte(rel + "\n" + strconv.Itoa(len(body)) + "\n")); err != nil {
+			return "", err
+		}
+		if _, err := sum.Write(body); err != nil {
+			return "", err
+		}
+	}
+	return hex.EncodeToString(sum.Sum(nil)), nil
+}
+
+// TestORP03MatchesFrozenCommit fails when SPEC, GAPS, 0.3 schemas, or
+// examples differ from the frozen main commit. The check is a content digest,
+// so a shallow checkout still fails on a real edit. When f203ca97 is present,
+// a mismatch also prints git diff.
+func TestORP03MatchesFrozenCommit(t *testing.T) {
+	repo := filepath.Dir(filepath.Dir(mustProtocolRoot(t)))
+	got, err := frozenORP03Digest(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == frozenORP03SHA256 {
+		return
+	}
+	check := exec.Command("git", "cat-file", "-e", "f203ca97^{commit}")
+	check.Dir = repo
+	if check.Run() != nil {
+		t.Fatalf("ORP 0.3 digest %s, want %s (frozen commit f203ca97 is not in this checkout)", got, frozenORP03SHA256)
+	}
+	cmd := exec.Command("git", "diff", "--exit-code", "f203ca97", "--")
+	cmd.Args = append(cmd.Args, frozenORP03Roots...)
+	cmd.Dir = repo
+	out, diffErr := cmd.CombinedOutput()
+	t.Fatalf("ORP 0.3 digest %s, want %s: %v\n%s", got, frozenORP03SHA256, diffErr, out)
 }

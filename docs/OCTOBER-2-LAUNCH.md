@@ -6,7 +6,7 @@ This file preserves the earlier proposed plan, not a deployment record.
 
 ## Outcome
 
-Present Distributoor as a private beta for developer products and developer
+Present Allagio as a private beta for developer products and developer
 content. Demonstrate one real builder repository, one consenting publisher,
 an approved placement, an attributed Stripe test checkout and its refund.
 Invite the first five interested people from the approximately 50 meetup
@@ -16,7 +16,7 @@ payment received by the publisher.
 
 Suggested positioning: **You built it. Give it a distribution channel.**
 Builders use their existing coding agent to prepare their product for referrals.
-Publishers earn from relevant recommendations they approve. Distributoor
+Publishers earn from relevant recommendations they approve. Allagio
 provides matching, permissions, attribution and commission records.
 
 ## Verified starting point
@@ -68,7 +68,7 @@ origin. npm accepts remote tarball package specifications, so the landing page
 can provide one copyable command without waiting for ownership of an npm scope:
 
 ```sh
-npx --yes --package=https://PILOT_ORIGIN/downloads/offer-rails-0.1.0.tgz offer-rails --api-url https://PILOT_ORIGIN
+npx --yes --package=https://PILOT_ORIGIN/downloads/allagio-0.1.0.tgz offer-rails --api-url https://PILOT_ORIGIN
 ```
 
 This is a proposed release command. Replace `PILOT_ORIGIN`, implement the
@@ -84,7 +84,7 @@ References: [npm exec](https://docs.npmjs.com/cli/v11/commands/npm-exec/),
 ## UI and UX brief
 
 Use the supplied Amp screenshots for the quiet workspace: warm ivory, dark
-ink text, narrow sidebar, subtle borders and room to read. Give Distributoor
+ink text, narrow sidebar, subtle borders and room to read. Give Allagio
 its own small coral accent and typography. Borrow Convex's clear agent setup
 entry point and PostHog's command-first setup and visible task progress.
 References: [Amp](https://ampcode.com/home), [Convex](https://www.convex.dev/),
@@ -129,7 +129,7 @@ commission clearance and receipt need the real refund window and payment.
 
 Call it a working private beta only after public login, a supported client,
 real article publication and Stripe-delivered checkout/refund pass. Rehearse
-from a clean browser and a project without existing Distributoor configuration.
+from a clean browser and a project without existing Allagio configuration.
 Keep a dated verification record with the deployed commit and test-mode evidence,
 without credentials or buyer personal data.
 

@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+
+	"affilio-api/internal/config"
 )
 
 const (
@@ -82,8 +84,9 @@ func ClaimsMode(mode string) string {
 }
 
 // discoveryDescription names the test proof page and the llms.txt walkthrough.
-func discoveryDescription() string {
-	return "In testing. A cold agent reads " + DocsPath + ", then POST /orp. Message schema: https://offer-rails.onrender.com/orp/schemas/envelope.schema.json. Protocol: https://offer-rails.onrender.com/orp/spec. Public proof page template: " + ProofPageTemplate + ". POST /orp/deals/<deal>/activate moves an accepted deal to active. Execute claims an active deal. Offer Rails does not hold money. L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path. Many-party, leave, seat."
+func discoveryDescription(origin string) string {
+	text := "In testing. A cold agent reads " + DocsPath + ", then POST /orp. Message schema: {{PUBLIC_BASE_URL}}/orp/schemas/envelope.schema.json. Protocol: {{PUBLIC_BASE_URL}}/orp/spec. Public proof page template: " + ProofPageTemplate + ". POST /orp/deals/<deal>/activate moves an accepted deal to active. Execute claims an active deal. Allagio does not hold money. L0, L1, L2, and L3 are unclaimed. DCP v0.1 remains the live affiliate path. Many-party, leave, seat."
+	return config.ExpandPublicBase(text, origin)
 }
 
 // DiscoveryDocument is GET /.well-known/orp.json. conformance is omitted:
@@ -93,7 +96,7 @@ func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
 		"orp":         []any{Version04, Version},
 		"host":        HostParty(dns),
 		"name":        TestingName,
-		"description": discoveryDescription(),
+		"description": discoveryDescription(origin),
 		"docs":        strings.TrimRight(origin, "/") + DocsPath,
 		"endpoint":    origin + "/orp",
 		"suggest":     origin + "/orp/suggest",

@@ -299,7 +299,7 @@ WHERE id=$1`, id); err != nil {
 		}
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, req)
-		if rec.Code != http.StatusNotFound || rec.Header().Get("Location") != "" || !strings.Contains(rec.Body.String(), "This link is not on Offer Rails.") || !strings.Contains(rec.Header().Get("Content-Type"), "text/html") {
+		if rec.Code != http.StatusNotFound || rec.Header().Get("Location") != "" || !strings.Contains(rec.Body.String(), "This link is not on Allagio.") || !strings.Contains(rec.Header().Get("Content-Type"), "text/html") {
 			t.Fatalf("%s: %d location %q type %q body %s", label, rec.Code, rec.Header().Get("Location"), rec.Header().Get("Content-Type"), rec.Body.String())
 		}
 		if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("X-Robots-Tag") != "noindex, nofollow" {

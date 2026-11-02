@@ -188,7 +188,7 @@ test('L1-POLICIES', async () => {
     assert.equal(doc.status, 200);
     assert.deepEqual(doc.message.conformance.levels, ['L0']);
     assert.equal(doc.message.policies, undefined);
-    assert.match(doc.message.description, /Not the Offer Rails hosted API/);
+    assert.match(doc.message.description, /Not the Allagio hosted API/);
   });
   await withHost({}, async (full) => {
     assert.deepEqual(full.levels(), ['L0', 'L1', 'L2', 'L3']);

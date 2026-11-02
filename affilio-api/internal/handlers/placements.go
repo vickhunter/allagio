@@ -781,7 +781,7 @@ func fetchArticleText(ctx context.Context, raw string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "OfferRails/article-text")
+	req.Header.Set("User-Agent", "Allagio/article-text")
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err

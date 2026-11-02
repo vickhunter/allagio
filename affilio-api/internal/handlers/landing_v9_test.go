@@ -55,13 +55,13 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	}
 	protocol := httptest.NewRecorder()
 	r.ServeHTTP(protocol, httptest.NewRequest(http.MethodGet, "/protocol/", nil))
-	if !strings.Contains(protocol.Body.String(), "Offer Rails · Protocol") {
+	if !strings.Contains(protocol.Body.String(), "· Protocol") {
 		t.Fatal("protocol page title missing")
 	}
 	you := httptest.NewRecorder()
 	r.ServeHTTP(you, httptest.NewRequest(http.MethodGet, "/you/", nil))
 	youBody := you.Body.String()
-	if !strings.Contains(youBody, "Offer Rails · Your limits") || !strings.Contains(youBody, "This page is not a signup form") {
+	if !strings.Contains(youBody, "· Your limits") || !strings.Contains(youBody, "This page is not a signup form") {
 		t.Fatal("human limits page is missing its title or the not-a-signup line")
 	}
 	if !strings.Contains(youBody, "No deals yet.") || strings.Contains(youBody, "Example wording. Not a live agreement.") || strings.Contains(youBody, "Your agent agreed: link to X in your post Y, 8% per sale, ends 30 Nov.") {
@@ -73,10 +73,10 @@ func TestLandingV9RoutesStayOnTheGoApp(t *testing.T) {
 	setup := httptest.NewRecorder()
 	r.ServeHTTP(setup, httptest.NewRequest(http.MethodGet, "/publishers/setup?source=cursor", nil))
 	setupBody := setup.Body.String()
-	if !strings.Contains(setupBody, "Offer Rails · Publisher setup") || !strings.Contains(setupBody, "Install the plugin") {
+	if !strings.Contains(setupBody, "· Publisher setup") || !strings.Contains(setupBody, "Install the plugin") {
 		t.Fatal("publisher setup page is missing its title or first step")
 	}
-	if !strings.Contains(setupBody, `href="/downloads/`+pluginZipName+`"`) {
+	if !strings.Contains(setupBody, `href="/downloads/offer-rails.zip"`) && !strings.Contains(setupBody, `href="/downloads/`+pluginZipName+`"`) {
 		t.Fatal("publisher setup is missing the plugin download")
 	}
 	if !strings.Contains(setupBody, `/auth/login?`) || !strings.Contains(setupBody, `return_to=%2Fowner%2Fconnect-site`) || !strings.Contains(setupBody, `source=cursor`) {

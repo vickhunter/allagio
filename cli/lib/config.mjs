@@ -24,7 +24,7 @@ export function saveConfig(io, config) {
 
 export function authHeaders(config) {
   if (!config.access_token || !config.key_header) {
-    throw new Error('Run offer-rails login first.');
+    throw new Error('Run allagio login first.');
   }
   return { [config.key_header]: config.access_token };
 }

@@ -1,4 +1,4 @@
-// distributoor is the maker CLI for the Distributoor network: register a
+// distributoor is the legacy maker CLI name for Allagio: register a
 // product, get it distribution-ready, publish an offer, track earnings.
 // The same verbs are available to agents through cmd/distributoor-mcp.
 //
@@ -96,7 +96,7 @@ func clientFor(cfg *cliConfig) *dcp.Client {
 
 func cmdInit(args []string) error {
 	fs := flag.NewFlagSet("init", flag.ExitOnError)
-	apiURL := fs.String("api-url", "http://localhost:8080", "Distributoor API base URL")
+	apiURL := fs.String("api-url", "http://localhost:8080", "Allagio API base URL")
 	email := fs.String("email", "", "maker email (required unless already initialized)")
 	name := fs.String("name", "", "maker display name")
 	product := fs.String("product", "", "product name (required)")
@@ -290,7 +290,7 @@ func cmdSnippet() error {
 			}
 		}
 	}
-	fmt.Printf(`<!-- Distributoor attribution for %v: persist the click id, pass it into checkout -->
+	fmt.Printf(`<!-- Allagio attribution for %v: persist the click id, pass it into checkout -->
 <script>
 (function () {
   var ref = new URLSearchParams(location.search).get(%q);

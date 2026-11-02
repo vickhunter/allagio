@@ -27,7 +27,7 @@ func TestLandingUnknownPathIs404(t *testing.T) {
 		t.Fatalf("status %d", rec.Code)
 	}
 	body := rec.Body.String()
-	for _, needle := range []string{"That page is not on Offer Rails.", `aria-label="Main"`, `href="/agents"`, ">Home<"} {
+	for _, needle := range []string{"That page is not on ", `aria-label="Main"`, `href="/agents"`, ">Home<"} {
 		if !strings.Contains(body, needle) {
 			t.Fatalf("missing %s", needle)
 		}
@@ -38,7 +38,7 @@ func TestLandingUnknownPathIs404(t *testing.T) {
 
 	api := httptest.NewRecorder()
 	r.ServeHTTP(api, httptest.NewRequest(http.MethodGet, "/v1/directory/makers", nil))
-	if api.Code != http.StatusServiceUnavailable || strings.Contains(api.Body.String(), "That page is not on Offer Rails.") || strings.Contains(api.Body.String(), `"items"`) || !strings.Contains(api.Body.String(), `"error":"directory unavailable"`) {
+	if api.Code != http.StatusServiceUnavailable || strings.Contains(api.Body.String(), "That page is not on Allagio.") || strings.Contains(api.Body.String(), `"items"`) || !strings.Contains(api.Body.String(), `"error":"directory unavailable"`) {
 		t.Fatalf("api miss %d %s", api.Code, api.Body.String())
 	}
 }
@@ -121,7 +121,7 @@ func TestLandingStaticShellsRenderTemplates(t *testing.T) {
 		if strings.Contains(body, "{{") || strings.Contains(body, "InstallerReady") {
 			t.Fatalf("%s still serves template source, status %d", path, rec.Code)
 		}
-		if !strings.Contains(body, `name="or-plugin" content="0"`) || !strings.Contains(body, "That page is not on Offer Rails.") {
+		if !strings.Contains(body, `name="or-plugin" content="0"`) || !strings.Contains(body, "That page is not on ") {
 			t.Fatalf("%s missing rendered not-found page, status %d", path, rec.Code)
 		}
 		if path == "/landing-v9" || path == "/landing-v9/" || path == "/landing-v9/index.html" {

@@ -27,7 +27,7 @@ func ServeDCPDiscovery(publicBase string) gin.HandlerFunc {
 		c.JSON(200, gin.H{
 			"dcp_version": "0.1",
 			"name":        dcp.ServerName,
-			"description": "Offer Rails. Makers publish offers, publishers earn commissions, agents do the operational work.",
+			"description": "Allagio. Makers publish offers, publishers earn commissions, agents do the operational work.",
 			"http_base":   "/v1",
 			"mcp": gin.H{
 				"transport": mcpTransport,

@@ -36,7 +36,7 @@ ledger entry: commission, pending, clears_at = occurred_at + refund_window_days
    not `https`, a bare code returns `302` to the site home. `?placement=`
    returns `302` to the referring post, or the site home when that post is
    missing. Link-preview clients and `HEAD` get the same redirect and record
-   no click. A deleted or unknown tracking code returns `302` to the Offer Rails
+   no click. A deleted or unknown tracking code returns `302` to the Allagio
    home page. A rate limit is that untracked `302`, never a 429. Readers never
    see a 4xx or a 5xx. Every go-link response sends `Cache-Control: no-store`
    and `X-Robots-Tag: noindex, nofollow`.

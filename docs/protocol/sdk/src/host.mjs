@@ -205,7 +205,7 @@ export class ReferenceHost {
       orp: ['0.4', '0.3'],
       host: this.hostId,
       name: 'ORP Reference Host',
-      description: 'Reference host for the ORP 0.3 and 0.4 conformance suite. Not the Offer Rails hosted API.',
+      description: 'Reference host for the ORP 0.3 and 0.4 conformance suite. Not the Allagio hosted API.',
       endpoint: `${this.origin}/orp`,
       suggest: `${this.origin}/orp/suggest`,
       join: `${this.origin}/orp/join`,

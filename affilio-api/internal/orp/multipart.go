@@ -367,7 +367,7 @@ func ValidateParties(parties []any, hostID string) (Problem, bool) {
 			holder, _ := obj["holder"].(string)
 			key := HolderKey(holder)
 			if obj == nil || key == "" || reservedHolders[key] || (hostKey != "" && key == hostKey) {
-				return Invalid("Offer Rails does not hold money. A deposit term names an outside holder.", field+"/terms/deposit/holder"), true
+				return Invalid("Allagio does not hold money. A deposit term names an outside holder.", field+"/terms/deposit/holder"), true
 			}
 		}
 		_, percent := terms["percent"]

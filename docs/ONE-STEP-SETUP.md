@@ -2,7 +2,7 @@
 
 The design follows the [PostHog wizard](https://github.com/PostHog/wizard): one
 entry point detects the project and carries integration knowledge in skills.
-Distributoor uses the builder's existing agent. The installer bootstraps the
+Allagio uses the builder's existing agent. The installer bootstraps the
 connection; its skill directs checkout edits, tests, assessment and reporting.
 
 ## Builders

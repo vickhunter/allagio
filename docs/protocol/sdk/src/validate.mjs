@@ -6,6 +6,8 @@ import addFormats from 'ajv-formats';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const schemaRoots = [join(here, '..', '..', 'schema', '0.3'), join(here, '..', '..', 'schema', '0.4')];
+// Frozen ORP schema $id host. Ajv looks schemas up by this prefix.
+// It is not the public site origin. PUBLIC_BASE_URL does not rewrite $id values.
 const BASE = 'https://offer-rails.onrender.com/orp/schemas/';
 
 function walk(dir) {

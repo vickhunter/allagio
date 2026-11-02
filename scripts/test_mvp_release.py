@@ -638,8 +638,8 @@ class ReleaseTests(unittest.TestCase):
         values = configuration()
         del values["RAILWAY_DOCKERFILE_PATH"]
         values.update({
-            "PUBLIC_BASE_URL": "https://affilio-mvp.onrender.com",
-            "ALLOWED_ORIGINS": "https://affilio-mvp.onrender.com",
+            "PUBLIC_BASE_URL": "https://allagio.example",
+            "ALLOWED_ORIGINS": "https://allagio.example",
             "PORT": "10000",
             "API_KEY_SECRET": "c" * 32,
             "GIN_MODE": "release",
@@ -678,7 +678,7 @@ class ReleaseTests(unittest.TestCase):
             release.validate_config(values | {"API_KEY_SECRET": "short"}, origin=values["PUBLIC_BASE_URL"])
 
     def test_verify_accepts_any_https_base_url(self):
-        origin = "https://affilio-mvp.onrender.com"
+        origin = "https://allagio.example"
         responses = public_responses()
         responses["/.well-known/oauth-protected-resource/mcp"] = response(body=json.dumps({"resource": origin + "/mcp", "authorization_servers": [origin], "scopes_supported": ["maker", "publisher"]}).encode())
         responses["/.well-known/oauth-authorization-server"] = response(body=json.dumps({"issuer": origin, "authorization_endpoint": origin + "/oauth/authorize", "token_endpoint": origin + "/oauth/token", "registration_endpoint": origin + "/oauth/register", "code_challenge_methods_supported": ["S256"]}).encode())
@@ -708,8 +708,32 @@ class ReleaseTests(unittest.TestCase):
                 with self.subTest(path=path), patch.object(release, "fetch", side_effect=lambda path, *args: responses[path]), self.assertRaises(release.ReleaseError):
                     release.verify()
 
-    def test_installer_package_is_offer_rails_with_old_command_aliases(self):
-        self.assertEqual(release.INSTALLER, "offer-rails-0.1.0.tgz")
+    def test_image_build_and_release_script_agree_on_the_installer(self):
+        script = (release.ROOT / "image/build-image.sh").read_text()
+
+        def assignment(name):
+            found = re.search(r"(?m)^%s=(['\"]?)([^'\"\s]+)\1\s*$" % re.escape(name), script)
+            self.assertIsNotNone(found, name)
+            return found.group(2)
+
+        self.assertEqual(assignment("installer_tarball"), release.INSTALLER)
+        self.assertEqual(assignment("package_name"), release.INSTALLER_PACKAGE)
+        dockerfile = (release.ROOT / "Dockerfile.mvp").read_text()
+
+        def docker_default(name):
+            found = re.search(r"(?m)^ARG %s=(\S+)\s*$" % re.escape(name), dockerfile)
+            self.assertIsNotNone(found, name)
+            return found.group(1)
+
+        self.assertEqual(docker_default("INSTALLER_TGZ"), release.INSTALLER)
+        self.assertEqual(docker_default("PACKAGE_NAME"), release.INSTALLER_PACKAGE)
+
+    def test_installer_package_is_allagio_with_old_command_aliases(self):
+        self.assertEqual(release.INSTALLER, "allagio-0.1.0.tgz")
+        root = Path(release.__file__).resolve().parent.parent
+        for rel in ("scripts/mvp_release.py", ".github/workflows/mvp-release.yml"):
+            text = (root / rel).read_text()
+            self.assertNotIn("offer-rails-0.1.0.tgz", text, rel)
         self.assertIn("protocol.html", release.ASSETS)
         self.assertIn("protocol.html", release.TEMPLATE_ASSETS)
 
@@ -729,12 +753,16 @@ class ReleaseTests(unittest.TestCase):
             return output.getvalue()
 
         bins = {
+            "allagio": "bin/setup.mjs",
             "offer-rails": "bin/setup.mjs",
             "affilio": "bin/setup.mjs",
             "distributoor": "bin/setup.mjs",
             "distributoor-setup": "bin/setup.mjs",
         }
-        release.validate_installer(archive({"name": "offer-rails", "version": "0.1.0", "bin": bins}))
+        release.validate_installer(archive({"name": "allagio", "version": "0.1.0", "bin": bins}))
+        old_name = archive({"name": "offer-rails", "version": "0.1.0", "bin": bins})
+        with self.assertRaisesRegex(release.ReleaseError, "Installer package metadata"):
+            release.validate_installer(old_name)
         stale = archive({"name": "@distributoor/setup", "version": "0.1.0", "bin": {"distributoor-setup": "bin/setup.mjs"}})
         with self.assertRaisesRegex(release.ReleaseError, "Installer package metadata"):
             release.validate_installer(stale)

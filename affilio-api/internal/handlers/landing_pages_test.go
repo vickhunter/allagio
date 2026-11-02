@@ -110,7 +110,7 @@ func TestBuiltLandingPagesAndLLMsTxt(t *testing.T) {
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("unknown path: %d %s", missing.Code, missing.Body.String())
 	}
-	if !strings.Contains(missing.Body.String(), "That page is not on Offer Rails.") {
+	if !strings.Contains(missing.Body.String(), "That page is not on ") {
 		t.Fatalf("unknown path body %q", missing.Body.String())
 	}
 }

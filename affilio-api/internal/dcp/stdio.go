@@ -10,12 +10,12 @@ import (
 // the entrypoint. cmd/distributoor-mcp calls this same function so an existing
 // config that starts the old binary keeps working.
 func RunStdio() {
-	apiURL := Getenv(EnvAPIURL, LegacyEnvAPIURL)
+	apiURL := Getenv(EnvAPIURL, LegacyEnvAPIURL, OlderEnvAPIURL)
 	if apiURL == "" {
 		apiURL = "http://localhost:8080"
 	}
-	client := NewClient(apiURL, Getenv(EnvAPIKey, LegacyEnvAPIKey))
-	client.SiteKey = Getenv(EnvSiteKey, LegacyEnvSiteKey)
+	client := NewClient(apiURL, Getenv(EnvAPIKey, LegacyEnvAPIKey, OlderEnvAPIKey))
+	client.SiteKey = Getenv(EnvSiteKey, LegacyEnvSiteKey, OlderEnvSiteKey)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)

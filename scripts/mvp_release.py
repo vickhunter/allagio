@@ -20,7 +20,8 @@ PROJECT = "cf3a1d9d-d8f8-44bf-94e1-fcb590055ae0"
 ENVIRONMENT = "2534a1db-d231-45ae-868e-680c48b11dfb"
 SERVICE = "c3a5be47-e442-4ff4-8dda-ee808944c233"
 ORIGIN = "https://distributoor-production.up.railway.app"
-INSTALLER = "offer-rails-0.1.0.tgz"
+INSTALLER = "allagio-0.1.0.tgz"
+INSTALLER_PACKAGE = "allagio"
 CHECKS = {"onboarding", "affilio-api-tests", "mvp-release-package"}
 ASSETS = (
     "home.html", "workspace.html", "protocol.html", "workspace.css", "workspace.js",
@@ -58,7 +59,7 @@ PLUGIN_VERSION = "0.1.33"
 TEST_ONLY_PLUGIN_SEAMS = ("affilio_go_utc_date", "affilio_rewrite_requires_wp_rewrite")
 PACKAGED_OUT = {"e2e", "tests", "test-results", "playwright-report"}
 PACKAGED_FILES = {"phpunit.xml", "phpunit.xml.dist", ".phpunit.result.cache"}
-HOSTED_BUILD_NAMES = {"home.html", "makers.html", "publishers.html", "publishers-setup.html", "protocol.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}
+HOSTED_BUILD_NAMES = {"home.html", "makers.html", "publishers.html", "publishers-setup.html", "protocol.html", "you.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md"}
 HOSTED_BUILD_PREFIXES = ("workspace", "landing", "package")
 ASSET_CONCAT = re.compile(r"""AFFILIO_PLUGIN_(?:URL|DIR)\s*\.\s*(['"])([^'"]+)\1""")
 DYNAMIC_BUILD = re.compile(r"""admin/build/['"]\s*\.\s*\$""")
@@ -764,8 +765,9 @@ def validate_installer(data):
         package = json.load(archive.extractfile("package/package.json"))
         bins = package.get("bin") or {}
         require(
-            package.get("name") == "offer-rails"
+            package.get("name") == INSTALLER_PACKAGE
             and package.get("version") == "0.1.0"
+            and bins.get("allagio") == "bin/setup.mjs"
             and bins.get("offer-rails") == "bin/setup.mjs"
             and bins.get("affilio") == "bin/setup.mjs"
             and bins.get("distributoor") == "bin/setup.mjs"

@@ -1,4 +1,4 @@
-# Decision models for Distributoor
+# Decision models for Allagio
 
 Research decision, 2026-09-30. Jev and CLM have not been installed, called, benchmarked or integrated into this POC. This note defines an optional experiment; it does not change runtime behavior or the commercial pilot gate.
 

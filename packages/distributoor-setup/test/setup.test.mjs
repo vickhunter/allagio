@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { validateAPI, detectProject, checkServer, mergeMCP, installSkills, skillNames } from '../lib/setup.mjs';
+import { offerRailsSkillBodies } from '../lib/offer-rails-skills.mjs';
 import { previousSkillBodies } from '../lib/previous-skills.mjs';
 
 const execute = promisify(execFile);
@@ -93,9 +94,9 @@ test('re-running setup upgrades the previous canonical skill text', async t => {
   const paths = await installSkills(root, 'skill', context);
   const marker = '\n\n<!-- distributoor-setup-context -->\n';
   const titles = {
-    'distributoor-onboard': ['# Distributoor setup', '# Offer Rails setup'],
-    'distributoor-instrument': ['# Distributoor attribution instrumentation', '# Offer Rails attribution instrumentation'],
-    'distributoor-launch': ['# Distributoor offer launch', '# Offer Rails offer launch'],
+    'distributoor-onboard': ['# Distributoor setup', '# Allagio setup'],
+    'distributoor-instrument': ['# Distributoor attribution instrumentation', '# Allagio attribution instrumentation'],
+    'distributoor-launch': ['# Distributoor offer launch', '# Allagio offer launch'],
   };
   const oldContext = '## This installation\n\nHosted API: https://old.example\n\nDetected dependencies (hints to verify): {"frameworks":["go"],"providers":[]}\n\nRequested product URL: "https://old.example"\n';
   const legacy = paths.filter(path => previousSkillBodies[path.split('/').at(-2)]);
@@ -128,6 +129,59 @@ test('re-running setup upgrades the previous canonical skill text', async t => {
   assert.match(await readFile(paths[0], 'utf8'), /Edited by the owner/);
 });
 
+test('re-running setup upgrades the Offer Rails skill text from main', async t => {
+  const root = await fixture(t);
+  const context = { api: 'https://pilot.example', project: { frameworks: ['next'], providers: ['stripe'] } };
+  const paths = await installSkills(root, 'skill', context);
+  const marker = '\n\n<!-- distributoor-setup-context -->\n';
+  const titles = {
+    'distributoor-onboard': ['# Offer Rails setup', '# Allagio setup'],
+    'distributoor-instrument': ['# Offer Rails attribution instrumentation', '# Allagio attribution instrumentation'],
+    'distributoor-launch': ['# Offer Rails offer launch', '# Allagio offer launch'],
+  };
+  const oldContext = '## This installation\n\nHosted API: https://old.example\n\nDetected dependencies (hints to verify): {"frameworks":["go"],"providers":[]}\n\nRequested product URL: "https://old.example"\n';
+  assert.equal(paths.length, 4);
+  assert.equal(Object.keys(offerRailsSkillBodies).length, 4);
+  for (const path of paths) {
+    const name = path.split('/').at(-2);
+    const previous = offerRailsSkillBodies[name];
+    assert.equal(typeof previous, 'string');
+    if (titles[name]) assert.ok(previous.includes(titles[name][0]));
+    await writeFile(path, `${previous}${marker}${oldContext}`);
+  }
+  await installSkills(root, 'skill', { ...context, website: 'https://product.example' });
+  for (const path of paths) {
+    const name = path.split('/').at(-2);
+    const upgraded = await readFile(path, 'utf8');
+    if (titles[name]) {
+      assert.ok(upgraded.includes(titles[name][1]));
+      assert.equal(upgraded.includes(titles[name][0]), false);
+    }
+    if (name === 'distributoor-revenue') {
+      assert.match(upgraded, /MCP connection \(`allagio`\)/);
+      assert.equal(upgraded.includes('Offer Rails MCP connection'), false);
+    }
+    assert.match(upgraded, /Hosted API: https:\/\/pilot\.example/);
+    assert.match(upgraded, /https:\/\/product\.example/);
+  }
+});
+
+test('a compatible distributoor connection is moved to allagio', async t => {
+  const root = await fixture(t);
+  await mkdir(resolve(root, '.cursor'));
+  const file = resolve(root, '.cursor/mcp.json');
+  await writeFile(file, `${JSON.stringify({ mcpServers: { distributoor: { url: 'https://pilot.example/mcp' }, other: { command: 'tool' } } }, null, 2)}\n`);
+  await mergeMCP(root, 'cursor', 'https://pilot.example/mcp');
+  const saved = JSON.parse(await readFile(file, 'utf8'));
+  assert.equal(saved.mcpServers.distributoor, undefined);
+  assert.deepEqual(saved.mcpServers.allagio, { url: 'https://pilot.example/mcp' });
+  assert.deepEqual(saved.mcpServers.other, { command: 'tool' });
+  const kept = `${JSON.stringify({ mcpServers: { distributoor: { url: 'https://other.example/mcp', command: 'old' } } })}\n`;
+  await writeFile(file, kept);
+  await assert.rejects(mergeMCP(root, 'cursor', 'https://pilot.example/mcp'), /preserved/);
+  assert.equal(await readFile(file, 'utf8'), kept);
+});
+
 test('connection preflight rejects unavailable or mismatched OAuth without redirecting', async () => {
   await assert.rejects(checkServer('https://pilot.example', async () => ({ ok: false })), /not available/);
   await assert.rejects(checkServer('https://pilot.example', async () => ({ ok: true, json: async () => ({}) })), /expected maker/);
@@ -146,15 +200,15 @@ test('offline CLI prepares a real project without invoking or claiming a connect
   const { stdout } = await execute(process.execPath, [cli, '--project', root, '--client', 'cursor', '--api-url', 'http://127.0.0.1:8086', '--offline']);
   assert.match(stdout, /connection has not been verified/);
   assert.match(stdout, /integration and paid conversion verification are still pending/);
-  assert.equal(JSON.parse(await readFile(resolve(root, '.cursor/mcp.json'), 'utf8')).mcpServers.distributoor.url, 'http://127.0.0.1:8086/mcp');
+  assert.equal(JSON.parse(await readFile(resolve(root, '.cursor/mcp.json'), 'utf8')).mcpServers.allagio.url, 'http://127.0.0.1:8086/mcp');
   assert.deepEqual((await readdir(resolve(root, '.agents/skills'))).sort(), [...skillNames].sort());
 });
 
-test('package command is offer-rails and keeps the old names', async () => {
+test('package command is allagio and keeps the old names', async () => {
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(pkg.name, 'offer-rails');
+  assert.equal(pkg.name, 'allagio');
   assert.equal(pkg.version, '0.1.0');
-  for (const name of ['offer-rails', 'affilio', 'distributoor', 'distributoor-setup']) {
+  for (const name of ['allagio', 'offer-rails', 'affilio', 'distributoor', 'distributoor-setup']) {
     assert.equal(pkg.bin[name], 'bin/setup.mjs');
   }
 });

@@ -10,12 +10,14 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"affilio-api/internal/config"
 	"affilio-api/internal/database"
 	"github.com/gin-gonic/gin"
 )
@@ -91,6 +93,8 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	review.POST("/offers/:id/approve", (&OfferReviewHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}).Approve)
 	review.POST("/offers/:id/reject", (&OfferReviewHandler{DB: h.DB, ClaimsCheck: h.ClaimsCheck}).Reject)
 	review.POST("/payouts/batch", payouts.RunBatch)
+	public.GET("/sitemap.xml", h.Sitemap)
+	public.HEAD("/sitemap.xml", h.Sitemap)
 	if h.AssetsPath != "" {
 		public.GET("/", h.Home)
 		public.GET("/makers", h.Makers)
@@ -138,9 +142,12 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 			public.GET("/assets/"+file, func(c *gin.Context) { c.File(filepath.Join(h.AssetsPath, file)) })
 		}
 		public.GET("/downloads/"+installerArchive, h.serveInstaller)
+		public.GET("/downloads/"+legacyOfferRailsArchive, h.serveInstaller)
 		public.GET("/downloads/"+legacyInstallerArchive, h.serveInstaller)
 		public.GET("/downloads/"+pluginZipName, h.DownloadWordPress)
 		public.HEAD("/downloads/"+pluginZipName, h.DownloadWordPress)
+		public.GET("/downloads/"+legacyPluginZipName, h.DownloadWordPress)
+		public.HEAD("/downloads/"+legacyPluginZipName, h.DownloadWordPress)
 		public.GET("/downloads/"+pluginZipOnDisk, h.DownloadWordPress)
 		public.HEAD("/downloads/"+pluginZipOnDisk, h.DownloadWordPress)
 	}
@@ -163,16 +170,20 @@ func (h *HostedHandler) requireOperator(c *gin.Context) {
 }
 
 const (
-	installerArchive       = "offer-rails-0.1.0.tgz"
-	legacyInstallerArchive = "distributoor-setup-0.1.0.tgz"
+	installerArchive        = "allagio-0.1.0.tgz"
+	legacyOfferRailsArchive = "offer-rails-0.1.0.tgz"
+	legacyInstallerArchive  = "distributoor-setup-0.1.0.tgz"
 	// pluginZipOnDisk is the file the release image writes. The browser
-	// download name is pluginZipName. The old URL stays so an existing link
+	// download name is pluginZipName. The old URLs stay so an existing link
 	// still downloads the same archive.
-	pluginZipOnDisk = "affilio.zip"
-	pluginZipName   = "offer-rails.zip"
+	pluginZipOnDisk     = "affilio.zip"
+	pluginZipName       = "allagio.zip"
+	legacyPluginZipName = "offer-rails.zip"
 )
 
 func (h *HostedHandler) installCommand() string {
+	// The package is the tarball on this host, not a name in the npm registry.
+	// The bin inside that archive is offer-rails.
 	return "npx --yes --package=" + h.BaseURL + "/downloads/" + installerArchive + " offer-rails --api-url " + h.BaseURL
 }
 
@@ -180,15 +191,42 @@ func (h *HostedHandler) installerPath() (string, bool) {
 	if h.DownloadsPath == "" {
 		return "", false
 	}
-	primary := filepath.Join(h.DownloadsPath, installerArchive)
-	if _, err := os.Stat(primary); err == nil {
-		return primary, true
-	}
-	legacy := filepath.Join(h.DownloadsPath, legacyInstallerArchive)
-	if _, err := os.Stat(legacy); err == nil {
-		return legacy, true
+	for _, name := range []string{installerArchive, legacyOfferRailsArchive, legacyInstallerArchive} {
+		file := filepath.Join(h.DownloadsPath, name)
+		if _, err := os.Stat(file); err == nil {
+			return file, true
+		}
 	}
 	return "", false
+}
+
+// sitemapPaths are the public pages a crawler may list. Draft legal pages
+// and the demo stay off the map.
+var sitemapPaths = []string{
+	"/",
+	"/makers/",
+	"/publishers/",
+	"/protocol/",
+	"/you/",
+	"/agents/",
+	"/llms.txt",
+	"/llms-full.txt",
+	"/skill.md",
+}
+
+func (h *HostedHandler) Sitemap(c *gin.Context) {
+	base := config.DocumentOrigin(h.BaseURL)
+	var b strings.Builder
+	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+	b.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n")
+	for _, path := range sitemapPaths {
+		loc := base + path
+		b.WriteString("  <url><loc>")
+		b.WriteString(template.HTMLEscapeString(loc))
+		b.WriteString("</loc></url>\n")
+	}
+	b.WriteString("</urlset>\n")
+	writeMethodBody(c, http.StatusOK, "application/xml; charset=utf-8", []byte(b.String()))
 }
 
 func (h *HostedHandler) serveInstaller(c *gin.Context) {
@@ -245,17 +283,17 @@ func (h *HostedHandler) serveMarkdownTwin(c *gin.Context, name string) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-	writeMethodBody(c, http.StatusOK, "text/markdown; charset=utf-8", body)
+	writeMethodBody(c, http.StatusOK, "text/markdown; charset=utf-8", []byte(config.ExpandPublicBase(string(body), h.BaseURL)))
 }
 
 // landingNotFoundFallback is the page served for an unknown address, and when
 // a landing-v9 shell cannot be rendered.
-var landingNotFoundFallback = []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · Page not found</title></head><body><header><a href="/">Offer Rails</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a><a href="/agents">Agents</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main><h1>That page is not on Offer Rails.</h1><p>The address does not match a page on this site.</p><p><a href="/">Home</a></p><p><a href="/agents">Agents</a></p></main></body></html>`)
+var landingNotFoundFallback = []byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Allagio · Page not found</title></head><body><header><a href="/">Allagio</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a><a href="/agents">Agents</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main><h1>That page is not on Allagio.</h1><p>The address does not match a page on this site.</p><p><a href="/">Home</a></p><p><a href="/agents">Agents</a></p></main></body></html>`)
 
 // youLimitsPlain is the limits page used when you.html is missing or is not
 // a valid template. data-limits-fallback marks this copy so a test can tell
 // it from the built page. The mode sentences must match you.html.
-var youLimitsTemplate = `<!DOCTYPE html><html lang="en" data-limits-fallback="1"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · Your limits</title></head><body><header><a href="/">Offer Rails</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a><a href="/agents">Agents</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main id="main"><h1>Your limits, your approvals, a receipt in plain words.</h1><p>This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.</p><p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in to set your limits</a></p><section id="limits"><h2>Limits</h2><p>Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.</p><h3>Ask me every time</h3><p>Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.</p><h3>Approve within my rules</h3><p>Once you set it. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the checks</h3><p>Only you can turn this on. While claims are not checked, this also waits for a person.</p></section><section id="approvals"><h2>Approvals</h2><p>«publishStepParagraph» Your agent can prepare the placement and show you the terms.</p></section><section id="receipts"><h2>Receipts</h2><p>No deals yet.</p></section><p><a href="/#join" style="display:inline-flex;min-height:44px;align-items:center">Give your agent the join line</a></p></main></body></html>`
+var youLimitsTemplate = `<!DOCTYPE html><html lang="en" data-limits-fallback="1"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Allagio · Your limits</title></head><body><header><a href="/">Allagio</a><nav aria-label="Main"><a href="/makers/">Makers</a><a href="/publishers/">Publishers</a><a href="/protocol/">Protocol</a><a href="/agents">Agents</a></nav><a href="/auth/login?return_to=%2Fowner">Sign in</a></header><main id="main"><h1>Your limits, your approvals, a receipt in plain words.</h1><p>This page is not a signup form. It is the limits, the approvals, and a plain-word receipt of what your agent agreed to.</p><p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in to set your limits</a></p><section id="limits"><h2>Limits</h2><p>Your limits come first. A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on.</p><h3>Ask me every time</h3><p>Under Ask me every time the decide step waits for you. A site key can set the publish step to auto.</p><h3>Approve within my rules</h3><p>Once you set it. While claims are not checked, this still waits for a person.</p><h3>Approve anything that passes the checks</h3><p>Only you can turn this on. While claims are not checked, this also waits for a person.</p></section><section id="approvals"><h2>Approvals</h2><p>«publishStepParagraph» Your agent can prepare the placement and show you the terms.</p></section><section id="receipts"><h2>Receipts</h2><p>No deals yet.</p></section><p><a href="/#join" style="display:inline-flex;min-height:44px;align-items:center">Give your agent the join line</a></p></main></body></html>`
 
 var youLimitsPlain = []byte(strings.ReplaceAll(youLimitsTemplate, "«publishStepParagraph»", publishStepParagraph))
 
@@ -397,7 +435,7 @@ func (h *HostedHandler) writeLandingUnavailable(c *gin.Context, name string) {
 		return
 	}
 	page := template.HTMLEscapeString(landingPageName(name))
-	body := []byte(fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Offer Rails · %s</title></head><body><nav><a href="/">Home</a></nav><main><h1>%s</h1><p>This page is temporarily unavailable.</p></main></body></html>`, page, page))
+	body := []byte(fmt.Sprintf(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Allagio · %s</title></head><body><nav><a href="/">Home</a></nav><main><h1>%s</h1><p>This page is temporarily unavailable.</p></main></body></html>`, page, page))
 	c.Header("Retry-After", "60")
 	c.Data(http.StatusServiceUnavailable, "text/html; charset=utf-8", stampLandingLinks(body, landingSourceFrom(c)))
 }
@@ -490,16 +528,36 @@ func buildWordPressZip(raw []byte, baseURL string) ([]byte, int) {
 	return output.Bytes(), http.StatusOK
 }
 
+// pluginAPIBase is the API origin written into a downloaded plugin.
+// Loopback stays blank. Any other http(s) origin, including Render and
+// Railway, is written as <origin>/v1.
+func pluginAPIBase(baseURL string) string {
+	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	parsed, err := url.Parse(base)
+	if base == "" || err != nil || parsed.Hostname() == "" {
+		return ""
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return ""
+	}
+	switch strings.ToLower(parsed.Hostname()) {
+	case "localhost", "127.0.0.1", "::1":
+		return ""
+	}
+	return base + "/v1"
+}
+
 func rewriteDownloadedPlugin(name string, data []byte, baseURL string) []byte {
+	replacement := pluginAPIBase(baseURL)
 	if name == "affilio-wp/affilio.php" {
-		replacement := ""
-		base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
-		if base != "" && !strings.Contains(strings.ToLower(base), "railway.app") {
-			replacement = base + "/v1"
-		}
 		data = bytes.ReplaceAll(data, []byte("https://affilio-production.up.railway.app/v1"), []byte(replacement))
 	}
-	return bytes.ReplaceAll(data, []byte("railway.app"), nil)
+	// Drop a leftover railway.app host only when this download is not itself
+	// aimed at Railway. Stripping after the write would mangle that base.
+	if !strings.Contains(strings.ToLower(replacement), "railway.app") {
+		data = bytes.ReplaceAll(data, []byte("railway.app"), nil)
+	}
+	return data
 }
 
 func (h *HostedHandler) placementReceiptHTML(p *database.Placement) template.HTML {

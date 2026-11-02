@@ -1,9 +1,10 @@
 {
-  "name": "offer-rails",
+  "name": "allagio",
   "version": "0.1.0",
-  "description": "Connect your coding agent and let it set up Offer Rails in your product.",
+  "description": "Connect your coding agent and let it set up Allagio in your product.",
   "type": "module",
   "bin": {
+    "allagio": "bin/setup.mjs",
     "offer-rails": "bin/setup.mjs",
     "affilio": "bin/setup.mjs",
     "distributoor": "bin/setup.mjs",

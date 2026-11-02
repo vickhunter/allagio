@@ -59,7 +59,7 @@ export async function run(argv, io = defaultIO()) {
   if (command === 'undo') return undoCommand(io);
   if (command === 'kill') return killCommand(io);
   if (command === 'mcp') return mcpCommand(io);
-  io.stdout(`offer-rails commands: login, scan [path|url], list, status, digest, undo, kill, mcp\n`);
+  io.stdout(`allagio commands: login, scan [path|url], list, status, digest, undo, kill, mcp\n`);
   io.stdout(`Session-only commands print a dashboard sign-in link: ${SESSION_ONLY.map((item) => item.command).join(', ')}\n`);
   return { exitCode: command === 'help' || flags.help ? 0 : 1 };
 }

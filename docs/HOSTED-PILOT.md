@@ -1,4 +1,4 @@
-# Hosted Distributoor pilot
+# Hosted Allagio pilot
 
 The next pilot supports hosted MCP, signed-in owner review and a Stripe configuration check. It is implemented on `feat/agent-revenue-poc`; it has not been deployed. The existing Railway production service remains on `main`.
 
@@ -64,7 +64,7 @@ Configuration verification does **not** prove that the entered signing secret wo
 
 1. Preserve the `via` click UUID from the attributed redirect across the buyer journey.
 2. Set `client_reference_id` to that click UUID on its Stripe Checkout Session.
-3. Set session metadata `dtr_product_id` to its Distributoor product UUID.
+3. Set session metadata `dtr_product_id` to its Allagio product UUID.
 4. Use the configured Stripe account, one-time price and currency.
 5. Deliver Stripe's real paid-checkout and refund events to `/v1/webhooks/stripe/{product_id}`.
 

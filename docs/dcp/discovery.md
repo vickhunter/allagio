@@ -6,15 +6,15 @@ and qualify distribution networks the way MCP clients find servers.
 ```json
 {
   "dcp_version": "0.1",
-  "name": "offer-rails-mcp",
-  "description": "Offer Rails. Makers publish offers, publishers earn commissions, agents do the operational work.",
+  "name": "allagio-mcp",
+  "description": "Allagio. Makers publish offers, publishers earn commissions, agents do the operational work.",
   "http_base": "/v1",
   "mcp": {
     "transport": "streamable-http",
     "url": "/mcp",
     "stdio": {
-      "command": "offer-rails-mcp",
-      "env": ["OFFERRAILS_API_URL", "OFFERRAILS_API_KEY", "OFFERRAILS_SITE_KEY"]
+      "command": "allagio-mcp",
+      "env": ["ALLAGIO_API_URL", "ALLAGIO_API_KEY", "ALLAGIO_SITE_KEY"]
     }
   },
   "verbs": {
@@ -33,9 +33,11 @@ Fields:
 - `mcp` — how to reach the network's MCP server: the hosted `streamable-http`
   transport at `url` (relative to the endpoint's origin), with the `stdio`
   block describing the locally spawned server. The server name is
-  `offer-rails-mcp`. The npm package `offer-rails` is not published yet. It is
-  coming soon. Use the hosted MCP URL, or the installer archive on that same
-  host: `npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>`.
+  `allagio-mcp`. Older binaries `offer-rails-mcp` and `distributoor-mcp`
+  still start that same server. The npm package is coming soon. When the
+  hosted installer archive is on this origin, the installer command is
+  `npx --yes --package=<origin>/downloads/allagio-0.1.0.tgz offer-rails --api-url <origin>`.
+  That command runs the installer, not the stdio server.
 - `verbs` — the verb names actually served; agents SHOULD treat missing verbs
   as unsupported rather than failing the whole endpoint.
 - `payout_methods` — how publishers get paid (`manual`, `stripe_connect`,

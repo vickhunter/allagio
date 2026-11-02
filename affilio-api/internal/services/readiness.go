@@ -283,7 +283,7 @@ func (e *ReadinessEngine) fetchPage(ctx context.Context, rawURL string) fetchedP
 	if err != nil {
 		return fetchedPage{Err: "invalid url"}
 	}
-	req.Header.Set("User-Agent", "OfferRails-Readiness/1.0")
+	req.Header.Set("User-Agent", "Allagio-Readiness/1.0")
 	client := e.httpClient()
 	defer client.CloseIdleConnections()
 	resp, err := client.Do(req)
@@ -393,7 +393,7 @@ func (e *ReadinessEngine) checkCheckoutPresent(ctx context.Context, product Read
 	if strings.TrimSpace(product.CheckoutURL) == "" && !pageHasCheckoutAction(bodies) {
 		check.Status = "fail"
 		check.Evidence = "no checkout, buy, or sign-up link found on the landing or pricing page"
-		check.Remediation = "Add a buy, subscribe, checkout, or sign-up link on the landing or pricing page, or set a checkout URL. Offer Rails does not require a particular payment provider."
+		check.Remediation = "Add a buy, subscribe, checkout, or sign-up link on the landing or pricing page, or set a checkout URL. Allagio does not require a particular payment provider."
 		return check, nil
 	}
 	check.Status = "pass"
@@ -418,7 +418,7 @@ func (e *ReadinessEngine) checkCheckoutPresent(ctx context.Context, product Read
 		Status:      "warn",
 		Score:       60,
 		Evidence:    "no known payment provider",
-		Remediation: "No known payment provider was detected. Offer Rails does not hold money and does not require Stripe, Lemon Squeezy, or Polar.",
+		Remediation: "No known payment provider was detected. Allagio does not hold money and does not require Stripe, Lemon Squeezy, or Polar.",
 	}
 }
 
