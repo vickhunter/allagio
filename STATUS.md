@@ -1,6 +1,6 @@
 ## November 2 — D-121 landing name Allagio
 
-The landing source that a person sees says Allagio. The footer says “working name Allagio”. ORP stays ORP. The home title is unchanged. `/agents` title and meta say Allagio. Directory install URLs read `public-base.mjs`. The hosted line is “Allagio does not hold money.” The Go landing tests pin Allagio again. `llms.txt`, `llms-full.txt`, and `skill.md` are the D-120 copies. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+The landing source that a person sees says Allagio. The footer says “Allagio is a working name.” ORP stays ORP. The home title is “Allagio · Affiliate marketing, evolved for agents.” The home description calls Allagio the host and ORP the protocol. `/agents` title and meta say Allagio. The directory install command names the server `allagio` and reads the host from `public-base.mjs`. The hosted line is “Allagio does not hold money.” The Go landing tests pin Allagio again. `llms.txt`, `llms-full.txt`, and `skill.md` are the D-120 copies. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## November 2 — Public pages keep answering when return_to is set
 

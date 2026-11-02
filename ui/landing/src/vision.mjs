@@ -4,8 +4,6 @@ import { approvalModes } from './lib/modes.mjs'
 // A status says Coming unless that deal works today. Nothing is Verified end to end
 // until adapterTests and e2e are both true. They are not.
 
-export const visionLine = 'Allagio is the host any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. ORP, works over MCP. working name Allagio.'
-
 export const publishStepParagraph = 'A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.'
 
 export const visionHonest = 'That is the direction. What works today is an affiliate link. ' + publishStepParagraph + ' The other deals on this page are Coming. Nothing here is Verified end to end.'

@@ -1,16 +1,34 @@
 import { createServer } from 'node:http'
-import { readFileSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, readFileSync, mkdirSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 import AxeBuilder from '@axe-core/playwright'
 
-const outDir = process.argv[2]
-if (!outDir) {
-  console.error('usage: node scripts/proof-d121.mjs <out-dir>')
+const scriptDir = dirname(fileURLToPath(import.meta.url))
+const defaultBuild = resolve(scriptDir, '../../../affilio-wp/admin/build')
+
+function defaultChrome() {
+  const fromEnv = process.env.CHROME_PATH || process.env.CHROME
+  if (fromEnv) return fromEnv
+  const candidates = ['/usr/local/bin/chrome', '/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium']
+  return candidates.find((candidate) => existsSync(candidate)) || 'chrome'
+}
+
+function arg(name) {
+  const flag = process.argv.find((item) => item.startsWith(`--${name}=`))
+  return flag ? flag.slice(name.length + 3) : ''
+}
+
+const outDir = arg('out') || process.argv[2]
+const build = resolve(arg('build') || process.env.AFFILIO_BUILD || defaultBuild)
+const chromePath = arg('chrome') || defaultChrome()
+if (!outDir || outDir.startsWith('--')) {
+  console.error('usage: node scripts/proof-d121.mjs <out-dir> [--build=DIR] [--chrome=PATH]')
+  console.error('env: AFFILIO_BUILD, CHROME_PATH')
   process.exit(2)
 }
 
-const build = resolve('/workspace/affilio-wp/admin/build')
 const routes = [
   ['home', '/'],
   ['you', '/you/'],
@@ -20,7 +38,8 @@ const routes = [
   ['setup', '/publishers/setup'],
   ['protocol', '/protocol/'],
 ]
-const widths = [390, 1440]
+const widths = [390, 1280, 1440]
+const impacts = ['minor', 'moderate', 'serious', 'critical']
 
 function page(name) {
   return readFileSync(join(build, name), 'utf8')
@@ -68,7 +87,7 @@ const server = createServer((req, res) => {
   if (path.startsWith('/landing-v9/')) {
     const file = join(build, path)
     try {
-      if (!statSync(file).isFile()) throw new Error('dir')
+      if (!file.startsWith(build) || !statSync(file).isFile()) throw new Error('dir')
       res.writeHead(200, { 'content-type': typeFor(file) })
       res.end(readFileSync(file))
     } catch {
@@ -86,10 +105,11 @@ const origin = `http://127.0.0.1:${server.address().port}`
 mkdirSync(outDir, { recursive: true })
 const browser = await chromium.launch({
   headless: true,
-  executablePath: process.env.CHROME_PATH || '/usr/local/bin/chrome',
+  executablePath: chromePath,
   args: ['--disable-gpu'],
 })
 const report = []
+const totals = Object.fromEntries(impacts.map((impact) => [impact, 0]))
 let failed = false
 try {
   for (const width of widths) {
@@ -106,13 +126,17 @@ try {
         scrollWidth: document.documentElement.scrollWidth,
         innerWidth: window.innerWidth,
         title: document.title,
+        text: document.body.innerText,
       }))
       const overflow = layout.scrollWidth > layout.innerWidth + 1
+      const offerRails = (layout.title + '\n' + layout.text).includes('Offer Rails')
       const axe = await new AxeBuilder({ page }).analyze()
-      const serious = axe.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')
-      if (overflow || serious.length) failed = true
-      report.push({ name, route, width, title: layout.title, overflow, axe: serious.map((item) => item.id) })
-      console.log(`${name} ${width} overflow=${overflow} axe=${serious.map((item) => item.id).join(',') || '0'} title=${layout.title}`)
+      const byImpact = Object.fromEntries(impacts.map((impact) => [impact, axe.violations.filter((item) => item.impact === impact).map((item) => item.id)]))
+      for (const impact of impacts) totals[impact] += byImpact[impact].length
+      if (overflow || offerRails || impacts.some((impact) => byImpact[impact].length)) failed = true
+      report.push({ name, route, width, title: layout.title, overflow, offerRails, axe: byImpact })
+      const axeText = impacts.map((impact) => `${impact}=${byImpact[impact].length}`).join(' ')
+      console.log(`${name} ${width} overflow=${overflow} offerRails=${offerRails} ${axeText} title=${layout.title}`)
     }
     await context.close()
   }
@@ -120,5 +144,6 @@ try {
   await browser.close()
   server.close()
 }
-writeFileSync(join(outDir, 'report.json'), JSON.stringify(report, null, 2))
+writeFileSync(join(outDir, 'report.json'), JSON.stringify({ totals, report }, null, 2))
+console.log('axe totals ' + impacts.map((impact) => `${impact}=${totals[impact]}`).join(' '))
 if (failed) process.exit(1)

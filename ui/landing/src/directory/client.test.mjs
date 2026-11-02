@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { DirectoryFailure, fixtureHeaders, getMember, httpsUrl, listDirectory, logoSrc, makersUrl, memberRoute, memberUrl, parseItem, parseList, publishersUrl, wantsFixtures } from './client.mjs'
 import { fixtureList, fixtureMember, testMakers, testPublishers } from './fixtures.mjs'
-import { agentPrompt, installCommand, makerPrompt } from './prompt.mjs'
+import { agentPrompt, installCommand, installLead, makerPrompt } from './prompt.mjs'
 
 const maker = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -117,6 +117,7 @@ test('fixtures are TEST data and are not imported by the page', () => {
   assert.match(makerPrompt, /Add my product to the Allagio directory/)
   assert.equal(agentPrompt.includes(installCommand), true)
   assert.equal(makerPrompt.includes(installCommand), true)
-  assert.match(installCommand, /claude mcp add/)
+  assert.match(installCommand, /claude mcp add --scope user --transport http allagio /)
+  assert.equal(installLead.includes('offer-rails'), false)
   assert.doesNotMatch(agentPrompt, /connector|marketplace|github\.com/i)
 })

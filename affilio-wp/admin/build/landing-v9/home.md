@@ -1,6 +1,6 @@
-Offer Rails · Affiliate marketing, evolved for agents
+Allagio · Affiliate marketing, evolved for agents
 
-Offer Rails is the protocol an agent uses to get you more traffic, engagement, clients, or income. You keep the limits and the approval.
+Allagio (working name) is the host an agent uses to get you more traffic, engagement, clients, or income, over ORP. You keep the limits and the approval.
 
 While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.
 
