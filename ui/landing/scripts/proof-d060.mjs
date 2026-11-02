@@ -151,7 +151,7 @@ try {
     const page = await context.newPage()
 
     await page.goto(base + '/makers/?directoryFixtures=1', { waitUntil: 'networkidle' })
-    await page.locator('#directory').getByRole('heading', { name: 'Makers on Offer Rails' }).waitFor()
+    await page.locator('#directory').getByRole('heading', { name: 'Makers on Allagio' }).waitFor()
     await page.locator('#directory').getByText('TEST Vibe Sales').waitFor()
     const placed = await page.evaluate(() => {
       const hero = document.querySelector('#hero-h')?.closest('section')
@@ -211,7 +211,7 @@ try {
 
     const missing = await page.goto(base + '/makers/not-a-real-site', { waitUntil: 'networkidle' })
     if (!missing || missing.status() !== 404) throw new Error('404 status ' + (missing && missing.status()))
-    await page.getByRole('heading', { name: 'That page is not on Offer Rails.' }).waitFor()
+    await page.getByRole('heading', { name: 'That page is not on Allagio.' }).waitFor()
     const nav = await page.locator('nav[aria-label="Main"]').innerText()
     if (!nav.includes('Makers') || !nav.includes('Publishers')) throw new Error('404 nav ' + nav)
     const home = await page.locator('#main').getByRole('link', { name: 'Home', exact: true }).getAttribute('href')
@@ -224,7 +224,7 @@ try {
     await page.locator('#directory').getByText('No publishers listed yet. Yours can be first.').waitFor()
     await check(page, 'publishers-empty-' + width)
     await page.goto(base + '/publishers/?directoryFixtures=1', { waitUntil: 'networkidle' })
-    await page.locator('#directory').getByRole('heading', { name: 'Publishers on Offer Rails' }).waitFor()
+    await page.locator('#directory').getByRole('heading', { name: 'Publishers on Allagio' }).waitFor()
     await page.locator('#directory').getByText('TEST Field Journal').waitFor()
     const publishersPlaced = await page.evaluate(() => {
       const hero = document.querySelector('#hero-h')?.closest('section')
@@ -241,7 +241,7 @@ try {
 
     const publisherMiss = await page.goto(base + '/publishers/not-a-real-site', { waitUntil: 'networkidle' })
     if (!publisherMiss || publisherMiss.status() !== 404) throw new Error('publisher 404 ' + (publisherMiss && publisherMiss.status()))
-    await page.getByRole('heading', { name: 'That page is not on Offer Rails.' }).waitFor()
+    await page.getByRole('heading', { name: 'That page is not on Allagio.' }).waitFor()
     await check(page, 'publishers-404-' + width)
     await context.close()
   }

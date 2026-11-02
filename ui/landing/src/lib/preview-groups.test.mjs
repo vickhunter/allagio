@@ -30,7 +30,7 @@ test('groups a verified offer ahead of topic-matched unverified programs', () =>
     assert.equal(program.source_url.length > 0, true)
     assert.equal(program.checked_at.length > 0, true)
   }
-  assert.equal(suggestedNote, "Not on Offer Rails yet. Payouts go through the company's own affiliate program.")
+  assert.equal(suggestedNote, "Not on Allagio yet. Payouts go through the company's own affiliate program.")
 })
 
 test('defaults an existing offer to verified and leaves the fixture out', () => {

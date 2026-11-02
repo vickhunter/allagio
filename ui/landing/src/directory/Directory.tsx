@@ -55,7 +55,7 @@ function AddYours({ source, kind, level = 'h3' }: { source: string; kind: Direct
   const [copied, setCopied] = useState(false)
   const prompt = kind === 'maker' ? makerPrompt : agentPrompt
   const heading = kind === 'maker' ? 'Add your product' : 'Add your site or newsletter'
-  const lead = kind === 'maker' ? 'Add my product to the Offer Rails directory\n' : 'Add my site or newsletter to the Offer Rails directory\n'
+  const lead = kind === 'maker' ? 'Add my product to the Allagio directory\n' : 'Add my site or newsletter to the Allagio directory\n'
   const Title = level === 'h2' ? 'h2' : 'h3'
   return (
     <div id="add-yours" className="mt-8 max-w-3xl rounded-2xl border border-line bg-s1 p-5">
@@ -154,7 +154,7 @@ export function DirectorySection({ kind }: { kind: DirectoryKind }) {
       <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         {chrome.heading ? (
           <>
-            <h2 id="directory-h" className="h-display text-3xl sm:text-4xl">{kind === 'maker' ? 'Makers on Offer Rails' : 'Publishers on Offer Rails'}</h2>
+            <h2 id="directory-h" className="h-display text-3xl sm:text-4xl">{kind === 'maker' ? 'Makers on Allagio' : 'Publishers on Allagio'}</h2>
             <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">{kind === 'maker' ? 'Makers add a product through their AI agent. Each maker is listed by its owner.' : 'Sites add themselves through their AI agent. Each one is listed by its owner.'}</p>
           </>
         ) : null}
@@ -201,7 +201,7 @@ function MissingProfile({ source }: { source: string }) {
   return (
     <Page page="missing">
       <section data-not-found className="mx-auto max-w-3xl px-5 pb-20 pt-16">
-        <h1 className="h-display text-4xl sm:text-6xl">That page is not on Offer Rails.</h1>
+        <h1 className="h-display text-4xl sm:text-6xl">That page is not on Allagio.</h1>
         <p className="mt-4 text-lg leading-relaxed text-t2">The address does not match a page on this site.</p>
         <p className="mt-8 flex flex-wrap gap-3">
           <a className="inline-flex min-h-11 min-w-11 items-center rounded-xl bg-t1 px-5 font-semibold text-s0" href={withSource('/', source)}>Home</a>
@@ -221,18 +221,18 @@ export function DirectoryDetail() {
   useEffect(() => {
     if (!route) {
       setMissing(true)
-      document.title = 'Offer Rails · Page not found'
+      document.title = 'Allagio · Page not found'
       return
     }
     let gone = false
     getMember(route.kind, route.slug).then((item) => {
       if (gone) return
       setMember(item)
-      document.title = `Offer Rails · ${item.name}`
+      document.title = `Allagio · ${item.name}`
     }).catch(() => {
       if (gone) return
       setMissing(true)
-      document.title = 'Offer Rails · Page not found'
+      document.title = 'Allagio · Page not found'
     })
     return () => { gone = true }
   }, [route])

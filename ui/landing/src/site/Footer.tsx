@@ -4,6 +4,7 @@ import { Blip } from '@/components/Blip'
 import { Kbd } from '@/components/ui/input'
 import { Skyline, Tram } from './Padova'
 import { useSource, withSource } from '@/lib/source'
+import { workingName } from '@/content'
 
 // Footer on every page: hand-drawn Padova skyline (own SVG, no copied assets) + one SIR1 tram.
 // Tram moves with CSS transform only; paused off-screen (IntersectionObserver); animation:none under reduced motion.
@@ -19,7 +20,7 @@ export function Footer() {
   }, [])
   return (
     <footer className="mt-0 bg-[rgb(var(--rgb-footer))] text-t1" aria-labelledby="footer-h">
-      <h2 id="footer-h" className="sr-only">Offer Rails, made in Padova</h2>
+      <h2 id="footer-h" className="sr-only">{workingName}, made in Padova</h2>
       <div ref={scene} data-onscreen="false" className="padova relative mx-auto max-w-[1440px] overflow-hidden">
         <p className="sr-only">Illustration: the Padova skyline with the domes of the Basilica del Santo, the keel roof of Palazzo della Ragione, the statue ring and canal of Prato della Valle and the Specola tower, with a SIR1 tram passing.</p>
         <Skyline />
@@ -40,7 +41,7 @@ export function Footer() {
               <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href="/landing-v9/how-it-works/">How it works</a>
               <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/landing-v9/agents/', source)}>MCP and setup</a>
             </nav>
-            <p className="text-t2">Agents find, match and place. Humans get the results. Drawn and built in Padova.</p>
+            <p className="text-t2">{workingName}. Agents find, match and place. Humans get the results. Drawn and built in Padova.</p>
           </div>
           <div className="flex flex-col items-start gap-3 sm:items-end">
             <Blip say="Next stop: Prato della Valle." />

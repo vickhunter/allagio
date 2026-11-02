@@ -177,7 +177,7 @@ try {
       home: document.querySelector('a[href="/"], a[href^="/?"]')?.textContent || '',
       agents: [...document.querySelectorAll('a')].some((el) => el.getAttribute('href')?.startsWith('/agents')),
     }))
-    if (missing.h !== 'That page is not on Offer Rails.') throw new Error('404 heading ' + missing.h)
+    if (missing.h !== 'That page is not on Allagio.') throw new Error('404 heading ' + missing.h)
     if (!missing.nav.includes('Makers') || !missing.agents) throw new Error('404 links ' + JSON.stringify(missing))
     if (!missing.scroll) throw new Error('404-' + width + ' scrolls sideways')
     const missingAxe = await new AxeBuilder({ page }).analyze()

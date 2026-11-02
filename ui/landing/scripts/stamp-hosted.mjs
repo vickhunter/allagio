@@ -41,7 +41,7 @@ const youShell = `<div id="static-landing">
 const protocolShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
-      <h1>Offer Rails Protocol</h1>
+      <h1>ORP</h1>
       <p>ORP 0.3 is frozen: a plain deal is still two parties. ORP 0.4 adds seats. These pages are generated from the schema files.</p>
       <p>Apache-2.0 planned. Until publication, this is a draft in the repository.</p>
     </main>
@@ -111,7 +111,7 @@ const agentsFile = resolve(assets, 'agents/index.html')
 writeFileSync(agentsFile, readFileSync(agentsFile, 'utf8').replaceAll('href="/landing-v9/llms.txt"', 'href="/llms.txt"'))
 const missingShell = `<div id="static-landing">
     <header>
-      <a href="/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Offer Rails</a>
+      <a href="/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Allagio</a>
       <nav aria-label="Main">
         <a href="/makers/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Makers</a>
         <a href="/publishers/" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Publishers</a>
@@ -121,7 +121,7 @@ const missingShell = `<div id="static-landing">
       <a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;min-width:44px;align-items:center">Sign in</a>
     </header>
     <main id="main">
-      <h1>That page is not on Offer Rails.</h1>
+      <h1>That page is not on Allagio.</h1>
       <p>The address does not match a page on this site.</p>
       <p><a href="/" style="display:inline-flex;min-height:44px;align-items:center">Home</a></p>
       <p><a href="/agents" style="display:inline-flex;min-height:44px;align-items:center">Agents</a></p>

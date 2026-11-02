@@ -42,7 +42,7 @@ export function HowItWorks() {
       <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <p className="eyebrow">How it works</p>
         <h2 id="how-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">From a product to a paid sale, in five steps.</h2>
-        <p className="mt-3 max-w-2xl text-t2">Makers bring products. Publishers bring posts they already make. Agents find, match and place. Offer Rails keeps the record.</p>
+        <p className="mt-3 max-w-2xl text-t2">Makers bring products. Publishers bring posts they already make. Agents find, match and place. Allagio keeps the record.</p>
         <ol className="mt-10 grid gap-3 md:grid-cols-6 md:grid-rows-[auto_auto_auto]">
           {steps.map((s, i) => {
             const Icon = s.icon

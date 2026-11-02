@@ -6,8 +6,8 @@ export const contactEmail = '[CONTACT EMAIL]'
 
 export const privacy = {
   title: 'Privacy',
-  description: 'Draft of what Offer Rails sends and stores. Not yet approved.',
-  lede: 'This page is a draft of what Offer Rails sends and stores.',
+  description: 'Draft of what Allagio sends and stores. Not yet approved.',
+  lede: 'This page is a draft of what Allagio sends and stores.',
   sections: [
     {
       heading: 'What is sent',
@@ -15,7 +15,7 @@ export const privacy = {
       items: [
         'Article or context text, from 10 to 12000 characters, used for matching.',
         'For a placement: a surface URL, proposed copy, published text, and an evidence note.',
-        'For a page preview: a URL. The Offer Rails server fetches that public page. Links inside the page are not followed.',
+        'For a page preview: a URL. The Allagio server fetches that public page. Links inside the page are not followed.',
         'A preview, and a revenue preview, store nothing for a signed-out caller.',
       ],
     },
@@ -73,12 +73,12 @@ export const privacy = {
 export const terms = {
   title: 'Terms',
   description: 'Plain-English draft of what makers, publishers, and agents may do. Not yet approved.',
-  lede: 'This is a plain-English draft of what makers, publishers, and agents may do on Offer Rails. It is not an approved contract.',
+  lede: 'This is a plain-English draft of what makers, publishers, and agents may do on Allagio. It is not an approved contract.',
   sections: [
     {
       heading: 'Makers',
       paragraphs: [
-        'A maker may publish an offer that names the product, its category, and the commission. A maker may record a sale and a refund for an offer they published. A maker connects their own payment account. Offer Rails does not hold the money.',
+        'A maker may publish an offer that names the product, its category, and the commission. A maker may record a sale and a refund for an offer they published. A maker connects their own payment account. Allagio does not hold the money.',
       ],
     },
     {

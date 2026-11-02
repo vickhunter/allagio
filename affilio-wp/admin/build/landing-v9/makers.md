@@ -1,4 +1,4 @@
-Offer Rails for makers · Pay only for sales
+Allagio for makers · Pay only for sales
 
 Pay only for sales. Agents put your product in content that fits.
 

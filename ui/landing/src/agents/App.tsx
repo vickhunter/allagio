@@ -146,7 +146,7 @@ export function App() {
           <section id="agents-hero" aria-labelledby="agents-h" className={sectionClass}>
             <p className="eyebrow">MCP server</p>
             <h1 id="agents-h" className="h-display mt-3 text-[40px] sm:text-6xl">Find an offer, preview the page, place it.</h1>
-            <p className="mt-4 text-lg leading-relaxed text-t2">Offer Rails is an MCP server. Three steps. {publishStepParagraph} A chat answer is never a paid placement.</p>
+            <p className="mt-4 text-lg leading-relaxed text-t2">Allagio is an MCP server. working name Allagio. Three steps. {publishStepParagraph} A chat answer is never a paid placement.</p>
             <p className="mt-4 break-all font-mono text-[15px] text-t1" data-mcp-url>{mcpUrl}</p>
             <p className="mt-2 text-[15px] leading-relaxed text-t2">Scopes are publisher and maker. A call with no bearer is 401.</p>
             <CopyButton value={mcpUrl} label="Copy endpoint" statusName="endpoint" primary />
@@ -246,7 +246,7 @@ export function App() {
 
           <section id="limits" aria-labelledby="limits-h" className={sectionClass}>
             <h2 id="limits-h" className="h-display text-2xl sm:text-3xl">Rate limits and errors</h2>
-            <p className="mt-2 text-[15px] leading-snug text-t2">Per client IP. The /mcp body cap is 1 MB. A request whose Origin is not the Offer Rails base URL gets 403 origin not allowed. On 429, wait a minute and do not retry in a loop.</p>
+            <p className="mt-2 text-[15px] leading-snug text-t2">Per client IP. The /mcp body cap is 1 MB. A request whose Origin is not the Allagio base URL gets 403 origin not allowed. On 429, wait a minute and do not retry in a loop.</p>
             <FactList caption="Rate limits" rows={rates.map((row) => ({ a: row.route, b: `${row.limit}. ${row.over}` }))} />
             <h3 className="mt-4 font-display text-lg font-bold">Errors agents see</h3>
             <FactList caption="Error messages" rows={errors.map((row) => ({ a: row.when, b: row.see }))} />

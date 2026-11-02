@@ -6,7 +6,7 @@
 import { previewErrorCopy, samplePreview } from './preview-map.mjs'
 
 export const publicLinksNote = "Public links only. Private posts and accounts can't be read."
-export const suggestedNote = "Not on Offer Rails yet. Payouts go through the company's own affiliate program."
+export const suggestedNote = "Not on Allagio yet. Payouts go through the company's own affiliate program."
 export const closestLead = 'No program lines up with this post yet.'
 export const notifyLabel = 'Notify me when a match joins'
 export const notifyStorageKey = 'offer-rails.preview.notify'
