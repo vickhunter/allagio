@@ -1,0 +1,304 @@
+{
+  "totals": {
+    "minor": 0,
+    "moderate": 0,
+    "serious": 0,
+    "critical": 0
+  },
+  "report": [
+    {
+      "name": "home",
+      "route": "/",
+      "width": 390,
+      "title": "Allagio · Affiliate marketing, evolved for agents",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "you",
+      "route": "/you/",
+      "width": 390,
+      "title": "Allagio · Your limits",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "agents",
+      "route": "/agents",
+      "width": 390,
+      "title": "Allagio · MCP server",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "makers",
+      "route": "/makers/",
+      "width": 390,
+      "title": "Allagio for makers · Pay only for sales",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "publishers",
+      "route": "/publishers/",
+      "width": 390,
+      "title": "Allagio for publishers · Earn from more of your posts",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "setup",
+      "route": "/publishers/setup",
+      "width": 390,
+      "title": "Allagio · Publisher setup",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "protocol",
+      "route": "/protocol/",
+      "width": 390,
+      "title": "ORP · Allagio · Protocol",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "home",
+      "route": "/",
+      "width": 1280,
+      "title": "Allagio · Affiliate marketing, evolved for agents",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "you",
+      "route": "/you/",
+      "width": 1280,
+      "title": "Allagio · Your limits",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "agents",
+      "route": "/agents",
+      "width": 1280,
+      "title": "Allagio · MCP server",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "makers",
+      "route": "/makers/",
+      "width": 1280,
+      "title": "Allagio for makers · Pay only for sales",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "publishers",
+      "route": "/publishers/",
+      "width": 1280,
+      "title": "Allagio for publishers · Earn from more of your posts",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "setup",
+      "route": "/publishers/setup",
+      "width": 1280,
+      "title": "Allagio · Publisher setup",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "protocol",
+      "route": "/protocol/",
+      "width": 1280,
+      "title": "ORP · Allagio · Protocol",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "home",
+      "route": "/",
+      "width": 1440,
+      "title": "Allagio · Affiliate marketing, evolved for agents",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "you",
+      "route": "/you/",
+      "width": 1440,
+      "title": "Allagio · Your limits",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "agents",
+      "route": "/agents",
+      "width": 1440,
+      "title": "Allagio · MCP server",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "makers",
+      "route": "/makers/",
+      "width": 1440,
+      "title": "Allagio for makers · Pay only for sales",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "publishers",
+      "route": "/publishers/",
+      "width": 1440,
+      "title": "Allagio for publishers · Earn from more of your posts",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "setup",
+      "route": "/publishers/setup",
+      "width": 1440,
+      "title": "Allagio · Publisher setup",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    },
+    {
+      "name": "protocol",
+      "route": "/protocol/",
+      "width": 1440,
+      "title": "ORP · Allagio · Protocol",
+      "overflow": false,
+      "offerRails": false,
+      "axe": {
+        "minor": [],
+        "moderate": [],
+        "serious": [],
+        "critical": []
+      }
+    }
+  ]
+}
