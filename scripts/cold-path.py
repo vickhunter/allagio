@@ -163,7 +163,7 @@ def main():
         doc = expect(status, raw, 200)
         text = doc.get("text", "")
         if "does not hold money" not in text:
-            raise SystemExit("proof page was empty")
+            raise SystemExit('proof page missing "does not hold money"')
 
     step("llms.txt", llms)
     step("skill.md", skill)
