@@ -38,6 +38,9 @@ func TestLoginAcceptsPublicPageReturn(t *testing.T) {
 		"/you/../admin",
 		"/you x",
 		"https:/you",
+		" /you",
+		"/you\t",
+		"/Publishers/Setup",
 	}
 	for _, raw := range refused {
 		if _, ok := loginReturnPathAllowed(raw); ok {

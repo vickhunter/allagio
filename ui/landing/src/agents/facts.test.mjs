@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -153,7 +153,19 @@ test('ordered steps name the hosted join, prepare, receipt, and sale bodies', ()
 
 test('sign-in return paths include the public pages', () => {
   const line = deviceSignIn.details.find((item) => item.includes('The return path may be'))
-  assert.match(line, /\/device or \/device\?user_code=<canonical code>, \/you, or \/publishers\/setup/)
+  assert.match(line, /\/device or \/device\?user_code=<canonical code>, \/you, \/you\/, \/publishers\/setup, or \/publishers\/setup\//)
+  assert.match(line, /For \/device, any other query is refused/)
+  assert.equal(line.includes('Any other query'), false)
+})
+
+test('built facts chunk pins the sign-in return paths', () => {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const assets = resolve(here, '../../../../affilio-wp/admin/build/landing-v9/assets')
+  const chunks = readdirSync(assets).filter((name) => /^facts-.*\.js$/.test(name))
+  assert.equal(chunks.length, 1)
+  const built = readFileSync(resolve(assets, chunks[0]), 'utf8')
+  assert.match(built, /\/you, \/you\/, \/publishers\/setup, or \/publishers\/setup\//)
+  assert.match(built, /For \/device, any other query is refused/)
 })
 
 test('only page preview and digest are coming soon', () => {
