@@ -1,3 +1,7 @@
+## November 2 — D-121 return-path wording
+
+The agents page says a sign-in may return to `/you`, `/you/`, `/publishers/setup`, or `/publishers/setup/`. Any other query is refused only for `/device`. The built facts chunk is pinned to that sentence. Login tests refuse a leading space, a tab, and `/Publishers/Setup`. `llms-full.txt` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## November 2 — D-123 follow-up
 
 The HTTP 400 was only in LoginStart. The allowlist accepts exactly `/you`, `/you/`, `/publishers/setup`, and `/publishers/setup/` with any query. The pages do not parse `return_to`. The cold-path check says the proof page is missing `does not hold money` when that sentence is absent. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
