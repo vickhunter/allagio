@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { DirectoryFailure, fixtureHeaders, getMember, httpsUrl, listDirectory, logoSrc, makersUrl, memberRoute, memberUrl, parseItem, parseList, publishersUrl, wantsFixtures } from './client.mjs'
 import { fixtureList, fixtureMember, testMakers, testPublishers } from './fixtures.mjs'
@@ -120,4 +122,14 @@ test('fixtures are TEST data and are not imported by the page', () => {
   assert.match(installCommand, /claude mcp add --scope user --transport http allagio /)
   assert.equal(installLead.includes('offer-rails'), false)
   assert.doesNotMatch(agentPrompt, /connector|marketplace|github\.com/i)
+})
+
+test('built Directory chunk contains the allagio install label', () => {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const assets = resolve(here, '../../../../affilio-wp/admin/build/landing-v9/assets')
+  const chunks = readdirSync(assets).filter((name) => /^Directory-.*\.js$/.test(name))
+  assert.equal(chunks.length, 1)
+  const built = readFileSync(resolve(assets, chunks[0]), 'utf8')
+  assert.equal(built.includes('allagio'), true)
+  assert.match(built, /claude mcp add --scope user --transport http allagio /)
 })

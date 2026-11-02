@@ -182,7 +182,7 @@ export const deviceSignIn = {
   ],
   details: [
     'grant_type is optional. When it is sent, it is urn:ietf:params:oauth:grant-type:device_code. While you wait, a 400 body has error, interval, and expires_in.',
-    'A signed-out human is redirected to /auth/login?return_to= and then back. The return path may be /device or /device?user_code=<canonical code>. Any other query, a broken percent-escape, a fragment, or an absolute URL is refused.',
+    'A signed-out human is redirected to /auth/login?return_to= and then back. The return path may be /device or /device?user_code=<canonical code>, /you, or /publishers/setup. Any other query, a broken percent-escape, a fragment, or an absolute URL is refused.',
     'The signed-in human posts the form to POST /device with the session cookie, Origin equal to the public origin, the csrf field, user_code, and decision approve or deny. Approve also sends project as site:<id> or offer:<id>, and that project must belong to the session owner. The stored return path is only that canonical /device URL. source, ref, and via are not copied onto it.',
     'The JSON equivalent is POST /v1/device/approve with the owner session, user_code, decision, and on approve scope plus project_id.',
   ],

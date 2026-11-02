@@ -151,6 +151,11 @@ test('ordered steps name the hosted join, prepare, receipt, and sale bodies', ()
   assert.equal(JSON.stringify(orderedSteps).includes('Needs authentication'), false)
 })
 
+test('sign-in return paths include the public pages', () => {
+  const line = deviceSignIn.details.find((item) => item.includes('The return path may be'))
+  assert.match(line, /\/device or \/device\?user_code=<canonical code>, \/you, or \/publishers\/setup/)
+})
+
 test('only page preview and digest are coming soon', () => {
   assert.deepEqual(tools.filter((tool) => tool.soon).map((tool) => tool.name), ['preview_page', 'get_digest'])
 })
