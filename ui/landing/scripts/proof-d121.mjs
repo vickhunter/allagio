@@ -11,7 +11,7 @@ const defaultBuild = resolve(scriptDir, '../../../affilio-wp/admin/build')
 function defaultChrome() {
   const fromEnv = process.env.CHROME_PATH || process.env.CHROME
   if (fromEnv) return fromEnv
-  const candidates = ['/usr/local/bin/chrome', '/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium']
+  const candidates = ['/opt/google/chrome/chrome', '/usr/bin/google-chrome', '/usr/bin/chromium']
   return candidates.find((candidate) => existsSync(candidate)) || 'chrome'
 }
 
