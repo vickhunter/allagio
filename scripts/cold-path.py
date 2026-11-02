@@ -162,7 +162,7 @@ def main():
         status, raw = request("GET", "/orp/proof/" + deal["id"])
         doc = expect(status, raw, 200)
         text = doc.get("text", "")
-        if "Allagio" not in text and "does not hold money" not in text:
+        if "does not hold money" not in text:
             raise SystemExit("proof page was empty")
 
     step("llms.txt", llms)

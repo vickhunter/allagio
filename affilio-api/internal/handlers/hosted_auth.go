@@ -531,14 +531,17 @@ func (h *HostedHandler) ownerLogin() services.OwnerLogin {
 
 // loginReturnPathAllowed is the return-path check LoginStart uses. A path is
 // allowed when it is /owner (including the owner sections), /oauth/authorize,
-// or /device. An absolute URL, a host, or a fragment is refused.
+// /device, /you, or /publishers/setup. An absolute URL, a host, or a fragment
+// is refused. /you and /publishers/setup are the public pages a sign-in can
+// come back to. They are same-origin relative paths, not open redirects.
 func loginReturnPathAllowed(returnTo string) (*url.URL, bool) {
 	u, err := url.Parse(returnTo)
 	if err != nil || u == nil || u.IsAbs() || u.Host != "" || u.Fragment != "" {
 		return u, false
 	}
 	switch u.Path {
-	case "/owner", "/owner/products", "/owner/placements", "/owner/earnings", "/owner/settings", "/owner/review", "/owner/connect-site", "/oauth/authorize":
+	case "/owner", "/owner/products", "/owner/placements", "/owner/earnings", "/owner/settings", "/owner/review", "/owner/connect-site", "/oauth/authorize",
+		"/you", "/you/", "/publishers/setup", "/publishers/setup/":
 		return u, true
 	}
 	if deviceSignInReturn(u) {

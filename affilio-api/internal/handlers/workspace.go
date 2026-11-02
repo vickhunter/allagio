@@ -330,15 +330,17 @@ func (h *HostedHandler) renderLandingShells(c *gin.Context) {
 	}
 }
 
-func (h *HostedHandler) Home(c *gin.Context)           { h.landing(c, "home.html") }
-func (h *HostedHandler) Makers(c *gin.Context)         { h.landing(c, "makers.html") }
-func (h *HostedHandler) Publishers(c *gin.Context)     { h.landing(c, "publishers.html") }
-func (h *HostedHandler) PublisherSetup(c *gin.Context) { h.landing(c, "publishers-setup.html") }
-func (h *HostedHandler) Protocol(c *gin.Context)       { h.landing(c, "protocol.html") }
-func (h *HostedHandler) You(c *gin.Context)            { h.landing(c, "you.html") }
-func (h *HostedHandler) Privacy(c *gin.Context)        { h.builtPage(c, "privacy") }
-func (h *HostedHandler) Terms(c *gin.Context)          { h.builtPage(c, "terms") }
-func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents") }
+func (h *HostedHandler) Home(c *gin.Context)       { h.landing(c, "home.html") }
+func (h *HostedHandler) Makers(c *gin.Context)     { h.landing(c, "makers.html") }
+func (h *HostedHandler) Publishers(c *gin.Context) { h.landing(c, "publishers.html") }
+func (h *HostedHandler) PublisherSetup(c *gin.Context) {
+	h.landingKeepingReturn(c, "publishers-setup.html")
+}
+func (h *HostedHandler) Protocol(c *gin.Context) { h.landing(c, "protocol.html") }
+func (h *HostedHandler) You(c *gin.Context)      { h.landingKeepingReturn(c, "you.html") }
+func (h *HostedHandler) Privacy(c *gin.Context)  { h.builtPage(c, "privacy") }
+func (h *HostedHandler) Terms(c *gin.Context)    { h.builtPage(c, "terms") }
+func (h *HostedHandler) Agents(c *gin.Context)   { h.builtPage(c, "agents") }
 
 // LEGAL_PAGES_APPROVED stays false until the privacy and terms wording is approved.
 // Those pages send X-Robots-Tag: noindex while it is false, including the copies
@@ -392,6 +394,17 @@ func executeLandingTemplate(name string, src []byte, data gin.H) ([]byte, error)
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// landingKeepingReturn serves a public page that may be opened with return_to.
+// The page is the response. return_to is not a redirect: a same-origin
+// relative path is the only shape that parses, and an absolute URL or a
+// broken percent-escape is ignored. Request.ParseForm is not used, because
+// a broken escape makes ParseForm return an error and a handler that maps
+// that error to HTTP 400 would hide the page.
+func (h *HostedHandler) landingKeepingReturn(c *gin.Context, name string) {
+	_ = publicReturnFrom(c.Request.URL.RawQuery)
+	h.landing(c, name)
 }
 
 func (h *HostedHandler) landing(c *gin.Context, name string) {

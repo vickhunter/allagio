@@ -1,3 +1,7 @@
+## November 2 — Public pages keep answering when return_to is set
+
+`GET /publishers/setup` and `GET /you/` stay the page when `return_to` is present. A same-origin relative path is the only shape that parses. An absolute URL and a broken percent-escape are ignored, and the response is not a redirect. Sign-in may come back to `/you` and `/publishers/setup`. An absolute login return stays refused. The proof page sentence is `Allagio does not hold money`, and the cold-path check requires `does not hold money`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## October 31 — D-120 product name Allagio
 
 The public name in the Go API, CLI, SDK, docs, and MCP server is Allagio. The MCP server name is `allagio-mcp`. The CLI command is `allagio`. `offer-rails`, `affilio`, `distributoor`, and `distributoor-setup` stay as installer command aliases. Download aliases that stay: `affilio.zip`, `offer-rails.zip`, `offer-rails-0.1.0.tgz`, and `distributoor-setup-0.1.0.tgz`. Environment names an agent should set are `ALLAGIO_API_URL`, `ALLAGIO_API_KEY`, and `ALLAGIO_SITE_KEY`. `OFFERRAILS_*` and `DISTRIBUTOOR_*` are still read.
