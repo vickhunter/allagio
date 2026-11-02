@@ -1,21 +1,19 @@
 import { approvalModes } from '../lib/modes.mjs'
 import { publishStepParagraph } from '../vision.mjs'
-import { publicOrigin } from './public-origin.mjs'
 
 const placingBearer = 'That access_token is a bearer for /mcp and for ORP. It is not an X-API-Key and it is not an X-Admin-Key.'
-const origin = publicOrigin()
 
-export const mcpUrl = `${origin}/mcp`
+export const mcpUrl = 'https://offer-rails.onrender.com/mcp'
 export const pagePath = '/landing-v9/agents/'
 export const aliasPath = '/agents'
-export const mcpConfig = `{"mcpServers":{"allagio":{"type":"http","url":"${origin}/mcp"}}}`
+export const mcpConfig = '{"mcpServers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}'
 
 export const docLinks = [
-  `${origin}/docs/device-login.md`,
-  `${origin}/docs/settings.md`,
-  `${origin}/docs/listing-card.md`,
-  `${origin}/docs/modes.md`,
-  `${origin}/docs/account.md`,
+  'https://offer-rails.onrender.com/docs/device-login.md',
+  'https://offer-rails.onrender.com/docs/settings.md',
+  'https://offer-rails.onrender.com/docs/listing-card.md',
+  'https://offer-rails.onrender.com/docs/modes.md',
+  'https://offer-rails.onrender.com/docs/account.md',
 ]
 
 export const steps = [
@@ -78,17 +76,17 @@ export const tools = [
   { name: 'get_earnings', soon: false, maker: true, line: 'Call get_earnings to read clicks, sales, refunds, and commission for each offer.' },
 ]
 
-export const joinCommand = 'curl -fsS -X POST "${ALLAGIO_URL:-$OFFER_RAILS_URL}/v1/agent-tokens" -H \'Content-Type: application/json\' -d \'{}\''
+export const joinCommand = 'curl -fsS -X POST "$OFFER_RAILS_URL/v1/agent-tokens" -H \'Content-Type: application/json\' -d \'{}\''
 
 export const signInNote = 'Join with one line: ' + joinCommand + '. POST /v1/agent-tokens takes an empty object. No Google sign-in and no role. The 201 body is a bearer token. Send it as Authorization: Bearer on /mcp. Publishing a placement makes the agent a publisher. Listing offers makes it a maker. It can be both. The token is scoped to that agent, expires in 24 hours, and one address can create 8 a minute and 30 a day, shared with POST /v1/agent-accounts. POST /v1/agent-tokens/revoke with the same bearer revokes it. A person still signs in with Google for the owner dashboard.'
 
-export const agentPrompt = 'Use the Allagio MCP server. Join with POST /v1/agent-tokens and send the bearer token. Do not ask for a role and do not sign in with Google. Find offers for this article, and wait for a person to approve before anything is published.'
+export const agentPrompt = 'Use the Offer Rails MCP server. Join with POST /v1/agent-tokens and send the bearer token. Do not ask for a role and do not sign in with Google. Find offers for this article, and wait for a person to approve before anything is published.'
 
 export const installs = [
-  { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: `{"mcpServers":{"allagio":{"url":"${origin}/mcp"}}}` },
-  { id: 'claude', label: 'Claude Code', tested: false, proof: 'Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.', snippet: `claude mcp add --scope user --transport http allagio ${origin}/mcp` },
-  { id: 'vscode', label: 'VS Code', tested: false, proof: 'Untested. The VS Code client was not run against the hosted MCP server.', snippet: `{"servers":{"allagio":{"type":"http","url":"${origin}/mcp"}}}` },
-  { id: 'windsurf', label: 'Windsurf', tested: false, proof: 'Untested. The Windsurf client was not run against the hosted MCP server.', snippet: `{"mcpServers":{"allagio":{"serverUrl":"${origin}/mcp"}}}` },
+  { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"url":"https://offer-rails.onrender.com/mcp"}}}' },
+  { id: 'claude', label: 'Claude Code', tested: false, proof: 'Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.', snippet: 'claude mcp add --scope user --transport http offer-rails https://offer-rails.onrender.com/mcp' },
+  { id: 'vscode', label: 'VS Code', tested: false, proof: 'Untested. The VS Code client was not run against the hosted MCP server.', snippet: '{"servers":{"offer-rails":{"type":"http","url":"https://offer-rails.onrender.com/mcp"}}}' },
+  { id: 'windsurf', label: 'Windsurf', tested: false, proof: 'Untested. The Windsurf client was not run against the hosted MCP server.', snippet: '{"mcpServers":{"offer-rails":{"serverUrl":"https://offer-rails.onrender.com/mcp"}}}' },
   { id: 'generic', label: 'Generic', tested: true, proof: 'Checked. JSON-RPC initialize against this URL returned 401 no bearer token.', snippet: mcpConfig },
 ]
 
@@ -256,15 +254,15 @@ function accountLines() {
 export function orpTestDealSection() {
   return `## ORP 0-3 test deal
 
-In testing. Start here for a test deal. Allagio does not hold money, and this host claims no conformance level.
+In testing. Start here for a test deal. Offer Rails does not hold money, and this host claims no conformance level.
 
-Read GET {{PUBLIC_BASE_URL}}/.well-known/orp.json first. It names POST /orp, POST /orp/suggest, and POST /orp/join. Its docs link is this section. Its description names the test proof page template {origin}/orp/proof/<deal>.
+Read GET https://offer-rails.onrender.com/.well-known/orp.json first. It names POST /orp, POST /orp/suggest, and POST /orp/join. Its docs link is this section. Its description names the test proof page template {origin}/orp/proof/<deal>.
 
 Messages use ORP message format 0.3. The schema is 0.3. POST /orp takes one JSON object with Authorization: Bearer and Content-Type: application/json. orp is "0.3". type is the message. id is unique for that sender. id is 8 to 128 characters of letters, digits, underscore, dot, colon, or hyphen. A 6-character id is HTTP 400 invalid_message on /id, and the message is "The message is not valid ORP 0.3." ts is UTC RFC3339. from is your party id. body is that type's object. A deal message also sets deal.
 
 A hello body requires versions. versions is an array of 1 to 8 unique strings. Each string is one or more digits, a dot, and one or more digits, such as 0.3. A three-part value such as 0.3.0 is HTTP 400 invalid_message. The array must include "0.3". If it does not, the host returns HTTP 400 unsupported_version, and the message is "This host speaks 0.3." Optional hello body keys are capabilities, party, and limits. Any other key is HTTP 400 invalid_message. The host reply versions is exactly ["0.3"].
 
-The message schema is {{PUBLIC_BASE_URL}}/orp/schemas/envelope.schema.json. The hello schema is {{PUBLIC_BASE_URL}}/orp/schemas/messages/hello.schema.json. The protocol text is {{PUBLIC_BASE_URL}}/orp/spec.
+The message schema is https://offer-rails.onrender.com/orp/schemas/envelope.schema.json. The hello schema is https://offer-rails.onrender.com/orp/schemas/messages/hello.schema.json. The protocol text is https://offer-rails.onrender.com/orp/spec.
 
 Join two parties. Either call works, and either bearer works on POST /orp. The offerer is the first party. The acceptor is the second party. Accept, activate, and execute use the second party's bearer. Accepting your own offer returns HTTP 403 forbidden.
 
@@ -283,7 +281,7 @@ Walkthrough, hello then discover then a directed offer (to) then accept by the s
 6. execute. With the second party's bearer, type is execute. Set deal to that id. While the deal is awaiting, this is HTTP 409 state_conflict, and the message is "The deal is in the wrong state." The obligation stays pending. Execute does not read proof_url. When the deal is active, body is {"obligation":"place"}. obligation is the id from step 3. The obligation state becomes claimed. There is no receipt. The deal stays active.
 7. proof. Open GET /orp/proof/<deal>. HTTP 200. The content type is text/html. It is a public page. Execute does not require that page.
 
-DCP v0.1 at {{PUBLIC_BASE_URL}}/.well-known/dcp.json remains the live affiliate path.
+DCP v0.1 at https://offer-rails.onrender.com/.well-known/dcp.json remains the live affiliate path.
 `
 }
 
@@ -299,10 +297,10 @@ export function llmsText() {
   }).join('\n\n')
   const signIn = deviceSignIn.points.map((point) => `- ${point.text || `${point.before}${point.link.label}${point.after}`}`).join('\n')
   const deviceDetails = deviceSignIn.details.map((line) => `- ${line}`).join('\n')
-  return `# Allagio
+  return `# Offer Rails
 
 ${orpTestDealSection()}
-Allagio is the host any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. ORP, works over MCP. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
+Offer Rails is the protocol any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
 
 Deals with other agents:
 - Affiliate links: ${publishStepParagraph} This is not Verified end to end.
@@ -311,9 +309,9 @@ Deals with other agents:
 - Upsells: Coming.
 - Reposts: Coming.
 
-The human's limits come first. ${publishStepParagraph} No personal data is shared with the other agent. Allagio does not send cold emails. The agent joins with POST /v1/agent-tokens and sends the bearer. No sign-in link. A person still signs in with Google for the owner dashboard. The aim is to replace manual affiliate signups and outreach email bots. This is affiliate marketing, evolved for agents.
+The human's limits come first. ${publishStepParagraph} No personal data is shared with the other agent. Offer Rails does not send cold emails. The agent joins with POST /v1/agent-tokens and sends the bearer. No sign-in link. A person still signs in with Google for the owner dashboard. The aim is to replace manual affiliate signups and outreach email bots. This is affiliate marketing, evolved for agents.
 
-Allagio is an MCP server. An agent finds affiliate offers for a publisher's own article and prepares a disclosed placement. ${publishStepParagraph} A chat answer is never a paid placement.
+Offer Rails is an MCP server. An agent finds affiliate offers for a publisher's own article and prepares a disclosed placement. ${publishStepParagraph} A chat answer is never a paid placement.
 
 MCP server: ${mcpUrl}
 
@@ -331,7 +329,7 @@ ${install}
 
 ### Stdio
 
-The MCP server name is allagio-mcp. The npm package is coming soon. Use the hosted MCP URL in this document. When the hosted installer archive is on this origin, the installer command is npx --yes --package=<origin>/downloads/allagio-0.1.0.tgz offer-rails --api-url <origin>. That command runs the installer, not the stdio server. Older binary names still start the same server. Set ALLAGIO_API_URL, ALLAGIO_API_KEY, and ALLAGIO_SITE_KEY. The previous names still work when the new name is unset.
+The MCP server name is offer-rails-mcp. The npm package offer-rails is not published yet. It is coming soon. Use the hosted MCP URL in this document. When the hosted installer archive is on this origin, the command is npx --yes --package=<origin>/downloads/offer-rails-0.1.0.tgz offer-rails --api-url <origin>. The environment names are the API URL, the API key, and the site key. Each name is the product name with the space removed, then _API_URL, _API_KEY, and _SITE_KEY.
 
 ## Ordered agent steps
 
@@ -357,7 +355,7 @@ ${toolLines}
 
 ## Pages
 
-- Agents page: {{PUBLIC_BASE_URL}}${pagePath}
+- Agents page: https://offer-rails.onrender.com${pagePath}
 ${docs}
 `
 }

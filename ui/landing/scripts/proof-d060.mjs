@@ -14,7 +14,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repo = resolve(root, '../..')
 const build = resolve(repo, 'affilio-wp/admin/build')
 const shots = '/opt/cursor/artifacts/screenshots'
-const install = 'npx --yes --package=https://offer-rails.example/downloads/allagio-0.1.0.tgz offer-rails --api-url https://offer-rails.example'
+const install = 'npx --yes --package=https://offer-rails.example/downloads/offer-rails-0.1.0.tgz offer-rails --api-url https://offer-rails.example'
 
 function page(name) {
   return readFileSync(join(build, name), 'utf8')
