@@ -1,6 +1,6 @@
 ## November 6 — D-125 CLI paste harness
 
-The paste harness reads the six documented `node cli/bin/offer-rails.mjs` commands. It does not look for `npx`. Publish and install stay on an ephemeral loopback registry. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+The paste harness reads the six documented `node cli/bin/offer-rails.mjs` commands and runs the package installed from the loopback registry. Those commands do not load the source tree. A missing installed module fails. It does not look for `npx`. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## November 2 — D-121 return-path wording
 
