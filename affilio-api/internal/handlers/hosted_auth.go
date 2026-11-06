@@ -119,7 +119,6 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 	public.GET("/.well-known/oauth-protected-resource", h.resourceMetadata)
 	public.GET("/.well-known/oauth-protected-resource/mcp", h.resourceMetadata)
 	public.GET("/.well-known/oauth-authorization-server", h.authorizationMetadata)
-	public.GET("/.well-known/agent-card.json", h.AgentCard)
 	public.POST("/oauth/register", h.RegisterOAuthClient)
 	public.GET("/oauth/authorize", h.Authorize)
 	public.POST("/oauth/token", h.Token)

@@ -61,13 +61,17 @@ A 0.3 deal is unchanged. It does not mint a tracked link. A 0.3 deal does not in
 DCP v0.1 at {{PUBLIC_BASE_URL}}/.well-known/dcp.json remains the live affiliate path.
 `
 
+// discoveryLine is the only short discovery sentence. It names the live HTTP
+// signup and the live MCP call. It does not describe an A2A binding.
+const discoveryLine = "Discovery: POST /v1/agent-tokens with {} and no key. POST /mcp with Authorization: Bearer. The configured origin is {{PUBLIC_BASE_URL}}. A2A support is not implemented. ORP, works over MCP."
+
 const llmsText = `# Allagio
 
 Next: [/skill.md]({{PUBLIC_BASE_URL}}/skill.md)
 
 Cold path: this file, then [/skill.md]({{PUBLIC_BASE_URL}}/skill.md), then join, then a test deal, then proof.
 
-Agent card: GET /.well-known/agent-card.json.
+` + discoveryLine + `
 
 ## ORP 0-3 test deal
 
@@ -103,7 +107,7 @@ This file is a pointer. It is not a second copy of the rules.
 
 Full text: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 
-Agent card: GET /.well-known/agent-card.json.
+` + discoveryLine + `
 
 ## Connect a hosted assistant
 

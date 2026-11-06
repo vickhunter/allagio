@@ -1,6 +1,6 @@
-## November 6 — D-124 A2A Agent Card
+## November 6 — D-124 discovery
 
-`GET /.well-known/agent-card.json` is discovery only. The name is Allagio. URLs come from the hosted base URL. The interfaces are MCP and `GET /v1/health`. There is no A2A task or message endpoint. Skills are the MCP tools. The schema is the published A2A v1.0.0 artifact. `protocolVersion` is omitted because that field means the URL speaks A2A. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+A2A support is not implemented. No Agent Card is served. Discovery stays in `llms.txt`, `skill.md`, and the protocol README. The HTTP call is POST /v1/agent-tokens with {} and no key. The MCP call is POST /mcp with Authorization: Bearer. ORP, works over MCP. Health is not an integration transport. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## November 2 — D-121 return-path wording
 

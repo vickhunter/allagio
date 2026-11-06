@@ -4,7 +4,7 @@ Next: [/skill.md]({{PUBLIC_BASE_URL}}/skill.md)
 
 Cold path: this file, then [/skill.md]({{PUBLIC_BASE_URL}}/skill.md), then join, then a test deal, then proof.
 
-Agent card: GET /.well-known/agent-card.json.
+Discovery: POST /v1/agent-tokens with {} and no key. POST /mcp with Authorization: Bearer. The configured origin is {{PUBLIC_BASE_URL}}. A2A support is not implemented. ORP, works over MCP.
 
 ## ORP 0-3 test deal
 

@@ -229,7 +229,7 @@ func TestSitemapUsesConfiguredOrigin(t *testing.T) {
 	}
 	card := httptest.NewRecorder()
 	r.ServeHTTP(card, httptest.NewRequest(http.MethodGet, "/.well-known/agent-card.json", nil))
-	if card.Code != http.StatusOK || !strings.Contains(card.Header().Get("Content-Type"), "application/json") || !strings.Contains(card.Body.String(), `"name":"Allagio"`) {
-		t.Fatalf("agent card %d %s", card.Code, card.Body.String())
+	if card.Code == http.StatusOK {
+		t.Fatal("agent card is served")
 	}
 }

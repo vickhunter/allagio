@@ -18,10 +18,10 @@ INVALID-68 posts `schema/examples/invalid/envelope-68-shape.json`, `version-semv
 
 The claims mode on the reference host is an in-memory page catalog (`registerPage`). It does not fetch the network and it does not change `CLAIMS_CHECK`.
 
-## Discovery: A2A Agent Card
+## Discovery
 
-`GET /.well-known/agent-card.json` is a discovery document for Allagio. A client can read the host name, the MCP URL, the public HTTP API health URL, and the MCP tool names. The card does not accept A2A tasks or messages. It is not a base protocol. ORP works over MCP.
+A2A support is not implemented. This host does not serve an Agent Card. ORP, works over MCP.
 
-The card is checked against the A2A v1.0.0 Agent Card schema published at <https://a2a-protocol.org/v1.0.0/spec/a2a.json> (tag `v1.0.0`, commit `173695755607e884aa9acf8ce4feed90e32727a1`). The spec is <https://github.com/a2aproject/A2A/blob/v1.0.0/docs/specification.md>.
+Discovery: POST /v1/agent-tokens with {} and no key. POST /mcp with Authorization: Bearer. The configured origin is {{PUBLIC_BASE_URL}}. A2A support is not implemented. ORP, works over MCP.
 
-`AgentInterface.protocolVersion` is defined as the A2A version that URL exposes. These URLs do not speak A2A, so the field is omitted. The published JSON Schema does not require it. `protocolBinding` is an open string. The card uses `MCP` and `HTTP`. It does not use `JSONRPC`, `GRPC`, or `HTTP+JSON`, which are the A2A task transports named in the schema.
+POST /v1/agent-tokens is the HTTP signup. The body is {}. No key is sent. The 201 body returns access_token. POST /mcp is the MCP endpoint. It takes that access_token as Authorization: Bearer. The bearer is not an X-API-Key or X-Admin-Key. A direct Message from SendMessage does not make these endpoints A2A. The configured base URL is the public origin. No personal data is in this section.
