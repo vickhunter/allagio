@@ -261,21 +261,49 @@ for _ in $(seq 1 60); do
 done
 curl -sf "http://127.0.0.1:${VERD_PORT}/-/ping" >/dev/null
 
+REGISTRY="http://127.0.0.1:${VERD_PORT}"
+node -e '
+const u = new URL(process.argv[1]);
+const host = u.hostname;
+const loop = host === "127.0.0.1" || host === "localhost" || host === "::1";
+if (u.protocol !== "http:" || !loop || u.username || u.password || u.hostname.includes("npmjs")) {
+  console.error("refusing to publish outside the loopback registry");
+  process.exit(1);
+}
+' "$REGISTRY"
+
 PUBLISH_NPMRC="$WORKDIR/publish-npmrc"
 touch "$PUBLISH_NPMRC"
 publish_pack() {
-  (cd "$CLI" && NPM_CONFIG_USERCONFIG="$PUBLISH_NPMRC" npm publish --registry "http://127.0.0.1:${VERD_PORT}")
+  (cd "$CLI" && NPM_CONFIG_USERCONFIG="$PUBLISH_NPMRC" npm publish --registry "$REGISTRY")
 }
 if ! publish_pack >/dev/null; then
   ADD="$(curl -sS -X PUT "http://127.0.0.1:${VERD_PORT}/-/user/org.couchdb.user:orcli" \
     -H 'Content-Type: application/json' \
     -d '{"name":"orcli","password":"orcli-pass-123","email":"orcli@example.com"}')"
-  AUTH_TOKEN="$(node -e 'const j=JSON.parse(process.argv[1]); if(!j.token){console.error(process.argv[1]); process.exit(1)} console.log(j.token)' "$ADD")"
+  AUTH_TOKEN="$(node -e 'const j=JSON.parse(process.argv[1]); if(!j.token) process.exit(1); process.stdout.write(j.token)' "$ADD")"
   printf 'registry=http://127.0.0.1:%s/\n//127.0.0.1:%s/:_authToken=%s\n' "$VERD_PORT" "$VERD_PORT" "$AUTH_TOKEN" >"$PUBLISH_NPMRC"
-  publish_pack
+  publish_pack >/dev/null
 fi
 
-mapfile -t LINES < <(awk '/<!-- paste:begin -->/{p=1;next} /<!-- paste:end -->/{p=0} p && $1=="npx"{print}' "$CLI/README.md")
+INSTALL_DIR="$WORKDIR/install"
+mkdir -p "$INSTALL_DIR"
+npm install --prefix "$INSTALL_DIR" --registry "$REGISTRY" allagio@0.1.0
+node -e '
+const fs = require("fs");
+const installed = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+if (installed.name !== "allagio" || installed.version !== "0.1.0") {
+  console.error("installed package is not the published local package");
+  process.exit(1);
+}
+' "$INSTALL_DIR/node_modules/allagio/package.json"
+cmp -s "$CLI/bin/offer-rails.mjs" "$INSTALL_DIR/node_modules/allagio/bin/offer-rails.mjs"
+echo "loopback install matches the published package"
+
+if ! node "$CLI/scripts/readme-commands.mjs" "$CLI/README.md" >"$WORKDIR/readme-lines.txt"; then
+  exit 1
+fi
+mapfile -t LINES < "$WORKDIR/readme-lines.txt"
 if [[ "${#LINES[@]}" -ne 6 ]]; then
   echo "expected 6 README lines, found ${#LINES[@]}" >&2
   printf ' %s\n' "${LINES[@]}" >&2
@@ -284,6 +312,7 @@ fi
 
 CLEAN="$WORKDIR/clean"
 mkdir -p "$CLEAN/home"
+ln -sfn "$CLI" "$CLEAN/cli"
 export HOME="$CLEAN/home"
 export npm_config_cache="$WORKDIR/npm-cache"
 export npm_config_registry="http://127.0.0.1:${VERD_PORT}"
@@ -353,6 +382,7 @@ bash -c "${LINES[5]}" >"$WORKDIR/kill.out" 2>"$WORKDIR/kill.err" || true
 device_login() {
   local dir="$1" token="$2" csrf="$3" offer="$4" label="$5"
   mkdir -p "$dir"
+  ln -sfn "$CLI" "$dir/cli"
   local out="$WORKDIR/${label}-login.out"
   local err="$WORKDIR/${label}-login.err"
   (

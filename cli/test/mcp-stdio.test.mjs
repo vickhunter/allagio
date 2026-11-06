@@ -137,9 +137,9 @@ async function checkServer(label, server) {
   }
 }
 
-test('published npx offer-rails mcp speaks stdio as configured', async (t) => {
+test('documented local mcp command speaks stdio', async (t) => {
   if (process.env.OFFER_RAILS_MCP_SPAWN !== '1') {
-    t.skip('runs from paste-test.sh against the Verdaccio install');
+    t.skip('runs from paste-test.sh after the loopback install');
     return;
   }
   for (const { label, server } of configuredServers()) {

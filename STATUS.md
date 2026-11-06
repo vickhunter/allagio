@@ -1,3 +1,7 @@
+## November 6 — D-125 CLI paste harness
+
+The paste harness reads the six documented `node cli/bin/offer-rails.mjs` commands. It does not look for `npx`. Publish and install stay on an ephemeral loopback registry. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## November 2 — D-121 return-path wording
 
 The agents page says a sign-in may return to `/you`, `/you/`, `/publishers/setup`, or `/publishers/setup/`. Any other query is refused only for `/device`. The built facts chunk is pinned to that sentence. Login tests refuse a leading space, a tab, and `/Publishers/Setup`. `llms-full.txt` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
