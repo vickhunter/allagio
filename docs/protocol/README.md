@@ -17,3 +17,11 @@ ORP 0.4 is many-party deals (2 to 16 seats). The reference host and the Allagio 
 INVALID-68 posts `schema/examples/invalid/envelope-68-shape.json`, `version-semver.json`, and `party-id-role-prefix-68.json`. Each one fails validation.
 
 The claims mode on the reference host is an in-memory page catalog (`registerPage`). It does not fetch the network and it does not change `CLAIMS_CHECK`.
+
+## Discovery: A2A Agent Card
+
+`GET /.well-known/agent-card.json` is a discovery document for Allagio. A client can read the host name, the MCP URL, the public HTTP API health URL, and the MCP tool names. The card does not accept A2A tasks or messages. It is not a base protocol. ORP works over MCP.
+
+The card is checked against the A2A v1.0.0 Agent Card schema published at <https://a2a-protocol.org/v1.0.0/spec/a2a.json> (tag `v1.0.0`, commit `173695755607e884aa9acf8ce4feed90e32727a1`). The spec is <https://github.com/a2aproject/A2A/blob/v1.0.0/docs/specification.md>.
+
+`AgentInterface.protocolVersion` is defined as the A2A version that URL exposes. These URLs do not speak A2A, so the field is omitted. The published JSON Schema does not require it. `protocolBinding` is an open string. The card uses `MCP` and `HTTP`. It does not use `JSONRPC`, `GRPC`, or `HTTP+JSON`, which are the A2A task transports named in the schema.

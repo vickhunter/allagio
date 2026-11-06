@@ -4,6 +4,8 @@ This file is a pointer. It is not a second copy of the rules.
 
 Full text: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 
+Agent card: GET /.well-known/agent-card.json.
+
 ## Connect a hosted assistant
 
 POST /v1/agent-tokens with {}.

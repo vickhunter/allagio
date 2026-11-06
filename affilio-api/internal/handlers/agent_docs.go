@@ -67,6 +67,8 @@ Next: [/skill.md]({{PUBLIC_BASE_URL}}/skill.md)
 
 Cold path: this file, then [/skill.md]({{PUBLIC_BASE_URL}}/skill.md), then join, then a test deal, then proof.
 
+Agent card: GET /.well-known/agent-card.json.
+
 ## ORP 0-3 test deal
 
 Join. POST /orp/join with {}. An empty body returns token and party. Send the token as Authorization: Bearer. Use party as from.
@@ -100,6 +102,8 @@ const skillMD = `# Allagio
 This file is a pointer. It is not a second copy of the rules.
 
 Full text: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
+
+Agent card: GET /.well-known/agent-card.json.
 
 ## Connect a hosted assistant
 

@@ -1,3 +1,7 @@
+## November 6 — D-124 A2A Agent Card
+
+`GET /.well-known/agent-card.json` is discovery only. The name is Allagio. URLs come from the hosted base URL. The interfaces are MCP and `GET /v1/health`. There is no A2A task or message endpoint. Skills are the MCP tools. The schema is the published A2A v1.0.0 artifact. `protocolVersion` is omitted because that field means the URL speaks A2A. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## November 2 — D-121 return-path wording
 
 The agents page says a sign-in may return to `/you`, `/you/`, `/publishers/setup`, or `/publishers/setup/`. Any other query is refused only for `/device`. The built facts chunk is pinned to that sentence. Login tests refuse a leading space, a tab, and `/Publishers/Setup`. `llms-full.txt` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

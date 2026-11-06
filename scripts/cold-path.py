@@ -109,6 +109,15 @@ def main():
         if "/skill.md" not in text:
             raise SystemExit("llms.txt has no skill pointer")
 
+    def agent_card():
+        status, raw = request("GET", "/.well-known/agent-card.json")
+        doc = expect(status, raw, 200)
+        if doc.get("name") != "Allagio":
+            raise SystemExit("agent card name")
+        blob = json.dumps(doc)
+        if "JSONRPC" in blob or "HTTP+JSON" in blob or "/a2a" in blob:
+            raise SystemExit("agent card claims an A2A task endpoint")
+
     def skill():
         status, raw = request("GET", "/skill.md")
         doc = expect(status, raw, 200)
@@ -166,6 +175,7 @@ def main():
             raise SystemExit('proof page missing "does not hold money"')
 
     step("llms.txt", llms)
+    step("agent card", agent_card)
     step("skill.md", skill)
     step("join", join)
     step("test deal", test_deal)
