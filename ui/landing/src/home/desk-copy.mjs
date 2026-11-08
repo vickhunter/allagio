@@ -4,6 +4,11 @@ import { samplePreview, slotLabel } from '../lib/preview-map.mjs'
 // not an earnings claim, and not a relevance score.
 const offer = samplePreview.offer
 
+export const fixtureName = offer.name
+export const fixtureSummary = offer.summary
+export const fixtureCommission = `${offer.commission_value}% commission`
+export const fixtureSlot = slotLabel(samplePreview.slot)
+
 export const deskLabel = 'Illustrative example'
 export const deskWorks = 'Works today. Affiliate placement. Not verified end to end.'
 export const deskComing = 'Coming. Suggesting an offer while you write is not on the hosted server today.'
@@ -28,5 +33,20 @@ export const deskParagraphs = [
 ]
 
 export function staticDeskParagraphs() {
-  return deskParagraphs.map((line) => `<p>${line}</p>`).join('\n      ')
+  return `<p class="desk-label">${deskLabel}</p>
+      <p>${deskWorks}</p>
+      <p>${deskComing}</p>
+      <div class="desk-stage">
+        <div class="desk-offer">
+          <p>${deskOffer}</p>
+        </div>
+        <div class="desk-article">
+          <p class="desk-article-title">${deskContent}</p>
+          <div class="desk-bars" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="desk-inset"><p>${deskPlacement}</p></div>
+          <div class="desk-bars" aria-hidden="true"><span></span><span></span></div>
+        </div>
+      </div>
+      <p>${deskAsk}</p>
+      <p>${deskMcp}</p>`
 }

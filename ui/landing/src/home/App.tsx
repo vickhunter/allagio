@@ -21,17 +21,19 @@ export function App() {
       <section aria-labelledby="hero-h" className="home-hero" data-hero-bg="fallback">
         <div className="hero-fallback" aria-hidden="true" />
         <div className="hero-grid">
-          <div className="hero-copy">
-            <h1 id="hero-h" className="h-display max-w-xl text-[1.65rem] leading-[1.2] text-tinv sm:text-4xl">{inWriteOffer}</h1>
-            <div className="hero-panel mt-5">
-              <JoinForm />
-            </div>
-            <p className="mt-3">
-              <a className={`${linkClass} text-tinv`} href={withSource('/you/', source)}>Your limits</a>
-            </p>
-            <p className="mt-2 max-w-xl text-base leading-relaxed text-tinv2">{pitch}</p>
+          <div className="hero-title">
+            <h1 id="hero-h" className="h-display max-w-[18em] text-[1.35rem] leading-[1.15] text-tinv sm:text-[2rem] sm:leading-[1.12]">{inWriteOffer}</h1>
           </div>
           <DistributionDesk />
+          <div className="hero-copy">
+            <div className="hero-panel">
+              <JoinForm />
+            </div>
+            <p className="mt-2">
+              <a className={`${linkClass} text-tinv`} href={withSource('/you/', source)}>Your limits</a>
+            </p>
+          </div>
+          <p className="hero-pitch">{pitch}</p>
         </div>
       </section>
 

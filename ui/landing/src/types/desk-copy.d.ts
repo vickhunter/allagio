@@ -1,4 +1,8 @@
 declare module '@/home/desk-copy.mjs' {
+  export const fixtureName: string
+  export const fixtureSummary: string
+  export const fixtureCommission: string
+  export const fixtureSlot: string
   export const deskLabel: string
   export const deskWorks: string
   export const deskComing: string
