@@ -713,7 +713,7 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     const page = await context.newPage();
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(base + '/landing');
-    await expect(page.getByRole('heading', { name: 'Connect your agent to Allagio.', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Offers, ready for your agent.', exact: true })).toBeVisible();
     await expect(page.locator('[data-primary-action]')).toHaveCount(1);
     await fits(page);
     await frame(page, `after-landing-${viewport.width}`);
@@ -1250,7 +1250,7 @@ test('landing still renders at both widths', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
     const page = await context.newPage();
     await page.goto(base + '/landing');
-    await expect(page.getByRole('heading', { name: 'Connect your agent to Allagio.', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Offers, ready for your agent.', exact: true })).toBeVisible();
     await fits(page);
     await shot(page, `audit-landing-${viewport.tag}`);
     await context.close();

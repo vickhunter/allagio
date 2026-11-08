@@ -179,7 +179,7 @@ test.describe('public landing contrast and tap targets', () => {
       await page.goto(landing.base + '/landing', { waitUntil: 'networkidle' });
       // D-128 semantic update. The heading is the agent-setup line. Copy setup prompt
       // is the same public-line control, not a skipped check and not a D-126 import.
-      await expect(page.getByRole('heading', { name: 'Connect your agent to Allagio.', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Offers, ready for your agent.', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Copy setup prompt', exact: true })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Set up your agent', exact: true }).first()).toBeVisible();
       await expect(page.locator('#how')).toHaveCount(1);

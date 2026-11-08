@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { howLead, makerBenefit, publisherBenefit } from '../src/home/desk-copy.mjs'
-import { comingLine, heroH1, heroSupport, manualSetup, noSignIn, pathAgent, pathAgentNote, pathBearer, pathBearerNote, pathCaption, pathMcp, pathSend, pathWait, promptLine, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
+import { joinLead, joinPrompt } from '../src/components/join-prompt.mjs'
+import { comingLine, heroH1, heroSupport, manualSetup, noSignIn, pathAgent, pathAgentNote, pathBearer, pathBearerNote, pathCaption, pathMcp, pathSend, pathWait, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
 import { publishStepParagraph } from '../src/vision.mjs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -32,14 +33,21 @@ const homeShell = `<div id="static-landing">
       <h1>${heroH1}</h1>
       <p>${heroSupport}</p>
       <p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in</a></p>
-      <p>${promptLine}</p>
       <p><a href="${setupHref}" style="display:inline-flex;min-height:44px;align-items:center">${setupLabel}</a></p>
+      <details>
+        <summary>Setup details</summary>
+        <p>${joinLead}</p>
+        <p>${joinPrompt}</p>
+        <p><a href="/llms.txt" style="display:inline-flex;min-height:44px;align-items:center">llms.txt</a></p>
+        ${staticSetupSteps()}
+        <p>${noSignIn}</p>
+      </details>
       <p>Manual setup</p>
       <p>MCP</p>
       <p>Your limits</p>
       <p>You approve</p>
       <p>Labelled placement</p>
-      <h2>Give your agent this line to start.</h2>
+      <h2>You send the bearer yourself.</h2>
       <p>${manualSetup} This page does not issue a token.</p>
       <figure>
         <p>${pathCaption}</p>
@@ -51,11 +59,6 @@ const homeShell = `<div id="static-landing">
         <p>${pathMcp}</p>
         <p>${pathWait}</p>
       </figure>
-      <details>
-        <summary>Setup details</summary>
-        ${staticSetupSteps()}
-        <p>${noSignIn}</p>
-      </details>
       <h2>${makerBenefit}</h2>
       <p>Agents put your product in content that fits. The worked sale is an example, not a result from the picture.</p>
       <p><a href="/makers/" style="display:inline-flex;min-height:44px;align-items:center">Makers</a></p>

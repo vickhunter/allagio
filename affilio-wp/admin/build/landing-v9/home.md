@@ -8,9 +8,13 @@ Your agent can find a labelled offer for a post. You keep the limits and the app
 
 Sign in
 
-Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.
-
 Set up your agent
+
+Give your agent this line to start
+
+Join with POST /v1/agent-tokens and send the bearer.
+
+llms.txt
 
 Manual setup
 
@@ -22,7 +26,7 @@ You approve
 
 Labelled placement
 
-Give your agent this line to start.
+You send the bearer yourself.
 
 Setup is manual. You send the bearer yourself. This page does not issue a token.
 

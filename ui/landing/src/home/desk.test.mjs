@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { pagePath } from '../agents/facts.mjs'
-import { joinPrompt } from '../components/join-prompt.mjs'
+import { joinLead, joinPrompt } from '../components/join-prompt.mjs'
 import { comingLine, heroH1, heroSupport, manualSetup, noSignIn, pathCaption, promptLine, setupHref, setupLabel, setupSteps } from './hero-copy.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
@@ -39,7 +39,7 @@ test('the homepage keeps Copy and adds a separate setup link', () => {
   const sequence = readFileSync(resolve(root, 'src/home/SetupSequence.tsx'), 'utf8')
   const header = readFileSync(resolve(root, 'src/site/Header.tsx'), 'utf8')
   assert.match(app, /heroH1/)
-  assert.match(app, /<JoinPrompt \/>/)
+  assert.match(app, /<JoinPrompt line=\{false\} \/>/)
   assert.match(app, /setupHref/)
   assert.match(app, /setupLabel/)
   assert.match(app, /<SetupSequence \/>/)
@@ -58,7 +58,7 @@ test('the no-JS home shell keeps both setup destinations and the public prompt',
   assert.match(stamp, /return_to=%2Fowner%3Fsetup%3Dmaker/)
   assert.match(stamp, /href="\/owner\/settings"/)
   assert.match(stamp, /setupHref/)
-  for (const line of [heroH1, heroSupport, manualSetup, setupLabel, promptLine, comingLine, pathCaption, ...setupSteps, noSignIn]) {
+  for (const line of [heroH1, heroSupport, manualSetup, setupLabel, joinLead, joinPrompt, comingLine, pathCaption, ...setupSteps, noSignIn]) {
     assert.equal(md.includes(line), true, `home.md dropped ${line}`)
   }
 })

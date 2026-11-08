@@ -45,8 +45,10 @@ test('the home first screen connects the agent with a setup link and the public 
       assert.equal(await copy.count(), 1)
       const copyBox = await copy.boundingBox()
       assert.ok(copyBox && copyBox.y + copyBox.height < viewport.height, `${viewport.width} copy bottom ${copyBox && copyBox.y + copyBox.height}`)
-      assert.equal(await page.locator('[data-join-prompt] pre').innerText(), joinPrompt)
-      assert.equal(await page.locator('[data-join-prompt] a').getAttribute('href'), '/llms.txt')
+      await page.locator('.setup-details summary').click()
+      const details = page.locator('.setup-details')
+      assert.match(await details.innerText(), new RegExp(joinPrompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+      assert.equal(await details.locator('a[href="/llms.txt"]').count(), 1)
       const coming = page.locator('#publishers').getByText('Offer suggestions while you write: Coming.')
       assert.equal(await coming.count(), 1)
       if (viewport.width < 768) {

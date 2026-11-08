@@ -1,6 +1,6 @@
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
-import { JoinPrompt } from '@/components/join-prompt.mjs'
+import { JoinPrompt, joinLead, joinPrompt } from '@/components/join-prompt.mjs'
 import { example, faq } from '@/content'
 import { Vision } from './Vision'
 import { PostPreview } from '@/components/PostPreview'
@@ -41,18 +41,30 @@ export function App() {
         <div className="scalar-main">
           <section aria-labelledby="hero-h" className="orbit-stage" data-hero-bg="fallback">
             <div className="hero-fallback" aria-hidden="true" />
-            <Orbit />
-            <div className="orbit-copy">
-              <h1 id="hero-h">{heroH1}</h1>
-              <p className="orbit-support">{heroSupport}</p>
-              <div className="orbit-actions">
-                <a className="orbit-signin" href={signIn}>Sign in</a>
-                <div id="join" className="orbit-join">
-                  <JoinPrompt />
+            <div className="orbit-scene">
+              <Orbit />
+              <div className="orbit-copy">
+                <h1 id="hero-h">{heroH1}</h1>
+                <p className="orbit-support">{heroSupport}</p>
+                <div className="orbit-actions">
+                  <a className="orbit-signin" href={signIn}>Sign in</a>
+                  <div id="join" className="orbit-join">
+                    <JoinPrompt line={false} />
+                  </div>
                 </div>
-                <a className="orbit-setup" data-primary-action href={withSource(setupHref, source)} data-track="secondary_click" data-track-to="agents">{setupLabel}</a>
               </div>
             </div>
+            <p className="orbit-next">
+              <a className="orbit-setup" data-primary-action href={withSource(setupHref, source)} data-track="secondary_click" data-track-to="agents">{setupLabel}</a>
+            </p>
+            <details className="setup-details">
+              <summary>Setup details</summary>
+              <p>{joinLead}</p>
+              <p>{joinPrompt}</p>
+              <p><a href="/llms.txt">llms.txt</a></p>
+              {setupSteps.map((step) => <p key={step}>{step}</p>)}
+              <p>{noSignIn}</p>
+            </details>
           </section>
 
           <ul className="cap-rail" aria-label="What this page can do">
@@ -62,14 +74,9 @@ export function App() {
           <section id="connection" aria-labelledby="connection-h" className="split">
             <div>
               <p className="kicker">Connection</p>
-              <h2 id="connection-h">Give your agent this line to start.</h2>
+              <h2 id="connection-h">You send the bearer yourself.</h2>
               <p>{manualSetup} This page does not issue a token.</p>
-              <Rows items={['You send the bearer yourself.', 'The join line is public. Copy does not open a page.', noSignIn]} />
-              <details className="setup-details">
-                <summary>Setup details</summary>
-                {setupSteps.map((step) => <p key={step}>{step}</p>)}
-                <p>{noSignIn}</p>
-              </details>
+              <Rows items={['The join line is public. Copy does not open a page.', noSignIn]} />
             </div>
             <SetupSequence />
           </section>

@@ -1,23 +1,23 @@
-// Original orbit. Six plain spheres and two thin ellipses. No copied marks, no customer names.
+import type { CSSProperties } from 'react'
+
+// Ornament only. Six original spheres ride one ellipse. They are not a connection.
 const spheres = [
-  { cls: 'sphere-moss', style: { top: '-14%', left: '18%' } },
-  { cls: 'sphere-clay', style: { top: '-16%', left: '64%' } },
-  { cls: 'sphere-sand', style: { top: '34%', left: '-6%' } },
-  { cls: 'sphere-stone', style: { top: '46%', left: '6%' } },
-  { cls: 'sphere-ink', style: { top: '18%', left: '88%' } },
-  { cls: 'sphere-blue', style: { top: '58%', left: '82%' } },
+  { cls: 'sphere-moss', a: '-110deg' },
+  { cls: 'sphere-clay', a: '-68deg' },
+  { cls: 'sphere-sand', a: '168deg' },
+  { cls: 'sphere-stone', a: '138deg' },
+  { cls: 'sphere-ink', a: '-12deg' },
+  { cls: 'sphere-blue', a: '32deg' },
 ] as const
 
 export function Orbit() {
   return (
     <div className="orbit" aria-hidden="true">
-      <svg className="orbit-ring" viewBox="0 0 760 280">
-        <ellipse cx="380" cy="140" rx="330" ry="112" fill="none" stroke="currentColor" strokeWidth="1" />
-        <ellipse cx="380" cy="140" rx="286" ry="92" fill="none" stroke="currentColor" strokeWidth="1" />
-      </svg>
-      <div className="orbit-spin">
-        {spheres.map((sphere) => <span key={sphere.cls} className={`sphere ${sphere.cls}`} style={sphere.style} />)}
-      </div>
+      <div className="orbit-ring orbit-ring-a" />
+      <div className="orbit-ring orbit-ring-b" />
+      {spheres.map((sphere) => (
+        <span key={sphere.cls} className={`sphere ${sphere.cls}`} style={{ '--a0': sphere.a, '--a': sphere.a } as CSSProperties} />
+      ))}
     </div>
   )
 }
