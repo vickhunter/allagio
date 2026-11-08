@@ -1,7 +1,8 @@
 import { pagePath } from '../agents/facts.mjs'
 import { joinPrompt } from '../components/join-prompt.mjs'
 
-export const heroH1 = 'Connect your agent to Allagio.'
+export const heroH1 = 'Offers, ready for your agent.'
+export const heroSupport = 'Your agent can find a labelled offer for a post. You keep the limits and the approval.'
 export const manualSetup = 'Setup is manual. You send the bearer yourself.'
 export const comingLine = 'Offer suggestions while you write: Coming.'
 export const setupLabel = 'Set up your agent'

@@ -40,7 +40,7 @@ export function Header({ page }: { page: PageKey }) {
       className={`inline-flex min-h-11 min-w-11 items-center rounded-md px-2.5 transition-colors duration-150 sm:px-3 ${tone} ${current === key ? 'bg-s2 font-semibold' : ''}`}>{label}</a>
   )
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-s0/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-line bg-white">
       <div className="site-bar">
         <Logo />
         <button ref={menuRef} type="button" className="site-menu-btn" aria-expanded={open} aria-controls="site-menu" onClick={() => setOpen((value) => !value)}>
@@ -59,7 +59,7 @@ export function Header({ page }: { page: PageKey }) {
             {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}<span className="hidden sm:inline">{paused ? 'Play' : 'Pause'} motion</span><span className="sr-only sm:hidden">{paused ? 'Play' : 'Pause'} motion</span>
           </button>
           <CommandPalette commands={siteCommands.map((command) => ({ ...command, href: command.href.startsWith('#') ? command.href : withSource(command.href, source) }))} />
-          <a href={signInHref('/owner', source)} data-track="nav_cta" className="inline-flex min-h-11 min-w-11 items-center rounded-lg border-2 border-moss bg-s1 px-3 text-[13px] font-semibold text-t1 transition-colors duration-150 hover:bg-s2">Sign in</a>
+          <a href={signInHref('/owner', source)} data-track="nav_cta" className="inline-flex min-h-11 min-w-11 items-center rounded-full bg-t1 px-3.5 text-[13px] font-semibold text-s0">Sign in</a>
         </div>
       </div>
     </header>

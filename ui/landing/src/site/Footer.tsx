@@ -26,28 +26,34 @@ export function Footer() {
         <Skyline />
         <div className="tram-lane" aria-hidden="true"><div className="tram"><Tram /></div></div>
       </div>
-      <div className="border-t border-[rgb(var(--rgb-footer-line))]">
-        <div className="mx-auto grid max-w-6xl gap-6 px-5 py-8 text-sm sm:grid-cols-[1fr_auto] sm:items-end">
+      <div className="border-t border-[rgb(var(--rgb-footer-line))] bg-s1">
+        <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 text-sm sm:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,.7fr))]">
           <div className="space-y-3">
             <Logo />
-            <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
-              <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/', source)}>Home</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center text-maker underline-offset-4 hover:underline" href={withSource('/makers/', source)}>For makers</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center text-pub underline-offset-4 hover:underline" href={withSource('/publishers/', source)}>For publishers</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/protocol/', source)}>Protocol</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/you/', source)}>Your limits</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/privacy', source)}>Privacy</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/terms', source)}>Terms</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href="/landing-v9/how-it-works/">How it works</a>
-              <a className="inline-flex min-h-11 min-w-11 items-center underline-offset-4 hover:underline" href={withSource('/landing-v9/agents/', source)}>MCP and setup</a>
-            </nav>
-            <p className="text-t2">{workingName} Agents find, match and place. Humans get the results. Drawn and built in Padova.</p>
-          </div>
-          <div className="flex flex-col items-start gap-3 sm:items-end">
+            <p className="max-w-[28ch] text-t2">{workingName} Agents find, match and place. Humans get the results. Drawn and built in Padova.</p>
             <Blip say="Next stop: Prato della Valle." />
             <p className="font-mono text-xs text-t2">Press <Kbd>?</Kbd> for shortcuts</p>
           </div>
+          <nav aria-label="Footer" className="foot-cols">
+            <p>Product</p>
+            <a href={withSource('/', source)}>Home</a>
+            <a href={withSource('/landing-v9/agents/', source)}>MCP and setup</a>
+            <a href="/landing-v9/how-it-works/">How it works</a>
+          </nav>
+          <nav aria-label="People" className="foot-cols">
+            <p>People</p>
+            <a href={withSource('/makers/', source)}>For makers</a>
+            <a href={withSource('/publishers/', source)}>For publishers</a>
+            <a href={withSource('/you/', source)}>Your limits</a>
+          </nav>
+          <nav aria-label="Paper" className="foot-cols">
+            <p>Paper</p>
+            <a href={withSource('/protocol/', source)}>Protocol</a>
+            <a href={withSource('/privacy', source)}>Privacy</a>
+            <a href={withSource('/terms', source)}>Terms</a>
+          </nav>
         </div>
+        <div className="foot-stripe" aria-hidden="true" />
       </div>
     </footer>
   )

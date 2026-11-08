@@ -35,7 +35,7 @@ test('the home first screen connects the agent with a setup link and the public 
       assert.equal(await page.getByRole('link', { name: 'I run a site' }).count(), 0)
       const heading = page.getByRole('heading', { level: 1 })
       const headingBox = await heading.boundingBox()
-      assert.equal(await heading.innerText(), 'Connect your agent to Allagio.')
+      assert.equal(await heading.innerText(), 'Offers, ready for your agent.')
       assert.ok(headingBox && headingBox.y + headingBox.height < viewport.height)
       const setup = page.getByRole('link', { name: 'Set up your agent', exact: true }).first()
       const setupBox = await setup.boundingBox()
@@ -47,9 +47,8 @@ test('the home first screen connects the agent with a setup link and the public 
       assert.ok(copyBox && copyBox.y + copyBox.height < viewport.height, `${viewport.width} copy bottom ${copyBox && copyBox.y + copyBox.height}`)
       assert.equal(await page.locator('[data-join-prompt] pre').innerText(), joinPrompt)
       assert.equal(await page.locator('[data-join-prompt] a').getAttribute('href'), '/llms.txt')
-      const coming = page.getByText('Offer suggestions while you write: Coming.')
-      const comingBox = await coming.boundingBox()
-      assert.ok(comingBox && comingBox.y < viewport.height, `${viewport.width} coming is below the fold`)
+      const coming = page.locator('#publishers').getByText('Offer suggestions while you write: Coming.')
+      assert.equal(await coming.count(), 1)
       if (viewport.width < 768) {
         await page.getByRole('button', { name: 'Menu', exact: true }).click()
       }

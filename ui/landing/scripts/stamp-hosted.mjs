@@ -1,6 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { howLead, makerBenefit, publisherBenefit } from '../src/home/desk-copy.mjs'
-import { comingLine, heroH1, manualSetup, noSignIn, pathAgent, pathAgentNote, pathBearer, pathBearerNote, pathCaption, pathMcp, pathSend, pathWait, promptLine, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
+import { comingLine, heroH1, heroSupport, manualSetup, noSignIn, pathAgent, pathAgentNote, pathBearer, pathBearerNote, pathCaption, pathMcp, pathSend, pathWait, promptLine, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
 import { publishStepParagraph } from '../src/vision.mjs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -30,9 +30,17 @@ const homeShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
       <h1>${heroH1}</h1>
-      <p>${manualSetup}</p>
-      <p><a href="${setupHref}" style="display:inline-flex;min-height:44px;align-items:center">${setupLabel}</a></p>
+      <p>${heroSupport}</p>
+      <p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in</a></p>
       <p>${promptLine}</p>
+      <p><a href="${setupHref}" style="display:inline-flex;min-height:44px;align-items:center">${setupLabel}</a></p>
+      <p>Manual setup</p>
+      <p>MCP</p>
+      <p>Your limits</p>
+      <p>You approve</p>
+      <p>Labelled placement</p>
+      <h2>Give your agent this line to start.</h2>
+      <p>${manualSetup} This page does not issue a token.</p>
       <figure>
         <p>${pathCaption}</p>
         <p>${pathAgent}</p>
@@ -43,20 +51,25 @@ const homeShell = `<div id="static-landing">
         <p>${pathMcp}</p>
         <p>${pathWait}</p>
       </figure>
-      <p>${comingLine}</p>
       <details>
         <summary>Setup details</summary>
         ${staticSetupSteps()}
         <p>${noSignIn}</p>
       </details>
+      <h2>${makerBenefit}</h2>
+      <p>Agents put your product in content that fits. The worked sale is an example, not a result from the picture.</p>
+      <p><a href="/makers/" style="display:inline-flex;min-height:44px;align-items:center">Makers</a></p>
+      <section id="publishers"><h2>${publisherBenefit}</h2><p>Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.</p><p>${comingLine}</p><p><a href="/publishers/" style="display:inline-flex;min-height:44px;align-items:center">Publishers</a></p></section>
+      <section id="how"><h2>The offer stays inside your limits.</h2><p>${howLead}</p></section>
+      <h2>A post, before an offer</h2>
+      <p>Nothing is inserted. Some posts get no offer.</p>
+      <h2>A labelled placement you can refuse</h2>
+      <p>One box, marked sponsored. Prepare waits until you approve.</p>
       <p><a href="/you/" style="display:inline-flex;min-height:44px;align-items:center">Your limits</a></p>
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
       <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
       <p><a href="/downloads/offer-rails.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
       <div class="hero-fallback" style="min-height:240px"></div>
-      <section id="how"><h2>How it works</h2><p>${howLead}</p></section>
-      <p>${makerBenefit}</p>
-      <section id="publishers"><h2>For publishers</h2><p>${publisherBenefit}</p></section>
     </main>
   </div>`
 

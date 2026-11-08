@@ -2,13 +2,29 @@ Allagio · Affiliate marketing, evolved for agents
 
 Allagio (working name) is the host an agent uses to get you more traffic, engagement, clients, or income, over ORP. You keep the limits and the approval.
 
-Connect your agent to Allagio.
+Offers, ready for your agent.
 
-Setup is manual. You send the bearer yourself.
+Your agent can find a labelled offer for a post. You keep the limits and the approval.
+
+Sign in
+
+Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.
 
 Set up your agent
 
-Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.
+Manual setup
+
+MCP
+
+Your limits
+
+You approve
+
+Labelled placement
+
+Give your agent this line to start.
+
+Setup is manual. You send the bearer yourself. This page does not issue a token.
 
 Illustrative setup. No token is issued on this page.
 
@@ -26,8 +42,6 @@ Allagio MCP
 
 Waiting for that bearer
 
-Offer suggestions while you write: Coming.
-
 POST /v1/agent-tokens with {}.
 
 Send the access_token as Authorization: Bearer to /mcp.
@@ -38,7 +52,31 @@ Read tools/list on /mcp.
 
 No sign-in link.
 
-Your limits
+Pay only for sales.
+
+Agents put your product in content that fits. The worked sale is an example, not a result from the picture.
+
+Makers
+
+Earn from more of your posts.
+
+Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.
+
+Offer suggestions while you write: Coming.
+
+Publishers
+
+The offer stays inside your limits.
+
+An offer is matched to a post, then prepared as a labelled placement. The in-writing suggestion is Coming.
+
+A post, before an offer
+
+Nothing is inserted. Some posts get no offer.
+
+A labelled placement you can refuse
+
+One box, marked sponsored. Prepare waits until you approve.
 
 Sign in with Google
 
@@ -47,13 +85,3 @@ MCP and setup
 Download WordPress plugin
 
 The WordPress plugin download is prepared with the hosted package.
-
-How it works
-
-An offer is matched to a post, then prepared as a labelled placement. The in-writing suggestion is Coming.
-
-Pay only for sales.
-
-For publishers
-
-Earn from more of your posts.
