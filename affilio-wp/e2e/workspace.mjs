@@ -26,7 +26,7 @@ try {
     const builder = await owner(fixture.builder);
     await builder.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await builder.goto(fixture.base + '/');
-    await expect(builder.getByRole('heading', { name: /Someone has the product/ })).toBeVisible();
+    await expect(builder.getByRole('heading', { name: 'Connect your agent to Allagio.', exact: true })).toBeVisible();
     if (await builder.locator('#install').count()) {
         await builder.getByRole('button', { name: 'Copy command', exact: true }).click();
         await expect(builder.locator('.copy-status')).toContainText('Copied.');

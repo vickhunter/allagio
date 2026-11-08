@@ -1,6 +1,6 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { howLead, makerBenefit, publisherBenefit } from '../src/home/desk-copy.mjs'
-import { comingLine, copyClarify, heroH1, manualSetup, promptLine, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
+import { comingLine, heroH1, manualSetup, noSignIn, pathAgent, pathAgentNote, pathBearer, pathBearerNote, pathCaption, pathMcp, pathSend, pathWait, promptLine, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
 import { publishStepParagraph } from '../src/vision.mjs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -33,9 +33,22 @@ const homeShell = `<div id="static-landing">
       <p>${manualSetup}</p>
       <p><a href="${setupHref}" style="display:inline-flex;min-height:44px;align-items:center">${setupLabel}</a></p>
       <p>${promptLine}</p>
-      <p>${copyClarify}</p>
+      <figure>
+        <p>${pathCaption}</p>
+        <p>${pathAgent}</p>
+        <p>${pathAgentNote}</p>
+        <p>${pathBearer}</p>
+        <p>${pathBearerNote}</p>
+        <p>${pathSend}</p>
+        <p>${pathMcp}</p>
+        <p>${pathWait}</p>
+      </figure>
       <p>${comingLine}</p>
-      ${staticSetupSteps()}
+      <details>
+        <summary>Setup details</summary>
+        ${staticSetupSteps()}
+        <p>${noSignIn}</p>
+      </details>
       <p><a href="/you/" style="display:inline-flex;min-height:44px;align-items:center">Your limits</a></p>
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
       <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>

@@ -47,7 +47,7 @@ test('the home first screen connects the agent with a setup link and the public 
       assert.ok(copyBox && copyBox.y + copyBox.height < viewport.height, `${viewport.width} copy bottom ${copyBox && copyBox.y + copyBox.height}`)
       assert.equal(await page.locator('[data-join-prompt] pre').innerText(), joinPrompt)
       assert.equal(await page.locator('[data-join-prompt] a').getAttribute('href'), '/llms.txt')
-      const coming = page.getByText('Suggesting an offer while you write is Coming.')
+      const coming = page.getByText('Offer suggestions while you write: Coming.')
       const comingBox = await coming.boundingBox()
       assert.ok(comingBox && comingBox.y < viewport.height, `${viewport.width} coming is below the fold`)
       if (viewport.width < 768) {

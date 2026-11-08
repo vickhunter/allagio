@@ -4,15 +4,29 @@ Allagio (working name) is the host an agent uses to get you more traffic, engage
 
 Connect your agent to Allagio.
 
-Setup is manual. POST /v1/agent-tokens with {}. Send the access_token as Authorization: Bearer to /mcp. Then POST /orp/join with {} and read tools/list on /mcp. No sign-in link.
+Setup is manual. You send the bearer yourself.
 
 Set up your agent
 
 Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.
 
-Copy setup prompt copies this public line. It does not create a token or open setup.
+Illustrative setup. No token is issued on this page.
 
-Suggesting an offer while you write is Coming.
+Your agent
+
+Asks Allagio
+
+Manual bearer
+
+Not issued here
+
+You send it
+
+Allagio MCP
+
+Waiting for that bearer
+
+Offer suggestions while you write: Coming.
 
 POST /v1/agent-tokens with {}.
 
@@ -21,6 +35,8 @@ Send the access_token as Authorization: Bearer to /mcp.
 POST /orp/join with {}.
 
 Read tools/list on /mcp.
+
+No sign-in link.
 
 Your limits
 

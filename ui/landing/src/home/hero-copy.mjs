@@ -1,14 +1,20 @@
 import { pagePath } from '../agents/facts.mjs'
 import { joinPrompt } from '../components/join-prompt.mjs'
 
-// Public setup words. The copy payload stays the existing join prompt.
 export const heroH1 = 'Connect your agent to Allagio.'
-export const manualSetup = 'Setup is manual. POST /v1/agent-tokens with {}. Send the access_token as Authorization: Bearer to /mcp. Then POST /orp/join with {} and read tools/list on /mcp. No sign-in link.'
-export const comingLine = 'Suggesting an offer while you write is Coming.'
+export const manualSetup = 'Setup is manual. You send the bearer yourself.'
+export const comingLine = 'Offer suggestions while you write: Coming.'
 export const setupLabel = 'Set up your agent'
-export const copyClarify = 'Copy setup prompt copies this public line. It does not create a token or open setup.'
 export const setupHref = pagePath
 export const promptLine = `Give your agent this line to start. ${joinPrompt}`
+export const pathCaption = 'Illustrative setup. No token is issued on this page.'
+export const pathAgent = 'Your agent'
+export const pathAgentNote = 'Asks Allagio'
+export const pathBearer = 'Manual bearer'
+export const pathBearerNote = 'Not issued here'
+export const pathSend = 'You send it'
+export const pathMcp = 'Allagio MCP'
+export const pathWait = 'Waiting for that bearer'
 
 export const setupSteps = [
   'POST /v1/agent-tokens with {}.',
@@ -16,7 +22,8 @@ export const setupSteps = [
   'POST /orp/join with {}.',
   'Read tools/list on /mcp.',
 ]
+export const noSignIn = 'No sign-in link.'
 
 export function staticSetupSteps() {
-  return setupSteps.map((line) => `<p>${line}</p>`).join('\n      ')
+  return setupSteps.map((line) => `<p>${line}</p>`).join('\n        ')
 }

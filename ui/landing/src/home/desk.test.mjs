@@ -5,26 +5,27 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { pagePath } from '../agents/facts.mjs'
 import { joinPrompt } from '../components/join-prompt.mjs'
-import { comingLine, copyClarify, heroH1, manualSetup, promptLine, setupHref, setupLabel, setupSteps } from './hero-copy.mjs'
+import { comingLine, heroH1, manualSetup, noSignIn, pathCaption, promptLine, setupHref, setupLabel, setupSteps } from './hero-copy.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 test('setup copy stays the public join line and the navigation target is the agents page', () => {
   assert.equal(joinPrompt, 'Join with POST /v1/agent-tokens and send the bearer.')
   assert.equal(heroH1, 'Connect your agent to Allagio.')
-  assert.match(manualSetup, /Setup is manual/)
-  assert.match(manualSetup, /POST \/v1\/agent-tokens with \{\}/)
-  assert.match(manualSetup, /Authorization: Bearer to \/mcp/)
-  assert.match(manualSetup, /POST \/orp\/join with \{\}/)
-  assert.match(manualSetup, /tools\/list on \/mcp/)
-  assert.match(manualSetup, /No sign-in link/)
-  assert.match(comingLine, /Coming/)
+  assert.equal(manualSetup, 'Setup is manual. You send the bearer yourself.')
+  assert.equal(comingLine, 'Offer suggestions while you write: Coming.')
+  assert.equal(noSignIn, 'No sign-in link.')
+  assert.deepEqual(setupSteps, [
+    'POST /v1/agent-tokens with {}.',
+    'Send the access_token as Authorization: Bearer to /mcp.',
+    'POST /orp/join with {}.',
+    'Read tools/list on /mcp.',
+  ])
   assert.equal(setupHref, pagePath)
   assert.equal(setupHref, '/landing-v9/agents/')
   assert.equal(setupLabel, 'Set up your agent')
   assert.match(promptLine, new RegExp(joinPrompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-  assert.match(copyClarify, /does not create a token/)
-  assert.equal(setupSteps.length, 4)
+  assert.equal(pathCaption.includes('No token is issued'), true)
   const prompt = readFileSync(resolve(root, 'src/components/join-prompt.mjs'), 'utf8')
   assert.match(prompt, /navigator\.clipboard\.writeText\(joinPrompt\)/)
   assert.match(prompt, /Copy setup prompt/)
@@ -34,6 +35,7 @@ test('setup copy stays the public join line and the navigation target is the age
 
 test('the homepage keeps Copy and adds a separate setup link', () => {
   const app = readFileSync(resolve(root, 'src/home/App.tsx'), 'utf8')
+  const sequence = readFileSync(resolve(root, 'src/home/SetupSequence.tsx'), 'utf8')
   const header = readFileSync(resolve(root, 'src/site/Header.tsx'), 'utf8')
   assert.match(app, /heroH1/)
   assert.match(app, /<JoinPrompt \/>/)
@@ -43,6 +45,8 @@ test('the homepage keeps Copy and adds a separate setup link', () => {
   assert.match(header, /Menu/)
   assert.match(header, /aria-controls="site-menu"/)
   assert.equal(header.includes('mask-image'), false)
+  assert.equal(sequence.includes('Coming'), false)
+  assert.match(app, /\{comingLine\}/)
   assert.equal(app.includes('Someone has the product'), false)
 })
 
@@ -52,7 +56,7 @@ test('the no-JS home shell keeps both setup destinations and the public prompt',
   assert.match(stamp, /return_to=%2Fowner%3Fsetup%3Dmaker/)
   assert.match(stamp, /href="\/owner\/settings"/)
   assert.match(stamp, /setupHref/)
-  for (const line of [heroH1, manualSetup, setupLabel, promptLine, copyClarify, comingLine, ...setupSteps]) {
+  for (const line of [heroH1, manualSetup, setupLabel, promptLine, comingLine, pathCaption, ...setupSteps, noSignIn]) {
     assert.equal(md.includes(line), true, `home.md dropped ${line}`)
   }
 })

@@ -6,7 +6,7 @@ import { Vision } from './Vision'
 import { PostPreview } from '@/components/PostPreview'
 import { SetupSequence } from './SetupSequence'
 import { signInHref, useOfferConfig, useSource, withSource } from '@/lib/source'
-import { copyClarify, heroH1, manualSetup, setupHref, setupLabel } from '@/home/hero-copy.mjs'
+import { comingLine, heroH1, manualSetup, noSignIn, setupHref, setupLabel, setupSteps } from '@/home/hero-copy.mjs'
 import { howLead, makerBenefit, publisherBenefit } from '@/home/desk-copy.mjs'
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
@@ -22,21 +22,28 @@ export function App() {
         <div className="hero-fallback" aria-hidden="true" />
         <div className="hero-grid">
           <div className="hero-lead">
-            <h1 id="hero-h" className="h-display max-w-[16em] text-[2rem] leading-[1.12] text-t1 sm:text-[2.6rem]">{heroH1}</h1>
+            <h1 id="hero-h" className="h-display max-w-[12em] text-[2.15rem] leading-[1.08] text-t1 sm:text-5xl">{heroH1}</h1>
             <p className="hero-support">{manualSetup}</p>
             <p className="mt-4">
-              <a className="setup-go" href={withSource(setupHref, source)} data-track="secondary_click" data-track-to="agents">{setupLabel}</a>
-            </p>
-            <div id="join" className="hero-prompt">
-              <JoinPrompt />
-              <p className="hero-clarify">{copyClarify}</p>
-            </div>
-            <p className="mt-2">
-              <a className={linkClass} href={withSource('/you/', source)}>Your limits</a>
+              <a className="setup-go" data-primary-action href={withSource(setupHref, source)} data-track="secondary_click" data-track-to="agents">{setupLabel}</a>
             </p>
           </div>
           <SetupSequence />
+          <div id="join" className="hero-prompt">
+            <JoinPrompt />
+          </div>
         </div>
+        <aside className="future-strip" aria-label="Not available yet">
+          <p>{comingLine}</p>
+        </aside>
+        <details className="setup-details">
+          <summary>Setup details</summary>
+          {setupSteps.map((step) => <p key={step}>{step}</p>)}
+          <p>{noSignIn}</p>
+        </details>
+        <p className="hero-limits">
+          <a className={linkClass} href={withSource('/you/', source)}>Your limits</a>
+        </p>
       </section>
 
       <section aria-labelledby="makers-h" className="border-t border-line bg-[rgb(var(--rgb-footer))]">
