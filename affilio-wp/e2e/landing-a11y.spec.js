@@ -177,8 +177,11 @@ test.describe('public landing contrast and tap targets', () => {
       });
       const page = await context.newPage();
       await page.goto(landing.base + '/landing', { waitUntil: 'networkidle' });
-      await expect(page.getByRole('heading', { name: /Someone has the product/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Copy command', exact: true })).toBeVisible();
+      // D-127 semantic update. Main already retired "Someone has the product" and the
+      // "Copy command" control. The approved heading is the in-write offer, and the
+      // current control is Copy. This is not a D-126 import and does not skip the check.
+      await expect(page.getByRole('heading', { name: /this fits your post, want to monetize it/ })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Copy', exact: true })).toBeVisible();
       await expect(page.locator('#how')).toHaveCount(1);
       await expect(page.locator('#publishers')).toHaveCount(1);
       expect(await axeContrast(page, ['#hero-h', '#join-h'])).toEqual([]);
@@ -187,7 +190,7 @@ test.describe('public landing contrast and tap targets', () => {
         const box = await page.getByRole('link', { name }).first().boundingBox();
         expect(box.height).toBeGreaterThanOrEqual(44);
       }
-      const copy = await page.getByRole('button', { name: 'Copy command', exact: true }).boundingBox();
+      const copy = await page.getByRole('button', { name: 'Copy', exact: true }).boundingBox();
       expect(copy.height).toBeGreaterThanOrEqual(44);
       await page.locator('a.skip').focus();
       const skip = await page.locator('a.skip').boundingBox();

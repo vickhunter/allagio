@@ -1,4 +1,5 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { howLead, makerBenefit, publisherBenefit, staticDeskParagraphs } from '../src/home/desk-copy.mjs'
 import { publishStepParagraph } from '../src/vision.mjs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,6 +23,24 @@ const shell = `<div id="static-landing">
       <div class="hero-fallback" style="min-height:240px"></div>
       <section id="how"><h2>How it works</h2></section>
       <section id="publishers"><h2>For publishers</h2></section>
+    </main>
+  </div>`
+const homeShell = `<div id="static-landing">
+    <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+    <main id="main">
+      <h1>While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.</h1>
+      <p>Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.</p>
+      <p><a href="/you/" style="display:inline-flex;min-height:44px;align-items:center">Your limits</a></p>
+      <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
+      <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
+      <p><a href="/downloads/offer-rails.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
+      <div class="hero-fallback" style="min-height:240px"></div>
+      <figure class="desk">
+      ${staticDeskParagraphs()}
+      </figure>
+      <section id="how"><h2>How it works</h2><p>${howLead}</p></section>
+      <p>${makerBenefit}</p>
+      <section id="publishers"><h2>For publishers</h2><p>${publisherBenefit}</p></section>
     </main>
   </div>`
 
@@ -101,7 +120,7 @@ rmSync(resolve(assets, 'publishers'), { recursive: true, force: true })
 rmSync(resolve(assets, 'protocol'), { recursive: true, force: true })
 rmSync(resolve(assets, 'you'), { recursive: true, force: true })
 
-writeFileSync(resolve(build, 'home.html'), stamp(resolve(dist, 'index.html')))
+writeFileSync(resolve(build, 'home.html'), stamp(resolve(dist, 'index.html'), homeShell))
 writeFileSync(resolve(build, 'makers.html'), stamp(resolve(dist, 'makers/index.html')))
 writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers/index.html')))
 writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publishers/setup/index.html'), setupShell))

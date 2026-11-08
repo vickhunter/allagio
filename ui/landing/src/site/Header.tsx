@@ -44,7 +44,7 @@ export function Header({ page }: { page: PageKey }) {
             {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}<span className="hidden sm:inline">{paused ? 'Play' : 'Pause'} motion</span><span className="sr-only sm:hidden">{paused ? 'Play' : 'Pause'} motion</span>
           </button>
           <CommandPalette commands={siteCommands.map((command) => ({ ...command, href: command.href.startsWith('#') ? command.href : withSource(command.href, source) }))} />
-          <a href={signInHref('/owner', source)} data-track="nav_cta" className="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-line-strong bg-s1 px-3 text-[13px] font-semibold transition-colors duration-150 hover:bg-s2">Sign in</a>
+          <a href={signInHref('/owner', source)} data-track="nav_cta" className="inline-flex min-h-11 min-w-11 items-center rounded-lg border-2 border-moss bg-s1 px-3 text-[13px] font-semibold text-t1 transition-colors duration-150 hover:bg-s2">Sign in</a>
         </div>
       </div>
     </header>

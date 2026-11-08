@@ -9,6 +9,15 @@ declare module '@/lib/preview-map.mjs' {
   export function codeFromStatus(status: number, aborted: boolean): number
   export function parsePreview(body: unknown): { title: string; offer: { name: string; blurb: string } | null; slot: string | null } | null
   export function readPreviewFixture(search: string): string
+  export const samplePreview: {
+    title: string
+    offer: {
+      name: string
+      summary: string
+      commission_value: number
+    }
+    slot: string
+  }
   export function fixtureBody(name: string): unknown
   export class PreviewStatus extends Error {
     code: number

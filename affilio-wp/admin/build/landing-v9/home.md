@@ -16,6 +16,28 @@ Download WordPress plugin
 
 The WordPress plugin download is prepared with the hosted package.
 
+Illustrative example
+
+Works today. Affiliate placement. Not verified end to end.
+
+Coming. Suggesting an offer while you write is not on the hosted server today.
+
+Field Notes. A pocket notebook for the habit. 20% commission.
+
+How to start a journal
+
+After the intro. Disclosure label. rel="sponsored".
+
+A new site stores the publish step as ask. This picture is not a live result.
+
+Works over MCP. A2A support is not implemented.
+
 How it works
 
+An offer is matched to a post, then prepared as a labelled placement. The in-writing suggestion is Coming.
+
+Pay only for sales.
+
 For publishers
+
+Earn from more of your posts.

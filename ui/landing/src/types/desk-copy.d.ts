@@ -1,0 +1,15 @@
+declare module '@/home/desk-copy.mjs' {
+  export const deskLabel: string
+  export const deskWorks: string
+  export const deskComing: string
+  export const deskOffer: string
+  export const deskContent: string
+  export const deskPlacement: string
+  export const deskAsk: string
+  export const deskMcp: string
+  export const howLead: string
+  export const makerBenefit: string
+  export const publisherBenefit: string
+  export const deskParagraphs: string[]
+  export function staticDeskParagraphs(): string
+}
