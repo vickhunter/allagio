@@ -1,12 +1,12 @@
 import { Page } from '@/site/Page'
 import { Accordion } from '@/site/Accordion'
-import { JoinForm } from '@/components/JoinForm'
-import { example, faq, pitch } from '@/content'
+import { JoinPrompt } from '@/components/join-prompt.mjs'
+import { example, faq } from '@/content'
 import { Vision } from './Vision'
 import { PostPreview } from '@/components/PostPreview'
-import { DistributionDesk } from './DistributionDesk'
+import { SetupSequence } from './SetupSequence'
 import { signInHref, useOfferConfig, useSource, withSource } from '@/lib/source'
-import { inWriteOffer } from '@/vision.mjs'
+import { copyClarify, heroH1, manualSetup, setupHref, setupLabel } from '@/home/hero-copy.mjs'
 import { howLead, makerBenefit, publisherBenefit } from '@/home/desk-copy.mjs'
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
@@ -21,19 +21,21 @@ export function App() {
       <section aria-labelledby="hero-h" className="home-hero" data-hero-bg="fallback">
         <div className="hero-fallback" aria-hidden="true" />
         <div className="hero-grid">
-          <div className="hero-title">
-            <h1 id="hero-h" className="h-display max-w-[18em] text-[1.35rem] leading-[1.15] text-tinv sm:text-[2rem] sm:leading-[1.12]">{inWriteOffer}</h1>
-          </div>
-          <DistributionDesk />
-          <div className="hero-copy">
-            <div className="hero-panel">
-              <JoinForm />
+          <div className="hero-lead">
+            <h1 id="hero-h" className="h-display max-w-[16em] text-[2rem] leading-[1.12] text-t1 sm:text-[2.6rem]">{heroH1}</h1>
+            <p className="hero-support">{manualSetup}</p>
+            <p className="mt-4">
+              <a className="setup-go" href={withSource(setupHref, source)} data-track="secondary_click" data-track-to="agents">{setupLabel}</a>
+            </p>
+            <div id="join" className="hero-prompt">
+              <JoinPrompt />
+              <p className="hero-clarify">{copyClarify}</p>
             </div>
             <p className="mt-2">
-              <a className={`${linkClass} text-tinv`} href={withSource('/you/', source)}>Your limits</a>
+              <a className={linkClass} href={withSource('/you/', source)}>Your limits</a>
             </p>
           </div>
-          <p className="hero-pitch">{pitch}</p>
+          <SetupSequence />
         </div>
       </section>
 
@@ -123,7 +125,7 @@ export function App() {
         <div className="mx-auto grid max-w-6xl gap-6 px-5 py-14 md:py-16">
           <div>
             <h2 id="join-h" className="h-display text-3xl sm:text-4xl">Give your agent this line to start</h2>
-            <p className="mt-3 text-lg leading-relaxed text-t2">The join line and the Copy button stay in the first screen.</p>
+            <p className="mt-3 max-w-[65ch] text-lg leading-relaxed text-t2">The public join line stays in the first screen. Copy setup prompt does not create a token.</p>
           </div>
           <div className="flex flex-col items-start gap-1">
             <a href={signIn} data-track="join_submit" data-track-role="unset" data-track-cta="Sign in with Google" className={linkClass}>Sign in with Google</a>

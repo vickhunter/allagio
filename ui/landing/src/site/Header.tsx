@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pause, Play } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { CommandPalette, type Command } from '@/components/CommandPalette'
@@ -21,7 +21,19 @@ export const siteCommands: Command[] = [
 export function Header({ page }: { page: PageKey }) {
   const source = useSource()
   const [paused, setPaused] = useState(false)
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLButtonElement>(null)
   useEffect(() => { document.documentElement.dataset.motion = paused ? 'paused' : 'on' }, [paused])
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      menuRef.current?.focus()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
   const current = page === 'setup' ? 'publishers' : page
   const link = (href: string, label: string, key: PageKey, tone: string) => (
     <a href={withSource(href, source)} aria-current={current === key ? 'page' : undefined} data-track="nav_click" data-track-to={key}
@@ -31,7 +43,10 @@ export function Header({ page }: { page: PageKey }) {
     <header className="sticky top-0 z-30 border-b border-line bg-s0/90 backdrop-blur">
       <div className="site-bar">
         <Logo />
-        <nav aria-label="Main" className="site-nav text-sm">
+        <button ref={menuRef} type="button" className="site-menu-btn" aria-expanded={open} aria-controls="site-menu" onClick={() => setOpen((value) => !value)}>
+          {open ? 'Close menu' : 'Menu'}
+        </button>
+        <nav id="site-menu" aria-label="Main" className={open ? 'site-menu is-open text-sm' : 'site-menu text-sm'}>
           {link('/you/', 'Your limits', 'you', 'text-t1 hover:bg-s2')}
           {link('/makers/', 'Makers', 'makers', 'text-maker hover:bg-maker-soft')}
           {link('/publishers/', 'Publishers', 'publishers', 'text-pub hover:bg-pub-soft')}

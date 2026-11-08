@@ -3,70 +3,56 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import {
-  deskAsk,
-  deskComing,
-  deskContent,
-  deskLabel,
-  deskMcp,
-  deskOffer,
-  deskParagraphs,
-  deskPlacement,
-  deskWorks,
-  howLead,
-  makerBenefit,
-  publisherBenefit,
-} from './desk-copy.mjs'
+import { pagePath } from '../agents/facts.mjs'
+import { joinPrompt } from '../components/join-prompt.mjs'
+import { comingLine, copyClarify, heroH1, manualSetup, promptLine, setupHref, setupLabel, setupSteps } from './hero-copy.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-test('the illustrative desk uses the preview fixture and keeps Coming beside Works today', () => {
-  assert.match(deskOffer, /Field Notes/)
-  assert.match(deskOffer, /A pocket notebook for the habit/)
-  assert.match(deskOffer, /20% commission/)
-  assert.equal(deskOffer.includes('relevance'), false)
-  assert.equal(deskContent, 'How to start a journal')
-  assert.match(deskPlacement, /After the intro/)
-  assert.match(deskPlacement, /rel="sponsored"/)
-  assert.match(deskWorks, /Works today/)
-  assert.match(deskWorks, /Not verified end to end/)
-  assert.match(deskComing, /^Coming\./)
-  assert.match(deskAsk, /publish step as ask/)
-  assert.match(deskMcp, /Works over MCP/)
-  assert.match(deskMcp, /A2A support is not implemented/)
-  assert.equal(deskParagraphs.includes(deskLabel), true)
-  for (const line of [...deskParagraphs, howLead, makerBenefit, publisherBenefit]) {
-    assert.equal(/\bads?\b|fully automatic|open[\s-]?source|best-converting/i.test(line), false, line)
-  }
+test('setup copy stays the public join line and the navigation target is the agents page', () => {
+  assert.equal(joinPrompt, 'Join with POST /v1/agent-tokens and send the bearer.')
+  assert.equal(heroH1, 'Connect your agent to Allagio.')
+  assert.match(manualSetup, /Setup is manual/)
+  assert.match(manualSetup, /POST \/v1\/agent-tokens with \{\}/)
+  assert.match(manualSetup, /Authorization: Bearer to \/mcp/)
+  assert.match(manualSetup, /POST \/orp\/join with \{\}/)
+  assert.match(manualSetup, /tools\/list on \/mcp/)
+  assert.match(manualSetup, /No sign-in link/)
+  assert.match(comingLine, /Coming/)
+  assert.equal(setupHref, pagePath)
+  assert.equal(setupHref, '/landing-v9/agents/')
+  assert.equal(setupLabel, 'Set up your agent')
+  assert.match(promptLine, new RegExp(joinPrompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  assert.match(copyClarify, /does not create a token/)
+  assert.equal(setupSteps.length, 4)
+  const prompt = readFileSync(resolve(root, 'src/components/join-prompt.mjs'), 'utf8')
+  assert.match(prompt, /navigator\.clipboard\.writeText\(joinPrompt\)/)
+  assert.match(prompt, /Copy setup prompt/)
+  assert.match(prompt, /href: '\/llms\.txt'/)
+  assert.match(prompt, /setCopied\(false\)/)
 })
 
-test('the homepage keeps the approved H1 and renders one labelled desk', () => {
+test('the homepage keeps Copy and adds a separate setup link', () => {
   const app = readFileSync(resolve(root, 'src/home/App.tsx'), 'utf8')
-  const desk = readFileSync(resolve(root, 'src/home/DistributionDesk.tsx'), 'utf8')
-  assert.match(app, /inWriteOffer/)
-  assert.match(app, /<DistributionDesk \/>/)
-  assert.match(app, /id="how"/)
-  assert.match(app, /id="publishers"/)
-  assert.match(app, /id="join-h"/)
-  assert.match(desk, /deskLabel/)
-  assert.match(desk, /deskContent/)
-  assert.match(desk, /deskPlacement/)
-  assert.match(desk, /fixtureName/)
-  assert.match(desk, /aria-hidden="true"/)
-  assert.equal(desk.includes('<button'), false)
-  assert.equal(/<figure[^>]*aria-hidden/.test(desk), false)
+  const header = readFileSync(resolve(root, 'src/site/Header.tsx'), 'utf8')
+  assert.match(app, /heroH1/)
+  assert.match(app, /<JoinPrompt \/>/)
+  assert.match(app, /setupHref/)
+  assert.match(app, /setupLabel/)
+  assert.match(app, /<SetupSequence \/>/)
+  assert.match(header, /Menu/)
+  assert.match(header, /aria-controls="site-menu"/)
+  assert.equal(header.includes('mask-image'), false)
   assert.equal(app.includes('Someone has the product'), false)
 })
 
-test('the no-JS shell and home.md keep the example, the return target, and the approved phrases', () => {
+test('the no-JS home shell keeps both setup destinations and the public prompt', () => {
   const stamp = readFileSync(resolve(root, 'scripts/stamp-hosted.mjs'), 'utf8')
   const md = readFileSync(resolve(root, '../../affilio-wp/admin/build/landing-v9/home.md'), 'utf8')
-  assert.match(stamp, /staticDeskParagraphs/)
   assert.match(stamp, /return_to=%2Fowner%3Fsetup%3Dmaker/)
-  assert.match(stamp, /data-primary-action/)
-  assert.match(stamp, /id="how"/)
-  assert.match(stamp, /id="publishers"/)
-  for (const line of [...deskParagraphs, howLead, makerBenefit, publisherBenefit]) {
+  assert.match(stamp, /href="\/owner\/settings"/)
+  assert.match(stamp, /setupHref/)
+  for (const line of [heroH1, manualSetup, setupLabel, promptLine, copyClarify, comingLine, ...setupSteps]) {
     assert.equal(md.includes(line), true, `home.md dropped ${line}`)
   }
 })

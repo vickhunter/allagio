@@ -5,11 +5,12 @@ import { chromium } from 'playwright-core'
 import test from 'node:test'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { joinPrompt } from '../components/join-prompt.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const chrome = ['/usr/local/bin/google-chrome', '/usr/bin/google-chrome'].find((path) => existsSync(path))
 
-test('the home first screen is the in-write offer, the join line, and your limits', { timeout: 60_000 }, async () => {
+test('the home first screen connects the agent with a setup link and the public copy control', { timeout: 60_000 }, async () => {
   assert.ok(chrome, 'chrome is required to measure the fold')
   const server = await createServer({
     root,
@@ -30,27 +31,39 @@ test('the home first screen is the in-write offer, the join line, and your limit
       const context = await browser.newContext({ viewport, reducedMotion: 'reduce' })
       const page = await context.newPage()
       await page.goto(base, { waitUntil: 'networkidle' })
-      assert.equal(await page.getByRole('button', { name: 'I sell a product' }).count(), 0, `${viewport.width} still has the maker role button`)
-      assert.equal(await page.getByRole('link', { name: 'I run a site' }).count(), 0, `${viewport.width} still has the publisher role link`)
-      const offer = page.getByRole('heading', { level: 1 })
-      const offerBox = await offer.boundingBox()
-      assert.ok(offerBox, `${viewport.width} offer heading has a box`)
-      assert.match(await offer.innerText(), /this fits your post, want to monetize it/)
-      assert.ok(offerBox.y + offerBox.height < viewport.height, `${viewport.width} offer bottom ${offerBox.y + offerBox.height}`)
-      const copies = page.getByRole('button', { name: 'Copy' })
-      assert.equal(await copies.count(), 1, `${viewport.width} has one Copy button`)
-      const box = await copies.boundingBox()
-      assert.ok(box, `${viewport.width} Copy button has a box`)
-      assert.ok(box.y + box.height < viewport.height, `${viewport.width} Copy bottom ${box.y + box.height}`)
-      assert.equal(await page.locator('header').getByRole('link', { name: 'Your limits' }).count(), 1, `${viewport.width} header limits link`)
-      const limits = page.locator('section').filter({ has: page.locator('#hero-h') }).getByRole('link', { name: 'Your limits', exact: true })
+      assert.equal(await page.getByRole('button', { name: 'I sell a product' }).count(), 0)
+      assert.equal(await page.getByRole('link', { name: 'I run a site' }).count(), 0)
+      const heading = page.getByRole('heading', { level: 1 })
+      const headingBox = await heading.boundingBox()
+      assert.equal(await heading.innerText(), 'Connect your agent to Allagio.')
+      assert.ok(headingBox && headingBox.y + headingBox.height < viewport.height)
+      const setup = page.getByRole('link', { name: 'Set up your agent', exact: true }).first()
+      const setupBox = await setup.boundingBox()
+      assert.ok(setupBox && setupBox.y + setupBox.height < viewport.height, `${viewport.width} setup link`)
+      assert.equal(await setup.getAttribute('href'), '/landing-v9/agents/')
+      const copy = page.getByRole('button', { name: 'Copy setup prompt', exact: true })
+      assert.equal(await copy.count(), 1)
+      const copyBox = await copy.boundingBox()
+      assert.ok(copyBox && copyBox.y + copyBox.height < viewport.height, `${viewport.width} copy bottom ${copyBox && copyBox.y + copyBox.height}`)
+      assert.equal(await page.locator('[data-join-prompt] pre').innerText(), joinPrompt)
+      assert.equal(await page.locator('[data-join-prompt] a').getAttribute('href'), '/llms.txt')
+      const coming = page.getByText('Suggesting an offer while you write is Coming.')
+      const comingBox = await coming.boundingBox()
+      assert.ok(comingBox && comingBox.y < viewport.height, `${viewport.width} coming is below the fold`)
+      if (viewport.width < 768) {
+        await page.getByRole('button', { name: 'Menu', exact: true }).click()
+      }
+      const limits = page.locator('header').getByRole('link', { name: 'Your limits', exact: true })
+      assert.equal(await limits.count(), 1)
       const limitsBox = await limits.boundingBox()
-      assert.ok(limitsBox, `${viewport.width} limits link has a box`)
-      assert.ok(limitsBox.y + limitsBox.height < viewport.height, `${viewport.width} limits bottom ${limitsBox.y + limitsBox.height}`)
-      const href = await limits.getAttribute('href')
-      assert.ok(href && href.startsWith('/you'), `${viewport.width} limits href ${href}`)
-      const headerBottom = await page.locator('header').evaluate((el) => el.getBoundingClientRect().bottom)
-      assert.ok(offerBox.y >= headerBottom - 1, `${viewport.width} offer overlaps the header at ${headerBottom}`)
+      assert.ok(limitsBox && limitsBox.height >= 44)
+      assert.ok((await limits.getAttribute('href'))?.startsWith('/you'))
+      const overflow = await page.evaluate(() => ({
+        inner: window.innerWidth,
+        client: document.documentElement.clientWidth,
+        scroll: document.documentElement.scrollWidth,
+      }))
+      assert.equal(overflow.scroll <= overflow.inner + 1, true, JSON.stringify(overflow))
       assert.equal(await page.getByText('Chapter A').count(), 0)
       assert.equal(await page.getByText('Path A').count(), 0)
       await context.close()

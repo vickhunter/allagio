@@ -21,7 +21,7 @@ export function JoinPrompt() {
             setCopied(false)
           }
         },
-      }, 'Copy'),
+      }, 'Copy setup prompt'),
       createElement('a', { href: '/llms.txt', className: 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline' }, 'llms.txt'),
     ),
     createElement('p', { role: 'status', 'aria-live': 'polite', className: 'mt-2 min-h-6 text-sm text-t2' }, copied ? 'Copied.' : ''),

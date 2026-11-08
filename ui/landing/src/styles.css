@@ -93,19 +93,21 @@ body{margin:0;font-weight:500}
 /* Flat paper. No decorative wash behind the hero. */
 .hero-fallback{background:rgb(var(--rgb-surface-0))}
 
-/* One public bar. The nav scrolls sideways instead of stacking into extra rows. */
-.site-bar{display:flex;align-items:center;gap:8px;max-width:72rem;margin:0 auto;padding:6px 12px 6px 16px}
+/* One public bar. Below 768px the destinations sit in a labelled menu, not a sideways clip. */
+.site-bar{position:relative;display:flex;align-items:center;gap:8px;max-width:72rem;margin:0 auto;padding:6px 12px 6px 16px}
 .site-bar>a:first-child{flex:0 0 auto}
-.site-nav{display:flex;min-width:0;flex:1 1 auto;align-items:center;gap:2px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;scroll-padding-inline:12px}
-@media (max-width:959px){
-  .site-nav{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent)}
+.site-menu-btn{display:inline-flex;min-height:44px;min-width:44px;align-items:center;justify-content:center;border:1px solid rgb(var(--rgb-line-strong));border-radius:10px;background:rgb(var(--rgb-surface-1));padding:0 12px;font-size:16px;font-weight:700}
+.site-menu{display:none;min-width:0;align-items:center;gap:2px}
+.site-menu.is-open{display:flex;position:absolute;z-index:40;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:2px;border-bottom:1px solid rgb(var(--rgb-line));background:rgb(var(--rgb-surface-0));padding:8px 12px 12px}
+.site-menu a{display:inline-flex;min-height:44px;align-items:center}
+@media (min-width:768px){
+  .site-menu-btn{display:none}
+  .site-menu,.site-menu.is-open{position:static;display:flex;flex:1 1 auto;flex-direction:row;align-items:center;border:0;background:transparent;padding:0}
 }
-.site-nav::-webkit-scrollbar{display:none}
-.site-nav a{flex:0 0 auto;white-space:nowrap}
 
-/* D-127 home stage. Dark ink, warm narrative below, moss only for the action and Works-today status. */
-.home-hero{position:relative;background:rgb(var(--rgb-surface-inv));color:rgb(var(--rgb-text-inv))}
-.home-hero>.hero-fallback{position:absolute;inset:0;background:rgb(var(--rgb-surface-inv));pointer-events:none}
+/* D-128 setup hero. Warm paper, one moss action, a short manual sequence. */
+.home-hero{position:relative;background:rgb(var(--rgb-surface-0));color:rgb(var(--rgb-text-1))}
+.home-hero>.hero-fallback{position:absolute;inset:0;background:rgb(var(--rgb-surface-0));pointer-events:none}
 .hero-grid{position:relative;display:grid;gap:8px;width:min(1180px,100%);margin:0 auto;padding:8px 16px 16px;grid-template-areas:"title" "copy" "stage" "pitch"}
 .hero-pitch{grid-area:pitch}
 .hero-title{grid-area:title;min-width:0}
@@ -195,3 +197,37 @@ body{margin:0;font-weight:500}
 .hiw .hiw-tile{transition:opacity var(--dur-fade,700ms) var(--ease-out,ease-out) calc(var(--i)*90ms),transform var(--dur-fade,700ms) var(--ease-out,ease-out) calc(var(--i)*90ms),border-color 300ms ease-out,box-shadow 300ms ease-out}
 .hiw .hiw-tile[data-active=y]{border-color:rgb(var(--rgb-text-1)/.55);box-shadow:0 10px 24px -16px rgb(var(--rgb-text-1)/.45)}
 @media (prefers-reduced-motion: reduce){.hiw .hiw-tile{opacity:1!important;transform:none!important;transition:none!important}}
+
+.hero-grid{display:grid;gap:20px;width:min(1120px,100%);margin:0 auto;padding:28px 20px 36px;grid-template-areas:none;grid-template-columns:1fr}
+.hero-lead{min-width:0;max-width:65ch}
+.hero-support,.hero-clarify,.setup-manual,.setup-coming-line,.setup-step p{max-width:65ch;font-size:16px;line-height:1.45}
+.hero-support{margin:12px 0 0;color:rgb(var(--rgb-text-2))}
+.hero-clarify{margin:8px 0 0;color:rgb(var(--rgb-text-2))}
+.setup-go{display:inline-flex;min-height:44px;min-width:44px;align-items:center;border-radius:10px;background:rgb(var(--rgb-moss));color:rgb(var(--rgb-text-inv));padding:0 16px;font-weight:700;text-decoration:none;box-shadow:0 3px 0 rgb(var(--rgb-moss-edge))}
+.hero-prompt{margin-top:14px;border:1px solid rgb(var(--rgb-line));border-radius:16px;background:rgb(var(--rgb-surface-1));padding:12px}
+.hero-prompt pre{margin-top:6px;padding:8px 10px}
+.hero-prompt [data-join-prompt] > div{margin-top:8px}
+.setup-seq{margin:0;min-width:0;border:1px solid rgb(var(--rgb-line));border-radius:18px;background:rgb(var(--rgb-surface-1));padding:16px}
+.setup-seq-label{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:16px;font-weight:700}
+.setup-coming{display:inline-flex;min-height:28px;align-items:center;border:1px solid rgb(var(--rgb-text-1));border-radius:999px;padding:0 10px}
+.setup-coming-line{margin:8px 0 0}
+.setup-steps{display:grid;gap:8px;margin:12px 0 0;padding:0;list-style:none}
+.setup-step{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:start;animation:setup-in 200ms var(--ease-out) both}
+.setup-step:nth-child(2){animation-delay:150ms}
+.setup-step:nth-child(3){animation-delay:300ms}
+.setup-step:nth-child(4){animation-delay:450ms}
+.setup-step p{margin:0}
+.setup-index{display:inline-flex;height:28px;width:28px;align-items:center;justify-content:center;border-radius:999px;background:rgb(var(--rgb-moss));color:rgb(var(--rgb-text-inv));font-size:14px;font-weight:700}
+.setup-steps{position:relative}
+.setup-step:not(:last-child) .setup-index{position:relative}
+.setup-step:not(:last-child) .setup-index::after{content:"";position:absolute;left:13px;top:28px;width:2px;height:16px;background:rgb(var(--rgb-moss));transform-origin:top;animation:setup-draw 200ms var(--ease-out) both}
+.setup-step:nth-child(1) .setup-index::after{animation-delay:150ms}
+.setup-step:nth-child(2) .setup-index::after{animation-delay:300ms}
+.setup-step:nth-child(3) .setup-index::after{animation-delay:450ms}
+@keyframes setup-in{from{transform:translateY(6px)}to{transform:none}}
+@keyframes setup-draw{from{transform:scaleY(.35)}to{transform:scaleY(1)}}
+@media (min-width:960px){
+  .hero-grid{grid-template-columns:minmax(0,.9fr) minmax(280px,.85fr);align-items:start;column-gap:40px;padding-top:48px}
+}
+.home-hero :focus-visible{outline:2px solid rgb(var(--rgb-setup));outline-offset:3px}
+.home-hero [data-join-prompt] button{background:rgb(var(--rgb-surface-0));color:rgb(var(--rgb-text-1));border:1px solid rgb(var(--rgb-line-strong));box-shadow:none;transform:none}
