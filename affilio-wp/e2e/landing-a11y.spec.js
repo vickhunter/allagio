@@ -177,8 +177,11 @@ test.describe('public landing contrast and tap targets', () => {
       });
       const page = await context.newPage();
       await page.goto(landing.base + '/landing', { waitUntil: 'networkidle' });
-      await expect(page.getByRole('heading', { name: /Someone has the product/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Copy command', exact: true })).toBeVisible();
+      // D-128 semantic update. The heading is the agent-setup line. Copy setup prompt
+      // is the same public-line control, not a skipped check and not a D-126 import.
+      await expect(page.getByRole('heading', { name: 'Offers, ready for your agent.', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Copy setup prompt', exact: true })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Set up your agent', exact: true }).first()).toBeVisible();
       await expect(page.locator('#how')).toHaveCount(1);
       await expect(page.locator('#publishers')).toHaveCount(1);
       expect(await axeContrast(page, ['#hero-h', '#join-h'])).toEqual([]);
@@ -187,7 +190,9 @@ test.describe('public landing contrast and tap targets', () => {
         const box = await page.getByRole('link', { name }).first().boundingBox();
         expect(box.height).toBeGreaterThanOrEqual(44);
       }
-      const copy = await page.getByRole('button', { name: 'Copy command', exact: true }).boundingBox();
+      const copy = await page.getByRole('button', { name: 'Copy setup prompt', exact: true }).boundingBox();
+      const setup = await page.getByRole('link', { name: 'Set up your agent', exact: true }).first().boundingBox();
+      expect(setup.height).toBeGreaterThanOrEqual(44);
       expect(copy.height).toBeGreaterThanOrEqual(44);
       await page.locator('a.skip').focus();
       const skip = await page.locator('a.skip').boundingBox();

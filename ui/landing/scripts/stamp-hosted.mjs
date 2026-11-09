@@ -1,4 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { howLead, makerBenefit, publisherBenefit } from '../src/home/desk-copy.mjs'
+import { joinLead, joinPrompt } from '../src/components/join-prompt.mjs'
+import { comingLine, heroH1, heroSupport, manualSetup, noSignIn, pathAgent, pathAgentNote, pathBearer, pathBearerNote, pathCaption, pathMcp, pathSend, pathWait, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
 import { publishStepParagraph } from '../src/vision.mjs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,6 +25,54 @@ const shell = `<div id="static-landing">
       <div class="hero-fallback" style="min-height:240px"></div>
       <section id="how"><h2>How it works</h2></section>
       <section id="publishers"><h2>For publishers</h2></section>
+    </main>
+  </div>`
+const homeShell = `<div id="static-landing">
+    <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+    <main id="main">
+      <h1>${heroH1}</h1>
+      <p>${heroSupport}</p>
+      <p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in</a></p>
+      <p><a href="${setupHref}" style="display:inline-flex;min-height:44px;align-items:center">${setupLabel}</a></p>
+      <details>
+        <summary>Setup details</summary>
+        <p>${joinLead}</p>
+        <p>${joinPrompt}</p>
+        <p><a href="/llms.txt" style="display:inline-flex;min-height:44px;align-items:center">llms.txt</a></p>
+        ${staticSetupSteps()}
+        <p>${noSignIn}</p>
+      </details>
+      <p>Manual setup</p>
+      <p>MCP</p>
+      <p>Your limits</p>
+      <p>You approve</p>
+      <p>Labelled placement</p>
+      <h2>You send the bearer yourself.</h2>
+      <p>${manualSetup} This page does not issue a token.</p>
+      <figure>
+        <p>${pathCaption}</p>
+        <p>${pathAgent}</p>
+        <p>${pathAgentNote}</p>
+        <p>${pathBearer}</p>
+        <p>${pathBearerNote}</p>
+        <p>${pathSend}</p>
+        <p>${pathMcp}</p>
+        <p>${pathWait}</p>
+      </figure>
+      <h2>${makerBenefit}</h2>
+      <p>Agents put your product in content that fits. The worked sale is an example, not a result from the picture.</p>
+      <p><a href="/makers/" style="display:inline-flex;min-height:44px;align-items:center">Makers</a></p>
+      <section id="publishers"><h2>${publisherBenefit}</h2><p>Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.</p><p>${comingLine}</p><p><a href="/publishers/" style="display:inline-flex;min-height:44px;align-items:center">Publishers</a></p></section>
+      <section id="how"><h2>The offer stays inside your limits.</h2><p>${howLead}</p></section>
+      <h2>A post, before an offer</h2>
+      <p>Nothing is inserted. Some posts get no offer.</p>
+      <h2>A labelled placement you can refuse</h2>
+      <p>One box, marked sponsored. Prepare waits until you approve.</p>
+      <p><a href="/you/" style="display:inline-flex;min-height:44px;align-items:center">Your limits</a></p>
+      <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
+      <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
+      <p><a href="/downloads/offer-rails.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
+      <div class="hero-fallback" style="min-height:240px"></div>
     </main>
   </div>`
 
@@ -101,7 +152,7 @@ rmSync(resolve(assets, 'publishers'), { recursive: true, force: true })
 rmSync(resolve(assets, 'protocol'), { recursive: true, force: true })
 rmSync(resolve(assets, 'you'), { recursive: true, force: true })
 
-writeFileSync(resolve(build, 'home.html'), stamp(resolve(dist, 'index.html')))
+writeFileSync(resolve(build, 'home.html'), stamp(resolve(dist, 'index.html'), homeShell))
 writeFileSync(resolve(build, 'makers.html'), stamp(resolve(dist, 'makers/index.html')))
 writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers/index.html')))
 writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publishers/setup/index.html'), setupShell))

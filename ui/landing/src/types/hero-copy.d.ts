@@ -1,0 +1,20 @@
+declare module '@/home/hero-copy.mjs' {
+  export const heroH1: string
+  export const heroSupport: string
+  export const manualSetup: string
+  export const comingLine: string
+  export const setupLabel: string
+  export const setupHref: string
+  export const promptLine: string
+  export const pathCaption: string
+  export const pathAgent: string
+  export const pathAgentNote: string
+  export const pathBearer: string
+  export const pathBearerNote: string
+  export const pathSend: string
+  export const pathMcp: string
+  export const pathWait: string
+  export const setupSteps: string[]
+  export const noSignIn: string
+  export function staticSetupSteps(): string
+}

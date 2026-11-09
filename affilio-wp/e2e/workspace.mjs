@@ -11,7 +11,7 @@ const contexts = [];
 const desktop = { width: 1440, height: 900 };
 const mobile = { width: 390, height: 844 };
 // Current approved home heading. The retired "Someone has the product" line is not on this page.
-const approvedH1 = 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.';
+const approvedH1 = 'Offers, ready for your agent.';
 
 async function owner(cookie, viewport = desktop) {
     const context = await browser.newContext({ viewport });
@@ -39,7 +39,7 @@ async function assertHydratedHome(page) {
     for (const name of ['Your limits', 'Makers', 'Publishers', 'Protocol', 'Agents']) {
         await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })).toBeVisible();
     }
-    await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sign in', exact: true }).first()).toBeVisible();
     await expect(page.locator('[data-hero-bg="fallback"]')).toBeVisible();
     await expect(page.locator('#vision')).toBeVisible();
     await expect(page.getByRole('region', { name: 'What your agent does' })).toBeVisible();
@@ -47,21 +47,19 @@ async function assertHydratedHome(page) {
     await expect(page.getByRole('region', { name: 'What it replaces' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'See it on a real post.', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Straight answers.', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'llms.txt', exact: true })).toBeVisible();
+    await expect(page.locator('summary').filter({ hasText: 'Setup details' })).toBeVisible();
+    await expect(page.locator('details a[href="/llms.txt"]')).toHaveCount(1);
     await expect(page.locator('canvas')).toHaveCount(0);
 }
+const joinLine = 'Join with POST /v1/agent-tokens and send the bearer.';
 async function copyJoinLine(page) {
     const prompt = page.locator('[data-join-prompt]');
-    const line = (await prompt.locator('pre').innerText()).trim();
-    await prompt.getByRole('button', { name: 'Copy', exact: true }).click();
+    await prompt.getByRole('button', { name: 'Copy setup prompt', exact: true }).click();
     await expect(prompt.getByRole('status')).toHaveText('Copied.');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(line);
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(joinLine);
 }
 async function revealGoogleSignIn(page) {
     const link = page.getByRole('link', { name: 'Sign in with Google', exact: true });
-    if (!(await link.isVisible())) {
-        await page.locator('summary').filter({ hasText: 'Set it up yourself' }).click();
-    }
     await expect(link).toBeVisible();
 }
 async function assertStaticHome(page) {
@@ -70,8 +68,8 @@ async function assertStaticHome(page) {
     await expect(page.locator('.hero-fallback').first()).toBeVisible();
     await expect(page.locator('#how')).toBeVisible();
     await expect(page.locator('#publishers')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'How it works', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'For publishers', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'You send the bearer yourself.', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'The offer stays inside your limits.', exact: true })).toBeVisible();
 }
 async function assertWorkspaceChrome(page) {
     const nav = page.getByRole('navigation', { name: 'Workspace' });

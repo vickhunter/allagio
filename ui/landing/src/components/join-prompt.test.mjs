@@ -7,7 +7,7 @@ import { JoinPrompt, joinHeading, joinLead, joinPrompt } from './join-prompt.mjs
 test('the join prompt and the Copy button render', () => {
   const html = renderToStaticMarkup(createElement(JoinPrompt))
   assert.match(html, new RegExp(joinPrompt))
-  assert.match(html, /<button[^>]*>Copy<\/button>/)
+  assert.match(html, /<button[^>]*>Copy setup prompt<\/button>/)
   assert.match(html, /href="\/llms.txt"/)
   assert.match(html, new RegExp(joinLead))
   assert.equal(joinHeading, 'Tell your agent: Join with POST /v1/agent-tokens and send the bearer.')
