@@ -49,14 +49,31 @@ func TestWorkspaceBrowser(t *testing.T) {
 	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO payouts(site_id,maker_id,amount,currency,method,status,payment_mode) SELECT site_id,$2,10,'USD','manual','pending','live' FROM owners WHERE id=$1 RETURNING id`, publisher.ID, builder.MakerID).Scan(&payoutID); err != nil {
 		t.Fatal(err)
 	}
-	fixture, err := json.Marshal(map[string]any{"base": base, "builder": builderCookie, "publisher": publisherCookie, "payout": payoutID, "screenshots": os.Getenv("AFFILIO_WORKSPACE_SCREENSHOTS")})
+	fixture := map[string]any{"base": base, "builder": builderCookie, "publisher": publisherCookie, "payout": payoutID, "screenshots": os.Getenv("AFFILIO_WORKSPACE_SCREENSHOTS")}
+	t.Run("journey", func(t *testing.T) {
+		runWorkspaceBrowser(t, fixture, 180*time.Second)
+	})
+	negative := map[string]any{}
+	for key, value := range fixture {
+		negative[key] = value
+	}
+	negative["mode"] = "negative"
+	negative["screenshots"] = ""
+	t.Run("missing_content", func(t *testing.T) {
+		runWorkspaceBrowser(t, negative, 60*time.Second)
+	})
+}
+
+func runWorkspaceBrowser(t *testing.T, fixture map[string]any, timeout time.Duration) {
+	t.Helper()
+	body, err := json.Marshal(fixture)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "node", filepath.Join("../../../affilio-wp/e2e", "workspace.mjs"))
-	cmd.Stdin = bytes.NewReader(fixture)
+	cmd.Stdin = bytes.NewReader(body)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("browser integration: %v\n%s", err, output)
