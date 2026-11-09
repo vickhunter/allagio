@@ -119,9 +119,9 @@ FROM conversions cv
 JOIN offers o ON o.id = cv.offer_id
 JOIN products p ON p.id = o.product_id
 JOIN makers m ON m.id = p.maker_id
-WHERE cv.provider_object_id=$1 AND cv.kind='sale' AND m.api_key=$2
+WHERE cv.provider_object_id=$1 AND cv.kind='sale' AND m.api_key_hash=$2
 ORDER BY cv.created_at DESC
-LIMIT 1`, objectID, fx.makerKey).Scan(&provider, &trust, &status, &reason, &sales)
+LIMIT 1`, objectID, services.HashAPIKey(fx.makerKey)).Scan(&provider, &trust, &status, &reason, &sales)
 	if err != nil {
 		fx.t.Fatalf("sale %s: %v", objectID, err)
 	}
@@ -136,9 +136,9 @@ FROM conversions cv
 JOIN offers o ON o.id = cv.offer_id
 JOIN products p ON p.id = o.product_id
 JOIN makers m ON m.id = p.maker_id
-WHERE cv.provider_object_id=$1 AND cv.kind='refund' AND m.api_key=$2
+WHERE cv.provider_object_id=$1 AND cv.kind='refund' AND m.api_key_hash=$2
 ORDER BY cv.created_at DESC
-LIMIT 1`, objectID, fx.makerKey).Scan(&provider, &trust, &status, &reason, &n)
+LIMIT 1`, objectID, services.HashAPIKey(fx.makerKey)).Scan(&provider, &trust, &status, &reason, &n)
 	if err != nil {
 		fx.t.Fatalf("refund %s: %v", objectID, err)
 	}
@@ -567,7 +567,7 @@ func TestRefundTrustIgnoresClientFieldAndKeepsAmountRules(t *testing.T) {
 func (fx *trustFixture) anotherSeller() *trustFixture {
 	fx.t.Helper()
 	makerKey := "maker-key-refund-b"
-	if _, err := fx.db.CreateMaker(context.Background(), makerKey, "maker-b-refund@example.com", "Maker B"); err != nil {
+	if _, err := fx.db.CreateMaker(context.Background(), services.HashAPIKey(makerKey), services.KeyPrefix(makerKey), "maker-b-refund@example.com", "Maker B"); err != nil {
 		fx.t.Fatal(err)
 	}
 	offerID := listedOffer(fx.t, fx.db, fx.r, makerKey)
@@ -580,7 +580,7 @@ func (fx *trustFixture) anotherSeller() *trustFixture {
 	}
 	var productID string
 	if err := fx.db.Pool.QueryRow(context.Background(), `
-SELECT p.id FROM products p JOIN makers m ON m.id=p.maker_id WHERE m.api_key=$1 ORDER BY p.created_at DESC LIMIT 1`, makerKey).Scan(&productID); err != nil {
+SELECT p.id FROM products p JOIN makers m ON m.id=p.maker_id WHERE m.api_key_hash=$1 ORDER BY p.created_at DESC LIMIT 1`, services.HashAPIKey(makerKey)).Scan(&productID); err != nil {
 		fx.t.Fatal(err)
 	}
 	return &trustFixture{
@@ -599,7 +599,7 @@ JOIN conversions cv ON cv.id = le.conversion_id
 JOIN offers o ON o.id = cv.offer_id
 JOIN products p ON p.id = o.product_id
 JOIN makers m ON m.id = p.maker_id
-WHERE cv.provider_object_id=$1 AND m.api_key=$2 AND le.status='pending'`, objectID, fx.makerKey).Scan(&amount)
+WHERE cv.provider_object_id=$1 AND m.api_key_hash=$2 AND le.status='pending'`, objectID, services.HashAPIKey(fx.makerKey)).Scan(&amount)
 	if err != nil {
 		fx.t.Fatal(err)
 	}
@@ -812,8 +812,8 @@ FROM conversions cv
 JOIN offers o ON o.id=cv.offer_id
 JOIN products p ON p.id=o.product_id
 JOIN makers m ON m.id=p.maker_id
-WHERE cv.provider_object_id=$1 AND cv.kind='sale' AND m.api_key=$2
-ORDER BY cv.created_at`, objectID, fx.makerKey)
+WHERE cv.provider_object_id=$1 AND cv.kind='sale' AND m.api_key_hash=$2
+ORDER BY cv.created_at`, objectID, services.HashAPIKey(fx.makerKey))
 	if err != nil {
 		fx.t.Fatal(err)
 	}
@@ -977,7 +977,7 @@ func TestFlaggedOrderDoesNotHoldAnotherSellersCommission(t *testing.T) {
 UPDATE conversions cv SET flagged=true, flag_reason='held'
 FROM offers o, products p, makers m
 WHERE cv.offer_id=o.id AND o.product_id=p.id AND p.maker_id=m.id
-AND cv.provider_object_id='order-1' AND cv.kind='sale' AND m.api_key=$1`, sellerA.makerKey)
+AND cv.provider_object_id='order-1' AND cv.kind='sale' AND m.api_key_hash=$1`, services.HashAPIKey(sellerA.makerKey))
 	if err != nil || tag.RowsAffected() != 1 {
 		t.Fatalf("flag sale: %v rows %d", err, tag.RowsAffected())
 	}
@@ -1004,7 +1004,7 @@ JOIN conversions cv ON cv.id=le.conversion_id
 JOIN offers o ON o.id=cv.offer_id
 JOIN products p ON p.id=o.product_id
 JOIN makers m ON m.id=p.maker_id
-WHERE cv.provider_object_id=$1 AND cv.kind='sale' AND le.kind='commission' AND m.api_key=$2`, objectID, fx.makerKey).Scan(&status)
+WHERE cv.provider_object_id=$1 AND cv.kind='sale' AND le.kind='commission' AND m.api_key_hash=$2`, objectID, services.HashAPIKey(fx.makerKey)).Scan(&status)
 	if err != nil {
 		fx.t.Fatal(err)
 	}

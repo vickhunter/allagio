@@ -381,7 +381,7 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 		pluginHash = services.HashAPIKey(pluginKey)
 		pluginPrefix = services.KeyPrefix(pluginKey)
 	}
-	account, err := h.DB.CreateOpenAgentAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey, pluginHash, pluginPrefix, h.clientAddressHash(ip))
+	account, err := h.DB.CreateOpenAgentAccount(c.Request.Context(), "agent:"+subject, strings.ToLower(req.Email), req.Name, database.NormalizeAttributionSource(req.Source), req.Role, strings.ToLower(req.Domain), services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), services.HashAPIKey(makerKey), services.KeyPrefix(makerKey), pluginHash, pluginPrefix, h.clientAddressHash(ip))
 	if errors.Is(err, database.ErrJoinLimited) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate limit exceeded"})
 		return

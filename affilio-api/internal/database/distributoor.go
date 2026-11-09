@@ -62,17 +62,18 @@ type OfferReviewItem struct {
 	MakerName       string
 }
 
-func (d *DB) CreateMaker(ctx context.Context, apiKey, email, name string) (string, error) {
+func (d *DB) CreateMaker(ctx context.Context, apiKeyHash, apiKeyPrefix, email, name string) (string, error) {
 	var id string
-	err := d.Pool.QueryRow(ctx, `INSERT INTO makers (api_key, email, name) VALUES ($1,$2,$3) RETURNING id`, apiKey, email, name).Scan(&id)
+	err := d.Pool.QueryRow(ctx, `INSERT INTO makers (api_key_hash, api_key_prefix, email, name) VALUES ($1,$2,$3,$4) RETURNING id`,
+		apiKeyHash, apiKeyPrefix, email, name).Scan(&id)
 	return id, err
 }
 
-func (d *DB) GetMakerByAnyAPIKey(ctx context.Context, apiKey string) (*Maker, error) {
+func (d *DB) GetMakerByAPIKeyHash(ctx context.Context, keyHash string) (*Maker, error) {
 	row := d.Pool.QueryRow(ctx, `
 SELECT id, email, COALESCE(name,''), status, created_at
 FROM makers
-WHERE (api_key=$1 OR api_key_previous=$1) AND status='active'`, apiKey)
+WHERE (api_key_hash=$1 OR (api_key_prev_hash=$1 AND api_key_prev_expires_at > NOW())) AND status='active'`, keyHash)
 	var m Maker
 	if err := row.Scan(&m.ID, &m.Email, &m.Name, &m.Status, &m.CreatedAt); err != nil {
 		return nil, err
@@ -94,13 +95,15 @@ func (d *DB) SetMakerTrusted(ctx context.Context, makerID string, trusted bool) 
 	return res.RowsAffected() > 0, nil
 }
 
-func (d *DB) RotateMakerAPIKey(ctx context.Context, makerID, newKey string) error {
+func (d *DB) RotateMakerAPIKey(ctx context.Context, makerID, newKeyHash, newKeyPrefix string, gracePeriod time.Duration) error {
 	_, err := d.Pool.Exec(ctx, `
 UPDATE makers
-SET api_key_previous=api_key,
-    api_key=$2,
+SET api_key_prev_hash=api_key_hash,
+    api_key_prev_expires_at=NOW()+$3::interval,
+    api_key_hash=$2,
+    api_key_prefix=$4,
     api_key_rotated_at=NOW()
-WHERE id=$1`, makerID, newKey)
+WHERE id=$1`, makerID, newKeyHash, gracePeriod, newKeyPrefix)
 	return err
 }
 

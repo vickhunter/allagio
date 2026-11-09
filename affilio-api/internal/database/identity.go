@@ -306,8 +306,8 @@ LIMIT 1`, keyHash).Scan(&siteID)
 SELECT m.id::text
 FROM makers m
 JOIN owners o ON o.maker_id = m.id AND o.agent_only
-WHERE m.status = 'active' AND (m.api_key = $1 OR m.api_key_previous = $1)
-LIMIT 1`, rawKey).Scan(&makerID)
+WHERE m.status = 'active' AND (m.api_key_hash = $1 OR (m.api_key_prev_hash = $1 AND m.api_key_prev_expires_at > NOW()))
+LIMIT 1`, keyHash).Scan(&makerID)
 	if err != nil {
 		return nil, err
 	}

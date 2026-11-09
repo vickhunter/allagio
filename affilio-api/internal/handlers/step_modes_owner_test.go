@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"affilio-api/internal/entry"
+	"affilio-api/internal/services"
 )
 
 func putOwnerModes(t *testing.T, r http.Handler, h *HostedHandler, cookie *http.Cookie, csrf string, modes map[string]any) {
@@ -41,7 +42,7 @@ func TestOwnerConfirmReceivedOffAndAsk(t *testing.T) {
 	h, r := newStepModeRouter(db, entry.LiveClaimChecker{})
 	owner, cookie := testOwnerSession(t, h, "owner-receipt", "owner-receipt@example.com")
 	siteID := createTestSite(t, db, "owner-receipt-key", "owner-receipt.example", "Receipt Blog")
-	makerID, err := db.CreateMaker(context.Background(), "owner-receipt-maker", "owner-receipt-maker@example.com", "Receipt Maker")
+	makerID, err := db.CreateMaker(context.Background(), services.HashAPIKey("owner-receipt-maker"), services.KeyPrefix("owner-receipt-maker"), "owner-receipt-maker@example.com", "Receipt Maker")
 	if err != nil {
 		t.Fatal(err)
 	}

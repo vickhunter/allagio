@@ -5,8 +5,11 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"affilio-api/internal/config"
@@ -69,6 +72,18 @@ func healthHandler(native bool) gin.HandlerFunc {
 	}
 }
 
+func readyHandler(db *database.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+		if err := db.Pool.Ping(ctx); err != nil {
+			c.JSON(503, gin.H{"status": "unavailable", "commit": version.Commit()})
+			return
+		}
+		c.JSON(200, gin.H{"status": "ok", "commit": version.Commit()})
+	}
+}
+
 func main() {
 	cfg := config.Load()
 	if err := cfg.ValidateSecrets(); err != nil {
@@ -108,6 +123,9 @@ func main() {
 	if err := middleware.ConfigureTrustedProxies(r, cfg.TrustedProxies); err != nil {
 		log.Fatalf("failed to set trusted proxies: %v", err)
 	}
+	if cfg.PublicBaseURL != "" && len(cfg.TrustedProxies) == 0 {
+		log.Print("warning: TRUSTED_PROXIES is empty on a hosted service; every request will share the edge IP, collapsing per-IP rate limits into one global bucket")
+	}
 	r.Use(middleware.CORS(cfg.AllowedOrigins))
 
 	if cfg.POCReportPath != "" {
@@ -118,6 +136,7 @@ func main() {
 	}
 	health := healthHandler(cfg.PublicBaseURL != "")
 	r.GET("/health", health)
+	r.GET("/ready", readyHandler(db))
 	preview := &handlers.PreviewHandler{
 		DB:      db,
 		Limiter: handlers.NewIPRateLimiter(10, time.Minute),
@@ -126,6 +145,7 @@ func main() {
 	r.GET("/.well-known/dcp.json", handlers.ServeDCPDiscovery(cfg.PublicBaseURL))
 
 	v1 := r.Group("/v1")
+	v1.Use(middleware.MaxRequestBody(8 << 20))
 
 	sites := &handlers.SitesHandler{
 		DB:              db,
@@ -159,6 +179,7 @@ func main() {
 	makers := &handlers.MakersHandler{
 		DB:              db,
 		RegisterLimiter: handlers.NewIPRateLimiter(8, time.Minute),
+		GracePeriod:     cfg.KeyRotationGracePeriod,
 	}
 	products := &handlers.ProductsHandler{DB: db}
 	offers := &handlers.OffersHandler{DB: db, ClaimsCheck: cfg.ClaimsCheck}
@@ -426,8 +447,29 @@ func main() {
 	if hosted == nil {
 		handlers.InstallSlashRedirect(r)
 	}
-	log.Printf("Affilio API listening on %s", net.JoinHostPort(cfg.Host, cfg.Port))
-	if err := r.Run(net.JoinHostPort(cfg.Host, cfg.Port)); err != nil {
-		log.Fatalf("server error: %v", err)
+	addr := net.JoinHostPort(cfg.Host, cfg.Port)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
+	log.Printf("Affilio API listening on %s", addr)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Print("shutting down")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("forced shutdown: %v", err)
+	}
+	cancelWorker()
 }
