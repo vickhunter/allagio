@@ -17,3 +17,11 @@ ORP 0.4 is many-party deals (2 to 16 seats). The reference host and the Allagio 
 INVALID-68 posts `schema/examples/invalid/envelope-68-shape.json`, `version-semver.json`, and `party-id-role-prefix-68.json`. Each one fails validation.
 
 The claims mode on the reference host is an in-memory page catalog (`registerPage`). It does not fetch the network and it does not change `CLAIMS_CHECK`.
+
+## Discovery
+
+A2A support is not implemented. This host does not serve an Agent Card. ORP, works over MCP.
+
+Discovery: POST /v1/agent-tokens with {} and no key. POST /mcp with Authorization: Bearer. The configured origin is {{PUBLIC_BASE_URL}}. A2A support is not implemented. ORP, works over MCP.
+
+POST /v1/agent-tokens is the HTTP signup. The body is {}. No key is sent. The 201 body returns access_token. POST /mcp is the MCP endpoint. It takes that access_token as Authorization: Bearer. The bearer is not an X-API-Key or X-Admin-Key. A direct Message from SendMessage does not make these endpoints A2A. The configured base URL is the public origin. No personal data is in this section.

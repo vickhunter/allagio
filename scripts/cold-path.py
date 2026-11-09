@@ -30,13 +30,15 @@ def stamp():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def request(method, path, body=None, token=None):
+def request(method, path, body=None, token=None, accept=None):
     data = None if body is None else json.dumps(body).encode()
     req = urllib.request.Request(ORIGIN + path, data=data, method=method)
     if body is not None:
         req.add_header("Content-Type", "application/json")
     if token:
         req.add_header("Authorization", "Bearer " + token)
+    if accept:
+        req.add_header("Accept", accept)
     try:
         with urllib.request.urlopen(req, timeout=30) as res:
             raw = res.read()
@@ -109,6 +111,44 @@ def main():
         if "/skill.md" not in text:
             raise SystemExit("llms.txt has no skill pointer")
 
+    def discovery():
+        status, raw = request("GET", "/llms.txt")
+        text = expect(status, raw, 200).get("text", "")
+        if "A2A support is not implemented" not in text or "ORP, works over MCP" not in text:
+            raise SystemExit("llms.txt discovery is missing")
+        if "agent-card" in text or "/v1/health" in text:
+            raise SystemExit("llms.txt advertises an unsupported card or health transport")
+        status, raw = request("GET", "/skill.md")
+        skill_text = expect(status, raw, 200).get("text", "")
+        if "A2A support is not implemented" not in skill_text or "ORP, works over MCP" not in skill_text:
+            raise SystemExit("skill.md discovery is missing")
+        status, raw = request("GET", "/.well-known/agent-card.json")
+        if status == 200:
+            raise SystemExit("agent card is served")
+        status, raw = request("POST", "/v1/agent-tokens", {})
+        token = expect(status, raw, 201).get("access_token") or ""
+        if not token:
+            raise SystemExit("agent token missing")
+        status, raw = request(
+            "POST",
+            "/mcp",
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "cold", "version": "1"},
+                },
+            },
+            token,
+            "application/json, text/event-stream",
+        )
+        doc = expect(status, raw, 200)
+        if not isinstance(doc.get("result"), dict):
+            raise SystemExit("mcp initialize did not return a result")
+
     def skill():
         status, raw = request("GET", "/skill.md")
         doc = expect(status, raw, 200)
@@ -166,6 +206,7 @@ def main():
             raise SystemExit('proof page missing "does not hold money"')
 
     step("llms.txt", llms)
+    step("discovery", discovery)
     step("skill.md", skill)
     step("join", join)
     step("test deal", test_deal)
