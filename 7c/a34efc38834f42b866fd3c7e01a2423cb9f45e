@@ -1,0 +1,79 @@
+affilio-wp/e2e/workspace.mjs
+  s_7e484d91fceb6c::t_affabc40910182 14
+  s_7e484d91fceb6c::t_45970e5051c15e 50
+  s_7e484d91fceb6c::t_29413e56bd5806 70-71
+  s_7e484d91fceb6c::t_bd4b4be58ab55d 53-58
+  s_7e484d91fceb6c::t_26738ec00b53b1 11-13
+  s_7e484d91fceb6c::t_4988c1e3f05938 15-17
+  s_7e484d91fceb6c::t_66c8880aeaa46b 47-49
+  s_7e484d91fceb6c::t_f7cb77c3eab115 51-52
+  s_7e484d91fceb6c::t_2e8c5bd9e58d7c 59-61,67-69
+  s_7e484d91fceb6c::t_594d571608d89d 72-74
+  s_8220ad857a49e3::t_c651940e9c9c3d 28,30-46,62-66,75-143,147-148,155-156,160-164,167,171-173,181-182,185-187,197,202-204,223-224,227-228,235,240-242,259,265,268-269,272-276
+STATUS.md
+  s_7e484d91fceb6c::t_70e6fcc38f9070 1-8
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_4edbab53c161a8 64-67,74-75,110-111
+affilio-api/internal/handlers/discovery_test.go
+  s_7e484d91fceb6c::t_0ea23278e5db2a 1-223
+affilio-api/internal/handlers/workspace_browser_test.go
+  s_7e484d91fceb6c::t_42b6f78e4e4946 52-69,73,76
+affilio-wp/admin/build/landing-v9/llms.txt
+  s_7e484d91fceb6c::t_3009d8d3f4756a 7-8
+affilio-wp/admin/build/landing-v9/skill.md
+  s_7e484d91fceb6c::t_e9e85b91f46a4a 7-8
+cli/scripts/installed-root.mjs
+  s_7e484d91fceb6c::t_2be930c0550831 1-50
+cli/scripts/paste-test.sh
+  s_7e484d91fceb6c::t_20cd66124188b0 24-26,267-277,281,287,289,292-320,327-361,364,433,564-566
+cli/scripts/readme-commands.mjs
+  s_7e484d91fceb6c::t_37f6304458e9f5 1-48
+cli/test/installed-root.test.mjs
+  s_7e484d91fceb6c::t_1cbc6f63389b30 1-63
+cli/test/mcp-stdio.test.mjs
+  s_7e484d91fceb6c::t_932acd2e7e650d 5,8-20,96,155,157
+cli/test/readme-commands.test.mjs
+  s_7e484d91fceb6c::t_462cec93114557 1-55
+docs/protocol/README.md
+  s_7e484d91fceb6c::t_6fc4779e0dafee 20-27
+proof/d126/after-workspace-browser.txt
+  s_7e484d91fceb6c::t_b3a9d6848b935f 1-172
+proof/d126/base-workspace-browser.txt
+  s_7e484d91fceb6c::t_d5842ed6f043c2 1-365
+proof/d126/commands.txt
+  s_7e484d91fceb6c::t_b4c95f3d17ecef 1-22
+proof/d126/handlers.exit
+  s_7e484d91fceb6c::t_473a7b1225ad6c 1
+proof/d126/handlers.json
+  s_7e484d91fceb6c::t_bbec0f0ad32067 1-2811
+proof/d126/landing.txt
+  s_7e484d91fceb6c::t_aa1e78b6a8a466 1-56
+scripts/cold-path.py
+  s_7e484d91fceb6c::t_a7ca04b3835dc7 33,40-41,114-151,209
+ui/landing/public/llms.txt
+  s_7e484d91fceb6c::t_f4ac41f6c8d73d 7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7ca34efc38834f42b866fd3c7e01a2423cb9f45e",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    },
+    "s_8220ad857a49e3": {
+      "agent_id": {
+        "tool": "devin",
+        "id": "s_8220ad857a49e3",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
