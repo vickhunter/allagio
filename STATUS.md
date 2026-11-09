@@ -1,3 +1,7 @@
+## November 9 — D-130 Poppy discovery
+
+`GET /.well-known/poppy.json` describes this host for Personal Agent Protocol draft 0.4. It lists the MCP endpoint and turns Poppy sign-in off. `llms.txt`, `skill.md`, and the pages do not mention it. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## November 6 — D-124 discovery
 
 A2A support is not implemented. No Agent Card is served. Discovery stays in `llms.txt`, `skill.md`, and the protocol README. The HTTP call is POST /v1/agent-tokens with {} and no key. The MCP call is POST /mcp with Authorization: Bearer. ORP, works over MCP. Health is not an integration transport. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
