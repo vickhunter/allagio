@@ -47,7 +47,8 @@ async function assertHydratedHome(page) {
     await expect(page.getByRole('region', { name: 'What it replaces' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'See it on a real post.', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Straight answers.', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'llms.txt', exact: true })).toHaveCount(1);
+    await expect(page.locator('summary').filter({ hasText: 'Setup details' })).toBeVisible();
+    await expect(page.locator('details a[href="/llms.txt"]')).toHaveCount(1);
     await expect(page.locator('canvas')).toHaveCount(0);
 }
 const joinLine = 'Join with POST /v1/agent-tokens and send the bearer.';
