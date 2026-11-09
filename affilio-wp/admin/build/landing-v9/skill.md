@@ -4,6 +4,8 @@ This file is a pointer. It is not a second copy of the rules.
 
 Full text: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 
+Discovery: POST /v1/agent-tokens with {} and no key. POST /mcp with Authorization: Bearer. The configured origin is {{PUBLIC_BASE_URL}}. A2A support is not implemented. ORP, works over MCP.
+
 ## Connect a hosted assistant
 
 POST /v1/agent-tokens with {}.

@@ -1,3 +1,7 @@
+## November 6 — D-124 discovery
+
+A2A support is not implemented. No Agent Card is served. Discovery stays in `llms.txt`, `skill.md`, and the protocol README. The HTTP call is POST /v1/agent-tokens with {} and no key. The MCP call is POST /mcp with Authorization: Bearer. ORP, works over MCP. Health is not an integration transport. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## November 2 — D-121 return-path wording
 
 The agents page says a sign-in may return to `/you`, `/you/`, `/publishers/setup`, or `/publishers/setup/`. Any other query is refused only for `/device`. The built facts chunk is pinned to that sentence. Login tests refuse a leading space, a tab, and `/Publishers/Setup`. `llms-full.txt` is unchanged. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
