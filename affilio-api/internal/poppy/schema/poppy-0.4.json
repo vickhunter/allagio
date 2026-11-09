@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://personalagentprotocol.org/docs/0.4/spec",
+  "title": "poppy.json",
+  "description": "Derived from Personal Agent Protocol draft 0.4, https://personalagentprotocol.org/docs/0.4/spec sections 3.1 and 7. Not an upstream file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "organization", "apis"],
+  "properties": {
+    "protocol_version": { "const": "0.4" },
+    "organization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "domain"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "domain": { "type": "string", "minLength": 1 },
+        "logo_uri": { "type": "string", "minLength": 1 }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issuer": { "type": "string", "minLength": 1 },
+        "disabled": { "type": "boolean" },
+        "scopes": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "scope_hints": { "type": "object" }
+      }
+    },
+    "apis": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "url", "description"],
+        "properties": {
+          "type": { "enum": ["openapi", "mcp"] },
+          "url": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

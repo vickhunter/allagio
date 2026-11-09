@@ -116,9 +116,10 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 	public := r.Group("", h.headers)
 	public.POST("/api/events", h.RecordLandingEvent)
 	h.mountDemo(public)
-	public.GET("/.well-known/oauth-protected-resource", h.resourceMetadata)
+	public.GET("/.well-known/oauth-protected-resource", h.originResourceMetadata)
 	public.GET("/.well-known/oauth-protected-resource/mcp", h.resourceMetadata)
 	public.GET("/.well-known/oauth-authorization-server", h.authorizationMetadata)
+	public.GET("/.well-known/poppy.json", h.Poppy)
 	public.POST("/oauth/register", h.RegisterOAuthClient)
 	public.GET("/oauth/authorize", h.Authorize)
 	public.POST("/oauth/token", h.Token)
@@ -657,12 +658,38 @@ func (h *HostedHandler) Logout(c *gin.Context) {
 	c.Redirect(http.StatusSeeOther, "/auth/login")
 }
 
+func (h *HostedHandler) origin() string {
+	return strings.TrimRight(strings.TrimSpace(h.BaseURL), "/")
+}
+
+func (h *HostedHandler) protectedResourceDocument(resource string) gin.H {
+	return gin.H{"resource": resource, "authorization_servers": []string{h.BaseURL}, "scopes_supported": []string{"publisher", "maker"}, "bearer_methods_supported": []string{"header"}}
+}
+
+// originResourceMetadata is GET /.well-known/oauth-protected-resource.
+// resource is the public origin, with no path. The MCP document stays on /mcp.
+func (h *HostedHandler) originResourceMetadata(c *gin.Context) {
+	c.JSON(200, h.protectedResourceDocument(h.origin()))
+}
+
 func (h *HostedHandler) resourceMetadata(c *gin.Context) {
-	c.JSON(200, gin.H{"resource": h.resource(), "authorization_servers": []string{h.BaseURL}, "scopes_supported": []string{"publisher", "maker"}, "bearer_methods_supported": []string{"header"}})
+	c.JSON(200, h.protectedResourceDocument(h.resource()))
 }
 
 func (h *HostedHandler) authorizationMetadata(c *gin.Context) {
-	c.JSON(200, gin.H{"issuer": h.BaseURL, "authorization_endpoint": h.BaseURL + "/oauth/authorize", "token_endpoint": h.BaseURL + "/oauth/token", "registration_endpoint": h.BaseURL + "/oauth/register", "response_types_supported": []string{"code"}, "grant_types_supported": []string{"authorization_code", "refresh_token"}, "code_challenge_methods_supported": []string{"S256"}, "token_endpoint_auth_methods_supported": []string{"none"}, "scopes_supported": []string{"publisher", "maker"}})
+	origin := h.origin()
+	c.JSON(200, gin.H{
+		"issuer":                                h.BaseURL,
+		"authorization_endpoint":                h.BaseURL + "/oauth/authorize",
+		"token_endpoint":                        h.BaseURL + "/oauth/token",
+		"registration_endpoint":                 h.BaseURL + "/oauth/register",
+		"response_types_supported":              []string{"code"},
+		"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
+		"code_challenge_methods_supported":      []string{"S256"},
+		"token_endpoint_auth_methods_supported": []string{"none"},
+		"scopes_supported":                      []string{"publisher", "maker"},
+		"protected_resources":                   []string{origin, origin + "/mcp"},
+	})
 }
 
 func validRedirect(raw string) bool {
