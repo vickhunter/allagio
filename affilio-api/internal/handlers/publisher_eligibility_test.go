@@ -8,6 +8,7 @@ import (
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/middleware"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -137,7 +138,7 @@ func publisherLegRouter(db *database.DB, verified bool) *gin.Engine {
 func insertPublisherMaker(t *testing.T, db *database.DB) string {
 	t.Helper()
 	var id string
-	err := db.Pool.QueryRow(context.Background(), `INSERT INTO makers(email, name, api_key) VALUES('maker-elig@example.com','Eligibility Maker','maker-elig-key') RETURNING id`).Scan(&id)
+	err := db.Pool.QueryRow(context.Background(), `INSERT INTO makers(email, name, api_key_hash, api_key_prefix) VALUES('maker-elig@example.com','Eligibility Maker',$1,$2) RETURNING id`, services.HashAPIKey("maker-elig-key"), services.KeyPrefix("maker-elig-key")).Scan(&id)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -114,8 +114,8 @@ EMAIL="$(node -e 'console.log(JSON.parse(process.argv[1]).email)' "$SEED")"
 
 OFFER_ID="$(psql_base -d affilio_paste -At <<SQL
 WITH maker AS (
-  INSERT INTO makers (api_key, email, name, trusted)
-  VALUES ('${MAKER_KEY}', '${EMAIL}', 'Paste Forge', true)
+  INSERT INTO makers (api_key_hash, api_key_prefix, email, name, trusted)
+  VALUES (encode(digest('${MAKER_KEY}','sha256'),'hex'), LEFT('${MAKER_KEY}',8), '${EMAIL}', 'Paste Forge', true)
   RETURNING id
 ), product AS (
   INSERT INTO products (maker_id, name, website_url, product_type, primary_category, readiness_status)
@@ -168,8 +168,8 @@ NODE
   email="$(node -e 'console.log(JSON.parse(process.argv[1]).email)' "$seed")"
   offer="$(psql_base -d affilio_paste -At <<SQL
 WITH maker AS (
-  INSERT INTO makers (api_key, email, name, trusted)
-  VALUES ('${maker_key}', '${email}', '${product_name}', false)
+  INSERT INTO makers (api_key_hash, api_key_prefix, email, name, trusted)
+  VALUES (encode(digest('${maker_key}','sha256'),'hex'), LEFT('${maker_key}',8), '${email}', '${product_name}', false)
   RETURNING id
 ), product AS (
   INSERT INTO products (maker_id, name, website_url, product_type, primary_category, readiness_status)

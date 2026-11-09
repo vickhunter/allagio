@@ -68,6 +68,8 @@ func NewIPRateLimiter(limit int, window time.Duration) *IPRateLimiter {
 	}
 }
 
+const maxRateLimitEntries = 100000
+
 func (l *IPRateLimiter) Allow(key string) bool {
 	if l == nil || l.limit <= 0 || l.window <= 0 {
 		return true
@@ -75,6 +77,24 @@ func (l *IPRateLimiter) Allow(key string) bool {
 	now := l.nowFn()
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if len(l.entries) >= maxRateLimitEntries {
+		for k, e := range l.entries {
+			if now.Sub(e.WindowStart) >= l.window {
+				delete(l.entries, k)
+			}
+		}
+		if len(l.entries) >= maxRateLimitEntries {
+			var oldest string
+			var oldestStart time.Time
+			first := true
+			for k, e := range l.entries {
+				if first || e.WindowStart.Before(oldestStart) {
+					oldest, oldestStart, first = k, e.WindowStart, false
+				}
+			}
+			delete(l.entries, oldest)
+		}
+	}
 	entry, ok := l.entries[key]
 	if !ok || now.Sub(entry.WindowStart) >= l.window {
 		l.entries[key] = rateLimitEntry{WindowStart: now, Count: 1}

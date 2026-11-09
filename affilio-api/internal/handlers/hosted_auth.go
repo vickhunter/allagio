@@ -976,7 +976,7 @@ func (h *HostedHandler) OwnerAccount(c *gin.Context) {
 			}
 			accountID = site.ID
 		} else {
-			maker, err := h.DB.GetMakerByAnyAPIKey(c.Request.Context(), key)
+			maker, err := h.DB.GetMakerByAPIKeyHash(c.Request.Context(), services.HashAPIKey(key))
 			if err != nil {
 				c.JSON(401, gin.H{"error": "valid maker owner key required"})
 				return

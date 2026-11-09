@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -16,6 +18,7 @@ import (
 type MakersHandler struct {
 	DB              *database.DB
 	RegisterLimiter *IPRateLimiter
+	GracePeriod     time.Duration
 }
 
 type makerRegisterRequest struct {
@@ -60,7 +63,7 @@ func (h *MakersHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate api key"})
 		return
 	}
-	makerID, err := h.DB.CreateMaker(c.Request.Context(), apiKey, req.Email, req.Name)
+	makerID, err := h.DB.CreateMaker(c.Request.Context(), services.HashAPIKey(apiKey), services.KeyPrefix(apiKey), req.Email, req.Name)
 	if err != nil {
 		if isUniqueViolation(err) {
 			c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
@@ -86,7 +89,7 @@ func (h *MakersHandler) RotateKey(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to rotate key"})
 		return
 	}
-	if err := h.DB.RotateMakerAPIKey(c.Request.Context(), req.MakerID, newKey); err != nil {
+	if err := h.DB.RotateMakerAPIKey(c.Request.Context(), req.MakerID, services.HashAPIKey(newKey), services.KeyPrefix(newKey), h.GracePeriod); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "rotation failed"})
 		return
 	}
@@ -94,7 +97,7 @@ func (h *MakersHandler) RotateKey(c *gin.Context) {
 		"maker_id":   req.MakerID,
 		"api_key":    newKey,
 		"rotated_at": time.Now().UTC().Format(time.RFC3339),
-		"note":       "previous key remains valid until manually revoked",
+		"note":       fmt.Sprintf("previous key remains valid for %s then expires", h.GracePeriod),
 	})
 }
 

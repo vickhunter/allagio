@@ -107,8 +107,11 @@ func (h *HostedHandler) MCPTransport() http.Handler {
 		if !ok {
 			return nil
 		}
-		bearer := strings.Fields(r.Header.Get("Authorization"))[1]
-		return newHostedMCPServer(g, h.LoopbackURL, h.BaseURL, bearer)
+		parts := strings.Fields(r.Header.Get("Authorization"))
+		if len(parts) != 2 {
+			return nil
+		}
+		return newHostedMCPServer(g, h.LoopbackURL, h.BaseURL, parts[1])
 	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
 	verify := func(ctx context.Context, token string, r *http.Request) (*auth.TokenInfo, error) {
 		hash := services.HashAPIKey(token)

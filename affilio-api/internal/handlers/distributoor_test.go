@@ -77,7 +77,7 @@ func newMakerRouterFull(db *database.DB, client *http.Client, claims string) *gi
 func createTestMaker(t *testing.T, db *database.DB) (makerID, apiKey string) {
 	t.Helper()
 	apiKey = "maker-key-test"
-	id, err := db.CreateMaker(context.Background(), apiKey, "maker@example.com", "Test Maker")
+	id, err := db.CreateMaker(context.Background(), services.HashAPIKey(apiKey), services.KeyPrefix(apiKey), "maker@example.com", "Test Maker")
 	if err != nil {
 		t.Fatalf("create maker: %v", err)
 	}
@@ -589,7 +589,7 @@ func TestProductIsolationBetweenMakers(t *testing.T) {
 	defer cleanup()
 
 	_, keyA := createTestMaker(t, db)
-	if _, err := db.CreateMaker(context.Background(), "maker-key-b", "other@example.com", "Other"); err != nil {
+	if _, err := db.CreateMaker(context.Background(), services.HashAPIKey("maker-key-b"), services.KeyPrefix("maker-key-b"), "other@example.com", "Other"); err != nil {
 		t.Fatalf("create second maker: %v", err)
 	}
 	r := newMakerRouter(db)

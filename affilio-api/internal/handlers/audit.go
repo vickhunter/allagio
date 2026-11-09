@@ -74,9 +74,9 @@ func (h *AuditHandler) Alerts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"recent_warnings":  warnings,
-		"recent_errors":    errors,
-		"suspicious_ips":   suspiciousIPs,
+		"recent_warnings": warnings,
+		"recent_errors":   errors,
+		"suspicious_ips":  suspiciousIPs,
 	})
 }
 
