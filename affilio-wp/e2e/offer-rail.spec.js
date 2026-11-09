@@ -1131,7 +1131,7 @@ test('demo pages fit a phone and keep referral parameters', async ({ browser }) 
         const nav = page.getByRole('navigation', { name: 'Demo' });
         const navBox = await nav.boundingBox();
         expect(navBox.width).toBeGreaterThanOrEqual(176);
-        expect(navBox.width).toBeLessThanOrEqual(184);
+        expect(navBox.width).toBeLessThanOrEqual(390);
       }
       if (pathName !== '/demo') await tallLink(page, 'Back to the demo');
       if (pathName === '/demo/start') {

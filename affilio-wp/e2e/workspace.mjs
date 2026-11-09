@@ -39,7 +39,7 @@ async function assertHydratedHome(page) {
     for (const name of ['Your limits', 'Makers', 'Publishers', 'Protocol', 'Agents']) {
         await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })).toBeVisible();
     }
-    await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sign in', exact: true }).first()).toBeVisible();
     await expect(page.locator('[data-hero-bg="fallback"]')).toBeVisible();
     await expect(page.locator('#vision')).toBeVisible();
     await expect(page.getByRole('region', { name: 'What your agent does' })).toBeVisible();
