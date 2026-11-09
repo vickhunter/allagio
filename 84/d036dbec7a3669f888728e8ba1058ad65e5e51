@@ -1,0 +1,21 @@
+affilio-wp/e2e/offer-rail.spec.js
+  s_7e484d91fceb6c::t_745cfd1f8727e8 1134
+affilio-wp/e2e/workspace.mjs
+  s_7e484d91fceb6c::t_bf3a52c3de7ab7 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "84d036dbec7a3669f888728e8ba1058ad65e5e51",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
