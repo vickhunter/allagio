@@ -1,0 +1,109 @@
+affilio-api/internal/migrations/052_hash_maker_keys.sql
+  s_7e484d91fceb6c::t_8c42a43bfbae7e 1-25
+affilio-api/internal/middleware/body_limit.go
+  s_7e484d91fceb6c::t_7ddef755d9996a 1-19
+affilio-api/internal/handlers/step_modes_owner_test.go
+  s_7e484d91fceb6c::t_51b6b6663919be 13
+  s_7e484d91fceb6c::t_802ab4ec0011ce 45
+affilio-api/internal/handlers/handlers_test.go
+  s_7e484d91fceb6c::t_27bea286e5461b 267
+  s_7e484d91fceb6c::t_4dfa7baea313cc 134
+affilio-api/internal/handlers/hosted_mcp.go
+  s_7e484d91fceb6c::t_47bf00367dafce 110-114
+affilio-api/internal/handlers/hosted_auth_test.go
+  s_7e484d91fceb6c::t_9e67d830f06e09 235
+  s_7e484d91fceb6c::t_ab8f1dc3f71ffd 260
+  s_7e484d91fceb6c::t_3d7f490a047796 227
+affilio-api/internal/handlers/sites.go
+  s_7e484d91fceb6c::t_892ae0dd73c6b2 71-72,80-97
+affilio-api/internal/middleware/maker_auth.go
+  s_7e484d91fceb6c::t_25b450c5143e84 34
+Distributoor-conversation.md
+  s_953c0e69f74fe7::t_380a229e1f7d0e 1-756
+affilio-api/cmd/server/main.go
+  s_7e484d91fceb6c::t_9bf7c6ae27b301 148
+  s_7e484d91fceb6c::t_9947ce9ec2d4a4 450-474
+  s_7e484d91fceb6c::t_226432e80d4d0b 182
+  s_7e484d91fceb6c::t_abe179e802a79f 8,10,12
+  s_7e484d91fceb6c::t_d20c7644e2f840 75-86
+  s_7e484d91fceb6c::t_23f45b499ca21a 126-128
+  s_7e484d91fceb6c::t_6a16e55c45531e 139
+affilio-api/internal/handlers/distributoor_test.go
+  s_7e484d91fceb6c::t_5adebfce05620a 80
+  s_7e484d91fceb6c::t_a9b8db350a00f0 592
+STATUS.md
+  s_7e484d91fceb6c::t_d3663b727d652f 1-4
+affilio-api/internal/database/distributoor.go
+  s_7e484d91fceb6c::t_9ebd12e130661d 98,106
+  s_7e484d91fceb6c::t_e30cbb1f417d96 67,72,76
+  s_7e484d91fceb6c::t_794fa9b4c21a94 65,68
+  s_7e484d91fceb6c::t_66cb0386b75c37 101-104
+Dockerfile.mvp
+  s_7e484d91fceb6c::t_41c7c26f1a33b8 37-38,40
+affilio-api/internal/handlers/makers.go
+  s_7e484d91fceb6c::t_9b954bc45d4d50 66
+  s_7e484d91fceb6c::t_ab9e48e7b58a02 21
+  s_7e484d91fceb6c::t_fa953114ca6b0c 13
+  s_7e484d91fceb6c::t_0933e160c9b02e 100
+  s_7e484d91fceb6c::t_d1d27456447762 92
+  s_7e484d91fceb6c::t_3caef682e96cff 5
+affilio-api/internal/handlers/agent_entry_test.go
+  s_7e484d91fceb6c::t_16415a444be98c 92
+affilio-api/internal/handlers/agent_entry.go
+  s_7e484d91fceb6c::t_bc8d4cffbce230 384
+affilio-api/internal/handlers/hosted_auth.go
+  s_7e484d91fceb6c::t_c3af671a330ff1 979
+affilio-api/internal/handlers/publisher_eligibility_test.go
+  s_7e484d91fceb6c::t_e84f9752625d29 11
+  s_7e484d91fceb6c::t_d44eb8975f4666 141
+affilio-api/internal/handlers/refund_trust_test.go
+  s_7e484d91fceb6c::t_f9eeb8d019fb9c 583
+  s_7e484d91fceb6c::t_4a70505ea26c6d 980
+  s_7e484d91fceb6c::t_f066a9864f920c 124,141,602,816,1007
+  s_7e484d91fceb6c::t_9209370e97e058 122,139,815
+  s_7e484d91fceb6c::t_58aa5a702b98e4 570
+affilio-api/internal/database/identity.go
+  s_7e484d91fceb6c::t_8723d5f468683e 309-310
+affilio-api/internal/handlers/step_modes_payout_test.go
+  s_7e484d91fceb6c::t_6e7e1286d16f2e 13
+  s_7e484d91fceb6c::t_f616b552e2519a 64
+affilio-api/internal/database/agent_entry.go
+  s_7e484d91fceb6c::t_4d5f836c935d90 375
+  s_7e484d91fceb6c::t_48cc4b69b721c7 330
+  s_7e484d91fceb6c::t_6c65f956755fcd 326
+  s_7e484d91fceb6c::t_038cf62d57d68d 320
+  s_7e484d91fceb6c::t_ab6b9f1a94cee2 321
+  s_7e484d91fceb6c::t_1517f3ac781736 327
+affilio-api/internal/handlers/step_modes_approve.go
+  s_7e484d91fceb6c::t_fdee5049b83ba3 147
+affilio-api/go.mod
+  s_7e484d91fceb6c::t_b13f8e949a6c13 3,12,41-44
+affilio-api/go.sum
+  s_7e484d91fceb6c::t_b6a41413eee28a 92-95,98-99,102-107
+affilio-api/internal/handlers/audit.go
+  s_7e484d91fceb6c::t_778145f6ac7117 77-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "49a46b78c5687117eaa4b17543f7283050196380",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    },
+    "s_953c0e69f74fe7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ef08-4392-7ff1-b439-24403e625a49",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
