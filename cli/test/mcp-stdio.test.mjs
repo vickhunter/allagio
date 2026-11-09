@@ -2,7 +2,21 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
+
+function assertSpawnUsesInstall() {
+  const installed = process.env.OFFER_RAILS_INSTALLED_ROOT;
+  const source = process.env.OFFER_RAILS_SOURCE_ROOT;
+  if (!installed || !source) return;
+  const root = fs.realpathSync(installed);
+  const src = fs.realpathSync(source);
+  for (const rel of ['cli/bin/offer-rails.mjs', 'cli/lib/commands.mjs', 'cli/lib/mcp.mjs']) {
+    const file = fs.realpathSync(path.resolve(rel));
+    assert.ok(file === root || file.startsWith(`${root}${path.sep}`), `${rel} is not the installed package: ${file}`);
+    assert.ok(!(file === src || file.startsWith(`${src}${path.sep}`)), `${rel} falls back to source: ${file}`);
+  }
+}
 
 function readmeText() {
   return fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
@@ -79,6 +93,7 @@ function serverSnapshot() {
 }
 
 async function checkServer(label, server) {
+  assertSpawnUsesInstall();
   const stderr = [];
   const child = spawn(server.command, server.args, { stdio: ['pipe', 'pipe', 'pipe'] });
   child.stderr.on('data', (chunk) => stderr.push(chunk.toString('utf8')));
@@ -137,9 +152,9 @@ async function checkServer(label, server) {
   }
 }
 
-test('published npx offer-rails mcp speaks stdio as configured', async (t) => {
+test('documented local mcp command speaks stdio', async (t) => {
   if (process.env.OFFER_RAILS_MCP_SPAWN !== '1') {
-    t.skip('runs from paste-test.sh against the Verdaccio install');
+    t.skip('runs from paste-test.sh after the loopback install');
     return;
   }
   for (const { label, server } of configuredServers()) {
