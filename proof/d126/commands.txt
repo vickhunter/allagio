@@ -1,0 +1,22 @@
+Base: c28bbf9fb151dbf1750bd99f4769f4f7e3392041
+Database URLs used a local affilio role. The password is not recorded here.
+
+1. Enabled failure on the unchanged harness, before any assertion edit:
+   AFFILIO_WORKSPACE_BROWSER=1 go test ./internal/handlers -run TestWorkspaceBrowser -count=1
+   Raw: proof/d126/base-workspace-browser.txt
+   Result: FAIL TestWorkspaceBrowser. Locator getByRole('heading', { name: /Someone has the product/ }) not found. The page H1 was the current approved sentence.
+
+2. Enabled journey and negative regression after the harness repair:
+   AFFILIO_WORKSPACE_BROWSER=1 AFFILIO_WORKSPACE_SCREENSHOTS=proof/d126/screenshots go test -v ./internal/handlers -run TestWorkspaceBrowser -count=1
+   Raw: proof/d126/after-workspace-browser.txt
+   Desktop viewport 1440x900. Mobile viewport 390x844.
+   Screenshots: proof/d126/screenshots/
+
+3. Landing suite:
+   cd ui/landing && node --test --test-reporter=spec src/**/*.test.mjs
+   Raw: proof/d126/landing.txt
+
+4. Handlers package, browser env unset:
+   go test -count=1 -json ./internal/handlers
+   Raw: proof/d126/handlers.json
+   Exit: proof/d126/handlers.exit

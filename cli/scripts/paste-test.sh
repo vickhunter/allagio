@@ -21,6 +21,9 @@ HEAD_PID=""
 HEAD_PORT="$(node -e 'const s=require("net").createServer();s.listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})')"
 
 cleanup() {
+  if [[ -d "${WORKDIR:-}/source-hidden" && ! -e "$CLI" ]]; then
+    mv "$WORKDIR/source-hidden" "$CLI"
+  fi
   if [[ -n "$API_PID" ]]; then kill "$API_PID" >/dev/null 2>&1 || true; fi
   if [[ -n "$VERD_PID" ]]; then kill "$VERD_PID" >/dev/null 2>&1 || true; fi
   if [[ -n "$HEAD_PID" ]]; then kill "$HEAD_PID" >/dev/null 2>&1 || true; fi
@@ -261,29 +264,104 @@ for _ in $(seq 1 60); do
 done
 curl -sf "http://127.0.0.1:${VERD_PORT}/-/ping" >/dev/null
 
+REGISTRY="http://127.0.0.1:${VERD_PORT}"
+node -e '
+const u = new URL(process.argv[1]);
+const host = u.hostname;
+const loop = host === "127.0.0.1" || host === "localhost" || host === "::1";
+if (u.protocol !== "http:" || !loop || u.username || u.password || u.hostname.includes("npmjs")) {
+  console.error("refusing to publish outside the loopback registry");
+  process.exit(1);
+}
+' "$REGISTRY"
+
 PUBLISH_NPMRC="$WORKDIR/publish-npmrc"
 touch "$PUBLISH_NPMRC"
 publish_pack() {
-  (cd "$CLI" && NPM_CONFIG_USERCONFIG="$PUBLISH_NPMRC" npm publish --registry "http://127.0.0.1:${VERD_PORT}")
+  (cd "$CLI" && NPM_CONFIG_USERCONFIG="$PUBLISH_NPMRC" npm publish --registry "$REGISTRY")
 }
 if ! publish_pack >/dev/null; then
   ADD="$(curl -sS -X PUT "http://127.0.0.1:${VERD_PORT}/-/user/org.couchdb.user:orcli" \
     -H 'Content-Type: application/json' \
     -d '{"name":"orcli","password":"orcli-pass-123","email":"orcli@example.com"}')"
-  AUTH_TOKEN="$(node -e 'const j=JSON.parse(process.argv[1]); if(!j.token){console.error(process.argv[1]); process.exit(1)} console.log(j.token)' "$ADD")"
+  AUTH_TOKEN="$(node -e 'const j=JSON.parse(process.argv[1]); if(!j.token) process.exit(1); process.stdout.write(j.token)' "$ADD")"
   printf 'registry=http://127.0.0.1:%s/\n//127.0.0.1:%s/:_authToken=%s\n' "$VERD_PORT" "$VERD_PORT" "$AUTH_TOKEN" >"$PUBLISH_NPMRC"
-  publish_pack
+  publish_pack >/dev/null
 fi
 
-mapfile -t LINES < <(awk '/<!-- paste:begin -->/{p=1;next} /<!-- paste:end -->/{p=0} p && $1=="npx"{print}' "$CLI/README.md")
+INSTALL_DIR="$WORKDIR/install"
+mkdir -p "$INSTALL_DIR"
+npm install --prefix "$INSTALL_DIR" --registry "$REGISTRY" allagio@0.1.0
+INSTALLED_ROOT="$(realpath "$INSTALL_DIR/node_modules/allagio")"
+SOURCE_ROOT="$(realpath "$CLI")"
+node -e '
+const fs = require("fs");
+const installed = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+if (installed.name !== "allagio" || installed.version !== "0.1.0") {
+  console.error("installed package is not the published local package");
+  process.exit(1);
+}
+' "$INSTALLED_ROOT/package.json"
+
+bind_installed() {
+  local dir="$1"
+  mkdir -p "$dir"
+  ln -sfn "$INSTALLED_ROOT" "$dir/cli"
+  node "$CLI/scripts/installed-root.mjs" \
+    --entry "$dir/cli/bin/offer-rails.mjs" \
+    --lib "$dir/cli/lib/commands.mjs" \
+    --installed "$INSTALLED_ROOT" \
+    --source "$SOURCE_ROOT"
+}
+
+if ! node "$CLI/scripts/readme-commands.mjs" "$CLI/README.md" >"$WORKDIR/readme-lines.txt"; then
+  exit 1
+fi
+mapfile -t LINES < "$WORKDIR/readme-lines.txt"
 if [[ "${#LINES[@]}" -ne 6 ]]; then
   echo "expected 6 README lines, found ${#LINES[@]}" >&2
   printf ' %s\n' "${LINES[@]}" >&2
   exit 1
 fi
 
+probe_installed_package() {
+  local probe="$WORKDIR/probe-intact"
+  bind_installed "$probe"
+  mv "$CLI" "$WORKDIR/source-hidden"
+  local code=0
+  (cd "$probe" && node cli/bin/offer-rails.mjs help >"$WORKDIR/probe-help.out" 2>"$WORKDIR/probe-help.err") || code=$?
+  mv "$WORKDIR/source-hidden" "$CLI"
+  if [[ "$code" -ne 0 ]] || ! grep -q 'allagio commands:' "$WORKDIR/probe-help.out"; then
+    echo "intact installed package failed while source was absent" >&2
+    cat "$WORKDIR/probe-help.err" >&2
+    exit 1
+  fi
+  echo "intact installed help exit 0 with source absent"
+  echo "installed entry: $(realpath "$probe/cli/bin/offer-rails.mjs")"
+  echo "installed commands: $(realpath "$probe/cli/lib/commands.mjs")"
+
+  local broken_pkg="$WORKDIR/broken-pkg"
+  rm -rf "$broken_pkg"
+  cp -a "$INSTALLED_ROOT" "$broken_pkg"
+  rm -f "$broken_pkg/lib/commands.mjs"
+  local broken="$WORKDIR/probe-broken"
+  mkdir -p "$broken"
+  ln -sfn "$broken_pkg" "$broken/cli"
+  code=0
+  (cd "$broken" && node cli/bin/offer-rails.mjs help >"$WORKDIR/broken-help.out" 2>"$WORKDIR/broken-help.err") || code=$?
+  if [[ "$code" -eq 0 ]] || ! grep -q 'ERR_MODULE_NOT_FOUND' "$WORKDIR/broken-help.err"; then
+    echo "broken installed package did not fail closed (exit ${code})" >&2
+    cat "$WORKDIR/broken-help.err" >&2
+    exit 1
+  fi
+  echo "broken installed commands.mjs exit ${code} ERR_MODULE_NOT_FOUND"
+}
+
+probe_installed_package
+
 CLEAN="$WORKDIR/clean"
 mkdir -p "$CLEAN/home"
+bind_installed "$CLEAN"
 export HOME="$CLEAN/home"
 export npm_config_cache="$WORKDIR/npm-cache"
 export npm_config_registry="http://127.0.0.1:${VERD_PORT}"
@@ -352,7 +430,7 @@ bash -c "${LINES[5]}" >"$WORKDIR/kill.out" 2>"$WORKDIR/kill.err" || true
 
 device_login() {
   local dir="$1" token="$2" csrf="$3" offer="$4" label="$5"
-  mkdir -p "$dir"
+  bind_installed "$dir"
   local out="$WORKDIR/${label}-login.out"
   local err="$WORKDIR/${label}-login.err"
   (
@@ -483,7 +561,9 @@ if [[ "$fail" -ne 0 ]]; then
 fi
 
 echo "=== mcp stdio ==="
-if ! OFFER_RAILS_MCP_SPAWN=1 OFFER_RAILS_PASTE_DB=affilio_paste node --test "$CLI/test/mcp-stdio.test.mjs" >"$WORKDIR/mcp.out" 2>"$WORKDIR/mcp.err"; then
+if ! OFFER_RAILS_MCP_SPAWN=1 OFFER_RAILS_PASTE_DB=affilio_paste \
+  OFFER_RAILS_INSTALLED_ROOT="$INSTALLED_ROOT" OFFER_RAILS_SOURCE_ROOT="$SOURCE_ROOT" \
+  node --test "$CLI/test/mcp-stdio.test.mjs" >"$WORKDIR/mcp.out" 2>"$WORKDIR/mcp.err"; then
   echo "mcp stdio failed" >&2
   cat "$WORKDIR/mcp.out" "$WORKDIR/mcp.err" >&2
   exit 1

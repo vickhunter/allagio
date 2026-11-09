@@ -1,0 +1,172 @@
+=== RUN   TestWorkspaceBrowser
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] POST   /api/events               --> affilio-api/internal/handlers.(*HostedHandler).RecordLandingEvent-fm (2 handlers)
+[GIN-debug] GET    /demo                     --> affilio-api/internal/handlers.(*HostedHandler).mountDemo.func1 (2 handlers)
+[GIN-debug] HEAD   /demo                     --> affilio-api/internal/handlers.(*HostedHandler).mountDemo.func2 (2 handlers)
+[GIN-debug] GET    /demo/:page               --> affilio-api/internal/handlers.(*HostedHandler).mountDemo.func3 (2 handlers)
+[GIN-debug] HEAD   /demo/:page               --> affilio-api/internal/handlers.(*HostedHandler).mountDemo.func4 (2 handlers)
+[GIN-debug] POST   /demo/operator            --> affilio-api/internal/handlers.(*HostedHandler).postDemoOperator-fm (2 handlers)
+[GIN-debug] GET    /.well-known/oauth-protected-resource --> affilio-api/internal/handlers.(*HostedHandler).resourceMetadata-fm (2 handlers)
+[GIN-debug] GET    /.well-known/oauth-protected-resource/mcp --> affilio-api/internal/handlers.(*HostedHandler).resourceMetadata-fm (2 handlers)
+[GIN-debug] GET    /.well-known/oauth-authorization-server --> affilio-api/internal/handlers.(*HostedHandler).authorizationMetadata-fm (2 handlers)
+[GIN-debug] POST   /oauth/register           --> affilio-api/internal/handlers.(*HostedHandler).RegisterOAuthClient-fm (2 handlers)
+[GIN-debug] GET    /oauth/authorize          --> affilio-api/internal/handlers.(*HostedHandler).Authorize-fm (2 handlers)
+[GIN-debug] POST   /oauth/token              --> affilio-api/internal/handlers.(*HostedHandler).Token-fm (2 handlers)
+[GIN-debug] GET    /auth/login               --> affilio-api/internal/handlers.(*HostedHandler).LoginStart-fm (2 handlers)
+[GIN-debug] GET    /auth/callback            --> affilio-api/internal/handlers.(*HostedHandler).LoginCallback-fm (2 handlers)
+[GIN-debug] GET    /device                   --> affilio-api/internal/handlers.(*HostedHandler).DevicePage-fm (2 handlers)
+[GIN-debug] POST   /device                   --> affilio-api/internal/handlers.(*HostedHandler).DeviceDecision-fm (3 handlers)
+[GIN-debug] GET    /owner                    --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] POST   /owner/accounts           --> affilio-api/internal/handlers.(*HostedHandler).OwnerAccount-fm (3 handlers)
+[GIN-debug] POST   /owner/logout             --> affilio-api/internal/handlers.(*HostedHandler).Logout-fm (3 handlers)
+[GIN-debug] POST   /owner/authorize          --> affilio-api/internal/handlers.(*HostedHandler).Consent-fm (3 handlers)
+[GIN-debug] GET    /owner/connect-site       --> affilio-api/internal/handlers.(*HostedHandler).ReviewSiteConnection-fm (3 handlers)
+[GIN-debug] POST   /owner/connect-site       --> affilio-api/internal/handlers.(*HostedHandler).CompleteSiteConnection-fm (3 handlers)
+[GIN-debug] GET    /owner/products           --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] GET    /owner/placements         --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] GET    /owner/earnings           --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] GET    /owner/settings           --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] GET    /owner/review             --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] POST   /owner/human-approval     --> affilio-api/internal/handlers.(*HostedHandler).SaveHumanApprovalForm-fm (3 handlers)
+[GIN-debug] GET    /owner/api/human-approval --> affilio-api/internal/handlers.(*HostedHandler).GetHumanApproval-fm (3 handlers)
+[GIN-debug] PUT    /owner/api/human-approval --> affilio-api/internal/handlers.(*HostedHandler).PutHumanApproval-fm (3 handlers)
+[GIN-debug] GET    /owner/api/agents         --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func1 (3 handlers)
+[GIN-debug] GET    /owner/api/session        --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func2 (3 handlers)
+[GIN-debug] GET    /owner/api/products       --> affilio-api/internal/handlers.(*ProductsHandler).List-fm (4 handlers)
+[GIN-debug] POST   /owner/api/products       --> affilio-api/internal/handlers.(*ProductsHandler).Create-fm (4 handlers)
+[GIN-debug] PATCH  /owner/api/products/:id   --> affilio-api/internal/handlers.(*ProductsHandler).Patch-fm (4 handlers)
+[GIN-debug] GET    /owner/api/offers         --> affilio-api/internal/handlers.(*OffersHandler).List-fm (4 handlers)
+[GIN-debug] POST   /owner/api/offers         --> affilio-api/internal/handlers.(*OffersHandler).Create-fm (4 handlers)
+[GIN-debug] PATCH  /owner/api/offers/:id     --> affilio-api/internal/handlers.(*OffersHandler).Patch-fm (4 handlers)
+[GIN-debug] POST   /owner/api/offers/:id/submit --> affilio-api/internal/handlers.(*OffersHandler).Submit-fm (4 handlers)
+[GIN-debug] GET    /owner/api/earnings/maker --> affilio-api/internal/handlers.(*PayoutsHandler).MakerEarnings-fm (4 handlers)
+[GIN-debug] GET    /owner/api/maker-placements --> affilio-api/internal/handlers.(*PlacementsHandler).ListForMaker-fm (4 handlers)
+[GIN-debug] GET    /owner/api/payments       --> affilio-api/internal/handlers.(*HostedHandler).MerchantPayments-fm (4 handlers)
+[GIN-debug] POST   /owner/api/payments/:id/report --> affilio-api/internal/handlers.(*HostedHandler).ReportMerchantPayment-fm (4 handlers)
+[GIN-debug] POST   /owner/api/opportunities  --> affilio-api/internal/handlers.(*PlacementsHandler).Find-fm (4 handlers)
+[GIN-debug] POST   /owner/api/article-text   --> affilio-api/internal/handlers.(*PlacementsHandler).ArticleText-fm (4 handlers)
+[GIN-debug] POST   /owner/api/placements     --> affilio-api/internal/handlers.(*PlacementsHandler).Prepare-fm (4 handlers)
+[GIN-debug] GET    /owner/api/placements     --> affilio-api/internal/handlers.(*PlacementsHandler).List-fm (4 handlers)
+[GIN-debug] POST   /owner/api/placements/:id/commit --> affilio-api/internal/handlers.(*PlacementsHandler).Commit-fm (4 handlers)
+[GIN-debug] GET    /owner/api/earnings/publisher --> affilio-api/internal/handlers.(*PayoutsHandler).Balance-fm (4 handlers)
+[GIN-debug] GET    /owner/api/history        --> affilio-api/internal/handlers.(*PayoutsHandler).History-fm (4 handlers)
+[GIN-debug] GET    /owner/api/payout-profile --> affilio-api/internal/handlers.(*HostedHandler).PayoutProfile-fm (4 handlers)
+[GIN-debug] POST   /owner/api/payout-profile --> affilio-api/internal/handlers.(*HostedHandler).SavePayoutProfile-fm (4 handlers)
+[GIN-debug] GET    /owner/api/review/offers  --> affilio-api/internal/handlers.(*OfferReviewHandler).Queue-fm (4 handlers)
+[GIN-debug] POST   /owner/api/review/offers/:id/approve --> affilio-api/internal/handlers.(*OfferReviewHandler).Approve-fm (4 handlers)
+[GIN-debug] POST   /owner/api/review/offers/:id/reject --> affilio-api/internal/handlers.(*OfferReviewHandler).Reject-fm (4 handlers)
+[GIN-debug] POST   /owner/api/review/payouts/batch --> affilio-api/internal/handlers.(*PayoutsHandler).RunBatch-fm (4 handlers)
+[GIN-debug] GET    /sitemap.xml              --> affilio-api/internal/handlers.(*HostedHandler).Sitemap-fm (2 handlers)
+[GIN-debug] HEAD   /sitemap.xml              --> affilio-api/internal/handlers.(*HostedHandler).Sitemap-fm (2 handlers)
+[GIN-debug] GET    /                         --> affilio-api/internal/handlers.(*HostedHandler).Home-fm (2 handlers)
+[GIN-debug] GET    /makers                   --> affilio-api/internal/handlers.(*HostedHandler).Makers-fm (2 handlers)
+[GIN-debug] GET    /makers/                  --> affilio-api/internal/handlers.(*HostedHandler).Makers-fm (2 handlers)
+[GIN-debug] GET    /publishers               --> affilio-api/internal/handlers.(*HostedHandler).Publishers-fm (2 handlers)
+[GIN-debug] GET    /publishers/              --> affilio-api/internal/handlers.(*HostedHandler).Publishers-fm (2 handlers)
+[GIN-debug] GET    /publishers/setup         --> affilio-api/internal/handlers.(*HostedHandler).PublisherSetup-fm (2 handlers)
+[GIN-debug] GET    /publishers/setup/        --> affilio-api/internal/handlers.(*HostedHandler).PublisherSetup-fm (2 handlers)
+[GIN-debug] GET    /publishers/setup.md      --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func3 (2 handlers)
+[GIN-debug] HEAD   /publishers/setup.md      --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func4 (2 handlers)
+[GIN-debug] GET    /makers/:slug             --> affilio-api/internal/handlers.(*HostedHandler).directoryProfile-fm (2 handlers)
+[GIN-debug] GET    /makers/:slug/            --> affilio-api/internal/handlers.(*HostedHandler).directoryProfile-fm (2 handlers)
+[GIN-debug] GET    /publishers/:slug         --> affilio-api/internal/handlers.(*HostedHandler).directoryProfile-fm (2 handlers)
+[GIN-debug] GET    /publishers/:slug/        --> affilio-api/internal/handlers.(*HostedHandler).directoryProfile-fm (2 handlers)
+[GIN-debug] GET    /protocol                 --> affilio-api/internal/handlers.(*HostedHandler).Protocol-fm (2 handlers)
+[GIN-debug] GET    /protocol/                --> affilio-api/internal/handlers.(*HostedHandler).Protocol-fm (2 handlers)
+[GIN-debug] GET    /you                      --> affilio-api/internal/handlers.(*HostedHandler).You-fm (2 handlers)
+[GIN-debug] GET    /you/                     --> affilio-api/internal/handlers.(*HostedHandler).You-fm (2 handlers)
+[GIN-debug] GET    /home.md                  --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func5 (2 handlers)
+[GIN-debug] HEAD   /home.md                  --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func6 (2 handlers)
+[GIN-debug] GET    /makers.md                --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func7 (2 handlers)
+[GIN-debug] HEAD   /makers.md                --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func8 (2 handlers)
+[GIN-debug] GET    /publishers.md            --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func9 (2 handlers)
+[GIN-debug] HEAD   /publishers.md            --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func10 (2 handlers)
+[GIN-debug] GET    /protocol.md              --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func11 (2 handlers)
+[GIN-debug] HEAD   /protocol.md              --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func12 (2 handlers)
+[GIN-debug] GET    /you.md                   --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func13 (2 handlers)
+[GIN-debug] HEAD   /you.md                   --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func14 (2 handlers)
+[GIN-debug] GET    /privacy.md               --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func15 (2 handlers)
+[GIN-debug] HEAD   /privacy.md               --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func16 (2 handlers)
+[GIN-debug] GET    /terms.md                 --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func17 (2 handlers)
+[GIN-debug] HEAD   /terms.md                 --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func18 (2 handlers)
+[GIN-debug] GET    /agents.md                --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func19 (2 handlers)
+[GIN-debug] HEAD   /agents.md                --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func20 (2 handlers)
+[GIN-debug] GET    /privacy                  --> affilio-api/internal/handlers.(*HostedHandler).Privacy-fm (2 handlers)
+[GIN-debug] GET    /privacy/                 --> affilio-api/internal/handlers.(*HostedHandler).Privacy-fm (2 handlers)
+[GIN-debug] GET    /terms                    --> affilio-api/internal/handlers.(*HostedHandler).Terms-fm (2 handlers)
+[GIN-debug] GET    /terms/                   --> affilio-api/internal/handlers.(*HostedHandler).Terms-fm (2 handlers)
+[GIN-debug] GET    /agents                   --> affilio-api/internal/handlers.(*HostedHandler).Agents-fm (2 handlers)
+[GIN-debug] GET    /agents/                  --> affilio-api/internal/handlers.(*HostedHandler).Agents-fm (2 handlers)
+[GIN-debug] GET    /landing-v9/*filepath     --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] HEAD   /landing-v9/*filepath     --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] GET    /assets/workspace.css     --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/workspace.js      --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/setup-controls.js --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/landing.css       --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/landing.js        --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/landing-scene.bundle.js --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/landing-scene.bundle.js.LEGAL.txt --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/THIRD_PARTY_NOTICES.md --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /downloads/allagio-0.1.0.tgz --> affilio-api/internal/handlers.(*HostedHandler).serveInstaller-fm (3 handlers)
+[GIN-debug] GET    /downloads/offer-rails-0.1.0.tgz --> affilio-api/internal/handlers.(*HostedHandler).serveInstaller-fm (3 handlers)
+[GIN-debug] GET    /downloads/distributoor-setup-0.1.0.tgz --> affilio-api/internal/handlers.(*HostedHandler).serveInstaller-fm (3 handlers)
+[GIN-debug] GET    /downloads/allagio.zip    --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] HEAD   /downloads/allagio.zip    --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] GET    /downloads/offer-rails.zip --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] HEAD   /downloads/offer-rails.zip --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] GET    /downloads/affilio.zip    --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] HEAD   /downloads/affilio.zip    --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] POST   /owner/grants/:id/revoke  --> affilio-api/internal/handlers.(*HostedHandler).RevokeGrant-fm (3 handlers)
+[GIN-debug] GET    /owner/placements/:id     --> affilio-api/internal/handlers.(*HostedHandler).ReviewPlacement-fm (3 handlers)
+[GIN-debug] POST   /owner/placements/:id/approve --> affilio-api/internal/handlers.(*HostedHandler).ApprovePlacement-fm (3 handlers)
+[GIN-debug] POST   /owner/placements/:id/revoke --> affilio-api/internal/handlers.(*HostedHandler).RevokePlacement-fm (4 handlers)
+[GIN-debug] POST   /owner/payouts/:id/confirm-received --> affilio-api/internal/handlers.(*HostedHandler).ConfirmReceived-fm (4 handlers)
+[GIN-debug] GET    /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] POST   /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] PUT    /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] PATCH  /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] HEAD   /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] OPTIONS /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] DELETE /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] CONNECT /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] TRACE  /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] GET    /v1/directory/makers      --> affilio-api/internal/handlers.(*HostedHandler).DirectoryMakers-fm (1 handlers)
+=== RUN   TestWorkspaceBrowser/journey
+    workspace_browser_test.go:54: Workspace browser integration passed: products, offers, placement approval, tracked link, payment reporting and receipt.
+        
+=== RUN   TestWorkspaceBrowser/missing_content
+    workspace_browser_test.go:63: NEGATIVE REGRESSION assertion failed as required:
+        expect(locator).toBeVisible() failed
+        
+        Locator: getByRole('heading', { name: 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.', exact: true, level: 1 })
+        Expected: visible
+        Timeout: 5000ms
+        Error: element(s) not found
+        
+        Call log:
+          - Expect "toBeVisible" getByRole('heading', { name: 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.', exact: true, level: 1 }) with timeout 5000ms
+          - waiting for getByRole('heading', { name: 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.', exact: true, level: 1 })
+        
+        NEGATIVE REGRESSION assertion failed as required:
+        expect(locator).toBeVisible() failed
+        
+        Locator: getByRole('navigation', { name: 'Workspace' })
+        Expected: visible
+        Timeout: 5000ms
+        Error: element(s) not found
+        
+        Call log:
+          - Expect "toBeVisible" getByRole('navigation', { name: 'Workspace' }) with timeout 5000ms
+          - waiting for getByRole('navigation', { name: 'Workspace' })
+        
+        Workspace browser negative regression passed: removing the approved heading or the workspace navigation fails the shared assertions.
+        
+--- PASS: TestWorkspaceBrowser (14.12s)
+    --- PASS: TestWorkspaceBrowser/journey (2.91s)
+    --- PASS: TestWorkspaceBrowser/missing_content (10.87s)
+PASS
+ok  	affilio-api/internal/handlers	14.133s
+EXIT:0
