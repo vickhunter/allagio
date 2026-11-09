@@ -1,0 +1,365 @@
+go: downloading go1.23.0 (linux/amd64)
+go: downloading github.com/gin-gonic/gin v1.9.1
+go: downloading github.com/jackc/pgx/v5 v5.5.5
+go: downloading github.com/modelcontextprotocol/go-sdk v1.0.0
+go: downloading golang.org/x/oauth2 v0.21.0
+go: downloading github.com/coreos/go-oidc/v3 v3.12.0
+go: downloading golang.org/x/text v0.16.0
+go: downloading github.com/gin-contrib/sse v0.1.0
+go: downloading github.com/mattn/go-isatty v0.0.19
+go: downloading golang.org/x/net v0.27.0
+go: downloading github.com/jackc/pgpassfile v1.0.0
+go: downloading github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a
+go: downloading golang.org/x/crypto v0.25.0
+go: downloading github.com/jackc/puddle/v2 v2.2.1
+go: downloading github.com/go-jose/go-jose/v4 v4.0.2
+go: downloading github.com/go-playground/validator/v10 v10.14.0
+go: downloading github.com/pelletier/go-toml/v2 v2.0.8
+go: downloading github.com/ugorji/go/codec v1.2.11
+go: downloading google.golang.org/protobuf v1.30.0
+go: downloading gopkg.in/yaml.v3 v3.0.1
+go: downloading golang.org/x/sys v0.26.0
+go: downloading github.com/google/jsonschema-go v0.3.0
+go: downloading golang.org/x/sync v0.7.0
+go: downloading github.com/gabriel-vasile/mimetype v1.4.2
+go: downloading github.com/go-playground/universal-translator v0.18.1
+go: downloading github.com/leodido/go-urn v1.2.4
+go: downloading github.com/go-playground/locales v0.14.1
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] POST   /api/events               --> affilio-api/internal/handlers.(*HostedHandler).RecordLandingEvent-fm (2 handlers)
+[GIN-debug] GET    /demo                     --> affilio-api/internal/handlers.(*HostedHandler).mountDemo.func1 (2 handlers)
+[GIN-debug] HEAD   /demo                     --> affilio-api/internal/handlers.(*HostedHandler).mountDemo.func2 (2 handlers)
+[GIN-debug] GET    /demo/:page               --> affilio-api/internal/handlers.(*HostedHandler).mountDemo.func3 (2 handlers)
+[GIN-debug] HEAD   /demo/:page               --> affilio-api/internal/handlers.(*HostedHandler).mountDemo.func4 (2 handlers)
+[GIN-debug] POST   /demo/operator            --> affilio-api/internal/handlers.(*HostedHandler).postDemoOperator-fm (2 handlers)
+[GIN-debug] GET    /.well-known/oauth-protected-resource --> affilio-api/internal/handlers.(*HostedHandler).resourceMetadata-fm (2 handlers)
+[GIN-debug] GET    /.well-known/oauth-protected-resource/mcp --> affilio-api/internal/handlers.(*HostedHandler).resourceMetadata-fm (2 handlers)
+[GIN-debug] GET    /.well-known/oauth-authorization-server --> affilio-api/internal/handlers.(*HostedHandler).authorizationMetadata-fm (2 handlers)
+[GIN-debug] POST   /oauth/register           --> affilio-api/internal/handlers.(*HostedHandler).RegisterOAuthClient-fm (2 handlers)
+[GIN-debug] GET    /oauth/authorize          --> affilio-api/internal/handlers.(*HostedHandler).Authorize-fm (2 handlers)
+[GIN-debug] POST   /oauth/token              --> affilio-api/internal/handlers.(*HostedHandler).Token-fm (2 handlers)
+[GIN-debug] GET    /auth/login               --> affilio-api/internal/handlers.(*HostedHandler).LoginStart-fm (2 handlers)
+[GIN-debug] GET    /auth/callback            --> affilio-api/internal/handlers.(*HostedHandler).LoginCallback-fm (2 handlers)
+[GIN-debug] GET    /device                   --> affilio-api/internal/handlers.(*HostedHandler).DevicePage-fm (2 handlers)
+[GIN-debug] POST   /device                   --> affilio-api/internal/handlers.(*HostedHandler).DeviceDecision-fm (3 handlers)
+[GIN-debug] GET    /owner                    --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] POST   /owner/accounts           --> affilio-api/internal/handlers.(*HostedHandler).OwnerAccount-fm (3 handlers)
+[GIN-debug] POST   /owner/logout             --> affilio-api/internal/handlers.(*HostedHandler).Logout-fm (3 handlers)
+[GIN-debug] POST   /owner/authorize          --> affilio-api/internal/handlers.(*HostedHandler).Consent-fm (3 handlers)
+[GIN-debug] GET    /owner/connect-site       --> affilio-api/internal/handlers.(*HostedHandler).ReviewSiteConnection-fm (3 handlers)
+[GIN-debug] POST   /owner/connect-site       --> affilio-api/internal/handlers.(*HostedHandler).CompleteSiteConnection-fm (3 handlers)
+[GIN-debug] GET    /owner/products           --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] GET    /owner/placements         --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] GET    /owner/earnings           --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] GET    /owner/settings           --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] GET    /owner/review             --> affilio-api/internal/handlers.(*HostedHandler).Dashboard-fm (3 handlers)
+[GIN-debug] POST   /owner/human-approval     --> affilio-api/internal/handlers.(*HostedHandler).SaveHumanApprovalForm-fm (3 handlers)
+[GIN-debug] GET    /owner/api/human-approval --> affilio-api/internal/handlers.(*HostedHandler).GetHumanApproval-fm (3 handlers)
+[GIN-debug] PUT    /owner/api/human-approval --> affilio-api/internal/handlers.(*HostedHandler).PutHumanApproval-fm (3 handlers)
+[GIN-debug] GET    /owner/api/agents         --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func1 (3 handlers)
+[GIN-debug] GET    /owner/api/session        --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func2 (3 handlers)
+[GIN-debug] GET    /owner/api/products       --> affilio-api/internal/handlers.(*ProductsHandler).List-fm (4 handlers)
+[GIN-debug] POST   /owner/api/products       --> affilio-api/internal/handlers.(*ProductsHandler).Create-fm (4 handlers)
+[GIN-debug] PATCH  /owner/api/products/:id   --> affilio-api/internal/handlers.(*ProductsHandler).Patch-fm (4 handlers)
+[GIN-debug] GET    /owner/api/offers         --> affilio-api/internal/handlers.(*OffersHandler).List-fm (4 handlers)
+[GIN-debug] POST   /owner/api/offers         --> affilio-api/internal/handlers.(*OffersHandler).Create-fm (4 handlers)
+[GIN-debug] PATCH  /owner/api/offers/:id     --> affilio-api/internal/handlers.(*OffersHandler).Patch-fm (4 handlers)
+[GIN-debug] POST   /owner/api/offers/:id/submit --> affilio-api/internal/handlers.(*OffersHandler).Submit-fm (4 handlers)
+[GIN-debug] GET    /owner/api/earnings/maker --> affilio-api/internal/handlers.(*PayoutsHandler).MakerEarnings-fm (4 handlers)
+[GIN-debug] GET    /owner/api/maker-placements --> affilio-api/internal/handlers.(*PlacementsHandler).ListForMaker-fm (4 handlers)
+[GIN-debug] GET    /owner/api/payments       --> affilio-api/internal/handlers.(*HostedHandler).MerchantPayments-fm (4 handlers)
+[GIN-debug] POST   /owner/api/payments/:id/report --> affilio-api/internal/handlers.(*HostedHandler).ReportMerchantPayment-fm (4 handlers)
+[GIN-debug] POST   /owner/api/opportunities  --> affilio-api/internal/handlers.(*PlacementsHandler).Find-fm (4 handlers)
+[GIN-debug] POST   /owner/api/article-text   --> affilio-api/internal/handlers.(*PlacementsHandler).ArticleText-fm (4 handlers)
+[GIN-debug] POST   /owner/api/placements     --> affilio-api/internal/handlers.(*PlacementsHandler).Prepare-fm (4 handlers)
+[GIN-debug] GET    /owner/api/placements     --> affilio-api/internal/handlers.(*PlacementsHandler).List-fm (4 handlers)
+[GIN-debug] POST   /owner/api/placements/:id/commit --> affilio-api/internal/handlers.(*PlacementsHandler).Commit-fm (4 handlers)
+[GIN-debug] GET    /owner/api/earnings/publisher --> affilio-api/internal/handlers.(*PayoutsHandler).Balance-fm (4 handlers)
+[GIN-debug] GET    /owner/api/history        --> affilio-api/internal/handlers.(*PayoutsHandler).History-fm (4 handlers)
+[GIN-debug] GET    /owner/api/payout-profile --> affilio-api/internal/handlers.(*HostedHandler).PayoutProfile-fm (4 handlers)
+[GIN-debug] POST   /owner/api/payout-profile --> affilio-api/internal/handlers.(*HostedHandler).SavePayoutProfile-fm (4 handlers)
+[GIN-debug] GET    /owner/api/review/offers  --> affilio-api/internal/handlers.(*OfferReviewHandler).Queue-fm (4 handlers)
+[GIN-debug] POST   /owner/api/review/offers/:id/approve --> affilio-api/internal/handlers.(*OfferReviewHandler).Approve-fm (4 handlers)
+[GIN-debug] POST   /owner/api/review/offers/:id/reject --> affilio-api/internal/handlers.(*OfferReviewHandler).Reject-fm (4 handlers)
+[GIN-debug] POST   /owner/api/review/payouts/batch --> affilio-api/internal/handlers.(*PayoutsHandler).RunBatch-fm (4 handlers)
+[GIN-debug] GET    /sitemap.xml              --> affilio-api/internal/handlers.(*HostedHandler).Sitemap-fm (2 handlers)
+[GIN-debug] HEAD   /sitemap.xml              --> affilio-api/internal/handlers.(*HostedHandler).Sitemap-fm (2 handlers)
+[GIN-debug] GET    /                         --> affilio-api/internal/handlers.(*HostedHandler).Home-fm (2 handlers)
+[GIN-debug] GET    /makers                   --> affilio-api/internal/handlers.(*HostedHandler).Makers-fm (2 handlers)
+[GIN-debug] GET    /makers/                  --> affilio-api/internal/handlers.(*HostedHandler).Makers-fm (2 handlers)
+[GIN-debug] GET    /publishers               --> affilio-api/internal/handlers.(*HostedHandler).Publishers-fm (2 handlers)
+[GIN-debug] GET    /publishers/              --> affilio-api/internal/handlers.(*HostedHandler).Publishers-fm (2 handlers)
+[GIN-debug] GET    /publishers/setup         --> affilio-api/internal/handlers.(*HostedHandler).PublisherSetup-fm (2 handlers)
+[GIN-debug] GET    /publishers/setup/        --> affilio-api/internal/handlers.(*HostedHandler).PublisherSetup-fm (2 handlers)
+[GIN-debug] GET    /publishers/setup.md      --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func3 (2 handlers)
+[GIN-debug] HEAD   /publishers/setup.md      --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func4 (2 handlers)
+[GIN-debug] GET    /makers/:slug             --> affilio-api/internal/handlers.(*HostedHandler).directoryProfile-fm (2 handlers)
+[GIN-debug] GET    /makers/:slug/            --> affilio-api/internal/handlers.(*HostedHandler).directoryProfile-fm (2 handlers)
+[GIN-debug] GET    /publishers/:slug         --> affilio-api/internal/handlers.(*HostedHandler).directoryProfile-fm (2 handlers)
+[GIN-debug] GET    /publishers/:slug/        --> affilio-api/internal/handlers.(*HostedHandler).directoryProfile-fm (2 handlers)
+[GIN-debug] GET    /protocol                 --> affilio-api/internal/handlers.(*HostedHandler).Protocol-fm (2 handlers)
+[GIN-debug] GET    /protocol/                --> affilio-api/internal/handlers.(*HostedHandler).Protocol-fm (2 handlers)
+[GIN-debug] GET    /you                      --> affilio-api/internal/handlers.(*HostedHandler).You-fm (2 handlers)
+[GIN-debug] GET    /you/                     --> affilio-api/internal/handlers.(*HostedHandler).You-fm (2 handlers)
+[GIN-debug] GET    /home.md                  --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func5 (2 handlers)
+[GIN-debug] HEAD   /home.md                  --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func6 (2 handlers)
+[GIN-debug] GET    /makers.md                --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func7 (2 handlers)
+[GIN-debug] HEAD   /makers.md                --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func8 (2 handlers)
+[GIN-debug] GET    /publishers.md            --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func9 (2 handlers)
+[GIN-debug] HEAD   /publishers.md            --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func10 (2 handlers)
+[GIN-debug] GET    /protocol.md              --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func11 (2 handlers)
+[GIN-debug] HEAD   /protocol.md              --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func12 (2 handlers)
+[GIN-debug] GET    /you.md                   --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func13 (2 handlers)
+[GIN-debug] HEAD   /you.md                   --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func14 (2 handlers)
+[GIN-debug] GET    /privacy.md               --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func15 (2 handlers)
+[GIN-debug] HEAD   /privacy.md               --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func16 (2 handlers)
+[GIN-debug] GET    /terms.md                 --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func17 (2 handlers)
+[GIN-debug] HEAD   /terms.md                 --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func18 (2 handlers)
+[GIN-debug] GET    /agents.md                --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func19 (2 handlers)
+[GIN-debug] HEAD   /agents.md                --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func20 (2 handlers)
+[GIN-debug] GET    /privacy                  --> affilio-api/internal/handlers.(*HostedHandler).Privacy-fm (2 handlers)
+[GIN-debug] GET    /privacy/                 --> affilio-api/internal/handlers.(*HostedHandler).Privacy-fm (2 handlers)
+[GIN-debug] GET    /terms                    --> affilio-api/internal/handlers.(*HostedHandler).Terms-fm (2 handlers)
+[GIN-debug] GET    /terms/                   --> affilio-api/internal/handlers.(*HostedHandler).Terms-fm (2 handlers)
+[GIN-debug] GET    /agents                   --> affilio-api/internal/handlers.(*HostedHandler).Agents-fm (2 handlers)
+[GIN-debug] GET    /agents/                  --> affilio-api/internal/handlers.(*HostedHandler).Agents-fm (2 handlers)
+[GIN-debug] GET    /landing-v9/*filepath     --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] HEAD   /landing-v9/*filepath     --> github.com/gin-gonic/gin.(*RouterGroup).createStaticHandler.func1 (3 handlers)
+[GIN-debug] GET    /assets/workspace.css     --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/workspace.js      --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/setup-controls.js --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/landing.css       --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/landing.js        --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/landing-scene.bundle.js --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/landing-scene.bundle.js.LEGAL.txt --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /assets/THIRD_PARTY_NOTICES.md --> affilio-api/internal/handlers.(*HostedHandler).mountWorkspace.func21 (3 handlers)
+[GIN-debug] GET    /downloads/allagio-0.1.0.tgz --> affilio-api/internal/handlers.(*HostedHandler).serveInstaller-fm (3 handlers)
+[GIN-debug] GET    /downloads/offer-rails-0.1.0.tgz --> affilio-api/internal/handlers.(*HostedHandler).serveInstaller-fm (3 handlers)
+[GIN-debug] GET    /downloads/distributoor-setup-0.1.0.tgz --> affilio-api/internal/handlers.(*HostedHandler).serveInstaller-fm (3 handlers)
+[GIN-debug] GET    /downloads/allagio.zip    --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] HEAD   /downloads/allagio.zip    --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] GET    /downloads/offer-rails.zip --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] HEAD   /downloads/offer-rails.zip --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] GET    /downloads/affilio.zip    --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] HEAD   /downloads/affilio.zip    --> affilio-api/internal/handlers.(*HostedHandler).DownloadWordPress-fm (3 handlers)
+[GIN-debug] POST   /owner/grants/:id/revoke  --> affilio-api/internal/handlers.(*HostedHandler).RevokeGrant-fm (3 handlers)
+[GIN-debug] GET    /owner/placements/:id     --> affilio-api/internal/handlers.(*HostedHandler).ReviewPlacement-fm (3 handlers)
+[GIN-debug] POST   /owner/placements/:id/approve --> affilio-api/internal/handlers.(*HostedHandler).ApprovePlacement-fm (3 handlers)
+[GIN-debug] POST   /owner/placements/:id/revoke --> affilio-api/internal/handlers.(*HostedHandler).RevokePlacement-fm (4 handlers)
+[GIN-debug] POST   /owner/payouts/:id/confirm-received --> affilio-api/internal/handlers.(*HostedHandler).ConfirmReceived-fm (4 handlers)
+[GIN-debug] GET    /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] POST   /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] PUT    /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] PATCH  /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] HEAD   /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] OPTIONS /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] DELETE /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] CONNECT /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] TRACE  /mcp                      --> affilio-api/internal/handlers.(*HostedHandler).MCP-fm (3 handlers)
+[GIN-debug] GET    /v1/directory/makers      --> affilio-api/internal/handlers.(*HostedHandler).DirectoryMakers-fm (1 handlers)
+--- FAIL: TestWorkspaceBrowser (6.08s)
+    workspace_browser_test.go:62: browser integration: exit status 1
+        node:internal/modules/run_main:123
+            triggerUncaughtException(
+            ^
+        
+        ExpectError: expect(locator).toBeVisible() failed
+        
+        Locator: getByRole('heading', { name: /Someone has the product/ })
+        Expected: visible
+        Timeout: 5000ms
+        Error: element(s) not found
+        
+        Call log:
+          - Expect "toBeVisible" getByRole('heading', { name: /Someone has the product/ }) with timeout 5000ms
+          - waiting for getByRole('heading', { name: /Someone has the product/ })
+        
+            at captureRawStack (/agent/repos/affilio/affilio-wp/e2e/node_modules/playwright-core/lib/coreBundle.js:9551:17)
+            at callMatcherAsStep (/agent/repos/affilio/affilio-wp/e2e/node_modules/playwright/lib/matchers/expect.js:13342:57)
+            at Object.toBeVisible (/agent/repos/affilio/affilio-wp/e2e/node_modules/playwright/lib/matchers/expect.js:13334:23)
+            at /agent/repos/affilio/affilio-wp/e2e/workspace.mjs:29:85 {
+          matcherResult: {
+            message: 'expect(locator).toBeVisible() failed\n' +
+              '\n' +
+              "Locator: getByRole('heading', { name: /Someone has the product/ })\n" +
+              'Expected: visible\n' +
+              'Timeout: 5000ms\n' +
+              'Error: element(s) not found\n' +
+              '\n' +
+              'Call log:\n' +
+              `  - Expect "toBeVisible" getByRole('heading', { name: /Someone has the product/ }) with timeout 5000ms\n` +
+              "  - waiting for getByRole('heading', { name: /Someone has the product/ })\n",
+            pass: false,
+            actual: undefined,
+            name: 'toBeVisible',
+            expected: 'visible',
+            log: [
+              `  - Expect "toBeVisible" getByRole('heading', { name: /Someone has the product/ }) with timeout 5000ms`,
+              "  - waiting for getByRole('heading', { name: /Someone has the product/ })"
+            ],
+            timeout: 5000,
+            ariaSnapshot: '- link "Skip to content":\n' +
+              '  - /url: "#main"\n' +
+              '- banner:\n' +
+              '  - link "Allagio, home":\n' +
+              '    - /url: /\n' +
+              '    - text: Allagio\n' +
+              '  - navigation "Main":\n' +
+              '    - link "Your limits":\n' +
+              '      - /url: /you/\n' +
+              '    - link "Makers":\n' +
+              '      - /url: /makers/\n' +
+              '    - link "Publishers":\n' +
+              '      - /url: /publishers/\n' +
+              '    - link "Protocol":\n' +
+              '      - /url: /protocol/\n' +
+              '    - link "Agents":\n' +
+              '      - /url: /agents\n' +
+              '  - button "Pause motion"\n' +
+              '  - button "Jump to… ⌘K"\n' +
+              '  - link "Sign in":\n' +
+              '    - /url: /auth/login?return_to=%2Fowner\n' +
+              '- main:\n' +
+              '  - region "While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.":\n' +
+              '    - heading "While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming." [level=1]\n' +
+              '    - paragraph: Give your agent this line to start\n' +
+              '    - text: Join with POST /v1/agent-tokens and send the bearer.\n' +
+              '    - button "Copy"\n' +
+              '    - link "llms.txt":\n' +
+              '      - /url: /llms.txt\n' +
+              '    - status\n' +
+              '    - group: Set it up yourself\n' +
+              '    - paragraph: We never hold your money.\n' +
+              '    - paragraph:\n' +
+              '      - link "Your limits":\n' +
+              '        - /url: /you/\n' +
+              '  - region "What your agent does":\n' +
+              '    - heading "What your agent does" [level=2]\n' +
+              '    - paragraph: "While you write a blog post, a social post, or a newsletter, your agent can suggest a matching offer: \\"this fits your post, want to monetize it?\\" That suggestion is Coming. The agent does not write the post, and it does not choose the offer."\n' +
+              '    - list:\n' +
+              '      - listitem:\n' +
+              '        - heading "Suggest an offer while you write" [level=3]\n' +
+              '        - text: Coming\n' +
+              '        - paragraph: Not on the hosted server today. The agent does not write the post.\n' +
+              '      - listitem:\n' +
+              '        - heading "Affiliate links" [level=3]\n' +
+              '        - text: Works today\n' +
+              '        - paragraph: Your agent can find an offer and prepare a placement. A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person. A pasted link counts clicks. This is not Verified end to end.\n' +
+              '      - listitem:\n' +
+              '        - heading "Link swaps" [level=3]\n' +
+              '        - text: Coming\n' +
+              '        - paragraph: Agents would trade links with each other. That deal is not implemented.\n' +
+              '      - listitem:\n' +
+              '        - heading "Cross-sells" [level=3]\n' +
+              '        - text: Coming\n' +
+              '        - paragraph: A matching product beside yours. Not implemented.\n' +
+              '      - listitem:\n' +
+              '        - heading "Upsells" [level=3]\n' +
+              '        - text: Coming\n' +
+              '        - paragraph: A higher offer on something you already mention. Not implemented.\n' +
+              '      - listitem:\n' +
+              '        - heading "Reposts" [level=3]\n' +
+              '        - text: Coming\n' +
+              '        - paragraph: Another agent reposting your piece. Not implemented.\n' +
+              '  - region "What you keep control of":\n' +
+              '    - heading "What you keep control of" [level=2]\n' +
+              '    - list:\n' +
+              '      - listitem:\n' +
+              '        - heading "Your limits come first" [level=3]\n' +
+              '        - paragraph: A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on. A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.\n' +
+              '      - listitem:\n' +
+              '        - heading "You approve" [level=3]\n' +
+              '        - paragraph: A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.\n' +
+              '      - listitem:\n' +
+              '        - heading "No personal data shared with the other agent" [level=3]\n' +
+              '        - paragraph: The other agent does not get your subscriber list. A click on this server stores a truncated hash of the IP address. That hash is not sent to the other agent.\n' +
+              '      - listitem:\n' +
+              '        - heading "No cold emails" [level=3]\n' +
+              '        - paragraph: Allagio does not send cold emails. Deals with other agents are the aim. Those deals, apart from an approved affiliate link, are Coming.\n' +
+              '      - listitem:\n' +
+              '        - heading "No signup on each program site" [level=3]\n' +
+              '        - paragraph: The aim is that your agent joins an offer without you filling in a form on the program site. Your agent joins here with POST /v1/agent-tokens and a bearer. No sign-in link. Google sign-in stays on the owner dashboard.\n' +
+              '    - paragraph:\n' +
+              '      - link "Your limits, approvals, and receipts":\n' +
+              '        - /url: /you/\n' +
+              '  - region "What it replaces":\n' +
+              '    - heading "What it replaces" [level=2]\n' +
+              '    - list:\n' +
+              '      - listitem:\n' +
+              '        - heading "Manual affiliate signups" [level=3]\n' +
+              '        - paragraph: Filling in a form on each program site is what this is built to replace. A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person. Your agent joins with POST /v1/agent-tokens and a bearer.\n' +
+              '      - listitem:\n' +
+              '        - heading "Outreach email bots" [level=3]\n' +
+              '        - paragraph: Cold email is what this is built to replace. Agent-to-agent link swaps, cross-sells, upsells, and reposts are Coming.\n' +
+              '  - region "On a €24.00 sale at 10%, the publisher earns €2.40. A €0.24 fee is paid by the maker, so the maker keeps €21.36.":\n' +
+              '    - heading "On a €24.00 sale at 10%, the publisher earns €2.40. A €0.24 fee is paid by the maker, so the maker keeps €21.36." [level=2]\n' +
+              '  - region "See it on a real post.":\n' +
+              '    - paragraph: On your post\n' +
+              '    - heading "See it on a real post." [level=2]\n' +
+              '    - paragraph: Paste a post URL. See where an offer would sit.\n' +
+              '    - text: Paste a post URL\n' +
+              '    - textbox "Paste a post URL":\n' +
+              '      - /placeholder: https://example.com/your-post\n' +
+              "    - paragraph: Public links only. Private posts and accounts can't be read.\n" +
+              '    - button "Preview this post"\n' +
+              '    - status\n' +
+              '  - region "Straight answers.":\n' +
+              '    - paragraph: Money, plainly\n' +
+              '    - heading "Straight answers." [level=2]\n' +
+              '    - heading "Do you hold or move the money?" [level=3]:\n' +
+              '      - button "Do you hold or move the money?" [expanded]\n' +
+              '    - region "Do you hold or move the money?":\n' +
+              '      - paragraph: No. Stripe handles checkout. Polar, Lemon Squeezy, and other payment adapters are coming. We record attribution, refunds and commission, and show whether a sale was provider-attested or seller-reported.\n' +
+              '    - heading "What does it cost?" [level=3]:\n' +
+              '      - button "What does it cost?"\n' +
+              '    - region "What does it cost?":\n' +
+              '      - paragraph: "You earn per sale: €2.40 on a €24.00 sale at 10%. The maker pays a separate fee of 10% of that commission: €0.24 on this example. The maker keeps €21.36."\n' +
+              '    - heading "What does my agent share?" [level=3]:\n' +
+              '      - button "What does my agent share?"\n' +
+              '    - region "What does my agent share?":\n' +
+              '      - paragraph: "An offer card: the project, the category and the commission terms. Never customer names, emails or lists. Enforced in code, not policy text."\n' +
+              '    - heading "Can I take a placement back?" [level=3]:\n' +
+              '      - button "Can I take a placement back?"\n' +
+              '    - region "Can I take a placement back?":\n' +
+              '      - paragraph: Yes. Undo is one tap in the digest. The box leaves the page at the plugin’s next sync (every 5 minutes) plus any page-cache delay, and clicks stop at the link right away.\n' +
+              '    - heading "What if I have no sales yet?" [level=3]:\n' +
+              '      - button "What if I have no sales yet?"\n' +
+              '    - region "What if I have no sales yet?":\n' +
+              '      - paragraph: "Later: Traffic trade. Two sites with overlapping topics could mention each other, no money involved. That is not live yet."\n' +
+              '- contentinfo "Allagio is a working name. Made in Padova.":\n' +
+              '  - heading "Allagio is a working name. Made in Padova." [level=2]\n' +
+              '  - paragraph: "Illustration: the Padova skyline with the domes of the Basilica del Santo, the keel roof of Palazzo della Ragione, the statue ring and canal of Prato della Valle and the Specola tower, with a SIR1 tram passing."\n' +
+              '  - link "Allagio, home":\n' +
+              '    - /url: /\n' +
+              '    - text: Allagio\n' +
+              '  - navigation "Footer":\n' +
+              '    - link "Home":\n' +
+              '      - /url: /\n' +
+              '    - link "For makers":\n' +
+              '      - /url: /makers/\n' +
+              '    - link "For publishers":\n' +
+              '      - /url: /publishers/\n' +
+              '    - link "Protocol":\n' +
+              '      - /url: /protocol/\n' +
+              '    - link "Your limits":\n' +
+              '      - /url: /you/\n' +
+              '    - link "Privacy":\n' +
+              '      - /url: /privacy\n' +
+              '    - link "Terms":\n' +
+              '      - /url: /terms\n' +
+              '    - link "How it works":\n' +
+              '      - /url: /landing-v9/how-it-works/\n' +
+              '    - link "MCP and setup":\n' +
+              '      - /url: /landing-v9/agents/\n' +
+              '  - paragraph: Allagio is a working name. Agents find, match and place. Humans get the results. Drawn and buil'... 91 more characters
+          }
+        }
+        
+        Node.js v22.23.4
+FAIL
+FAIL	affilio-api/internal/handlers	6.093s
+FAIL
+EXIT:1
