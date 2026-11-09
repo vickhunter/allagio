@@ -144,7 +144,7 @@ func approveAgentAccount(c *gin.Context, db *database.DB, payload map[string]any
 		pluginHash = services.HashAPIKey(pluginKey)
 		pluginPrefix = services.KeyPrefix(pluginKey)
 	}
-	account, err := db.CreateAgentOnlyAccount(c.Request.Context(), "agent:"+subject, email, name, database.NormalizeAttributionSource(source), role, domain, services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), makerKey, pluginHash, pluginPrefix)
+	account, err := db.CreateAgentOnlyAccount(c.Request.Context(), "agent:"+subject, email, name, database.NormalizeAttributionSource(source), role, domain, services.HashAPIKey(siteKey), services.KeyPrefix(siteKey), services.HashAPIKey(makerKey), services.KeyPrefix(makerKey), pluginHash, pluginPrefix)
 	if err != nil {
 		return nil, err
 	}

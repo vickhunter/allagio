@@ -89,7 +89,7 @@ func postJSON(t *testing.T, r http.Handler, method, path string, payload any, he
 func seedListedOffer(t *testing.T, db *database.DB, makerKey, email, name string) (makerID, offerID string) {
 	t.Helper()
 	var err error
-	makerID, err = db.CreateMaker(context.Background(), makerKey, email, name)
+	makerID, err = db.CreateMaker(context.Background(), services.HashAPIKey(makerKey), services.KeyPrefix(makerKey), email, name)
 	if err != nil {
 		t.Fatal(err)
 	}

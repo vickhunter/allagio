@@ -224,7 +224,7 @@ func TestHostedMakerSetupCreatesOnlyNewOwnedAccount(t *testing.T) {
 		t.Fatal("maker setup did not bind exactly the maker account")
 	}
 	var key *string
-	if err = db.Pool.QueryRow(context.Background(), `SELECT api_key FROM makers WHERE id=$1`, grant.MakerID).Scan(&key); err != nil || key != nil {
+	if err = db.Pool.QueryRow(context.Background(), `SELECT api_key_hash FROM makers WHERE id=$1`, grant.MakerID).Scan(&key); err != nil || key != nil {
 		t.Fatal("hosted setup created an unnecessary legacy key")
 	}
 	authorizeTestAgent(t, h, r, o, cookie, "maker")
@@ -232,7 +232,7 @@ func TestHostedMakerSetupCreatesOnlyNewOwnedAccount(t *testing.T) {
 	if err = db.Pool.QueryRow(context.Background(), `SELECT count(*) FROM makers WHERE email=$1`, o.Email).Scan(&count); err != nil || count != 1 {
 		t.Fatal("rerun duplicated maker")
 	}
-	foreign, err := db.CreateMaker(context.Background(), "existing-maker-owner", "existing-setup@example.com", "Existing maker")
+	foreign, err := db.CreateMaker(context.Background(), services.HashAPIKey("existing-maker-owner"), services.KeyPrefix("existing-maker-owner"), "existing-setup@example.com", "Existing maker")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +257,7 @@ func TestOIDCSignInLinksMakerByEmail(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	h, r, _ := hostedTestServer(t, db)
-	makerID, err := db.CreateMaker(context.Background(), "oidc-maker-key", "Publisher@Example.com", "OIDC Maker")
+	makerID, err := db.CreateMaker(context.Background(), services.HashAPIKey("oidc-maker-key"), services.KeyPrefix("oidc-maker-key"), "Publisher@Example.com", "OIDC Maker")
 	if err != nil {
 		t.Fatal(err)
 	}

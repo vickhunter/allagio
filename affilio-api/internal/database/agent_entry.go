@@ -317,17 +317,17 @@ type AgentAccount struct {
 	VerificationToken string
 }
 
-func (d *DB) CreateAgentOnlyAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix string) (AgentAccount, error) {
-	return d.createAgentOnlyAccount(ctx, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix, "")
+func (d *DB) CreateAgentOnlyAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerHash, makerPrefix, pluginHash, pluginPrefix string) (AgentAccount, error) {
+	return d.createAgentOnlyAccount(ctx, subject, email, name, source, role, domain, siteHash, sitePrefix, makerHash, makerPrefix, pluginHash, pluginPrefix, "")
 }
 
 // CreateOpenAgentAccount is POST /v1/agent-accounts. ipHash is the HMAC of
 // the client address and counts toward the shared 24-hour open-signup cap.
-func (d *DB) CreateOpenAgentAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix, ipHash string) (AgentAccount, error) {
-	return d.createAgentOnlyAccount(ctx, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix, ipHash)
+func (d *DB) CreateOpenAgentAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerHash, makerPrefix, pluginHash, pluginPrefix, ipHash string) (AgentAccount, error) {
+	return d.createAgentOnlyAccount(ctx, subject, email, name, source, role, domain, siteHash, sitePrefix, makerHash, makerPrefix, pluginHash, pluginPrefix, ipHash)
 }
 
-func (d *DB) createAgentOnlyAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerKey, pluginHash, pluginPrefix, ipHash string) (AgentAccount, error) {
+func (d *DB) createAgentOnlyAccount(ctx context.Context, subject, email, name, source, role, domain, siteHash, sitePrefix, makerHash, makerPrefix, pluginHash, pluginPrefix, ipHash string) (AgentAccount, error) {
 	if ipHash != "" {
 		if err := d.PruneClientAddressHashes(ctx); err != nil {
 			return AgentAccount{}, err
@@ -372,7 +372,7 @@ VALUES('https://offer-rails.agent',$1,$2,$3,$4,true,false) RETURNING id`, subjec
 			err = seedNewSitePublishAsk(ctx, tx, out.OwnerID, out.SiteID)
 		}
 	case "maker":
-		err = tx.QueryRow(ctx, `INSERT INTO makers(api_key,email,name) VALUES($1,$2,$3) RETURNING id`, makerKey, email, name).Scan(&out.MakerID)
+		err = tx.QueryRow(ctx, `INSERT INTO makers(api_key_hash,api_key_prefix,email,name) VALUES($1,$2,$3,$4) RETURNING id`, makerHash, makerPrefix, email, name).Scan(&out.MakerID)
 		if err == nil {
 			_, err = tx.Exec(ctx, `UPDATE owners SET maker_id=$2 WHERE id=$1`, out.OwnerID, out.MakerID)
 		}

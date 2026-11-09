@@ -31,7 +31,7 @@ func MakerKeyAuth(db *database.DB, resources ...string) gin.HandlerFunc {
 			return
 		}
 		keyHash := services.HashAPIKey(apiKey)
-		maker, err := db.GetMakerByAnyAPIKey(c.Request.Context(), apiKey)
+		maker, err := db.GetMakerByAPIKeyHash(c.Request.Context(), keyHash)
 		if err != nil {
 			makerID, offerID, keyErr := db.ProjectOfferKey(c.Request.Context(), keyHash)
 			if keyErr == nil {

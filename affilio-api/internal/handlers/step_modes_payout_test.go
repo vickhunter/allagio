@@ -10,6 +10,7 @@ import (
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
+	"affilio-api/internal/services"
 )
 
 func TestLinkChangeAskAndOff(t *testing.T) {
@@ -60,7 +61,7 @@ func TestPayoutActionsAskAndOff(t *testing.T) {
 	h, r := newStepModeRouter(db, entry.LiveClaimChecker{})
 	owner, cookie := testOwnerSession(t, h, "payout-owner", "payout-owner@example.com")
 	siteID := createTestSite(t, db, "payout-site-key", "payout-site.example", "Payout Blog")
-	makerID, err := db.CreateMaker(context.Background(), "payout-maker-key", "payout-maker@example.com", "Payout Maker")
+	makerID, err := db.CreateMaker(context.Background(), services.HashAPIKey("payout-maker-key"), services.KeyPrefix("payout-maker-key"), "payout-maker@example.com", "Payout Maker")
 	if err != nil {
 		t.Fatal(err)
 	}
