@@ -1,6 +1,6 @@
 ## November 9 — D-130 Poppy discovery
 
-`GET /.well-known/poppy.json` describes this host for Personal Agent Protocol draft 0.4. It lists the MCP endpoint and turns Poppy sign-in off. `llms.txt`, `skill.md`, and the pages do not mention it. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+`GET /.well-known/poppy.json` describes this host for Personal Agent Protocol draft 0.4. It lists the MCP endpoint and turns Poppy sign-in off. `llms.txt`, `skill.md`, and the pages do not mention it. `revocation_endpoint` is a known gap, to be scoped separately. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
 
 ## November 6 — D-124 discovery
 
