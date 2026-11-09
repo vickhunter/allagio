@@ -1,0 +1,20 @@
+affilio-wp/e2e/workspace.mjs
+  s_7e484d91fceb6c::t_8ef32d1d742f74 51
+  s_7e484d91fceb6c::t_7334b1a3a1d008 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "75a76a46241f0a1d93f9ca8686de5f150fce7951",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
