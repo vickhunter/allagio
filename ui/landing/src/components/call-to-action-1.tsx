@@ -3,7 +3,6 @@ import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import { Marquee } from "@/components/ui/marquee"
-import { JoinPrompt } from "@/components/join-prompt.mjs"
 import { example, feed } from "@/content"
 import { signInHref, withSource } from "@/lib/source"
 
@@ -81,7 +80,12 @@ export function CallToAction({ source }: { source: string }) {
               token.
             </p>
             <div className="mt-5 flex flex-col items-center gap-3">
-              <JoinPrompt line={false} />
+              <a
+                href="#join"
+                className={cn(buttonVariants({ size: "lg" }), "rounded-full px-6")}
+              >
+                Back to the join line
+              </a>
               <div className="flex flex-wrap items-center justify-center gap-4">
                 <a
                   href={signIn}

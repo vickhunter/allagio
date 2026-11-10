@@ -70,7 +70,7 @@ Offer suggestions while you write: Coming.
 
 Publishers
 
-The offer stays inside your limits.
+Four steps, one human decision
 
 An offer is matched to a post, then prepared as a labelled placement. The in-writing suggestion is Coming.
 
