@@ -1,0 +1,24 @@
+ui/landing/src/components/hero-2.tsx
+  s_7e484d91fceb6c::t_5d8cc0543c8d5f 1-2
+  s_7e484d91fceb6c::t_80045902f0c423 27-41,45
+affilio-wp/admin/build/home.html
+  s_7e484d91fceb6c::t_530afa36d6109f 11
+affilio-wp/admin/build/landing-v9/assets/index-DKd2Wvoh.js
+  s_7e484d91fceb6c::t_8f14673ccca92d 1-2,18,24,36-42,49-50,225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "833cbc0cbcc0f1cc606189f5b8710d22b49a3662",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
