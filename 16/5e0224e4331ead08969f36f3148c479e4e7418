@@ -1,0 +1,27 @@
+affilio-wp/admin/build/workspace.js
+  s_7e484d91fceb6c::t_39e698057b7099 658-687
+  s_7e484d91fceb6c::t_0381f7f7095261 647
+affilio-api/internal/handlers/owner_deals.go
+  s_7e484d91fceb6c::t_8e852c36d8c2b6 104-108
+  s_7e484d91fceb6c::t_89217af7b2d289 25
+STATUS.md
+  s_7e484d91fceb6c::t_b9f1962068f7b7 1-4
+affilio-wp/admin/build/workspace.css
+  s_7e484d91fceb6c::t_9f8c9905871433 56-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "165e0224e4331ead08969f36f3148c479e4e7418",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": null
+    }
+  }
+}
