@@ -85,12 +85,19 @@ export const signInNote = 'Join with one line: ' + joinCommand + '. POST /v1/age
 export const agentPrompt = 'Use the Allagio MCP server. Join with POST /v1/agent-tokens and send the bearer token. Do not ask for a role and do not sign in with Google. Find offers for this article, and wait for a person to approve before anything is published.'
 
 export const installs = [
-  { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: `{"mcpServers":{"allagio":{"url":"${origin}/mcp"}}}` },
   { id: 'claude', label: 'Claude Code', tested: false, proof: 'Untested. Claude Code adds and removes the server, but sign-in to the hosted MCP server is not working yet.', snippet: `claude mcp add --scope user --transport http allagio ${origin}/mcp` },
+  { id: 'codex', label: 'Codex', tested: false, proof: 'Untested. The Codex CLI was not run against the hosted MCP server.', snippet: `codex mcp add allagio --url ${origin}/mcp\ncodex mcp login allagio` },
+  { id: 'gemini', label: 'Gemini CLI', tested: false, proof: 'Untested. The Gemini CLI was not run against the hosted MCP server.', snippet: `gemini mcp add --transport http --scope user allagio ${origin}/mcp` },
+  { id: 'cursor', label: 'Cursor', tested: false, proof: 'Untested. The Cursor client was not run against the hosted MCP server.', snippet: `{"mcpServers":{"allagio":{"url":"${origin}/mcp"}}}` },
   { id: 'vscode', label: 'VS Code', tested: false, proof: 'Untested. The VS Code client was not run against the hosted MCP server.', snippet: `{"servers":{"allagio":{"type":"http","url":"${origin}/mcp"}}}` },
   { id: 'windsurf', label: 'Windsurf', tested: false, proof: 'Untested. The Windsurf client was not run against the hosted MCP server.', snippet: `{"mcpServers":{"allagio":{"serverUrl":"${origin}/mcp"}}}` },
+  { id: 'chatgpt', label: 'ChatGPT', tested: false, proof: 'Untested. The ChatGPT custom MCP URL was not run against the hosted server.', snippet: `${origin}/mcp` },
+  { id: 'amp', label: 'Amp', tested: false, proof: 'Untested. The Amp client was not run against the hosted MCP server.', snippet: `amp mcp add allagio ${origin}/mcp` },
+  { id: 'opencode', label: 'opencode', tested: false, proof: 'Untested. The opencode client was not run against the hosted MCP server.', snippet: `opencode mcp add allagio --global --url ${origin}/mcp\nopencode mcp auth allagio` },
   { id: 'generic', label: 'Generic', tested: true, proof: 'Checked. JSON-RPC initialize against this URL returned 401 no bearer token.', snippet: mcpConfig },
 ]
+
+export const installCheck = 'Check it works: ask your agent to read tools/list on the Allagio MCP server. A connected client answers with the tool names.'
 
 export const deployNote = 'The hosted app uses these steps.'
 

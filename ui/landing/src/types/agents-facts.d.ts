@@ -6,6 +6,7 @@ declare module '@/agents/facts.mjs' {
   export const signInNote: string
   export const agentPrompt: string
   export const installs: readonly { id: string; label: string; snippet: string; tested: boolean; proof: string }[]
+  export const installCheck: string
   export const deployNote: string
   export const approvalNote: string
   export const orderedSteps: readonly { n: number; title: string; line: string; body: string; details?: readonly string[] }[]

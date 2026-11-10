@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, errors, installs, mcpUrl, modes, orderedSteps, rates, signInNote, tools } from '@/agents/facts.mjs'
+import { agentAccount, agentPrompt, aloneToday, approvalNote, deployNote, deviceSignIn, errors, installCheck, installs, mcpUrl, modes, orderedSteps, rates, signInNote, tools } from '@/agents/facts.mjs'
 import { publishStepParagraph } from '@/vision.mjs'
 import { Page } from '@/site/Page'
 
@@ -161,6 +161,7 @@ export function App() {
           <section id="install" aria-labelledby="install-h" className={sectionClass}>
             <h2 id="install-h" className="h-display text-2xl sm:text-3xl">Install</h2>
             <InstallTabs />
+            <p className="mt-3 text-[15px] leading-relaxed text-t2">{installCheck}</p>
             <p className="text-[15px] leading-relaxed text-t2">{signInNote}</p>
           </section>
 
