@@ -42,7 +42,7 @@ export function Hero({ source }: { source: string }) {
                 initial={false}
                 transition={{ duration: 0.5, ease }}
               >
-                Offer Rails Protocol · agent to agent
+                Allagio · agent to agent
               </motion.p>
               <motion.h1
                 id="hero-h"
