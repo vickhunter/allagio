@@ -74,7 +74,7 @@ async function assertStaticHome(page) {
 async function assertWorkspaceChrome(page) {
     const nav = page.getByRole('navigation', { name: 'Workspace' });
     await expect(nav).toBeVisible();
-    for (const name of ['Overview', 'Products & offers', 'Placements', 'Earnings', 'Setup & agents']) {
+    for (const name of ['Overview', 'Products & offers', 'Placements', 'Earnings', 'Deals', 'Setup & agents']) {
         await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
     }
 }

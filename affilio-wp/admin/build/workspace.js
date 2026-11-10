@@ -634,6 +634,28 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         root.querySelector('[data-batch]').addEventListener('submit',event => { event.preventDefault(); const form = event.currentTarget; run(form.querySelector('button'),async () => { const data = await api('/review/payouts/batch','POST',{min_payout:Number(new FormData(form).get('minimum')),include_test_mode:false}); report(`${data.payouts.length} payout batches prepared. No money was transferred.`); }); });
         root.querySelectorAll('[data-review]').forEach(button => button.addEventListener('click',() => run(button,async () => { await api(`/review/offers/${button.dataset.review}/${button.dataset.decision}`,'POST',{}); await reviewPage(); })));
     };
+    const dealRoleLabel = deal => deal.role === 'offerer' ? 'Your agent offered this deal' : deal.role === 'acceptor' ? 'Your agent accepted this deal' : 'Your agent holds a seat';
+    const dealParties = deal => {
+        if (deal.parties && deal.parties.length) {
+            return `<p class="deal-parties">${deal.parties.map(party => `<span class="deal-party${party.you ? ' you' : ''}">${escape(party.id)}${party.role ? ` · ${escape(party.role)}` : ''}</span>`).join('')}</p>`;
+        }
+        return deal.counterparty ? `<p class="deal-parties"><span class="deal-party">${escape(deal.counterparty)}</span></p>` : '';
+    };
+    const dealCard = deal => {
+        const date = new Date(deal.updated_at);
+        const approve = deal.waiting_on_you && deal.approve_url
+            ? `<div class="actions"><a class="button" data-primary-action href="${escape(deal.approve_url)}">Review and decide ↗</a><p class="caption">Waiting on your ${escape(deal.waiting_step || 'approval')} step. Terms are shown before you decide.</p></div>`
+            : '';
+        return `<section class="deal${deal.waiting_on_you ? ' waiting' : ''}"><div class="row"><h3>${escape(deal.title || 'Untitled deal')}</h3>${pill(deal.state)}</div><p class="caption">${escape(dealRoleLabel(deal))}${deal.kind ? ` · ${escape(deal.kind)}` : ''} · updated ${escape(date.toLocaleString())}</p>${dealParties(deal)}${approve}</section>`;
+    };
+    const dealsPage = async () => {
+        const {deals} = await api('/deals');
+        const waiting = deals.filter(deal => deal.waiting_on_you);
+        const pending = waiting.length
+            ? `<section class="deal-pending"><h2>Needs your decision</h2>${waiting.map(dealCard).join('')}</section>`
+            : '';
+        root.innerHTML = `<section><h2>Agent deals</h2><p>These are the offers your agent proposed, accepted, or joined through the Offer Rails Protocol. A deal waits on you only when your approval settings say so.</p></section>${pending}<h2>All deals</h2>${deals.length ? deals.map(dealCard).join('') : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.')}`;
+    };
     document.querySelectorAll('form').forEach(form => {
         const key = form.querySelector('[name="stripe_key"]');
         if (!key) return;
@@ -657,7 +679,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     if (!root) return;
     root.insertAdjacentHTML('beforebegin','<div id="workspace-feedback" class="feedback" role="status" aria-live="polite"></div>');
     root.textContent = 'Loading your workspace…';
-    const pages = {'/owner/products':['Products & offers',productsPage],'/owner/placements':['Placements',placementsPage],'/owner/earnings':['Earnings',earningsPage],'/owner/settings':['Setup & agents',settingsPage],'/owner/review':['Offer review',reviewPage]};
+    const pages = {'/owner/products':['Products & offers',productsPage],'/owner/placements':['Placements',placementsPage],'/owner/earnings':['Earnings',earningsPage],'/owner/deals':['Deals',dealsPage],'/owner/settings':['Setup & agents',settingsPage],'/owner/review':['Offer review',reviewPage]};
     const [title,render] = pages[location.pathname] || ['Your distribution workspace',overview];
     document.querySelector('h1').textContent = title;
     const boot = async () => {

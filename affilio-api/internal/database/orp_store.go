@@ -838,6 +838,45 @@ func (d *DB) OwnerExists(ctx context.Context, id string) (bool, error) {
 	return ok, err
 }
 
+// ListOwnerORPDeals returns deals where the owner holds a seat, newest first.
+func (d *DB) ListOwnerORPDeals(ctx context.Context, ownerID string, limit int) ([]ORPDeal, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := d.Pool.Query(ctx, `
+SELECT id, offer_id, offerer_owner::text, acceptor_owner::text, offerer_party, acceptor_party,
+       terms, terms_hash, state, waiting, obligations, bound, parties, updated_at, created_at
+FROM orp_deals
+WHERE
+    (parties IS NULL AND (offerer_owner=$1::uuid OR acceptor_owner=$1::uuid))
+    OR (parties IS NOT NULL AND parties->'seats' @> jsonb_build_array(jsonb_build_object('owner', $1::text)))
+ORDER BY updated_at DESC
+LIMIT $2`, ownerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ORPDeal{}
+	for rows.Next() {
+		var deal ORPDeal
+		var offerID, offererOwner *string
+		if err = rows.Scan(
+			&deal.ID, &offerID, &offererOwner, &deal.AcceptorOwner, &deal.OffererParty, &deal.AcceptorParty,
+			&deal.Terms, &deal.TermsHash, &deal.State, &deal.Waiting, &deal.Obligations, &deal.Bound, &deal.Parties, &deal.UpdatedAt, &deal.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if offerID != nil {
+			deal.OfferID = *offerID
+		}
+		if offererOwner != nil {
+			deal.OffererOwner = *offererOwner
+		}
+		out = append(out, deal)
+	}
+	return out, rows.Err()
+}
+
 // ListORPInbox returns messages newer than after, oldest first.
 func (d *DB) ListORPInbox(ctx context.Context, ownerID string, after int64, limit int) ([]json.RawMessage, int64, error) {
 	if limit <= 0 || limit > 100 {
