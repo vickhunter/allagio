@@ -644,7 +644,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     const dealCard = deal => {
         const date = new Date(deal.updated_at);
         const approve = deal.waiting_on_you && deal.approve_url
-            ? `<div class="actions"><a class="button" data-primary-action href="${escape(deal.approve_url)}">Review and decide ↗</a><p class="caption">Waiting on your ${escape(deal.waiting_step || 'approval')} step. Terms are shown before you decide.</p></div>`
+            ? `<div class="deal-terms" data-terms-for="${escape(deal.id)}"><p class="caption">Loading the terms…</p></div><div class="actions"><button type="button" data-primary-action data-approve-url="${escape(deal.approve_url)}" data-approve-deal="${escape(deal.id)}" disabled>Approve this deal</button><a class="button secondary" href="${escape(deal.approve_url)}">Open the approval page ↗</a><p class="caption">Waiting on your ${escape(deal.waiting_step || 'approval')} step. Terms load before you can approve.</p></div>`
             : '';
         return `<section class="deal${deal.waiting_on_you ? ' waiting' : ''}"><div class="row"><h3>${escape(deal.title || 'Untitled deal')}</h3>${pill(deal.state)}</div><p class="caption">${escape(dealRoleLabel(deal))}${deal.kind ? ` · ${escape(deal.kind)}` : ''} · updated ${escape(date.toLocaleString())}</p>${dealParties(deal)}${approve}<details class="deal-events" data-deal="${escape(deal.id)}"><summary>Timeline</summary><div class="deal-timeline"><p class="caption">Loading…</p></div></details></section>`;
     };
@@ -655,6 +655,36 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             ? `<section class="deal-pending"><h2>Needs your decision</h2>${waiting.map(dealCard).join('')}</section>`
             : '';
         root.innerHTML = `<section><h2>Agent deals</h2><p>These are the offers your agent proposed, accepted, or joined through the Offer Rails Protocol. A deal waits on you only when your approval settings say so.</p></section>${pending}<h2>All deals</h2>${deals.length ? deals.map(dealCard).join('') : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.')}`;
+        const termsMarkup = terms => {
+            if (!terms) return '<p class="caption">Terms could not be read for this deal.</p>';
+            const obligations = Array.isArray(terms.obligations) ? terms.obligations : [];
+            const items = obligations.map(o => {
+                const bits = [o.id, o.party, o.surface, o.url, o.amount !== undefined ? `${o.amount}${o.currency ? ' ' + o.currency : ''}` : ''].filter(v => v !== undefined && v !== null && v !== '');
+                return `<li><strong>${escape(o.type || 'obligation')}</strong>${bits.length ? ` — ${escape(bits.join(' · '))}` : ''}</li>`;
+            }).join('');
+            return `<div class="deal-terms-body">${terms.kind ? `<p class="caption">Kind: ${escape(terms.kind)}</p>` : ''}${items ? `<ul class="deal-obligations">${items}</ul>` : '<p class="caption">No obligations listed on these terms.</p>'}</div>`;
+        };
+        root.querySelectorAll('.deal-terms').forEach(async slot => {
+            const id = slot.dataset.termsFor;
+            try {
+                const data = await api(`/deals/${encodeURIComponent(id)}`);
+                slot.innerHTML = termsMarkup(data.deal && data.deal.terms);
+            } catch (error) {
+                slot.innerHTML = `<p class="field-error" role="alert">${escape(error.message)}</p>`;
+            }
+            const button = root.querySelector(`[data-approve-deal="${CSS.escape(id)}"]`);
+            if (button) button.disabled = false;
+        });
+        root.querySelectorAll('[data-approve-url]').forEach(button => button.addEventListener('click', () => run(button, async () => {
+            button.disabled = true;
+            const response = await fetch(button.dataset.approveUrl, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, body:'{}'});
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || data.reason || 'The approval could not be recorded.');
+            }
+            report('Approval recorded. Your agent can continue the deal.');
+            await dealsPage();
+        })));
         root.querySelectorAll('.deal-events').forEach(details => details.addEventListener('toggle', async () => {
             if (!details.open || details.dataset.loaded) return;
             details.dataset.loaded = '1';

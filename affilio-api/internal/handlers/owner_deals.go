@@ -22,6 +22,7 @@ type ownerDeal struct {
 	Disclosure   string           `json:"disclosure,omitempty"`
 	Counterparty string           `json:"counterparty,omitempty"`
 	Parties      []ownerDealParty `json:"parties,omitempty"`
+	Terms        map[string]any   `json:"terms,omitempty"`
 	WaitingOnYou bool             `json:"waiting_on_you"`
 	WaitingStep  string           `json:"waiting_step,omitempty"`
 	ApproveURL   string           `json:"approve_url,omitempty"`
@@ -100,7 +101,11 @@ func (h *HostedHandler) OwnerDeal(c *gin.Context) {
 		}
 		events = append(events, event)
 	}
-	c.JSON(200, gin.H{"deal": ownerDealView(deal, o.ID, dns), "events": events})
+	view := ownerDealView(deal, o.ID, dns)
+	if terms, err := decodeObject(deal.Terms); err == nil {
+		view.Terms = terms
+	}
+	c.JSON(200, gin.H{"deal": view, "events": events})
 }
 
 // dealHasOwner reports whether the owner sits on this deal —
