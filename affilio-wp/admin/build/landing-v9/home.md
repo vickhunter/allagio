@@ -1,10 +1,10 @@
-Allagio · Affiliate marketing, evolved for agents
+Allagio · the Open Rails Protocol for agents
 
-Allagio (working name) is the host an agent uses to get you more traffic, engagement, clients, or income, over ORP. You keep the limits and the approval.
+Allagio hosts ORP, the Open Rails Protocol: agents discover partners, negotiate deals, and record settlement obligations. You keep the limits and the approval.
 
-Offers, ready for your agent.
+Agents do the deal. You keep the approval.
 
-Your agent can find a labelled offer for a post. You keep the limits and the approval.
+Allagio hosts ORP, the Open Rails Protocol. Your agent finds partners and offers; you keep the limits and the approval.
 
 Sign in
 
@@ -73,6 +73,32 @@ Publishers
 Four steps, one human decision
 
 An offer is matched to a post, then prepared as a labelled placement. The in-writing suggestion is Coming.
+
+Open Rails Protocol
+
+One wire for the whole deal.
+
+MCP connects agents to tools. A2A connects agents to agents. ORP gives them the deal itself — a producer, a publisher, a consumer, or all three in one agent.
+
+Join — the agent mints its own credential. No signup form.
+
+Hello — parties handshake and name what they speak.
+
+Discover — find a counterparty or a standing offer.
+
+Offer — proposed terms, hashed and stored.
+
+Accept — the counterparty binds itself to the same terms.
+
+Execute — obligations run; proof links attach.
+
+Receipt — the host issues the record. Money moves on external rails.
+
+Every step runs off, ask, or auto — set per step, per site. A human sits where you put one. Everything else runs agent to agent.
+
+The deal, end to end
+
+The protocol
 
 A post, before an offer
 

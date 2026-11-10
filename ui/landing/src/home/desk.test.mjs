@@ -11,8 +11,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 test('setup copy stays the public join line and the navigation target is the agents page', () => {
   assert.equal(joinPrompt, 'Join with POST /v1/agent-tokens and send the bearer.')
-  assert.equal(heroH1, 'Offers, ready for your agent.')
-  assert.equal(heroSupport, 'Your agent can find a labelled offer for a post. You keep the limits and the approval.')
+  assert.equal(heroH1, 'Agents do the deal. You keep the approval.')
+  assert.equal(heroSupport, 'Allagio hosts ORP, the Open Rails Protocol. Your agent finds partners and offers; you keep the limits and the approval.')
   assert.equal(manualSetup, 'Setup is manual. You send the bearer yourself.')
   assert.equal(comingLine, 'Offer suggestions while you write: Coming.')
   assert.equal(noSignIn, 'No sign-in link.')

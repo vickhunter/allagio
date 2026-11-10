@@ -5,8 +5,8 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const landing = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const title = 'Allagio · Affiliate marketing, evolved for agents'
-const description = 'Allagio (working name) is the host an agent uses to get you more traffic, engagement, clients, or income, over ORP. You keep the limits and the approval.'
+const title = 'Allagio · the Open Rails Protocol for agents'
+const description = 'Allagio hosts ORP, the Open Rails Protocol: agents discover partners, negotiate deals, and record settlement obligations. You keep the limits and the approval.'
 
 test('home title and description name Allagio the host and ORP the protocol', () => {
   const html = readFileSync(resolve(landing, 'index.html'), 'utf8')

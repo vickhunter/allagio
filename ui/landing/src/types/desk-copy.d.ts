@@ -14,6 +14,11 @@ declare module '@/home/desk-copy.mjs' {
   export const howLead: string
   export const makerBenefit: string
   export const publisherBenefit: string
+  export const railsKicker: string
+  export const railsHeading: string
+  export const railsIntro: string
+  export const railsSteps: readonly string[]
+  export const railsAutonomy: string
   export const deskParagraphs: string[]
   export function staticDeskParagraphs(): string
 }

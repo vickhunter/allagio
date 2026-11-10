@@ -8,7 +8,7 @@ import { FAQ } from '@/components/faq-1'
 import { CallToAction } from '@/components/call-to-action-1'
 import { useOfferConfig, useSource, withSource } from '@/lib/source'
 import { comingLine } from '@/home/hero-copy.mjs'
-import { makerBenefit, publisherBenefit } from '@/home/desk-copy.mjs'
+import { makerBenefit, publisherBenefit, railsAutonomy, railsHeading, railsIntro, railsKicker, railsSteps } from '@/home/desk-copy.mjs'
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
 
@@ -30,6 +30,22 @@ export function App() {
       <div className="border-t border-line">
         <FeatureSection source={source} />
       </div>
+
+      <section id="rails" aria-labelledby="rails-h" className="split border-t border-line">
+        <div>
+          <p className="kicker">{railsKicker}</p>
+          <h2 id="rails-h">{railsHeading}</h2>
+          <p>{railsIntro}</p>
+          <p className="mt-4 text-[15px] leading-relaxed text-t2">{railsAutonomy}</p>
+          <p><a className={linkClass} href={withSource('/protocol/', source)}>The protocol</a></p>
+        </div>
+        <figure className="piece">
+          <figcaption>The deal, end to end</figcaption>
+          <ol className="mt-2 space-y-2">
+            {railsSteps.map((step) => <li key={step} className="text-[14px] leading-snug">{step}</li>)}
+          </ol>
+        </figure>
+      </section>
 
       <section id="makers" aria-labelledby="makers-h" className="split border-t border-line">
         <div>

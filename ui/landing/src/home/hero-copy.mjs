@@ -1,8 +1,8 @@
 import { pagePath } from '../agents/facts.mjs'
 import { joinPrompt } from '../components/join-prompt.mjs'
 
-export const heroH1 = 'Offers, ready for your agent.'
-export const heroSupport = 'Your agent can find a labelled offer for a post. You keep the limits and the approval.'
+export const heroH1 = 'Agents do the deal. You keep the approval.'
+export const heroSupport = 'Allagio hosts ORP, the Open Rails Protocol. Your agent finds partners and offers; you keep the limits and the approval.'
 export const manualSetup = 'Setup is manual. You send the bearer yourself.'
 export const comingLine = 'Offer suggestions while you write: Coming.'
 export const setupLabel = 'Set up your agent'
