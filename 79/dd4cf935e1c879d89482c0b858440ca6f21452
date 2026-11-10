@@ -1,0 +1,32 @@
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_6794c685a09fec 880-905
+STATUS.md
+  s_7e484d91fceb6c::t_e4c547317db3db 3
+affilio-api/internal/handlers/owner_deals_test.go
+  s_7e484d91fceb6c::t_4740b50037f2f3 80-97
+affilio-api/internal/handlers/owner_deals.go
+  s_7e484d91fceb6c::t_6bca51d823ab2b 62-124
+affilio-api/internal/handlers/workspace.go
+  s_7e484d91fceb6c::t_208d807580b5cd 48
+affilio-wp/admin/build/workspace.js
+  s_7e484d91fceb6c::t_65756d093c0f1d 649
+  s_7e484d91fceb6c::t_a65e94fdf4ab39 658-671
+affilio-wp/admin/build/workspace.css
+  s_7e484d91fceb6c::t_d8c633dc714e01 51-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "79dd4cf935e1c879d89482c0b858440ca6f21452",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
