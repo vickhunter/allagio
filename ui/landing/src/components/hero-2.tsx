@@ -1,5 +1,5 @@
 import { useRef } from "react"
-import { motion, useInView } from "motion/react"
+import { motion, useInView, useReducedMotion } from "motion/react"
 
 import { cn } from "@/lib/utils"
 import { BorderBeam } from "@/components/ui/border-beam"
@@ -27,11 +27,17 @@ const ease = [0.21, 0.47, 0.32, 0.98] as const
 export function Hero({ source }: { source: string }) {
   const fadeInRef = useRef(null)
   const fadeInInView = useInView(fadeInRef, { once: true })
+  const reducedMotion = useReducedMotion()
 
   return (
     <section id="hero" aria-labelledby="hero-h">
       <div className="relative h-full overflow-hidden">
-        <RetroGrid className="z-0" />
+        <div
+          className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_100%,var(--color-pub-soft),transparent)]"
+          data-hero-bg="fallback"
+          aria-hidden="true"
+        />
+        {reducedMotion ? null : <RetroGrid className="z-0" />}
         <div className="z-10 container mx-auto flex flex-col px-4 pt-24 pb-10 md:px-10 md:pt-32 md:pb-16">
           <div className="flex flex-col items-center gap-6 text-center">
             <div className="flex max-w-3xl flex-col items-center gap-4">
