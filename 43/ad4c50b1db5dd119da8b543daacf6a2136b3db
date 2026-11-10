@@ -1,0 +1,20 @@
+affilio-api/internal/dcp/orp_tools.go
+  s_7e484d91fceb6c::t_74eadffc1eb589 86-90,106-109
+  s_7e484d91fceb6c::t_0f38c550dd1309 110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "43ad4c50b1db5dd119da8b543daacf6a2136b3db",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
