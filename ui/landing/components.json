@@ -3,7 +3,26 @@
   "style": "new-york",
   "rsc": false,
   "tsx": true,
-  "tailwind": { "config": "", "css": "src/styles.css", "baseColor": "stone", "cssVariables": true },
-  "aliases": { "components": "@/components", "utils": "@/lib/utils", "ui": "@/components/ui", "lib": "@/lib" },
-  "iconLibrary": "lucide"
+  "tailwind": {
+    "config": "",
+    "css": "src/styles.css",
+    "baseColor": "stone",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib"
+  },
+  "iconLibrary": "lucide",
+  "registries": {
+    "@magicui-pro": {
+      "url": "https://pro.magicui.design/registry/{name}",
+      "headers": {
+        "Authorization": "Bearer ${MAGICUI_PRO_REGISTRY_TOKEN}"
+      }
+    },
+    "@magicui": "https://magicui.design/r/{name}"
+  }
 }

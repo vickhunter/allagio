@@ -40,7 +40,7 @@ async function assertHydratedHome(page) {
         await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })).toBeVisible();
     }
     await expect(page.getByRole('link', { name: 'Sign in', exact: true }).first()).toBeVisible();
-    await expect(page.locator('[data-hero-bg="fallback"]')).toBeVisible();
+    await expect(page.locator('#hero')).toBeVisible();
     await expect(page.locator('#vision')).toBeVisible();
     await expect(page.getByRole('region', { name: 'What your agent does' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'What you keep control of' })).toBeVisible();
@@ -49,7 +49,7 @@ async function assertHydratedHome(page) {
     await expect(page.getByRole('heading', { name: 'Straight answers.', exact: true })).toBeVisible();
     await expect(page.locator('summary').filter({ hasText: 'Setup details' })).toBeVisible();
     await expect(page.locator('details a[href="/llms.txt"]')).toHaveCount(1);
-    await expect(page.locator('canvas')).toHaveCount(0);
+    await expect(page.locator('#hero canvas')).toHaveCount(1);
 }
 const joinLine = 'Join with POST /v1/agent-tokens and send the bearer.';
 async function copyJoinLine(page) {
@@ -65,11 +65,11 @@ async function revealGoogleSignIn(page) {
 async function assertStaticHome(page) {
     await assertApprovedHeading(page);
     await expect(page.getByRole('link', { name: 'Sign in with Google', exact: true }).first()).toBeVisible();
-    await expect(page.locator('.hero-fallback').first()).toBeVisible();
+    await expect(page.locator('#hero')).toBeVisible();
     await expect(page.locator('#how')).toBeVisible();
     await expect(page.locator('#publishers')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'You send the bearer yourself.', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'The offer stays inside your limits.', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Four steps, one human decision', exact: true })).toBeVisible();
 }
 async function assertWorkspaceChrome(page) {
     const nav = page.getByRole('navigation', { name: 'Workspace' });
