@@ -79,6 +79,7 @@ export function Hero({ source }: { source: string }) {
               <a
                 className="inline-flex min-h-11 items-center font-semibold text-setup underline underline-offset-4 hover:no-underline"
                 href={withSource(setupHref, source)}
+                data-primary-action
                 data-track="secondary_click"
                 data-track-to="agents"
               >
