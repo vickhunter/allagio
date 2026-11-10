@@ -1,0 +1,75 @@
+ui/landing/src/components/hero-2.tsx
+  s_7e484d91fceb6c::t_7b10126039bbcc 112
+  s_7e484d91fceb6c::t_f20c164c1fba2d 7-108,110-111,113-131,137
+  s_7e484d91fceb6c::t_cf4df4a06fea0d 109
+  s_7e484d91fceb6c::t_a846e1495d62bb 4-6
+  s_7e484d91fceb6c::t_6a3583dea18d38 132-136
+  s_e6156b2d28b0d7::t_613fb61d38fc48 1-3
+ui/landing/src/styles.css
+  s_7e484d91fceb6c::t_6b4c23320f0795 32-38
+  s_e6156b2d28b0d7::t_8079ace06f92e7 3-4,42-52,369
+ui/landing/src/components/call-to-action-1.tsx
+  s_7e484d91fceb6c::t_affaabf72ecbf6 1-112,117
+  s_7e484d91fceb6c::t_d44bea8b73d9dd 113-116
+ui/landing/src/home/App.tsx
+  s_7e484d91fceb6c::t_88697eaf6c7d3f 2,5-11,28,30-32,34-48,50-63,65-75,77-81,83-89,91-92,94-96,98-100,102-106,108
+ui/landing/src/components/ui/button.tsx
+  s_7e484d91fceb6c::t_838ef888141a82 13-14,16,22
+ui/landing/src/components/feature-3.tsx
+  s_7e484d91fceb6c::t_35acb9944120ac 4-78
+  s_7e484d91fceb6c::t_49b3e7d04ef52c 1-3
+  s_7e484d91fceb6c::t_c2e7e167dd5145 79-81
+  s_e6156b2d28b0d7::t_694db4933b906c 82-86
+STATUS.md
+  s_7e484d91fceb6c::t_dc1401299dc6e8 1-4
+ui/landing/src/components/faq-1.tsx
+  s_7e484d91fceb6c::t_96f134265344be 7-43
+  s_7e484d91fceb6c::t_9db890c89690d7 4-6
+  s_7e484d91fceb6c::t_55ac82d444d190 44-46
+  s_e6156b2d28b0d7::t_e27286f82d2997 1-3,47-49
+affilio-wp/e2e/workspace.mjs
+  s_7e484d91fceb6c::t_ea0290c05f4b13 68
+  s_7e484d91fceb6c::t_f5c40af50ce649 52
+  s_7e484d91fceb6c::t_725f42bdaae8e5 43
+  s_7e484d91fceb6c::t_5ef86fb23dd605 72
+ui/landing/src/home/desk.test.mjs
+  s_7e484d91fceb6c::t_3baecf651858f5 39,42-47
+ui/landing/components.json
+  s_7e484d91fceb6c::t_2b7a30a73a1985 6-27
+ui/landing/package-lock.json
+  s_7e484d91fceb6c::t_6d67a92ee24fd9 14,16-18,53-90,385-1837,1840-1852,1855-1867,1870-1882,1885-1892,1903-1907,1909,1921-1949,2715,2758-2769,2798-2809,2814,2825-2830,2861-2887,2902-2910,3198-3238,3257-3266,3373-3449,3469-3537,3672-3677,3723-3765
+ui/landing/package.json
+  s_7e484d91fceb6c::t_5ab8a398152614 16,18-20
+ui/landing/src/components/ui/accordion.tsx
+  s_7e484d91fceb6c::t_08951447829bd1 1-63
+ui/landing/src/components/ui/border-beam.tsx
+  s_7e484d91fceb6c::t_81fce32b40326b 1-105
+ui/landing/src/components/ui/marquee.tsx
+  s_7e484d91fceb6c::t_aad7e18895f248 1-74
+ui/landing/src/components/ui/retro-grid.tsx
+  s_7e484d91fceb6c::t_96c897d0c6490a 1-864
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8dc043199947e6104c28810a08a45770f3f033d8",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    },
+    "s_e6156b2d28b0d7": {
+      "agent_id": {
+        "tool": "devin",
+        "id": "s_e6156b2d28b0d7",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
