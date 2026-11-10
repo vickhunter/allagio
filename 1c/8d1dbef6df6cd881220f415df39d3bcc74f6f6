@@ -1,0 +1,36 @@
+affilio-wp/admin/build/workspace.js
+  s_7e484d91fceb6c::t_5a417209eb1240 682
+  s_7e484d91fceb6c::t_03e1a7365aad00 637-658
+affilio-api/internal/handlers/owner_deals_test.go
+  s_7e484d91fceb6c::t_38dc3474df27e5 1-95
+affilio-api/internal/handlers/owner_deals.go
+  s_7e484d91fceb6c::t_cc3446108e5ea5 1-111
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_fb9f5169959945 841-879
+affilio-wp/admin/build/workspace.html
+  s_7e484d91fceb6c::t_d3f2a6cb3d7b0e 4
+STATUS.md
+  s_7e484d91fceb6c::t_00d4e72b2ce9b1 1-4
+affilio-api/internal/handlers/workspace.go
+  s_7e484d91fceb6c::t_a126f741651fa4 42,47
+affilio-wp/e2e/workspace.mjs
+  s_7e484d91fceb6c::t_2d63b77ada936f 77
+affilio-wp/admin/build/workspace.css
+  s_7e484d91fceb6c::t_da3fd6e89f517e 47-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1c8d1dbef6df6cd881220f415df39d3bcc74f6f6",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
