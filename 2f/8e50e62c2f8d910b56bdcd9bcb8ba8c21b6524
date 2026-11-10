@@ -1,0 +1,26 @@
+ui/landing/src/agents/facts.mjs
+  s_7e484d91fceb6c::t_e30ccaebcb0bda 94
+  s_7e484d91fceb6c::t_d761403df90060 89-91,95-96,100
+  s_7e484d91fceb6c::t_d4d2c98e742f15 101
+ui/landing/src/agents/App.tsx
+  s_7e484d91fceb6c::t_a52689a256f0ae 164
+  s_7e484d91fceb6c::t_5c8730b4a9a7de 2
+ui/landing/src/types/agents-facts.d.ts
+  s_7e484d91fceb6c::t_6b22a8fd60b175 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f8e50e62c2f8d910b56bdcd9bcb8ba8c21b6524",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
