@@ -1,0 +1,41 @@
+ui/landing/src/components/hero-2.tsx
+  s_7e484d91fceb6c::t_c6e0ad5a725089 45
+affilio-wp/admin/build/agent-poc.html
+  s_7e484d91fceb6c::t_715b094849a6b9 5,11
+affilio-wp/admin/build/dashboard.js
+  s_7e484d91fceb6c::t_3cc6cdee8d36d8 166,173,352,649,736
+affilio-wp/admin/build/distribution.js
+  s_7e484d91fceb6c::t_044bcf1d3585bd 84
+affilio-wp/admin/build/earnings.js
+  s_7e484d91fceb6c::t_c03a9bb3640a3e 182
+affilio-wp/admin/build/marketplace.js
+  s_7e484d91fceb6c::t_32593beca55e8c 111,188
+affilio-wp/admin/build/onboarding.js
+  s_7e484d91fceb6c::t_ca4b27f1ef79ee 10
+affilio-wp/admin/build/sidebar.js
+  s_7e484d91fceb6c::t_5c8a6c659be3bb 95,99
+affilio-wp/admin/build/workspace.js
+  s_7e484d91fceb6c::t_05016ba737351c 589,606,657
+ui/landing/src/components/JoinForm.tsx
+  s_7e484d91fceb6c::t_f3527376593054 22,25
+ui/landing/src/components/ui/button.tsx
+  s_7e484d91fceb6c::t_2437fa7fa65385 6
+ui/landing/src/site/Padova.tsx
+  s_7e484d91fceb6c::t_54720abd0fd25c 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6dcdcacb4e925adf9e0949cbd7d3dba06c8ab082",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
