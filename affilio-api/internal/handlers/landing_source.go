@@ -39,10 +39,10 @@ func landingSourceFrom(c *gin.Context) string {
 
 func landingLinkTracksSource(path string) bool {
 	switch path {
-	case "/", "/makers", "/publishers", "/protocol", "/you", "/owner", "/auth/login":
+	case "/", "/makers", "/publishers", "/protocol", "/you", "/owner", "/auth/login", "/use-cases":
 		return true
 	}
-	return strings.HasPrefix(path, "/makers/") || strings.HasPrefix(path, "/publishers/") || strings.HasPrefix(path, "/protocol/") || strings.HasPrefix(path, "/you/") || strings.HasPrefix(path, "/owner/")
+	return strings.HasPrefix(path, "/makers/") || strings.HasPrefix(path, "/publishers/") || strings.HasPrefix(path, "/protocol/") || strings.HasPrefix(path, "/you/") || strings.HasPrefix(path, "/owner/") || strings.HasPrefix(path, "/use-cases/")
 }
 
 func withLandingSource(href, source string) string {

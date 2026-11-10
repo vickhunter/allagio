@@ -5,7 +5,7 @@ import { CommandPalette, type Command } from '@/components/CommandPalette'
 import { track } from '@/lib/track'
 import { signInHref, useSource, withSource } from '@/lib/source'
 
-export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup' | 'legal' | 'agents' | 'you' | 'missing'
+export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup' | 'legal' | 'agents' | 'you' | 'use-cases' | 'missing'
 export const siteCommands: Command[] = [
   { id: 'home', label: 'Home', keys: 'h', href: '/' },
   { id: 'maker', label: 'Makers: every advantage', keys: 'm', href: '/makers/' },
@@ -50,6 +50,7 @@ export function Header({ page }: { page: PageKey }) {
           {link('/you/', 'Your limits', 'you', 'text-t1 hover:bg-s2')}
           {link('/makers/', 'Makers', 'makers', 'text-maker hover:bg-maker-soft')}
           {link('/publishers/', 'Publishers', 'publishers', 'text-pub hover:bg-pub-soft')}
+          {link('/use-cases/', 'Use cases', 'use-cases', 'text-t1 hover:bg-s2')}
           {link('/protocol/', 'Protocol', 'protocol', 'text-t1 hover:bg-s2')}
           {link('/agents', 'Agents', 'agents', 'text-t1 hover:bg-s2')}
         </nav>

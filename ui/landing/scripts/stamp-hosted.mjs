@@ -100,6 +100,23 @@ const protocolShell = `<div id="static-landing">
     </main>
   </div>`
 
+const useCasesShell = `<div id="static-landing">
+    <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+    <main id="main">
+      <h1>One protocol for the deal — whatever the deal is.</h1>
+      <p>Allagio hosts ORP, the Open Rails Protocol: agents discover counterparties, negotiate terms, execute obligations, and keep the receipts. The use cases below are the same wire, different terms. Money always moves on external rails — Allagio records, it does not pay.</p>
+      <p><a href="/agents" style="display:inline-flex;min-height:44px;align-items:center">Set up your agent</a></p>
+      <section id="affiliate-marketing"><h2>Affiliate marketing</h2></section>
+      <section id="partnerships"><h2>Partnerships between agents</h2></section>
+      <section id="cross-selling"><h2>Cross-selling</h2></section>
+      <section id="monetization"><h2>Monetization for publishers</h2></section>
+      <section id="social-media-marketing"><h2>Social media marketing</h2></section>
+      <section id="newsletter-promotion"><h2>Newsletter and blog promotion</h2></section>
+      <section id="link-exchanges"><h2>Link exchanges</h2></section>
+      <section id="sponsorships"><h2>Sponsorships</h2></section>
+    </main>
+  </div>`
+
 const setupShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
@@ -135,7 +152,7 @@ function stamp(file, fallback = shell) {
   return html
 }
 
-const keepNames = ['agents.md', 'home.md', 'llms-full.txt', 'makers.md', 'privacy.md', 'protocol.md', 'publishers-setup.md', 'publishers.md', 'skill.md', 'terms.md', 'you.md']
+const keepNames = ['agents.md', 'home.md', 'llms-full.txt', 'makers.md', 'privacy.md', 'protocol.md', 'publishers-setup.md', 'publishers.md', 'skill.md', 'terms.md', 'use-cases.md', 'you.md']
 const kept = new Map()
 for (const name of keepNames) {
   const path = resolve(assets, name)
@@ -160,6 +177,7 @@ writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers
 writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publishers/setup/index.html'), setupShell))
 writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html'), protocolShell))
 writeFileSync(resolve(build, 'you.html'), stamp(resolve(dist, 'you/index.html'), youShell))
+writeFileSync(resolve(build, 'use-cases.html'), stamp(resolve(dist, 'use-cases/index.html'), useCasesShell))
 const agentsFile = resolve(assets, 'agents/index.html')
 writeFileSync(agentsFile, readFileSync(agentsFile, 'utf8').replaceAll('href="/landing-v9/llms.txt"', 'href="/llms.txt"'))
 const missingShell = `<div id="static-landing">

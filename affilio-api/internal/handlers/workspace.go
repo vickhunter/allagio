@@ -115,6 +115,10 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/protocol/", h.Protocol)
 		public.GET("/you", h.You)
 		public.GET("/you/", h.You)
+		public.GET("/use-cases", h.UseCases)
+		public.GET("/use-cases/", h.UseCases)
+		public.GET("/use-cases.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "use-cases.md") })
+		public.HEAD("/use-cases.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "use-cases.md") })
 		public.GET("/home.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "home.md") })
 		public.HEAD("/home.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "home.md") })
 		public.GET("/makers.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "makers.md") })
@@ -210,6 +214,7 @@ var sitemapPaths = []string{
 	"/publishers/",
 	"/protocol/",
 	"/you/",
+	"/use-cases/",
 	"/agents/",
 	"/llms.txt",
 	"/llms-full.txt",
@@ -338,6 +343,7 @@ func (h *HostedHandler) Publishers(c *gin.Context)     { h.landing(c, "publisher
 func (h *HostedHandler) PublisherSetup(c *gin.Context) { h.landing(c, "publishers-setup.html") }
 func (h *HostedHandler) Protocol(c *gin.Context)       { h.landing(c, "protocol.html") }
 func (h *HostedHandler) You(c *gin.Context)            { h.landing(c, "you.html") }
+func (h *HostedHandler) UseCases(c *gin.Context)       { h.landing(c, "use-cases.html") }
 func (h *HostedHandler) Privacy(c *gin.Context)        { h.builtPage(c, "privacy") }
 func (h *HostedHandler) Terms(c *gin.Context)          { h.builtPage(c, "terms") }
 func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents") }

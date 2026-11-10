@@ -434,7 +434,7 @@ func directoryMarkdownMiss(cleaned string) bool {
 func markdownPage(cleaned string) bool {
 	switch cleaned {
 	case "/skill.md", "/home.md", "/makers.md", "/publishers.md", "/publishers/setup.md",
-		"/protocol.md", "/you.md", "/privacy.md", "/terms.md", "/agents.md":
+		"/protocol.md", "/you.md", "/privacy.md", "/terms.md", "/agents.md", "/use-cases.md":
 		return true
 	default:
 		return false

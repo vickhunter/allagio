@@ -38,7 +38,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: { index: resolve(__dirname, 'index.html'), makers: resolve(__dirname, 'makers/index.html'), publishers: resolve(__dirname, 'publishers/index.html'), publishersSetup: resolve(__dirname, 'publishers/setup/index.html'), protocol: resolve(__dirname, 'protocol/index.html'), you: resolve(__dirname, 'you/index.html'), privacy: resolve(__dirname, 'privacy/index.html'), terms: resolve(__dirname, 'terms/index.html'), agents: resolve(__dirname, 'agents/index.html'), notFound: resolve(__dirname, 'not-found/index.html'), profile: resolve(__dirname, 'profile/index.html') },
+      input: { index: resolve(__dirname, 'index.html'), makers: resolve(__dirname, 'makers/index.html'), publishers: resolve(__dirname, 'publishers/index.html'), publishersSetup: resolve(__dirname, 'publishers/setup/index.html'), useCases: resolve(__dirname, 'use-cases/index.html'), protocol: resolve(__dirname, 'protocol/index.html'), you: resolve(__dirname, 'you/index.html'), privacy: resolve(__dirname, 'privacy/index.html'), terms: resolve(__dirname, 'terms/index.html'), agents: resolve(__dirname, 'agents/index.html'), notFound: resolve(__dirname, 'not-found/index.html'), profile: resolve(__dirname, 'profile/index.html') },
     },
   },
 })
