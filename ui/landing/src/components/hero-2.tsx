@@ -1,5 +1,5 @@
-import { useRef } from "react"
-import { motion, useInView, useReducedMotion } from "motion/react"
+import { useEffect, useRef, useState } from "react"
+import { motion, useInView } from "motion/react"
 
 import { cn } from "@/lib/utils"
 import { BorderBeam } from "@/components/ui/border-beam"
@@ -24,10 +24,25 @@ const fadeUpVariants = {
 
 const ease = [0.21, 0.47, 0.32, 0.98] as const
 
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  )
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const handleChange = () => setReduced(query.matches)
+    query.addEventListener("change", handleChange)
+    return () => query.removeEventListener("change", handleChange)
+  }, [])
+  return reduced
+}
+
 export function Hero({ source }: { source: string }) {
   const fadeInRef = useRef(null)
   const fadeInInView = useInView(fadeInRef, { once: true })
-  const reducedMotion = useReducedMotion()
+  const reducedMotion = usePrefersReducedMotion()
 
   return (
     <section id="hero" aria-labelledby="hero-h">
