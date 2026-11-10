@@ -7,7 +7,7 @@
     const catalog = (key, fallback) => (copy[key] ? String(copy[key]) : fallback);
     root.innerHTML = '<h2></h2><p data-description></p><p data-progress role="status" aria-live="polite"></p><ul data-skipped hidden></ul><p data-error role="alert"></p><button type="button" class="button button-primary" data-connect></button><p><a data-dashboard hidden></a></p>';
     root.querySelector('h2').textContent = t('Find earning opportunities in your posts', 'Trova opportunità di guadagno nei tuoi articoli');
-    root.querySelector('[data-description]').textContent = t('Connect to create your site account and analyze published posts with Offer Rails. Your domain, site name and published article content are sent to ', 'Collega per creare il tuo account e analizzare gli articoli pubblicati con Offer Rails. Dominio, nome del sito e contenuto degli articoli pubblicati vengono inviati a ') + AffilioSetup.serviceUrl + '. ' + t('You review suggestions before anything is inserted.', 'Puoi rivedere i suggerimenti prima di ogni inserimento.');
+    root.querySelector('[data-description]').textContent = t('Connect to create your site account and analyze published posts with Allagio. Your domain, site name and published article content are sent to ', 'Collega per creare il tuo account e analizzare gli articoli pubblicati con Allagio. Dominio, nome del sito e contenuto degli articoli pubblicati vengono inviati a ') + AffilioSetup.serviceUrl + '. ' + t('You review suggestions before anything is inserted.', 'Puoi rivedere i suggerimenti prima di ogni inserimento.');
     const button = root.querySelector('[data-connect]');
     const progress = root.querySelector('[data-progress]');
     const error = root.querySelector('[data-error]');

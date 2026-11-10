@@ -3,20 +3,23 @@ import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
-// shadcn/ui Button, re-skinned to Offer Rails tokens. "keycap" is the ONE primary per page (rule 30).
+// shadcn/ui Button, re-skinned to Allagio tokens. "keycap" is the ONE primary per page (rule 30).
 const buttonVariants = cva(
   'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-semibold transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 min-h-11',
   {
     variants: {
       variant: {
         keycap: 'keycap p-0 text-base',
+        default: 'bg-moss text-tinv hover:opacity-90 px-4',
+        destructive: 'bg-maker text-tinv hover:opacity-90 px-4',
         outline: 'border border-line-strong bg-s1 text-t1 hover:bg-s2 px-4',
+        secondary: 'bg-s2 text-t1 hover:bg-line px-4',
         ghost: 'text-t1 hover:bg-s2 px-3',
         link: 'text-setup underline underline-offset-4 hover:no-underline px-0 min-h-0',
         solid: 'bg-t1 text-s0 hover:bg-[rgb(60_66_55)] px-5',
         inverse: 'bg-s0 text-t1 hover:bg-s2 px-4',
       },
-      size: { default: '', sm: 'min-h-9 text-[13px]', lg: 'text-base' },
+      size: { default: '', sm: 'min-h-9 text-[13px]', lg: 'text-base', icon: 'size-11 p-0' },
     },
     defaultVariants: { variant: 'outline', size: 'default' },
   },

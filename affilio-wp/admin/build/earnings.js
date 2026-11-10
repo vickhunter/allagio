@@ -179,7 +179,7 @@
             root.innerHTML = `
                 <div class="affilio-panel affilio-panel-warning">
                     <h2>${t('Earnings', 'Guadagni')}</h2>
-                    <p class="affilio-field-error" role="alert" tabindex="-1">${t('Could not load your balance from the Offer Rails API.', 'Impossibile caricare il saldo dall\'API di Offer Rails.')}</p>
+                    <p class="affilio-field-error" role="alert" tabindex="-1">${t('Could not load your balance from the Allagio API.', 'Impossibile caricare il saldo dall\'API di Allagio.')}</p>
                     <p><button class="button button-primary" data-primary-action data-retry>${t('Retry', 'Riprova')}</button></p>
                 </div>
             `;

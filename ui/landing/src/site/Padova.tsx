@@ -1,4 +1,4 @@
-// Padova, drawn by hand in SVG for Offer Rails (no traced photos, no third-party assets).
+// Padova, drawn by hand in SVG for Allagio (no traced photos, no third-party assets).
 // Left→right: Prato della Valle (statue ring + canal), Basilica del Santo (domes + bell towers),
 // Palazzo della Ragione (keel roof over the loggias), La Specola (observatory tower).
 const C = {

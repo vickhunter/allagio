@@ -81,7 +81,7 @@ function affilioEmptyOfferMessage(result, copy) {
         status = await call();
         root.innerHTML = '<p id="distribution-message" role="status" aria-live="polite"></p>';
         if (!status.site_connected) { root.insertAdjacentHTML('beforeend',`<section><h2>Connect your site first.</h2><a class="button" href="${escape(status.settings_url)}">Open setup</a></section>`); markNext(); return; }
-        if (!status.native_available) { root.insertAdjacentHTML('beforeend','<section><h2>Distribution is not enabled on this service.</h2><p>Your existing scan and affiliate tools remain available. Connect to the updated Offer Rails service to use native placements.</p></section>'); return; }
+        if (!status.native_available) { root.insertAdjacentHTML('beforeend','<section><h2>Distribution is not enabled on this service.</h2><p>Your existing scan and affiliate tools remain available. Connect to the updated Allagio service to use native placements.</p></section>'); return; }
         if (!status.publisher_connected) {
             root.insertAdjacentHTML('beforeend','<section><h2>Connect your publisher account.</h2><p>Sign in once to review placements for this WordPress site and connect your agent. Your WordPress administrator session proves access to this installation.</p><button class="button" data-connect-owner>Connect publisher account</button><p data-owner-link></p><button class="button" data-refresh>Refresh connection</button></section>');
             root.querySelector('[data-connect-owner]').addEventListener('click',event => run(event.currentTarget,async () => {
