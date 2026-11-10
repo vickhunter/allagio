@@ -1,0 +1,56 @@
+ui/landing/scripts/stamp-hosted.mjs
+  s_7e484d91fceb6c::t_4d99fb388ec179 69
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_d15544bee694a2 92-94,96
+  s_7e484d91fceb6c::t_e52f958b5c00b5 255,260
+  s_7e484d91fceb6c::t_8c8c72474ba936 882-920
+STATUS.md
+  s_7e484d91fceb6c::t_d6393baa50aff6 1-4
+affilio-api/internal/orp/publicdocs_test.go
+  s_7e484d91fceb6c::t_45878351b524b5 349
+  s_7e484d91fceb6c::t_6e4ab1ce786145 352,354
+  s_7e484d91fceb6c::t_709c2f7e139024 263-266
+  s_7e484d91fceb6c::t_592cac85faf48e 287
+  s_7e484d91fceb6c::t_8462fcfa9c944a 283,285
+  s_7e484d91fceb6c::t_bbe3506b23f10d 209
+affilio-api/internal/handlers/orp_host.go
+  s_7e484d91fceb6c::t_b3096ed42ecaf6 240-247
+affilio-api/internal/handlers/orp_trust.go
+  s_7e484d91fceb6c::t_cf102a43c90ec5 4,16,39,98,110,116,147-158,164,175-240,243,251,255-338
+  s_7e484d91fceb6c::t_1a8d3ffbe80b1b 1-3,5-15,17-38,40-97,99-109,111-115,117-146,159-163,165-174,241-242,244-250,252-254,339
+affilio-api/internal/handlers/orp_deal.go
+  s_7e484d91fceb6c::t_f2a07f26785802 701
+affilio-api/internal/orp/reputation.go
+  s_7e484d91fceb6c::t_c677a5fd8c282e 1-103
+affilio-api/internal/orp/envelope.go
+  s_7e484d91fceb6c::t_31bf7268766358 220,223-231
+  s_7e484d91fceb6c::t_e04bf05e837a89 232
+affilio-api/internal/handlers/hosted_mcp.go
+  s_7e484d91fceb6c::t_3da0751295a0cb 57-63
+affilio-api/internal/handlers/orp_trust_test.go
+  s_7e484d91fceb6c::t_b5c2e896f79f36 10-11
+  s_7e484d91fceb6c::t_9ef00a037f6c69 134-135
+  s_7e484d91fceb6c::t_b2789cdc3261ba 1-9,12-29,36-48,55-133,136-256
+  s_7e484d91fceb6c::t_f0142959910938 30-35
+  s_7e484d91fceb6c::t_e43da78683c4d5 49-54
+affilio-api/internal/orp/bundled/SPEC.md
+  s_7e484d91fceb6c::t_308374ddbb8635 1-3,1238,1369-1376
+affilio-wp/admin/build/home.html
+  s_7e484d91fceb6c::t_bffd00d618e416 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "22f0da409aad5c677da1cf999ac4055e3ecb9452",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
