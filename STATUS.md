@@ -1,3 +1,7 @@
+## November 9 — deal inbox (devin/deal-inbox)
+
+`/owner/deals` is a new workspace page listing the signed-in owner's ORP deals, backed by `GET /owner/api/deals`. It covers 0.3 deals (owner is offerer or acceptor) and 0.4 deals (owner holds a parties seat), newest first, capped at 50. A deal whose `waiting.party` resolves to the signed-in owner surfaces `waiting_on_you`, the waiting step, and a relative `/orp/approve/{escalation}` link; escalation tokens are never emitted for deals waiting on another party. Deal terms stay off this endpoint — the approval page shows them before a decision. The workspace nav gains a "Deals" link and the browser assertions cover it. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## November 9 — D-130 Poppy discovery
 
 `GET /.well-known/poppy.json` describes this host for Personal Agent Protocol draft 0.4. It lists the MCP endpoint and turns Poppy sign-in off. `llms.txt`, `skill.md`, and the pages do not mention it. `revocation_endpoint` is a known gap, to be scoped separately. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

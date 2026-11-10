@@ -39,11 +39,12 @@ func (h *HostedHandler) LoadWorkspace() error {
 }
 
 func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
-	for _, path := range []string{"/products", "/placements", "/earnings", "/settings", "/review"} {
+	for _, path := range []string{"/products", "/placements", "/earnings", "/deals", "/settings", "/review"} {
 		owner.GET(path, h.Dashboard)
 	}
 	owner.POST("/human-approval", h.SaveHumanApprovalForm)
 	api := owner.Group("/api")
+	api.GET("/deals", h.OwnerDeals)
 	api.GET("/human-approval", h.GetHumanApproval)
 	api.PUT("/human-approval", h.PutHumanApproval)
 	api.GET("/agents", func(c *gin.Context) {
