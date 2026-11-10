@@ -1,0 +1,21 @@
+affilio-api/internal/handlers/allagio_discovery.go
+  s_7e484d91fceb6c::t_a459f79ccacc39 1-148
+affilio-api/cmd/server/main.go
+  s_7e484d91fceb6c::t_39da7ca56c313a 146-148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "faa74b22fd9192ec6f814971734efaad16ed8790",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
