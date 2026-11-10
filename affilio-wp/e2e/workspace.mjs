@@ -228,7 +228,7 @@ async function journey() {
     await assertWorkspaceChrome(builder);
     await expect(builder.getByRole('heading', { level: 1, name: 'Earnings', exact: true })).toBeVisible();
     await builder.getByLabel('Payment reference').fill('browser-check-reference');
-    await builder.getByLabel('I have sent this payment outside Offer Rails.').check();
+    await builder.getByLabel('I have sent this payment outside Allagio.').check();
     await builder.getByRole('button', { name: 'Report payment sent' }).click();
     await expect(builder.locator('#workspace-feedback')).toContainText('publisher must confirm receipt separately');
     const publisher = await owner(fixture.publisher);
