@@ -1,0 +1,56 @@
+ui/landing/scripts/stamp-hosted.mjs
+  s_7e484d91fceb6c::t_69b61a7a9c308c 2
+  s_7e484d91fceb6c::t_c6d37ab54a568b 69
+affilio-wp/admin/build/landing-v9/home.md
+  s_7e484d91fceb6c::t_636eee3d895a14 1,3,5,7
+  s_7e484d91fceb6c::t_4217e3cd19dcc6 77-102
+ui/landing/src/home/hero-copy.mjs
+  s_7e484d91fceb6c::t_ee8d64a3a316e8 4-5
+affilio-wp/e2e/workspace.mjs
+  s_7e484d91fceb6c::t_91e665351ffb13 14
+ui/landing/src/home/App.tsx
+  s_7e484d91fceb6c::t_6a22fecd8141b6 11
+  s_7e484d91fceb6c::t_518e08c204ce2c 34-49
+ui/landing/index.html
+  s_7e484d91fceb6c::t_35a77707b8d20b 9-10
+ui/landing/src/home/desk-copy.mjs
+  s_7e484d91fceb6c::t_d16e285a99483b 24-37
+ui/landing/src/home/desk.test.mjs
+  s_7e484d91fceb6c::t_1433d7f6c6b69f 14-15
+ui/landing/src/home/join-fold.test.mjs
+  s_7e484d91fceb6c::t_a93b69ca63e7f9 38
+ui/landing/src/home/title.test.mjs
+  s_7e484d91fceb6c::t_155f3bf561d153 8-9
+ui/landing/src/types/desk-copy.d.ts
+  s_7e484d91fceb6c::t_823a38b43f90c0 17-21
+affilio-wp/admin/build/home.html
+  s_7e484d91fceb6c::t_07de4ed3557d77 9-11,18,29-30,67
+affilio-wp/admin/build/landing-v9/agents/index.html
+  s_7e484d91fceb6c::t_3273fd4ee947a3 10,14
+affilio-wp/admin/build/landing-v9/assets/agents-DA8wTLqH.js
+  s_7e484d91fceb6c::t_097fafc813d184 1
+affilio-wp/admin/build/landing-v9/assets/facts-By5yYDdp.js
+  s_7e484d91fceb6c::t_4a59180fe21ca9 1
+affilio-wp/admin/build/landing-v9/assets/index-DXlr6lpY.js
+  s_7e484d91fceb6c::t_bd54fa4890b56f 1,225
+affilio-wp/admin/build/landing-v9/assets/makers-I5dvh14x.js
+  s_7e484d91fceb6c::t_3df317f20acbd5 1
+affilio-wp/admin/build/makers.html
+  s_7e484d91fceb6c::t_832ac3aabe4e9d 11,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "81b61900f3492dfb0db9a0b06b09da86e72873c1",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
