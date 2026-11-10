@@ -877,6 +877,32 @@ LIMIT $2`, ownerID, limit)
 	return out, rows.Err()
 }
 
+// ListORPDealEvents returns this owner's inbox messages for one deal, oldest first.
+func (d *DB) ListORPDealEvents(ctx context.Context, ownerID, dealID string, limit int) ([]json.RawMessage, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 200
+	}
+	rows, err := d.Pool.Query(ctx, `
+SELECT message
+FROM orp_inbox
+WHERE owner_id=$1 AND message->>'deal'=$2
+ORDER BY id
+LIMIT $3`, ownerID, dealID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []json.RawMessage{}
+	for rows.Next() {
+		var message json.RawMessage
+		if err = rows.Scan(&message); err != nil {
+			return nil, err
+		}
+		out = append(out, message)
+	}
+	return out, rows.Err()
+}
+
 // ListORPInbox returns messages newer than after, oldest first.
 func (d *DB) ListORPInbox(ctx context.Context, ownerID string, after int64, limit int) ([]json.RawMessage, int64, error) {
 	if limit <= 0 || limit > 100 {

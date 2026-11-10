@@ -77,6 +77,24 @@ func TestOwnerDealViewWaitingOnOtherHidesToken(t *testing.T) {
 	}
 }
 
+func TestDealHasOwner(t *testing.T) {
+	deal := dealFixture(t, nil)
+	if !dealHasOwner(deal, deal.OffererOwner) || !dealHasOwner(deal, deal.AcceptorOwner) {
+		t.Fatal("0.3 owners not recognized")
+	}
+	if dealHasOwner(deal, "99999999-9999-9999-9999-999999999999") {
+		t.Fatal("stranger recognized as owner")
+	}
+	owner := "33333333-3333-3333-3333-333333333333"
+	deal.Parties = json.RawMessage(`{"seats":[{"id":"x","owner":"` + owner + `","role":"acceptor"}]}`)
+	if !dealHasOwner(deal, owner) {
+		t.Fatal("0.4 seat owner not recognized")
+	}
+	if dealHasOwner(deal, deal.OffererOwner) {
+		t.Fatal("0.4 deal leaked a non-seat owner")
+	}
+}
+
 func TestOwnerDealViewPartiesSeats(t *testing.T) {
 	owner := "33333333-3333-3333-3333-333333333333"
 	deal := dealFixture(t, func(d *database.ORPDeal) {

@@ -646,7 +646,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const approve = deal.waiting_on_you && deal.approve_url
             ? `<div class="actions"><a class="button" data-primary-action href="${escape(deal.approve_url)}">Review and decide ↗</a><p class="caption">Waiting on your ${escape(deal.waiting_step || 'approval')} step. Terms are shown before you decide.</p></div>`
             : '';
-        return `<section class="deal${deal.waiting_on_you ? ' waiting' : ''}"><div class="row"><h3>${escape(deal.title || 'Untitled deal')}</h3>${pill(deal.state)}</div><p class="caption">${escape(dealRoleLabel(deal))}${deal.kind ? ` · ${escape(deal.kind)}` : ''} · updated ${escape(date.toLocaleString())}</p>${dealParties(deal)}${approve}</section>`;
+        return `<section class="deal${deal.waiting_on_you ? ' waiting' : ''}"><div class="row"><h3>${escape(deal.title || 'Untitled deal')}</h3>${pill(deal.state)}</div><p class="caption">${escape(dealRoleLabel(deal))}${deal.kind ? ` · ${escape(deal.kind)}` : ''} · updated ${escape(date.toLocaleString())}</p>${dealParties(deal)}${approve}<details class="deal-events" data-deal="${escape(deal.id)}"><summary>Timeline</summary><div class="deal-timeline"><p class="caption">Loading…</p></div></details></section>`;
     };
     const dealsPage = async () => {
         const {deals} = await api('/deals');
@@ -655,6 +655,20 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             ? `<section class="deal-pending"><h2>Needs your decision</h2>${waiting.map(dealCard).join('')}</section>`
             : '';
         root.innerHTML = `<section><h2>Agent deals</h2><p>These are the offers your agent proposed, accepted, or joined through the Offer Rails Protocol. A deal waits on you only when your approval settings say so.</p></section>${pending}<h2>All deals</h2>${deals.length ? deals.map(dealCard).join('') : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.')}`;
+        root.querySelectorAll('.deal-events').forEach(details => details.addEventListener('toggle', async () => {
+            if (!details.open || details.dataset.loaded) return;
+            details.dataset.loaded = '1';
+            const slot = details.querySelector('.deal-timeline');
+            try {
+                const data = await api(`/deals/${encodeURIComponent(details.dataset.deal)}`);
+                const events = data.events || [];
+                slot.innerHTML = events.length
+                    ? `<ol class="deal-event-list">${events.map(event => `<li><span class="deal-event-type">${escape(event.type || 'message')}</span> ${event.state ? pill(event.state) : ''} <span class="deal-party">${escape(event.from || '')}</span><time class="caption">${escape(new Date(event.ts).toLocaleString())}</time></li>`).join('')}</ol>`
+                    : '<p class="caption">No messages recorded for this deal yet.</p>';
+            } catch (error) {
+                slot.innerHTML = `<p class="field-error" role="alert">${escape(error.message)}</p>`;
+            }
+        }));
     };
     document.querySelectorAll('form').forEach(form => {
         const key = form.querySelector('[name="stripe_key"]');

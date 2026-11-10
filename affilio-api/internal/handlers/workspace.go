@@ -45,6 +45,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	owner.POST("/human-approval", h.SaveHumanApprovalForm)
 	api := owner.Group("/api")
 	api.GET("/deals", h.OwnerDeals)
+	api.GET("/deals/:id", h.OwnerDeal)
 	api.GET("/human-approval", h.GetHumanApproval)
 	api.PUT("/human-approval", h.PutHumanApproval)
 	api.GET("/agents", func(c *gin.Context) {

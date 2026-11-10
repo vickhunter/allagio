@@ -59,6 +59,69 @@ func (h *HostedHandler) OwnerDeals(c *gin.Context) {
 	c.JSON(200, gin.H{"deals": out})
 }
 
+// OwnerDeal is the workspace detail for one deal: the same view as the list
+// plus the message timeline this owner's inbox recorded for it.
+// A deal the owner does not sit on answers 404, same as an unknown id.
+func (h *HostedHandler) OwnerDeal(c *gin.Context) {
+	o := ownerFrom(c)
+	deal, found, err := h.DB.GetORPDeal(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.Status(500)
+		return
+	}
+	if !found || !dealHasOwner(deal, o.ID) {
+		c.JSON(404, gin.H{"reason": "not_found"})
+		return
+	}
+	dns := ""
+	if base, err := url.Parse(h.BaseURL); err == nil {
+		dns = base.Host
+	}
+	messages, err := h.DB.ListORPDealEvents(c.Request.Context(), o.ID, deal.ID, 200)
+	if err != nil {
+		c.Status(500)
+		return
+	}
+	events := make([]gin.H, 0, len(messages))
+	for _, raw := range messages {
+		doc, err := decodeObject(raw)
+		if err != nil {
+			continue
+		}
+		event := gin.H{
+			"type": doc["type"],
+			"from": doc["from"],
+			"ts":   doc["ts"],
+		}
+		if body, ok := doc["body"].(map[string]any); ok {
+			if state, _ := body["state"].(string); state != "" {
+				event["state"] = state
+			}
+		}
+		events = append(events, event)
+	}
+	c.JSON(200, gin.H{"deal": ownerDealView(deal, o.ID, dns), "events": events})
+}
+
+// dealHasOwner reports whether the owner sits on this deal —
+// as offerer or acceptor on 0.3, or holding a parties seat on 0.4.
+func dealHasOwner(deal database.ORPDeal, ownerID string) bool {
+	if len(deal.Parties) != 0 && string(deal.Parties) != "null" {
+		if doc, err := decodeObject(deal.Parties); err == nil {
+			if seats, _ := doc["seats"].([]any); len(seats) > 0 {
+				for _, raw := range seats {
+					seat, _ := raw.(map[string]any)
+					if owner, _ := seat["owner"].(string); owner == ownerID {
+						return true
+					}
+				}
+				return false
+			}
+		}
+	}
+	return deal.OffererOwner == ownerID || deal.AcceptorOwner == ownerID
+}
+
 func ownerDealView(deal database.ORPDeal, ownerID, dns string) ownerDeal {
 	view := ownerDeal{ID: deal.ID, State: deal.State, UpdatedAt: deal.UpdatedAt, CreatedAt: deal.CreatedAt}
 	if terms, err := decodeObject(deal.Terms); err == nil && terms != nil {
