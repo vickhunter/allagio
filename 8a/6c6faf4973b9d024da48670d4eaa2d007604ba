@@ -1,0 +1,23 @@
+docs/protocol/SPEC.md
+  s_7e484d91fceb6c::t_f5bbebb7329e0b 1-3
+  s_7e484d91fceb6c::t_5f4a84b94420b4 1238
+  s_7e484d91fceb6c::t_0a0a6115f8494b 1369-1376
+docs/protocol/README.md
+  s_7e484d91fceb6c::t_673f803762ebab 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8a6c6faf4973b9d024da48670d4eaa2d007604ba",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
