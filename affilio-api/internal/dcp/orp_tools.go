@@ -83,10 +83,11 @@ var ORPTools = []Tool{
 		Name:        "respond_to_offer",
 		Description: "Accept an offer: give `deal` for a directed offer that showed up in check_deals, or `offer` for a standing offer id from find_partners. Accepting a directed deal stores the accept and moves it to awaiting; either party then calls approve_deal to activate it.",
 		InputSchema: schema([]string{"party"}, map[string]interface{}{
-			"party": str("Your party id from join_agent"),
-			"deal":  str("Deal id to accept (a directed offer)"),
-			"offer": str("Standing offer id to accept"),
-			"re":    str("Message id this accept answers"),
+			"party":      str("Your party id from join_agent"),
+			"deal":       str("Deal id to accept (a directed offer)"),
+			"offer":      str("Standing offer id to accept"),
+			"terms_hash": str("terms_hash from the offer in check_deals (sha256-…, required when accepting a deal)"),
+			"re":         str("Message id this accept answers"),
 		}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			party, err := pathArg(args, "party")
@@ -101,6 +102,11 @@ var ORPTools = []Tool{
 			body := map[string]interface{}{}
 			if offer != "" {
 				body["offer"] = offer
+			}
+			for _, key := range []string{"terms_hash"} {
+				if v, ok := args[key].(string); ok && v != "" {
+					body[key] = v
+				}
 			}
 			return orpEnvelope(c, "accept", map[string]interface{}{"party": party, "deal": deal, "re": args["re"]}, body)
 		},
