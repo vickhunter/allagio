@@ -43,6 +43,7 @@ func (h *MCPHandler) Receive(c *gin.Context) {
 	}
 	client := dcp.NewClient(h.LoopbackURL, makerKey)
 	client.SiteKey = c.GetHeader("X-API-Key")
+	client.Bearer = makerKey
 
 	resp := dcp.HandleMessage(client, body)
 	if resp == nil {

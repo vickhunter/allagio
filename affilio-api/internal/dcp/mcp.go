@@ -2,6 +2,8 @@ package dcp
 
 import (
 	"encoding/json"
+	"net/url"
+	"strings"
 )
 
 // Minimal MCP server core: JSON-RPC 2.0 messages over a line-delimited stdio
@@ -49,7 +51,7 @@ func HandleMessage(client *Client, raw []byte) []byte {
 	case "initialize":
 		resp.Result = map[string]interface{}{
 			"protocolVersion": mcpProtocolVersion,
-			"capabilities":    map[string]interface{}{"tools": map[string]interface{}{}},
+			"capabilities":    map[string]interface{}{"tools": map[string]interface{}{}, "resources": map[string]interface{}{}},
 			"serverInfo": map[string]interface{}{
 				"name":    ServerName,
 				"title":   ServerTitle,
@@ -82,6 +84,37 @@ func HandleMessage(client *Client, raw []byte) []byte {
 			"content": []map[string]interface{}{{"type": "text", "text": content}},
 			"isError": isError,
 		}
+	case "resources/list":
+		resp.Result = map[string]interface{}{"resources": []map[string]interface{}{
+			{"uri": "orp://inbox", "name": "ORP agent inbox", "mimeType": "application/json", "description": "Messages addressed to this party: offers, accepts, receipts, deal states."},
+		}}
+	case "resources/templates/list":
+		resp.Result = map[string]interface{}{"resourceTemplates": []map[string]interface{}{
+			{"uriTemplate": "orp://inbox", "name": "ORP agent inbox", "mimeType": "application/json"},
+			{"uriTemplate": "orp://deals/{deal_id}", "name": "ORP deal", "mimeType": "application/json", "description": "One deal's parties, terms and state by id."},
+		}}
+	case "resources/read":
+		var params struct {
+			URI string `json:"uri"`
+		}
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			resp.Error = &rpcError{Code: -32602, Message: "invalid params"}
+			break
+		}
+		path, ok := resourcePath(params.URI)
+		if !ok {
+			resp.Error = &rpcError{Code: -32602, Message: "unknown resource " + params.URI}
+			break
+		}
+		out, err := client.Do("GET", path, nil)
+		if err != nil {
+			resp.Error = &rpcError{Code: -32000, Message: err.Error()}
+			break
+		}
+		raw, _ := json.Marshal(out)
+		resp.Result = map[string]interface{}{"contents": []map[string]interface{}{
+			{"uri": params.URI, "mimeType": "application/json", "text": string(raw)},
+		}}
 	default:
 		resp.Error = &rpcError{Code: -32601, Message: "method not found"}
 	}
@@ -90,6 +123,17 @@ func HandleMessage(client *Client, raw []byte) []byte {
 		return nil
 	}
 	return encoded
+}
+
+// resourcePath maps an orp:// resource URI to its loopback API path.
+func resourcePath(uri string) (string, bool) {
+	if uri == "orp://inbox" {
+		return "/orp/inbox", true
+	}
+	if id, ok := strings.CutPrefix(uri, "orp://deals/"); ok && id != "" {
+		return "/orp/deals/" + url.PathEscape(id), true
+	}
+	return "", false
 }
 
 func toolResultContent(result map[string]interface{}, err error) (string, bool) {
