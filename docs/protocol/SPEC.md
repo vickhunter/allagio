@@ -1,4 +1,6 @@
-# Offer Rails Protocol (ORP) 0.3
+# Open Rails Protocol (ORP) 0.3
+
+> **Renamed 2026-11-10.** This protocol was previously titled the Offer Rails Protocol. The wire acronym `orp`, every `orp_` identifier, schema id and message name is unchanged. Allagio is the host and reference implementation.
 
 **Status:** canonical draft, frozen 2026-10-23 (D-099). This is the one ORP 0.3 wire format. Changes after the freeze follow [§19](#19-change-control). [§20](#20-many-party-deals-orp-04) specifies ORP 0.4. A valid 0.3 message stays valid and means what it meant.
 **Schemas:** [`schema/0.3/`](https://offer-rails.onrender.com/orp/schemas/) (JSON Schema 2020-12). Valid and invalid examples are in [`schema/examples/`](https://offer-rails.onrender.com/orp/examples/), checked by `npm test` in `schema/`.
@@ -1233,7 +1235,7 @@ ORP 0.4 adds deals with more than two parties. It does not change a valid 0.3 me
 
 ### 20.1 Seats and splits
 
-A 0.4 deal has 2 to 16 parties ([`deal`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/deal.schema.json)). Each seat has `id`, `role`, and `required`. Roles are `offerer`, `acceptor`, `curator`, `facilitator`, `service`, `signer`, and `member`. A deal has at most one offerer and one acceptor, and at least one required seat.
+A 0.4 deal has 2 to 16 parties ([`deal`](https://offer-rails.onrender.com/orp/schemas/0.4/messages/deal.schema.json)). Each seat has `id`, `role`, and `required`. Roles are `offerer`, `acceptor`, `curator`, `facilitator`, `service`, `signer`, `consumer`, and `member`. A deal has at most one offerer and one acceptor, and at least one required seat. `consumer` is always optional; see [§20.7](#207-consumer-attestation-optional).
 
 Seat `terms` are that seat's split. A percent is an integer from 0 to 100. An amount is the seat's `amount` field. `per`, `hours`, and `deposit` are not amounts. When no seat carries an amount, the percents sum to 100. Percents that sum to something other than 100 are rejected even when a seat has `hours`, `per`, `deposit`, or a `cap`. Fixed amounts alone do not use that sum. A mix exists only when a seat carries both a percent and an amount, or when percent seats sit beside seats that carry an amount. A mix is valid when every percent term has a `cap` and the percents are not over 100. Those percents do not have to sum to 100. A sum of 101 is rejected. A percent without a `cap` in a mix is rejected. The host answers `invalid_message`.
 
@@ -1363,6 +1365,14 @@ A facilitator percent of 1 with a cap, beside fixed amounts on the other seats, 
 ```
 
 The property check draws random deals of 2 to 16 parties. A percent split that sums to 100 validates. The same split moved by any non-zero amount is rejected. Two signature orders of the same seats finish in the same state.
+
+### 20.7 Consumer attestation (optional)
+
+A `consumer` seat is the beneficiary side of a deal: the person or agent who redeems the offer, buys the product, or receives the placement's value. A human and an agent can each hold any seats, including more than one role on the same deal. The seat is always optional. A deal without a consumer seat is complete, and an unsigned consumer seat never blocks `active`.
+
+A consumer seat may send `attest` on a deal it sits on. `attest` binds that party's signature to an `outcome` or `receipt` it names — the buyer's agent recording "this outcome happened" independently of the two trading parties. An attestation carries deal id, the attested object, the seat id, and a signature; it carries no personal data, per [§7](#7-identity-and-privacy). Attestations accumulate and never overwrite an `outcome`.
+
+A host may accept `attest` and surface it on `outcome` rows (for example `attested_by`), may require it before releasing a `pay` obligation, or may ignore it entirely. A host that does not implement it answers `unknown_type`, and a conforming agent treats that as "attestation unsupported," not an error worth retrying. The Allagio hosted API does not implement `consumer` seats or `attest` today; both are specified here so a host or a counterparty agent can adopt them without a wire change.
 
 ---
 

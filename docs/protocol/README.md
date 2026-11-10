@@ -1,4 +1,4 @@
-# ORP 0.3
+# Open Rails Protocol (ORP) 0.3
 
 [`SPEC.md`](SPEC.md) is the protocol. [`schema/`](schema/) is the JSON Schema. [`sdk/`](sdk/) is a reference host and a small client, used only by the conformance suite. [`conformance/test/`](conformance/test/) is that suite. [`GAPS.md`](GAPS.md) is the ranked list of hosted pitfalls from the D-099 agent-as-user run, with the dispositions from that report.
 
