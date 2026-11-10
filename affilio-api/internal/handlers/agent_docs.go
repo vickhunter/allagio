@@ -90,6 +90,8 @@ Message rules for that walk: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 - [Listing card]({{PUBLIC_BASE_URL}}/docs/listing-card.md): the only scan payload that may be uploaded
 - [Modes]({{PUBLIC_BASE_URL}}/docs/modes.md): manual, auto, and yolo
 - [Account]({{PUBLIC_BASE_URL}}/docs/account.md): account keys and the account digest
+- [Use cases]({{PUBLIC_BASE_URL}}/use-cases.md): affiliate marketing, partnerships, cross-selling, monetization, social, newsletters, link exchanges, sponsorships
+- [Reference]({{PUBLIC_BASE_URL}}/reference.md): ORP endpoints, MCP tools, auth, request/response examples, errors
 
 Full text: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 `

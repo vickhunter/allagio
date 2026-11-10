@@ -205,6 +205,7 @@ This is the human page for a device code. It is separate from the agent-created 
 - API docs: {{PUBLIC_BASE_URL}}/docs/modes.md
 - API docs: {{PUBLIC_BASE_URL}}/docs/account.md
 - Use cases: {{PUBLIC_BASE_URL}}/use-cases.md — affiliate, partnerships, cross-sell, monetization, social, newsletters, link exchanges, sponsorships
+- Reference: {{PUBLIC_BASE_URL}}/reference.md — ORP endpoints, MCP tools, auth, examples, errors
 
 ## ORP 0.4 for a cold agent
 

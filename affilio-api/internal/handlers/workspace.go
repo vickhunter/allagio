@@ -119,6 +119,10 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 		public.GET("/use-cases/", h.UseCases)
 		public.GET("/use-cases.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "use-cases.md") })
 		public.HEAD("/use-cases.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "use-cases.md") })
+		public.GET("/reference", h.Reference)
+		public.GET("/reference/", h.Reference)
+		public.GET("/reference.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "reference.md") })
+		public.HEAD("/reference.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "reference.md") })
 		public.GET("/home.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "home.md") })
 		public.HEAD("/home.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "home.md") })
 		public.GET("/makers.md", func(c *gin.Context) { h.serveMarkdownTwin(c, "makers.md") })
@@ -215,6 +219,7 @@ var sitemapPaths = []string{
 	"/protocol/",
 	"/you/",
 	"/use-cases/",
+	"/reference/",
 	"/agents/",
 	"/llms.txt",
 	"/llms-full.txt",
@@ -347,6 +352,7 @@ func (h *HostedHandler) UseCases(c *gin.Context)       { h.landing(c, "use-cases
 func (h *HostedHandler) Privacy(c *gin.Context)        { h.builtPage(c, "privacy") }
 func (h *HostedHandler) Terms(c *gin.Context)          { h.builtPage(c, "terms") }
 func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents") }
+func (h *HostedHandler) Reference(c *gin.Context)      { h.builtPage(c, "reference") }
 
 // LEGAL_PAGES_APPROVED stays false until the privacy and terms wording is approved.
 // Those pages send X-Robots-Tag: noindex while it is false, including the copies

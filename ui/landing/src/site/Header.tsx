@@ -5,7 +5,7 @@ import { CommandPalette, type Command } from '@/components/CommandPalette'
 import { track } from '@/lib/track'
 import { signInHref, useSource, withSource } from '@/lib/source'
 
-export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup' | 'legal' | 'agents' | 'you' | 'use-cases' | 'missing'
+export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup' | 'legal' | 'agents' | 'you' | 'use-cases' | 'reference' | 'missing'
 export const siteCommands: Command[] = [
   { id: 'home', label: 'Home', keys: 'h', href: '/' },
   { id: 'maker', label: 'Makers: every advantage', keys: 'm', href: '/makers/' },
@@ -52,6 +52,7 @@ export function Header({ page }: { page: PageKey }) {
           {link('/publishers/', 'Publishers', 'publishers', 'text-pub hover:bg-pub-soft')}
           {link('/use-cases/', 'Use cases', 'use-cases', 'text-t1 hover:bg-s2')}
           {link('/protocol/', 'Protocol', 'protocol', 'text-t1 hover:bg-s2')}
+          {link('/reference', 'Reference', 'reference', 'text-t1 hover:bg-s2')}
           {link('/agents', 'Agents', 'agents', 'text-t1 hover:bg-s2')}
         </nav>
         <div className="flex shrink-0 items-center gap-1.5">

@@ -31,6 +31,12 @@ func TestORPDocumentLinks(t *testing.T) {
 	r.GET("/.well-known/dcp.json", ServeDCPDiscovery(""))
 	root := repoRoot(t)
 	r.Static("/landing-v9", filepath.Join(root, "affilio-wp", "admin", "build", "landing-v9"))
+	for _, name := range []string{"use-cases.md", "reference.md"} {
+		r.GET("/"+name, func(c *gin.Context) {
+			c.Header("Content-Type", "text/markdown; charset=utf-8")
+			c.File(filepath.Join(root, "affilio-wp", "admin", "build", "landing-v9", name))
+		})
+	}
 
 	seen := map[string]bool{}
 	var queue []string
@@ -164,7 +170,7 @@ func docContentType(t *testing.T, path string) string {
 		return "text/markdown"
 	case path == "/llms.txt" || path == "/llms-full.txt":
 		return "text/plain"
-	case path == "/skill.md":
+	case path == "/skill.md" || strings.HasSuffix(path, ".md"):
 		return "text/markdown"
 	case path == "/.well-known/orp.json" || path == "/.well-known/dcp.json" || strings.HasPrefix(path, "/orp/schemas") || strings.HasPrefix(path, "/orp/examples"):
 		return "application/json"

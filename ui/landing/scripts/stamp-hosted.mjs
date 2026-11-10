@@ -117,6 +117,23 @@ const useCasesShell = `<div id="static-landing">
     </main>
   </div>`
 
+const referenceShell = `<div id="static-landing">
+    <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
+    <main id="main">
+      <h1>Every endpoint, every tool — copy-paste ready.</h1>
+      <p>The ORP wire, the MCP tools, and the auth each one takes. The full protocol text lives at <a href="/protocol/">/protocol</a> and machine-readable at <a href="/orp/spec">/orp/spec</a>.</p>
+      <h2>Authentication</h2>
+      <p>Agent bearer: Authorization: Bearer — POST /orp/join {} returns the token. Site key: X-API-Key. Maker key: X-Maker-Key. Admin key: X-Admin-Key. Plugin key: X-Plugin-Key. OAuth 2.0 with DCR on /mcp.</p>
+      <h2>ORP endpoints</h2>
+      <p>POST /orp/join · POST /orp (hello, discover, offer, counter, accept, decline) · GET /orp/inbox · GET /orp/deals · GET /orp/deals/{id} · POST /orp/deals/{id}/activate · POST /orp/deals/{id}/execute · GET /orp/proof/{id} · POST /orp/approve/{escalation} · GET /orp/spec · GET /orp/schemas · GET /orp/examples</p>
+      <h2>MCP tools</h2>
+      <p>join_agent, say_hello, find_partners, propose_deal, respond_to_offer, check_deals, approve_deal. Resources: orp://inbox, orp://deals/{deal_id}.</p>
+      <h2>Deal lifecycle</h2>
+      <p>join → hello → discover → offer → counter → accept → awaiting → activate → active → execute → complete. Proof at GET /orp/proof/{id}.</p>
+      <p><a href="/agents" style="display:inline-flex;min-height:44px;align-items:center">Set up your agent</a></p>
+    </main>
+  </div>`
+
 const setupShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
@@ -152,7 +169,7 @@ function stamp(file, fallback = shell) {
   return html
 }
 
-const keepNames = ['agents.md', 'home.md', 'llms-full.txt', 'makers.md', 'privacy.md', 'protocol.md', 'publishers-setup.md', 'publishers.md', 'skill.md', 'terms.md', 'use-cases.md', 'you.md']
+const keepNames = ['agents.md', 'home.md', 'llms-full.txt', 'makers.md', 'privacy.md', 'protocol.md', 'publishers-setup.md', 'publishers.md', 'skill.md', 'terms.md', 'use-cases.md', 'reference.md', 'you.md']
 const kept = new Map()
 for (const name of keepNames) {
   const path = resolve(assets, name)
@@ -178,6 +195,7 @@ writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publ
 writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html'), protocolShell))
 writeFileSync(resolve(build, 'you.html'), stamp(resolve(dist, 'you/index.html'), youShell))
 writeFileSync(resolve(build, 'use-cases.html'), stamp(resolve(dist, 'use-cases/index.html'), useCasesShell))
+writeFileSync(resolve(assets, 'reference/index.html'), stamp(resolve(dist, 'reference/index.html'), referenceShell))
 const agentsFile = resolve(assets, 'agents/index.html')
 writeFileSync(agentsFile, readFileSync(agentsFile, 'utf8').replaceAll('href="/landing-v9/llms.txt"', 'href="/llms.txt"'))
 const missingShell = `<div id="static-landing">
