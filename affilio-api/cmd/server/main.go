@@ -143,6 +143,9 @@ func main() {
 	}
 	r.POST("/api/preview", preview.Preview)
 	r.GET("/.well-known/dcp.json", handlers.ServeDCPDiscovery(cfg.PublicBaseURL))
+	r.GET("/.well-known/allagio.json", handlers.ServeAllagioDiscovery(cfg.PublicBaseURL))
+	r.GET("/.well-known/agent-card.json", handlers.ServeAgentCard(cfg.PublicBaseURL))
+	r.GET("/.well-known/agent.json", handlers.ServeAgentCard(cfg.PublicBaseURL))
 
 	v1 := r.Group("/v1")
 	v1.Use(middleware.MaxRequestBody(8 << 20))
