@@ -1,0 +1,31 @@
+affilio-api/internal/dcp/tools.go
+  s_7e484d91fceb6c::t_eb5eae0c8e0d37 312-313
+affilio-api/internal/dcp/mcp.go
+  s_7e484d91fceb6c::t_a6d85fff741d88 5-6
+  s_7e484d91fceb6c::t_35dfb60ec2f88a 128-138
+  s_7e484d91fceb6c::t_30773e0f4f9736 54
+  s_7e484d91fceb6c::t_e5dddf8879c42e 87-117
+affilio-api/internal/handlers/hosted_mcp.go
+  s_7e484d91fceb6c::t_e680e23fde8f36 57
+affilio-api/internal/handlers/mcp.go
+  s_7e484d91fceb6c::t_262cdf1fec25e3 46
+affilio-api/internal/dcp/orp_tools.go
+  s_7e484d91fceb6c::t_77cfb317bdca44 1-45,47-48,50-167
+  s_7e484d91fceb6c::t_df6f571276ea2b 46,49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ff53eb022e7ae61efc32b8581099213759e6f4aa",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
