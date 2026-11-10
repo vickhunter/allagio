@@ -206,7 +206,7 @@ func pagePhrases(src string) []string {
 		add(m[1])
 	}
 	chunk = regexp.MustCompile(`(?s)\{\{if .*?\}\}(.*?)\{\{else\}\}(.*?)\{\{end\}\}`).ReplaceAllString(chunk, "$1\n$2")
-	for _, tag := range []string{"h1", "h2", "h3", "p", "a"} {
+	for _, tag := range []string{"h1", "h2", "h3", "p", "a", "li", "figcaption"} {
 		re := regexp.MustCompile(`(?s)<` + tag + `\b[^>]*>(.*?)</` + tag + `>`)
 		for _, m := range re.FindAllStringSubmatch(chunk, -1) {
 			for _, part := range strings.Split(m[1], "\n") {
@@ -260,8 +260,10 @@ func TestSchemaIDsUseOneHost(t *testing.T) {
 	}
 }
 
-// frozenORP03Roots are the ORP 0.3 files that stay byte-identical to main
-// f203ca97, including SPEC.md and GAPS.md in the repo and the bundle.
+// frozenORP03Roots are the ORP 0.3 files that stay byte-identical to
+// 8a6c6fa (the Open Rails rename + optional consumer attestation, a §19
+// change-control amendment on top of the f203ca97 freeze), including
+// SPEC.md and GAPS.md in the repo and the bundle.
 var frozenORP03Roots = []string{
 	"docs/protocol/SPEC.md",
 	"docs/protocol/GAPS.md",
@@ -278,11 +280,11 @@ var frozenORP03Roots = []string{
 	"affilio-api/internal/orp/bundled/schemas/constraints.schema.json",
 }
 
-// frozenORP03SHA256 is sha256 over those files at f203ca97, sorted by
+// frozenORP03SHA256 is sha256 over those files at 8a6c6fa, sorted by
 // repo-relative path. Each file contributes "<path>\n<len>\n" and its bytes.
-// A shallow checkout has no f203ca97 object, so the test uses this digest
+// A shallow checkout has no 8a6c6fa object, so the test uses this digest
 // and does not require git history.
-const frozenORP03SHA256 = "aa9b0650d323f46a0bfdf04d18180f22019eda2c86a4ee88330cc04a3d805005"
+const frozenORP03SHA256 = "10817a7ad88839e51161c19225e790a2daad16a65eccaca942d405f5c471e53b"
 
 func frozenORP03Digest(repo string) (string, error) {
 	var files []string
@@ -344,12 +346,12 @@ func TestORP03MatchesFrozenCommit(t *testing.T) {
 	if got == frozenORP03SHA256 {
 		return
 	}
-	check := exec.Command("git", "cat-file", "-e", "f203ca97^{commit}")
+	check := exec.Command("git", "cat-file", "-e", "8a6c6fa^{commit}")
 	check.Dir = repo
 	if check.Run() != nil {
-		t.Fatalf("ORP 0.3 digest %s, want %s (frozen commit f203ca97 is not in this checkout)", got, frozenORP03SHA256)
+		t.Fatalf("ORP 0.3 digest %s, want %s (frozen commit 8a6c6fa is not in this checkout)", got, frozenORP03SHA256)
 	}
-	cmd := exec.Command("git", "diff", "--exit-code", "f203ca97", "--")
+	cmd := exec.Command("git", "diff", "--exit-code", "8a6c6fa", "--")
 	cmd.Args = append(cmd.Args, frozenORP03Roots...)
 	cmd.Dir = repo
 	out, diffErr := cmd.CombinedOutput()

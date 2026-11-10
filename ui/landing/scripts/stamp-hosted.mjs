@@ -66,7 +66,7 @@ const homeShell = `<div id="static-landing">
       <p><a href="/makers/" style="display:inline-flex;min-height:44px;align-items:center">Makers</a></p>
       <section id="publishers"><h2>${publisherBenefit}</h2><p>Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.</p><p>${comingLine}</p><p><a href="/publishers/" style="display:inline-flex;min-height:44px;align-items:center">Publishers</a></p></section>
       <section id="how"><h2>Four steps, one human decision</h2><p>${howLead}</p></section>
-      <section id="rails"><h2>${railsHeading}</h2><p>${railsIntro}</p><p>${railsAutonomy}</p><ol>${railsSteps.map((step) => `<li>${step}</li>`).join('')}</ol></section>
+      <section id="rails"><h2>${railsHeading}</h2><p>${railsIntro}</p><p>${railsAutonomy}</p><p><a href="/protocol/" style="display:inline-flex;min-height:44px;align-items:center">The protocol</a></p><figure><figcaption>The deal, end to end</figcaption><ol>${railsSteps.map((step) => `<li>${step}</li>`).join('')}</ol></figure></section>
       <h2>A post, before an offer</h2>
       <p>Nothing is inserted. Some posts get no offer.</p>
       <h2>A labelled placement you can refuse</h2>

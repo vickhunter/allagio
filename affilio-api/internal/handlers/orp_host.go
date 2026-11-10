@@ -237,6 +237,14 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 		h.leave04(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "seat":
 		h.seat04(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "decline":
+		h.decline(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "revoke":
+		h.revoke(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "dispute":
+		h.dispute(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "reputation":
+		h.reputation(c, dns, msg, hash)
 	case msg.Type == "receipt":
 		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the host issues a receipt."}), database.ORPEffect{})
 	case orp.IsHostOnly(msg.Type):

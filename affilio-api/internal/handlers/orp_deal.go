@@ -698,6 +698,7 @@ func (h *ORPHost) acceptDeal(c *gin.Context, dns string, msg orp.Message, hash, 
 		deal.UpdatedAt = now.UTC()
 		effect.UpdateDealID = deal.ID
 		effect.UpdateState = "awaiting"
+		effect.UpdateFrom = []string{"proposed"}
 		effect.UpdatedAt = deal.UpdatedAt
 	}
 	doc, err := h.dealMessage(dns, party, msg.ID, deal, now)

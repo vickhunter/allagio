@@ -89,9 +89,11 @@ type ORPEffect struct {
 	Deal              *ORPDeal
 	UpdateObligations json.RawMessage
 	UpdateDealID      string
-	// UpdateState "awaiting" moves that deal from proposed to awaiting.
-	// Any other value, or a row that is no longer proposed, is an error.
+	// UpdateState moves that deal to a new state when its current state is
+	// one of UpdateFrom. An empty UpdateFrom, or a row in another state,
+	// is an error.
 	UpdateState string
+	UpdateFrom  []string
 	UpdatedAt   time.Time
 	Inbox       []ORPInboxItem
 	// ManyUpdate rewrites one 0.4 deal. ManyExpectHash and ManyExpectAt must
@@ -250,12 +252,12 @@ WHERE id=$1 AND owner_id=$6::uuid`, offer.ID, offer.Terms, offer.TermsHash, offe
 		}
 	}
 	if effect.UpdateState != "" {
-		if effect.UpdateDealID == "" || effect.UpdateState != "awaiting" {
+		if effect.UpdateDealID == "" || len(effect.UpdateFrom) == 0 {
 			return errors.New("orp state effect")
 		}
 		tag, err := tx.Exec(ctx, `
 UPDATE orp_deals SET state=$2, updated_at=$3
-WHERE id=$1 AND state='proposed'`, effect.UpdateDealID, effect.UpdateState, effect.UpdatedAt)
+WHERE id=$1 AND state=ANY($4)`, effect.UpdateDealID, effect.UpdateState, effect.UpdatedAt, effect.UpdateFrom)
 		if err != nil {
 			return err
 		}
@@ -852,6 +854,45 @@ WHERE
     OR (parties IS NOT NULL AND parties->'seats' @> jsonb_build_array(jsonb_build_object('owner', $1::text)))
 ORDER BY updated_at DESC
 LIMIT $2`, ownerID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ORPDeal{}
+	for rows.Next() {
+		var deal ORPDeal
+		var offerID, offererOwner *string
+		if err = rows.Scan(
+			&deal.ID, &offerID, &offererOwner, &deal.AcceptorOwner, &deal.OffererParty, &deal.AcceptorParty,
+			&deal.Terms, &deal.TermsHash, &deal.State, &deal.Waiting, &deal.Obligations, &deal.Bound, &deal.Parties, &deal.UpdatedAt, &deal.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		if offerID != nil {
+			deal.OfferID = *offerID
+		}
+		if offererOwner != nil {
+			deal.OffererOwner = *offererOwner
+		}
+		out = append(out, deal)
+	}
+	return out, rows.Err()
+}
+
+// ListORPDealsForParty lists deals where the party id sits, oldest first.
+func (d *DB) ListORPDealsForParty(ctx context.Context, party string, limit int) ([]ORPDeal, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := d.Pool.Query(ctx, `
+SELECT id, offer_id, offerer_owner::text, acceptor_owner::text, offerer_party, acceptor_party,
+       terms, terms_hash, state, waiting, obligations, bound, parties, updated_at, created_at
+FROM orp_deals
+WHERE
+    (parties IS NULL AND (offerer_party=$1 OR acceptor_party=$1))
+    OR (parties IS NOT NULL AND parties->'seats' @> jsonb_build_array(jsonb_build_object('party', $1::text)))
+ORDER BY created_at ASC
+LIMIT $2`, party, limit)
 	if err != nil {
 		return nil, err
 	}

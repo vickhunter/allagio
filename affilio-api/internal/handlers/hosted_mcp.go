@@ -54,7 +54,13 @@ func hostedToolList(g *database.AgentGrant) []dcp.Tool {
 			}
 		}
 	}
-	return append(tools, dcp.ORPTools...)
+	for _, t := range dcp.ORPTools {
+		if t.Name == "approve_deal" {
+			continue
+		}
+		tools = append(tools, t)
+	}
+	return tools
 }
 
 const hostedMCPInstructions = "Use existing products and publishing tools. Prepare a placement. " + ownerApprovalURL + " " + publishStepParagraph + " Agents cannot approve a placement. Never ask for payment secrets in chat. Agent tools cannot connect Stripe or confirm receipt of money. suggest_monetization takes a draft and returns up to three offers with a tracked link and a disclosure line. It does not publish."

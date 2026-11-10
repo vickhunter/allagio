@@ -217,8 +217,18 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 	if problem, bad := checkHandledBody(orp, typ, body); bad {
 		return Message{}, problem, false
 	}
-	if (typ == "execute" || typ == "leave" || typ == "seat") && msg.Deal == "" {
+	if (typ == "execute" || typ == "leave" || typ == "seat" || typ == "decline" || typ == "dispute") && msg.Deal == "" {
 		return Message{}, Invalid(label, "/deal"), false
+	}
+	if typ == "revoke" {
+		scope, _ := body["scope"].(string)
+		if scope == "offer" {
+			if offer, _ := body["offer"].(string); offer == "" {
+				return Message{}, Invalid(label, "/body/offer"), false
+			}
+		} else if msg.Deal == "" {
+			return Message{}, Invalid(label, "/deal"), false
+		}
 	}
 	if typ == "accept" && msg.Deal == "" {
 		offer, _ := body["offer"].(string)
