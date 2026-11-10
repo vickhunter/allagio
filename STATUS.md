@@ -1,3 +1,9 @@
+## November 10 — hosted Render (test mode)
+
+- 2026-11-10 12:25 Rome: hosted Render (test mode) now runs `79dd4cf935e1c879d89482c0b858440ca6f21452` (deploy `dep-dbpfuaec6qcc73ai3g10`, image `offerrails/affilio:79dd4cf9` digest `sha256:fb8371f5d34bdd5b4fab0b2b6a5b6a26c76451eb31c5ea108b771e5bc195f4b0`). Main is ahead (`#121` `83678193`, not deployed).
+- Migration `052` (hash maker keys) was applied by hand at 12:25:16 Rome (prod `AUTO_MIGRATE=false`) before the new code went live at 12:25:44: about 30 seconds of maker-key auth downtime while `436ce343` ran against hashed keys. Next time apply a one-way auth migration in the same step as the deploy or put the app in maintenance first.
+- Rollback rule: `052` is one-way. Rolling back means restoring the database from Neon snapshot branch `pre-79dd4cf9-20261110` (`br-rapid-bonus-b210zhrh`) AND redeploying `436ce343` (`dep-dbgpe0ei0phs738lgmu0`, digest `sha256:6638e9e5...c309`). A code-only rollback breaks maker-key auth.
+
 ## November 10 — inline deal approval (devin/deal-approve-inline)
 
 `GET /owner/api/deals/:id` now returns the decoded terms document — the owner is a verified party, so the detail response carries what the standalone approval page already shows them. On `/owner/deals`, a card waiting on the owner lazy-loads those terms (kind + obligations) and only then enables "Approve this deal". The button POSTs JSON with `X-CSRF-Token` to the existing `/orp/approve/{escalation}` endpoint — the same `ownerFormCSRF` check the approval form passes — so no approval-path code is duplicated and every guard (`humanStepOn`, waiting-party match, session check) still runs. The link-out approval page remains as a second action. Declining a waiting deal is still "do not approve" — there is no owner decline endpoint and none is faked. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
