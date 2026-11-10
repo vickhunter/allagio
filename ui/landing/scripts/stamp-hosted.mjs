@@ -30,18 +30,20 @@ const shell = `<div id="static-landing">
 const homeShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
-      <h1>${heroH1}</h1>
-      <p>${heroSupport}</p>
-      <p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in</a></p>
-      <p><a href="${setupHref}" style="display:inline-flex;min-height:44px;align-items:center">${setupLabel}</a></p>
-      <details>
-        <summary>Setup details</summary>
-        <p>${joinLead}</p>
-        <p>${joinPrompt}</p>
-        <p><a href="/llms.txt" style="display:inline-flex;min-height:44px;align-items:center">llms.txt</a></p>
-        ${staticSetupSteps()}
-        <p>${noSignIn}</p>
-      </details>
+      <section id="hero">
+        <h1>${heroH1}</h1>
+        <p>${heroSupport}</p>
+        <p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in</a></p>
+        <p><a href="${setupHref}" style="display:inline-flex;min-height:44px;align-items:center">${setupLabel}</a></p>
+        <details>
+          <summary>Setup details</summary>
+          <p>${joinLead}</p>
+          <p>${joinPrompt}</p>
+          <p><a href="/llms.txt" style="display:inline-flex;min-height:44px;align-items:center">llms.txt</a></p>
+          ${staticSetupSteps()}
+          <p>${noSignIn}</p>
+        </details>
+      </section>
       <p>Manual setup</p>
       <p>MCP</p>
       <p>Your limits</p>
@@ -63,7 +65,7 @@ const homeShell = `<div id="static-landing">
       <p>Agents put your product in content that fits. The worked sale is an example, not a result from the picture.</p>
       <p><a href="/makers/" style="display:inline-flex;min-height:44px;align-items:center">Makers</a></p>
       <section id="publishers"><h2>${publisherBenefit}</h2><p>Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.</p><p>${comingLine}</p><p><a href="/publishers/" style="display:inline-flex;min-height:44px;align-items:center">Publishers</a></p></section>
-      <section id="how"><h2>The offer stays inside your limits.</h2><p>${howLead}</p></section>
+      <section id="how"><h2>Four steps, one human decision</h2><p>${howLead}</p></section>
       <h2>A post, before an offer</h2>
       <p>Nothing is inserted. Some posts get no offer.</p>
       <h2>A labelled placement you can refuse</h2>
@@ -72,7 +74,6 @@ const homeShell = `<div id="static-landing">
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
       <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
       <p><a href="/downloads/offer-rails.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
-      <div class="hero-fallback" style="min-height:240px"></div>
     </main>
   </div>`
 
