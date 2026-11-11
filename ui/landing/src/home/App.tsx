@@ -52,7 +52,7 @@ export function App() {
         </div>
         <figure className="piece min-w-0">
           <figcaption>The deal, end to end</figcaption>
-          <BentoGrid className="mt-3 auto-rows-[9.5rem] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <BentoGrid className="mt-3 auto-rows-[8.5rem] grid-cols-1 sm:grid-cols-2">
             {railsSteps.map((step, i) => {
               const [name, ...rest] = step.split(' — ')
               return (
@@ -63,7 +63,7 @@ export function App() {
                   Icon={stepIcons[i]}
                   href={withSource('/reference', source)}
                   cta="Reference"
-                  className={i === 0 ? 'bg-s1 sm:col-span-2' : 'bg-s1'}
+                  className={i === 0 ? 'bg-s1 col-span-1 sm:col-span-2' : 'bg-s1'}
                   background={<div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-t2/30 to-transparent" />}
                 />
               )

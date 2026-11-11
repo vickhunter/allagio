@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pause, Play } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { CommandPalette, type Command } from '@/components/CommandPalette'
-import { track } from '@/lib/track'
 import { signInHref, useSource, withSource } from '@/lib/source'
 import { useCaseLinks } from '@/use-cases/links.mjs'
 
@@ -18,13 +16,11 @@ export const siteCommands: Command[] = [
   { id: 'join', label: 'Join', keys: 'j', href: '#join' },
 ]
 
-// Shared header. One "Pause motion" switch stops every ambient loop on the page (WCAG 2.2.2).
+// Shared header.
 export function Header({ page }: { page: PageKey }) {
   const source = useSource()
-  const [paused, setPaused] = useState(false)
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => { document.documentElement.dataset.motion = paused ? 'paused' : 'on' }, [paused])
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
@@ -72,10 +68,6 @@ export function Header({ page }: { page: PageKey }) {
           {link('/agents', 'Agents', 'agents', 'text-t1 hover:bg-s2')}
         </nav>
         <div className="flex shrink-0 items-center gap-1.5">
-          <button type="button" onClick={() => { setPaused((p) => !p); track('motion_toggle', { paused: !paused }) }} aria-pressed={paused}
-            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-s1 px-2.5 text-[13px] text-t2 transition-colors duration-150 hover:bg-s2">
-            {paused ? <Play className="size-3.5" aria-hidden /> : <Pause className="size-3.5" aria-hidden />}<span className="hidden sm:inline">{paused ? 'Play' : 'Pause'} motion</span><span className="sr-only sm:hidden">{paused ? 'Play' : 'Pause'} motion</span>
-          </button>
           <CommandPalette commands={siteCommands.map((command) => ({ ...command, href: command.href.startsWith('#') ? command.href : withSource(command.href, source) }))} />
           <a href={signInHref('/owner', source)} data-track="nav_cta" className="inline-flex min-h-11 min-w-11 items-center rounded-full bg-t1 px-3.5 text-[13px] font-semibold text-s0">Sign in</a>
         </div>
