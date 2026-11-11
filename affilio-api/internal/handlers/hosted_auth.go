@@ -1175,7 +1175,12 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 				c.Status(500)
 				return
 			}
-			pageBody = string(section) + string(modesSection) + pageBody
+			notifySection, err := h.notifySection(c, o)
+			if err != nil {
+				c.Status(500)
+				return
+			}
+			pageBody = string(section) + string(modesSection) + string(notifySection) + pageBody
 		}
 		h.render(c, "Your distribution workspace", "", template.HTML(pageBody))
 		return
@@ -1195,6 +1200,12 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 			return
 		}
 		body.WriteString(string(modesSection))
+		notifySection, err := h.notifySection(c, o)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+		body.WriteString(string(notifySection))
 	}
 	returnTo := c.Query("return_to")
 	if !validAuthorizationReturn(returnTo) {

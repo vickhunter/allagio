@@ -1171,9 +1171,13 @@ func (h *ORPHost) finishRaw(c *gin.Context, msg orp.Message, hash string, status
 }
 
 func (h *ORPHost) store(c *gin.Context, msg orp.Message, hash string, status int, raw []byte, effect database.ORPEffect) (database.ORPSaved, error) {
-	return h.Entry.DB.CommitORP(c.Request.Context(), database.ORPRecord{
+	saved, err := h.Entry.DB.CommitORP(c.Request.Context(), database.ORPRecord{
 		Party: msg.From, ID: msg.ID, Hash: hash, Status: status, Reply: raw,
 	}, effect)
+	if err == nil {
+		h.notifyWaiting(c, effect)
+	}
+	return saved, err
 }
 
 func (h *ORPHost) errorDoc(dns string, msg orp.Message, problem orp.Problem) map[string]any {

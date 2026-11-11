@@ -111,6 +111,20 @@ func (d *DB) EndOwnerSession(ctx context.Context, hash string) error {
 	return err
 }
 
+// OwnerNotify returns the owner's deal-waiting webhook url and signing secret.
+func (d *DB) OwnerNotify(ctx context.Context, ownerID string) (url, secret string, err error) {
+	err = d.Pool.QueryRow(ctx, `SELECT notify_url, notify_secret FROM owners WHERE id=$1`, ownerID).Scan(&url, &secret)
+	return url, secret, err
+}
+
+// SetOwnerNotify stores the webhook url; the secret rotates only when a new
+// one is given so an empty secret keeps the existing one.
+func (d *DB) SetOwnerNotify(ctx context.Context, ownerID, url, secret string) error {
+	_, err := d.Pool.Exec(ctx, `UPDATE owners SET notify_url=$2,
+  notify_secret = CASE WHEN $3='' THEN notify_secret ELSE $3 END WHERE id=$1`, ownerID, url, secret)
+	return err
+}
+
 func (d *DB) BindOwnerAccount(ctx context.Context, ownerID, role, accountID string) (bool, error) {
 	query := `UPDATE owners SET site_id=$2 WHERE id=$1 AND site_id IS NULL`
 	if role == "maker" {
