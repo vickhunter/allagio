@@ -1,0 +1,65 @@
+affilio-api/internal/handlers/workspace.go
+  s_7e484d91fceb6c::t_3afa49f429e243 48
+affilio-api/internal/handlers/orp_space.go
+  s_7e484d91fceb6c::t_b02ec43ad52323 1-4,6-227,235,237-239,241-242,244,248,250,253,257,259,275,277
+  s_7e484d91fceb6c::t_1fabf04598384f 5
+  s_7e484d91fceb6c::t_1636d3af01330f 228-234,236,240,243,245-247,249,251-252,254-256,258,260-274,276,278-279
+affilio-api/internal/handlers/allagio_discovery.go
+  s_7e484d91fceb6c::t_94892d7b6b03cc 79
+affilio-api/internal/handlers/handlers_test.go
+  s_7e484d91fceb6c::t_79e2a2edcf5a65 270
+  s_7e484d91fceb6c::t_d5b7abc1777efa 134
+affilio-api/internal/handlers/hosted_auth.go
+  s_7e484d91fceb6c::t_e21783d36e3b0f 1183-1188
+  s_7e484d91fceb6c::t_70975923b51a78 1214-1219
+affilio-api/internal/handlers/orp_space_test.go
+  s_7e484d91fceb6c::t_27d8e16bb415ca 130
+  s_7e484d91fceb6c::t_a5d2de4337b080 1-4,6-22,25-26,38-42,44,46-47,54-61,63-67,71-87,89-92,94,96-106,108-119,122-123,126,132-133
+  s_7e484d91fceb6c::t_5a2b4f8b974ea8 5,23-24,27-37,43,48-50,52-53,69-70,107,129,131
+  s_7e484d91fceb6c::t_3a9c6ab344644d 95
+  s_7e484d91fceb6c::t_890dd28ba01e34 120
+  s_7e484d91fceb6c::t_4b12efbc9dcc03 125,127-128
+  s_7e484d91fceb6c::t_23a736a0f2002f 45
+  s_7e484d91fceb6c::t_c69d45e32437c4 51
+  s_7e484d91fceb6c::t_fdb70fc331ef3f 62
+  s_7e484d91fceb6c::t_2f083d3cffb001 68
+  s_7e484d91fceb6c::t_e31885e7a6ed50 88
+  s_7e484d91fceb6c::t_a4dbe0f7a5de2e 93
+  s_7e484d91fceb6c::t_1b785da2556d0b 121
+  s_7e484d91fceb6c::t_e4d7b927c6f45b 124
+affilio-api/internal/migrations/055_orp_spaces.sql
+  s_7e484d91fceb6c::t_8734dcae29824d 1-13
+affilio-api/internal/handlers/orp_host.go
+  s_7e484d91fceb6c::t_60cdac67792db9 230,232
+  s_7e484d91fceb6c::t_5816a865457e48 266
+  s_7e484d91fceb6c::t_a33f68a8008e06 231,233
+affilio-api/internal/orp/envelope.go
+  s_7e484d91fceb6c::t_6fc09ac8e7ddf4 233-235
+  s_7e484d91fceb6c::t_b4b7fe0f326437 280-285,291-441
+  s_7e484d91fceb6c::t_d60fee05883b57 442
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_34374671167ecf 86-102
+  s_7e484d91fceb6c::t_7047eb59841bb5 124-126
+  s_7e484d91fceb6c::t_d26f5542f73fb7 298-314
+  s_7e484d91fceb6c::t_74345d07bc32ce 123,1033-1100
+STATUS.md
+  s_7e484d91fceb6c::t_0f80261df2f9ba 1-4
+affilio-api/internal/orp/snapshot.go
+  s_7e484d91fceb6c::t_7fd9333f566e69 118-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e7c4599af59307907bb06d6d24908a2a7198f57d",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
