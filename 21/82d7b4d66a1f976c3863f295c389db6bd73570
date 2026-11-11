@@ -1,0 +1,27 @@
+affilio-api/internal/handlers/hosted_auth.go
+  s_7e484d91fceb6c::t_36cffb9a5ae4a4 1173-1178,1192-1197
+affilio-api/internal/handlers/human_approval.go
+  s_7e484d91fceb6c::t_7821dbb2926300 172-243
+affilio-api/internal/handlers/allagio_discovery.go
+  s_7e484d91fceb6c::t_00e65eb4c3afe4 79
+affilio-api/internal/handlers/workspace.go
+  s_7e484d91fceb6c::t_d783dc17fc540d 46
+STATUS.md
+  s_7e484d91fceb6c::t_f931f96c082a3b 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2182d7b4d66a1f976c3863f295c389db6bd73570",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
