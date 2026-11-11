@@ -1,0 +1,21 @@
+STATUS.md
+  s_7e484d91fceb6c::t_7cfdddd6a00041 1-4
+affilio-wp/admin/build/workspace.css
+  s_7e484d91fceb6c::t_2a48f65ac91e6e 60-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "68392a28df61cb8c6d00e3ae19a9355d0603aeeb",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
