@@ -3,6 +3,7 @@ import { Logo } from '@/components/Logo'
 import { CommandPalette, type Command } from '@/components/CommandPalette'
 import { signInHref, useSource, withSource } from '@/lib/source'
 import { useCaseLinks } from '@/use-cases/links.mjs'
+import { ChevronDown } from 'lucide-react'
 
 export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup' | 'legal' | 'agents' | 'you' | 'use-cases' | 'reference' | 'missing'
 export const siteCommands: Command[] = [
@@ -48,8 +49,12 @@ export function Header({ page }: { page: PageKey }) {
           {link('/makers/', 'Makers', 'makers', 'text-maker hover:bg-maker-soft')}
           {link('/publishers/', 'Publishers', 'publishers', 'text-pub hover:bg-pub-soft')}
           <div className="group relative">
-            {link('/use-cases/', 'Use cases', 'use-cases', 'text-t1 hover:bg-s2')}
-            <div className="invisible absolute left-0 top-full z-40 hidden w-64 rounded-xl border border-line bg-white p-1.5 opacity-0 shadow-lg transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 md:block">
+            <a href={withSource('/use-cases/', source)} aria-current={current === 'use-cases' ? 'page' : undefined} data-track="nav_click" data-track-to="use-cases"
+              className={`inline-flex min-h-11 min-w-11 items-center gap-1 rounded-md px-2.5 text-t1 transition-colors duration-150 hover:bg-s2 sm:px-3 ${current === 'use-cases' ? 'bg-s2 font-semibold' : ''}`}>
+              Use cases
+              <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 text-t2 transition-transform duration-150 group-hover:rotate-180 group-focus-within:rotate-180" />
+            </a>
+            <div className="invisible absolute left-0 top-full z-40 hidden w-64 translate-y-1 rounded-xl border border-line bg-white p-1.5 opacity-0 shadow-lg transition-all duration-150 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 md:block">
               {useCaseLinks.map((item) => (
                 <a
                   key={item.id}
