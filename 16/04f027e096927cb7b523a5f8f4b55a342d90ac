@@ -1,0 +1,29 @@
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_8a6d423a095fd5 54
+affilio-api/internal/handlers/llms_archive.go
+  s_7e484d91fceb6c::t_06e14a700747d3 53
+affilio-api/internal/orp/bundled/GAPS.md
+  s_7e484d91fceb6c::t_f638292c36a8af 15-16,21,27,30
+affilio-wp/admin/build/landing-v9/llms-full.txt
+  s_7e484d91fceb6c::t_9a9859d90d8a96 47
+docs/protocol/GAPS.md
+  s_7e484d91fceb6c::t_7b9d65b26aa645 15-16,21,27,30
+docs/protocol/SPEC.md
+  s_7e484d91fceb6c::t_bb0b463d7429ec 1248,1477
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1604f027e096927cb7b523a5f8f4b55a342d90ac",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
