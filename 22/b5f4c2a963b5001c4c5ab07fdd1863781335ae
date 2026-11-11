@@ -1,0 +1,25 @@
+docs/protocol/package.json
+  s_7e484d91fceb6c::t_0989844b8f9a68 2-3,5-37
+docs/protocol/LICENSE
+  s_7e484d91fceb6c::t_d7d0811580f620 1-202
+docs/protocol/NOTICE
+  s_7e484d91fceb6c::t_74e3eb22659e80 1-5
+docs/protocol/package-lock.json
+  s_7e484d91fceb6c::t_4d5ebdca4f51f6 2-3,8-10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "22b5f4c2a963b5001c4c5ab07fdd1863781335ae",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
