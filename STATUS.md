@@ -1,3 +1,7 @@
+## November 11 — bento deal lifecycle + copyable reference blocks
+
+The `#rails` "deal, end to end" figure now renders the seven protocol steps as a `BentoGrid` (pulled from the free `@magicui` registry; the CLI wrote to a literal `@/` dir due to alias resolution, moved to `src/components/ui/bento-grid.tsx`, `@radix-ui/react-icons` added for its Button arrow). Step names split on " — " into card title + description; card 1 spans two columns; each card links to `/reference`. Step-number icons are hoisted module-level components. On `/reference`, every code block gains a `CopyBlock` hover-revealed copy button with the same 2s "✓ Copied" check-flash as the hero CTA — the page's copy-paste claim is now literal. Stamped assets rebuilt; handlers green. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## November 11 — social-proof client strip
 
 The homepage gains a `#clients` strip under the hero: a `Marquee` row of the eight install-matrix clients (Claude, ChatGPT, Gemini, Cursor, VS Code, Copilot, Windsurf, opencode) as simplified monochrome glyph pills, linking to `/agents`. The glyphs moved into a shared `clientMarks` export in `join-prompt.mjs` so the CTA marks and the strip stay in sync. React Doctor 100/100 on the diff. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.

@@ -2,6 +2,7 @@ import { Page } from '@/site/Page'
 import { example } from '@/content'
 import { Vision } from './Vision'
 import { ClientStrip } from '@/components/client-strip'
+import { BentoCard, BentoGrid } from '@/components/ui/bento-grid'
 import { PostPreview } from '@/components/PostPreview'
 import { Hero } from '@/components/hero-2'
 import { FeatureSection } from '@/components/feature-3'
@@ -12,6 +13,14 @@ import { comingLine } from '@/home/hero-copy.mjs'
 import { makerBenefit, publisherBenefit, railsAutonomy, railsHeading, railsIntro, railsKicker, railsSteps } from '@/home/desk-copy.mjs'
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
+
+const stepIcons = Array.from({ length: 7 }, (_, i) => {
+  const StepIcon = ({ className }: { className?: string }) => (
+    <span className={className} aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+  )
+  StepIcon.displayName = `StepIcon${i + 1}`
+  return StepIcon
+})
 
 function Rows({ items }: { items: string[] }) {
   return (
@@ -41,11 +50,25 @@ export function App() {
           <p className="mt-4 text-[15px] leading-relaxed text-t2">{railsAutonomy}</p>
           <p><a className={linkClass} href={withSource('/protocol/', source)}>The protocol</a></p>
         </div>
-        <figure className="piece">
+        <figure className="piece min-w-0">
           <figcaption>The deal, end to end</figcaption>
-          <ol className="mt-2 space-y-2">
-            {railsSteps.map((step) => <li key={step} className="text-[14px] leading-snug">{step}</li>)}
-          </ol>
+          <BentoGrid className="mt-3 auto-rows-[9.5rem] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {railsSteps.map((step, i) => {
+              const [name, ...rest] = step.split(' — ')
+              return (
+                <BentoCard
+                  key={name}
+                  name={name}
+                  description={rest.join(' — ')}
+                  Icon={stepIcons[i]}
+                  href={withSource('/reference', source)}
+                  cta="Reference"
+                  className={i === 0 ? 'bg-s1 sm:col-span-2' : 'bg-s1'}
+                  background={<div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-t2/30 to-transparent" />}
+                />
+              )
+            })}
+          </BentoGrid>
         </figure>
       </section>
 

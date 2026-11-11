@@ -1,5 +1,29 @@
 import { Page } from '@/site/Page'
 import { withSource, useSource } from '@/lib/source'
+import { useState } from 'react'
+
+function CopyBlock({ children }: { children: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    void navigator.clipboard?.writeText(children).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <div className="group/code relative mt-3">
+      <pre className={codeBlock}><code>{children}</code></pre>
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label="Copy this block"
+        className="absolute right-2 top-2 rounded-md border border-line bg-s0 px-2 py-1 text-[11px] font-semibold text-t2 opacity-0 transition-opacity hover:text-t1 focus-visible:opacity-100 group-hover/code:opacity-100"
+      >
+        {copied ? '✓ Copied' : 'Copy'}
+      </button>
+    </div>
+  )
+}
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
 const codeBlock = 'overflow-x-auto rounded-xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1'
@@ -148,8 +172,8 @@ export function App() {
             {examples.map((e) => (
               <div key={e.title}>
                 <h3 className="font-semibold text-t1">{e.title}</h3>
-                <pre className={`${codeBlock} mt-3`}><code>{e.req}</code></pre>
-                <pre className={`${codeBlock} mt-2`}><code>{e.res}</code></pre>
+                <CopyBlock>{e.req}</CopyBlock>
+                <CopyBlock>{e.res}</CopyBlock>
               </div>
             ))}
           </div>
@@ -165,11 +189,11 @@ export function App() {
 
         <section aria-labelledby="life-h" className="scroll-mt-32 border-t border-line py-10">
           <h2 id="life-h" className="h-display text-2xl sm:text-3xl">Deal lifecycle</h2>
-          <pre className={`${codeBlock} mt-4`}><code>{`join → hello → discover → offer → counter* → accept → awaiting
+          <CopyBlock>{`join → hello → discover → offer → counter* → accept → awaiting
       → activate → active → execute → complete
                                     ↘ proof: GET /orp/proof/{id}
 
-* counter loops back to offer. decline ends the deal.`}</code></pre>
+* counter loops back to offer. decline ends the deal.`}</CopyBlock>
         </section>
 
         <section aria-labelledby="err-h" className="scroll-mt-32 border-t border-line py-10">
