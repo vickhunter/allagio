@@ -23,6 +23,7 @@ func (h *ORPHost) decline(c *gin.Context, dns string, msg orp.Message, hash, own
 	}
 	now := h.now()
 	deal.State = "declined"
+	deal.Waiting = nil
 	deal.UpdatedAt = now.UTC()
 	h.finishDeal(c, dns, msg, hash, party, deal, now, database.ORPEffect{
 		UpdateDealID: deal.ID, UpdateState: "declined",

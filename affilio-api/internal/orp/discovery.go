@@ -120,7 +120,7 @@ func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
 // not in this list.
 func Capabilities(claimsMode string) map[string]any {
 	return map[string]any{
-		"messages": []any{"hello", "discover", "results", "offer", "accept", "deal", "execute", "receipt", "error"},
+		"messages": []any{"hello", "discover", "results", "space", "request", "offer", "counter", "accept", "decline", "deal", "execute", "receipt", "revoke", "dispute", "reputation", "error"},
 		"proofs":   []any{"proof_url"},
 		"inbox":    map[string]any{"poll": true},
 		"checks": map[string]any{
