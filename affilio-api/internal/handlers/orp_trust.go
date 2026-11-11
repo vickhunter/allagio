@@ -152,6 +152,11 @@ func (h *ORPHost) dispute(c *gin.Context, dns string, msg orp.Message, hash, own
 		return
 	}
 	effect.Inbox = append(h.dealInbox(dns, msg.ID, deal, now), h.forwardInbox(msg, deal)...)
+	// A counterparty with no owner (a catalog offerer, or a 0.4 seat) gets no
+	// forwardInbox row. The sender's own copy is the durable opener record.
+	if rawMsg, err := json.Marshal(msg); err == nil && ownerID != "" {
+		effect.Inbox = append(effect.Inbox, database.ORPInboxItem{OwnerID: ownerID, Message: rawMsg})
+	}
 	h.finishDeal(c, dns, msg, hash, party, deal, now, effect)
 }
 

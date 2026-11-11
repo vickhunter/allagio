@@ -21,9 +21,12 @@ var ErrORPReplay = errors.New("orp replay")
 // The message transaction rolls back, so the accept is not stored.
 var ErrORPState = errors.New("orp state")
 
-// ErrORPNotOpener is a dispute withdraw whose sender is not the single opener.
-// A history that does not name one opener fails the same way.
+// ErrORPNotOpener is a dispute withdraw whose sender is not the known opener.
 var ErrORPNotOpener = errors.New("orp opener")
+
+// ErrORPOpenerUnknown means stored dispute history does not name one opener.
+// The caller is not told they are the wrong party.
+var ErrORPOpenerUnknown = errors.New("orp opener unknown")
 
 // ErrORPNotObligor is an obligation revoke whose sender is not the obligor.
 var ErrORPNotObligor = errors.New("orp obligor")
@@ -233,8 +236,7 @@ INSERT INTO orp_deals(
 			return err
 		}
 	} else if effect.UpdateDealID != "" && len(effect.UpdateObligations) > 0 {
-		if _, err := tx.Exec(ctx, `
-UPDATE orp_deals SET obligations=$2, updated_at=$3 WHERE id=$1`, effect.UpdateDealID, JSONList(effect.UpdateObligations), effect.UpdatedAt); err != nil {
+		if err := applyGuardedObligations(ctx, tx, effect); err != nil {
 			return err
 		}
 	}
@@ -434,6 +436,73 @@ func ObligationObligor(deal ORPDeal, obligationID string) (string, bool) {
 	return match, true
 }
 
+// applyGuardedObligations writes an obligation snapshot only when the locked
+// row is still active at ExpectUpdatedAt. A verified or revoked obligation
+// in that row must stay as stored, including its receipt.
+func applyGuardedObligations(ctx context.Context, tx pgx.Tx, effect ORPEffect) error {
+	if effect.ExpectUpdatedAt.IsZero() {
+		return errors.New("orp obligation effect")
+	}
+	var state string
+	var obligations []byte
+	var fresh bool
+	err := tx.QueryRow(ctx, `
+SELECT state, obligations, updated_at = $2
+FROM orp_deals WHERE id=$1 FOR UPDATE`, effect.UpdateDealID, effect.ExpectUpdatedAt).Scan(&state, &obligations, &fresh)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrORPState
+	}
+	if err != nil {
+		return err
+	}
+	if !fresh || state != "active" || !keepsTerminalObligations(obligations, effect.UpdateObligations) {
+		return ErrORPState
+	}
+	tag, err := tx.Exec(ctx, `
+UPDATE orp_deals SET obligations=$2, updated_at=$3
+WHERE id=$1 AND state='active' AND updated_at=$4`, effect.UpdateDealID, JSONList(effect.UpdateObligations), effect.UpdatedAt, effect.ExpectUpdatedAt)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return ErrORPState
+	}
+	return nil
+}
+
+func keepsTerminalObligations(locked, next json.RawMessage) bool {
+	var current, proposed []map[string]any
+	if json.Unmarshal(locked, &current) != nil || json.Unmarshal(next, &proposed) != nil {
+		return false
+	}
+	byID := map[string]map[string]any{}
+	for _, row := range proposed {
+		id, _ := row["id"].(string)
+		if id == "" {
+			return false
+		}
+		if _, dup := byID[id]; dup {
+			return false
+		}
+		byID[id] = row
+	}
+	for _, row := range current {
+		state, _ := row["state"].(string)
+		if state != "verified" && state != "revoked" {
+			continue
+		}
+		id, _ := row["id"].(string)
+		got, ok := byID[id]
+		if !ok || got["state"] != state {
+			return false
+		}
+		if receipt, exists := row["receipt"]; exists && got["receipt"] != receipt {
+			return false
+		}
+	}
+	return true
+}
+
 func revokedObligation(raw json.RawMessage, obligationID string) (json.RawMessage, error) {
 	var rows []map[string]any
 	if err := json.Unmarshal(raw, &rows); err != nil {
@@ -496,12 +565,15 @@ ORDER BY id`, dealID)
 	}
 	opener, open, ambiguous := replayDisputeOpener(deal, messages)
 	if ambiguous {
-		return ErrORPNotOpener
+		return ErrORPOpenerUnknown
 	}
 	if !open {
 		return ErrORPState
 	}
-	if opener != sender || !partyOnORPDeal(deal, opener) {
+	if !partyOnORPDeal(deal, opener) {
+		return ErrORPOpenerUnknown
+	}
+	if opener != sender {
 		return ErrORPNotOpener
 	}
 	return nil
@@ -511,36 +583,41 @@ func replayDisputeOpener(deal ORPDeal, messages []json.RawMessage) (opener strin
 	if len(messages) == 0 {
 		return "", false, true
 	}
+	// Message ids are unique per sender, not across parties. The same id from
+	// two parties is two facts. respond does not name or clear the opener,
+	// including a respond that is stored after withdraw.
 	type fact struct{ action, from string }
 	seen := map[string]fact{}
 	var order []string
+	sawOpen := false
 	for _, raw := range messages {
 		id, action, from, ok := disputeFact(raw)
 		if !ok || !partyOnORPDeal(deal, from) {
 			return "", false, true
 		}
-		if prev, exists := seen[id]; exists {
+		if action == "respond" {
+			continue
+		}
+		key := from + "\x00" + id
+		if prev, exists := seen[key]; exists {
 			if prev.action != action || prev.from != from {
 				return "", false, true
 			}
 			continue
 		}
-		seen[id] = fact{action: action, from: from}
-		order = append(order, id)
+		seen[key] = fact{action: action, from: from}
+		order = append(order, key)
 	}
-	for _, id := range order {
-		ev := seen[id]
+	for _, key := range order {
+		ev := seen[key]
 		switch ev.action {
 		case "open":
 			if open {
 				return "", false, true
 			}
+			sawOpen = true
 			opener = ev.from
 			open = true
-		case "respond":
-			if !open {
-				return "", false, true
-			}
 		case "withdraw":
 			if !open {
 				return "", false, true
@@ -550,6 +627,9 @@ func replayDisputeOpener(deal ORPDeal, messages []json.RawMessage) (opener strin
 		default:
 			return "", false, true
 		}
+	}
+	if !sawOpen {
+		return "", false, true
 	}
 	return opener, open, false
 }
