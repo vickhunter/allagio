@@ -1,0 +1,34 @@
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_dc6d74a3e272eb 101-105
+  s_7e484d91fceb6c::t_b6f9e146beba4b 268-270
+  s_7e484d91fceb6c::t_1fc598a92401a5 297-303
+affilio-api/internal/handlers/orp_deal.go
+  s_7e484d91fceb6c::t_0d65595b25e1e8 751-842
+  s_7e484d91fceb6c::t_6e729740e9c380 717-718,720-726
+affilio-api/internal/handlers/orp_counter_test.go
+  s_7e484d91fceb6c::t_09191c8912b7c0 1-111
+  s_7e484d91fceb6c::t_79416e3072889a 112
+affilio-api/internal/handlers/orp_host.go
+  s_7e484d91fceb6c::t_07b75beb1c578a 234-235
+affilio-api/internal/handlers/handlers_test.go
+  s_7e484d91fceb6c::t_3319ef37573e4e 134
+  s_7e484d91fceb6c::t_cd7b4b4fdce4ca 268
+STATUS.md
+  s_7e484d91fceb6c::t_5254eafa0e81ba 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9c0991396599a5d77ecade69eaca0e518738453b",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": null
+    }
+  }
+}
