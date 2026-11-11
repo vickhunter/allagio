@@ -4,7 +4,7 @@ import { Vision } from './Vision'
 import { ClientStrip } from '@/components/client-strip'
 import { BentoCard, BentoGrid } from '@/components/ui/bento-grid'
 import { BorderBeam } from '@/components/ui/border-beam'
-import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, Receipt, Zap } from 'lucide-react'
+import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, LayoutTemplate, Receipt, Calculator, XCircle, Zap } from 'lucide-react'
 import { PostPreview } from '@/components/PostPreview'
 import { Hero } from '@/components/hero-2'
 import { FeatureSection } from '@/components/feature-3'
@@ -99,8 +99,9 @@ export function App() {
           <Rows items={['A commission is a share of a sale.', 'A new site waits for a person before publish.', `${example.product} · ${example.price} · ${example.commission} commission.`]} />
           <p><a className={linkClass} href={withSource('/makers/', source)}>Makers</a></p>
         </div>
-        <figure className="piece">
-          <figcaption>Worked sale</figcaption>
+        <figure className="piece group relative overflow-hidden transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-maker/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <figcaption className="flex items-center gap-2"><Calculator aria-hidden="true" className="h-4 w-4 text-maker" />Worked sale</figcaption>
           <p>{example.product}</p>
           <p>{example.price} · {example.commission} commission</p>
           <p>On a {example.price} sale at {example.commission}, the publisher earns {example.publisher}. A {example.fee} fee is paid by the maker, so the maker keeps {example.maker}.</p>
@@ -115,8 +116,9 @@ export function App() {
           <Rows items={['One labelled box, marked sponsored.', comingLine, 'Undo stops clicks at the link right away.']} />
           <p><a className={linkClass} href={withSource('/publishers/', source)}>Publishers</a></p>
         </div>
-        <figure className="piece">
-          <figcaption>Placement</figcaption>
+        <figure className="piece group relative overflow-hidden transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-pub/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          <figcaption className="flex items-center gap-2"><LayoutTemplate aria-hidden="true" className="h-4 w-4 text-pub" />Placement</figcaption>
           <p>After the matching part of the post.</p>
           <p className="piece-note">Illustrative. Not a live placement on your site.</p>
         </figure>
@@ -124,12 +126,13 @@ export function App() {
 
       <section id="compare" aria-labelledby="compare-h" className="compare border-t border-line">
         <h2 id="compare-h" className="sr-only">With and without a labelled offer</h2>
-        <article>
-          <h3>A post, before an offer</h3>
+        <article className="relative border border-line">
+          <h3 className="flex items-center gap-2.5"><XCircle aria-hidden="true" className="h-6 w-6 text-t2" />A post, before an offer</h3>
           <p>Nothing is inserted. Some posts get no offer.</p>
         </article>
-        <article>
-          <h3>A labelled placement you can refuse</h3>
+        <article className="relative overflow-hidden border border-pub/30 bg-s1 shadow-md">
+          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-pub/70 to-transparent" />
+          <h3 className="flex items-center gap-2.5"><CheckCircle2 aria-hidden="true" className="h-6 w-6 text-pub" />A labelled placement you can refuse</h3>
           <p>One box, marked sponsored. Prepare waits until you approve.</p>
         </article>
       </section>

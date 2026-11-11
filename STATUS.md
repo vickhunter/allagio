@@ -1,3 +1,7 @@
+## November 11 — Magic UI pass: piece figures, compare cards, nav affordance
+
+Round two of the Magic UI sweep. `#makers`/`#publishers` `figure.piece` blocks now have icon figcaptions (Calculator in maker terracotta, LayoutTemplate in publisher olive), a hover lift + shadow, and a top gradient reveal line in the role's brand color. `#compare` articles become proper cards: muted XCircle on "before", pub-olive CheckCircle2 + accent border + shadow + gradient edge on "after". Nav "Use cases" trigger got a rotating ChevronDown and the dropdown translates in on open. React Doctor 100/100, stamped to `admin/build/landing-v9`. `CLAIMS_CHECK` unchanged.
+
 ## November 11 — Magic UI bento: full-width deal lifecycle
 
 `#rails` moves out of the cramped `.split` right column into a full-width section (`max-w-6xl`): copy block on top, `BentoGrid` below at `lg:grid-cols-3` / `auto-rows-[13rem]`. Cards now use the real `BentoCard` treatment — lucide icons (KeyRound/Handshake/Compass/FileSignature/CheckCircle2/Zap/Receipt) that shrink on hover, per-card radial tint washes, and the hover-revealed "Reference →" CTA the component ships. Join spans two columns as the featured card with a `BorderBeam` edge; Receipt bookends the grid at two columns. Mobile collapses to one column with no overflow (verified at 390px). React Doctor 100/100, `tsc --noEmit` clean, `npm run build` clean, `stamp-hosted` synced. `CLAIMS_CHECK` unchanged.
