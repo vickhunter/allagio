@@ -18,6 +18,10 @@ type DB struct {
 	// back. Production leaves it nil. Tests use it to prove a failed approve
 	// leaves no inbox row and no tracking token.
 	ORPBeforeCommit func(context.Context) error
+	// ORPBeforeEffect runs inside CommitORP before the deal write.
+	// Production leaves it nil. Tests use it to change the row after the
+	// handler has read it and before the conditional update.
+	ORPBeforeEffect func(context.Context) error
 	// ApprovalsReadErr, when set, is returned by DealOwnerApprovals.
 	// Production leaves it nil. Tests use it to fail that read only.
 	ApprovalsReadErr error

@@ -1,3 +1,7 @@
+## November 11 — dispute opener and obligation revoke
+
+SPEC §15.2: only the opener may withdraw a dispute. The opener is the party named by the stored dispute messages. A missing history, or two opens with no withdraw between them, fails closed and leaves the deal disputed. SPEC §15.1: only the obligor may revoke an obligation, and only while the deal is active and that obligation is pending or claimed. Work already verified stays verified. The deal row is locked and the write matches the state the handler read, so a concurrent change does not apply. `use-cases.html` stays out of the WordPress plugin ZIP. No new migration. `CLAIMS_CHECK` is unchanged. No deploy.
+
 ## November 11 — secret-scan gate + use-cases dropdown
 
 Secret gate before public flip: pattern scan of tree and `git log -S` for provider key shapes (Anthropic/OpenAI/AWS/GitHub/Slack/Google/private-key PEMs, password/key assignments) found no live secrets — only `cli/lib/scan.mjs`'s own detection patterns and a test DSN. A prior full-history scan report already exists (`440ed7a`). Remaining gates before public flip: rotate the `.env.local` Magic UI registry token if it was ever committed, and confirm `API_KEY_SECRET`/`ADMIN_API_KEY`/`STRIPE_WEBHOOK_SECRET` are set in production, not defaults. Also shipped: the "Use cases" nav item opens a dropdown of all eight cases deep-linking to section anchors (`src/use-cases/links.mjs` shared between nav and page), and the CTA marks were redrawn to read as Cursor, Claude, ChatGPT, and Devin. No new migration. `CLAIMS_CHECK` is unchanged.

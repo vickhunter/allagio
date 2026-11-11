@@ -2,8 +2,11 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -253,4 +256,324 @@ func TestORPReputation(t *testing.T) {
 	if !strings.HasPrefix(body["from"].(string), "orp:") || body["to"] != maker || body["re"] != "m_trust_rep01" {
 		t.Fatalf("envelope %s", rec.Body.String())
 	}
+}
+
+func orpProblem(body map[string]any) (code, message string) {
+	inner, _ := body["body"].(map[string]any)
+	code, _ = inner["code"].(string)
+	message, _ = inner["message"].(string)
+	return code, message
+}
+
+func obligationState(t *testing.T, db *database.DB, dealID, obligationID string) string {
+	t.Helper()
+	var state string
+	err := db.Pool.QueryRow(context.Background(), `
+SELECT elem->>'state'
+FROM orp_deals, jsonb_array_elements(obligations) elem
+WHERE orp_deals.id=$1 AND elem->>'id'=$2`, dealID, obligationID).Scan(&state)
+	if err != nil {
+		t.Fatalf("obligation %s: %v", obligationID, err)
+	}
+	return state
+}
+
+func openDispute(t *testing.T, r *gin.Engine, token, party, dealID, id string) {
+	t.Helper()
+	open := orpEnvelope("dispute", id, party, map[string]any{
+		"action": "open", "obligation": "place", "claim": "not_done",
+		"statement": "zq placement never appeared",
+	})
+	open["deal"] = dealID
+	rec, body := postJSON(t, r, http.MethodPost, "/orp", open, bearerHeader(token))
+	if rec.Code != http.StatusOK || body["body"].(map[string]any)["state"] != "disputed" {
+		t.Fatalf("open %s %d %s", id, rec.Code, rec.Body.String())
+	}
+}
+
+func withdrawDispute(r http.Handler, token, party, dealID, id string) (int, map[string]any) {
+	msg := orpEnvelope("dispute", id, party, map[string]any{"action": "withdraw", "dispute": "d1"})
+	msg["deal"] = dealID
+	raw, _ := json.Marshal(msg)
+	req := httptest.NewRequest(http.MethodPost, "/orp", strings.NewReader(string(raw)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	var body map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	return rec.Code, body
+}
+
+// TestORPDisputeWithdrawOpenerOnly pins SPEC §15.2: only the opener may withdraw.
+// A respondent, a non-party, a spoofed from, and a history that does not name
+// one opener are refused. The deal stays disputed.
+func TestORPDisputeWithdrawOpenerOnly(t *testing.T) {
+	entry, r := trustHost(t)
+	makerToken, maker := joinParty(t, r)
+	pubToken, publisher := joinParty(t, r)
+	thirdToken, third := joinParty(t, r)
+	setPlacementPublish(t, entry.DB, ownerOfParty(maker), "auto")
+
+	dealID, termsHash := directedDeal(t, r, makerToken, maker, publisher)
+	activateDeal(t, entry.DB, r, pubToken, publisher, dealID, termsHash)
+
+	earlyCode, earlyBody := withdrawDispute(r, pubToken, publisher, dealID, "m_trust_wd_early")
+	if earlyCode != http.StatusConflict || orpCode(earlyBody) != "state_conflict" {
+		t.Fatalf("withdraw before open %d %v", earlyCode, earlyBody)
+	}
+	if dealState(t, entry.DB, dealID) != "active" {
+		t.Fatal("early withdraw changed the deal")
+	}
+
+	openDispute(t, r, makerToken, maker, dealID, "m_trust_wd_open")
+
+	strangerCode, _ := withdrawDispute(r, thirdToken, third, dealID, "m_trust_wd_stranger")
+	if strangerCode != http.StatusNotFound {
+		t.Fatalf("non-party withdraw %d", strangerCode)
+	}
+	spoofCode, spoofBody := withdrawDispute(r, thirdToken, publisher, dealID, "m_trust_wd_spoof")
+	if spoofCode != http.StatusForbidden || orpCode(spoofBody) != "forbidden" {
+		t.Fatalf("spoofed withdraw %d %v", spoofCode, spoofBody)
+	}
+	respondentCode, respondentBody := withdrawDispute(r, pubToken, publisher, dealID, "m_trust_wd_respondent")
+	if respondentCode != http.StatusForbidden || orpCode(respondentBody) != "forbidden" {
+		t.Fatalf("respondent withdraw %d %v", respondentCode, respondentBody)
+	}
+	if dealState(t, entry.DB, dealID) != "disputed" {
+		t.Fatal("refused withdraw changed the deal")
+	}
+
+	openerCode, openerBody := withdrawDispute(r, makerToken, maker, dealID, "m_trust_wd_opener")
+	if openerCode != http.StatusOK || openerBody["body"].(map[string]any)["state"] != "active" {
+		t.Fatalf("opener withdraw %d %v", openerCode, openerBody)
+	}
+	if dealState(t, entry.DB, dealID) != "active" {
+		t.Fatal("opener withdraw did not restore active")
+	}
+
+	// Older rows keep the opener only in the stored dispute message.
+	// Two open messages, or none, do not name one opener: fail closed.
+	ambiguous, ambiguousHash := directedDealID(t, r, makerToken, maker, publisher, "ambig")
+	activateDealID(t, r, pubToken, publisher, ambiguous, ambiguousHash, "ambigacc")
+	openDispute(t, r, makerToken, maker, ambiguous, "m_trust_ambig_open")
+	plantDisputeOpen(t, entry.DB, ambiguous, publisher, "m_trust_ambig_other")
+	ambigCode, _ := withdrawDispute(r, makerToken, maker, ambiguous, "m_trust_ambig_wd")
+	otherCode, _ := withdrawDispute(r, pubToken, publisher, ambiguous, "m_trust_ambig_wd2")
+	if ambigCode != http.StatusForbidden || otherCode != http.StatusForbidden {
+		t.Fatalf("ambiguous withdraw maker %d publisher %d", ambigCode, otherCode)
+	}
+	if dealState(t, entry.DB, ambiguous) != "disputed" {
+		t.Fatal("ambiguous withdraw changed the deal")
+	}
+
+	missing, missingHash := directedDealID(t, r, makerToken, maker, publisher, "miss")
+	activateDealID(t, r, pubToken, publisher, missing, missingHash, "missacc")
+	openDispute(t, r, makerToken, maker, missing, "m_trust_miss_open")
+	if _, err := entry.DB.Pool.Exec(context.Background(), `
+DELETE FROM orp_inbox
+WHERE COALESCE(message->>'deal', message->>'Deal')=$1
+  AND COALESCE(message->>'type', message->>'Type')='dispute'`, missing); err != nil {
+		t.Fatal(err)
+	}
+	missCode, _ := withdrawDispute(r, makerToken, maker, missing, "m_trust_miss_wd")
+	if missCode != http.StatusForbidden {
+		t.Fatalf("missing opener history %d", missCode)
+	}
+	if dealState(t, entry.DB, missing) != "disputed" {
+		t.Fatal("unresolved opener withdrew the dispute")
+	}
+}
+
+func orpCode(body map[string]any) string {
+	code, _ := orpProblem(body)
+	return code
+}
+
+// plantDisputeOpen inserts a second stored open, the shape older inbox rows use.
+func plantDisputeOpen(t *testing.T, db *database.DB, dealID, from, id string) {
+	t.Helper()
+	var raw []byte
+	var owner string
+	err := db.Pool.QueryRow(context.Background(), `
+SELECT message, owner_id::text
+FROM orp_inbox
+WHERE COALESCE(message->>'deal', message->>'Deal')=$1
+  AND COALESCE(message->>'type', message->>'Type')='dispute'
+ORDER BY id
+LIMIT 1`, dealID).Scan(&raw, &owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var obj map[string]any
+	if err = json.Unmarshal(raw, &obj); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := obj["From"]; ok {
+		obj["From"] = from
+		obj["ID"] = id
+	} else {
+		obj["from"] = from
+		obj["id"] = id
+	}
+	encoded, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Pool.Exec(context.Background(), `INSERT INTO orp_inbox(owner_id, message) VALUES($1,$2)`, owner, encoded); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestORPObligationRevokeObligor pins SPEC §15.1. Only the obligor may revoke
+// an obligation, only while the deal is active, and only while that obligation
+// is still pending or claimed. Verified work stays verified. A write that loses
+// the race does not apply.
+func TestORPObligationRevokeObligor(t *testing.T) {
+	entry, r := trustHost(t)
+	makerToken, maker := joinParty(t, r)
+	pubToken, publisher := joinParty(t, r)
+	thirdToken, third := joinParty(t, r)
+	setPlacementPublish(t, entry.DB, ownerOfParty(maker), "auto")
+
+	dealID, termsHash := directedDeal(t, r, makerToken, maker, publisher)
+	activateDeal(t, entry.DB, r, pubToken, publisher, dealID, termsHash)
+
+	wrong := orpEnvelope("revoke", "m_trust_ob_wrong", maker, map[string]any{"scope": "obligation", "obligation": "place", "reason": "owner_request"})
+	wrong["deal"] = dealID
+	wrongRec, wrongBody := postJSON(t, r, http.MethodPost, "/orp", wrong, bearerHeader(makerToken))
+	if wrongRec.Code != http.StatusForbidden || orpCode(wrongBody) != "forbidden" {
+		t.Fatalf("wrong obligor %d %s", wrongRec.Code, wrongRec.Body.String())
+	}
+	if obligationState(t, entry.DB, dealID, "place") != "pending" {
+		t.Fatal("wrong obligor revoked the obligation")
+	}
+
+	stranger := orpEnvelope("revoke", "m_trust_ob_stranger", third, map[string]any{"scope": "obligation", "obligation": "place", "reason": "other"})
+	stranger["deal"] = dealID
+	strangerRec, _ := postJSON(t, r, http.MethodPost, "/orp", stranger, bearerHeader(thirdToken))
+	if strangerRec.Code != http.StatusNotFound {
+		t.Fatalf("non-party revoke %d %s", strangerRec.Code, strangerRec.Body.String())
+	}
+	spoof := orpEnvelope("revoke", "m_trust_ob_spoof", publisher, map[string]any{"scope": "obligation", "obligation": "place", "reason": "other"})
+	spoof["deal"] = dealID
+	spoofRec, spoofBody := postJSON(t, r, http.MethodPost, "/orp", spoof, bearerHeader(thirdToken))
+	if spoofRec.Code != http.StatusForbidden || orpCode(spoofBody) != "forbidden" {
+		t.Fatalf("spoofed revoke %d %s", spoofRec.Code, spoofRec.Body.String())
+	}
+	if obligationState(t, entry.DB, dealID, "place") != "pending" || dealState(t, entry.DB, dealID) != "active" {
+		t.Fatal("refused revoke changed the deal")
+	}
+
+	declinedID, _ := directedDealID(t, r, makerToken, maker, publisher, "decl")
+	decline := orpEnvelope("decline", "m_trust_ob_dec", publisher, map[string]any{"reason": "not_relevant"})
+	decline["deal"] = declinedID
+	declineRec, _ := postJSON(t, r, http.MethodPost, "/orp", decline, bearerHeader(pubToken))
+	if declineRec.Code != http.StatusOK {
+		t.Fatalf("decline %d %s", declineRec.Code, declineRec.Body.String())
+	}
+	declRevoke := orpEnvelope("revoke", "m_trust_ob_decl", publisher, map[string]any{"scope": "obligation", "obligation": "place", "reason": "other"})
+	declRevoke["deal"] = declinedID
+	declRec, declBody := postJSON(t, r, http.MethodPost, "/orp", declRevoke, bearerHeader(pubToken))
+	if declRec.Code != http.StatusConflict || orpCode(declBody) != "state_conflict" {
+		t.Fatalf("declined revoke %d %s", declRec.Code, declRec.Body.String())
+	}
+	if dealState(t, entry.DB, declinedID) != "declined" || obligationState(t, entry.DB, declinedID, "place") != "pending" {
+		t.Fatal("declined deal obligation changed")
+	}
+
+	verifiedID, verifiedHash := directedDealID(t, r, makerToken, maker, publisher, "ver")
+	activateDealID(t, r, pubToken, publisher, verifiedID, verifiedHash, "veracc")
+	if _, err := entry.DB.Pool.Exec(context.Background(), `
+UPDATE orp_deals
+SET obligations = jsonb_set(obligations, '{0,state}', '"verified"')
+WHERE id=$1`, verifiedID); err != nil {
+		t.Fatal(err)
+	}
+	verRevoke := orpEnvelope("revoke", "m_trust_ob_ver", publisher, map[string]any{"scope": "obligation", "obligation": "place", "reason": "breach"})
+	verRevoke["deal"] = verifiedID
+	verRec, verBody := postJSON(t, r, http.MethodPost, "/orp", verRevoke, bearerHeader(pubToken))
+	if verRec.Code != http.StatusConflict || orpCode(verBody) != "state_conflict" {
+		t.Fatalf("verified revoke %d %s", verRec.Code, verRec.Body.String())
+	}
+	if obligationState(t, entry.DB, verifiedID, "place") != "verified" {
+		t.Fatal("verified obligation was revoked")
+	}
+
+	claimedID, claimedHash := directedDealID(t, r, makerToken, maker, publisher, "claim")
+	activateDealID(t, r, pubToken, publisher, claimedID, claimedHash, "claimacc")
+	exec := orpEnvelope("execute", "m_trust_ob_exec", publisher, map[string]any{"obligation": "place"})
+	exec["deal"] = claimedID
+	execRec, _ := postJSON(t, r, http.MethodPost, "/orp", exec, bearerHeader(pubToken))
+	if execRec.Code != http.StatusOK || obligationState(t, entry.DB, claimedID, "place") != "claimed" {
+		t.Fatalf("claim %d %s", execRec.Code, execRec.Body.String())
+	}
+	claimRevoke := orpEnvelope("revoke", "m_trust_ob_claim", publisher, map[string]any{"scope": "obligation", "obligation": "place", "reason": "brand_safety"})
+	claimRevoke["deal"] = claimedID
+	claimRec, _ := postJSON(t, r, http.MethodPost, "/orp", claimRevoke, bearerHeader(pubToken))
+	if claimRec.Code != http.StatusOK || obligationState(t, entry.DB, claimedID, "place") != "revoked" {
+		t.Fatalf("claimed revoke %d %s state %s", claimRec.Code, claimRec.Body.String(), obligationState(t, entry.DB, claimedID, "place"))
+	}
+	if dealState(t, entry.DB, claimedID) != "active" {
+		t.Fatal("obligation revoke changed the deal state")
+	}
+
+	raceID, raceHash := directedDealID(t, r, makerToken, maker, publisher, "race")
+	activateDealID(t, r, pubToken, publisher, raceID, raceHash, "raceacc")
+	entry.DB.ORPBeforeEffect = func(ctx context.Context) error {
+		_, err := entry.DB.Pool.Exec(ctx, `
+UPDATE orp_deals
+SET obligations = jsonb_set(obligations, '{0,state}', '"verified"')
+WHERE id=$1`, raceID)
+		return err
+	}
+	raceRevoke := orpEnvelope("revoke", "m_trust_ob_race", publisher, map[string]any{"scope": "obligation", "obligation": "place", "reason": "other"})
+	raceRevoke["deal"] = raceID
+	raceRec, _ := postJSON(t, r, http.MethodPost, "/orp", raceRevoke, bearerHeader(pubToken))
+	entry.DB.ORPBeforeEffect = nil
+	if raceRec.Code != http.StatusConflict {
+		t.Fatalf("stale revoke %d %s", raceRec.Code, raceRec.Body.String())
+	}
+	if obligationState(t, entry.DB, raceID, "place") != "verified" {
+		t.Fatal("stale revoke overwrote a verified obligation")
+	}
+
+	concID, concHash := directedDealID(t, r, makerToken, maker, publisher, "conc")
+	activateDealID(t, r, pubToken, publisher, concID, concHash, "concacc")
+	var wg sync.WaitGroup
+	codes := make([]int, 2)
+	wg.Add(2)
+	for i := 0; i < 2; i++ {
+		go func(i int) {
+			defer wg.Done()
+			codes[i], _ = postRevoke(r, pubToken, publisher, concID, "m_trust_ob_conc_"+string(rune('a'+i)))
+		}(i)
+	}
+	wg.Wait()
+	ok, conflict := 0, 0
+	for _, code := range codes {
+		switch code {
+		case http.StatusOK:
+			ok++
+		case http.StatusConflict:
+			conflict++
+		}
+	}
+	if ok != 1 || conflict != 1 || obligationState(t, entry.DB, concID, "place") != "revoked" {
+		t.Fatalf("concurrent revoke codes %v state %s", codes, obligationState(t, entry.DB, concID, "place"))
+	}
+}
+
+func postRevoke(r http.Handler, token, party, dealID, id string) (int, map[string]any) {
+	msg := orpEnvelope("revoke", id, party, map[string]any{"scope": "obligation", "obligation": "place", "reason": "owner_request"})
+	msg["deal"] = dealID
+	raw, _ := json.Marshal(msg)
+	req := httptest.NewRequest(http.MethodPost, "/orp", strings.NewReader(string(raw)))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	var body map[string]any
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	return rec.Code, body
 }
