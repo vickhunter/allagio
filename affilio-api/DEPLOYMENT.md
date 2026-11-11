@@ -143,6 +143,18 @@ If rollback requires DB rollback:
 - Prefer forward-fix migration over destructive schema rollback.
 - Snapshot database before any manual rollback actions.
 
+## Owner Sign-In (Pocket ID OIDC)
+
+`/owner/*` authenticates through an external OIDC provider. We use **Pocket ID** — open source, single binary + SQLite, ~$1-2/mo on Railway, passkey-first.
+
+Setup:
+1. Railway project → New Service → deploy `ghcr.io/pocket-id/pocket-id` (or the Pocket ID Railway template). Attach a volume for `/app/data`, set `APP_URL=https://id.allagio.<tld>` (or a Railway domain), generate a domain.
+2. In Pocket ID admin → OIDC Clients → create client "Allagio", callback `https://affilio-production.up.railway.app/auth/callback`.
+3. Set on the API service: `OIDC_ISSUER=https://<pocket-id-domain>`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` from that client.
+4. Redeploy; `GET /health` stays `ok` and `/owner` hands off to Pocket ID.
+
+Every verified OIDC identity becomes its own owner workspace — no allowlist is enforced; keep the Pocket ID user directory to the people who should have workspaces.
+
 ## Operational Notes
 - `go.sum` generation may require network in local environments.
 - In restricted environments, set:

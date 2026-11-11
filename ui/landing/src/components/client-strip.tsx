@@ -14,7 +14,7 @@ export function ClientStrip() {
             key={mark.name}
             className="inline-flex items-center gap-2 rounded-full border border-line bg-s1 px-4 py-2 text-[13px] font-semibold text-t1"
           >
-            <svg viewBox="0 0 16 16" width={14} height={14} role="img" aria-label={mark.name} className="shrink-0 opacity-80">
+            <svg viewBox="0 0 24 24" width={14} height={14} role="img" aria-label={mark.name} className="shrink-0 opacity-80">
               <path d={mark.d} fill="currentColor" />
             </svg>
             {mark.name}
