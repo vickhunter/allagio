@@ -1,6 +1,7 @@
 import { Page } from '@/site/Page'
 import { example } from '@/content'
 import { Vision } from './Vision'
+import { ClientStrip } from '@/components/client-strip'
 import { PostPreview } from '@/components/PostPreview'
 import { Hero } from '@/components/hero-2'
 import { FeatureSection } from '@/components/feature-3'
@@ -26,6 +27,7 @@ export function App() {
   return (
     <Page page="home">
       <Hero source={source} />
+      <ClientStrip />
 
       <div className="border-t border-line">
         <FeatureSection source={source} />
