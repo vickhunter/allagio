@@ -1,0 +1,41 @@
+ui/landing/scripts/stamp-hosted.mjs
+  s_7e484d91fceb6c::t_9c6eaa6df80ac0 165-166,169
+STATUS.md
+  s_7e484d91fceb6c::t_161ba65a8207a2 1-4
+affilio-wp/admin/build/home.html
+  s_7e484d91fceb6c::t_f6f39576da4989 24
+affilio-wp/admin/build/landing-v9/not-found/index.html
+  s_7e484d91fceb6c::t_ea820dc50c9f33 14
+affilio-wp/admin/build/landing-v9/profile/index.html
+  s_7e484d91fceb6c::t_5950a5a0880574 18
+affilio-wp/admin/build/landing-v9/reference/index.html
+  s_7e484d91fceb6c::t_cbf9039fc596d6 16
+affilio-wp/admin/build/makers.html
+  s_7e484d91fceb6c::t_681946dac746bb 24
+affilio-wp/admin/build/protocol.html
+  s_7e484d91fceb6c::t_edd86e418af26a 16
+affilio-wp/admin/build/publishers-setup.html
+  s_7e484d91fceb6c::t_af5f63040f79e1 18
+affilio-wp/admin/build/publishers.html
+  s_7e484d91fceb6c::t_d6932426983e65 22
+affilio-wp/admin/build/use-cases.html
+  s_7e484d91fceb6c::t_eefe727dfba7b8 17
+affilio-wp/admin/build/you.html
+  s_7e484d91fceb6c::t_7c1b321fdd26b4 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "79de2e9adbf05f72ae776926ed4bded386d6bf4e",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
