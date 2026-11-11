@@ -242,6 +242,56 @@ func (h *HostedHandler) ListSpaceForm(c *gin.Context) {
 	c.Redirect(http.StatusSeeOther, "/owner/settings")
 }
 
+func (h *HostedHandler) offersSection(c *gin.Context, o *database.Owner) (template.HTML, error) {
+	offers, err := h.DB.ListORPOffersByOwner(c.Request.Context(), o.ID)
+	if err != nil {
+		return "", err
+	}
+	if len(offers) == 0 {
+		return "", nil
+	}
+	var b strings.Builder
+	b.WriteString(`<section id="standing-offers"><h2>Your standing offers</h2><p>Offers your agent opened for discovery. A waiting offer lists when you approve it.</p>`)
+	for _, offer := range offers {
+		var terms map[string]any
+		_ = json.Unmarshal(offer.Terms, &terms)
+		title, _ := terms["title"].(string)
+		b.WriteString(`<div class="deal"><h3>`)
+		b.WriteString(template.HTMLEscapeString(title))
+		b.WriteString(` <code>`)
+		b.WriteString(template.HTMLEscapeString(offer.ID))
+		b.WriteString(`</code></h3><p>`)
+		if offer.Listed {
+			b.WriteString(`listed`)
+		} else {
+			b.WriteString(`waiting for your approval</p><form method="post" action="/owner/offers/`)
+			b.WriteString(template.HTMLEscapeString(offer.ID))
+			b.WriteString(`/list"><input type="hidden" name="csrf" value="`)
+			b.WriteString(template.HTMLEscapeString(o.CSRF))
+			b.WriteString(`"><button>List it</button></form><p>`)
+		}
+		b.WriteString(`</p></div>`)
+	}
+	b.WriteString(`</section>`)
+	return template.HTML(b.String()), nil
+}
+
+// ListOfferForm is the owner's approval of a waiting standing offer: the
+// list step was ask, and this click lists it.
+func (h *HostedHandler) ListOfferForm(c *gin.Context) {
+	o := ownerFrom(c)
+	listed, err := h.DB.ListORPOfferOwner(c.Request.Context(), o.ID, c.Param("id"))
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	if !listed {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	c.Redirect(http.StatusSeeOther, "/owner/settings")
+}
+
 func (h *HostedHandler) spacesSection(c *gin.Context, o *database.Owner) (template.HTML, error) {
 	spaces, err := h.DB.ListORPSpacesByOwner(c.Request.Context(), o.ID)
 	if err != nil {

@@ -1165,3 +1165,31 @@ func (d *DB) OwnerSiteDomain(ctx context.Context, ownerID string) (string, error
 	err := d.Pool.QueryRow(ctx, `SELECT s.domain FROM sites s JOIN owners o ON o.site_id=s.id WHERE o.id=$1::uuid`, ownerID).Scan(&domain)
 	return domain, err
 }
+
+// ListORPOffersByOwner returns one owner's standing offers for the dashboard,
+// listed and waiting alike.
+func (d *DB) ListORPOffersByOwner(ctx context.Context, ownerID string) ([]ORPOffer, error) {
+	rows, err := d.Pool.Query(ctx, `
+SELECT id, owner_id::text, party, terms, terms_hash, deal_limit, created_at, listed
+FROM orp_offers WHERE owner_id=$1::uuid ORDER BY created_at DESC`, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ORPOffer
+	for rows.Next() {
+		var offer ORPOffer
+		if err = rows.Scan(&offer.ID, &offer.OwnerID, &offer.Party, &offer.Terms, &offer.TermsHash, &offer.Limit, &offer.CreatedAt, &offer.Listed); err != nil {
+			return nil, err
+		}
+		out = append(out, offer)
+	}
+	return out, rows.Err()
+}
+
+// ListORPOfferOwner marks one standing offer listed after the owner's
+// ask-step approval.
+func (d *DB) ListORPOfferOwner(ctx context.Context, ownerID, id string) (bool, error) {
+	tag, err := d.Pool.Exec(ctx, `UPDATE orp_offers SET listed=true WHERE owner_id=$1::uuid AND id=$2`, ownerID, id)
+	return tag.RowsAffected() == 1, err
+}

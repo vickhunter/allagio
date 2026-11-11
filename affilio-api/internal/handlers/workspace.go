@@ -46,6 +46,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	owner.POST("/step-modes", h.SaveStepModesForm)
 	owner.POST("/notify", h.SaveNotifyForm)
 	owner.POST("/spaces/:id/list", h.ListSpaceForm)
+	owner.POST("/offers/:id/list", h.ListOfferForm)
 	api := owner.Group("/api")
 	api.GET("/deals", h.OwnerDeals)
 	api.GET("/deals/:id", h.OwnerDeal)

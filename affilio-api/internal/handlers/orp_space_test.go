@@ -131,3 +131,44 @@ func TestORPSpaceWithdraw(t *testing.T) {
 		t.Fatalf("withdrawn space discoverable %v", items)
 	}
 }
+
+// A standing offer under list:ask waits unlisted; the owner's list step
+// (the same approval the /owner/offers form posts) flips it discoverable.
+func TestORPOfferOwnerListApproval(t *testing.T) {
+	entry, r := trustHost(t)
+	makerToken, maker := joinParty(t, r)
+	pubToken, publisher := joinParty(t, r)
+
+	rec, body := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("offer", "m_oa_001", maker, standingOffer()), bearerHeader(makerToken))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("offer %d %s", rec.Code, rec.Body.String())
+	}
+	inner, _ := body["body"].(map[string]any)
+	waiting, _ := inner["waiting"].(map[string]any)
+	offerID, _ := inner["id"].(string)
+	if waiting["step"] != "list" || offerID == "" {
+		t.Fatalf("offer reply %s", rec.Body.String())
+	}
+
+	miss, missBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "m_oa_002", publisher, map[string]any{
+		"want": "offers", "query": "zqtestmention", "limit": 5,
+	}), bearerHeader(pubToken))
+	if miss.Code != http.StatusOK || missBody["body"].(map[string]any)["empty_reason"] != "no_match" {
+		t.Fatalf("waiting offer discoverable %s", miss.Body.String())
+	}
+
+	listed, err := entry.DB.ListORPOfferOwner(context.Background(), ownerOfParty(maker), offerID)
+	if err != nil || !listed {
+		t.Fatalf("owner list %v %v", listed, err)
+	}
+	found, foundBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("discover", "m_oa_003", publisher, map[string]any{
+		"want": "offers", "query": "zqtestmention", "limit": 5,
+	}), bearerHeader(pubToken))
+	if found.Code != http.StatusOK {
+		t.Fatalf("discover %d %s", found.Code, found.Body.String())
+	}
+	items, _ := foundBody["body"].(map[string]any)["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items %s", found.Body.String())
+	}
+}
