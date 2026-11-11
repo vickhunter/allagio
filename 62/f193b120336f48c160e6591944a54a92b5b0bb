@@ -1,0 +1,59 @@
+STATUS.md
+  s_7e484d91fceb6c::t_f2330fd639e610 1-4
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_fd20757f7d1647 67
+affilio-api/internal/migrations/058_a2a_tasks.sql
+  s_7e484d91fceb6c::t_c3baea020b7e08 1-12
+affilio-api/internal/handlers/a2a.go
+  s_7e484d91fceb6c::t_96d1d57e0733d9 1-224
+affilio-api/internal/handlers/orp_host_test.go
+  s_7e484d91fceb6c::t_7aa43fb1e65342 278
+affilio-api/cmd/server/main.go
+  s_7e484d91fceb6c::t_900ceca4b0df3c 321
+affilio-api/internal/handlers/a2a_test.go
+  s_7e484d91fceb6c::t_6e1ebaa79b6335 9
+  s_7e484d91fceb6c::t_38758266ff3cb7 5
+  s_7e484d91fceb6c::t_7d04ca597a52fa 1-4,6-8,10-15,36-41,44,47-52,54-58,60-68,71,74-84,87,90-102,105-106,109-112,114-118,120-124,126-128
+  s_7e484d91fceb6c::t_6bee1dad172832 16-35,42-43,53,69-70,85-86,103-104
+  s_7e484d91fceb6c::t_c86134abe5783b 45-46
+  s_7e484d91fceb6c::t_43675c0480db4b 59
+  s_7e484d91fceb6c::t_c7d5a33da2611a 72-73
+  s_7e484d91fceb6c::t_4730a9302bf72f 88-89
+  s_7e484d91fceb6c::t_7967749bcdd43c 107-108
+  s_7e484d91fceb6c::t_9df41cdf5707e3 113
+  s_7e484d91fceb6c::t_3ccf4cdae24224 119
+  s_7e484d91fceb6c::t_4d2af3324ac710 125
+affilio-api/internal/handlers/allagio_discovery.go
+  s_7e484d91fceb6c::t_da09a07fdd1b9b 64-65
+  s_7e484d91fceb6c::t_4c9e62dc56cccc 104
+affilio-api/internal/handlers/handlers_test.go
+  s_7e484d91fceb6c::t_e3de9710f9a95c 273
+  s_7e484d91fceb6c::t_c7e3fef7b97f9c 134
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_21383830616495 1215
+  s_7e484d91fceb6c::t_e1d642059b5fd4 1196-1214,1216-1223
+affilio-wp/admin/build/landing-v9/llms.txt
+  s_7e484d91fceb6c::t_2c3034caa7a66b 7
+affilio-wp/admin/build/landing-v9/skill.md
+  s_7e484d91fceb6c::t_c021e5bf60ab67 7
+docs/protocol/README.md
+  s_7e484d91fceb6c::t_e70e532ed87a52 25
+ui/landing/public/llms.txt
+  s_7e484d91fceb6c::t_8ec0607e7fbc5d 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "62f193b120336f48c160e6591944a54a92b5b0bb",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
