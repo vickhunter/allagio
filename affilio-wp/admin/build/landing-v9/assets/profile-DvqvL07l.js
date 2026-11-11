@@ -1,1 +1,0 @@
-import{b as e,y as t}from"./Page-xeuuvvIi.js";import{t as n}from"./Directory-BpBPD1qV.js";var r=e();t(`profile`,(0,r.jsx)(n,{}));

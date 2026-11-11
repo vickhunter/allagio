@@ -3,6 +3,8 @@ import { example } from '@/content'
 import { Vision } from './Vision'
 import { ClientStrip } from '@/components/client-strip'
 import { BentoCard, BentoGrid } from '@/components/ui/bento-grid'
+import { BorderBeam } from '@/components/ui/border-beam'
+import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, Receipt, Zap } from 'lucide-react'
 import { PostPreview } from '@/components/PostPreview'
 import { Hero } from '@/components/hero-2'
 import { FeatureSection } from '@/components/feature-3'
@@ -14,13 +16,17 @@ import { makerBenefit, publisherBenefit, railsAutonomy, railsHeading, railsIntro
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
 
-const stepIcons = Array.from({ length: 7 }, (_, i) => {
-  const StepIcon = ({ className }: { className?: string }) => (
-    <span className={className} aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-  )
-  StepIcon.displayName = `StepIcon${i + 1}`
-  return StepIcon
-})
+const stepIcons = [KeyRound, Handshake, Compass, FileSignature, CheckCircle2, Zap, Receipt]
+
+const cardWashes = [
+  'bg-[radial-gradient(120%_120%_at_0%_0%,rgba(26,110,66,0.10),transparent_60%)]',
+  'bg-[radial-gradient(120%_120%_at_100%_0%,rgba(160,110,20,0.10),transparent_60%)]',
+  'bg-[radial-gradient(120%_120%_at_0%_100%,rgba(60,80,140,0.09),transparent_60%)]',
+  'bg-[radial-gradient(120%_120%_at_100%_100%,rgba(26,110,66,0.08),transparent_60%)]',
+  'bg-[radial-gradient(120%_120%_at_0%_0%,rgba(160,110,20,0.09),transparent_60%)]',
+  'bg-[radial-gradient(120%_120%_at_100%_0%,rgba(60,80,140,0.10),transparent_60%)]',
+  'bg-[radial-gradient(120%_120%_at_100%_100%,rgba(26,110,66,0.10),transparent_60%)]',
+]
 
 function Rows({ items }: { items: string[] }) {
   return (
@@ -42,34 +48,47 @@ export function App() {
         <FeatureSection source={source} />
       </div>
 
-      <section id="rails" aria-labelledby="rails-h" className="split border-t border-line">
-        <div>
-          <p className="kicker">{railsKicker}</p>
-          <h2 id="rails-h">{railsHeading}</h2>
-          <p>{railsIntro}</p>
-          <p className="mt-4 text-[15px] leading-relaxed text-t2">{railsAutonomy}</p>
-          <p><a className={linkClass} href={withSource('/protocol/', source)}>The protocol</a></p>
+      <section id="rails" aria-labelledby="rails-h" className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
+          <div className="max-w-2xl">
+            <p className="kicker">{railsKicker}</p>
+            <h2 id="rails-h">{railsHeading}</h2>
+            <p>{railsIntro}</p>
+            <p className="mt-4 text-[15px] leading-relaxed text-t2">{railsAutonomy}</p>
+            <p><a className={linkClass} href={withSource('/protocol/', source)}>The protocol</a></p>
+          </div>
+          <figure className="mt-10">
+            <figcaption className="sr-only">The deal, end to end</figcaption>
+            <BentoGrid className="auto-rows-[13rem] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {railsSteps.map((step, i) => {
+                const [name, ...rest] = step.split(' — ')
+                return (
+                  <BentoCard
+                    key={name}
+                    name={name}
+                    description={rest.join(' — ')}
+                    Icon={stepIcons[i]}
+                    href={withSource('/reference', source)}
+                    cta="Reference"
+                    className={
+                      i === 0
+                        ? 'bg-s1 col-span-1 sm:col-span-2 lg:col-span-2'
+                        : i === railsSteps.length - 1
+                          ? 'bg-s1 col-span-1 sm:col-span-2 lg:col-span-2'
+                          : 'bg-s1 col-span-1'
+                    }
+                    background={
+                      <>
+                        <div className={`absolute inset-0 ${cardWashes[i]}`} />
+                        {i === 0 ? <BorderBeam size={140} duration={7} borderWidth={1.5} /> : null}
+                      </>
+                    }
+                  />
+                )
+              })}
+            </BentoGrid>
+          </figure>
         </div>
-        <figure className="piece min-w-0">
-          <figcaption>The deal, end to end</figcaption>
-          <BentoGrid className="mt-3 auto-rows-[11.5rem] grid-cols-1 sm:grid-cols-2">
-            {railsSteps.map((step, i) => {
-              const [name, ...rest] = step.split(' — ')
-              return (
-                <BentoCard
-                  key={name}
-                  name={name}
-                  description={rest.join(' — ')}
-                  Icon={stepIcons[i]}
-                  href={withSource('/reference', source)}
-                  cta="Reference"
-                  className={i === 0 ? 'bg-s1 col-span-1 sm:col-span-2' : 'bg-s1 col-span-1'}
-                  background={<div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-t2/30 to-transparent" />}
-                />
-              )
-            })}
-          </BentoGrid>
-        </figure>
       </section>
 
       <section id="makers" aria-labelledby="makers-h" className="split border-t border-line">
