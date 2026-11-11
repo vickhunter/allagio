@@ -76,7 +76,7 @@ func ServeAllagioDiscovery(publicBase string) gin.HandlerFunc {
 			},
 			"auth": auth,
 			"capabilities": gin.H{
-				"orp_messages":  []string{"hello", "discover", "suggest", "offer", "accept", "decline", "deal", "leave", "execute", "receipt", "revoke", "dispute", "reputation", "activate"},
+				"orp_messages":  []string{"hello", "discover", "suggest", "space", "request", "offer", "counter", "accept", "decline", "deal", "leave", "execute", "receipt", "revoke", "dispute", "reputation", "activate"},
 				"mcp_deal_tools": orpTools,
 				"mcp_resources":  []string{"orp://inbox", "orp://deals/{deal_id}"},
 				"roles":          []string{"offerer", "acceptor", "curator", "facilitator", "service", "signer", "member", "consumer"},

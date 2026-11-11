@@ -227,6 +227,10 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 		h.finish(c, msg, hash, http.StatusOK, orp.HelloReplyFor(msg.ORP, dns, msg.From, msg.ID, party, h.claimsMode(), h.now()), database.ORPEffect{})
 	case msg.Type == "discover":
 		h.discover(c, dns, msg, hash)
+	case msg.Type == "space":
+		h.space(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "request":
+		h.request(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "offer":
 		h.offer(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "accept":
@@ -259,7 +263,7 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 func (h *ORPHost) discover(c *gin.Context, dns string, msg orp.Message, hash string) {
 	want, _ := msg.Body["want"].(string)
 	if want == "spaces" {
-		h.finish(c, msg, hash, http.StatusOK, orp.ResultsReply(dns, msg.From, msg.ID, []any{}, "no_match", h.now()), database.ORPEffect{})
+		h.discoverSpaces(c, dns, msg, hash)
 		return
 	}
 	rows, err := h.candidates(c)

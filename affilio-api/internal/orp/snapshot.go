@@ -115,3 +115,8 @@ func DealView(body map[string]any, viewer string) map[string]any {
 	}
 	return out
 }
+
+// SpaceReply answers a space put or withdraw with the listed form.
+func SpaceReply(dns, to, re string, body map[string]any, now time.Time) map[string]any {
+	return envelope(dns, to, re, "", "space", body, now)
+}

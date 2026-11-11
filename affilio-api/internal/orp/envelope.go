@@ -230,6 +230,9 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 			return Message{}, Invalid(label, "/deal"), false
 		}
 	}
+	if typ == "request" && msg.To == "" {
+		return Message{}, Invalid(label, "/to"), false
+	}
 	if typ == "accept" && msg.Deal == "" {
 		offer, _ := body["offer"].(string)
 		if offer == "" {
@@ -274,9 +277,167 @@ func checkHandledBody(version, typ string, body map[string]any) (Problem, bool) 
 		return checkLeaveBody(body)
 	case "seat":
 		return checkSeatBody(body)
+	case "space":
+		problem, bad := checkSpaceBody(body)
+		return relabelVersion(version, problem, bad)
+	case "request":
+		problem, bad := checkRequestBody(body)
+		return relabelVersion(version, problem, bad)
 	default:
 		return Problem{}, false
 	}
+}
+
+var spaceIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+func spaceStr(obj map[string]any, key string, max int, required bool) (Problem, bool) {
+	value, present := obj[key]
+	if !present || value == nil {
+		if required {
+			return Invalid("The message is not valid ORP 0.3.", "/body/space/"+key), true
+		}
+		return Problem{}, false
+	}
+	text, ok := value.(string)
+	if !ok || (required && text == "") || utf8.RuneCountInString(text) > max {
+		return Invalid("The message is not valid ORP 0.3.", "/body/space/"+key), true
+	}
+	return Problem{}, false
+}
+
+func spaceStringList(obj map[string]any, key string) (Problem, bool) {
+	value, present := obj[key]
+	if !present || value == nil {
+		return Problem{}, false
+	}
+	list, ok := value.([]any)
+	if !ok || len(list) > 20 {
+		return Invalid("The message is not valid ORP 0.3.", "/body/space/"+key), true
+	}
+	for _, item := range list {
+		text, ok := item.(string)
+		if !ok || text == "" || utf8.RuneCountInString(text) > 100 {
+			return Invalid("The message is not valid ORP 0.3.", "/body/space/"+key), true
+		}
+	}
+	return Problem{}, false
+}
+
+func checkSpaceBody(body map[string]any) (Problem, bool) {
+	for key := range body {
+		switch key {
+		case "action", "space", "id":
+		default:
+			return Invalid("The message is not valid ORP 0.3.", "/body/"+escapePointer(key)), true
+		}
+	}
+	action, _ := body["action"].(string)
+	if action != "put" && action != "withdraw" {
+		return Invalid("The message is not valid ORP 0.3.", "/body/action"), true
+	}
+	if action == "withdraw" {
+		id, _ := body["id"].(string)
+		if id == "" {
+			if sp, ok := body["space"].(map[string]any); ok {
+				id, _ = sp["id"].(string)
+			}
+		}
+		if !spaceIDPattern.MatchString(id) {
+			return Invalid("The message is not valid ORP 0.3.", "/body/id"), true
+		}
+		return Problem{}, false
+	}
+	sp, ok := body["space"].(map[string]any)
+	if !ok {
+		return Invalid("The message is not valid ORP 0.3.", "/body/space"), true
+	}
+	for key := range sp {
+		switch key {
+		case "id", "kind", "platform", "title", "locator", "topics", "languages",
+			"audience", "accepts", "disclosure", "rules":
+		default:
+			return Invalid("The message is not valid ORP 0.3.", "/body/space/"+escapePointer(key)), true
+		}
+	}
+	if _, present := sp["verified"]; present {
+		return Invalid("The message is not valid ORP 0.3.", "/body/space/verified"), true
+	}
+	id, _ := sp["id"].(string)
+	if !spaceIDPattern.MatchString(id) {
+		return Invalid("The message is not valid ORP 0.3.", "/body/space/id"), true
+	}
+	for _, key := range []string{"kind", "platform", "title"} {
+		if problem, bad := spaceStr(sp, key, 200, true); bad {
+			return problem, true
+		}
+	}
+	if problem, bad := spaceStr(sp, "locator", 2000, false); bad {
+		return problem, true
+	}
+	if locator, _ := sp["locator"].(string); locator != "" && !strings.HasPrefix(locator, "https://") {
+		return Invalid("The message is not valid ORP 0.3.", "/body/space/locator"), true
+	}
+	for _, key := range []string{"topics", "languages", "accepts"} {
+		if problem, bad := spaceStringList(sp, key); bad {
+			return problem, true
+		}
+	}
+	if disc, present := sp["disclosure"]; present {
+		obj, ok := disc.(map[string]any)
+		if !ok {
+			return Invalid("The message is not valid ORP 0.3.", "/body/space/disclosure"), true
+		}
+		for key := range obj {
+			if key != "label" && key != "lang" {
+				return Invalid("The message is not valid ORP 0.3.", "/body/space/disclosure/"+escapePointer(key)), true
+			}
+		}
+		if problem, bad := spaceStr(obj, "label", 100, false); bad {
+			return problem, true
+		}
+		if problem, bad := spaceStr(obj, "lang", 16, false); bad {
+			return problem, true
+		}
+	}
+	if rules, present := sp["rules"]; present {
+		if _, ok := rules.(map[string]any); !ok {
+			return Invalid("The message is not valid ORP 0.3.", "/body/space/rules"), true
+		}
+	}
+	if aud, present := sp["audience"]; present {
+		if _, ok := aud.(map[string]any); !ok {
+			return Invalid("The message is not valid ORP 0.3.", "/body/space/audience"), true
+		}
+	}
+	return Problem{}, false
+}
+
+func checkRequestBody(body map[string]any) (Problem, bool) {
+	for key := range body {
+		switch key {
+		case "space", "context", "kind", "terms":
+		default:
+			return Invalid("The message is not valid ORP 0.3.", "/body/"+escapePointer(key)), true
+		}
+	}
+	if space, present := body["space"]; present {
+		text, ok := space.(string)
+		if !ok || !spaceIDPattern.MatchString(text) {
+			return Invalid("The message is not valid ORP 0.3.", "/body/space"), true
+		}
+	}
+	if ctx, present := body["context"]; present {
+		if _, ok := ctx.(map[string]any); !ok {
+			return Invalid("The message is not valid ORP 0.3.", "/body/context"), true
+		}
+	}
+	if kind, present := body["kind"]; present {
+		text, ok := kind.(string)
+		if !ok || utf8.RuneCountInString(text) > 64 {
+			return Invalid("The message is not valid ORP 0.3.", "/body/kind"), true
+		}
+	}
+	return Problem{}, false
 }
 
 func checkHelloFor(version string, body map[string]any) (Problem, bool) {

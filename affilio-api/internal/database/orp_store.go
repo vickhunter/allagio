@@ -83,6 +83,23 @@ type ORPInboxItem struct {
 	Message json.RawMessage
 }
 
+// ORPSpace is one registered space a party offers for deal work.
+// Space holds the full object including locator; hosts strip locator
+// before showing the space to another party.
+type ORPSpace struct {
+	ID      string
+	OwnerID string
+	Party   string
+	Space   json.RawMessage
+	Listed  bool
+}
+
+// ORPSpaceRef names one space for a withdraw effect.
+type ORPSpaceRef struct {
+	OwnerID string
+	ID      string
+}
+
 // ORPEffect is the state written with one message. Empty fields write nothing.
 type ORPEffect struct {
 	Offer             *ORPOffer
@@ -103,7 +120,10 @@ type ORPEffect struct {
 	UpdateTerms     json.RawMessage
 	UpdateTermsHash string
 	UpdatedAt       time.Time
-	Inbox       []ORPInboxItem
+	Inbox           []ORPInboxItem
+	// Space upserts one space; SpaceWithdraw marks one withdrawn.
+	Space         *ORPSpace
+	SpaceWithdraw *ORPSpaceRef
 	// ManyUpdate rewrites one 0.4 deal. ManyExpectHash and ManyExpectAt must
 	// still match, or the transaction rolls back.
 	ManyUpdate     *ORPDeal
@@ -273,6 +293,23 @@ WHERE id=$1 AND state=ANY($4)`, effect.UpdateDealID, effect.UpdateState, effect.
 		}
 		if tag.RowsAffected() == 0 {
 			return ErrORPState
+		}
+	}
+	if effect.Space != nil {
+		sp := effect.Space
+		if _, err := tx.Exec(ctx, `
+INSERT INTO orp_spaces(id, owner_id, party, space, listed, withdrawn_at, updated_at)
+VALUES($1,$2::uuid,$3,$4,$5,NULL,$6)
+ON CONFLICT (owner_id, id) DO UPDATE
+SET space=$4, listed=$5, withdrawn_at=NULL, updated_at=$6`, sp.ID, sp.OwnerID, sp.Party, sp.Space, sp.Listed, effect.UpdatedAt); err != nil {
+			return err
+		}
+	}
+	if effect.SpaceWithdraw != nil {
+		if _, err := tx.Exec(ctx, `
+UPDATE orp_spaces SET withdrawn_at=$3, listed=false, updated_at=$3
+WHERE owner_id=$1::uuid AND id=$2 AND withdrawn_at IS NULL`, effect.SpaceWithdraw.OwnerID, effect.SpaceWithdraw.ID, effect.UpdatedAt); err != nil {
+			return err
 		}
 	}
 	for _, item := range effect.Inbox {
@@ -992,4 +1029,72 @@ LIMIT $3`, ownerID, after, limit)
 		next = id
 	}
 	return out, next, rows.Err()
+}
+
+// ListORPSpaces returns listed, not-withdrawn spaces, newest first.
+func (d *DB) ListORPSpaces(ctx context.Context, limit int) ([]ORPSpace, error) {
+	rows, err := d.Pool.Query(ctx, `
+SELECT id, owner_id::text, party, space, listed FROM orp_spaces
+WHERE listed AND withdrawn_at IS NULL ORDER BY updated_at DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ORPSpace
+	for rows.Next() {
+		var sp ORPSpace
+		if err = rows.Scan(&sp.ID, &sp.OwnerID, &sp.Party, &sp.Space, &sp.Listed); err != nil {
+			return nil, err
+		}
+		out = append(out, sp)
+	}
+	return out, rows.Err()
+}
+
+// GetORPSpace reads one space for its owner (any listing state).
+func (d *DB) GetORPSpace(ctx context.Context, ownerID, id string) (ORPSpace, error) {
+	var sp ORPSpace
+	var withdrawn *time.Time
+	err := d.Pool.QueryRow(ctx, `
+SELECT id, owner_id::text, party, space, listed, withdrawn_at FROM orp_spaces
+WHERE owner_id=$1::uuid AND id=$2`, ownerID, id).Scan(&sp.ID, &sp.OwnerID, &sp.Party, &sp.Space, &sp.Listed, &withdrawn)
+	if withdrawn != nil {
+		sp.Listed = false
+	}
+	return sp, err
+}
+
+// ListORPSpacesByOwner returns one owner's not-withdrawn spaces for the dashboard.
+func (d *DB) ListORPSpacesByOwner(ctx context.Context, ownerID string) ([]ORPSpace, error) {
+	rows, err := d.Pool.Query(ctx, `
+SELECT id, owner_id::text, party, space, listed FROM orp_spaces
+WHERE owner_id=$1::uuid AND withdrawn_at IS NULL ORDER BY updated_at DESC`, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ORPSpace
+	for rows.Next() {
+		var sp ORPSpace
+		if err = rows.Scan(&sp.ID, &sp.OwnerID, &sp.Party, &sp.Space, &sp.Listed); err != nil {
+			return nil, err
+		}
+		out = append(out, sp)
+	}
+	return out, rows.Err()
+}
+
+// ListORPSpaceOwner marks one space listed after the owner's ask-step approval.
+func (d *DB) ListORPSpaceOwner(ctx context.Context, ownerID, id string) (bool, error) {
+	tag, err := d.Pool.Exec(ctx, `
+UPDATE orp_spaces SET listed=true, updated_at=NOW()
+WHERE owner_id=$1::uuid AND id=$2 AND withdrawn_at IS NULL`, ownerID, id)
+	return tag.RowsAffected() == 1, err
+}
+
+// OwnerSiteDomain is the claimed site's bare domain for one owner.
+func (d *DB) OwnerSiteDomain(ctx context.Context, ownerID string) (string, error) {
+	var domain string
+	err := d.Pool.QueryRow(ctx, `SELECT s.domain FROM sites s JOIN owners o ON o.site_id=s.id WHERE o.id=$1::uuid`, ownerID).Scan(&domain)
+	return domain, err
 }
