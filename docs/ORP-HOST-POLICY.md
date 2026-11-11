@@ -16,6 +16,16 @@ A deal that is `disputed` and whose stored history is missing or ambiguous stays
 
 When the history names one opener, a different party is refused. That refusal is not used for a missing or ambiguous history.
 
+## What the sender sees
+
+A successful `open`, `respond`, or `withdraw` stores two kinds of inbox row for the sender when that sender has an owner id.
+
+`GET /orp/inbox` returns both, unchanged. One is the host deal snapshot: `type` is `deal`, `from` is the host, and `deal` is the deal id. The other is a copy of the dispute message the sender just sent. That copy is the stored Go value, so its names are `From`, `Type`, `Deal`, and `Body`, not the wire names `from`, `type`, `deal`, and `body`. `From` is the sender's own party id. `Body.action` is `open`, `respond`, or `withdraw`.
+
+The owner deal-event list reads `message->>'deal'`. It includes the host deal snapshot. It does not include the dispute copy, because that copy keeps the deal id under `Deal`.
+
+The host does not remove the sender's copy, and it does not merge it with the copy a counterparty receives. `check_deals` returns `GET /orp/inbox` as stored. No client in this repository skips a message because `From` is the caller, and none refuses to answer its own echo. A consumer that acts on every inbox row must compare `From` with its own party id and not treat that row as a new counterparty action.
+
 ## Before the next deploy
 
 Before this build is deployed, count the hosted deals that are `disputed` and whose opener history is missing or ambiguous. The count is read-only: `SELECT` only. No `UPDATE`, no `DELETE`, no snapshot restore, and no repair.
