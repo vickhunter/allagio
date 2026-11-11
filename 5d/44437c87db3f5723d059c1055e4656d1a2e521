@@ -1,0 +1,38 @@
+affilio-api/internal/handlers/workspace.go
+  s_7e484d91fceb6c::t_93a0ffe178ef8d 49
+affilio-api/internal/handlers/orp_space.go
+  s_7e484d91fceb6c::t_9cd3675be295be 245-294
+affilio-api/internal/handlers/hosted_auth.go
+  s_7e484d91fceb6c::t_3b2b0df9623be3 1193
+  s_7e484d91fceb6c::t_0d63367773dbde 1225-1230
+  s_7e484d91fceb6c::t_63c45bb7335ebc 1188-1192
+STATUS.md
+  s_7e484d91fceb6c::t_6f5857d5465314 1-6
+affilio-api/internal/handlers/directory_makers_test.go
+  s_7e484d91fceb6c::t_ac7156d1de8cce 4
+  s_7e484d91fceb6c::t_bdf6ac8a571e65 38-86
+affilio-api/internal/handlers/directory_makers.go
+  s_7e484d91fceb6c::t_2684f8a8f8c192 34-38,45-48,51-54,60,62-64
+  s_7e484d91fceb6c::t_50ddf27c387a5b 8,11
+  s_7e484d91fceb6c::t_8706ef07d2a6f9 16-19,27-33,39-44,49-50,55-59,61,65-66,68,70
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_9c3549e548b7c6 1168-1195
+affilio-api/internal/handlers/orp_space_test.go
+  s_7e484d91fceb6c::t_6b5e5c3d11cde5 134-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5d44437c87db3f5723d059c1055e4656d1a2e521",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
