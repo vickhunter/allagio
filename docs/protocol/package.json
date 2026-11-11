@@ -1,8 +1,40 @@
 {
-  "name": "@offerrails/orp",
-  "private": true,
+  "name": "@orp/sdk",
+  "version": "0.4.0",
   "type": "module",
-  "description": "ORP 0.3 schemas, reference host, and the L0–L3 conformance suite.",
+  "description": "Open Rails Protocol (ORP): 0.3 + 0.4 schemas, reference host, client, Ed25519 signing, and the L0–L3 conformance suite.",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": "./sdk/src/index.mjs",
+    "./host": "./sdk/src/host.mjs",
+    "./client": "./sdk/src/client.mjs",
+    "./sign": "./sdk/src/sign.mjs",
+    "./schema/*": "./schema/*"
+  },
+  "files": [
+    "sdk",
+    "schema",
+    "conformance",
+    "SPEC.md",
+    "README.md",
+    "GAPS.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "keywords": [
+    "orp",
+    "open-rails-protocol",
+    "agents",
+    "a2a",
+    "mcp",
+    "affiliate",
+    "partnerships"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vickhunter/allagio.git",
+    "directory": "docs/protocol"
+  },
   "scripts": {
     "test": "node --test schema/test/*.test.mjs conformance/test/*.test.mjs"
   },
