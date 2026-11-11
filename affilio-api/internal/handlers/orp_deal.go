@@ -714,9 +714,16 @@ func (h *ORPHost) acceptDeal(c *gin.Context, dns string, msg orp.Message, hash, 
 	now := h.now()
 	effect := database.ORPEffect{}
 	// Only the counterparty accept of a proposed deal stores awaiting.
-	// The offerer's own accept leaves the row proposed.
+	// The offerer's own accept leaves the row proposed. After a counter the
+	// wait flips to the other party, so the accept must come from waiting.party.
 	if deal.State == "proposed" {
-		if party != deal.AcceptorParty {
+		waitingParty := deal.AcceptorParty
+		if waiting, err := decodeObject(deal.Waiting); err == nil {
+			if p, _ := waiting["party"].(string); p != "" {
+				waitingParty = p
+			}
+		}
+		if party != waitingParty {
 			h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}), database.ORPEffect{})
 			return
 		}
@@ -739,6 +746,98 @@ func (h *ORPHost) acceptDeal(c *gin.Context, dns string, msg orp.Message, hash, 
 	}
 	effect.Inbox = h.dealInbox(dns, msg.ID, deal, now)
 	h.finishRaw(c, msg, hash, http.StatusOK, raw, effect)
+}
+
+// counter replaces the terms of a proposed deal. Either party may counter;
+// each counter flips the accept wait to the other party, stores the new
+// terms_hash (a stale accept then fails terms_mismatch), and counts a round —
+// the host caps a deal at 20 rounds per the spec. Many-party deals are out of
+// scope: 0.4 amendments go through their own flow.
+func (h *ORPHost) counter(c *gin.Context, dns string, msg orp.Message, hash, ownerID string) {
+	deal, found, err := h.Entry.DB.GetORPDeal(c.Request.Context(), msg.Deal)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	party := orp.MemberParty(dns, ownerID)
+	if !found || (deal.OffererParty != party && deal.AcceptorParty != party) {
+		h.finish(c, msg, hash, http.StatusNotFound, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}), database.ORPEffect{})
+		return
+	}
+	if len(deal.Parties) > 0 {
+		h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "A many-party deal is amended, not countered."}), database.ORPEffect{})
+		return
+	}
+	if deal.State != "proposed" {
+		h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "Only a proposed deal can be countered."}), database.ORPEffect{})
+		return
+	}
+	terms, ok := msg.Body["terms"].(map[string]any)
+	if !ok {
+		h.finish(c, msg, hash, http.StatusBadRequest, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusBadRequest, Code: "bad_request", Message: "terms is required."}), database.ORPEffect{})
+		return
+	}
+	hashOfTerms := orp.TermsHash(terms)
+	if given, _ := msg.Body["terms_hash"].(string); given != "" && given != hashOfTerms {
+		h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "terms_mismatch", Message: "terms_hash does not match the terms."}), database.ORPEffect{})
+		return
+	}
+	rounds := 0
+	if waiting, err := decodeObject(deal.Waiting); err == nil {
+		if n, ok := wholeLimit(waiting["rounds"]); ok {
+			rounds = n
+		}
+	}
+	if rounds >= 20 {
+		h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is out of negotiation rounds."}), database.ORPEffect{})
+		return
+	}
+	other, otherOwner, otherRole := deal.AcceptorParty, deal.AcceptorOwner, "acceptor"
+	if party == deal.AcceptorParty {
+		other, otherOwner, otherRole = deal.OffererParty, deal.OffererOwner, "offerer"
+	}
+	otherMode, err := h.placementMode(c, otherOwner)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	now := h.now()
+	origin, _ := h.origin(c)
+	waiting := waitingOn(other, "accept", holdReasons(otherMode, orp.Places(terms, otherRole)), origin, now)
+	waiting["rounds"] = rounds + 1
+	waitingRaw, err := json.Marshal(waiting)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	termsRaw, err := json.Marshal(terms)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	deal.Terms = termsRaw
+	deal.TermsHash = hashOfTerms
+	deal.Waiting = waitingRaw
+	doc, err := h.dealMessage(dns, party, msg.ID, deal, now)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	h.finishRaw(c, msg, hash, http.StatusOK, raw, database.ORPEffect{
+		UpdateDealID:    deal.ID,
+		UpdateState:     "proposed",
+		UpdateFrom:      []string{"proposed"},
+		UpdateWaiting:   waitingRaw,
+		UpdateTerms:     termsRaw,
+		UpdateTermsHash: hashOfTerms,
+		UpdatedAt:       now.UTC(),
+		Inbox:           h.dealInbox(dns, msg.ID, deal, now),
+	})
 }
 
 func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, ownerID string) {

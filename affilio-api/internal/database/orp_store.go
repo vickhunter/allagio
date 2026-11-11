@@ -98,7 +98,11 @@ type ORPEffect struct {
 	// ClearWaiting removes it. Neither set leaves the marker as stored.
 	UpdateWaiting json.RawMessage
 	ClearWaiting  bool
-	UpdatedAt     time.Time
+	// UpdateTerms/UpdateTermsHash replace the deal's terms in the same update;
+	// a counter uses them so a stale accept fails terms_mismatch.
+	UpdateTerms     json.RawMessage
+	UpdateTermsHash string
+	UpdatedAt       time.Time
 	Inbox       []ORPInboxItem
 	// ManyUpdate rewrites one 0.4 deal. ManyExpectHash and ManyExpectAt must
 	// still match, or the transaction rolls back.
@@ -261,8 +265,9 @@ WHERE id=$1 AND owner_id=$6::uuid`, offer.ID, offer.Terms, offer.TermsHash, offe
 		}
 		tag, err := tx.Exec(ctx, `
 UPDATE orp_deals SET state=$2, updated_at=$3,
-  waiting = CASE WHEN $5 THEN NULL ELSE COALESCE($6, waiting) END
-WHERE id=$1 AND state=ANY($4)`, effect.UpdateDealID, effect.UpdateState, effect.UpdatedAt, effect.UpdateFrom, effect.ClearWaiting, nullJSON(effect.UpdateWaiting))
+  waiting = CASE WHEN $5 THEN NULL ELSE COALESCE($6, waiting) END,
+  terms = COALESCE($7, terms), terms_hash = COALESCE($8, terms_hash)
+WHERE id=$1 AND state=ANY($4)`, effect.UpdateDealID, effect.UpdateState, effect.UpdatedAt, effect.UpdateFrom, effect.ClearWaiting, nullJSON(effect.UpdateWaiting), nullJSON(effect.UpdateTerms), nilOrString(effect.UpdateTermsHash))
 		if err != nil {
 			return err
 		}
@@ -287,6 +292,13 @@ func nullJSON(raw json.RawMessage) any {
 		return nil
 	}
 	return raw
+}
+
+func nilOrString(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 // JSONList is the stored form of a NOT NULL JSONB list.

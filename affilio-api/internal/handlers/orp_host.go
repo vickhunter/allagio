@@ -231,6 +231,8 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 		h.offer(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "accept":
 		h.accept(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "counter":
+		h.counter(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "execute":
 		h.execute(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "leave":
