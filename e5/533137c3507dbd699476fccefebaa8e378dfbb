@@ -1,0 +1,21 @@
+affilio-api/internal/orp/discovery.go
+  s_7e484d91fceb6c::t_4c03b16a3c0da2 123
+affilio-api/internal/handlers/orp_trust.go
+  s_7e484d91fceb6c::t_be7e5a244374db 26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e5533137c3507dbd699476fccefebaa8e378dfbb",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
