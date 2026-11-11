@@ -4,6 +4,7 @@ import { Logo } from '@/components/Logo'
 import { CommandPalette, type Command } from '@/components/CommandPalette'
 import { track } from '@/lib/track'
 import { signInHref, useSource, withSource } from '@/lib/source'
+import { useCaseLinks } from '@/use-cases/links.mjs'
 
 export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup' | 'legal' | 'agents' | 'you' | 'use-cases' | 'reference' | 'missing'
 export const siteCommands: Command[] = [
@@ -50,7 +51,22 @@ export function Header({ page }: { page: PageKey }) {
           {link('/you/', 'Your limits', 'you', 'text-t1 hover:bg-s2')}
           {link('/makers/', 'Makers', 'makers', 'text-maker hover:bg-maker-soft')}
           {link('/publishers/', 'Publishers', 'publishers', 'text-pub hover:bg-pub-soft')}
-          {link('/use-cases/', 'Use cases', 'use-cases', 'text-t1 hover:bg-s2')}
+          <div className="group relative">
+            {link('/use-cases/', 'Use cases', 'use-cases', 'text-t1 hover:bg-s2')}
+            <div className="invisible absolute left-0 top-full z-40 hidden w-64 rounded-xl border border-line bg-white p-1.5 opacity-0 shadow-lg transition-opacity duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 md:block">
+              {useCaseLinks.map((item) => (
+                <a
+                  key={item.id}
+                  href={withSource(`/use-cases/#${item.id}`, source)}
+                  data-track="nav_click"
+                  data-track-to={`use-cases-${item.id}`}
+                  className="block rounded-lg px-3 py-2 text-[13px] font-medium text-t1 transition-colors hover:bg-s2"
+                >
+                  {item.title}
+                </a>
+              ))}
+            </div>
+          </div>
           {link('/protocol/', 'Protocol', 'protocol', 'text-t1 hover:bg-s2')}
           {link('/reference', 'Reference', 'reference', 'text-t1 hover:bg-s2')}
           {link('/agents', 'Agents', 'agents', 'text-t1 hover:bg-s2')}

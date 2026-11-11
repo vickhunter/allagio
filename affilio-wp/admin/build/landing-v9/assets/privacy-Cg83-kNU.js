@@ -1,0 +1,1 @@
+import{b as e,x as t}from"./Page-DvWrmzfL.js";import{n,t as r}from"./Document-CKK4ORS_.js";var i=t();function a(){return(0,i.jsx)(r,{title:n.title,lede:n.lede,sections:n.sections,otherHref:`/terms`,otherLabel:`Read the terms draft`})}e(`privacy`,(0,i.jsx)(a,{}));
