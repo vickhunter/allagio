@@ -94,7 +94,11 @@ type ORPEffect struct {
 	// is an error.
 	UpdateState string
 	UpdateFrom  []string
-	UpdatedAt   time.Time
+	// UpdateWaiting replaces the deal's waiting marker in the same update;
+	// ClearWaiting removes it. Neither set leaves the marker as stored.
+	UpdateWaiting json.RawMessage
+	ClearWaiting  bool
+	UpdatedAt     time.Time
 	Inbox       []ORPInboxItem
 	// ManyUpdate rewrites one 0.4 deal. ManyExpectHash and ManyExpectAt must
 	// still match, or the transaction rolls back.
@@ -256,8 +260,9 @@ WHERE id=$1 AND owner_id=$6::uuid`, offer.ID, offer.Terms, offer.TermsHash, offe
 			return errors.New("orp state effect")
 		}
 		tag, err := tx.Exec(ctx, `
-UPDATE orp_deals SET state=$2, updated_at=$3
-WHERE id=$1 AND state=ANY($4)`, effect.UpdateDealID, effect.UpdateState, effect.UpdatedAt, effect.UpdateFrom)
+UPDATE orp_deals SET state=$2, updated_at=$3,
+  waiting = CASE WHEN $5 THEN NULL ELSE COALESCE($6, waiting) END
+WHERE id=$1 AND state=ANY($4)`, effect.UpdateDealID, effect.UpdateState, effect.UpdatedAt, effect.UpdateFrom, effect.ClearWaiting, nullJSON(effect.UpdateWaiting))
 		if err != nil {
 			return err
 		}
@@ -744,7 +749,11 @@ SELECT EXISTS(
 // changed is false when the row is no longer awaiting.
 // approval is written in this same transaction, and only after the update
 // matches one row. A later inbox error rolls the approval back with the deal.
-func (d *DB) ActivateORPDeal(ctx context.Context, id string, bound json.RawMessage, updated time.Time, inbox []ORPInboxItem, approval *DealApproval) (bool, error) {
+// ActivateORPDeal resolves one awaiting deal to state and stores the snapshots.
+// obligations, when set, replaces the obligation rows in the same transaction —
+// a held share claim or obligation revoke lands on approval.
+// changed is false when the row is no longer awaiting.
+func (d *DB) ActivateORPDeal(ctx context.Context, id, state string, bound, obligations json.RawMessage, updated time.Time, inbox []ORPInboxItem, approval *DealApproval) (bool, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return false, err
@@ -752,8 +761,8 @@ func (d *DB) ActivateORPDeal(ctx context.Context, id string, bound json.RawMessa
 	defer tx.Rollback(ctx)
 	tag, err := tx.Exec(ctx, `
 UPDATE orp_deals
-SET state='active', waiting=NULL, bound=$2, updated_at=$3
-WHERE id=$1 AND state='awaiting'`, id, JSONList(bound), updated)
+SET state=$2, waiting=NULL, bound=$3, updated_at=$4, obligations=COALESCE($5, obligations)
+WHERE id=$1 AND state='awaiting'`, id, state, JSONList(bound), updated, nullJSON(obligations))
 	if err != nil {
 		return false, err
 	}

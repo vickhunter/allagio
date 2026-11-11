@@ -26,7 +26,7 @@ func (h *ORPHost) decline(c *gin.Context, dns string, msg orp.Message, hash, own
 	deal.UpdatedAt = now.UTC()
 	h.finishDeal(c, dns, msg, hash, party, deal, now, database.ORPEffect{
 		UpdateDealID: deal.ID, UpdateState: "declined",
-		UpdateFrom: []string{"proposed", "awaiting"}, UpdatedAt: deal.UpdatedAt,
+		UpdateFrom: []string{"proposed", "awaiting"}, ClearWaiting: true, UpdatedAt: deal.UpdatedAt,
 	})
 }
 
@@ -40,7 +40,19 @@ func (h *ORPHost) revoke(c *gin.Context, dns string, msg orp.Message, hash, owne
 	if !ok {
 		return
 	}
+	mode, err := h.modeFor(c, ownerID, database.StepRevoke)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	if mode == database.ModeOff {
+		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, stepOff("revoke", "The owner has turned off revoke, so this agent cannot revoke.")), database.ORPEffect{})
+		return
+	}
 	now := h.now()
+	hold := func(waiting map[string]any) {
+		h.holdDeal(c, dns, msg, hash, party, deal, waiting, []string{"proposed", "awaiting", "active"}, now)
+	}
 	switch scope {
 	case "obligation":
 		obligationID, _ := msg.Body["obligation"].(string)
@@ -53,6 +65,14 @@ func (h *ORPHost) revoke(c *gin.Context, dns string, msg orp.Message, hash, owne
 			h.finish(c, msg, hash, http.StatusNotFound, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such obligation for this sender."}), database.ORPEffect{})
 			return
 		}
+		if mode == database.ModeAsk {
+			origin, _ := h.origin(c)
+			waiting := waitingOn(party, "revoke", []any{"step_ask"}, origin, now)
+			waiting["scope"] = "obligation"
+			waiting["obligation"] = obligationID
+			hold(waiting)
+			return
+		}
 		deal.Obligations = rows
 		deal.UpdatedAt = now.UTC()
 		h.finishDeal(c, dns, msg, hash, party, deal, now, database.ORPEffect{
@@ -63,16 +83,32 @@ func (h *ORPHost) revoke(c *gin.Context, dns string, msg orp.Message, hash, owne
 			h.stateConflict(c, dns, msg, hash)
 			return
 		}
+		if mode == database.ModeAsk {
+			origin, _ := h.origin(c)
+			waiting := waitingOn(party, "revoke", []any{"step_ask"}, origin, now)
+			waiting["scope"] = "deal"
+			hold(waiting)
+			return
+		}
 		deal.State = "revoked"
 		deal.UpdatedAt = now.UTC()
 		h.finishDeal(c, dns, msg, hash, party, deal, now, database.ORPEffect{
 			UpdateDealID: deal.ID, UpdateState: "revoked",
-			UpdateFrom: []string{"proposed", "awaiting", "active"}, UpdatedAt: deal.UpdatedAt,
+			UpdateFrom: []string{"proposed", "awaiting", "active"}, ClearWaiting: true, UpdatedAt: deal.UpdatedAt,
 		})
 	}
 }
 
 func (h *ORPHost) revokeOffer(c *gin.Context, dns string, msg orp.Message, hash, ownerID string) {
+	mode, err := h.modeFor(c, ownerID, database.StepRevoke)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	if mode == database.ModeOff {
+		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, stepOff("revoke", "The owner has turned off revoke, so this agent cannot revoke.")), database.ORPEffect{})
+		return
+	}
 	offerID, _ := msg.Body["offer"].(string)
 	offer, found, err := h.Entry.DB.GetORPOfferOwned(c.Request.Context(), offerID, ownerID)
 	if err != nil {

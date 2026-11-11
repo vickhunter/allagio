@@ -14,20 +14,24 @@ const (
 	StepPlacementPublish = "placement_publish"
 	StepLinkChange       = "link_change"
 	StepPayout           = "payout"
+	StepShare            = "share"
+	StepRevoke           = "revoke"
 	ModeAuto             = "auto"
 	ModeAsk              = "ask"
 	ModeOff              = "off"
 )
 
 // StepModes is the owner's choice for each agent step.
-// An empty field on a missing row reads as auto, except placement publish,
-// which reads as ask. A saved value, including auto, is left as stored.
+// An empty field on a missing row reads as auto, except placement publish
+// and share, which read as ask. A saved value, including auto, is left as stored.
 type StepModes struct {
 	SiteSignup       string
 	OfferMatch       string
 	PlacementPublish string
 	LinkChange       string
 	Payout           string
+	Share            string
+	Revoke           string
 }
 
 func (m StepModes) Get(step string) string {
@@ -43,9 +47,13 @@ func (m StepModes) Get(step string) string {
 		mode = m.LinkChange
 	case StepPayout:
 		mode = m.Payout
+	case StepShare:
+		mode = m.Share
+	case StepRevoke:
+		mode = m.Revoke
 	}
 	if mode == "" {
-		if step == StepPlacementPublish {
+		if step == StepPlacementPublish || step == StepShare {
 			return ModeAsk
 		}
 		return ModeAuto
@@ -65,6 +73,10 @@ func (m *StepModes) Set(step, mode string) bool {
 		m.LinkChange = mode
 	case StepPayout:
 		m.Payout = mode
+	case StepShare:
+		m.Share = mode
+	case StepRevoke:
+		m.Revoke = mode
 	default:
 		return false
 	}
@@ -86,6 +98,12 @@ func (m StepModes) filled() StepModes {
 	}
 	if m.Payout == "" {
 		m.Payout = ModeAuto
+	}
+	if m.Share == "" {
+		m.Share = ModeAsk
+	}
+	if m.Revoke == "" {
+		m.Revoke = ModeAuto
 	}
 	return m
 }
@@ -116,7 +134,7 @@ func (d *DB) LoadStepModes(ctx context.Context, ownerID, siteID string) (StepMod
 	}
 	var m StepModes
 	err := d.Pool.QueryRow(ctx, `
-SELECT site_signup, offer_match, placement_publish, link_change, payout
+SELECT site_signup, offer_match, placement_publish, link_change, payout, share, revoke
 FROM agent_step_modes
 WHERE (NULLIF($2,'') IS NOT NULL AND site_id = NULLIF($2,'')::uuid)
    OR (NULLIF($1,'') IS NOT NULL AND owner_id = NULLIF($1,'')::uuid AND site_id IS NULL)
@@ -124,7 +142,7 @@ ORDER BY CASE
   WHEN site_id IS NOT NULL AND owner_id IS NOT NULL THEN 0
   WHEN site_id IS NOT NULL THEN 1
   ELSE 2 END
-LIMIT 1`, ownerID, siteID).Scan(&m.SiteSignup, &m.OfferMatch, &m.PlacementPublish, &m.LinkChange, &m.Payout)
+LIMIT 1`, ownerID, siteID).Scan(&m.SiteSignup, &m.OfferMatch, &m.PlacementPublish, &m.LinkChange, &m.Payout, &m.Share, &m.Revoke)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return StepModes{}.filled(), nil
 	}
@@ -166,15 +184,17 @@ func (d *DB) SaveStepModes(ctx context.Context, ownerID, siteID string, modes St
 	}
 	modes = modes.filled()
 	_, err := d.Pool.Exec(ctx, `
-INSERT INTO agent_step_modes(scope_key, owner_id, site_id, site_signup, offer_match, placement_publish, link_change, payout)
-VALUES($1, NULLIF($2,'')::uuid, NULLIF($3,'')::uuid, $4, $5, $6, $7, $8)
+INSERT INTO agent_step_modes(scope_key, owner_id, site_id, site_signup, offer_match, placement_publish, link_change, payout, share, revoke)
+VALUES($1, NULLIF($2,'')::uuid, NULLIF($3,'')::uuid, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (scope_key) DO UPDATE SET
   site_signup = EXCLUDED.site_signup,
   offer_match = EXCLUDED.offer_match,
   placement_publish = EXCLUDED.placement_publish,
   link_change = EXCLUDED.link_change,
   payout = EXCLUDED.payout,
-  updated_at = NOW()`, key, ownerID, siteID, modes.SiteSignup, modes.OfferMatch, modes.PlacementPublish, modes.LinkChange, modes.Payout)
+  share = EXCLUDED.share,
+  revoke = EXCLUDED.revoke,
+  updated_at = NOW()`, key, ownerID, siteID, modes.SiteSignup, modes.OfferMatch, modes.PlacementPublish, modes.LinkChange, modes.Payout, modes.Share, modes.Revoke)
 	return err
 }
 

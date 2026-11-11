@@ -237,9 +237,35 @@ func checkObligation(obj map[string]any, path string) (Problem, bool) {
 		return checkPay(obj, path)
 	case "credit":
 		return checkCredit(obj, path)
+	case "share":
+		return checkShare03(obj, path)
 	default:
 		return Invalid("The message is not valid ORP 0.3.", path+"/action"), true
 	}
+}
+
+// checkShare03 validates a share obligation: the obligor hands the counterparty
+// an aggregate data set described by data, optionally by a due time.
+func checkShare03(obj map[string]any, path string) (Problem, bool) {
+	allowed := map[string]bool{
+		"id": true, "by": true, "action": true, "data": true, "due": true, "proof": true,
+	}
+	if problem, bad := unknownKey(obj, allowed, path); bad {
+		return problem, true
+	}
+	if problem, bad := obligationIdentity(obj, path); bad {
+		return problem, true
+	}
+	if _, present := obj["data"]; !present {
+		return Invalid("The message is not valid ORP 0.3.", path+"/data"), true
+	}
+	if problem, bad := optionalDeadline(obj, path+"/due"); bad {
+		return problem, true
+	}
+	if problem, bad := proofList(obj, path, false); bad {
+		return problem, true
+	}
+	return Problem{}, false
 }
 
 func checkPlace(obj map[string]any, path string) (Problem, bool) {

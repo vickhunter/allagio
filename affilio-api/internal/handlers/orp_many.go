@@ -499,8 +499,18 @@ func (h *ORPHost) ApprovePost(c *gin.Context) {
 		writeOwnerApproval(c)
 		return
 	}
+	state, obligations, err := pendingOutcome(deal)
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
 	expectHash, expectAt := deal.TermsHash, deal.UpdatedAt
 	now := h.now()
+	deal.State = state
+	deal.Waiting = nil
+	if len(obligations) > 0 {
+		deal.Obligations = obligations
+	}
 	terms, err := decodeObject(deal.Terms)
 	if err != nil {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)

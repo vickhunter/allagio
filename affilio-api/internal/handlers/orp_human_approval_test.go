@@ -277,7 +277,7 @@ func TestORP03ActivateAskOptInDoesNotBind(t *testing.T) {
 	if err := db.Pool.QueryRow(context.Background(), `SELECT bound FROM orp_deals WHERE id=$1`, openID).Scan(&openBound); err != nil {
 		t.Fatal(err)
 	}
-	changed, err := db.ActivateORPDeal(context.Background(), openID, openBound, time.Now().UTC(), []database.ORPInboxItem{{
+	changed, err := db.ActivateORPDeal(context.Background(), openID, "active", openBound, nil, time.Now().UTC(), []database.ORPInboxItem{{
 		OwnerID: "00000000-0000-4000-8000-000000000099", Message: []byte(`{"type":"deal"}`),
 	}}, &database.DealApproval{OwnerID: acceptor.owner, Party: acceptor.party, Step: "accept", By: "agent"})
 	if err == nil || changed || countDealApprovals(t, db, openID, "") != 0 {

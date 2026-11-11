@@ -194,14 +194,22 @@ func (h *ORPHost) Activate(c *gin.Context) {
 	}
 	record := h.stepAskRecord(dns, deal, "agent")
 	now := h.now()
+	state, obligations, err := pendingOutcome(deal)
+	if err != nil {
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
+		return
+	}
 	bound, err := bindMandates(deal.Bound, deal.OffererParty, deal.AcceptorParty, now)
 	if err != nil {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
-	deal.State = "active"
+	deal.State = state
 	deal.Waiting = nil
 	deal.Bound = bound
+	if len(obligations) > 0 {
+		deal.Obligations = obligations
+	}
 	deal.UpdatedAt = now.UTC()
 	doc, err := h.dealMessage(dns, party, "", deal, now)
 	if err != nil {
@@ -213,7 +221,7 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
-	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, bound, deal.UpdatedAt, h.dealInbox(dns, "", deal, now), record)
+	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, state, bound, obligations, deal.UpdatedAt, h.dealInbox(dns, "", deal, now), record)
 	if err != nil {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
@@ -370,8 +378,18 @@ func (h *ORPHost) approveOwnerPost(c *gin.Context) {
 		h.finishOwner03(c, dns, deal, party)
 		return
 	}
+	state, obligations, err := pendingOutcome(deal)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
 	expectHash, expectAt := deal.TermsHash, deal.UpdatedAt
 	now := h.now()
+	deal.State = state
+	deal.Waiting = nil
+	if len(obligations) > 0 {
+		deal.Obligations = obligations
+	}
 	h.noteApproval(&deal, party, step, "owner")
 	h.signSeat(&deal, party, now)
 	h.refreshMany(&deal, terms, now)
@@ -393,18 +411,26 @@ func (h *ORPHost) finishOwner03(c *gin.Context, dns string, deal database.ORPDea
 		return
 	}
 	now := h.now()
+	state, obligations, err := pendingOutcome(deal)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
+		return
+	}
 	bound, err := bindMandates(deal.Bound, deal.OffererParty, deal.AcceptorParty, now)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
 		return
 	}
 	record := h.stepAskRecord(dns, deal, "owner")
-	deal.State = "active"
+	deal.State = state
 	deal.Waiting = nil
 	deal.Bound = bound
 	deal.Parties = nil
+	if len(obligations) > 0 {
+		deal.Obligations = obligations
+	}
 	deal.UpdatedAt = now.UTC()
-	h.writeActive03(c, dns, party, deal, record)
+	h.writeActive03(c, dns, party, deal, record, state, obligations)
 }
 
 // acceptReady is the Activate gate: the deal is awaiting and the accept is stored.
@@ -433,7 +459,7 @@ func (h *ORPHost) stepAskRecord(dns string, deal database.ORPDeal, by string) *d
 	return &database.DealApproval{OwnerID: ownerID, Party: party, Step: step, By: by}
 }
 
-func (h *ORPHost) writeActive03(c *gin.Context, dns, viewer string, deal database.ORPDeal, record *database.DealApproval) {
+func (h *ORPHost) writeActive03(c *gin.Context, dns, viewer string, deal database.ORPDeal, record *database.DealApproval, state string, obligations json.RawMessage) {
 	doc, err := h.dealMessage(dns, viewer, "", deal, deal.UpdatedAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
@@ -444,7 +470,7 @@ func (h *ORPHost) writeActive03(c *gin.Context, dns, viewer string, deal databas
 		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
 		return
 	}
-	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, deal.Bound, deal.UpdatedAt, h.dealInbox(dns, "", deal, deal.UpdatedAt), record)
+	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, state, deal.Bound, obligations, deal.UpdatedAt, h.dealInbox(dns, "", deal, deal.UpdatedAt), record)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
 		return
@@ -769,6 +795,25 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, stepOff("execute", "The owner has turned off placement publish, so this agent cannot claim a placement.")), database.ORPEffect{})
 		return
 	}
+	if obligation["action"] == "share" {
+		share, err := h.modeFor(c, ownerID, database.StepShare)
+		if err != nil {
+			h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+			return
+		}
+		if share == database.ModeOff {
+			h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, stepOff("share", "The owner has turned off data sharing, so this agent cannot claim a share.")), database.ORPEffect{})
+			return
+		}
+		if share == database.ModeAsk {
+			now := h.now()
+			origin, _ := h.origin(c)
+			waiting := waitingOn(party, "share", []any{"step_ask"}, origin, now)
+			waiting["obligation"] = obligationID
+			h.holdDeal(c, dns, msg, hash, party, deal, waiting, []string{"active"}, now)
+			return
+		}
+	}
 	now := h.now()
 	obligations, err := markClaimed(deal.Obligations, obligationID)
 	if err != nil {
@@ -907,6 +952,10 @@ func (h *ORPHost) roomFor(c *gin.Context, owners ...string) (bool, orp.Problem) 
 }
 
 func (h *ORPHost) placementMode(c *gin.Context, ownerID string) (string, error) {
+	return h.modeFor(c, ownerID, database.StepPlacementPublish)
+}
+
+func (h *ORPHost) modeFor(c *gin.Context, ownerID, step string) (string, error) {
 	if h.Entry == nil || h.Entry.DB == nil || ownerID == "" {
 		return database.ModeAsk, nil
 	}
@@ -914,7 +963,58 @@ func (h *ORPHost) placementMode(c *gin.Context, ownerID string) (string, error) 
 	if err != nil {
 		return "", err
 	}
-	return modes.Get(database.StepPlacementPublish), nil
+	return modes.Get(step), nil
+}
+
+// holdDeal stores the message as a held ask: the deal drops to awaiting with a
+// waiting marker naming the step. The pending action lands on approval —
+// Activate for an agent bearer, ApprovePost for the owner form.
+func (h *ORPHost) holdDeal(c *gin.Context, dns string, msg orp.Message, hash, party string, deal database.ORPDeal, waiting map[string]any, from []string, now time.Time) {
+	raw, err := json.Marshal(waiting)
+	if err != nil {
+		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		return
+	}
+	deal.State = "awaiting"
+	deal.Waiting = raw
+	deal.UpdatedAt = now.UTC()
+	h.finishDeal(c, dns, msg, hash, party, deal, now, database.ORPEffect{
+		UpdateDealID: deal.ID, UpdateState: "awaiting", UpdateFrom: from,
+		UpdateWaiting: raw, UpdatedAt: deal.UpdatedAt,
+	})
+}
+
+// pendingOutcome resolves a held ask on an awaiting deal. A share wait marks
+// its obligation claimed and returns active; a revoke wait lands its scope —
+// the deal scope ends it, an obligation scope revokes that row and returns
+// active. Any other wait returns active untouched.
+func pendingOutcome(deal database.ORPDeal) (string, json.RawMessage, error) {
+	if len(deal.Waiting) == 0 || string(deal.Waiting) == "null" {
+		return "active", nil, nil
+	}
+	waiting, err := decodeObject(deal.Waiting)
+	if err != nil {
+		return "", nil, err
+	}
+	step, _ := waiting["step"].(string)
+	obligationID, _ := waiting["obligation"].(string)
+	switch {
+	case step == "share" && obligationID != "":
+		rows, err := markClaimed(deal.Obligations, obligationID)
+		if err != nil {
+			return "", nil, err
+		}
+		return "active", rows, nil
+	case step == "revoke" && obligationID != "":
+		rows, err := markObligation(deal.Obligations, obligationID, "revoked")
+		if err != nil {
+			return "", nil, err
+		}
+		return "active", rows, nil
+	case step == "revoke":
+		return "revoked", nil, nil
+	}
+	return "active", nil, nil
 }
 
 func (h *ORPHost) bearer(c *gin.Context, dns string) (*database.AgentGrant, bool) {

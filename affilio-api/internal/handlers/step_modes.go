@@ -269,6 +269,8 @@ func (h *AgentEntry) GetStepModes(c *gin.Context) {
 			database.StepPlacementPublish: modes.PlacementPublish,
 			database.StepLinkChange:       modes.LinkChange,
 			database.StepPayout:           modes.Payout,
+			database.StepShare:            modes.Share,
+			database.StepRevoke:           modes.Revoke,
 		},
 	}
 	if siteID != "" {
