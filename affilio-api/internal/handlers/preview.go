@@ -37,12 +37,22 @@ type previewOfferCard struct {
 	LowConfidence      bool    `json:"low_confidence,omitempty"`
 }
 
+type previewSuggestion struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+	Line string `json:"line"`
+	Note string `json:"note"`
+}
+
 type previewResponse struct {
 	Title         string             `json:"title"`
+	Author        string             `json:"author,omitempty"`
+	Excerpt       string             `json:"excerpt,omitempty"`
 	Offer         *previewOfferCard  `json:"offer"`
 	Offers        []previewOfferCard `json:"offers,omitempty"`
 	Slot          *string            `json:"slot"`
 	LowConfidence bool               `json:"low_confidence,omitempty"`
+	Suggestion    previewSuggestion  `json:"suggestion"`
 }
 
 func (h *PreviewHandler) Preview(c *gin.Context) {
@@ -68,6 +78,9 @@ func (h *PreviewHandler) Preview(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "preview failed"})
 		return
 	}
+	out.Author = page.Author
+	out.Excerpt = previewExcerpt(page.Text)
+	out.Suggestion = suggestLine(out)
 	c.JSON(http.StatusOK, out)
 }
 
@@ -187,4 +200,43 @@ func previewCard(cards []previewOfferCard, hit services.DryRunHit) previewOfferC
 	card.Relevance = hit.Relevance
 	card.Reason = hit.Reason
 	return card
+}
+
+const excerptRunes = 320
+
+func previewExcerpt(text string) string {
+	text = strings.Join(strings.Fields(text), " ")
+	runes := []rune(text)
+	if len(runes) > excerptRunes {
+		return string(runes[:excerptRunes]) + "…"
+	}
+	return text
+}
+
+// suggestLine always answers with the line Allagio would append to the post.
+// A verified offer names itself; a low-confidence or absent match is labelled
+// "not on Allagio yet" instead of pretending a program exists.
+func suggestLine(out previewResponse) previewSuggestion {
+	if out.Offer != nil && !out.LowConfidence {
+		return previewSuggestion{
+			Kind: "partner_mention",
+			Name: out.Offer.Name,
+			Line: "Sponsored — " + out.Offer.Name + ": " + out.Offer.Summary,
+			Note: "A listed offer, labelled inline.",
+		}
+	}
+	if out.Offer != nil {
+		return previewSuggestion{
+			Kind: "partner_mention",
+			Name: out.Offer.Name,
+			Line: "Sponsored — " + out.Offer.Name + ": " + out.Offer.Summary,
+			Note: "Closest listed offer, low confidence.",
+		}
+	}
+	return previewSuggestion{
+		Kind: "partner_mention",
+		Name: "Suggested partner",
+		Line: "Sponsored — a partner whose product fits this post would take this line.",
+		Note: "No listed program matched; a matching partner could fill this slot.",
+	}
 }

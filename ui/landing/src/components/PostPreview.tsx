@@ -102,6 +102,22 @@ function SuggestedCard({ program }: { program: UnverifiedProgram }) {
   )
 }
 
+function PostCard({ preview }: { preview: PreviewGroups }) {
+  const suggestion = preview.suggestion
+  return (
+    <article className="mt-3 rounded-xl border border-line bg-s0 p-4" aria-label="Post preview with the Allagio line highlighted">
+      <p className="text-[13px] font-semibold text-t1">{preview.author || 'Post'}</p>
+      <p className="mt-1 text-[15px] leading-relaxed text-t1">{preview.excerpt || preview.title}</p>
+      {suggestion && (
+        <p className="mt-3 text-[15px] leading-relaxed">
+          <mark className="post-hi">{suggestion.line}</mark>
+        </p>
+      )}
+      {suggestion?.note && <p className="mt-2 text-[12px] text-t2">{suggestion.note}</p>}
+    </article>
+  )
+}
+
 function GroupHeading({ level, id, children }: { level: 3 | 4; id: string; children: ReactNode }) {
   const className = 'font-display text-lg font-bold'
   if (level === 3) return <h3 id={id} className={className}>{children}</h3>
@@ -287,6 +303,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
             <button type="button" onClick={tryAnother} className={`${outlineClass} mt-4`}>Try another URL</button>
           </div>
         )}
+        {phase === 'ready' && preview && <PostCard preview={preview} />}
         {phase === 'ready' && preview?.kind === 'groups' && <GroupsView preview={preview} approveHref={approveHref} statusId={id} titleLevel={titleLevel} />}
         {phase === 'ready' && preview?.kind === 'closest' && (
           <div>

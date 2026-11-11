@@ -46,8 +46,9 @@ const (
 
 // Page is the title and visible text of a public HTML page.
 type Page struct {
-	Title string
-	Text  string
+	Title  string
+	Text   string
+	Author string
 }
 
 // Document is the raw body of one public response.
@@ -573,10 +574,11 @@ func pageFromOEmbed(kind string, body []byte) (Page, error) {
 			title = strings.TrimSpace(title[:i])
 		}
 	}
+	author := cleanLine(doc.AuthorName)
 	if title == "" {
-		title = cleanLine(doc.AuthorName)
+		title = author
 	}
-	return Page{Title: title, Text: text}, nil
+	return Page{Title: title, Text: text, Author: author}, nil
 }
 
 var (

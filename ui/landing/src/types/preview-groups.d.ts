@@ -17,8 +17,12 @@ declare module '@/lib/preview-groups.mjs' {
     checked_at: string
     topics: string[]
   }
+  export type PreviewSuggestion = { kind: string; name: string; line: string; note: string }
   export type PreviewGroups = {
     title: string
+    author: string
+    excerpt: string
+    suggestion: PreviewSuggestion | null
     verified: VerifiedOffer[]
     suggested: UnverifiedProgram[]
     closest: UnverifiedProgram[]

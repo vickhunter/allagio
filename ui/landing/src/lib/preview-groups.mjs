@@ -7,7 +7,7 @@ import { previewErrorCopy, samplePreview } from './preview-map.mjs'
 
 export const publicLinksNote = "Public links only. Private posts and accounts can't be read."
 export const suggestedNote = "Not on Allagio yet. Payouts go through the company's own affiliate program."
-export const closestLead = 'No program lines up with this post yet.'
+export const closestLead = 'No listed program lines up — a matching partner would take the highlighted line.'
 export const notifyLabel = 'Notify me when a match joins'
 export const notifyStorageKey = 'offer-rails.preview.notify'
 export const notifyLimit = 20
@@ -195,8 +195,12 @@ export function groupPreview(body, options = {}) {
     }
   }
   const kind = verified.length || suggested.length ? 'groups' : 'closest'
+  const suggestion = asSuggestion(body && body.suggestion) || fallbackSuggestion(offers[0])
   return {
     title,
+    author: textOf(body && body.author),
+    excerpt: textOf(body && body.excerpt),
+    suggestion,
     verified,
     suggested,
     closest,
@@ -206,11 +210,25 @@ export function groupPreview(body, options = {}) {
   }
 }
 
+function asSuggestion(raw) {
+  if (!raw || typeof raw !== 'object') return null
+  const line = textOf(raw.line)
+  if (!line) return null
+  return { kind: textOf(raw.kind) || 'partner_mention', name: textOf(raw.name) || 'Suggested partner', line, note: textOf(raw.note) }
+}
+
+function fallbackSuggestion(offer) {
+  if (offer && offer.name) {
+    return { kind: 'partner_mention', name: offer.name, line: `Sponsored — ${offer.name}: ${offer.blurb || ''}`.replace(/:\s*$/, '.'), note: 'Closest listed offer.' }
+  }
+  return { kind: 'partner_mention', name: 'Suggested partner', line: 'Sponsored — a partner whose product fits this post would take this line.', note: 'No listed program matched; a matching partner could fill this slot.' }
+}
+
 export function adaptPreview(body, options = {}) {
   const readFailure = classifyReadFailure(body)
   const title = textOf(body && body.title)
   if (readFailure) {
-    return { title, verified: [], suggested: [], closest: [], readFailure, kind: 'unreadable', slot: null }
+    return { title, author: '', excerpt: '', suggestion: null, verified: [], suggested: [], closest: [], readFailure, kind: 'unreadable', slot: null }
   }
   return groupPreview(body, options)
 }

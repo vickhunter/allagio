@@ -361,6 +361,18 @@ body{margin:0;font-weight:500}
   .orbit-signin,.orbit-actions [data-join-prompt] button{width:min(260px,100%)}
   .sphere{width:54px;height:54px;left:calc(50% - 27px + cos(var(--a)) * 40%);top:calc(50% - 27px + sin(var(--a)) * 40%)}
 }
+.post-hi{
+  color:inherit;
+  padding:0 .15em;
+  border-radius:.2em;
+  background:linear-gradient(100deg,rgba(125,211,168,.45),rgba(125,180,232,.45),rgba(232,184,125,.45));
+  background-size:200% 100%;
+  box-decoration-break:clone;
+  -webkit-box-decoration-break:clone;
+  animation:post-hi-sweep 1.6s ease-out 1;
+}
+@keyframes post-hi-sweep{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion: reduce){.post-hi{animation:none}}
 @media (min-width:1100px){
   .scalar-frame{display:grid;grid-template-columns:186px minmax(0,1fr);align-items:start}
   .scalar-rail{display:block;position:sticky;top:64px;padding:28px 12px 28px 16px}
