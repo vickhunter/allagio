@@ -1,0 +1,75 @@
+affilio-api/internal/handlers/agent_join.go
+  s_7e484d91fceb6c::t_4705263613afcd 18
+  s_7e484d91fceb6c::t_2af759fe5d6625 60-64,72
+affilio-api/internal/handlers/llms_archive.go
+  s_7e484d91fceb6c::t_52611eb06f80d5 58
+  s_7e484d91fceb6c::t_d5023c8b78cb9b 24
+affilio-api/internal/orp/suggest.go
+  s_7e484d91fceb6c::t_3f1b355d34d3d9 563-572,575-579,582,585,588-595
+  s_7e484d91fceb6c::t_c67cab306a6657 401
+affilio-api/internal/handlers/orp_deal.go
+  s_7e484d91fceb6c::t_2f432d1e4d6188 1015,1018-1020,1030
+  s_7e484d91fceb6c::t_f0f2d369a9860a 1231
+  s_7e484d91fceb6c::t_cf146e6f0b8f32 1349-1389
+  s_7e484d91fceb6c::t_7e278da2cfc457 206-209,227
+  s_7e484d91fceb6c::t_081219d7079b00 495-498,509
+  s_7e484d91fceb6c::t_21bdef4700f66d 447-475
+  s_7e484d91fceb6c::t_6bde1a69a185b7 1309
+affilio-api/internal/handlers/orp_many.go
+  s_7e484d91fceb6c::t_d067be610de9e8 528-529
+  s_7e484d91fceb6c::t_ec7a2f8f2f9d10 991,994-996,1005-1006
+affilio-api/internal/handlers/orp_deal_test.go
+  s_7e484d91fceb6c::t_983b5906bd6100 757-761,764,1117,1123,1127,1129,1131,1136,1145,1150,1155
+  s_7e484d91fceb6c::t_faf8f8921bb556 762-763
+  s_7e484d91fceb6c::t_23e5e19833926f 1016
+  s_7e484d91fceb6c::t_0684eb3997def3 8
+  s_7e484d91fceb6c::t_bf797122ec4265 1106
+  s_7e484d91fceb6c::t_3f2f67375451e3 1120
+  s_7e484d91fceb6c::t_2150f7b4577020 1104-1105,1107-1116,1118-1119,1121-1122,1124-1126,1128,1130,1132-1135,1137-1144,1146-1149,1151-1154,1156
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_19420f96f1d2e3 24
+  s_7e484d91fceb6c::t_81590e6a8cf61a 59
+  s_7e484d91fceb6c::t_4c9944209f0d00 166
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_23d2e3161411ad 872,880-881
+  s_7e484d91fceb6c::t_c0e73e439628e9 564
+  s_7e484d91fceb6c::t_1ec39687a2e434 569,576,598-616
+  s_7e484d91fceb6c::t_447eac60ee9c5c 407-408,410-411,414-416,423-453,470,617-618
+  s_7e484d91fceb6c::t_9b5e30224f1184 542
+  s_7e484d91fceb6c::t_39fdf30648f4d8 67-71
+  s_7e484d91fceb6c::t_b75944ab5c762c 770-776
+  s_7e484d91fceb6c::t_7fbf0af69f4349 927,930,975,992,1014,1031
+affilio-api/internal/handlers/orp_human_approval_test.go
+  s_7e484d91fceb6c::t_132b26bd47989e 282
+affilio-api/internal/migrations/056_orp_deal_tracking.sql
+  s_7e484d91fceb6c::t_2db66af2b60a3b 1-5
+affilio-api/internal/handlers/handlers_test.go
+  s_7e484d91fceb6c::t_d4f3bb5274a778 134
+  s_7e484d91fceb6c::t_dc3d696991f8c1 271
+STATUS.md
+  s_7e484d91fceb6c::t_4a580e630ec94a 1-6
+affilio-api/internal/handlers/allagio_discovery.go
+  s_7e484d91fceb6c::t_1c61dfa786f51e 79,101-105,107
+affilio-api/internal/orp/bundled/GAPS.md
+  s_7e484d91fceb6c::t_5680ced9f22190 18-19,22-25
+affilio-wp/admin/build/landing-v9/llms-full.txt
+  s_7e484d91fceb6c::t_ae667d2bf7b60d 18,52,230
+docs/protocol/GAPS.md
+  s_7e484d91fceb6c::t_f36a6d6eec6041 18-19,22-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c24e669e571cb8319d6a771ba654ca05909ed30b",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
