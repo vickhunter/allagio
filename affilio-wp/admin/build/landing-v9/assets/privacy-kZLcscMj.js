@@ -1,1 +1,0 @@
-import{S as e,x as t}from"./Page-B90lvm1L.js";import{n,t as r}from"./Document-DF6INtET.js";var i=e();function a(){return(0,i.jsx)(r,{title:n.title,lede:n.lede,sections:n.sections,otherHref:`/terms`,otherLabel:`Read the terms draft`})}t(`privacy`,(0,i.jsx)(a,{}));

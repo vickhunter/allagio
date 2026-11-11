@@ -1,3 +1,7 @@
+## November 11 — use-cases page: icon card grid
+
+`/use-cases` flat split text rows become a `md:grid-cols-2` card grid: per-case lucide icon chip (BadgePercent/Handshake/ArrowLeftRight/Coins/Share2/Mail/Link2/Megaphone), problem + how copy, and the tools row as an inset mono chip. Hover lift + gradient edge reveal matches the homepage piece figures; section anchors kept for dropdown deep-links. Verified 1440 + 390, no overflow. React Doctor clean, stamped. `CLAIMS_CHECK` unchanged.
+
 ## November 11 — Magic UI pass: piece figures, compare cards, nav affordance
 
 Round two of the Magic UI sweep. `#makers`/`#publishers` `figure.piece` blocks now have icon figcaptions (Calculator in maker terracotta, LayoutTemplate in publisher olive), a hover lift + shadow, and a top gradient reveal line in the role's brand color. `#compare` articles become proper cards: muted XCircle on "before", pub-olive CheckCircle2 + accent border + shadow + gradient edge on "after". Nav "Use cases" trigger got a rotating ChevronDown and the dropdown translates in on open. React Doctor 100/100, stamped to `admin/build/landing-v9`. `CLAIMS_CHECK` unchanged.

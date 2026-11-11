@@ -1,8 +1,11 @@
 import { Page } from '@/site/Page'
 import { withSource, useSource } from '@/lib/source'
 import { useCaseLinks } from '@/use-cases/links.mjs'
+import { ArrowLeftRight, BadgePercent, Coins, Handshake, Link2, Mail, Megaphone, Share2 } from 'lucide-react'
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
+
+const caseIcons = [BadgePercent, Handshake, ArrowLeftRight, Coins, Share2, Mail, Link2, Megaphone]
 
 const cases = [
   {
@@ -66,19 +69,24 @@ export function App() {
         <p className="mt-4"><a className={linkClass} href={withSource('/agents', source)}>Set up your agent</a></p>
       </section>
 
-      <div className="mx-auto max-w-6xl px-5 pb-16">
-        {cases.map((c) => (
-          <section key={c.id} id={c.id} aria-labelledby={`${c.id}-h`} className="scroll-mt-32 border-t border-line py-10 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:gap-10">
-            <div>
-              <h2 id={`${c.id}-h`} className="h-display text-2xl sm:text-3xl">{c.title}</h2>
-              <p className="mt-3 text-[15px] leading-relaxed text-t2">{c.problem}</p>
-            </div>
-            <div className="mt-4 md:mt-0">
-              <p className="text-[15px] leading-relaxed text-t1">{c.how}</p>
-              <p className="mt-3 font-mono text-[13px] leading-relaxed text-t2">{c.tools}</p>
-            </div>
-          </section>
-        ))}
+      <div className="mx-auto grid max-w-6xl gap-5 px-5 pb-16 md:grid-cols-2">
+        {cases.map((c, i) => {
+          const Icon = caseIcons[i]
+          return (
+            <section key={c.id} id={c.id} aria-labelledby={`${c.id}-h`} className="group relative scroll-mt-32 overflow-hidden rounded-xl border border-line bg-s1 p-6 transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-lg">
+              <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-pub/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-s0 text-t1 transition-transform duration-300 group-hover:scale-110">
+                  <Icon aria-hidden="true" className="h-5 w-5" />
+                </span>
+                <h2 id={`${c.id}-h`} className="h-display text-xl sm:text-2xl">{c.title}</h2>
+              </div>
+              <p className="mt-4 text-[15px] leading-relaxed text-t2">{c.problem}</p>
+              <p className="mt-3 text-[15px] leading-relaxed text-t1">{c.how}</p>
+              <p className="mt-4 rounded-lg bg-s2/60 px-3 py-2 font-mono text-[12.5px] leading-relaxed text-t2">{c.tools}</p>
+            </section>
+          )
+        })}
       </div>
     </Page>
   )
