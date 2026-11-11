@@ -64,7 +64,11 @@ type ORPDeal struct {
 	Obligations   json.RawMessage
 	Bound         json.RawMessage
 	// Parties is the 0.4 many-party document. Nil on an ORP 0.3 row.
-	Parties   json.RawMessage
+	Parties json.RawMessage
+	// Tracking is the 0.3 tracked-link document ({tracking, clicks,
+	// link_receipts}) minted on first activate. Nil until then; a 0.4 row
+	// keeps the same data inside Parties instead.
+	Tracking  json.RawMessage
 	UpdatedAt time.Time
 	CreatedAt time.Time
 	// WireApprovals is who approved each ask step for this 0.4 response.
@@ -400,17 +404,52 @@ func (d *DB) RecordORPClick(ctx context.Context, token, class, clickID string, a
 	}
 	defer tx.Rollback(ctx)
 	var id, state string
-	var parties, obligationsRaw, termsRaw []byte
+	var parties, trackingRaw, obligationsRaw, termsRaw []byte
+	var offererOwner, offererParty, acceptorOwner, acceptorParty *string
 	err = tx.QueryRow(ctx, `
-SELECT id, state, parties, obligations, terms
+SELECT id, state, parties, tracking, obligations, terms,
+       offerer_owner::text, offerer_party, acceptor_owner::text, acceptor_party
 FROM orp_deals
 WHERE parties->'tracking' @> jsonb_build_array(jsonb_build_object('token', $1::text))
-FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
+   OR tracking->'tracking' @> jsonb_build_array(jsonb_build_object('token', $1::text))
+FOR UPDATE`, token).Scan(&id, &state, &parties, &trackingRaw, &obligationsRaw, &termsRaw,
+		&offererOwner, &offererParty, &acceptorOwner, &acceptorParty)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", "", "", false, nil
 	}
 	if err != nil {
 		return "", "", "", false, err
+	}
+	// A 0.4 deal keeps tracking inside parties; a 0.3 deal in the tracking
+	// column. Both hold the same document shape, so one pipeline serves both.
+	var raw []byte
+	column := ""
+	for _, candidate := range []struct {
+		col string
+		doc []byte
+	}{{"parties", parties}, {"tracking", trackingRaw}} {
+		if len(candidate.doc) == 0 {
+			continue
+		}
+		var probe struct {
+			Tracking []struct {
+				Token string `json:"token"`
+			} `json:"tracking"`
+		}
+		if json.Unmarshal(candidate.doc, &probe) != nil {
+			continue
+		}
+		for _, e := range probe.Tracking {
+			if e.Token == token {
+				raw, column = candidate.doc, candidate.col
+			}
+		}
+		if column != "" {
+			break
+		}
+	}
+	if column == "" {
+		return "", "", "", false, nil
 	}
 	var doc struct {
 		Seats []struct {
@@ -428,7 +467,7 @@ FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 		} `json:"tracking"`
 		Clicks []json.RawMessage `json:"clicks"`
 	}
-	if err = json.Unmarshal(parties, &doc); err != nil {
+	if err = json.Unmarshal(raw, &doc); err != nil {
 		return "", "", "", false, err
 	}
 	var entry *struct {
@@ -500,7 +539,7 @@ FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 	}
 	doc.Clicks = append(doc.Clicks, click)
 	var stored map[string]any
-	if err = json.Unmarshal(parties, &stored); err != nil {
+	if err = json.Unmarshal(raw, &stored); err != nil {
 		return "", "", "", false, err
 	}
 	clicks := make([]any, 0, len(doc.Clicks))
@@ -522,19 +561,19 @@ FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 			"verified_at": at.Format(time.RFC3339),
 		})
 	}
-	raw, err := json.Marshal(stored)
+	raw, err = json.Marshal(stored)
 	if err != nil {
 		return "", "", "", false, err
 	}
 	if receiptID == "" {
-		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET parties=$2 WHERE id=$1`, id, raw); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET `+column+`=$2 WHERE id=$1`, id, raw); err != nil {
 			return "", "", "", false, err
 		}
 	} else {
 		if at.IsZero() {
 			at = time.Now().UTC()
 		}
-		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET parties=$2, obligations=$3, updated_at=$4 WHERE id=$1`, id, raw, JSONList(nextObligations), at.UTC()); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE orp_deals SET `+column+`=$2, obligations=$3, updated_at=$4 WHERE id=$1`, id, raw, JSONList(nextObligations), at.UTC()); err != nil {
 			return "", "", "", false, err
 		}
 		host := ""
@@ -554,6 +593,27 @@ FOR UPDATE`, token).Scan(&id, &state, &parties, &obligationsRaw, &termsRaw)
 			}
 			if _, err = tx.Exec(ctx, `INSERT INTO orp_inbox(owner_id, message) VALUES($1,$2)`, seat.Owner, message); err != nil {
 				return "", "", "", false, err
+			}
+		}
+		// A 0.3 deal has no seats; the receipt reaches both owners directly.
+		if len(doc.Seats) == 0 {
+			host = hostPartyFromSeat(oneStr(offererParty))
+			for _, dest := range []struct {
+				owner, party *string
+			}{{offererOwner, offererParty}, {acceptorOwner, acceptorParty}} {
+				if dest.owner == nil || dest.party == nil || host == "" {
+					continue
+				}
+				message, err := json.Marshal(map[string]any{
+					"orp": "0.3", "type": "receipt", "id": receiptID, "ts": at.UTC().Format(time.RFC3339),
+					"from": host, "to": *dest.party, "deal": id, "body": receiptBody,
+				})
+				if err != nil {
+					return "", "", "", false, err
+				}
+				if _, err = tx.Exec(ctx, `INSERT INTO orp_inbox(owner_id, message) VALUES($1::uuid,$2)`, *dest.owner, message); err != nil {
+					return "", "", "", false, err
+				}
 			}
 		}
 	}
@@ -707,6 +767,13 @@ func hostPartyFromSeat(seatID string) string {
 	return "orp:" + rest[:i] + "/host"
 }
 
+func oneStr(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
+}
+
 func jsonWhole(value any) (int, bool) {
 	switch n := value.(type) {
 	case float64:
@@ -802,7 +869,7 @@ SELECT EXISTS(
 // obligations, when set, replaces the obligation rows in the same transaction —
 // a held share claim or obligation revoke lands on approval.
 // changed is false when the row is no longer awaiting.
-func (d *DB) ActivateORPDeal(ctx context.Context, id, state string, bound, obligations json.RawMessage, updated time.Time, inbox []ORPInboxItem, approval *DealApproval) (bool, error) {
+func (d *DB) ActivateORPDeal(ctx context.Context, id, state string, bound, obligations json.RawMessage, updated time.Time, inbox []ORPInboxItem, approval *DealApproval, tracking json.RawMessage) (bool, error) {
 	tx, err := d.Pool.Begin(ctx)
 	if err != nil {
 		return false, err
@@ -810,8 +877,8 @@ func (d *DB) ActivateORPDeal(ctx context.Context, id, state string, bound, oblig
 	defer tx.Rollback(ctx)
 	tag, err := tx.Exec(ctx, `
 UPDATE orp_deals
-SET state=$2, waiting=NULL, bound=$3, updated_at=$4, obligations=COALESCE($5, obligations)
-WHERE id=$1 AND state='awaiting'`, id, state, JSONList(bound), updated, nullJSON(obligations))
+SET state=$2, waiting=NULL, bound=$3, updated_at=$4, obligations=COALESCE($5, obligations), tracking=COALESCE($6, tracking)
+WHERE id=$1 AND state='awaiting'`, id, state, JSONList(bound), updated, nullJSON(obligations), nullJSON(tracking))
 	if err != nil {
 		return false, err
 	}
@@ -857,10 +924,10 @@ func (d *DB) GetORPDeal(ctx context.Context, id string) (ORPDeal, bool, error) {
 	var offerID, offererOwner *string
 	err := d.Pool.QueryRow(ctx, `
 SELECT id, offer_id, offerer_owner::text, acceptor_owner::text, offerer_party, acceptor_party,
-       terms, terms_hash, state, waiting, obligations, bound, parties, updated_at, created_at
+       terms, terms_hash, state, waiting, obligations, bound, parties, tracking, updated_at, created_at
 FROM orp_deals WHERE id=$1`, id).Scan(
 		&deal.ID, &offerID, &offererOwner, &deal.AcceptorOwner, &deal.OffererParty, &deal.AcceptorParty,
-		&deal.Terms, &deal.TermsHash, &deal.State, &deal.Waiting, &deal.Obligations, &deal.Bound, &deal.Parties, &deal.UpdatedAt, &deal.CreatedAt,
+		&deal.Terms, &deal.TermsHash, &deal.State, &deal.Waiting, &deal.Obligations, &deal.Bound, &deal.Parties, &deal.Tracking, &deal.UpdatedAt, &deal.CreatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ORPDeal{}, false, nil
@@ -905,7 +972,7 @@ func (d *DB) ListOwnerORPDeals(ctx context.Context, ownerID string, limit int) (
 	}
 	rows, err := d.Pool.Query(ctx, `
 SELECT id, offer_id, offerer_owner::text, acceptor_owner::text, offerer_party, acceptor_party,
-       terms, terms_hash, state, waiting, obligations, bound, parties, updated_at, created_at
+       terms, terms_hash, state, waiting, obligations, bound, parties, tracking, updated_at, created_at
 FROM orp_deals
 WHERE
     (parties IS NULL AND (offerer_owner=$1::uuid OR acceptor_owner=$1::uuid))
@@ -922,7 +989,7 @@ LIMIT $2`, ownerID, limit)
 		var offerID, offererOwner *string
 		if err = rows.Scan(
 			&deal.ID, &offerID, &offererOwner, &deal.AcceptorOwner, &deal.OffererParty, &deal.AcceptorParty,
-			&deal.Terms, &deal.TermsHash, &deal.State, &deal.Waiting, &deal.Obligations, &deal.Bound, &deal.Parties, &deal.UpdatedAt, &deal.CreatedAt,
+			&deal.Terms, &deal.TermsHash, &deal.State, &deal.Waiting, &deal.Obligations, &deal.Bound, &deal.Parties, &deal.Tracking, &deal.UpdatedAt, &deal.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -944,7 +1011,7 @@ func (d *DB) ListORPDealsForParty(ctx context.Context, party string, limit int) 
 	}
 	rows, err := d.Pool.Query(ctx, `
 SELECT id, offer_id, offerer_owner::text, acceptor_owner::text, offerer_party, acceptor_party,
-       terms, terms_hash, state, waiting, obligations, bound, parties, updated_at, created_at
+       terms, terms_hash, state, waiting, obligations, bound, parties, tracking, updated_at, created_at
 FROM orp_deals
 WHERE
     (parties IS NULL AND (offerer_party=$1 OR acceptor_party=$1))
@@ -961,7 +1028,7 @@ LIMIT $2`, party, limit)
 		var offerID, offererOwner *string
 		if err = rows.Scan(
 			&deal.ID, &offerID, &offererOwner, &deal.AcceptorOwner, &deal.OffererParty, &deal.AcceptorParty,
-			&deal.Terms, &deal.TermsHash, &deal.State, &deal.Waiting, &deal.Obligations, &deal.Bound, &deal.Parties, &deal.UpdatedAt, &deal.CreatedAt,
+			&deal.Terms, &deal.TermsHash, &deal.State, &deal.Waiting, &deal.Obligations, &deal.Bound, &deal.Parties, &deal.Tracking, &deal.UpdatedAt, &deal.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

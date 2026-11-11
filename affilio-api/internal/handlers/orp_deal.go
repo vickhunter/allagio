@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
@@ -204,6 +203,10 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
+	tracking := h.trackingDoc03(dns, deal, state)
+	if len(tracking) > 0 {
+		deal.Tracking = tracking
+	}
 	deal.State = state
 	deal.Waiting = nil
 	deal.Bound = bound
@@ -221,7 +224,7 @@ func (h *ORPHost) Activate(c *gin.Context) {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
-	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, state, bound, obligations, deal.UpdatedAt, h.dealInbox(dns, "", deal, now), record)
+	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, state, bound, obligations, deal.UpdatedAt, h.dealInbox(dns, "", deal, now), record, tracking)
 	if err != nil {
 		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
@@ -441,6 +444,35 @@ func (h *ORPHost) acceptReady(c *gin.Context, deal database.ORPDeal) (bool, erro
 	return h.Entry.DB.ORPAcceptStored(c.Request.Context(), deal.AcceptorParty, deal.ID)
 }
 
+// trackingDoc03 mints the 0.3 tracked-link doc when a deal first reaches
+// active. The column mirrors the tracking/clicks/link_receipts part of the
+// 0.4 parties doc so one click pipeline serves both. An existing doc, a
+// non-active state, or a 0.4 row returns nil — the column is left alone.
+func (h *ORPHost) trackingDoc03(dns string, deal database.ORPDeal, state string) json.RawMessage {
+	if state != "active" || len(deal.Parties) > 0 {
+		return nil
+	}
+	var doc orp.Many
+	if len(deal.Tracking) > 0 && string(deal.Tracking) != "null" {
+		if err := json.Unmarshal(deal.Tracking, &doc); err == nil && len(doc.Tracking) > 0 {
+			return nil
+		}
+	}
+	terms, err := decodeObject(deal.Terms)
+	if err != nil {
+		return nil
+	}
+	doc.Tracking = orp.MintTracking(h.publicOrigin(dns), deal.ID, terms, nil)
+	if len(doc.Tracking) == 0 {
+		return nil
+	}
+	raw, err := json.Marshal(map[string]any{"tracking": doc.Tracking})
+	if err != nil {
+		return nil
+	}
+	return raw
+}
+
 // stepAskRecord is the approval row for a step_ask wait. Nil when the wait is not one.
 func (h *ORPHost) stepAskRecord(dns string, deal database.ORPDeal, by string) *database.DealApproval {
 	if len(deal.Waiting) == 0 || string(deal.Waiting) == "null" {
@@ -460,6 +492,10 @@ func (h *ORPHost) stepAskRecord(dns string, deal database.ORPDeal, by string) *d
 }
 
 func (h *ORPHost) writeActive03(c *gin.Context, dns, viewer string, deal database.ORPDeal, record *database.DealApproval, state string, obligations json.RawMessage) {
+	tracking := h.trackingDoc03(dns, deal, state)
+	if len(tracking) > 0 {
+		deal.Tracking = tracking
+	}
 	doc, err := h.dealMessage(dns, viewer, "", deal, deal.UpdatedAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
@@ -470,7 +506,7 @@ func (h *ORPHost) writeActive03(c *gin.Context, dns, viewer string, deal databas
 		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
 		return
 	}
-	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, state, deal.Bound, obligations, deal.UpdatedAt, h.dealInbox(dns, "", deal, deal.UpdatedAt), record)
+	changed, err := h.Entry.DB.ActivateORPDeal(c.Request.Context(), deal.ID, state, deal.Bound, obligations, deal.UpdatedAt, h.dealInbox(dns, "", deal, deal.UpdatedAt), record, tracking)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"reason": "unavailable"})
 		return
@@ -976,12 +1012,12 @@ func (h *ORPHost) standingItems(c *gin.Context, text string) ([]any, error) {
 	items := make([]any, 0)
 	for _, offer := range offers {
 		terms, err := decodeObject(offer.Terms)
-		if err != nil || orp.OfferExpired(terms, h.now()) || !orp.OfferMatches(terms, text) {
+		if err != nil || orp.OfferExpired(terms, h.now()) {
 			continue
 		}
-		reason := "Standing test offer: " + orp.TermsTitle(terms) + "."
-		if utf8.RuneCountInString(reason) > 200 {
-			reason = string([]rune(reason)[:200])
+		score, reason, ok := orp.ScoreOffer(terms, text)
+		if !ok {
+			continue
 		}
 		items = append(items, map[string]any{
 			"offer": map[string]any{
@@ -991,7 +1027,7 @@ func (h *ORPHost) standingItems(c *gin.Context, text string) ([]any, error) {
 			},
 			"party": offer.Party,
 			"fit": map[string]any{
-				"score":   70,
+				"score":   score,
 				"reasons": []any{reason},
 			},
 			"pool":   "test",
@@ -1192,7 +1228,7 @@ func (h *ORPHost) dealMessage(dns, viewer, re string, deal database.ORPDeal, now
 	if len(deal.Parties) > 0 {
 		return h.manySnapshot(dns, viewer, re, deal, now)
 	}
-	body, err := dealBody(deal, now)
+	body, err := dealBody(deal, h.publicOrigin(dns), now)
 	if err != nil {
 		return nil, err
 	}
@@ -1270,7 +1306,7 @@ func newTestDeal(offerID, offererOwner, acceptorOwner, offererParty, acceptorPar
 	}
 }
 
-func dealBody(deal database.ORPDeal, now time.Time) (map[string]any, error) {
+func dealBody(deal database.ORPDeal, origin string, now time.Time) (map[string]any, error) {
 	terms, err := decodeObject(deal.Terms)
 	if err != nil {
 		return nil, err
@@ -1309,6 +1345,47 @@ func dealBody(deal database.ORPDeal, now time.Time) (map[string]any, error) {
 			return nil, err
 		}
 		body["waiting"] = waiting
+	}
+	// The 0.3 tracked-link doc mirrors the 0.4 wire shape so a party reads
+	// tracking the same way on either deal kind.
+	if len(deal.Tracking) > 0 && string(deal.Tracking) != "null" {
+		var doc orp.Many
+		if err := json.Unmarshal(deal.Tracking, &doc); err != nil {
+			return nil, err
+		}
+		if len(doc.Tracking) > 0 {
+			rows := make([]any, len(doc.Tracking))
+			for i, entry := range doc.Tracking {
+				clicks, share := orp.ClickReadout(doc, entry.Obligation)
+				item := map[string]any{
+					"obligation":  entry.Obligation,
+					"link":        strings.TrimRight(origin, "/") + "/go/" + entry.Token,
+					"destination": entry.Destination,
+					"status":      entry.Status,
+					"param":       entry.Param,
+					"clicks":      clicks,
+					"click_share": share,
+				}
+				if entry.Alias != "" {
+					item["alias"] = entry.Alias
+				}
+				for _, receipt := range doc.LinkReceipts {
+					if receipt.Obligation != entry.Obligation || receipt.ID == "" || receipt.VerifiedAt == "" {
+						continue
+					}
+					method := receipt.Method
+					if method == "" {
+						method = "link"
+					}
+					item["receipt"] = map[string]any{
+						"id": receipt.ID, "method": method, "verified_at": receipt.VerifiedAt,
+					}
+					break
+				}
+				rows[i] = item
+			}
+			body["tracking"] = rows
+		}
 	}
 	return body, nil
 }

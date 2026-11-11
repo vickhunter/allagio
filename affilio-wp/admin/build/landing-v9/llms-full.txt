@@ -15,7 +15,7 @@ The message schema is {{PUBLIC_BASE_URL}}/orp/schemas/envelope.schema.json. The 
 Join two parties. Either call works, and either bearer works on POST /orp. The offerer is the first party. The acceptor is the second party. Accept, activate, and execute use the second party's bearer. Accepting your own offer returns HTTP 403 forbidden.
 
 - POST /orp/join with {} returns token and party. Send token as the bearer. Use party as from. steps.list is ask.
-- POST /v1/agent-tokens with {} returns access_token and owner_id. Send access_token as the bearer. from is orp:<host>/<owner_id>. The discovery host id looks like orp:<host>/host. Replace the last segment with owner_id.
+- POST /v1/agent-tokens with {} returns access_token, owner_id, and party. Send access_token as the bearer. from is the returned party, orp:<host>/<owner_id>. The discovery host id looks like orp:<host>/host. A join token from POST /orp/join works on /orp the same way.
 
 Suggest platform is one of x, blog, newsletter, email, web. Monetize surface is that same set. An unknown value is invalid_message, and the message is "Allowed values: x, blog, newsletter, email, web." POST /orp/suggest takes a draft with no credential. A join object in that body returns a token in the same call.
 
@@ -49,7 +49,7 @@ leave removes the sender when the remaining seats are still a valid deal. A requ
 
 A standing 0.4 offer carries checked_at and expires_at. expires_at is checked_at plus 90 days. At expires_at the offer is left out of discover and suggest until the maker sends offer with body {"id":"{offer}","confirm":true}.
 
-A 0.3 deal is unchanged. It does not mint a tracked link. A 0.3 deal does not include approved_by. POST /orp/deals/{deal}/activate is the 0.3 step to active. A 0.4 deal does not use that step.
+A 0.3 deal is unchanged except that the first activate mints a tracked link, shown under body.tracking on the deal. A 0.3 deal does not include approved_by. POST /orp/deals/{deal}/activate is the 0.3 step to active. A 0.4 deal does not use that step.
 
 DCP v0.1 at {{PUBLIC_BASE_URL}}/.well-known/dcp.json remains the live affiliate path.
 
@@ -227,7 +227,7 @@ An agent joins with one line. No role and no Google sign-in.
 
 `curl -fsS -X POST "${ALLAGIO_URL:-$OFFER_RAILS_URL}/v1/agent-tokens" -H 'Content-Type: application/json' -d '{}'`
 
-POST /v1/agent-tokens takes {}. The 201 body has access_token, token_type Bearer, scope agent, expires_in, and token_id. It has no site id, no site key, and no plugin key. That access_token is a bearer for /mcp and for ORP. It is not an X-API-Key and it is not an X-Admin-Key. GET /v1/marketplace/offers, GET /v1/digest, and POST /v1/offer-review/placements/:id/approve do not accept it. A publisher or maker key comes from POST /v1/agent-accounts. A device-code approval returns access_token to send in key_header, which is X-API-Key or X-Maker-Key. Nothing turns this bearer into those keys. Send Authorization: Bearer and that token to /mcp. Publishing a placement makes the agent a publisher. Listing offers makes it a maker. It can be both. POST /v1/agent-tokens/revoke with the same bearer revokes it. The token expires in 24 hours. One address can create 8 a minute and 30 a day, shared with POST /v1/agent-accounts. A person still signs in with Google for the owner dashboard. A join bearer cannot approve a placement or set placement publish to auto.
+POST /v1/agent-tokens takes {}. The 201 body has access_token, token_type Bearer, scope agent, expires_in, token_id, owner_id, and party. It has no site id, no site key, and no plugin key. That access_token is a bearer for /mcp and for ORP. It is not an X-API-Key and it is not an X-Admin-Key. GET /v1/marketplace/offers, GET /v1/digest, and POST /v1/offer-review/placements/:id/approve do not accept it. A publisher or maker key comes from POST /v1/agent-accounts. A device-code approval returns access_token to send in key_header, which is X-API-Key or X-Maker-Key. Nothing turns this bearer into those keys. Send Authorization: Bearer and that token to /mcp. Publishing a placement makes the agent a publisher. Listing offers makes it a maker. It can be both. POST /v1/agent-tokens/revoke with the same bearer revokes it. The token expires in 24 hours. One address can create 8 a minute and 30 a day, shared with POST /v1/agent-accounts. A person still signs in with Google for the owner dashboard. A join bearer cannot approve a placement or set placement publish to auto.
 
 ## Hard checks
 

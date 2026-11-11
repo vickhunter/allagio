@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -753,8 +754,14 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 	if len(bound) != 2 || !parties[offerer] || !parties[acceptor] {
 		t.Fatalf("bound %s", actRec.Body.String())
 	}
-	if _, ok := actDeal["tracking"]; ok {
-		t.Fatalf("tracking minted %s", actRec.Body.String())
+	tracking, _ := actDeal["tracking"].([]any)
+	if len(tracking) != 1 {
+		t.Fatalf("tracking not minted %s", actRec.Body.String())
+	}
+	trackRow, _ := tracking[0].(map[string]any)
+	trackLink, _ := trackRow["link"].(string)
+	if trackRow["obligation"] != "place" || !strings.Contains(trackLink, "/go/") {
+		t.Fatalf("tracking entry %v", trackRow)
 	}
 	if err := orp.ValidateAgainst(schemaPath(t, "messages/deal.schema.json"), actBody); err != nil {
 		t.Fatalf("activate schema: %v\n%s", err, actRec.Body.String())
@@ -1006,7 +1013,7 @@ func TestApprovedByKeepsEachParty(t *testing.T) {
 	if _, ok := body["approved_by"]; ok {
 		t.Fatal("failed read still sent approved_by")
 	}
-	plain, err := dealBody(deal, now)
+	plain, err := dealBody(deal, "http://example.test", now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1093,4 +1100,57 @@ func inboxHasReceipt(t *testing.T, messages []any) bool {
 		}
 	}
 	return false
+}
+
+func TestORP03TrackingMinted(t *testing.T) {
+	_, r := trustHost(t)
+	makerToken, maker := joinParty(t, r)
+	pubToken, publisher := joinParty(t, r)
+
+	directed := orpEnvelope("offer", "m_track_offer", maker, standingOffer())
+	directed["to"] = publisher
+	dirRec, dirBody := postJSON(t, r, http.MethodPost, "/orp", directed, bearerHeader(makerToken))
+	dirID, _ := dirBody["deal"].(string)
+	dirDeal, _ := dirBody["body"].(map[string]any)
+	if dirRec.Code != http.StatusOK || dirID == "" {
+		t.Fatalf("directed %d %s", dirRec.Code, dirRec.Body.String())
+	}
+	acc := orpEnvelope("accept", "m_track_accept", publisher, map[string]any{"terms_hash": dirDeal["terms_hash"]})
+	acc["deal"] = dirID
+	accRec, _ := postJSON(t, r, http.MethodPost, "/orp", acc, bearerHeader(pubToken))
+	if accRec.Code != http.StatusOK {
+		t.Fatalf("accept %d %s", accRec.Code, accRec.Body.String())
+	}
+	actRec, actBody := postJSON(t, r, http.MethodPost, "/orp/deals/"+dirID+"/activate", nil, bearerHeader(makerToken))
+	if actRec.Code != http.StatusOK {
+		t.Fatalf("activate %d %s", actRec.Code, actRec.Body.String())
+	}
+	tracking, _ := actBody["body"].(map[string]any)["tracking"].([]any)
+	if len(tracking) != 1 {
+		t.Fatalf("activate tracking %s", actRec.Body.String())
+	}
+	entry, _ := tracking[0].(map[string]any)
+	link, _ := entry["link"].(string)
+	if entry["obligation"] != "place" || entry["destination"] != "https://example.com/notes" || !strings.Contains(link, "/go/") {
+		t.Fatalf("tracking entry %v", entry)
+	}
+	token := link[strings.LastIndex(link, "/go/")+4:]
+
+	req := httptest.NewRequest(http.MethodGet, "/go/"+token, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusFound || !strings.HasPrefix(w.Header().Get("Location"), "https://example.com/notes") {
+		t.Fatalf("go redirect %d %s", w.Code, w.Header().Get("Location"))
+	}
+
+	dealRec, dealDoc := postJSON(t, r, http.MethodGet, "/orp/deals/"+dirID, nil, bearerHeader(makerToken))
+	if dealRec.Code != http.StatusOK {
+		t.Fatalf("deal %d %s", dealRec.Code, dealRec.Body.String())
+	}
+	rows, _ := dealDoc["body"].(map[string]any)["tracking"].([]any)
+	row, _ := rows[0].(map[string]any)
+	if len(rows) != 1 || row["clicks"] != float64(1) {
+		t.Fatalf("deal tracking %s", dealRec.Body.String())
+	}
 }

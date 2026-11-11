@@ -398,6 +398,7 @@ func pitch(dns string, candidate Candidate, draft string, words []string) (map[s
 			"score":   score,
 			"reasons": []any{reason},
 		},
+		"pool":   "catalog",
 		"checks": map[string]any{"claims": "not_checked"},
 		"pitch":  text,
 	}
@@ -559,17 +560,39 @@ func JoinResponse(origin, dns, ownerID, token string) map[string]any {
 // OfferMatches reports whether a standing offer fits discover text.
 // An empty word list matches every offer. A word counts at length 4.
 func OfferMatches(terms map[string]any, text string) bool {
+	_, _, ok := ScoreOffer(terms, text)
+	return ok
+}
+
+// ScoreOffer is the one matcher suggest and discover share for standing
+// offers. It returns a 0–100 fit and a reason that quotes the matched
+// words (FitReason), or ok=false when no draft word overlaps the terms.
+// An empty text lists every offer at a neutral 55 with an honest
+// "no query" reason.
+func ScoreOffer(terms map[string]any, text string) (score int, reason string, ok bool) {
 	words := matchWords(text)
 	if len(words) == 0 {
-		return true
+		reason = "Standing offer: " + TermsTitle(terms) + "."
+		if utf8.RuneCountInString(reason) > 200 {
+			reason = clipRunes(reason, 200)
+		}
+		return 55, reason, true
 	}
 	blob := strings.ToLower(termsBlob(terms))
+	hits := 0
 	for _, word := range words {
 		if strings.Contains(blob, word) {
-			return true
+			hits++
 		}
 	}
-	return false
+	if hits == 0 {
+		return 0, "", false
+	}
+	score = 40 + hits*15
+	if score > 100 {
+		score = 100
+	}
+	return score, FitReason(text, termsBlob(terms)), true
 }
 
 func termsBlob(terms map[string]any) string {

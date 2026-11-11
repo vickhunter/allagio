@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"affilio-api/internal/database"
+	"affilio-api/internal/orp"
 	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -56,6 +57,11 @@ func (h *AgentEntry) CreateAgentToken(c *gin.Context) {
 		c.JSON(status, gin.H{"error": errText})
 		return
 	}
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	_, dns := orp.Origin(h.BaseURL, scheme, c.Request.Host)
 	c.JSON(http.StatusCreated, gin.H{
 		"access_token": raw,
 		"token_type":   "Bearer",
@@ -63,6 +69,7 @@ func (h *AgentEntry) CreateAgentToken(c *gin.Context) {
 		"expires_in":   joinExpiresIn(issued.ExpiresAt),
 		"token_id":     issued.TokenID,
 		"owner_id":     issued.OwnerID,
+		"party":        orp.MemberParty(dns, issued.OwnerID),
 		"agent_only":   true,
 		"human_login":  false,
 		"roles":        []string{},

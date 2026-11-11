@@ -525,7 +525,8 @@ func (h *ORPHost) ApprovePost(c *gin.Context) {
 	h.publishMany(c, dns, msg, bodyHash, deal, mustMany(deal), expectHash, expectAt)
 }
 
-// Go redirects a tracked 0.4 link and attributes the click by split.
+// Go redirects a tracked link and attributes the click by split.
+// The token lookup covers a 0.4 parties doc and a 0.3 tracking column alike.
 func (h *ORPHost) Go(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("Referrer-Policy", "no-referrer")
@@ -987,12 +988,12 @@ func (h *ORPHost) freshPitches(c *gin.Context, text string) ([]any, error) {
 	items := make([]any, 0)
 	for _, offer := range offers {
 		terms, err := decodeObject(offer.Terms)
-		if err != nil || !orp.HasCheckedAt(terms) || orp.OfferExpired(terms, h.now()) || !orp.OfferMatches(terms, text) {
+		if err != nil || !orp.HasCheckedAt(terms) || orp.OfferExpired(terms, h.now()) {
 			continue
 		}
-		reason := "Standing test offer: " + orp.TermsTitle(terms) + "."
-		if utf8.RuneCountInString(reason) > 200 {
-			reason = string([]rune(reason)[:200])
+		score, reason, ok := orp.ScoreOffer(terms, text)
+		if !ok {
+			continue
 		}
 		pitch := "You can monetize this draft: " + orp.TermsTitle(terms) + "."
 		if utf8.RuneCountInString(pitch) > 280 {
@@ -1001,7 +1002,8 @@ func (h *ORPHost) freshPitches(c *gin.Context, text string) ([]any, error) {
 		items = append(items, map[string]any{
 			"offer":  map[string]any{"id": offer.ID, "terms": terms, "terms_hash": offer.TermsHash},
 			"party":  offer.Party,
-			"fit":    map[string]any{"score": 70, "reasons": []any{reason}},
+			"fit":    map[string]any{"score": score, "reasons": []any{reason}},
+			"pool":   "test",
 			"checks": map[string]any{"claims": "not_checked"},
 			"pitch":  pitch,
 		})

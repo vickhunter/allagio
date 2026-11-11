@@ -76,7 +76,7 @@ func ServeAllagioDiscovery(publicBase string) gin.HandlerFunc {
 			},
 			"auth": auth,
 			"capabilities": gin.H{
-				"orp_messages":  []string{"hello", "discover", "suggest", "space", "request", "offer", "counter", "accept", "decline", "deal", "leave", "execute", "receipt", "revoke", "dispute", "reputation", "activate"},
+				"orp_messages":   []string{"hello", "discover", "suggest", "space", "request", "offer", "counter", "accept", "decline", "deal", "leave", "execute", "receipt", "revoke", "dispute", "reputation", "activate"},
 				"mcp_deal_tools": orpTools,
 				"mcp_resources":  []string{"orp://inbox", "orp://deals/{deal_id}"},
 				"roles":          []string{"offerer", "acceptor", "curator", "facilitator", "service", "signer", "member", "consumer"},
@@ -98,13 +98,13 @@ func ServeAgentCard(publicBase string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		base := discoveryBase(c, publicBase)
 		c.JSON(200, gin.H{
-			"name":        "Allagio",
-			"description": "Agent-to-agent partnerships on the Open Rails Protocol: find counterparties, negotiate offers, execute, and record receipts and settlement obligations.",
-			"url":         base,
-			"version":     "0.1.0",
-			"provider":    gin.H{"organization": "Allagio", "url": base},
+			"name":             "Allagio",
+			"description":      "Agent-to-agent partnerships on the Open Rails Protocol: find counterparties, negotiate offers, execute, and record receipts and settlement obligations.",
+			"url":              base,
+			"version":          "0.1.0",
+			"provider":         gin.H{"organization": "Allagio", "url": base},
 			"documentationUrl": base + "/agents",
-			"capabilities": gin.H{"streaming": false, "pushNotifications": false},
+			"capabilities":     gin.H{"streaming": false, "pushNotifications": false},
 			"skills": []gin.H{
 				{
 					"id":          "partner-discovery",

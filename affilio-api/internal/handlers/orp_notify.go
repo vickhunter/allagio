@@ -143,4 +143,3 @@ func (h *HostedHandler) SaveNotifyForm(c *gin.Context) {
 	}
 	c.Redirect(http.StatusSeeOther, "/owner/settings")
 }
-
