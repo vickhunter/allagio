@@ -1,3 +1,7 @@
+## November 11 — section contrast bands + RetroGrid demo stage
+
+Homepage sections all sat on the same `s0` wash. Now `#makers` and `#post-preview` carry `bg-s2/50` olive-cream bands for pocket-id-style rhythm, and the post-preview demo section is a stage: Magic UI `RetroGrid` (WebGL perspective grid, pub-olive lines at 0.3 opacity, reduced-motion fallback built into the component) behind the form card. Piece figures' `bg-s1` pops against the tint. Verified via screenshots. React Doctor 100. `CLAIMS_CHECK` unchanged.
+
 ## November 11 — use-cases page: icon card grid
 
 `/use-cases` flat split text rows become a `md:grid-cols-2` card grid: per-case lucide icon chip (BadgePercent/Handshake/ArrowLeftRight/Coins/Share2/Mail/Link2/Megaphone), problem + how copy, and the tools row as an inset mono chip. Hover lift + gradient edge reveal matches the homepage piece figures; section anchors kept for dropdown deep-links. Verified 1440 + 390, no overflow. React Doctor clean, stamped. `CLAIMS_CHECK` unchanged.
