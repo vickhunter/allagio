@@ -1,0 +1,109 @@
+ui/landing/src/home/App.tsx
+  s_7e484d91fceb6c::t_3c8798a0d6c69b 17-24
+  s_7e484d91fceb6c::t_1322e2280d80a9 63
+  s_7e484d91fceb6c::t_9246b04c3669c5 53,55-62,64-71
+  s_7e484d91fceb6c::t_5368909dcacaf1 5
+ui/landing/src/reference/App.tsx
+  s_7e484d91fceb6c::t_a67553a68e45c9 3-26
+  s_7e484d91fceb6c::t_5eede5c8ae8e29 192
+  s_7e484d91fceb6c::t_e9cd4c8b527329 175-176
+  s_7e484d91fceb6c::t_9468f9825902f1 196
+STATUS.md
+  s_7e484d91fceb6c::t_857b9bc3611b06 1-4
+affilio-wp/admin/build/home.html
+  s_7e484d91fceb6c::t_edfdcfc63dd05c 11-17,19-20
+affilio-wp/admin/build/landing-v9/agents/index.html
+  s_7e484d91fceb6c::t_dabf0137d522f6 10-12,14-15
+affilio-wp/admin/build/landing-v9/assets/Directory-B3Wi_JqD.js
+  s_7e484d91fceb6c::t_53176604a1aa21 1,5
+affilio-wp/admin/build/landing-v9/assets/Document-y3JYOBQM.js
+  s_7e484d91fceb6c::t_11532ff3950130 1
+affilio-wp/admin/build/landing-v9/assets/Page-DPxhVge8.css
+  s_7e484d91fceb6c::t_927157c7f544d1 2
+affilio-wp/admin/build/landing-v9/assets/PostPreview-BvtiH7Bp.js
+  s_7e484d91fceb6c::t_9f54da24e99ff4 1
+affilio-wp/admin/build/landing-v9/assets/SignInChoice-EZpQg0tu.js
+  s_7e484d91fceb6c::t_05d2655bbed079 1
+affilio-wp/admin/build/landing-v9/assets/agents-DLYPOWIa.js
+  s_7e484d91fceb6c::t_6e40b52e0a6c54 1
+affilio-wp/admin/build/landing-v9/assets/badge-BZwD8tyZ.js
+  s_7e484d91fceb6c::t_a2367c779a44e2 1
+affilio-wp/admin/build/landing-v9/assets/card-CNR3D6ok.js
+  s_7e484d91fceb6c::t_03da97f9408796 1
+affilio-wp/admin/build/landing-v9/assets/facts-CZOdmvAN.js
+  s_7e484d91fceb6c::t_15959250619279 1
+affilio-wp/admin/build/landing-v9/assets/index-CtN-LnU7.js
+  s_7e484d91fceb6c::t_d64f758c59de11 1-2,18,24,36-42,49-50,225
+affilio-wp/admin/build/landing-v9/assets/join-prompt-0vJQ8T8-.js
+  s_7e484d91fceb6c::t_6f0f15a8a85846 1
+affilio-wp/admin/build/landing-v9/assets/makers-B0lopHjl.js
+  s_7e484d91fceb6c::t_f92d24effefdb2 1
+affilio-wp/admin/build/landing-v9/assets/notFound-GDfN43E0.js
+  s_7e484d91fceb6c::t_7ca289db30bb9b 1
+affilio-wp/admin/build/landing-v9/assets/privacy-Bk7awwHe.js
+  s_7e484d91fceb6c::t_dfff9bfc0b8dd8 1
+affilio-wp/admin/build/landing-v9/assets/profile-CFTaYFQj.js
+  s_7e484d91fceb6c::t_bb13666adf5461 1
+affilio-wp/admin/build/landing-v9/assets/protocol-ul3Y4NEx.js
+  s_7e484d91fceb6c::t_fb62af2f518aac 1
+affilio-wp/admin/build/landing-v9/assets/publishers-ut-NKZgC.js
+  s_7e484d91fceb6c::t_66e2014f03b136 1
+affilio-wp/admin/build/landing-v9/assets/publishersSetup-CtAoOZGV.js
+  s_7e484d91fceb6c::t_008e89c6f686d0 1
+affilio-wp/admin/build/landing-v9/assets/reference-DBqlcqYq.js
+  s_7e484d91fceb6c::t_f8dd5e4a672493 1,33,37
+affilio-wp/admin/build/landing-v9/assets/terms-csBWJCDi.js
+  s_7e484d91fceb6c::t_cea9429639b693 1
+affilio-wp/admin/build/landing-v9/assets/useCases-CeHMzDHZ.js
+  s_7e484d91fceb6c::t_6209ace485ea8a 1
+affilio-wp/admin/build/landing-v9/assets/vision-Bb96CSz4.js
+  s_7e484d91fceb6c::t_0e2bacfcd13e9b 1
+affilio-wp/admin/build/landing-v9/assets/you-eTAa524L.js
+  s_7e484d91fceb6c::t_80b1c3fe47168b 1
+affilio-wp/admin/build/landing-v9/not-found/index.html
+  s_7e484d91fceb6c::t_952b44c434b97e 9-11
+affilio-wp/admin/build/landing-v9/privacy/index.html
+  s_7e484d91fceb6c::t_6d228cc0669664 12-15
+affilio-wp/admin/build/landing-v9/profile/index.html
+  s_7e484d91fceb6c::t_6f757169d92bda 9-12,14-15
+affilio-wp/admin/build/landing-v9/reference/index.html
+  s_7e484d91fceb6c::t_9535529eedc1bb 11-13
+affilio-wp/admin/build/landing-v9/terms/index.html
+  s_7e484d91fceb6c::t_0edcee18a6f096 12-15
+affilio-wp/admin/build/landing-v9/use-cases/index.html
+  s_7e484d91fceb6c::t_674a79ac05e6bf 11-13
+affilio-wp/admin/build/makers.html
+  s_7e484d91fceb6c::t_ded02bc2d963e7 11-17,19-21
+affilio-wp/admin/build/protocol.html
+  s_7e484d91fceb6c::t_5ac234ee6f1c95 11-13
+affilio-wp/admin/build/publishers-setup.html
+  s_7e484d91fceb6c::t_e42d4936a51757 11-15
+affilio-wp/admin/build/publishers.html
+  s_7e484d91fceb6c::t_7f50951edc55d3 11-16,18-19
+affilio-wp/admin/build/use-cases.html
+  s_7e484d91fceb6c::t_ca5748576bcb61 11-13
+affilio-wp/admin/build/you.html
+  s_7e484d91fceb6c::t_a30a9199c362df 11-14
+ui/landing/package-lock.json
+  s_7e484d91fceb6c::t_feafae71027339 11,967-975
+ui/landing/package.json
+  s_7e484d91fceb6c::t_76fabe85cd4185 13
+ui/landing/src/components/ui/bento-grid.tsx
+  s_7e484d91fceb6c::t_96969641dfb2a7 1-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e42b2e98ff6fd12045eea510bd52c8265313912f",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
