@@ -1,3 +1,7 @@
+## November 11 — fix: static-shell flash on page navigation
+
+Every stamped page carried a `#static-landing` no-JS fallback — raw unstyled HTML that painted for ~1s until `boot.tsx` removed it on React mount, appearing as a "broken page" on every navigation. Stamped pages now inject `@media (scripting:enabled){#static-landing{display:none}}` into `<head>` — JS-on visitors never see the shell; no-JS still gets the full fallback (verified: `display:block` with JS disabled, hidden with JS on). `CLAIMS_CHECK` unchanged.
+
 ## November 11 — section contrast bands + RetroGrid demo stage
 
 Homepage sections all sat on the same `s0` wash. Now `#makers` and `#post-preview` carry `bg-s2/50` olive-cream bands for pocket-id-style rhythm, and the post-preview demo section is a stage: Magic UI `RetroGrid` (WebGL perspective grid, pub-olive lines at 0.3 opacity, reduced-motion fallback built into the component) behind the form card. Piece figures' `bg-s1` pops against the tint. Verified via screenshots. React Doctor 100. `CLAIMS_CHECK` unchanged.

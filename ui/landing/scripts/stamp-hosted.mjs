@@ -162,9 +162,11 @@ const setupShell = `<div id="static-landing">
     </main>
   </div>`
 
+const hideShellWhenJs = '<style>@media (scripting:enabled){#static-landing{display:none}}</style>'
+
 function stamp(file, fallback = shell) {
   let html = readFileSync(file, 'utf8')
-  if (!html.includes('name="or-install"')) html = html.replace('</head>', `    ${meta}\n  </head>`)
+  if (!html.includes('name="or-install"')) html = html.replace('</head>', `    ${meta}\n    ${hideShellWhenJs}\n  </head>`)
   if (!html.includes('id="static-landing"')) html = html.replace('<div id="root"></div>', `${fallback}\n    <div id="root"></div>`)
   return html
 }
