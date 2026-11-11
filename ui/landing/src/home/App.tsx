@@ -4,6 +4,7 @@ import { Vision } from './Vision'
 import { ClientStrip } from '@/components/client-strip'
 import { BentoCard, BentoGrid } from '@/components/ui/bento-grid'
 import { BorderBeam } from '@/components/ui/border-beam'
+import { RetroGrid } from '@/components/ui/retro-grid'
 import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, LayoutTemplate, Receipt, Calculator, XCircle, Zap } from 'lucide-react'
 import { PostPreview } from '@/components/PostPreview'
 import { Hero } from '@/components/hero-2'
@@ -91,7 +92,7 @@ export function App() {
         </div>
       </section>
 
-      <section id="makers" aria-labelledby="makers-h" className="split border-t border-line">
+      <section id="makers" aria-labelledby="makers-h" className="split border-t border-line bg-s2/50">
         <div>
           <p className="kicker">Makers</p>
           <h2 id="makers-h">{makerBenefit}</h2>
@@ -124,7 +125,7 @@ export function App() {
         </figure>
       </section>
 
-      <section id="compare" aria-labelledby="compare-h" className="compare border-t border-line">
+      <section id="compare" aria-labelledby="compare-h" className="compare border-t border-line bg-s0">
         <h2 id="compare-h" className="sr-only">With and without a labelled offer</h2>
         <article className="relative border border-line">
           <h3 className="flex items-center gap-2.5"><XCircle aria-hidden="true" className="h-6 w-6 text-t2" />A post, before an offer</h3>
@@ -143,8 +144,9 @@ export function App() {
         </div>
       </div>
 
-      <section id="post-preview" aria-labelledby="preview-h" className="border-t border-line">
-        <div className="mx-auto max-w-3xl px-5 py-16 md:py-20">
+      <section id="post-preview" aria-labelledby="preview-h" className="relative overflow-hidden border-t border-line bg-s2/50">
+        <RetroGrid aria-hidden="true" className="opacity-100" opacity={0.3} lightLineColor="rgb(63 92 53)" />
+        <div className="relative mx-auto max-w-3xl px-5 py-16 md:py-20">
           <p className="kicker">On your post</p>
           <h2 id="preview-h" className="h-display mt-3 text-3xl">See it on a real post.</h2>
           <p className="mt-4 text-lg leading-relaxed text-t2">Paste a post URL. See where an offer would sit.</p>
