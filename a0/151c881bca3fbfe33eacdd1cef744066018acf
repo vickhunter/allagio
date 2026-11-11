@@ -1,0 +1,35 @@
+ui/landing/src/components/join-prompt.mjs
+  s_7e484d91fceb6c::t_fdad180f5804e3 16-19,21,28-32
+affilio-wp/admin/build/home.html
+  s_7e484d91fceb6c::t_f972a0431515c0 11,13
+affilio-wp/admin/build/landing-v9/assets/SignInChoice-DZH59v-Z.js
+  s_7e484d91fceb6c::t_6eb299dcc2a5e0 1
+affilio-wp/admin/build/landing-v9/assets/index-Cn800We4.js
+  s_7e484d91fceb6c::t_a6c653677f2394 1
+affilio-wp/admin/build/landing-v9/assets/join-prompt-B2ZeMvq8.js
+  s_7e484d91fceb6c::t_e272a4fa67629a 1
+affilio-wp/admin/build/landing-v9/assets/makers-BLSghIW_.js
+  s_7e484d91fceb6c::t_81ec1df768a50a 1
+affilio-wp/admin/build/landing-v9/assets/publishers-Cs0NOwbK.js
+  s_7e484d91fceb6c::t_04e0d2ec2b42f6 1
+affilio-wp/admin/build/makers.html
+  s_7e484d91fceb6c::t_5040830944631a 11,13,16
+affilio-wp/admin/build/publishers.html
+  s_7e484d91fceb6c::t_48ffed74cb5ec1 11,13,16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a0151c881bca3fbfe33eacdd1cef744066018acf",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
