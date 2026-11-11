@@ -301,7 +301,7 @@ func (h *ORPHost) writeOwnerForm(c *gin.Context, deal database.ORPDeal, terms ma
 	}
 	owner, signedIn := h.signedInOwner(c)
 	if !signedIn {
-		writeOwnerApproval(c)
+		h.writeOwnerApprovalFor(c, ownerID)
 		return true
 	}
 	if owner.ID != ownerID {

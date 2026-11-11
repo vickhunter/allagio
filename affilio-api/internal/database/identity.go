@@ -375,3 +375,115 @@ AND lower(m.email)<>lower($6) AND NOT EXISTS(SELECT 1 FROM owners WHERE id=$3 AN
 	}
 	return res.RowsAffected() == 1, nil
 }
+
+// CreatePartyClaim stores a single-use claim code for the owner. Any earlier
+// unclaimed code for the same owner is replaced.
+func (d *DB) CreatePartyClaim(ctx context.Context, ownerID, codeHash string, expires time.Time) error {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `DELETE FROM orp_party_claims WHERE owner_id=$1 AND claimed_at IS NULL`, ownerID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO orp_party_claims(code_hash,owner_id,expires_at) VALUES($1,$2,$3)`, codeHash, ownerID, expires); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// PartyClaimState describes a claim code for the claim page. OwnerAgentOnly
+// tells the page whether claiming actually changes anything.
+type PartyClaimState struct {
+	OwnerID        string
+	PartyID        string
+	State          string // ok, expired, claimed, missing
+	OwnerAgentOnly bool
+	OwnerHuman     bool
+}
+
+func (d *DB) PartyClaimState(ctx context.Context, codeHash string, now time.Time) PartyClaimState {
+	var s PartyClaimState
+	var expires time.Time
+	var claimed *time.Time
+	err := d.Pool.QueryRow(ctx, `SELECT owner_id,expires_at,claimed_at FROM orp_party_claims WHERE code_hash=$1`, codeHash).Scan(&s.OwnerID, &expires, &claimed)
+	if err != nil {
+		s.State = "missing"
+		return s
+	}
+	s.State = "ok"
+	if claimed != nil {
+		s.State = "claimed"
+		return s
+	}
+	if now.After(expires) {
+		s.State = "expired"
+		return s
+	}
+	_ = d.Pool.QueryRow(ctx, `SELECT COALESCE(agent_only,false),COALESCE(human_login,false) FROM owners WHERE id=$1`, s.OwnerID).Scan(&s.OwnerAgentOnly, &s.OwnerHuman)
+	return s
+}
+
+// ClaimParty moves the person's sign-in identity onto the claim's agent
+// owner and starts a session for it. The person's former owner row keeps
+// its site/maker links when the agent owner already has its own.
+// Returns the claimed owner id or a problem word: expired, claimed,
+// missing, taken.
+func (d *DB) ClaimParty(ctx context.Context, codeHash, personOwnerID, tokenHash, csrf string, now time.Time) (string, string, error) {
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	defer tx.Rollback(ctx)
+	var agentID string
+	var expires time.Time
+	var claimed *time.Time
+	err = tx.QueryRow(ctx, `SELECT owner_id,expires_at,claimed_at FROM orp_party_claims WHERE code_hash=$1 FOR UPDATE`, codeHash).Scan(&agentID, &expires, &claimed)
+	if err != nil {
+		return "", "missing", nil
+	}
+	if claimed != nil {
+		return "", "claimed", nil
+	}
+	if now.After(expires) {
+		return "", "expired", nil
+	}
+	var human bool
+	if err = tx.QueryRow(ctx, `SELECT COALESCE(human_login,false) FROM owners WHERE id=$1 FOR UPDATE`, agentID).Scan(&human); err != nil {
+		return "", "", err
+	}
+	if human && agentID != personOwnerID {
+		return "", "taken", nil
+	}
+	if agentID == personOwnerID {
+		if _, err = tx.Exec(ctx, `UPDATE orp_party_claims SET claimed_at=$2,claimed_by=$3 WHERE code_hash=$1`, codeHash, now, personOwnerID); err != nil {
+			return "", "", err
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO owner_sessions(token_hash,owner_id,csrf,expires_at) VALUES($1,$2,$3,$4)`, tokenHash, agentID, csrf, now.Add(8*time.Hour)); err != nil {
+			return "", "", err
+		}
+		return agentID, "", tx.Commit(ctx)
+	}
+	var issuer, subject string
+	var email, name *string
+	var siteID, makerID *string
+	if err = tx.QueryRow(ctx, `SELECT issuer,subject,email,name,site_id,maker_id FROM owners WHERE id=$1 FOR UPDATE`, personOwnerID).Scan(&issuer, &subject, &email, &name, &siteID, &makerID); err != nil {
+		return "", "", err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE owners SET issuer='claimed:'||id::text, subject='claimed:'||id::text, site_id=NULL, maker_id=NULL WHERE id=$1`, personOwnerID); err != nil {
+		return "", "", err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE owners SET issuer=$2, subject=$3, email=$4, name=$5,
+site_id=COALESCE(site_id,$6), maker_id=COALESCE(maker_id,$7),
+human_login=true, human_login_at=COALESCE(human_login_at,$8) WHERE id=$1`, agentID, issuer, subject, email, name, siteID, makerID, now); err != nil {
+		return "", "", err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE orp_party_claims SET claimed_at=$2,claimed_by=$3 WHERE code_hash=$1`, codeHash, now, personOwnerID); err != nil {
+		return "", "", err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO owner_sessions(token_hash,owner_id,csrf,expires_at) VALUES($1,$2,$3,$4)`, tokenHash, agentID, csrf, now.Add(8*time.Hour)); err != nil {
+		return "", "", err
+	}
+	return agentID, "", tx.Commit(ctx)
+}

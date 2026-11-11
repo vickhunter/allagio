@@ -28,6 +28,28 @@ func writeOwnerApproval(c *gin.Context) {
 	})
 }
 
+// writeOwnerApprovalFor answers the owner-approval page when the waiting
+// owner may be an agent-only account. A human sign-in cannot reach such an
+// owner, so the response names the claim flow instead of a bare sign-in.
+func (h *ORPHost) writeOwnerApprovalFor(c *gin.Context, ownerID string) {
+	body := gin.H{
+		"reason":  "owner_approval",
+		"message": ownerApprovalMessage,
+	}
+	if h.Entry != nil && h.Entry.DB != nil && ownerID != "" {
+		var agentOnly, human bool
+		if err := h.Entry.DB.Pool.QueryRow(c.Request.Context(),
+			`SELECT COALESCE(agent_only,false),COALESCE(human_login,false) FROM owners WHERE id=$1`,
+			ownerID).Scan(&agentOnly, &human); err == nil && agentOnly && !human {
+			body["claim"] = gin.H{
+				"endpoint": "POST /v1/party-claims",
+				"message":  "This party is an agent account with no human sign-in. Its own bearer mints a single-use claim link; the human opens it, signs in, and takes over the party.",
+			}
+		}
+	}
+	c.JSON(http.StatusForbidden, body)
+}
+
 func humanStepOn(steps []string, waiting map[string]any) bool {
 	step, _ := waiting["step"].(string)
 	for _, item := range steps {
