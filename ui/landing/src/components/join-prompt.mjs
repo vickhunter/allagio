@@ -58,11 +58,13 @@ export function JoinPrompt({ line = true } = {}) {
       ? check
       : createElement('span', { 'aria-hidden': true, className: 'flex items-center gap-1' }, ...marks),
     copied ? 'Copied' : 'Copy setup prompt')
+  const wrapped = createElement('span', { className: copied ? 'relative inline-flex overflow-hidden rounded-[10px]' : 'cta-beam relative inline-flex overflow-hidden rounded-[10px]' },
+    button)
   const row = line
     ? createElement('div', { className: 'mt-3 flex flex-wrap items-center gap-3' },
-      button,
+      wrapped,
       createElement('a', { href: '/llms.txt', className: 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline' }, 'llms.txt'))
-    : button
+    : wrapped
   return createElement('div', { 'data-join-prompt': '1' },
     line ? createElement('p', { className: 'text-sm font-semibold text-t1' }, joinLead) : null,
     line ? createElement('pre', { className: 'mt-3 whitespace-pre-wrap rounded-xl border border-line bg-s0 p-4 font-mono text-sm leading-relaxed text-t1' }, joinPrompt) : null,

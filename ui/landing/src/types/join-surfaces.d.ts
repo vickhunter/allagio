@@ -24,3 +24,4 @@ declare module '@/components/join-prompt.mjs' {
   export function JoinPrompt(props?: { line?: boolean }): ReactElement
   export const clientMarks: readonly { name: string; d: string }[]
 }
+
