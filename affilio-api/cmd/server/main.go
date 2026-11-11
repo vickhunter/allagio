@@ -318,6 +318,7 @@ func main() {
 		SuggestLimiter: handlers.NewIPRateLimiter(30, time.Minute),
 		MessageLimiter: handlers.NewIPRateLimiter(30, time.Minute),
 	}).Mount(r)
+	(&handlers.A2A{Entry: agentEntry, Engine: r}).Mount(r)
 	signals := v1.Group("/agent-signals")
 	signals.Use(middleware.AdminKeyAuth(cfg.AdminAPIKey, audit))
 	signals.GET("", agentEntry.AgentSignals)

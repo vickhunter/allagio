@@ -275,6 +275,7 @@ func mountORP(entry *AgentEntry, host *ORPHost) *gin.Engine {
 	r.NoRoute(func(c *gin.Context) { c.JSON(http.StatusNotFound, gin.H{"error": "not found"}) })
 	entry.Mount(r)
 	host.Mount(r)
+	(&A2A{Entry: entry, Engine: r}).Mount(r)
 	r.GET("/.well-known/dcp.json", ServeDCPDiscovery(""))
 	return r
 }

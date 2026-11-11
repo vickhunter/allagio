@@ -1,3 +1,7 @@
+## November 11 — A2A task transport live
+
+The agent card was discovery-only. `POST /a2a` now serves JSON-RPC 2.0: `tasks/send` takes a DataPart carrying an ORP envelope and forwards it to this engine's `POST /orp` in-process, so bearer auth, envelope validation, idempotent replay, waiting markers, and inbox delivery are byte-identical to the wire endpoint. A TextPart maps to `POST /orp/suggest`. Task state maps honestly: a `waiting` reply is `input-required` (the human step lives outside the task), a problem doc is `failed`, anything else `completed`. `tasks/get` reads back a stored task (owner-scoped; anonymous suggest tasks by unguessable id); `tasks/cancel` refuses `-32002` — tasks are synchronous; unknown methods `-32601`. Migration `058_a2a_tasks.sql` persists task docs. The agent card `url` now points at `/a2a` and `allagio.json` names the endpoint + part mapping. `streaming`/`pushNotifications` stay `false` — `tasks/sendSubscribe` is not implemented. Four tests: hello→completed, offer→input-required, no-auth→failed, get/cancel/method errors.
+
 ## November 11 — real maker directory + owner approval for standing offers
 
 `GET /v1/directory/makers` was a stub that always returned an empty list. It now lists the parties whose standing offers are `listed` — data ORP `discover` already returns — grouped as `{party, offer_count, titles}` (up to 5 titles, capped at 200 offers, expired offers skipped). The makers account table is never read: no emails, no keys. A dead database still answers 503.

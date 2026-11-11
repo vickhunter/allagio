@@ -1193,3 +1193,31 @@ func (d *DB) ListORPOfferOwner(ctx context.Context, ownerID, id string) (bool, e
 	tag, err := d.Pool.Exec(ctx, `UPDATE orp_offers SET listed=true WHERE owner_id=$1::uuid AND id=$2`, ownerID, id)
 	return tag.RowsAffected() == 1, err
 }
+
+// SaveA2ATask stores one A2A task document, replacing it on the same id.
+func (d *DB) SaveA2ATask(ctx context.Context, taskID, ownerID, sessionID string, doc json.RawMessage) error {
+	var owner *string
+	if ownerID != "" {
+		owner = &ownerID
+	}
+	_, err := d.Pool.Exec(ctx, `
+INSERT INTO a2a_tasks(task_id, owner_id, session_id, doc) VALUES($1,$2::uuid,$3,$4)
+ON CONFLICT(task_id) DO UPDATE SET doc=EXCLUDED.doc, session_id=EXCLUDED.session_id, updated_at=NOW()`,
+		taskID, owner, sessionID, doc)
+	return err
+}
+
+// GetA2ATask reads one task for its owner. Tasks with no owner (anonymous
+// suggest tasks) are readable by the unguessable id alone.
+func (d *DB) GetA2ATask(ctx context.Context, taskID, ownerID string) (json.RawMessage, bool, error) {
+	var doc json.RawMessage
+	err := d.Pool.QueryRow(ctx, `
+SELECT doc FROM a2a_tasks WHERE task_id=$1 AND (owner_id IS NULL OR owner_id=NULLIF($2,'')::uuid)`, taskID, ownerID).Scan(&doc)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return doc, true, nil
+}

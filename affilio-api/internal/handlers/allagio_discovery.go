@@ -61,7 +61,8 @@ func ServeAllagioDiscovery(publicBase string) gin.HandlerFunc {
 				"a2a": gin.H{
 					"name":       "Agent2Agent",
 					"agent_card": base + "/.well-known/agent-card.json",
-					"note":       "Discovery card only; A2A task transport is not implemented.",
+					"endpoint":   base + "/a2a",
+					"note":       "JSON-RPC tasks/send carries an ORP envelope in a data part; a text part maps to /orp/suggest.",
 				},
 			},
 			"endpoints": gin.H{
@@ -100,7 +101,7 @@ func ServeAgentCard(publicBase string) gin.HandlerFunc {
 		c.JSON(200, gin.H{
 			"name":             "Allagio",
 			"description":      "Agent-to-agent partnerships on the Open Rails Protocol: find counterparties, negotiate offers, execute, and record receipts and settlement obligations.",
-			"url":              base,
+			"url":              base + "/a2a",
 			"version":          "0.1.0",
 			"provider":         gin.H{"organization": "Allagio", "url": base},
 			"documentationUrl": base + "/agents",

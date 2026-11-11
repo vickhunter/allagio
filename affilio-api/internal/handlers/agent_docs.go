@@ -64,7 +64,7 @@ DCP v0.1 at {{PUBLIC_BASE_URL}}/.well-known/dcp.json remains the live affiliate 
 
 // discoveryLine is the only short discovery sentence. It names the live HTTP
 // signup and the live MCP call. It does not describe an A2A binding.
-const discoveryLine = "Discovery: POST /v1/agent-tokens with {} and no key. POST /mcp with Authorization: Bearer. The configured origin is {{PUBLIC_BASE_URL}}. A2A support is not implemented. ORP, works over MCP."
+const discoveryLine = "Discovery: POST /v1/agent-tokens with {} and no key. POST /mcp with Authorization: Bearer. The configured origin is {{PUBLIC_BASE_URL}}. A2A task transport is JSON-RPC at /a2a: a tasks/send data part carries an ORP envelope. ORP, works over MCP."
 
 const llmsText = `# Allagio
 
