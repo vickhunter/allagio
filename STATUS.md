@@ -1,3 +1,7 @@
+## November 11 — discovery advertises real ORP surface + owner share/revoke toggles
+
+Two fixes from the external-agent audit. `allagio.json` `orp_messages` listed only 6 message types while the host handles ~14 — now `[hello, discover, suggest, offer, accept, decline, deal, leave, execute, receipt, revoke, dispute, reputation, activate]`. And the new `share`/`revoke` step modes were API-only: `/owner/settings` gains an "Agent steps on this site" section (same owner-form pattern as human-approval) with per-step ask/auto/off selects posting to `POST /owner/step-modes` → `SaveStepModes` for the owner's site. `Claim`/payout and other steps stay API-managed. `CLAIMS_CHECK` unchanged.
+
 ## November 11 — fix: static-shell flash on page navigation
 
 Every stamped page carried a `#static-landing` no-JS fallback — raw unstyled HTML that painted for ~1s until `boot.tsx` removed it on React mount, appearing as a "broken page" on every navigation. Stamped pages now inject `@media (scripting:enabled){#static-landing{display:none}}` into `<head>` — JS-on visitors never see the shell; no-JS still gets the full fallback (verified: `display:block` with JS disabled, hidden with JS on). `CLAIMS_CHECK` unchanged.

@@ -169,6 +169,78 @@ func humanStepLabel(name string) string {
 	}
 }
 
+var ownerStepModeOrder = []string{database.StepShare, database.StepRevoke}
+
+func ownerStepModeLabel(name string) string {
+	switch name {
+	case database.StepShare:
+		return "Share: an agent asks to share this site or its deal data with another agent. ask waits for you; auto shares at once; off refuses."
+	case database.StepRevoke:
+		return "Revoke: an agent ends a deal or takes back an obligation. ask waits for you; auto revokes at once; off refuses."
+	default:
+		return ""
+	}
+}
+
+func (h *HostedHandler) stepModesSection(c *gin.Context, o *database.Owner) (template.HTML, error) {
+	modes, err := h.DB.LoadStepModes(c.Request.Context(), o.ID, o.SiteID)
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	b.WriteString(`<section id="step-modes"><h2>Agent steps on this site</h2>`)
+	b.WriteString(`<p>Every agent step runs off, ask, or auto — set per step. ask waits for a person; auto runs at once; off refuses the step.</p><form method="post" action="/owner/step-modes">`)
+	b.WriteString(`<input type="hidden" name="csrf" value="`)
+	b.WriteString(template.HTMLEscapeString(o.CSRF))
+	b.WriteString(`">`)
+	for _, name := range ownerStepModeOrder {
+		current := modes.Get(name)
+		b.WriteString(`<label>`)
+		b.WriteString(template.HTMLEscapeString(ownerStepModeLabel(name)))
+		b.WriteString(` <select name="`)
+		b.WriteString(template.HTMLEscapeString(name))
+		b.WriteString(`">`)
+		for _, mode := range []string{database.ModeAsk, database.ModeAuto, database.ModeOff} {
+			b.WriteString(`<option value="`)
+			b.WriteString(mode)
+			b.WriteString(`"`)
+			if mode == current {
+				b.WriteString(` selected`)
+			}
+			b.WriteString(`>`)
+			b.WriteString(mode)
+			b.WriteString(`</option>`)
+		}
+		b.WriteString(`</select></label>`)
+	}
+	b.WriteString(`<button>Save</button></form></section>`)
+	return template.HTML(b.String()), nil
+}
+
+func (h *HostedHandler) SaveStepModesForm(c *gin.Context) {
+	o := ownerFrom(c)
+	modes, err := h.DB.LoadStepModes(c.Request.Context(), o.ID, o.SiteID)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	for _, name := range ownerStepModeOrder {
+		mode := c.PostForm(name)
+		if mode == "" {
+			continue
+		}
+		if !database.ValidStepMode(mode) || !modes.Set(name, mode) {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+	}
+	if err := h.DB.SaveStepModes(c.Request.Context(), o.ID, o.SiteID, modes); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Redirect(http.StatusSeeOther, "/owner/settings")
+}
+
 func (h *HostedHandler) SaveHumanApprovalForm(c *gin.Context) {
 	o := ownerFrom(c)
 	var steps []string
