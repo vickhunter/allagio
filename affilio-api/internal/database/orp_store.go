@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"affilio-api/internal/orp"
+
 	"github.com/jackc/pgx/v5"
 )
 
@@ -18,6 +20,16 @@ var ErrORPReplay = errors.New("orp replay")
 // ErrORPState is a conditional deal update that matched no row.
 // The message transaction rolls back, so the accept is not stored.
 var ErrORPState = errors.New("orp state")
+
+// ErrORPNotOpener is a dispute withdraw whose sender is not the known opener.
+var ErrORPNotOpener = errors.New("orp opener")
+
+// ErrORPOpenerUnknown means stored dispute history does not name one opener.
+// The caller is not told they are the wrong party.
+var ErrORPOpenerUnknown = errors.New("orp opener unknown")
+
+// ErrORPNotObligor is an obligation revoke whose sender is not the obligor.
+var ErrORPNotObligor = errors.New("orp obligor")
 
 // ORPRepeatWindow is how soon a later human click follows the previous
 // counted click on the same tracking entry before it is stored as repeat.
@@ -135,6 +147,17 @@ type ORPEffect struct {
 	ManyExpectAt   time.Time
 	// OfferUpdate refreshes a standing offer's terms and window.
 	OfferUpdate *ORPOffer
+	// RevokeObligationID revokes one obligation on UpdateDealID.
+	// The locked row must still be active, ExpectUpdatedAt must still match,
+	// the obligation must still be pending or claimed, and Sender must be
+	// that obligation's obligor. A stale row returns ErrORPState.
+	// A sender who is not the obligor returns ErrORPNotObligor.
+	RevokeObligationID string
+	ExpectUpdatedAt    time.Time
+	Sender             string
+	// DisputeWithdrawFrom is the party attempting to withdraw the open dispute.
+	// Stored dispute messages must name that party as the single opener.
+	DisputeWithdrawFrom string
 }
 
 // ORPSaved is the reply that should be written. Reused means an earlier
@@ -198,6 +221,11 @@ WHERE party=$1 AND message_id=$2`, rec.Party, rec.ID).Scan(&storedHash, &saved.S
 		saved.Reused = true
 		return saved, nil
 	}
+	if d.ORPBeforeEffect != nil {
+		if err = d.ORPBeforeEffect(ctx); err != nil {
+			return ORPSaved{}, err
+		}
+	}
 	if err = applyORPEffect(ctx, tx, effect); err != nil {
 		return ORPSaved{}, err
 	}
@@ -235,9 +263,12 @@ INSERT INTO orp_deals(
 			return err
 		}
 	}
-	if effect.UpdateDealID != "" && len(effect.UpdateObligations) > 0 {
-		if _, err := tx.Exec(ctx, `
-UPDATE orp_deals SET obligations=$2, updated_at=$3 WHERE id=$1`, effect.UpdateDealID, JSONList(effect.UpdateObligations), effect.UpdatedAt); err != nil {
+	if effect.RevokeObligationID != "" {
+		if err := revokeLockedObligation(ctx, tx, effect); err != nil {
+			return err
+		}
+	} else if effect.UpdateDealID != "" && len(effect.UpdateObligations) > 0 {
+		if err := applyGuardedObligations(ctx, tx, effect); err != nil {
 			return err
 		}
 	}
@@ -283,6 +314,14 @@ WHERE id=$1 AND owner_id=$6::uuid`, offer.ID, offer.Terms, offer.TermsHash, offe
 			return ErrORPState
 		}
 	}
+	if effect.DisputeWithdrawFrom != "" {
+		if effect.UpdateDealID == "" {
+			return errors.New("orp dispute effect")
+		}
+		if err := requireDisputeOpener(ctx, tx, effect.UpdateDealID, effect.DisputeWithdrawFrom); err != nil {
+			return err
+		}
+	}
 	if effect.UpdateState != "" {
 		if effect.UpdateDealID == "" || len(effect.UpdateFrom) == 0 {
 			return errors.New("orp state effect")
@@ -326,6 +365,407 @@ INSERT INTO orp_inbox(owner_id, message) VALUES($1,$2)`, item.OwnerID, item.Mess
 		}
 	}
 	return nil
+}
+
+// revokeLockedObligation applies SPEC §15.1 to the locked deal row.
+// Work already verified stays verified. The obligor is read again from the
+// locked terms, and the write matches the row the handler read.
+func revokeLockedObligation(ctx context.Context, tx pgx.Tx, effect ORPEffect) error {
+	if effect.UpdateDealID == "" || effect.Sender == "" {
+		return errors.New("orp obligation effect")
+	}
+	var state, offerer, acceptor string
+	var obligations, terms, parties []byte
+	var fresh bool
+	err := tx.QueryRow(ctx, `
+SELECT state, obligations, terms, parties, offerer_party, acceptor_party, updated_at = $2
+FROM orp_deals WHERE id=$1 FOR UPDATE`, effect.UpdateDealID, effect.ExpectUpdatedAt).Scan(
+		&state, &obligations, &terms, &parties, &offerer, &acceptor, &fresh)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrORPState
+	}
+	if err != nil {
+		return err
+	}
+	if !fresh || state != "active" {
+		return ErrORPState
+	}
+	deal := ORPDeal{
+		ID: effect.UpdateDealID, State: state, Terms: terms, Parties: parties,
+		OffererParty: offerer, AcceptorParty: acceptor, Obligations: obligations,
+	}
+	obligor, ok := ObligationObligor(deal, effect.RevokeObligationID)
+	if !ok || obligor != effect.Sender {
+		return ErrORPNotObligor
+	}
+	next, err := revokedObligation(obligations, effect.RevokeObligationID)
+	if err != nil {
+		return err
+	}
+	tag, err := tx.Exec(ctx, `
+UPDATE orp_deals SET obligations=$2, updated_at=$3
+WHERE id=$1 AND state='active' AND updated_at=$4`, effect.UpdateDealID, JSONList(next), effect.UpdatedAt, effect.ExpectUpdatedAt)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return ErrORPState
+	}
+	return nil
+}
+
+// ObligationObligor is the party who must perform obligationID.
+// ok is false when the terms do not name exactly one party on this deal.
+func ObligationObligor(deal ORPDeal, obligationID string) (string, bool) {
+	if obligationID == "" {
+		return "", false
+	}
+	var terms map[string]any
+	if json.Unmarshal(deal.Terms, &terms) != nil {
+		return "", false
+	}
+	raw, _ := terms["obligations"].([]any)
+	var by string
+	found := 0
+	for _, item := range raw {
+		obj, _ := item.(map[string]any)
+		if obj == nil || obj["id"] != obligationID {
+			continue
+		}
+		found++
+		by, _ = obj["by"].(string)
+	}
+	if found != 1 || by == "" {
+		return "", false
+	}
+	if len(deal.Parties) == 0 || string(deal.Parties) == "null" {
+		switch by {
+		case "offerer":
+			if deal.OffererParty == "" {
+				return "", false
+			}
+			return deal.OffererParty, true
+		case "acceptor":
+			if deal.AcceptorParty == "" {
+				return "", false
+			}
+			return deal.AcceptorParty, true
+		default:
+			if strings.HasPrefix(by, "orp:") && (by == deal.OffererParty || by == deal.AcceptorParty) {
+				return by, true
+			}
+			return "", false
+		}
+	}
+	doc, err := orp.DecodeMany(deal.Parties)
+	if err != nil {
+		return "", false
+	}
+	if strings.HasPrefix(by, "orp:") {
+		n := 0
+		for _, seat := range doc.Seats {
+			if seat.ID == by {
+				n++
+			}
+		}
+		if n == 1 {
+			return by, true
+		}
+		return "", false
+	}
+	match := ""
+	n := 0
+	for _, seat := range doc.Seats {
+		if seat.Role == by && seat.ID != "" {
+			n++
+			match = seat.ID
+		}
+	}
+	if n != 1 {
+		return "", false
+	}
+	return match, true
+}
+
+// applyGuardedObligations writes an obligation snapshot only when the locked
+// row is still active at ExpectUpdatedAt. A verified or revoked obligation
+// in that row must stay as stored, including its receipt.
+func applyGuardedObligations(ctx context.Context, tx pgx.Tx, effect ORPEffect) error {
+	if effect.ExpectUpdatedAt.IsZero() {
+		return errors.New("orp obligation effect")
+	}
+	var state string
+	var obligations []byte
+	var fresh bool
+	err := tx.QueryRow(ctx, `
+SELECT state, obligations, updated_at = $2
+FROM orp_deals WHERE id=$1 FOR UPDATE`, effect.UpdateDealID, effect.ExpectUpdatedAt).Scan(&state, &obligations, &fresh)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrORPState
+	}
+	if err != nil {
+		return err
+	}
+	if !fresh || state != "active" || !keepsTerminalObligations(obligations, effect.UpdateObligations) {
+		return ErrORPState
+	}
+	tag, err := tx.Exec(ctx, `
+UPDATE orp_deals SET obligations=$2, updated_at=$3
+WHERE id=$1 AND state='active' AND updated_at=$4`, effect.UpdateDealID, JSONList(effect.UpdateObligations), effect.UpdatedAt, effect.ExpectUpdatedAt)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return ErrORPState
+	}
+	return nil
+}
+
+func keepsTerminalObligations(locked, next json.RawMessage) bool {
+	var current, proposed []map[string]any
+	if json.Unmarshal(locked, &current) != nil || json.Unmarshal(next, &proposed) != nil {
+		return false
+	}
+	byID := map[string]map[string]any{}
+	for _, row := range proposed {
+		id, _ := row["id"].(string)
+		if id == "" {
+			return false
+		}
+		if _, dup := byID[id]; dup {
+			return false
+		}
+		byID[id] = row
+	}
+	for _, row := range current {
+		state, _ := row["state"].(string)
+		if state != "verified" && state != "revoked" {
+			continue
+		}
+		id, _ := row["id"].(string)
+		got, ok := byID[id]
+		if !ok || got["state"] != state {
+			return false
+		}
+		if receipt, exists := row["receipt"]; exists && got["receipt"] != receipt {
+			return false
+		}
+	}
+	return true
+}
+
+func revokedObligation(raw json.RawMessage, obligationID string) (json.RawMessage, error) {
+	var rows []map[string]any
+	if err := json.Unmarshal(raw, &rows); err != nil {
+		return nil, err
+	}
+	found := 0
+	for i := range rows {
+		if rows[i]["id"] != obligationID {
+			continue
+		}
+		found++
+		state, _ := rows[i]["state"].(string)
+		if state != "" && state != "pending" && state != "claimed" {
+			return nil, ErrORPState
+		}
+		rows[i]["state"] = "revoked"
+	}
+	if found != 1 {
+		return nil, ErrORPState
+	}
+	return json.Marshal(rows)
+}
+
+// requireDisputeOpener enforces SPEC §15.2 inside the deal lock.
+// The opener is the party on the newest unmatched dispute open in orp_inbox.
+// Two opens, a missing history, or a sender who is not that party fails closed.
+func requireDisputeOpener(ctx context.Context, tx pgx.Tx, dealID, sender string) error {
+	var offerer, acceptor string
+	var parties []byte
+	err := tx.QueryRow(ctx, `
+SELECT offerer_party, acceptor_party, parties
+FROM orp_deals WHERE id=$1 FOR UPDATE`, dealID).Scan(&offerer, &acceptor, &parties)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrORPState
+	}
+	if err != nil {
+		return err
+	}
+	deal := ORPDeal{ID: dealID, OffererParty: offerer, AcceptorParty: acceptor, Parties: parties}
+	rows, err := tx.Query(ctx, `
+SELECT message
+FROM orp_inbox
+WHERE COALESCE(message->>'deal', message->>'Deal') = $1
+  AND COALESCE(message->>'type', message->>'Type') = 'dispute'
+ORDER BY id`, dealID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var messages []json.RawMessage
+	for rows.Next() {
+		var message json.RawMessage
+		if err = rows.Scan(&message); err != nil {
+			return err
+		}
+		messages = append(messages, message)
+	}
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	opener, open, ambiguous := replayDisputeOpener(deal, messages)
+	if ambiguous {
+		return ErrORPOpenerUnknown
+	}
+	if !open {
+		return ErrORPState
+	}
+	if !partyOnORPDeal(deal, opener) {
+		return ErrORPOpenerUnknown
+	}
+	if opener != sender {
+		return ErrORPNotOpener
+	}
+	return nil
+}
+
+func replayDisputeOpener(deal ORPDeal, messages []json.RawMessage) (opener string, open, ambiguous bool) {
+	if len(messages) == 0 {
+		return "", false, true
+	}
+	// Message ids are unique per sender, not across parties. The same id from
+	// two parties is two facts. respond does not name or clear the opener,
+	// including a respond that is stored after withdraw.
+	type fact struct{ action, from string }
+	seen := map[string]fact{}
+	var order []string
+	sawOpen := false
+	for _, raw := range messages {
+		id, action, from, ok := disputeFact(raw)
+		if !ok || !partyOnORPDeal(deal, from) {
+			return "", false, true
+		}
+		if action == "respond" {
+			continue
+		}
+		key := from + "\x00" + id
+		if prev, exists := seen[key]; exists {
+			if prev.action != action || prev.from != from {
+				return "", false, true
+			}
+			continue
+		}
+		seen[key] = fact{action: action, from: from}
+		order = append(order, key)
+	}
+	for _, key := range order {
+		ev := seen[key]
+		switch ev.action {
+		case "open":
+			if open {
+				return "", false, true
+			}
+			sawOpen = true
+			opener = ev.from
+			open = true
+		case "withdraw":
+			if !open {
+				return "", false, true
+			}
+			opener = ""
+			open = false
+		default:
+			return "", false, true
+		}
+	}
+	if !sawOpen {
+		return "", false, true
+	}
+	return opener, open, false
+}
+
+func disputeFact(raw json.RawMessage) (id, action, from string, ok bool) {
+	var obj map[string]any
+	if json.Unmarshal(raw, &obj) != nil {
+		return "", "", "", false
+	}
+	id, ok = oneString(obj, "id", "ID")
+	if !ok {
+		return "", "", "", false
+	}
+	from, ok = oneString(obj, "from", "From")
+	if !ok {
+		return "", "", "", false
+	}
+	typ, typOK := oneString(obj, "type", "Type")
+	if !typOK || typ != "dispute" {
+		return "", "", "", false
+	}
+	body, bodyOK := oneObject(obj, "body", "Body")
+	if !bodyOK {
+		return "", "", "", false
+	}
+	action, _ = body["action"].(string)
+	if action == "" {
+		return "", "", "", false
+	}
+	return id, action, from, true
+}
+
+func oneString(obj map[string]any, lower, upper string) (string, bool) {
+	lowerValue, lowerOK := obj[lower].(string)
+	upperValue, upperOK := obj[upper].(string)
+	switch {
+	case lowerOK && upperOK && lowerValue != "" && upperValue != "" && lowerValue != upperValue:
+		return "", false
+	case lowerOK && lowerValue != "":
+		return lowerValue, true
+	case upperOK && upperValue != "":
+		return upperValue, true
+	default:
+		return "", false
+	}
+}
+
+func oneObject(obj map[string]any, lower, upper string) (map[string]any, bool) {
+	lowerValue, lowerOK := obj[lower].(map[string]any)
+	upperValue, upperOK := obj[upper].(map[string]any)
+	switch {
+	case lowerOK && upperOK:
+		left, _ := lowerValue["action"].(string)
+		right, _ := upperValue["action"].(string)
+		if left != right {
+			return nil, false
+		}
+		return lowerValue, true
+	case lowerOK:
+		return lowerValue, true
+	case upperOK:
+		return upperValue, true
+	default:
+		return nil, false
+	}
+}
+
+func partyOnORPDeal(deal ORPDeal, party string) bool {
+	if party == "" {
+		return false
+	}
+	if len(deal.Parties) == 0 || string(deal.Parties) == "null" {
+		return party == deal.OffererParty || party == deal.AcceptorParty
+	}
+	doc, err := orp.DecodeMany(deal.Parties)
+	if err != nil {
+		return false
+	}
+	n := 0
+	for _, seat := range doc.Seats {
+		if seat.ID == party {
+			n++
+		}
+	}
+	return n == 1
 }
 
 func nullJSON(raw json.RawMessage) any {

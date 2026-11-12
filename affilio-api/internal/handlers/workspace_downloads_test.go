@@ -45,7 +45,7 @@ func releaseExcluded(rel string) bool {
 
 func hostedBuildFile(name string) bool {
 	switch name {
-	case "home.html", "makers.html", "publishers.html", "publishers-setup.html", "protocol.html", "you.html", "agent-poc.html", "setup-controls.js", "THIRD_PARTY_NOTICES.md":
+	case "home.html", "makers.html", "publishers.html", "publishers-setup.html", "protocol.html", "you.html", "agent-poc.html", "setup-controls.js", "use-cases.html", "THIRD_PARTY_NOTICES.md":
 		return true
 	}
 	return strings.HasPrefix(name, "workspace") || strings.HasPrefix(name, "landing") || strings.HasPrefix(name, "package")

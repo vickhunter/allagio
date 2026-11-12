@@ -177,9 +177,8 @@ test.describe('public landing contrast and tap targets', () => {
       });
       const page = await context.newPage();
       await page.goto(landing.base + '/landing', { waitUntil: 'networkidle' });
-      // D-128 semantic update. The heading is the agent-setup line. Copy setup prompt
-      // is the same public-line control, not a skipped check and not a D-126 import.
-      await expect(page.getByRole('heading', { name: 'Offers, ready for your agent.', exact: true })).toBeVisible();
+      // The home h1 is the approved line. Contrast and tap-target checks below stay.
+      await expect(page.getByRole('heading', { name: 'Agents do the deal. You keep the approval.', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Copy setup prompt', exact: true })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Set up your agent', exact: true }).first()).toBeVisible();
       await expect(page.locator('#how')).toHaveCount(1);

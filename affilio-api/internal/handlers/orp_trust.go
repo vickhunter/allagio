@@ -56,14 +56,33 @@ func (h *ORPHost) revoke(c *gin.Context, dns string, msg orp.Message, hash, owne
 	}
 	switch scope {
 	case "obligation":
-		obligationID, _ := msg.Body["obligation"].(string)
-		rows, err := markObligation(deal.Obligations, obligationID, "revoked")
-		if err != nil {
-			h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+		// SPEC §12: obligations run on an active deal. §15.1: verified work stays verified.
+		// Only that obligation's obligor may stop it.
+		if deal.State != "active" {
+			h.stateConflict(c, dns, msg, hash)
 			return
 		}
-		if rows == nil {
+		obligationID, _ := msg.Body["obligation"].(string)
+		state, found, dup := obligationSnapshot(deal.Obligations, obligationID)
+		if dup {
+			h.stateConflict(c, dns, msg, hash)
+			return
+		}
+		if !found {
 			h.finish(c, msg, hash, http.StatusNotFound, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such obligation for this sender."}), database.ORPEffect{})
+			return
+		}
+		if !revocableObligation(state) {
+			message := "The obligation is in the wrong state."
+			if state == "verified" {
+				message = "Work already verified stays verified."
+			}
+			h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: message}), database.ORPEffect{})
+			return
+		}
+		obligor, ok := database.ObligationObligor(deal, obligationID)
+		if !ok || obligor != party {
+			h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the obligor may revoke this obligation."}), database.ORPEffect{})
 			return
 		}
 		if mode == database.ModeAsk {
@@ -74,10 +93,17 @@ func (h *ORPHost) revoke(c *gin.Context, dns string, msg orp.Message, hash, owne
 			hold(waiting)
 			return
 		}
+		rows, err := markObligation(deal.Obligations, obligationID, "revoked")
+		if err != nil || rows == nil {
+			h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+			return
+		}
+		prior := deal.UpdatedAt
 		deal.Obligations = rows
 		deal.UpdatedAt = now.UTC()
 		h.finishDeal(c, dns, msg, hash, party, deal, now, database.ORPEffect{
-			UpdateDealID: deal.ID, UpdateObligations: rows, UpdatedAt: deal.UpdatedAt,
+			UpdateDealID: deal.ID, RevokeObligationID: obligationID, Sender: party,
+			ExpectUpdatedAt: prior, UpdatedAt: deal.UpdatedAt,
 		})
 	default:
 		if deal.State != "proposed" && deal.State != "awaiting" && deal.State != "active" {
@@ -150,7 +176,9 @@ func (h *ORPHost) dispute(c *gin.Context, dns string, msg orp.Message, hash, own
 			h.stateConflict(c, dns, msg, hash)
 			return
 		}
+		// SPEC §15.2: the opener may withdraw. The stored messages name that party.
 		effect = h.moveDeal(&deal, "active", []string{"disputed"}, now)
+		effect.DisputeWithdrawFrom = party
 	case "respond":
 		if deal.State != "disputed" {
 			h.stateConflict(c, dns, msg, hash)
@@ -161,6 +189,11 @@ func (h *ORPHost) dispute(c *gin.Context, dns string, msg orp.Message, hash, own
 		return
 	}
 	effect.Inbox = append(h.dealInbox(dns, msg.ID, deal, now), h.forwardInbox(msg, deal)...)
+	// A counterparty with no owner (a catalog offerer, or a 0.4 seat) gets no
+	// forwardInbox row. The sender's own copy is the durable opener record.
+	if rawMsg, err := json.Marshal(msg); err == nil && ownerID != "" {
+		effect.Inbox = append(effect.Inbox, database.ORPInboxItem{OwnerID: ownerID, Message: rawMsg})
+	}
 	h.finishDeal(c, dns, msg, hash, party, deal, now, effect)
 }
 
@@ -357,6 +390,28 @@ func (h *ORPHost) ownerOf(deal database.ORPDeal, party string) string {
 		}
 	}
 	return ""
+}
+
+func obligationSnapshot(raw json.RawMessage, obligationID string) (state string, found, dup bool) {
+	var rows []map[string]any
+	if json.Unmarshal(raw, &rows) != nil {
+		return "", false, false
+	}
+	for _, row := range rows {
+		if row["id"] != obligationID {
+			continue
+		}
+		if found {
+			return "", true, true
+		}
+		found = true
+		state, _ = row["state"].(string)
+	}
+	return state, found, false
+}
+
+func revocableObligation(state string) bool {
+	return state == "" || state == "pending" || state == "claimed"
 }
 
 // markObligation sets one obligation's state; nil rows mean no such id.

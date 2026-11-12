@@ -18,6 +18,11 @@ type DB struct {
 	// back. Production leaves it nil. Tests use it to prove a failed approve
 	// leaves no inbox row and no tracking token.
 	ORPBeforeCommit func(context.Context) error
+	// ORPBeforeEffect runs inside CommitORP before the deal write, on Pool,
+	// which is a different connection from the open transaction. Production
+	// leaves it nil. A hook must not lock a row this transaction already
+	// holds, or insert the orp_messages key it already inserted.
+	ORPBeforeEffect func(context.Context) error
 	// ApprovalsReadErr, when set, is returned by DealOwnerApprovals.
 	// Production leaves it nil. Tests use it to fail that read only.
 	ApprovalsReadErr error

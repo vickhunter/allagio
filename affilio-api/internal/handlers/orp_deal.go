@@ -956,6 +956,7 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
 	}
+	prior := deal.UpdatedAt
 	deal.Obligations = obligations
 	deal.UpdatedAt = now.UTC()
 	doc, err := h.dealMessage(dns, party, msg.ID, deal, now)
@@ -971,6 +972,7 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 	h.finishRaw(c, msg, hash, http.StatusOK, raw, database.ORPEffect{
 		UpdateDealID:      deal.ID,
 		UpdateObligations: obligations,
+		ExpectUpdatedAt:   prior,
 		UpdatedAt:         now.UTC(),
 		Inbox:             h.dealInbox(dns, msg.ID, deal, now),
 	})
@@ -1199,6 +1201,18 @@ func (h *ORPHost) finishRaw(c *gin.Context, msg orp.Message, hash string, status
 		}
 		if errors.Is(err, database.ErrORPState) {
 			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The deal is in the wrong state."}, false)
+			return
+		}
+		if errors.Is(err, database.ErrORPNotOpener) {
+			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the opener may withdraw."}, false)
+			return
+		}
+		if errors.Is(err, database.ErrORPOpenerUnknown) {
+			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "The host cannot tell who opened this dispute."}, false)
+			return
+		}
+		if errors.Is(err, database.ErrORPNotObligor) {
+			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the obligor may revoke this obligation."}, false)
 			return
 		}
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
