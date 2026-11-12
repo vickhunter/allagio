@@ -1,3 +1,7 @@
+## November 12 — Canonical domain: allagio.dev
+
+`PUBLIC_BASE_URL` flipped to `https://allagio.dev` on Railway — discovery docs, the agent card, join URLs, the `or-install` meta, and plugin download rewrites all derive from it, so nothing else needed code changes. Party IDs already minted under `orp:affilio-production.up.railway.app/...` stay valid (opaque strings); new joins mint `orp:allagio.dev/...`. **Ops note:** the OIDC callback moved to `https://allagio.dev/auth/callback` — register it in Pocket ID or owner login breaks. `www.allagio.dev` still needs its own Railway custom domain if wanted.
+
 ## November 12 — A2A sendSubscribe + security gate
 
 `POST /a2a` now also answers `tasks/sendSubscribe`: the task completes synchronously as before, but the response streams `text/event-stream` — a `submitted` status event, then the terminal status (`completed`, `input-required`, `failed`) marked `final`. Tasks still store for `tasks/get`; push notifications stay false and the agent card now honestly says `streaming: true`. Security gate: repo scan is clean — every `sk_live_`/`PRIVATE KEY`/`ghp_` match is the code that *refuses* live keys, and `.gitleaks.toml` already allowlists the test fakes.

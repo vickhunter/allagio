@@ -96,7 +96,7 @@ revision. Required checks are `affilio-api-tests`, `onboarding` and
 runtime assets, notices and archives, and runs the packaged installer in a fresh
 product directory. It does not publish the internal WordPress ZIP: the public
 download handler serves `affilio-wp/affilio.php` and removes any `railway.app`
-host before responding. A leftover `https://affilio-production.up.railway.app/v1`
+host before responding. A leftover `https://allagio.dev/v1`
 placeholder in that main file is replaced with the service origin when the
 origin itself is not a `railway.app` host.
 All three workflows also allow manual runs against a release branch when a

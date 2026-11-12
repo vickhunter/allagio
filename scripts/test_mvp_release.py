@@ -253,7 +253,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_configuration_rejects_wrong_service_origin_and_invalid_cipher(self):
         release.validate_config(configuration())
-        for name, value in {"PUBLIC_BASE_URL": "https://affilio-production.up.railway.app", "ALLOWED_ORIGINS": "*", "CONNECTION_ENCRYPTION_KEY": "invalid", "AUTO_MIGRATE": "false"}.items():
+        for name, value in {"PUBLIC_BASE_URL": "https://allagio.dev", "ALLOWED_ORIGINS": "*", "CONNECTION_ENCRYPTION_KEY": "invalid", "AUTO_MIGRATE": "false"}.items():
             with self.subTest(name=name), self.assertRaisesRegex(release.ReleaseError, name):
                 release.validate_config(configuration() | {name: value})
 

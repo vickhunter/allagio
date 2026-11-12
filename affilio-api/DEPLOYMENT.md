@@ -149,7 +149,7 @@ If rollback requires DB rollback:
 
 Setup:
 1. Railway project → New Service → deploy `ghcr.io/pocket-id/pocket-id` (or the Pocket ID Railway template). Attach a volume for `/app/data`, set `APP_URL=https://id.allagio.<tld>` (or a Railway domain), generate a domain.
-2. In Pocket ID admin → OIDC Clients → create client "Allagio", callback `https://affilio-production.up.railway.app/auth/callback`.
+2. In Pocket ID admin → OIDC Clients → create client "Allagio", callback `https://allagio.dev/auth/callback`.
 3. Set on the API service: `OIDC_ISSUER=https://<pocket-id-domain>`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` from that client.
 4. Redeploy; `GET /health` stays `ok` and `/owner` hands off to Pocket ID.
 
