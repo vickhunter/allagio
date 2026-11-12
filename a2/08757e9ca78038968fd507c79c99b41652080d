@@ -1,0 +1,33 @@
+server.json
+  s_27702ffeb33526::t_697b1ec0fb7c86 1-18
+affilio-api/internal/entry/policy.go
+  s_27702ffeb33526::t_4aedaa4802270c 25
+affilio-api/internal/handlers/hosted_mcp.go
+  s_27702ffeb33526::t_ed827dd3c2f525 75
+  s_27702ffeb33526::t_00fc44e537bfd8 6
+  s_27702ffeb33526::t_69c1408a15b03a 101
+  s_27702ffeb33526::t_90b83339a5ab97 104,108-204
+  s_27702ffeb33526::t_e2557332bb0498 205-206
+affilio-api/internal/handlers/d088_publish_default_test.go
+  s_27702ffeb33526::t_52a885fc6aad35 107
+affilio-api/internal/handlers/demo_backend_test.go
+  s_27702ffeb33526::t_4aa5f2a1fba31c 99-101
+affilio-api/internal/handlers/mcp_test.go
+  s_27702ffeb33526::t_355f1db00b75e4 14-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a208757e9ca78038968fd507c79c99b41652080d",
+  "prompts": {},
+  "sessions": {
+    "s_27702ffeb33526": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "carnation-viscose",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
