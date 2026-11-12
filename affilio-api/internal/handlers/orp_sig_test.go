@@ -137,7 +137,11 @@ func TestORPPartyKeysEndpoint(t *testing.T) {
 		t.Fatalf("key body %s", rec.Body.String())
 	}
 
-	rec, _ = postJSON(t, r, http.MethodGet, "/orp/keys/"+opaque[:len(opaque)-1]+"f", nil, nil)
+	other := "f"
+	if strings.HasSuffix(opaque, other) {
+		other = "e"
+	}
+	rec, _ = postJSON(t, r, http.MethodGet, "/orp/keys/"+opaque[:len(opaque)-1]+other, nil, nil)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("unknown opaque %d %s", rec.Code, rec.Body.String())
 	}
