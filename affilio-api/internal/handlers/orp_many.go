@@ -531,7 +531,7 @@ func (h *ORPHost) Go(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("Referrer-Policy", "no-referrer")
 	c.Header("X-Robots-Tag", "noindex")
-	origin, _ := h.origin(c)
+	origin, dns := h.origin(c)
 	token := c.Param("token")
 	purpose := strings.Join([]string{
 		c.GetHeader("Sec-Fetch-Purpose"),
@@ -563,6 +563,9 @@ func (h *ORPHost) Go(c *gin.Context) {
 		q.Add(alias, clickID)
 	}
 	target.RawQuery = q.Encode()
+	if record {
+		h.sweepPayouts(c, dns)
+	}
 	c.Redirect(http.StatusFound, target.String())
 }
 

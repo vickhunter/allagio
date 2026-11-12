@@ -140,6 +140,7 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 	owner.POST("/placements/:id/approve", h.ApprovePlacement)
 	owner.POST("/placements/:id/revoke", h.requirePublisher, h.RevokePlacement)
 	owner.POST("/payouts/:id/confirm-received", h.requirePublisher, h.ConfirmReceived)
+	owner.POST("/orp-payouts/:id/sent", h.SendORPPayout)
 	if h.Payments != nil {
 		owner.GET("/products/:id/connection", h.Payments.Form)
 		owner.POST("/products/:id/connection", h.Payments.Connect)
@@ -1190,7 +1191,12 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 				c.Status(500)
 				return
 			}
-			pageBody = string(section) + string(modesSection) + string(notifySection) + string(spacesSection) + string(offersSection) + pageBody
+			payoutsSection, err := h.payoutsSection(c, o)
+			if err != nil {
+				c.Status(500)
+				return
+			}
+			pageBody = string(section) + string(modesSection) + string(notifySection) + string(spacesSection) + string(offersSection) + string(payoutsSection) + pageBody
 		}
 		h.render(c, "Your distribution workspace", "", template.HTML(pageBody))
 		return
@@ -1228,6 +1234,12 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 			return
 		}
 		body.WriteString(string(offersSection))
+		payoutsSection, err := h.payoutsSection(c, o)
+		if err != nil {
+			c.Status(500)
+			return
+		}
+		body.WriteString(string(payoutsSection))
 	}
 	returnTo := c.Query("return_to")
 	if !validAuthorizationReturn(returnTo) {

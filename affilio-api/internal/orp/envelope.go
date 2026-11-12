@@ -217,7 +217,7 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 	if problem, bad := checkHandledBody(orp, typ, body); bad {
 		return Message{}, problem, false
 	}
-	if (typ == "execute" || typ == "leave" || typ == "seat" || typ == "decline" || typ == "dispute") && msg.Deal == "" {
+	if (typ == "execute" || typ == "leave" || typ == "seat" || typ == "decline" || typ == "dispute" || typ == "payout") && msg.Deal == "" {
 		return Message{}, Invalid(label, "/deal"), false
 	}
 	if typ == "revoke" {
@@ -282,6 +282,9 @@ func checkHandledBody(version, typ string, body map[string]any) (Problem, bool) 
 		return relabelVersion(version, problem, bad)
 	case "request":
 		problem, bad := checkRequestBody(body)
+		return relabelVersion(version, problem, bad)
+	case "payout":
+		problem, bad := checkPayoutBody(body)
 		return relabelVersion(version, problem, bad)
 	default:
 		return Problem{}, false
@@ -407,6 +410,31 @@ func checkSpaceBody(body map[string]any) (Problem, bool) {
 	if aud, present := sp["audience"]; present {
 		if _, ok := aud.(map[string]any); !ok {
 			return Invalid("The message is not valid ORP 0.3.", "/body/space/audience"), true
+		}
+	}
+	return Problem{}, false
+}
+
+func checkPayoutBody(body map[string]any) (Problem, bool) {
+	for key := range body {
+		switch key {
+		case "payout", "answer", "note":
+		default:
+			return Invalid("The message is not valid ORP 0.3.", "/body/"+escapePointer(key)), true
+		}
+	}
+	pid, _ := body["payout"].(string)
+	if !localPattern.MatchString(pid) {
+		return Invalid("The message is not valid ORP 0.3.", "/body/payout"), true
+	}
+	answer, _ := body["answer"].(string)
+	if answer != "confirm" && answer != "not_received" {
+		return Invalid("The message is not valid ORP 0.3.", "/body/answer"), true
+	}
+	if note, present := body["note"]; present {
+		text, ok := note.(string)
+		if !ok || utf8.RuneCountInString(text) > 2000 {
+			return Invalid("The message is not valid ORP 0.3.", "/body/note"), true
 		}
 	}
 	return Problem{}, false

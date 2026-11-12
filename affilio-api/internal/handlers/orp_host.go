@@ -306,6 +306,8 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 		h.revoke(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "dispute":
 		h.dispute(c, dns, msg, hash, grant.OwnerID)
+	case msg.Type == "payout":
+		h.payout(c, dns, msg, hash, grant.OwnerID)
 	case msg.Type == "reputation":
 		h.reputation(c, dns, msg, hash)
 	case msg.Type == "receipt":

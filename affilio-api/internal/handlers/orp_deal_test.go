@@ -203,7 +203,7 @@ func TestORPTestDealProof(t *testing.T) {
 		t.Fatalf("receipt %d %s", receiptRec.Code, receiptRec.Body.String())
 	}
 	payRec, payBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("payout", "m_d092c_paymsg", publisher, map[string]any{}), bearerHeader(pubToken))
-	if payRec.Code != http.StatusForbidden || payBody["body"].(map[string]any)["code"] != "forbidden" {
+	if payRec.Code != http.StatusBadRequest || payBody["body"].(map[string]any)["code"] != "invalid_message" {
 		t.Fatalf("payout %d %s", payRec.Code, payRec.Body.String())
 	}
 

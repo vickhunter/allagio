@@ -37,6 +37,7 @@ func (h *ORPHost) Inbox(c *gin.Context) {
 	if !ok {
 		return
 	}
+	h.sweepPayouts(c, dns)
 	after := int64(0)
 	if raw := strings.TrimSpace(c.Query("after")); raw != "" {
 		n, err := strconv.ParseInt(raw, 10, 64)
