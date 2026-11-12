@@ -155,6 +155,17 @@ Setup:
 
 Every verified OIDC identity becomes its own owner workspace — no allowlist is enforced; keep the Pocket ID user directory to the people who should have workspaces.
 
+## ORP Outcome Worker (Railway cron)
+
+The weekly `outcome` sweep (ORP SPEC 14.1) runs as a second Railway service from the same repo and Dockerfile — no image or build change is needed.
+
+- Create a new service on the existing project, same repo, same Dockerfile.
+- Start command: `/bin/affilio outcomes`
+- Cron schedule: `0 6 * * *` — daily is fine; the sweep only emits when a deal's last period is at least 7 days old, plus one `final` per ended deal.
+- Env vars: same `DATABASE_URL` and `PUBLIC_BASE_URL` as the API service. `PUBLIC_BASE_URL` sets the host party id (`orp:<host>/host`) on the `from` field, so it must match the API's value.
+- No public domain, no port, no HTTP config. The subcommand connects, sweeps once, logs `outcome sweep done: deals=… sent=… finals=…`, and exits non-zero only on a database error.
+- Migrations stay owned by the API service; the worker never runs them.
+
 ## Operational Notes
 - `go.sum` generation may require network in local environments.
 - In restricted environments, set:

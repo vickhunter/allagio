@@ -84,8 +84,29 @@ func readyHandler(db *database.DB) gin.HandlerFunc {
 	}
 }
 
+// runOutcomes is the `affilio outcomes` worker: one ORP outcome sweep (SPEC
+// 14.1), then exit. It never opens a port and never runs migrations — the
+// server owns those.
+func runOutcomes(cfg config.Config) {
+	ctx := context.Background()
+	db, err := database.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("database connection failed: %v", err)
+	}
+	defer db.Close()
+	stats, err := handlers.SweepORPOutcomes(ctx, db, cfg.PublicBaseURL, time.Now())
+	if err != nil {
+		log.Fatalf("outcome sweep: %v", err)
+	}
+	log.Printf("outcome sweep done: deals=%d sent=%d finals=%d", stats.Deals, stats.Sent, stats.Finals)
+}
+
 func main() {
 	cfg := config.Load()
+	if len(os.Args) > 1 && os.Args[1] == "outcomes" {
+		runOutcomes(cfg)
+		return
+	}
 	if err := cfg.ValidateSecrets(); err != nil {
 		log.Fatalf("refusing to start: %v", err)
 	}

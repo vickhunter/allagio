@@ -83,6 +83,8 @@ Test deal. Hello, then discover, then a directed offer (to), then accept by the 
 
 Payouts. A pay obligation with a fixed amount mints a payout record when its basis is met: after points at the obligation that must verify, per deal waits for every non-pay obligation, and per placement pays once per verified place. Pay per click, per conversion, and rate-only pay mint nothing. The record lands in both parties' inboxes at each state change. hold delays it as held until hold_until; then the payer's settle step applies — payout starts as ask and waits for the owner at /owner/settings, an owner-set auto sends (the test rail moves no money), and off also waits. The payee answers a sent payout with a payout message {payout, answer: confirm|not_received} on the deal; confirm marks it paid.
 
+Outcomes. The host sends each party an outcome for every active deal with tracking or pay, once a week per deal, plus a final one when the deal ends. Rows count clicks by class only — human, bot, preview, test; a repeat counts nowhere. A pay obligation's earned sums the payouts minted in the period, and only when they share one currency. There are no sources, conversions, or revenue yet: clicks store no referrer. The message lands in each party owner's inbox; it is not a reply to a request.
+
 Proof. Open GET /orp/proof/<deal>. HTTP 200.
 
 Message rules for that walk: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
