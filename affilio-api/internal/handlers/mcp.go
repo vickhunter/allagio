@@ -53,3 +53,10 @@ func (h *MCPHandler) Receive(c *gin.Context) {
 	}
 	c.Data(http.StatusOK, "application/json", resp)
 }
+
+// MethodNotAllowed answers non-POST methods on /v1/mcp. The Streamable HTTP
+// spec expects 405 here so clients learn the endpoint is POST-only.
+func (h *MCPHandler) MethodNotAllowed(c *gin.Context) {
+	c.Header("Allow", "POST")
+	c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "method not allowed"})
+}

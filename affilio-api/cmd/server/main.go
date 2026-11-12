@@ -279,6 +279,7 @@ func main() {
 		RateLimiter: handlers.NewIPRateLimiter(240, time.Minute),
 	}
 	v1.POST("/mcp", mcp.Receive)
+	v1.Match([]string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodDelete, http.MethodPatch, http.MethodOptions}, "/mcp", mcp.MethodNotAllowed)
 
 	openSignup := handlers.NewIPRateLimiter(handlers.OpenSignupPerMinute, time.Minute)
 	addressKey, addressWarning := services.ClientAddressHMACKey(cfg.APIKeySecret)

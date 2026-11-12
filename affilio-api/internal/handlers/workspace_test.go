@@ -243,6 +243,9 @@ func TestMerchantPaymentAuthority(t *testing.T) {
 	maker, cookie := linkedMaker(t, h, "payer")
 	other, otherCookie := linkedMaker(t, h, "foreign-payer")
 	siteID := createTestSite(t, db, "payee-key", "payee.example", "Payee")
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE agent_step_modes SET payout='auto' WHERE site_id=$1::uuid`, siteID); err != nil {
+		t.Fatal(err)
+	}
 	var liveID, testID string
 	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO payouts(site_id,amount,currency,method,status,maker_id,payment_mode) VALUES($1,10,'USD','manual','pending',$2,'live') RETURNING id`, siteID, maker.MakerID).Scan(&liveID); err != nil {
 		t.Fatal(err)

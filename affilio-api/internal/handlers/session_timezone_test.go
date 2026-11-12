@@ -70,6 +70,13 @@ func TestSaleAttributionAndPayoutWhenSessionTimeZoneIsNotUTC(t *testing.T) {
 	offerID := listedOffer(t, db, r, makerKey)
 	siteKey := "site-key-session-zone"
 	createTestSite(t, db, siteKey, "zone.example.com", "Zone Blog")
+	var zoneSiteID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT id FROM sites WHERE domain='zone.example.com'`).Scan(&zoneSiteID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE agent_step_modes SET payout='auto' WHERE site_id=$1::uuid`, zoneSiteID); err != nil {
+		t.Fatal(err)
+	}
 	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
 	code := join["tracking_code"].(string)
 	req := httptest.NewRequest(http.MethodGet, "/v1/go/"+code, nil)

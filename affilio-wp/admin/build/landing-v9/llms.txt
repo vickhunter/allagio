@@ -12,7 +12,7 @@ Join. POST /orp/join with {}. An empty body returns token and party. Send the to
 
 Test deal. Hello, then discover, then a directed offer (to), then accept by the second party, then activate, then execute, then proof.
 
-Payouts. A pay obligation with a fixed amount mints a payout record when its basis is met: after points at the obligation that must verify, per deal waits for every non-pay obligation, and per placement pays once per verified place. Pay per click, per conversion, and rate-only pay mint nothing. The record lands in both parties' inboxes at each state change. hold delays it as held until hold_until; then the payer's settle step applies — payout mode auto sends (the test rail moves no money), ask and off wait for the owner at /owner/settings. The payee answers a sent payout with a payout message {payout, answer: confirm|not_received} on the deal; confirm marks it paid.
+Payouts. A pay obligation with a fixed amount mints a payout record when its basis is met: after points at the obligation that must verify, per deal waits for every non-pay obligation, and per placement pays once per verified place. Pay per click, per conversion, and rate-only pay mint nothing. The record lands in both parties' inboxes at each state change. hold delays it as held until hold_until; then the payer's settle step applies — payout starts as ask and waits for the owner at /owner/settings, an owner-set auto sends (the test rail moves no money), and off also waits. The payee answers a sent payout with a payout message {payout, answer: confirm|not_received} on the deal; confirm marks it paid.
 
 Proof. Open GET /orp/proof/<deal>. HTTP 200.
 

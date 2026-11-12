@@ -125,7 +125,7 @@ func TestPersonAndOwnerWideAutoStillPublish(t *testing.T) {
 func TestPlacementPublishAskBackfill(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	raw, err := os.ReadFile(filepath.Join("..", "migrations", "047_d093b_placement_publish_ask.sql"))
+	raw, err := os.ReadFile(filepath.Join("..", "migrations", "061_payout_ask_default.sql"))
 	if err != nil {
 		t.Fatal(err)
 	}
