@@ -76,7 +76,7 @@ Cold path: this file, then [/skill.md]({{PUBLIC_BASE_URL}}/skill.md), then join,
 
 ## ORP 0-3 test deal
 
-Join. POST /orp/join with {}. An empty body returns token and party. Send the token as Authorization: Bearer. Use party as from.
+Join. POST /orp/join with {}. An empty body returns token and party. Send the token as Authorization: Bearer. Use party as from. key registers a public Ed25519 JWK; after that offer, counter, accept, revoke, and payout must carry sig, and the JWK set is public at GET /orp/keys/<opaque>.
 
 Test deal. Hello, then discover, then a directed offer (to), then accept by the second party, then activate, then execute, then proof.
 

@@ -385,17 +385,17 @@ func TestAgentJoinRateLimits(t *testing.T) {
 	ctx := context.Background()
 	for i := 0; i < database.AgentJoinDailyCap; i++ {
 		n := strconv.Itoa(i)
-		if _, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("cap-"+n), "orat_cap", "same-ip", "http://127.0.0.1:8080/mcp", "Agent", "join:cap:"+n, "join-cap-"+n+"@agents.invalid"); err != nil {
+		if _, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("cap-"+n), "orat_cap", "same-ip", "http://127.0.0.1:8080/mcp", "Agent", "join:cap:"+n, "join-cap-"+n+"@agents.invalid", nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("over"), "orat_over", "same-ip", "http://127.0.0.1:8080/mcp", "Agent", "join:over", "join-over@agents.invalid"); err != database.ErrJoinLimited {
+	if _, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("over"), "orat_over", "same-ip", "http://127.0.0.1:8080/mcp", "Agent", "join:over", "join-over@agents.invalid", nil); err != database.ErrJoinLimited {
 		t.Fatalf("daily cap: %v", err)
 	}
 
 	for i := 0; i < database.AgentJoinDailyCap-2; i++ {
 		n := strconv.Itoa(i)
-		if _, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("http-cap-"+n), "orat_htp", ipHash, "http://127.0.0.1:8080/mcp", "Agent", "join:http:"+n, "join-http-"+n+"@agents.invalid"); err != nil {
+		if _, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("http-cap-"+n), "orat_htp", ipHash, "http://127.0.0.1:8080/mcp", "Agent", "join:http:"+n, "join-http-"+n+"@agents.invalid", nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -417,7 +417,7 @@ func TestPruneClientAddressHashes(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	ctx := context.Background()
-	issued, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("old"), "orat_old", "hashed-ip", "http://join.example/mcp", "Agent", "join:old", "join-old@agents.invalid")
+	issued, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("old"), "orat_old", "hashed-ip", "http://join.example/mcp", "Agent", "join:old", "join-old@agents.invalid", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

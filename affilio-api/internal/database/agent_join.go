@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -75,8 +76,9 @@ func reserveOpenSignup(ctx context.Context, tx pgx.Tx, ipHash string) error {
 }
 
 // CreateAgentJoinToken inserts an agent-only owner with no site and no maker,
-// and one hashed bearer token. The caller supplies the token hash.
-func (d *DB) CreateAgentJoinToken(ctx context.Context, tokenHash, prefix, ipHash, resource, name, subject, email string) (AgentJoinIssued, error) {
+// and one hashed bearer token. The caller supplies the token hash. partyKey is
+// an optional public JWK bound to the party for sig verification.
+func (d *DB) CreateAgentJoinToken(ctx context.Context, tokenHash, prefix, ipHash, resource, name, subject, email string, partyKey map[string]any) (AgentJoinIssued, error) {
 	if err := d.PruneClientAddressHashes(ctx); err != nil {
 		return AgentJoinIssued{}, err
 	}
@@ -101,7 +103,35 @@ RETURNING id::text, scope, expires_at`, tokenHash, prefix, out.OwnerID, agentJoi
 	if err != nil {
 		return AgentJoinIssued{}, err
 	}
+	if partyKey != nil {
+		keyRaw, err := json.Marshal(partyKey)
+		if err != nil {
+			return AgentJoinIssued{}, err
+		}
+		if _, err = tx.Exec(ctx, `INSERT INTO party_keys(owner_id, kid, jwk) VALUES($1, $2, $3)`,
+			out.OwnerID, partyKey["kid"], keyRaw); err != nil {
+			return AgentJoinIssued{}, err
+		}
+	}
 	return out, tx.Commit(ctx)
+}
+
+// PartyKeys lists the active signing keys bound to a party owner.
+func (d *DB) PartyKeys(ctx context.Context, ownerID string) ([]map[string]any, error) {
+	rows, err := d.Pool.Query(ctx, `SELECT jwk FROM party_keys WHERE owner_id=$1 AND revoked_at IS NULL`, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []map[string]any
+	for rows.Next() {
+		var jwk map[string]any
+		if err := rows.Scan(&jwk); err != nil {
+			return nil, err
+		}
+		out = append(out, jwk)
+	}
+	return out, rows.Err()
 }
 
 // AgentJoinToken loads a live join grant. The resource must match the server

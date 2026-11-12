@@ -52,7 +52,7 @@ func (h *AgentEntry) CreateAgentToken(c *gin.Context) {
 	if !ok {
 		return
 	}
-	raw, issued, status, errText := h.mintJoinToken(c, name)
+	raw, issued, status, errText := h.mintJoinToken(c, name, nil)
 	if status != 0 {
 		c.JSON(status, gin.H{"error": errText})
 		return
@@ -151,7 +151,7 @@ func (h *AgentEntry) RevokeAgentTokenByID(c *gin.Context) {
 
 // mintJoinToken creates the owner and the bearer. The caller already applied
 // the per-minute limiter, so this does not count the address a second time.
-func (h *AgentEntry) mintJoinToken(c *gin.Context, name string) (string, database.AgentJoinIssued, int, string) {
+func (h *AgentEntry) mintJoinToken(c *gin.Context, name string, partyKey map[string]any) (string, database.AgentJoinIssued, int, string) {
 	raw, err := newAgentJoinSecret()
 	if err != nil {
 		return "", database.AgentJoinIssued{}, http.StatusInternalServerError, "token failed"
@@ -164,7 +164,7 @@ func (h *AgentEntry) mintJoinToken(c *gin.Context, name string) (string, databas
 	if _, err = rand.Read(emailNonce); err != nil {
 		return "", database.AgentJoinIssued{}, http.StatusInternalServerError, "token failed"
 	}
-	issued, err := h.DB.CreateAgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), services.KeyPrefix(raw), h.clientAddressHash(h.joinClientIP(c)), h.mcpResource(c), name, "join:"+subject, "join-"+hex.EncodeToString(emailNonce)+"@agents.invalid")
+	issued, err := h.DB.CreateAgentJoinToken(c.Request.Context(), services.HashAPIKey(raw), services.KeyPrefix(raw), h.clientAddressHash(h.joinClientIP(c)), h.mcpResource(c), name, "join:"+subject, "join-"+hex.EncodeToString(emailNonce)+"@agents.invalid", partyKey)
 	if errors.Is(err, database.ErrJoinLimited) {
 		return "", database.AgentJoinIssued{}, http.StatusTooManyRequests, "rate limit exceeded"
 	}
@@ -176,14 +176,14 @@ func (h *AgentEntry) mintJoinToken(c *gin.Context, name string) (string, databas
 
 // MintJoin is the ORP join. It uses the same per-minute limiter, the same
 // daily cap, and the same owner row as POST /v1/agent-tokens.
-func (h *AgentEntry) MintJoin(c *gin.Context, name string) (string, database.AgentJoinIssued, int, string) {
+func (h *AgentEntry) MintJoin(c *gin.Context, name string, partyKey map[string]any) (string, database.AgentJoinIssued, int, string) {
 	if spoofedLoopbackMint(h.ListenHost, c.Request.Host, c.Request.RemoteAddr) {
 		return "", database.AgentJoinIssued{}, http.StatusForbidden, "loopback host is not accepted from this client"
 	}
 	if h.TokenLimiter != nil && !h.TokenLimiter.Allow(h.joinClientIP(c)) {
 		return "", database.AgentJoinIssued{}, http.StatusTooManyRequests, "rate limit exceeded"
 	}
-	return h.mintJoinToken(c, name)
+	return h.mintJoinToken(c, name, partyKey)
 }
 
 var errNoBearer = errors.New("no bearer")

@@ -84,10 +84,11 @@ type SuggestRequest struct {
 	Haystack string
 }
 
-// JoinRequest is the optional join object. Key registration is refused.
+// JoinRequest is the optional join object. Key holds a public Ed25519 JWK.
 type JoinRequest struct {
 	AgentName    string
 	AgentVersion string
+	Key          map[string]any
 }
 
 // ParseSuggest checks a suggest body. The draft is kept only in this value.
@@ -163,8 +164,8 @@ func ParseSuggest(value any) (SuggestRequest, Problem, bool) {
 }
 
 // ParseJoin checks a join body. An empty object is complete. Email, name,
-// domain, phone, and password are refused. A signing key is refused because
-// this layer does not store one.
+// domain, phone, and password are refused. key registers a public Ed25519 JWK
+// so later envelopes can carry sig.
 func ParseJoin(value any, prefix string) (JoinRequest, Problem, bool) {
 	if value == nil {
 		return JoinRequest{}, Invalid("The join request is not valid.", prefix), false
@@ -197,10 +198,18 @@ func ParseJoin(value any, prefix string) (JoinRequest, Problem, bool) {
 			return JoinRequest{}, Invalid("The join request is not valid.", prefix+"/"+escapePointer(key)), false
 		}
 	}
-	if _, present := obj["key"]; present {
-		return JoinRequest{}, Invalid("This testing host does not register signing keys.", prefix+"/key"), false
-	}
 	var req JoinRequest
+	if key, present := obj["key"]; present {
+		path := prefix + "/key"
+		if prefix == "" {
+			path = "/key"
+		}
+		parsed, problem, keyOK := ParseJoinKey(key, path)
+		if !keyOK {
+			return JoinRequest{}, problem, false
+		}
+		req.Key = parsed
+	}
 	if agent, present := obj["agent"]; present {
 		path := prefix + "/agent"
 		if prefix == "" {

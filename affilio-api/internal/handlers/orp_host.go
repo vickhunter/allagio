@@ -36,6 +36,7 @@ func (h *ORPHost) Mount(r gin.IRouter) {
 	r.POST("/orp/suggest", h.Suggest)
 	r.POST(MonetizationSuggestPath, h.Monetize)
 	r.POST("/orp/join", h.Join)
+	r.GET("/orp/keys/:opaque", h.PartyKeysEndpoint)
 	r.POST("/v1/party-claims", h.PartyClaim)
 	r.GET("/claim/:code", h.ClaimPage)
 	r.POST("/claim/:code", h.ClaimPost)
@@ -115,7 +116,7 @@ func (h *ORPHost) Suggest(c *gin.Context) {
 	}
 	var joined map[string]any
 	if req.HasJoin {
-		joined, problem, ok = h.mint(c, origin, dns, req.Join.AgentName)
+		joined, problem, ok = h.mint(c, origin, dns, req.Join.AgentName, req.Join.Key)
 		if !ok {
 			h.writeProblem(c, dns, "", "", problem, true)
 			return
@@ -159,12 +160,28 @@ func (h *ORPHost) Join(c *gin.Context) {
 		h.writeProblem(c, dns, "", "", problem, true)
 		return
 	}
-	joined, problem, ok := h.mint(c, origin, dns, req.AgentName)
+	joined, problem, ok := h.mint(c, origin, dns, req.AgentName, req.Key)
 	if !ok {
 		h.writeProblem(c, dns, "", "", problem, true)
 		return
 	}
 	writeORP(c, http.StatusCreated, joined, true)
+}
+
+// PartyKeysEndpoint is GET /orp/keys/<opaque>. It serves the JWK set a party
+// registered at join. A party with no keys is a 404.
+func (h *ORPHost) PartyKeysEndpoint(c *gin.Context) {
+	opaque := c.Param("opaque")
+	if h.Entry == nil || h.Entry.DB == nil || opaque == "" {
+		writeORP(c, http.StatusNotFound, map[string]any{"error": "not_found"}, false)
+		return
+	}
+	keys, err := h.Entry.DB.PartyKeys(c.Request.Context(), opaque)
+	if err != nil || len(keys) == 0 {
+		writeORP(c, http.StatusNotFound, map[string]any{"error": "not_found"}, false)
+		return
+	}
+	writeORP(c, http.StatusOK, map[string]any{"keys": keys}, false)
 }
 
 // Envelope is POST /orp. A #68-shaped body is invalid_message before any
@@ -213,9 +230,25 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 	if h.seen(c, dns, msg, hash) {
 		return
 	}
-	if msg.HasSig {
-		h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusUnauthorized, Code: "bad_signature", Message: "This testing host publishes no keys and cannot verify sig."}, false)
-		return
+	if msg.HasSig || orp.SignedType(msg.Type) {
+		keys, err := h.Entry.DB.PartyKeys(c.Request.Context(), grant.OwnerID)
+		if err != nil {
+			h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
+			return
+		}
+		if msg.HasSig {
+			if len(keys) == 0 {
+				h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusUnauthorized, Code: "bad_signature", Message: "This party has no registered key. Join again with key to send signed envelopes."}, false)
+				return
+			}
+			if _, ok := orp.VerifyEnvelopeSig(value, keys); !ok {
+				h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusUnauthorized, Code: "bad_signature", Message: "sig does not verify against the party key."}, false)
+				return
+			}
+		} else if len(keys) > 0 {
+			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusUnauthorized, Code: "unauthorized", Message: "This party registered a key, so " + msg.Type + " must carry sig."}, false)
+			return
+		}
 	}
 	if problem, stale := orp.ClockProblem(msg.TS, h.now()); stale {
 		h.writeProblem(c, dns, msg.From, msg.ID, problem, false)
@@ -327,7 +360,7 @@ func (h *ORPHost) candidates(c *gin.Context) ([]orp.Candidate, error) {
 	return out, nil
 }
 
-func (h *ORPHost) mint(c *gin.Context, origin, dns, agentName string) (map[string]any, orp.Problem, bool) {
+func (h *ORPHost) mint(c *gin.Context, origin, dns, agentName string, partyKey map[string]any) (map[string]any, orp.Problem, bool) {
 	name := agentName
 	if name == "" {
 		var err error
@@ -336,7 +369,7 @@ func (h *ORPHost) mint(c *gin.Context, origin, dns, agentName string) (map[strin
 			return nil, internalProblem(), false
 		}
 	}
-	raw, issued, status, _ := h.Entry.MintJoin(c, name)
+	raw, issued, status, _ := h.Entry.MintJoin(c, name, partyKey)
 	if status == http.StatusTooManyRequests {
 		return nil, rateLimited("Too many joins from this address."), false
 	}

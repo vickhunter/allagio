@@ -69,6 +69,7 @@ func ServeAllagioDiscovery(publicBase string) gin.HandlerFunc {
 				"mcp":           mcp,
 				"orp":           base + "/orp",
 				"orp_join":      base + "/orp/join",
+				"orp_keys":      base + "/orp/keys/{opaque}",
 				"orp_suggest":   base + "/orp/suggest",
 				"orp_inbox":     base + "/orp/inbox",
 				"http_base":     base + "/v1",
