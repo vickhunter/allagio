@@ -1,0 +1,19 @@
+affilio-api/internal/handlers/orp_sig_test.go
+  s_27702ffeb33526::t_f39d5efe30c168 140-144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8ceb04346b555177a8da12bdd3066af624938c44",
+  "prompts": {},
+  "sessions": {
+    "s_27702ffeb33526": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "carnation-viscose",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
