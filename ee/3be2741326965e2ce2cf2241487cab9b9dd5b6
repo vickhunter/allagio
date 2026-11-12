@@ -1,0 +1,89 @@
+affilio-api/internal/preview/fetch_test.go
+  s_27702ffeb33526::t_712b9caba3754a 79-84
+affilio-api/internal/handlers/orp_share_test.go
+  s_27702ffeb33526::t_396dcdb4982e65 63-65,67
+affilio-api/internal/orp/publicdocs_test.go
+  s_27702ffeb33526::t_e7e59a3b8c91da 285-289
+  s_27702ffeb33526::t_3f0882ad2330af 263-268
+affilio-api/internal/handlers/agent_join_test.go
+  s_27702ffeb33526::t_fe7d6877739575 629
+affilio-api/internal/handlers/step_modes_payout_test.go
+  s_27702ffeb33526::t_a4500326cb724f 169,176
+affilio-api/internal/database/orp_store.go
+  s_27702ffeb33526::t_f36169a0db6f8a 1661-1676
+  s_27702ffeb33526::t_28a92d3ea6ecab 1637-1641,1647,1649-1650,1652-1658
+  s_27702ffeb33526::t_7132aabf73a664 1659-1660
+affilio-api/internal/handlers/orp_payouts_test.go
+  s_27702ffeb33526::t_db99a223ce697f 259,262-264
+  s_27702ffeb33526::t_726fdc73a20399 92,95-97
+affilio-api/internal/handlers/d093b_publish_ask_test.go
+  s_7e484d91fceb6c::t_52c1f6862fec48 206
+  s_27702ffeb33526::t_d8c4ff38bc574d 180
+  s_27702ffeb33526::t_8cb0d942fff724 55
+affilio-api/internal/handlers/agent_docs.go
+  s_27702ffeb33526::t_8aeb4628ec8cb6 84
+affilio-api/internal/handlers/revenue_poc_test.go
+  s_27702ffeb33526::t_153d484a44288f 200-203,205-206
+  s_27702ffeb33526::t_582e73cff9e30f 204
+STATUS.md
+  s_27702ffeb33526::t_780cb12ead0fd3 1-6
+  s_27702ffeb33526::t_04c2dd21bd087f 484
+affilio-api/internal/handlers/llms_archive.go
+  s_27702ffeb33526::t_ea45327f96969d 140
+affilio-api/internal/migrations/047_d093b_placement_publish_ask.sql
+  s_7e484d91fceb6c::t_9cb3088d4c83e2 1-2
+  s_7e484d91fceb6c::t_d53fd7e90374a5 26
+affilio-api/internal/handlers/a2a_test.go
+  s_27702ffeb33526::t_142cbd36d391ab 67-102
+affilio-api/internal/database/step_modes.go
+  s_27702ffeb33526::t_213906a3a1f737 158-161
+  s_27702ffeb33526::t_15b411839c3a22 101
+  s_27702ffeb33526::t_d05951d0c7131a 172
+  s_27702ffeb33526::t_a806a782057759 295
+  s_27702ffeb33526::t_ad610aabb654fd 130-132
+  s_27702ffeb33526::t_8a80ec86d5e366 25-27
+  s_27702ffeb33526::t_d7c606d11d66a5 307
+  s_27702ffeb33526::t_f81b6414710d17 57
+affilio-api/internal/handlers/payouts_test.go
+  s_27702ffeb33526::t_7758562c91a28d 80-83,85-86
+  s_27702ffeb33526::t_ec3381d3e41e61 84
+affilio-api/internal/handlers/step_modes_test.go
+  s_27702ffeb33526::t_9261b0fd6fbd08 142
+  s_27702ffeb33526::t_03602088dd10fd 134
+affilio-api/internal/handlers/a2a.go
+  s_27702ffeb33526::t_379d4a6cdaf3b5 6,11
+  s_27702ffeb33526::t_943adc1e84b01f 150,176-177
+  s_27702ffeb33526::t_d45e2c700d0632 127-130
+  s_27702ffeb33526::t_56ffe41288d816 179,309-318
+  s_27702ffeb33526::t_fe1fc445384268 87-90,178
+affilio-api/internal/handlers/d088_publish_default_test.go
+  s_27702ffeb33526::t_0652afe78772e5 60
+affilio-api/internal/orp/bundled/SPEC.md
+  s_27702ffeb33526::t_7912da7dcab9e6 1248,1477
+affilio-wp/admin/build/landing-v9/llms-full.txt
+  s_7e484d91fceb6c::t_f2b9b0e179fc5b 134
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ee3be2741326965e2ce2cf2241487cab9b9dd5b6",
+  "prompts": {},
+  "sessions": {
+    "s_27702ffeb33526": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "carnation-viscose",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    },
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
