@@ -1,0 +1,51 @@
+affilio-api/internal/services/readiness.go
+  s_7e484d91fceb6c::t_72f2b3666866b0 274-297
+affilio-api/internal/handlers/orp_federation.go
+  s_7e484d91fceb6c::t_9e942de7d05679 9-11
+  s_7e484d91fceb6c::t_56ffc48d79fab3 39-41
+  s_7e484d91fceb6c::t_69a53533b8e08f 50
+  s_7e484d91fceb6c::t_5a9f36b863d2e8 61-62
+  s_7e484d91fceb6c::t_1b19d372f998d1 1-8,12-38,42-49,51-60,63-109
+affilio-api/internal/handlers/orp_host.go
+  s_7e484d91fceb6c::t_f35e6310202667 34-36
+  s_7e484d91fceb6c::t_26fc8ea46804cb 230-231,235-238
+  s_7e484d91fceb6c::t_1c39bb6b72570a 278-279
+  s_7e484d91fceb6c::t_b47f23bc6c34c5 284
+  s_7e484d91fceb6c::t_49b042308fb2f4 226-227,232-234,239-240,242-244,250
+  s_7e484d91fceb6c::t_6cc7fa7ff78dc7 241
+  s_7e484d91fceb6c::t_464e8a08708375 280-281
+affilio-api/internal/orp/snapshot.go
+  s_7e484d91fceb6c::t_38f33be9677ebb 36-37
+  s_7e484d91fceb6c::t_9b9be77ae084e8 46-59
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_23b42be7a43441 80
+affilio-api/internal/database/agent_join.go
+  s_7e484d91fceb6c::t_ad44f12bce8936 333
+  s_7e484d91fceb6c::t_f95972f567374f 325-332,334-341
+affilio-api/internal/handlers/orp_federation_test.go
+  s_7e484d91fceb6c::t_e77aa16e837dbd 10
+  s_7e484d91fceb6c::t_aedb2b74aa0500 1-9,11-73,75-152,154-185
+  s_7e484d91fceb6c::t_2aa3b51514461e 74,153
+STATUS.md
+  s_7e484d91fceb6c::t_2b39ce1d442531 1-4
+affilio-wp/admin/build/landing-v9/llms.txt
+  s_7e484d91fceb6c::t_dcb9abe10d4442 11
+ui/landing/public/llms.txt
+  s_7e484d91fceb6c::t_1636fe715c0511 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "58fc3ee69f6ceb9bf3c347cee556c465627de276",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
