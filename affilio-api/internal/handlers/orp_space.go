@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"affilio-api/internal/database"
@@ -94,8 +96,11 @@ func (h *ORPHost) withdrawSpace(c *gin.Context, dns string, msg orp.Message, has
 
 // spaceVerified returns the host-set verified list for a space. The domain
 // method wins when the locator host matches the owner's claimed site. On any
-// other host the locator is fetched and the marker method applies when the
-// page carries the claiming party's id. A fetch failure adds no method.
+// other host the locator is fetched and a page carrying the party id earns
+// bio_token on a social.profile or challenge_post on other kinds. An X
+// status locator is checked through the publish.twitter.com oEmbed endpoint;
+// other X URLs serve JS-gated pages and earn nothing. A fetch failure adds
+// no method.
 func (h *ORPHost) spaceVerified(c *gin.Context, ownerID, party string, rawSpace map[string]any) []any {
 	locator, _ := rawSpace["locator"].(string)
 	if locator == "" {
@@ -113,18 +118,62 @@ func (h *ORPHost) spaceVerified(c *gin.Context, ownerID, party string, rawSpace 
 		host = strings.TrimPrefix(strings.ToLower(host), "www.")
 		domain = strings.TrimPrefix(strings.ToLower(domain), "www.")
 		if host == domain || strings.HasSuffix(host, "."+domain) {
-			return []any{map[string]any{"method": "domain", "at": orp.Stamp(h.now())}}
+			return h.spaceVerification("domain")
 		}
 	}
 	fetch := h.FetchPage
 	if fetch == nil {
 		fetch = defaultPageFetch
 	}
+	if embed, xHost := xStatusEmbedURL(locator); xHost {
+		if embed == "" {
+			return nil
+		}
+		body, ok := fetch(c.Request.Context(), embed)
+		if !ok || !strings.Contains(body, party) {
+			return nil
+		}
+		return h.spaceVerification("challenge_post")
+	}
 	body, ok := fetch(c.Request.Context(), locator)
 	if !ok || !strings.Contains(body, party) {
 		return nil
 	}
-	return []any{map[string]any{"method": "marker", "at": orp.Stamp(h.now())}}
+	if kind, _ := rawSpace["kind"].(string); kind == "social.profile" {
+		return h.spaceVerification("bio_token")
+	}
+	return h.spaceVerification("challenge_post")
+}
+
+func (h *ORPHost) spaceVerification(method string) []any {
+	return []any{map[string]any{"method": method, "at": orp.Stamp(h.now())}}
+}
+
+var xHosts = map[string]bool{
+	"x.com": true, "www.x.com": true, "mobile.x.com": true,
+	"twitter.com": true, "www.twitter.com": true, "mobile.twitter.com": true,
+}
+
+// xStatusEmbedURL maps an X status locator, /<user>/status/<digits> on x.com
+// or twitter.com, to the publish.twitter.com oEmbed endpoint the host fetches
+// for the post text. The second result reports whether the locator is on an
+// X host at all: every other X URL is JS-gated and is never fetched.
+func xStatusEmbedURL(locator string) (string, bool) {
+	u, err := url.Parse(locator)
+	if err != nil {
+		return "", false
+	}
+	if !xHosts[strings.ToLower(u.Hostname())] {
+		return "", false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) != 3 || parts[1] != "status" {
+		return "", true
+	}
+	if _, err := strconv.ParseUint(parts[2], 10, 64); err != nil {
+		return "", true
+	}
+	return "https://publish.twitter.com/oembed?url=" + url.QueryEscape(locator) + "&omit_script=true", true
 }
 
 // request delivers a maker's terms request to a space owner's inbox. The spec
