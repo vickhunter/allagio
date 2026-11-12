@@ -32,7 +32,7 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
 
   return (
     <>
-      <button type="button" onClick={open} data-track="palette_button" className="hidden min-h-11 min-w-11 items-center gap-2 rounded-lg border border-line bg-s1 px-2.5 text-[13px] text-t2 hover:bg-s2 sm:inline-flex">
+      <button type="button" onClick={open} data-track="palette_button" className="hidden min-h-11 min-w-11 items-center gap-2 rounded-lg border border-line bg-s1 px-2.5 text-[13px] text-t2 hover:bg-s2 sm:inline-flex xl:hidden">
         Jump to… <Kbd>⌘K</Kbd>
       </button>
       <dialog ref={ref} aria-label="Command palette" className="m-auto mt-[14vh] w-[min(560px,92vw)] rounded-2xl border border-line bg-s1 p-0 text-t1 backdrop:bg-inv/30 backdrop:backdrop-blur-sm open:[animation:fade-up_300ms_var(--ease-menu)]"

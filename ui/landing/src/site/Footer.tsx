@@ -49,6 +49,7 @@ export function Footer() {
           <nav aria-label="Paper" className="foot-cols">
             <p>Paper</p>
             <a href={withSource('/protocol/', source)}>Protocol</a>
+            <a href={withSource('/reference', source)}>Reference</a>
             <a href={withSource('/privacy', source)}>Privacy</a>
             <a href={withSource('/terms', source)}>Terms</a>
           </nav>

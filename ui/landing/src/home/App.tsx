@@ -10,6 +10,7 @@ import { PostPreview } from '@/components/PostPreview'
 import { Hero } from '@/components/hero-2'
 import { FeatureSection } from '@/components/feature-3'
 import { FAQ } from '@/components/faq-1'
+import { TradeOffs } from '@/components/trade-offs'
 import { CallToAction } from '@/components/call-to-action-1'
 import { useOfferConfig, useSource, withSource } from '@/lib/source'
 import { comingLine } from '@/home/hero-copy.mjs'
@@ -45,7 +46,7 @@ export function App() {
       <Hero source={source} />
       <ClientStrip />
 
-      <div className="border-t border-line">
+      <div className="border-t border-line bg-s2/40">
         <FeatureSection source={source} />
       </div>
 
@@ -125,7 +126,7 @@ export function App() {
         </figure>
       </section>
 
-      <section id="compare" aria-labelledby="compare-h" className="compare border-t border-line bg-s0">
+      <section id="compare" aria-labelledby="compare-h" className="compare border-t border-line bg-s1">
         <h2 id="compare-h" className="sr-only">With and without a labelled offer</h2>
         <article className="relative border border-line">
           <h3 className="flex items-center gap-2.5"><XCircle aria-hidden="true" className="h-6 w-6 text-t2" />A post, before an offer</h3>
@@ -157,6 +158,10 @@ export function App() {
       </section>
 
       <div className="border-t border-line">
+        <TradeOffs />
+      </div>
+
+      <div className="border-t border-line bg-s1">
         <FAQ />
       </div>
 

@@ -55,7 +55,7 @@ export function FeatureSection({ source }: { source: string }) {
           {steps.map((step) => (
             <Card
               key={step.number}
-              className="border-line bg-card shadow-none transition-colors hover:border-line-strong"
+              className="border-line bg-card shadow-none transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-line-strong hover:shadow-md"
             >
               <CardContent className="flex h-full flex-col p-6 text-left">
                 <div className="font-mono text-sm tracking-tight text-setup">

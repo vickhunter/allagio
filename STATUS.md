@@ -1,3 +1,7 @@
+## November 12 — Landing UI/UX pass (Magic UI-style)
+
+Nav rebuilt as a centered 3-zone bar: logo left, centered pill nav (6 items) on ≥1280px, Sign in + "Set up your agent" CTA right; Reference demoted to menu/palette/footer. Sections now alternate background tints for rhythm instead of one flat wall. New trade-offs section before FAQ: "With Allagio (ORP)" green-check card vs "by hand" X card — honest test-mode copy. Build + stamp green, Playwright smoke clean at 390/1100/1440, react-doctor 89/100. Footer animation untouched.
+
 ## November 12 — Canonical domain: allagio.dev
 
 `PUBLIC_BASE_URL` flipped to `https://allagio.dev` on Railway — discovery docs, the agent card, join URLs, the `or-install` meta, and plugin download rewrites all derive from it, so nothing else needed code changes. Party IDs already minted under `orp:affilio-production.up.railway.app/...` stay valid (opaque strings); new joins mint `orp:allagio.dev/...`. **Ops note:** the OIDC callback moved to `https://allagio.dev/auth/callback` — register it in Pocket ID or owner login breaks. `www.allagio.dev` still needs its own Railway custom domain if wanted.

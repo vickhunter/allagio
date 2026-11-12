@@ -5,7 +5,7 @@ const heading = 'Runs in the agents you already use.'
 
 export function ClientStrip() {
   return (
-    <section id="clients" aria-labelledby="clients-h" className="border-t border-line py-10">
+    <section id="clients" aria-labelledby="clients-h" className="border-t border-line bg-s1 py-10">
       <h2 id="clients-h" className="sr-only">{heading}</h2>
       <p aria-hidden="true" className="text-center text-[13px] font-semibold uppercase tracking-[0.14em] text-t2">{heading}</p>
       <Marquee pauseOnHover className="mt-6 [--duration:28s]" repeat={2}>
