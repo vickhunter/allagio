@@ -1,0 +1,75 @@
+affilio-api/internal/handlers/orp_deal.go
+  s_7e484d91fceb6c::t_e812599f2e8b3f 40
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_cc1ee0f9a472a9 84-85
+affilio-api/internal/handlers/orp_payouts.go
+  s_7e484d91fceb6c::t_0976baf709007c 1-3,5-8,10-55,57-63,66-122,127-140,142-267,271-272,277-279
+  s_7e484d91fceb6c::t_967d6e593df138 56,64-65
+  s_7e484d91fceb6c::t_59984679e93bb2 4,9
+  s_7e484d91fceb6c::t_a3468115a6ac17 123-126,141
+  s_7e484d91fceb6c::t_c90e121b5e6e22 268-270,273-276
+affilio-api/internal/handlers/orp_many.go
+  s_7e484d91fceb6c::t_98cd9d659ec2c1 566-568
+  s_7e484d91fceb6c::t_10e451e3c61632 534
+affilio-api/internal/database/orp_payouts.go
+  s_7e484d91fceb6c::t_b673d729af470b 1-185,187,189-222
+  s_7e484d91fceb6c::t_e3ba0e65d33d2d 186,188
+affilio-api/internal/orp/envelope.go
+  s_7e484d91fceb6c::t_b8c527545ce2a6 220
+  s_7e484d91fceb6c::t_b5c7e6787d4f5c 286-288
+  s_7e484d91fceb6c::t_0c7688783a5f5c 418-442
+affilio-api/internal/handlers/orp_payouts_test.go
+  s_7e484d91fceb6c::t_b3ef50236c24ab 255,260-264
+  s_7e484d91fceb6c::t_f064c45e506243 114
+  s_7e484d91fceb6c::t_6f8fa7d0b7dc5b 191
+  s_7e484d91fceb6c::t_a72acdd269083d 256-259,265-276,278-279,281-284,286-289
+  s_7e484d91fceb6c::t_cb86644e198947 43
+  s_7e484d91fceb6c::t_e1d97eac4c5c53 209
+  s_7e484d91fceb6c::t_7a5fb27a5d6dae 1-35,37-42,44-91,93-106,108-109,111-113,115-183,185-186,188-190,192-208,210-239,241-242,244-254,285,290
+  s_7e484d91fceb6c::t_9a3c4d163d903b 36
+  s_7e484d91fceb6c::t_b54c3ff62017a9 92,107,110,184,187,240,243,277,280
+affilio-api/internal/handlers/orp_deal_test.go
+  s_7e484d91fceb6c::t_9572f81b0338a7 206
+affilio-api/internal/migrations/060_orp_payouts.sql
+  s_7e484d91fceb6c::t_7308455e16a8a7 1-24
+affilio-api/internal/handlers/orp_host.go
+  s_7e484d91fceb6c::t_e63449862837f7 309-310
+affilio-api/internal/orp/payouts.go
+  s_7e484d91fceb6c::t_874fbcdc45d73b 18
+  s_7e484d91fceb6c::t_1c839f49306e74 66-72,80-81
+  s_7e484d91fceb6c::t_9113c617b9fa17 32-34
+  s_7e484d91fceb6c::t_b4b928a2fbff5b 1-17,19-31,35-65,73-79,82-131,133-155,157-170,172-220
+  s_7e484d91fceb6c::t_a166d8aea31281 132,156,171
+affilio-api/internal/handlers/hosted_auth.go
+  s_7e484d91fceb6c::t_dcbe469252f4f1 1237-1242
+  s_7e484d91fceb6c::t_7267cc0e3fe005 143
+  s_7e484d91fceb6c::t_988458c72daab6 1194-1199
+affilio-api/internal/orp/discovery.go
+  s_7e484d91fceb6c::t_1d52a969108023 123
+affilio-api/internal/handlers/handlers_test.go
+  s_7e484d91fceb6c::t_afbbaf2316c236 285-287
+  s_7e484d91fceb6c::t_2e64fa8bb24ce4 134
+  s_7e484d91fceb6c::t_61a8efd5e9ffe5 275
+STATUS.md
+  s_7e484d91fceb6c::t_81d87b0574f2d8 1-6
+affilio-wp/admin/build/landing-v9/llms.txt
+  s_7e484d91fceb6c::t_36cd42c6ce605d 15-16
+ui/landing/public/llms.txt
+  s_7e484d91fceb6c::t_8149b7de69c917 15-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "668f05b1d46cb771bf298c61622ce6bdec8ba819",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
