@@ -1,0 +1,36 @@
+affilio-api/internal/handlers/llms_archive.go
+  s_7e484d91fceb6c::t_073d7ad1879dfa 26
+affilio-api/internal/handlers/orp_space.go
+  s_7e484d91fceb6c::t_38072b1965fb19 95-99,105-117,119-121,123-124,127
+  s_7e484d91fceb6c::t_f14b83d5c72682 51
+  s_7e484d91fceb6c::t_425eb3640b80a0 4,12
+  s_7e484d91fceb6c::t_91ffde2f203499 17-21
+affilio-api/internal/handlers/orp_space_test.go
+  s_7e484d91fceb6c::t_e86d8c05f1d089 8
+  s_7e484d91fceb6c::t_69463c0f759963 176-247
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_ea1c61e86d254f 26
+affilio-api/internal/handlers/orp_host.go
+  s_7e484d91fceb6c::t_dfc5e4e575090a 31-33
+  s_7e484d91fceb6c::t_fc6907661079f2 4
+STATUS.md
+  s_7e484d91fceb6c::t_c8bdb56898d31b 1-4
+affilio-wp/admin/build/landing-v9/llms-full.txt
+  s_7e484d91fceb6c::t_644db75040edd0 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3404b0f53ff15c882838316fb2980d7771cbc5f7",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
