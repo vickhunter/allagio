@@ -1,0 +1,48 @@
+affilio-api/internal/handlers/revenue_poc_test.go
+  s_27702ffeb33526::t_59ed887d15d147 164-170
+affilio-api/cmd/server/main.go
+  s_27702ffeb33526::t_366ae10219330e 282
+affilio-api/internal/handlers/d093b_publish_ask_test.go
+  s_7e484d91fceb6c::t_2bcb5703f926f8 128
+affilio-api/internal/handlers/workspace_test.go
+  s_27702ffeb33526::t_11482101a2ae72 246-248
+affilio-api/internal/handlers/handlers_test.go
+  s_7e484d91fceb6c::t_a7fc9ee1d16345 276
+  s_7e484d91fceb6c::t_5f1278f0eae3f4 134
+affilio-api/internal/handlers/mcp.go
+  s_27702ffeb33526::t_207b062336c714 56-62
+affilio-api/internal/handlers/session_timezone_test.go
+  s_27702ffeb33526::t_ab97a6ca78d505 73-79
+affilio-api/internal/migrations/061_payout_ask_default.sql
+  s_7e484d91fceb6c::t_7f51af4144f79c 1-37
+affilio-api/internal/migrations/047_d093b_placement_publish_ask.sql
+  s_7e484d91fceb6c::t_ab75e62de3ea3f 1,25
+affilio-wp/admin/build/landing-v9/llms.txt
+  s_27702ffeb33526::t_f5fede46ffd3a3 15
+ui/landing/public/llms.txt
+  s_27702ffeb33526::t_4ccba8a31d7b82 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2cb15425672a6c1d2552813d5f950831172b874d",
+  "prompts": {},
+  "sessions": {
+    "s_27702ffeb33526": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "carnation-viscose",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    },
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
