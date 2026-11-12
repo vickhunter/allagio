@@ -1,0 +1,33 @@
+affilio-api/internal/handlers/orp_space.go
+  s_7e484d91fceb6c::t_533dff1eb97918 8-9
+  s_7e484d91fceb6c::t_42ad8a659a3c40 99-103,121,128-137,142-176
+affilio-api/internal/handlers/orp_space_test.go
+  s_7e484d91fceb6c::t_e6d39dc443a0a6 7
+  s_7e484d91fceb6c::t_f802751454bd3a 181-186,197,201,208,211-235,238-266,269-270,273,280,287-319
+  s_7e484d91fceb6c::t_686b7552f4ba84 8,11-12
+  s_7e484d91fceb6c::t_8b53b5a549bfff 320
+STATUS.md
+  s_7e484d91fceb6c::t_2596e32265d512 1-4
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_eab96d21f943ad 26
+affilio-api/internal/handlers/llms_archive.go
+  s_7e484d91fceb6c::t_2f74023c9ae076 26
+affilio-wp/admin/build/landing-v9/llms-full.txt
+  s_7e484d91fceb6c::t_8d17cf621831e9 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "398bb9822f8085a225f84a453c86d0c7fceff339",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
