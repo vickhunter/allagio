@@ -1,0 +1,25 @@
+STATUS.md
+  s_7e484d91fceb6c::t_912e2495c431d4 1-4
+affilio-api/DEPLOYMENT.md
+  s_7e484d91fceb6c::t_97d480ad707701 152
+docs/MVP-DELIVERY.md
+  s_7e484d91fceb6c::t_ab3af9adf88594 99
+scripts/test_mvp_release.py
+  s_7e484d91fceb6c::t_38ca39103dc064 256
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5747b00a12c77df6b9801ee1a860df0e296ea83a",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
