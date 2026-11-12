@@ -1,3 +1,7 @@
+## November 12 — A2A sendSubscribe + security gate
+
+`POST /a2a` now also answers `tasks/sendSubscribe`: the task completes synchronously as before, but the response streams `text/event-stream` — a `submitted` status event, then the terminal status (`completed`, `input-required`, `failed`) marked `final`. Tasks still store for `tasks/get`; push notifications stay false and the agent card now honestly says `streaming: true`. Security gate: repo scan is clean — every `sk_live_`/`PRIVATE KEY`/`ghp_` match is the code that *refuses* live keys, and `.gitleaks.toml` already allowlists the test fakes.
+
 ## November 12 — settlement records: payout lifecycle on verified pay obligations
 
 A `pay` obligation with a fixed `amount` now produces real payout records. `orp.PlanPayouts` reads the terms against deal obligation states: `after` pays when that obligation verifies, `per: deal` pays when every non-pay obligation is verified or waived, and `per: placement` pays once per verified place. Pay per click, per conversion, and `rate_bps`-only pay mint nothing — those bases need click counting or provider revenue the test pool does not hold. `orp_payouts` (migration 060) dedupes on (deal, obligation, basis_obligation) so a replayed sweep is a no-op.

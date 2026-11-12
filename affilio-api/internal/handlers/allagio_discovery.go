@@ -106,7 +106,7 @@ func ServeAgentCard(publicBase string) gin.HandlerFunc {
 			"version":          "0.1.0",
 			"provider":         gin.H{"organization": "Allagio", "url": base},
 			"documentationUrl": base + "/agents",
-			"capabilities":     gin.H{"streaming": false, "pushNotifications": false},
+			"capabilities":     gin.H{"streaming": true, "pushNotifications": false},
 			"skills": []gin.H{
 				{
 					"id":          "partner-discovery",

@@ -44,6 +44,8 @@ func (a *A2A) RPC(c *gin.Context) {
 	switch req.Method {
 	case "tasks/send":
 		a.send(c, req)
+	case "tasks/sendSubscribe":
+		a.sendSubscribe(c, req)
 	case "tasks/get":
 		a.get(c, req)
 	case "tasks/cancel":
@@ -121,6 +123,92 @@ func (a *A2A) send(c *gin.Context, req rpcRequest) {
 		}
 	}
 	a.rpcResult(c, req.ID, json.RawMessage(raw))
+}
+
+// sendSubscribe is tasks/send over a stream: the task still completes
+// synchronously, so the SSE response is a submitted status then the
+// terminal status update marked final, then the stream ends.
+func (a *A2A) sendSubscribe(c *gin.Context, req rpcRequest) {
+	var p sendParams
+	if err := json.Unmarshal(req.Params, &p); err != nil || len(p.Message.Parts) == 0 {
+		a.rpcError(c, req.ID, -32602, "Invalid params: tasks/sendSubscribe needs a message with parts.")
+		return
+	}
+	if p.ID == "" {
+		p.ID = orp.LocalID("a2a_")
+	}
+	var path string
+	var body []byte
+	var bearer bool
+	for _, part := range p.Message.Parts {
+		switch part.Type {
+		case "data":
+			if env, ok := part.Data["orp"].(string); ok && (env == "0.3" || env == "0.4") {
+				path = "/orp"
+				body, _ = json.Marshal(part.Data)
+				bearer = true
+			}
+		case "text":
+			if path == "" {
+				path = "/orp/suggest"
+				body, _ = json.Marshal(map[string]any{"text": part.Text, "limit": 5})
+			}
+		}
+		if path != "" {
+			break
+		}
+	}
+	if path == "" {
+		a.rpcError(c, req.ID, -32602, "No supported part: send a data part with an ORP envelope or a text part for suggest.")
+		return
+	}
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-store")
+	c.Status(http.StatusOK)
+	flusher, canFlush := c.Writer.(http.Flusher)
+	writeEvent := func(result any) {
+		payload, _ := json.Marshal(gin.H{"jsonrpc": "2.0", "id": idOrNull(req.ID), "result": result})
+		_, _ = c.Writer.Write([]byte("data: "))
+		_, _ = c.Writer.Write(payload)
+		_, _ = c.Writer.Write([]byte("\n\n"))
+		if canFlush {
+			flusher.Flush()
+		}
+	}
+	writeEvent(map[string]any{
+		"id":     p.ID,
+		"status": map[string]any{"state": "submitted", "timestamp": time.Now().UTC().Format(time.RFC3339)},
+		"final":  false,
+	})
+	status, reply := a.forward(c, path, body, bearer)
+	doc := a.taskDoc(p, reply, status, c)
+	raw, err := json.Marshal(doc)
+	if err != nil {
+		writeEvent(map[string]any{
+			"id":     p.ID,
+			"status": map[string]any{"state": "failed", "timestamp": time.Now().UTC().Format(time.RFC3339)},
+			"final":  true,
+		})
+		return
+	}
+	ownerID := a.ownerID(c)
+	if a.Entry != nil && a.Entry.DB != nil {
+		if err := a.Entry.DB.SaveA2ATask(c.Request.Context(), p.ID, ownerID, p.SessionID, raw); err != nil {
+			writeEvent(map[string]any{
+				"id":     p.ID,
+				"status": map[string]any{"state": "failed", "timestamp": time.Now().UTC().Format(time.RFC3339)},
+				"final":  true,
+			})
+			return
+		}
+	}
+	state, _ := doc["status"].(map[string]any)["state"].(string)
+	writeEvent(map[string]any{
+		"id":       p.ID,
+		"status":   doc["status"],
+		"final":    true,
+		"metadata": map[string]any{"orp": true, "http_status": status, "state": state},
+	})
 }
 
 func (a *A2A) get(c *gin.Context, req rpcRequest) {

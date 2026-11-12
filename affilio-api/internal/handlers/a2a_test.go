@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -124,5 +127,53 @@ func TestA2AEdges(t *testing.T) {
 	errObj, _ = otherBody["error"].(map[string]any)
 	if other.Code != http.StatusOK || errObj["code"] != float64(-32601) {
 		t.Fatalf("method %d %s", other.Code, mustJSON(otherBody))
+	}
+}
+
+// tasks/sendSubscribe streams a submitted status then the terminal
+// update marked final over text/event-stream.
+func TestA2ASendSubscribe(t *testing.T) {
+	_, r := trustHost(t)
+	token, party := joinParty(t, r)
+
+	payload, _ := json.Marshal(map[string]any{
+		"jsonrpc": "2.0", "id": "req_sub", "method": "tasks/sendSubscribe",
+		"params": map[string]any{
+			"id": "task_sub_01",
+			"message": map[string]any{"role": "user", "parts": []any{
+				a2aDataPart(orpEnvelope("hello", "m_a2a_sub1", party, map[string]any{"versions": []any{"0.3"}})),
+			}},
+		},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/a2a", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/event-stream") {
+		t.Fatalf("subscribe %d %s", w.Code, w.Header().Get("Content-Type"))
+	}
+	var events []map[string]any
+	for _, chunk := range strings.Split(w.Body.String(), "\n\n") {
+		chunk = strings.TrimSpace(strings.TrimPrefix(chunk, "data:"))
+		if chunk == "" {
+			continue
+		}
+		var event map[string]any
+		if err := json.Unmarshal([]byte(chunk), &event); err != nil {
+			t.Fatalf("event %q: %v", chunk, err)
+		}
+		events = append(events, event)
+	}
+	if len(events) != 2 {
+		t.Fatalf("events %d %s", len(events), w.Body.String())
+	}
+	first, _ := events[0]["result"].(map[string]any)
+	if first["status"].(map[string]any)["state"] != "submitted" || first["final"] != false {
+		t.Fatalf("first %s", w.Body.String())
+	}
+	last, _ := events[1]["result"].(map[string]any)
+	if last["status"].(map[string]any)["state"] != "completed" || last["final"] != true {
+		t.Fatalf("last %s", w.Body.String())
 	}
 }
