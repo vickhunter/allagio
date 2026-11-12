@@ -96,6 +96,9 @@ func TestDemoOperatorDigestAndUnbilledGoLink(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE sites SET demo=true WHERE id=$1`, demoSite); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE agent_step_modes SET payout='auto' WHERE site_id=$1::uuid`, realSite); err != nil {
+		t.Fatal(err)
+	}
 	_, offerID := seedListedOffer(t, db, "d084a-maker", "d084a-maker@example.com", "Northstar")
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET landing_url='https://example.com/buy', status='listed' WHERE id=$1`, offerID); err != nil {
 		t.Fatal(err)

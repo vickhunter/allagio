@@ -11,6 +11,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func TestMCPGetIs405(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	mcp := &MCPHandler{}
+	r.POST("/v1/mcp", mcp.Receive)
+	r.Match([]string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodDelete, http.MethodPatch, http.MethodOptions}, "/v1/mcp", mcp.MethodNotAllowed)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/mcp", nil))
+	if rec.Code != http.StatusMethodNotAllowed || rec.Header().Get("Allow") != "POST" {
+		t.Fatalf("GET /v1/mcp: expected 405, got %d", rec.Code)
+	}
+}
+
 func TestHostedMCPTransport(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()

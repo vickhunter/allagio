@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -71,7 +72,7 @@ func newHostedMCPServer(grant *database.AgentGrant, loopbackURL, baseURL, bearer
 		readOnly := strings.HasPrefix(tool.Name, "get_") || strings.HasPrefix(tool.Name, "list_") || tool.Name == "find_opportunities" || tool.Name == "preview_revenue" || tool.Name == "suggest_monetization"
 		destructive := strings.HasPrefix(tool.Name, "update_") || tool.Name == "undo_placement" || tool.Name == "restore_placement"
 		openWorld := tool.Name == "run_assessment"
-		s.AddTool(&mcp.Tool{Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: readOnly || tool.Name == "commit_placement", DestructiveHint: &destructive, OpenWorldHint: &openWorld}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		s.AddTool(&mcp.Tool{Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema, OutputSchema: map[string]any{"type": "object"}, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: readOnly || tool.Name == "commit_placement", DestructiveHint: &destructive, OpenWorldHint: &openWorld}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := map[string]any{}
 			if len(req.Params.Arguments) > 0 {
 				if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
@@ -97,10 +98,110 @@ func newHostedMCPServer(grant *database.AgentGrant, loopbackURL, baseURL, bearer
 			if err != nil {
 				return nil, err
 			}
-			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}}, nil
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}, StructuredContent: out}, nil
 		})
 	}
+	addSearchFetchTools(s, loopbackURL, bearer)
 	return s
+}
+
+// addSearchFetchTools registers the OpenAI-compatible search/fetch pair: a
+// read-only lookup over the listed offers the caller's token can already see.
+// ids are offer ids and url is the product's website_url.
+func addSearchFetchTools(s *mcp.Server, loopbackURL, bearer string) {
+	loadOffers := func(ctx context.Context) ([]any, error) {
+		client := dcp.NewClient(loopbackURL, "")
+		client.Bearer = bearer
+		client.Context = ctx
+		client.HTTP = &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+		out, err := client.DoSite(http.MethodGet, "/v1/marketplace/offers", nil)
+		if err != nil {
+			return nil, err
+		}
+		items, _ := out["offers"].([]any)
+		return items, nil
+	}
+	structured := func(v any) (*mcp.CallToolResult, error) {
+		raw, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		m, _ := v.(map[string]any)
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(raw)}}, StructuredContent: m}, nil
+	}
+	fail := func(err error) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: err.Error()}}}, nil
+	}
+	outputSchema := map[string]any{"type": "object"}
+
+	s.AddTool(&mcp.Tool{
+		Name:         "search",
+		Description:  "Search listed offers by name, tagline, or category. Returns {results:[{id,title,url}]}.",
+		InputSchema:  map[string]any{"type": "object", "required": []string{"query"}, "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search query"}}},
+		OutputSchema: outputSchema,
+		Annotations:  &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Query string `json:"query"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+		items, err := loadOffers(ctx)
+		if err != nil {
+			return fail(err)
+		}
+		query := strings.ToLower(strings.TrimSpace(args.Query))
+		results := []any{}
+		for _, item := range items {
+			offer, _ := item.(map[string]any)
+			if offer == nil {
+				continue
+			}
+			haystack := strings.ToLower(fmt.Sprint(offer["product_name"], " ", offer["product_tagline"], " ", offer["primary_category"], " ", offer["terms"]))
+			if query == "" || strings.Contains(haystack, query) {
+				results = append(results, map[string]any{"id": offer["offer_id"], "title": offer["product_name"], "url": offer["website_url"]})
+			}
+		}
+		return structured(map[string]any{"results": results})
+	})
+
+	s.AddTool(&mcp.Tool{
+		Name:         "fetch",
+		Description:  "Fetch one listed offer by id from search. Returns {id,title,text,url,metadata}.",
+		InputSchema:  map[string]any{"type": "object", "required": []string{"id"}, "properties": map[string]any{"id": map[string]any{"type": "string", "description": "Offer id from a search result"}}},
+		OutputSchema: outputSchema,
+		Annotations:  &mcp.ToolAnnotations{ReadOnlyHint: true},
+	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, err
+		}
+		items, err := loadOffers(ctx)
+		if err != nil {
+			return fail(err)
+		}
+		for _, item := range items {
+			offer, _ := item.(map[string]any)
+			if id, _ := offer["offer_id"].(string); offer != nil && id == args.ID {
+				text := fmt.Sprint(offer["product_name"], " — ", offer["product_tagline"], "\nCategory: ", offer["primary_category"], "\nCommission: ", offer["commission_value"], " ", offer["commission_currency"], " ", offer["commission_type"], "\nTerms: ", offer["terms"])
+				return structured(map[string]any{
+					"id":    id,
+					"title": offer["product_name"],
+					"text":  text,
+					"url":   offer["website_url"],
+					"metadata": map[string]any{
+						"primary_category": offer["primary_category"],
+						"commission_type":  offer["commission_type"],
+						"joined":           offer["joined"],
+					},
+				})
+			}
+		}
+		return fail(fmt.Errorf("no listed offer with id %q", args.ID))
+	})
 }
 
 func (h *HostedHandler) MCPTransport() http.Handler {

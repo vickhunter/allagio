@@ -104,7 +104,7 @@ func TestRegisterAgainDoesNotRewritePublishMode(t *testing.T) {
 		t.Fatal("an existing site with no step row gained one")
 	}
 	modes, err := db.LoadStepModes(ctx, "", oldID)
-	if err != nil || modes.PlacementPublish != "ask" || modes.OfferMatch != "auto" || modes.Payout != "auto" {
+	if err != nil || modes.PlacementPublish != "ask" || modes.OfferMatch != "auto" || modes.Payout != "ask" {
 		t.Fatalf("old site read: %+v %v", modes, err)
 	}
 }

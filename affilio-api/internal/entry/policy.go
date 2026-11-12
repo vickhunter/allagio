@@ -22,7 +22,7 @@ const NewSitePublishDefault = "A new site waits for a person to approve each pla
 
 // MissingRowPublishAsk is the read when no step-mode row is saved for the
 // owner or the site. A stored auto is left as stored. The other steps stay auto.
-const MissingRowPublishAsk = "A site or owner with no saved step-mode row reads placement publish as ask. The other steps stay auto. A saved auto is left as stored."
+const MissingRowPublishAsk = "A site or owner with no saved step-mode row reads placement publish and payout as ask. The other steps stay auto. A saved auto is left as stored."
 
 // YoloAfterFirstReason is why a saved yolo site still answers manual
 // until its first approved placement.
