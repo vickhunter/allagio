@@ -1,3 +1,9 @@
+## November 12 — safe defaults: payout step ask, A2A task ids owner-scoped
+
+Two hardening changes ahead of real money and public agents. The `payout` step now defaults to `ask` everywhere a mode is read with no saved row — `Get`, `filled`, `LoadStepModes`, and `PayoutMode` — so a payable payout or a batch payout waits for owner approval instead of releasing on its own. An owner who explicitly stores `auto` still auto-sends; `off` still never runs. Fresh sites and fresh owners now read `payout: ask` from `/v1/step-modes` and the backfill writes `ask` for payout. `llms.txt` and the agent docs name the new default.
+
+`tasks/send` on `POST /a2a` no longer lets a client claim another owner's task id. `SaveA2ATask` keeps upserting by `task_id`, but `send` now checks an existing task's owner before saving: a stored task owned by someone else answers `-32602` `task_id_taken` instead of being overwritten, and anonymous tasks stay readable by unguessable id only. Regression: `TestA2ATaskIDScopedToOwner`.
+
 ## November 12 — Landing UI/UX pass (Magic UI-style)
 
 Nav rebuilt as a centered 3-zone bar: logo left, centered pill nav (6 items) on ≥1280px, Sign in + "Set up your agent" CTA right; Reference demoted to menu/palette/footer. Sections now alternate background tints for rhythm instead of one flat wall. New trade-offs section before FAQ: "With Allagio (ORP)" green-check card vs "by hand" X card — honest test-mode copy. Build + stamp green, Playwright smoke clean at 390/1100/1440, react-doctor 89/100. Footer animation untouched.
@@ -475,7 +481,7 @@ The agents page and llms.txt say the hosted app uses the ordered steps. The demo
 
 ## October 19 — Per-step auto, ask, or off
 
-Each agent step is `site_signup`, `offer_match`, `placement_publish`, `link_change`, or `payout`. The owner sets each one to `auto`, `ask`, or `off`. A missing row is `auto`. Human approval applies only where the owner chose `ask`. `off` does not run the step: the API and MCP answer `reason` `step_off` and a message that names the step.
+Each agent step is `site_signup`, `offer_match`, `placement_publish`, `link_change`, or `payout`. The owner sets each one to `auto`, `ask`, or `off`. A missing row is `auto` except `placement_publish` and `payout`, which read `ask`. Human approval applies only where the owner chose `ask`. `off` does not run the step: the API and MCP answer `reason` `step_off` and a message that names the step.
 
 `GET` and `PUT /v1/step-modes` read and set the modes for the signed-in owner or the site key. MCP tools `get_step_modes` and `set_step_modes` call that API. `ask` for signup, match, link change, and payout is a row on the offer-review queue (`step_approvals`), released by `POST /v1/offer-review/steps/:id/approve`. Placement publish reuses the pending placement and `POST /v1/offer-review/placements/:id/approve`. Switching publish from `ask` to `auto` leaves a placement that is already waiting; the next one publishes on its own.
 

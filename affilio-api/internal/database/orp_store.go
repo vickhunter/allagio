@@ -1634,17 +1634,46 @@ func (d *DB) ListORPOfferOwner(ctx context.Context, ownerID, id string) (bool, e
 	return tag.RowsAffected() == 1, err
 }
 
-// SaveA2ATask stores one A2A task document, replacing it on the same id.
+// ErrA2ATaskTaken is a task id stored under another owner.
+var ErrA2ATaskTaken = errors.New("a2a task id belongs to another owner")
+
+// SaveA2ATask stores one A2A task document, replacing it on the same id
+// only when the stored row belongs to the same owner.
 func (d *DB) SaveA2ATask(ctx context.Context, taskID, ownerID, sessionID string, doc json.RawMessage) error {
 	var owner *string
 	if ownerID != "" {
 		owner = &ownerID
 	}
-	_, err := d.Pool.Exec(ctx, `
+	tag, err := d.Pool.Exec(ctx, `
 INSERT INTO a2a_tasks(task_id, owner_id, session_id, doc) VALUES($1,$2::uuid,$3,$4)
-ON CONFLICT(task_id) DO UPDATE SET doc=EXCLUDED.doc, session_id=EXCLUDED.session_id, updated_at=NOW()`,
+ON CONFLICT(task_id) DO UPDATE SET doc=EXCLUDED.doc, session_id=EXCLUDED.session_id, updated_at=NOW()
+WHERE a2a_tasks.owner_id IS NOT DISTINCT FROM EXCLUDED.owner_id`,
 		taskID, owner, sessionID, doc)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrA2ATaskTaken
+	}
+	return nil
+}
+
+// A2ATaskOwner returns the owner stored for a task id, so a send can refuse
+// a foreign id before it runs any side effects. found is false when no row
+// exists; an empty ownerID means the stored task is anonymous.
+func (d *DB) A2ATaskOwner(ctx context.Context, taskID string) (ownerID string, found bool, err error) {
+	var owner *string
+	err = d.Pool.QueryRow(ctx, `SELECT owner_id::text FROM a2a_tasks WHERE task_id=$1`, taskID).Scan(&owner)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	if owner != nil {
+		ownerID = *owner
+	}
+	return ownerID, true, nil
 }
 
 // GetA2ATask reads one task for its owner. Tasks with no owner (anonymous

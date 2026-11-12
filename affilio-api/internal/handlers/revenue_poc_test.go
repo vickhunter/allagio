@@ -197,6 +197,13 @@ func TestConcurrentPayoutsAndRefundCancellation(t *testing.T) {
 
 func TestTestPayoutIsolationAndRefundAfterConfirmedReceipt(t *testing.T) {
 	db, r, siteKey, _, clickID := testPaidCampaign(t)
+	var siteID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT id FROM sites WHERE domain='publisher.example.com'`).Scan(&siteID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE agent_step_modes SET payout='auto' WHERE site_id=$1::uuid`, siteID); err != nil {
+		t.Fatal(err)
+	}
 	sendStripeEvent(t, db, r, stripeSalePayload("evt_late", "pi_late", clickID, 20000))
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE ledger_entries SET clears_at=NOW()-INTERVAL '1 day'`); err != nil {
 		t.Fatal(err)

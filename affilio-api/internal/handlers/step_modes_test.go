@@ -131,7 +131,7 @@ func TestStepModesDefaultToAuto(t *testing.T) {
 	}
 	rec, body := postJSON(t, r, http.MethodGet, "/v1/step-modes", nil, map[string]string{"X-API-Key": key})
 	modes := modeMap(t, body)
-	if rec.Code != http.StatusOK || body["site_id"] != siteID || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["placement_publish"] != "ask" || modes["link_change"] != "auto" || modes["payout"] != "auto" {
+	if rec.Code != http.StatusOK || body["site_id"] != siteID || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["placement_publish"] != "ask" || modes["link_change"] != "auto" || modes["payout"] != "ask" {
 		t.Fatalf("defaults: %d %s", rec.Code, rec.Body.String())
 	}
 	if body["placement_publish_effective"] != "ask" || body["placement_publish_reason"] != "domain_unverified" {
@@ -139,7 +139,7 @@ func TestStepModesDefaultToAuto(t *testing.T) {
 	}
 	saved := putStepModes(t, r, key, map[string]any{"placement_publish": "ask"})
 	modes = modeMap(t, saved)
-	if modes["placement_publish"] != "ask" || modes["offer_match"] != "auto" || modes["payout"] != "auto" || countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes`) != 1 {
+	if modes["placement_publish"] != "ask" || modes["offer_match"] != "auto" || modes["payout"] != "ask" || countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes`) != 1 {
 		t.Fatalf("partial save: %s", saved)
 	}
 	bad, badBody := postJSON(t, r, http.MethodPut, "/v1/step-modes", map[string]any{"placement_publish": "yolo"}, map[string]string{"X-API-Key": key})

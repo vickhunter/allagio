@@ -626,7 +626,7 @@ func TestJoinBearerFreshOwnerPlacementIsNotApproved(t *testing.T) {
 	}
 	got, gotBody := postJSON(t, r, http.MethodGet, "/v1/step-modes", nil, bearerHeader(token))
 	modes := modeMap(t, gotBody)
-	if got.Code != http.StatusOK || modes["placement_publish"] != "ask" || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["link_change"] != "auto" || modes["payout"] != "auto" {
+	if got.Code != http.StatusOK || modes["placement_publish"] != "ask" || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["link_change"] != "auto" || modes["payout"] != "ask" {
 		t.Fatalf("fresh modes: %d %s", got.Code, got.Body.String())
 	}
 

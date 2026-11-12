@@ -52,7 +52,7 @@ func TestVerifiedSiteWithoutRowAsksAndSavedAutoPublishes(t *testing.T) {
 	if len(content) > 0 {
 		text, _ = content[0].(map[string]any)["text"].(string)
 	}
-	if result["isError"] != false || !strings.Contains(text, `"placement_publish": "ask"`) || !strings.Contains(text, `"offer_match": "auto"`) || !strings.Contains(text, `"payout": "auto"`) || !strings.Contains(text, `"site_signup": "auto"`) {
+	if result["isError"] != false || !strings.Contains(text, `"placement_publish": "ask"`) || !strings.Contains(text, `"offer_match": "auto"`) || !strings.Contains(text, `"payout": "ask"`) || !strings.Contains(text, `"site_signup": "auto"`) {
 		t.Fatalf("get_step_modes: %d %s", mcpRec.Code, mcpRec.Body.String())
 	}
 
@@ -177,7 +177,7 @@ func TestPlacementPublishAskBackfill(t *testing.T) {
 	if err = db.Pool.QueryRow(ctx, `SELECT site_signup, offer_match, placement_publish, link_change, payout, COALESCE(owner_id::text,''), scope_key FROM agent_step_modes WHERE site_id=$1`, missing).Scan(&signup, &match, &publish, &link, &payout, &ownerID, &scope); err != nil {
 		t.Fatal(err)
 	}
-	if signup != "auto" || match != "auto" || publish != "ask" || link != "auto" || payout != "auto" || ownerID != "" || scope != "site:"+missing {
+	if signup != "auto" || match != "auto" || publish != "ask" || link != "auto" || payout != "ask" || ownerID != "" || scope != "site:"+missing {
 		t.Fatalf("backfill row %s %s %s %s %s owner=%s scope=%s", signup, match, publish, link, payout, ownerID, scope)
 	}
 	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes WHERE site_id=$1`, missing) != 1 {
@@ -203,7 +203,7 @@ func TestPlacementPublishAskBackfill(t *testing.T) {
 		t.Fatalf("owner-wide read after backfill: %+v %v", loaded, err)
 	}
 	bare, err := db.LoadStepModes(ctx, "", missing)
-	if err != nil || bare.PlacementPublish != "ask" || bare.SiteSignup != "auto" || bare.Payout != "auto" {
+	if err != nil || bare.PlacementPublish != "ask" || bare.SiteSignup != "auto" || bare.Payout != "ask" {
 		t.Fatalf("backfilled read: %+v %v", bare, err)
 	}
 }

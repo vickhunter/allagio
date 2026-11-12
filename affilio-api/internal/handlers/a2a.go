@@ -3,10 +3,12 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"time"
 
+	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
 
 	"github.com/gin-gonic/gin"
@@ -82,6 +84,10 @@ func (a *A2A) send(c *gin.Context, req rpcRequest) {
 		a.rpcResult(c, req.ID, doc)
 		return
 	}
+	if a.taskTaken(c, p.ID, ownerID) {
+		a.rpcError(c, req.ID, -32602, "That task id is already in use.")
+		return
+	}
 
 	var path string
 	var body []byte
@@ -118,6 +124,10 @@ func (a *A2A) send(c *gin.Context, req rpcRequest) {
 	}
 	if a.Entry != nil && a.Entry.DB != nil {
 		if err := a.Entry.DB.SaveA2ATask(c.Request.Context(), p.ID, ownerID, p.SessionID, raw); err != nil {
+			if errors.Is(err, database.ErrA2ATaskTaken) {
+				a.rpcError(c, req.ID, -32602, "That task id is already in use.")
+				return
+			}
 			a.rpcError(c, req.ID, -32603, "Internal error")
 			return
 		}
@@ -137,6 +147,7 @@ func (a *A2A) sendSubscribe(c *gin.Context, req rpcRequest) {
 	if p.ID == "" {
 		p.ID = orp.LocalID("a2a_")
 	}
+	ownerID := a.ownerID(c)
 	var path string
 	var body []byte
 	var bearer bool
@@ -160,6 +171,10 @@ func (a *A2A) sendSubscribe(c *gin.Context, req rpcRequest) {
 	}
 	if path == "" {
 		a.rpcError(c, req.ID, -32602, "No supported part: send a data part with an ORP envelope or a text part for suggest.")
+		return
+	}
+	if a.taskTaken(c, p.ID, ownerID) {
+		a.rpcError(c, req.ID, -32602, "That task id is already in use.")
 		return
 	}
 	c.Header("Content-Type", "text/event-stream")
@@ -191,7 +206,6 @@ func (a *A2A) sendSubscribe(c *gin.Context, req rpcRequest) {
 		})
 		return
 	}
-	ownerID := a.ownerID(c)
 	if a.Entry != nil && a.Entry.DB != nil {
 		if err := a.Entry.DB.SaveA2ATask(c.Request.Context(), p.ID, ownerID, p.SessionID, raw); err != nil {
 			writeEvent(map[string]any{
@@ -290,6 +304,16 @@ func (a *A2A) task(c *gin.Context, id, ownerID string) (json.RawMessage, bool, e
 		return nil, false, nil
 	}
 	return a.Entry.DB.GetA2ATask(c.Request.Context(), id, ownerID)
+}
+
+// taskTaken reports whether the id already stores a task for a different
+// owner, so a send refuses it before forwarding anything.
+func (a *A2A) taskTaken(c *gin.Context, id, ownerID string) bool {
+	if a.Entry == nil || a.Entry.DB == nil {
+		return false
+	}
+	stored, found, err := a.Entry.DB.A2ATaskOwner(c.Request.Context(), id)
+	return err == nil && found && stored != ownerID
 }
 
 func (a *A2A) rpcResult(c *gin.Context, id json.RawMessage, result any) {

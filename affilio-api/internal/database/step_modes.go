@@ -22,8 +22,9 @@ const (
 )
 
 // StepModes is the owner's choice for each agent step.
-// An empty field on a missing row reads as auto, except placement publish
-// and share, which read as ask. A saved value, including auto, is left as stored.
+// An empty field on a missing row reads as auto, except placement publish,
+// share, and payout, which read as ask. A saved value, including auto, is
+// left as stored.
 type StepModes struct {
 	SiteSignup       string
 	OfferMatch       string
@@ -53,7 +54,7 @@ func (m StepModes) Get(step string) string {
 		mode = m.Revoke
 	}
 	if mode == "" {
-		if step == StepPlacementPublish || step == StepShare {
+		if step == StepPlacementPublish || step == StepShare || step == StepPayout {
 			return ModeAsk
 		}
 		return ModeAuto
@@ -97,7 +98,7 @@ func (m StepModes) filled() StepModes {
 		m.LinkChange = ModeAuto
 	}
 	if m.Payout == "" {
-		m.Payout = ModeAuto
+		m.Payout = ModeAsk
 	}
 	if m.Share == "" {
 		m.Share = ModeAsk
@@ -126,8 +127,9 @@ func stepScopeKey(ownerID, siteID string) (string, bool) {
 }
 
 // LoadStepModes returns the saved modes for this owner and site.
-// A site row wins over an owner-wide row. No row means placement publish is
-// ask and the other steps are auto. A saved auto stays auto.
+// A site row wins over an owner-wide row. No row means placement publish,
+// share, and payout are ask and the other steps are auto. A saved auto
+// stays auto.
 func (d *DB) LoadStepModes(ctx context.Context, ownerID, siteID string) (StepModes, error) {
 	if ownerID == "" && siteID == "" {
 		return StepModes{}.filled(), nil
@@ -153,9 +155,10 @@ LIMIT 1`, ownerID, siteID).Scan(&m.SiteSignup, &m.OfferMatch, &m.PlacementPublis
 }
 
 // seedNewSitePublishAsk stores placement publish as ask for a site that was
-// just created. The other steps stay auto. An existing row is left alone, and
-// an owner-wide row is left alone, so a site that already chose its modes
-// keeps them. A missing row reads placement publish as ask.
+// just created, and payout as ask so money steps wait on the owner. The
+// other steps stay auto. An existing row is left alone, and an owner-wide
+// row is left alone, so a site that already chose its modes keeps them. A
+// missing row reads placement publish and payout as ask.
 func seedNewSitePublishAsk(ctx context.Context, tx pgx.Tx, ownerID, siteID string) error {
 	if siteID == "" {
 		return errors.New("site required")
@@ -166,7 +169,7 @@ func seedNewSitePublishAsk(ctx context.Context, tx pgx.Tx, ownerID, siteID strin
 	}
 	_, err := tx.Exec(ctx, `
 INSERT INTO agent_step_modes(scope_key, owner_id, site_id, site_signup, offer_match, placement_publish, link_change, payout)
-SELECT $1, NULLIF($2,'')::uuid, $3::uuid, 'auto', 'auto', 'ask', 'auto', 'auto'
+SELECT $1, NULLIF($2,'')::uuid, $3::uuid, 'auto', 'auto', 'ask', 'auto', 'ask'
 WHERE NOT EXISTS (
   SELECT 1 FROM agent_step_modes
   WHERE scope_key = $1
@@ -289,7 +292,7 @@ FROM agent_step_approvals WHERE id=$1`, id).Scan(&row.ID, &row.Step, &row.OwnerI
 }
 
 // PayoutMode is the payout step for a site, read on the caller's connection.
-// No row means auto.
+// No row means ask.
 func PayoutMode(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }, siteID string) (string, error) {
@@ -301,7 +304,7 @@ WHERE site_id = $1::uuid
 ORDER BY CASE WHEN site_id IS NOT NULL THEN 0 ELSE 1 END
 LIMIT 1`, siteID).Scan(&mode)
 	if errors.Is(err, pgx.ErrNoRows) || mode == "" {
-		return ModeAuto, nil
+		return ModeAsk, nil
 	}
 	return mode, err
 }

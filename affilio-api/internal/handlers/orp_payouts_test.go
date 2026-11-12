@@ -89,9 +89,12 @@ func lastPayoutRecord(t *testing.T, messages []any) map[string]any {
 }
 
 func TestORPPayoutLifecycle(t *testing.T) {
-	_, r := trustHost(t)
+	entry, r := trustHost(t)
 	makerToken, maker := joinParty(t, r)
 	pubToken, publisher := joinParty(t, r)
+	if err := entry.DB.SaveStepModes(context.Background(), ownerOfParty(maker), "", database.StepModes{Payout: "auto"}); err != nil {
+		t.Fatal(err)
+	}
 
 	offer := orpEnvelope("offer", "m_pay_offer_1", maker, map[string]any{"terms": paidTerms("")})
 	offer["to"] = publisher
@@ -253,9 +256,12 @@ func TestORPPayoutNoBasis(t *testing.T) {
 }
 
 func TestORPPayoutPerDeal(t *testing.T) {
-	_, r := trustHost(t)
+	entry, r := trustHost(t)
 	makerToken, maker := joinParty(t, r)
 	pubToken, publisher := joinParty(t, r)
+	if err := entry.DB.SaveStepModes(context.Background(), ownerOfParty(maker), "", database.StepModes{Payout: "auto"}); err != nil {
+		t.Fatal(err)
+	}
 
 	terms := paidTerms("")
 	obs, _ := terms["obligations"].([]any)

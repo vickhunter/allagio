@@ -1,4 +1,5 @@
--- D-093b: a site with no saved step-mode row stores placement_publish ask.
+-- D-093b: a site with no saved step-mode row stores placement_publish ask
+-- and payout ask. Money steps wait on the owner; the rest stay auto.
 -- Apply by hand. AUTO_MIGRATE stays off unless it is set to true.
 -- Safe to run more than once. A stored row is left as stored, including auto.
 -- This inserts one site-scoped row. It does not change an existing row.
@@ -22,7 +23,7 @@ SELECT
     'auto',
     'ask',
     'auto',
-    'auto'
+    'ask'
 FROM sites s
 WHERE NOT EXISTS (
     SELECT 1

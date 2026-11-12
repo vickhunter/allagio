@@ -64,6 +64,42 @@ func TestA2ASendHello(t *testing.T) {
 	}
 }
 
+// A task id belongs to its owner: another owner cannot replay it, overwrite
+// it, or read it — and the refusal happens before the message runs.
+func TestA2ATaskIDScopedToOwner(t *testing.T) {
+	_, r := trustHost(t)
+	tokenA, partyA := joinParty(t, r)
+	tokenB, partyB := joinParty(t, r)
+
+	code, body := a2aSend(t, r, "task_shared_01", []any{
+		a2aDataPart(orpEnvelope("hello", "m_a2a_scope1", partyA, map[string]any{"versions": []any{"0.3"}})),
+	}, bearerHeader(tokenA))
+	if code.Code != http.StatusOK || body["result"] == nil {
+		t.Fatalf("owner send %d %s", code.Code, mustJSON(body))
+	}
+
+	other, otherBody := a2aSend(t, r, "task_shared_01", []any{
+		a2aDataPart(orpEnvelope("hello", "m_a2a_scope2", partyB, map[string]any{"versions": []any{"0.3"}})),
+	}, bearerHeader(tokenB))
+	errObj, _ := otherBody["error"].(map[string]any)
+	if other.Code != http.StatusOK || errObj["code"] != float64(-32602) {
+		t.Fatalf("foreign send %d %s", other.Code, mustJSON(otherBody))
+	}
+
+	get, getBody := rpc(t, r, "tasks/get", map[string]any{"id": "task_shared_01"}, bearerHeader(tokenB))
+	errObj, _ = getBody["error"].(map[string]any)
+	if get.Code != http.StatusOK || errObj["code"] != float64(-32001) {
+		t.Fatalf("foreign get %d %s", get.Code, mustJSON(getBody))
+	}
+
+	// The owner's stored doc is untouched.
+	get, getBody = rpc(t, r, "tasks/get", map[string]any{"id": "task_shared_01"}, bearerHeader(tokenA))
+	got, _ := getBody["result"].(map[string]any)
+	if get.Code != http.StatusOK || got["id"] != "task_shared_01" {
+		t.Fatalf("owner get %d %s", get.Code, mustJSON(getBody))
+	}
+}
+
 // A waiting marker is input-required — the human step is outside the task.
 func TestA2ASendWaitingOffer(t *testing.T) {
 	_, r := trustHost(t)

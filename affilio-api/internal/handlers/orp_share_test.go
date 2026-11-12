@@ -60,10 +60,11 @@ func obligationState(t *testing.T, db *database.DB, dealID, obligationID string)
 	t.Helper()
 	var state string
 	err := db.Pool.QueryRow(context.Background(), `
-SELECT elem->>'state' FROM orp_deals d, jsonb_array_elements(d.obligations) elem
-WHERE d.id=$1 AND elem->>'id'=$2`, dealID, obligationID).Scan(&state)
+SELECT elem->>'state'
+FROM orp_deals, jsonb_array_elements(obligations) elem
+WHERE orp_deals.id=$1 AND elem->>'id'=$2`, dealID, obligationID).Scan(&state)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("obligation %s: %v", obligationID, err)
 	}
 	return state
 }

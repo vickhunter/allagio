@@ -260,10 +260,12 @@ func TestSchemaIDsUseOneHost(t *testing.T) {
 	}
 }
 
-// frozenORP03Roots are the ORP 0.3 files that stay byte-identical to
-// 8a6c6fa (the Open Rails rename + optional consumer attestation, a §19
-// change-control amendment on top of the f203ca97 freeze), including
-// SPEC.md and GAPS.md in the repo and the bundle.
+// frozenORP03Roots are the ORP 0.3 files that stay byte-identical to the
+// re-frozen state of 2026-11-12 (a §19 change-control amendment on top of
+// 8a6c6fa: the 0.3 tracked-link docs landed post-freeze and the bundle was
+// re-synced; 8a6c6fa was itself the rename + optional consumer attestation
+// amendment on top of f203ca97), including SPEC.md and GAPS.md in the repo
+// and the bundle.
 var frozenORP03Roots = []string{
 	"docs/protocol/SPEC.md",
 	"docs/protocol/GAPS.md",
@@ -280,11 +282,11 @@ var frozenORP03Roots = []string{
 	"affilio-api/internal/orp/bundled/schemas/constraints.schema.json",
 }
 
-// frozenORP03SHA256 is sha256 over those files at 8a6c6fa, sorted by
-// repo-relative path. Each file contributes "<path>\n<len>\n" and its bytes.
-// A shallow checkout has no 8a6c6fa object, so the test uses this digest
-// and does not require git history.
-const frozenORP03SHA256 = "10817a7ad88839e51161c19225e790a2daad16a65eccaca942d405f5c471e53b"
+// frozenORP03SHA256 is sha256 over those files at the 2026-11-12
+// re-freeze, sorted by repo-relative path. Each file contributes
+// "<path>\n<len>\n" and its bytes. A shallow checkout has no 8a6c6fa
+// object, so the test uses this digest and does not require git history.
+const frozenORP03SHA256 = "c6e61eaa572e0c661f568e6eba45aa067e892029a94cda3efff117663e646bec"
 
 func frozenORP03Digest(repo string) (string, error) {
 	var files []string

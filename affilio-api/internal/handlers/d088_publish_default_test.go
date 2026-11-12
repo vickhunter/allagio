@@ -57,7 +57,7 @@ func TestSiteWithNoStepRowStaysPendingWhenClaimsAreLive(t *testing.T) {
 
 	got, gotBody := postJSON(t, live, http.MethodGet, "/v1/step-modes", nil, map[string]string{"X-API-Key": key})
 	modes := modeMap(t, gotBody)
-	if got.Code != http.StatusOK || modes["placement_publish"] != "ask" || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["link_change"] != "auto" || modes["payout"] != "auto" {
+	if got.Code != http.StatusOK || modes["placement_publish"] != "ask" || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["link_change"] != "auto" || modes["payout"] != "ask" {
 		t.Fatalf("missing row modes: %d %s", got.Code, got.Body.String())
 	}
 	if gotBody["placement_publish_effective"] != "ask" || gotBody["placement_publish_reason"] != "step_ask" {

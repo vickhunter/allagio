@@ -77,6 +77,13 @@ func TestPayoutLifecycle(t *testing.T) {
 
 	siteKey := "site-key-payouts"
 	createTestSite(t, db, siteKey, "blog3.example.com", "Blog 3")
+	var siteID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT id FROM sites WHERE domain='blog3.example.com'`).Scan(&siteID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE agent_step_modes SET payout='auto' WHERE site_id=$1::uuid`, siteID); err != nil {
+		t.Fatal(err)
+	}
 	_, join := doSiteJSON(t, r, http.MethodPost, "/v1/marketplace/offers/"+offerID+"/join", siteKey, nil)
 	code := join["tracking_code"].(string)
 
