@@ -1,0 +1,45 @@
+affilio-api/internal/handlers/orp_trust.go
+  s_27702ffeb33526::t_64bce23f54cfaf 63-64,81-82,86-87,99-100,403,406
+  s_27702ffeb33526::t_95935fd7be9171 60-62
+  s_27702ffeb33526::t_957253f7ad48c8 78-80
+  s_27702ffeb33526::t_bb1c91c6f3b549 83-85
+  s_27702ffeb33526::t_79cff44fa76673 96-98
+  s_27702ffeb33526::t_e7d8febd758fef 101
+  s_27702ffeb33526::t_dcdf1f1cbc4852 400-402
+  s_27702ffeb33526::t_1dd8271eb4feca 404-405
+  s_27702ffeb33526::t_1456dd114f77f5 407-409
+affilio-api/internal/database/db.go
+  s_27702ffeb33526::t_565547cf55d96c 21-25
+affilio-api/internal/database/orp_store.go
+  s_27702ffeb33526::t_3756d3417b702a 12-13,24-33,150-160,224-228,266-271,317-324,370-770
+affilio-api/internal/handlers/orp_deal.go
+  s_27702ffeb33526::t_e62a55960a6acd 959,975,1206-1217
+affilio-api/internal/handlers/orp_trust_test.go
+  s_27702ffeb33526::t_896e7c9f301152 5,7,9,260-761
+affilio-api/internal/handlers/workspace_downloads_test.go
+  s_27702ffeb33526::t_4cc5a6a2edb655 48
+affilio-wp/e2e/landing-a11y.spec.js
+  s_27702ffeb33526::t_4642f3fc00eabd 180-181
+docs/ORP-HOST-POLICY.md
+  s_27702ffeb33526::t_3a593e53fa590f 1-61
+scripts/mvp_release.py
+  s_27702ffeb33526::t_0b686acf512c1f 62
+scripts/test_mvp_release.py
+  s_27702ffeb33526::t_093226831710e7 418
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "557c583405517a969ec13dba93d3a8b2958140c0",
+  "prompts": {},
+  "sessions": {
+    "s_27702ffeb33526": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "carnation-viscose",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
