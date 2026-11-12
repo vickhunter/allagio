@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"html/template"
 	"net/http"
@@ -8,9 +9,15 @@ import (
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
+
+func defaultPageFetch(ctx context.Context, rawURL string) (string, bool) {
+	body, _, ok := (&services.ReadinessEngine{}).FetchPublicPage(ctx, rawURL)
+	return body, ok
+}
 
 // space registers, updates, or withdraws one space (ORP 0.3 §9.1). put writes
 // the space and replies space listed with status listed or waiting — waiting
@@ -41,7 +48,7 @@ func (h *ORPHost) space(c *gin.Context, dns string, msg orp.Message, hash, owner
 	listed := mode == database.ModeAuto
 	now := h.now()
 	origin, _ := h.origin(c)
-	if verified := h.spaceVerified(c, ownerID, rawSpace); len(verified) > 0 {
+	if verified := h.spaceVerified(c, ownerID, msg.From, rawSpace); len(verified) > 0 {
 		rawSpace["verified"] = verified
 	}
 	spaceRaw, _ := json.Marshal(rawSpace)
@@ -85,28 +92,39 @@ func (h *ORPHost) withdrawSpace(c *gin.Context, dns string, msg orp.Message, has
 	})
 }
 
-func (h *ORPHost) spaceVerified(c *gin.Context, ownerID string, rawSpace map[string]any) []any {
+// spaceVerified returns the host-set verified list for a space. The domain
+// method wins when the locator host matches the owner's claimed site. On any
+// other host the locator is fetched and the marker method applies when the
+// page carries the claiming party's id. A fetch failure adds no method.
+func (h *ORPHost) spaceVerified(c *gin.Context, ownerID, party string, rawSpace map[string]any) []any {
 	locator, _ := rawSpace["locator"].(string)
 	if locator == "" {
 		return nil
 	}
 	domain, err := h.Entry.DB.OwnerSiteDomain(c.Request.Context(), ownerID)
-	if err != nil || domain == "" {
+	if err == nil && domain != "" {
+		host := locator
+		if i := strings.Index(host, "://"); i >= 0 {
+			host = host[i+3:]
+		}
+		if i := strings.IndexAny(host, "/?#"); i >= 0 {
+			host = host[:i]
+		}
+		host = strings.TrimPrefix(strings.ToLower(host), "www.")
+		domain = strings.TrimPrefix(strings.ToLower(domain), "www.")
+		if host == domain || strings.HasSuffix(host, "."+domain) {
+			return []any{map[string]any{"method": "domain", "at": orp.Stamp(h.now())}}
+		}
+	}
+	fetch := h.FetchPage
+	if fetch == nil {
+		fetch = defaultPageFetch
+	}
+	body, ok := fetch(c.Request.Context(), locator)
+	if !ok || !strings.Contains(body, party) {
 		return nil
 	}
-	host := locator
-	if i := strings.Index(host, "://"); i >= 0 {
-		host = host[i+3:]
-	}
-	if i := strings.IndexAny(host, "/?#"); i >= 0 {
-		host = host[:i]
-	}
-	host = strings.TrimPrefix(strings.ToLower(host), "www.")
-	domain = strings.TrimPrefix(strings.ToLower(domain), "www.")
-	if host != domain && !strings.HasSuffix(host, "."+domain) {
-		return nil
-	}
-	return []any{map[string]any{"method": "domain", "at": orp.Stamp(h.now())}}
+	return []any{map[string]any{"method": "marker", "at": orp.Stamp(h.now())}}
 }
 
 // request delivers a maker's terms request to a space owner's inbox. The spec

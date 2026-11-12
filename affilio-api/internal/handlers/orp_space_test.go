@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 )
 
 func putSpace(t *testing.T, r http.Handler, token, from, id, spaceID string) (int, map[string]any) {
@@ -170,5 +171,77 @@ func TestORPOfferOwnerListApproval(t *testing.T) {
 	items, _ := foundBody["body"].(map[string]any)["items"].([]any)
 	if len(items) != 1 {
 		t.Fatalf("items %s", found.Body.String())
+	}
+}
+
+// A space whose locator page carries the party id earns verified:marker. The
+// domain method still wins for same-domain locators; a page without the
+// marker leaves verified unset but the space still lists.
+func TestORPSpaceMarkerVerification(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	t.Cleanup(cleanup)
+	entry := &AgentEntry{
+		DB:           db,
+		BaseURL:      "http://127.0.0.1:8080",
+		AddressKey:   testAddressKey,
+		ClaimsCheck:  "off-local",
+		TokenLimiter: NewIPRateLimiter(8, time.Minute),
+	}
+	var pages map[string]string
+	host := &ORPHost{
+		Entry: entry,
+		FetchPage: func(ctx context.Context, rawURL string) (string, bool) {
+			body, ok := pages[rawURL]
+			return body, ok
+		},
+	}
+	r := mountORP(entry, host)
+	pubToken, publisher := joinParty(t, r)
+	pages = map[string]string{
+		"https://indiestack.example/issues": "<html><body>Weekly by " + publisher + ".</body></html>",
+		"https://other.example/page":        "<html><body>no marker here</body></html>",
+	}
+
+	msg := orpEnvelope("space", "m_marker1", publisher, map[string]any{
+		"action": "put",
+		"space": map[string]any{
+			"id": "sp_mark_1", "kind": "newsletter.issue", "platform": "newsletter",
+			"title": "Indie Stack Weekly", "locator": "https://indiestack.example/issues",
+		},
+	})
+	rec, body := postJSON(t, r, http.MethodPost, "/orp", msg, bearerHeader(pubToken))
+	inner, _ := body["body"].(map[string]any)
+	space, _ := inner["space"].(map[string]any)
+	verified, _ := space["verified"].([]any)
+	if rec.Code != http.StatusOK || len(verified) != 1 || verified[0].(map[string]any)["method"] != "marker" {
+		t.Fatalf("marker space %d %s", rec.Code, rec.Body.String())
+	}
+
+	msg = orpEnvelope("space", "m_marker2", publisher, map[string]any{
+		"action": "put",
+		"space": map[string]any{
+			"id": "sp_nomark", "kind": "blog.post", "platform": "blog",
+			"title": "No marker", "locator": "https://other.example/page",
+		},
+	})
+	rec, body = postJSON(t, r, http.MethodPost, "/orp", msg, bearerHeader(pubToken))
+	inner, _ = body["body"].(map[string]any)
+	space, _ = inner["space"].(map[string]any)
+	if rec.Code != http.StatusOK || space["verified"] != nil {
+		t.Fatalf("unmarked space %d %s", rec.Code, rec.Body.String())
+	}
+
+	msg = orpEnvelope("space", "m_marker3", publisher, map[string]any{
+		"action": "put",
+		"space": map[string]any{
+			"id": "sp_down", "kind": "blog.post", "platform": "blog",
+			"title": "Down page", "locator": "https://down.example/x",
+		},
+	})
+	rec, body = postJSON(t, r, http.MethodPost, "/orp", msg, bearerHeader(pubToken))
+	inner, _ = body["body"].(map[string]any)
+	space, _ = inner["space"].(map[string]any)
+	if rec.Code != http.StatusOK || space["verified"] != nil {
+		t.Fatalf("unreachable locator %d %s", rec.Code, rec.Body.String())
 	}
 }

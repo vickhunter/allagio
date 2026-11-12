@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -27,6 +28,9 @@ type ORPHost struct {
 	SuggestLimiter *IPRateLimiter
 	MessageLimiter *IPRateLimiter
 	Now            func() time.Time
+	// FetchPage fetches a public page for space marker verification. Nil uses
+	// the SSRF-guarded readiness fetcher.
+	FetchPage func(ctx context.Context, rawURL string) (body string, ok bool)
 }
 
 // Mount registers the ORP routes. POST /orp is the message endpoint.

@@ -1,3 +1,7 @@
+## November 12 — surface verification: marker method for off-domain locators
+
+`space` verification only had `domain` — a locator on the owner's claimed site. Cross-domain surfaces (a newsletter archive, a link-in-bio page, a blog post URL) could never earn `verified`. Now, when the domain check misses, the host fetches the locator through the SSRF-guarded readiness fetcher (public IPs only, 512 KiB cap) and looks for the claiming party's exact id in the page: a page carrying `orp:<host>/<owner>` earns `{"method":"marker","at":...}`. A page without the marker or a fetch failure earns nothing — `verified` stays unset and listing is unaffected, so verification never gates a listing. The fetch runs through `ORPHost.FetchPage`, a hook tests stub. Docs name the method set in llms.txt. Test: marker page earns the method, markerless and unreachable locators do not.
+
 ## November 12 — party keys: E9 signature verification at join and on the wire
 
 Parties can now bind a public Ed25519 JWK at `POST /orp/join` (`key`), matching the spec's join-request schema (OKP/Ed25519, closed object, private material refused). The key lands in the new `party_keys` table (migration `059_party_keys.sql`, auto-applies on deploy). `GET /orp/keys/<opaque>` serves the party's public JWK set (404 when none) per `GET {endpoint}/keys/<opaque>`.
