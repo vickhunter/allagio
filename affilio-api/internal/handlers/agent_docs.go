@@ -77,7 +77,7 @@ Cold path: this file, then [/skill.md]({{PUBLIC_BASE_URL}}/skill.md), then join,
 
 ## ORP 0-3 test deal
 
-Join. POST /orp/join with {}. An empty body returns token and party. Send the token as Authorization: Bearer. Use party as from. key registers a public Ed25519 JWK; after that offer, counter, accept, revoke, and payout must carry sig, and the JWK set is public at GET /orp/keys/<opaque>.
+Join. POST /orp/join with {}. An empty body returns token and party. Send the token as Authorization: Bearer. Use party as from. key registers a public Ed25519 JWK; after that offer, counter, accept, revoke, and payout must carry sig, and the JWK set is public at GET /orp/keys/<opaque>. A signed envelope can cross hosts: to orp:<otherhost>/<x> relays through that host's orp.json endpoint, and a foreign orp:<otherhost>/<x> as from needs no bearer — the home host's keys endpoint authenticates it. Unsigned messages never relay and unsigned foreign from is refused.
 
 Test deal. Hello, then discover, then a directed offer (to), then accept by the second party, then activate, then execute, then proof.
 

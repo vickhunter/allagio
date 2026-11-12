@@ -33,15 +33,28 @@ func ApproveURL(origin, escalation string) string {
 
 // OwnerFromParty returns the agent-account id carried in a member party id.
 func OwnerFromParty(dns, party string) (string, bool) {
-	prefix := "orp:" + dns + "/"
-	if !strings.HasPrefix(party, prefix) {
+	host, id, ok := SplitParty(party)
+	if !ok || host != dns {
 		return "", false
 	}
-	id := strings.TrimPrefix(party, prefix)
 	if !ownerIDPattern.MatchString(id) {
 		return "", false
 	}
 	return id, true
+}
+
+// SplitParty returns the host and opaque segments of an orp:<host>/<opaque>
+// id. ok is false for any other shape.
+func SplitParty(party string) (host, opaque string, ok bool) {
+	if !strings.HasPrefix(party, "orp:") {
+		return "", "", false
+	}
+	rest := strings.TrimPrefix(party, "orp:")
+	i := strings.Index(rest, "/")
+	if i <= 0 || i == len(rest)-1 {
+		return "", "", false
+	}
+	return rest[:i], rest[i+1:], true
 }
 
 // Stamp is the UTC RFC3339 form this host writes on messages.

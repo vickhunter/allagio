@@ -322,3 +322,20 @@ WHERE owner_id=$1
 RETURNING scope`, ownerID, " "+word+" ", word).Scan(&scope)
 	return scope, err
 }
+
+// EnsureFederatedOwner upserts the synthetic owner a foreign ORP party maps
+// to. The party id is unique under the orp-federated issuer, so a repeat
+// message finds the same owner.
+func (d *DB) EnsureFederatedOwner(ctx context.Context, party, host string) (string, error) {
+	sum := sha256.Sum256([]byte(party))
+	var id string
+	err := d.Pool.QueryRow(ctx, `INSERT INTO owners(issuer, subject, email, name, source, agent_only, human_login)
+VALUES('orp-federated', $1, $2, $3, 'mcp', true, false)
+ON CONFLICT (issuer, subject) DO UPDATE SET name=EXCLUDED.name
+RETURNING id::text`,
+		party,
+		"fed-"+hex.EncodeToString(sum[:8])+"@agents.invalid",
+		host,
+	).Scan(&id)
+	return id, err
+}

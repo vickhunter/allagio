@@ -271,6 +271,30 @@ func (e *ReadinessEngine) FetchPublicPage(ctx context.Context, rawURL string) (b
 	return page.Body, page.Status, page.OK
 }
 
+// PostPublicJSON POSTs a JSON body to a public URL under the same SSRF rules
+// as FetchPublicPage: public addresses only, redirects re-checked, the body
+// cap applies to the reply. ok is true for a 2xx status.
+func (e *ReadinessEngine) PostPublicJSON(ctx context.Context, rawURL string, payload []byte) (body string, status int, ok bool) {
+	if err := e.hostAllowed(ctx, rawURL); err != nil {
+		return "", 0, false
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, strings.NewReader(string(payload)))
+	if err != nil {
+		return "", 0, false
+	}
+	req.Header.Set("User-Agent", "Allagio-Readiness/1.0")
+	req.Header.Set("Content-Type", "application/json")
+	client := e.httpClient()
+	defer client.CloseIdleConnections()
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", 0, false
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+	return string(raw), resp.StatusCode, resp.StatusCode >= 200 && resp.StatusCode < 300
+}
+
 func (e *ReadinessEngine) fetchPage(ctx context.Context, rawURL string) fetchedPage {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {

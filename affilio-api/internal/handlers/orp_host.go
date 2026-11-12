@@ -31,6 +31,9 @@ type ORPHost struct {
 	// FetchPage fetches a public page for space marker verification. Nil uses
 	// the SSRF-guarded readiness fetcher.
 	FetchPage func(ctx context.Context, rawURL string) (body string, ok bool)
+	// FederationFetch is the host-to-host fetch seam (discovery, keys, relay).
+	// Nil uses the SSRF-guarded readiness client.
+	FederationFetch fedFetch
 }
 
 // Mount registers the ORP routes. POST /orp is the message endpoint.
@@ -220,21 +223,31 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 		h.writeProblem(c, dns, "", "", problem, false)
 		return
 	}
+	var grant *database.AgentGrant
+	local := false
 	grant, err := h.Entry.JoinGrant(c)
 	if err != nil {
-		h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusUnauthorized, Code: "unauthorized", Message: "No credential or a bad credential."}, false)
-		return
-	}
-	party := orp.MemberParty(dns, grant.OwnerID)
-	if msg.From != party {
-		h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "from does not match the credential."}, false)
-		return
+		foreign, handled := h.foreignGrant(c, dns, msg, value)
+		if !handled {
+			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusUnauthorized, Code: "unauthorized", Message: "No credential or a bad credential."}, false)
+			return
+		}
+		if foreign == nil {
+			return
+		}
+		grant = foreign
+	} else {
+		local = true
+		if msg.From != orp.MemberParty(dns, grant.OwnerID) {
+			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "from does not match the credential."}, false)
+			return
+		}
 	}
 	hash := orp.ContentHash(value)
 	if h.seen(c, dns, msg, hash) {
 		return
 	}
-	if msg.HasSig || orp.SignedType(msg.Type) {
+	if local && (msg.HasSig || orp.SignedType(msg.Type)) {
 		keys, err := h.Entry.DB.PartyKeys(c.Request.Context(), grant.OwnerID)
 		if err != nil {
 			h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
@@ -262,9 +275,13 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 		h.writeProblem(c, dns, msg.From, msg.ID, rateLimited("Too many messages from this party."), false)
 		return
 	}
+	if toHost, _, ok := orp.SplitParty(msg.To); ok && toHost != dns {
+		h.relayForeign(c, dns, msg, toHost, body)
+		return
+	}
 	switch {
 	case msg.Type == "hello":
-		h.finish(c, msg, hash, http.StatusOK, orp.HelloReplyFor(msg.ORP, dns, msg.From, msg.ID, party, h.claimsMode(), h.now()), database.ORPEffect{})
+		h.finish(c, msg, hash, http.StatusOK, orp.HelloReplyFor(msg.ORP, dns, msg.From, msg.ID, msg.From, h.claimsMode(), h.now()), database.ORPEffect{})
 	case msg.Type == "discover":
 		h.discover(c, dns, msg, hash)
 	case msg.Type == "space":
