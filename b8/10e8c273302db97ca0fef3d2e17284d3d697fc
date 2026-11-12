@@ -1,0 +1,59 @@
+affilio-api/cmd/server/main.go
+  s_7e484d91fceb6c::t_3d5942ab1801a6 87-103,106-109
+affilio-api/internal/handlers/orp_outcomes_test.go
+  s_7e484d91fceb6c::t_d9cbcb51579e1e 72
+  s_7e484d91fceb6c::t_7f6101b7c410bd 134-136
+  s_7e484d91fceb6c::t_2ac52a5be9aeff 50-52
+  s_7e484d91fceb6c::t_0345acc6420c6b 1-49,53-71,73-133,137-179
+affilio-api/DEPLOYMENT.md
+  s_7e484d91fceb6c::t_0c75fca52cecab 158-168
+affilio-api/internal/orp/outcomes_test.go
+  s_7e484d91fceb6c::t_ba50b77494e158 71,77
+  s_7e484d91fceb6c::t_762b84a733db91 1-70,72-76,78-96
+affilio-api/internal/orp/outcomes.go
+  s_7e484d91fceb6c::t_23b2b029ace95d 1-112
+affilio-api/internal/handlers/orp_outcomes.go
+  s_7e484d91fceb6c::t_040721b2595912 1-123
+affilio-api/internal/migrations/062_orp_outcomes.sql
+  s_7e484d91fceb6c::t_77ed893bf232ef 1-18
+STATUS.md
+  s_27702ffeb33526::t_371c0d52ca7d2e 5-8
+  s_7e484d91fceb6c::t_00d7cb37a6bcb2 1-4
+affilio-api/internal/database/orp_outcomes.go
+  s_7e484d91fceb6c::t_1b79ef50c95751 1-41,43-148
+  s_7e484d91fceb6c::t_e8e1d70ff47f08 42
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_f606a775b177ab 86-87
+affilio-api/internal/handlers/handlers_test.go
+  s_7e484d91fceb6c::t_392477f98cb373 277
+  s_7e484d91fceb6c::t_b3bc54c2e4f7e0 134
+  s_7e484d91fceb6c::t_0da514f9b53192 290-292
+affilio-wp/admin/build/landing-v9/llms.txt
+  s_7e484d91fceb6c::t_973f6e9a6f1c5f 17-18
+ui/landing/public/llms.txt
+  s_7e484d91fceb6c::t_678c2f529f5a77 17-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b810e8c273302db97ca0fef3d2e17284d3d697fc",
+  "prompts": {},
+  "sessions": {
+    "s_27702ffeb33526": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "carnation-viscose",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    },
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
