@@ -523,3 +523,39 @@ func TestReadinessAllowsOnlyTheConfiguredPublicOrigin(t *testing.T) {
 		t.Fatal("a different loopback origin must stay blocked")
 	}
 }
+
+func TestReadinessFlagsClientRenderedShell(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body><div id="root"></div><script src="/assets/index.js"></script></body></html>`))
+	}))
+	defer server.Close()
+
+	result := testEngine().Assess(context.Background(), ReadinessProduct{Name: "Spa", WebsiteURL: server.URL})
+	shell := findCheck(t, result.Checks, "client_rendered_shell")
+	if shell.Status != "warn" {
+		t.Fatalf("expected client_rendered_shell warn, got %+v", shell)
+	}
+	privacy := findCheck(t, result.Checks, "privacy_policy")
+	if privacy.Status != "fail" || !strings.Contains(privacy.Remediation, "prerendered") {
+		t.Fatalf("expected privacy fail pointing at prerendering, got %+v", privacy)
+	}
+	terms := findCheck(t, result.Checks, "terms")
+	if terms.Status != "fail" || !strings.Contains(terms.Evidence, "app shell") {
+		t.Fatalf("expected terms fail noting the app shell, got %+v", terms)
+	}
+}
+
+func TestReadinessDoesNotFlagStaticPageAsShell(t *testing.T) {
+	site := readyProductSite(t)
+	result := testEngine().Assess(context.Background(), ReadinessProduct{
+		Name:       "PromptForge",
+		WebsiteURL: site.URL,
+		PricingURL: site.URL + "/pricing",
+		DocsURL:    site.URL + "/docs",
+	})
+	for _, check := range result.Checks {
+		if check.Key == "client_rendered_shell" {
+			t.Fatalf("a static page with real text must not be flagged as a shell")
+		}
+	}
+}

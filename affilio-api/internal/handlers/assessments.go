@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -67,14 +68,82 @@ func (h *AssessmentsHandler) Assess(c *gin.Context) {
 	if result.Category != "" || len(result.Keywords) > 0 || len(result.Tags) > 0 {
 		_ = h.DB.FillProductTaxonomy(c.Request.Context(), product.ID, result.Category, result.Keywords, result.Tags)
 	}
+	h.notifyOwner(c, product, result)
 	c.JSON(http.StatusOK, gin.H{
 		"assessment_id":    assessmentID,
 		"product_id":       product.ID,
 		"readiness_status": result.Status,
 		"readiness_score":  result.Score,
 		"checks":           result.Checks,
+		"fix_hints":        fixHints(result.Checks),
+		"next_step":        assessNextStep(result),
 		"ai_summary":       result.AISummary,
 	})
+}
+
+// fixHints distills the non-passing checks into the actionable list an agent
+// works through top to bottom: what failed, why, and the concrete fix.
+func fixHints(checks []services.ReadinessCheck) []gin.H {
+	hints := []gin.H{}
+	for _, check := range checks {
+		if check.Status != "fail" && check.Status != "warn" {
+			continue
+		}
+		hint := gin.H{"check": check.Key, "status": check.Status, "evidence": check.Evidence}
+		if check.Remediation != "" {
+			hint["fix"] = check.Remediation
+		}
+		hints = append(hints, hint)
+	}
+	return hints
+}
+
+func assessNextStep(result services.ReadinessResult) string {
+	if result.Status != "ready" {
+		return "fix every fail/warn entry in fix_hints, then call run_assessment again"
+	}
+	return "product is ready — call create_offer, then submit_offer"
+}
+
+// latestFixHints reads the newest stored assessment for a product and returns
+// its actionable entries, for endpoints that only know the stored gate.
+func latestFixHints(ctx context.Context, db *database.DB, makerID, productID string) []gin.H {
+	list, err := db.ListReadinessAssessments(ctx, makerID, productID, 1)
+	if err != nil || len(list) == 0 {
+		return nil
+	}
+	checks := []services.ReadinessCheck{}
+	if json.Unmarshal(list[0].ChecksJSON, &checks) != nil {
+		return nil
+	}
+	return fixHints(checks)
+}
+
+// notifyOwner fires the owner's configured webhook when an assessment
+// finishes — the same signed channel as deal.waiting. A human who never opened
+// the dashboard learns that an agent listed (or tried to list) their product.
+// Best-effort and async; nothing breaks when no webhook is set.
+func (h *AssessmentsHandler) notifyOwner(c *gin.Context, product *database.Product, result services.ReadinessResult) {
+	ownerID, err := h.DB.OwnerIDByMaker(c.Request.Context(), product.MakerID)
+	if err != nil || ownerID == "" {
+		return
+	}
+	url, secret, err := h.DB.OwnerNotify(c.Request.Context(), ownerID)
+	if err != nil || url == "" || secret == "" {
+		return
+	}
+	payload, err := json.Marshal(map[string]any{
+		"type":             "assessment.finished",
+		"product_id":       product.ID,
+		"product":          product.Name,
+		"readiness_score":  result.Score,
+		"readiness_status": result.Status,
+		"fix_hints":        fixHints(result.Checks),
+	})
+	if err != nil {
+		return
+	}
+	go postSignedWebhook(url, secret, payload)
 }
 
 func (h *AssessmentsHandler) List(c *gin.Context) {

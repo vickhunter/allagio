@@ -64,7 +64,7 @@ func hostedToolList(g *database.AgentGrant) []dcp.Tool {
 	return tools
 }
 
-const hostedMCPInstructions = "Use existing products and publishing tools. Prepare a placement. " + ownerApprovalURL + " " + publishStepParagraph + " Agents cannot approve a placement. Never ask for payment secrets in chat. Agent tools cannot connect Stripe or confirm receipt of money. suggest_monetization takes a draft and returns up to three offers with a tracked link and a disclosure line. It does not publish."
+const hostedMCPInstructions = "Call get_started first — it returns the ordered recipe and the exact next_step to call. Use existing products and publishing tools. Prepare a placement. " + ownerApprovalURL + " " + publishStepParagraph + " Agents cannot approve a placement. Never ask for payment secrets in chat. Agent tools cannot connect Stripe or confirm receipt of money. suggest_monetization takes a draft and returns up to three offers with a tracked link and a disclosure line. It does not publish."
 
 func newHostedMCPServer(grant *database.AgentGrant, loopbackURL, baseURL, bearer string) *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: dcp.ServerName, Title: dcp.ServerTitle, Version: "0.3.0"}, &mcp.ServerOptions{Instructions: hostedMCPInstructions})

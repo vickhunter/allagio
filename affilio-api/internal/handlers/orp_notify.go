@@ -106,7 +106,7 @@ func (h *HostedHandler) notifySection(c *gin.Context, o *database.Owner) (templa
 	}
 	var b strings.Builder
 	b.WriteString(`<section id="notify"><h2>Deal-waiting webhook</h2>`)
-	b.WriteString(`<p>When a deal waits on your party, Allagio POSTs a signed <code>deal.waiting</code> event here with the deal id and the escalation url. Leave it empty to get no calls.</p><form method="post" action="/owner/notify">`)
+	b.WriteString(`<p>Allagio POSTs signed events here: <code>deal.waiting</code> when a deal waits on your party, <code>account.registered</code> when an agent opens an account for you, and <code>assessment.finished</code> when a product readiness check completes (score, status, fix_hints). Leave it empty to get no calls.</p><form method="post" action="/owner/notify">`)
 	b.WriteString(`<input type="hidden" name="csrf" value="`)
 	b.WriteString(template.HTMLEscapeString(o.CSRF))
 	b.WriteString(`"><label>Webhook url<input type="url" name="url" maxlength="500" value="`)

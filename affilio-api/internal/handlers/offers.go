@@ -204,12 +204,16 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 	}
 	if product.ReadinessStatus != "ready" {
 		reason, message := h.readinessReason(c.Request.Context(), product)
-		c.JSON(http.StatusConflict, gin.H{
+		body := gin.H{
 			"error":            readinessFailMessage,
 			"reason":           reason,
 			"message":          message,
 			"readiness_status": product.ReadinessStatus,
-		})
+		}
+		if hints := latestFixHints(c.Request.Context(), h.DB, makerID(c), product.ID); len(hints) > 0 {
+			body["fix_hints"] = hints
+		}
+		c.JSON(http.StatusConflict, body)
 		return
 	}
 	// Trusted makers skip the human review queue: their submissions list directly.

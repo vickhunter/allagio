@@ -41,6 +41,7 @@ func newMakerRouterFull(db *database.DB, client *http.Client, claims string) *gi
 	maker := r.Group("/v1/maker")
 	maker.Use(middleware.MakerKeyAuth(db))
 	{
+		maker.GET("/getting-started", products.GettingStarted)
 		maker.POST("/products", products.Create)
 		maker.GET("/products", products.List)
 		maker.GET("/products/:id", products.Get)
