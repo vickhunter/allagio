@@ -33,8 +33,9 @@ const check = createElement('svg', { viewBox: '0 0 16 16', width: 14, height: 14
   createElement('path', { d: 'M2.5 8.5 6 12 13.5 4.5', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }))
 
 // line=false keeps the copy control and drops the printed payload. The homepage
-// shows that payload in Setup details instead of the hero.
-export function JoinPrompt({ line = true } = {}) {
+// shows that payload in Setup details instead of the hero. Label props let the
+// caller translate the chrome; the English literals stay the defaults.
+export function JoinPrompt({ line = true, copyLabel = 'Copy setup prompt', copiedLabel = 'Copied', copiedStatus = 'Copied.' } = {}) {
   const [copied, setCopied] = useState(false)
   const timer = useRef(null)
   useEffect(() => () => clearTimeout(timer.current), [])
@@ -57,7 +58,7 @@ export function JoinPrompt({ line = true } = {}) {
     copied
       ? check
       : createElement('span', { 'aria-hidden': true, className: 'flex items-center gap-1' }, ...marks),
-    copied ? 'Copied' : 'Copy setup prompt')
+    copied ? copiedLabel : copyLabel)
   const wrapped = createElement('span', { className: copied ? 'relative inline-flex overflow-hidden rounded-[10px]' : 'cta-beam relative inline-flex overflow-hidden rounded-[10px]' },
     button)
   const row = line
@@ -69,6 +70,6 @@ export function JoinPrompt({ line = true } = {}) {
     line ? createElement('p', { className: 'text-sm font-semibold text-t1' }, joinLead) : null,
     line ? createElement('pre', { className: 'mt-3 whitespace-pre-wrap rounded-xl border border-line bg-s0 p-4 font-mono text-sm leading-relaxed text-t1' }, joinPrompt) : null,
     row,
-    createElement('p', { role: 'status', 'aria-live': 'polite', className: 'mt-2 min-h-6 text-sm text-t2' }, copied ? 'Copied.' : ''),
+    createElement('p', { role: 'status', 'aria-live': 'polite', className: 'mt-2 min-h-6 text-sm text-t2' }, copied ? copiedStatus : ''),
   )
 }

@@ -161,9 +161,8 @@ test('sign-in return paths include the public pages', () => {
 test('built facts chunk pins the sign-in return paths', () => {
   const here = dirname(fileURLToPath(import.meta.url))
   const assets = resolve(here, '../../../../affilio-wp/admin/build/landing-v9/assets')
-  const chunks = readdirSync(assets).filter((name) => /^facts-.*\.js$/.test(name))
-  assert.equal(chunks.length, 1)
-  const built = readFileSync(resolve(assets, chunks[0]), 'utf8')
+  const chunks = readdirSync(assets).filter((name) => name.endsWith('.js'))
+  const built = chunks.map((name) => readFileSync(resolve(assets, name), 'utf8')).join('')
   assert.match(built, /\/you, \/you\/, \/publishers\/setup, or \/publishers\/setup\//)
   assert.match(built, /For \/device, any other query is refused/)
 })

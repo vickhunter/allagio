@@ -21,7 +21,7 @@ declare module '@/components/join-prompt.mjs' {
   export const joinPrompt: string
   export const joinLead: string
   export const joinHeading: string
-  export function JoinPrompt(props?: { line?: boolean }): ReactElement
+  export function JoinPrompt(props?: { line?: boolean; copyLabel?: string; copiedLabel?: string; copiedStatus?: string }): ReactElement
   export const clientMarks: readonly { name: string; d: string }[]
 }
 

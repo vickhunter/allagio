@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Kbd } from '@/components/ui/input'
 import { Blip } from '@/components/Blip'
 import { track } from '@/lib/track'
+import { useLocale } from '@/i18n'
 
 export type Command = { id: string; label: string; keys?: string; href: string }
 
@@ -9,6 +10,7 @@ export type Command = { id: string; label: string; keys?: string; href: string }
 function nav(h: string) { if (h.startsWith('#')) location.hash = h.slice(1); else location.href = h }
 
 export function CommandPalette({ commands }: { commands: Command[] }) {
+  const { t } = useLocale()
   const ref = useRef<HTMLDialogElement>(null)
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
@@ -33,12 +35,12 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
   return (
     <>
       <button type="button" onClick={open} data-track="palette_button" className="hidden min-h-11 min-w-11 items-center gap-2 rounded-lg border border-line bg-s1 px-2.5 text-[13px] text-t2 hover:bg-s2 sm:inline-flex xl:hidden">
-        Jump to… <Kbd>⌘K</Kbd>
+        {t.chrome.paletteJump} <Kbd>⌘K</Kbd>
       </button>
       <dialog ref={ref} aria-label="Command palette" className="m-auto mt-[14vh] w-[min(560px,92vw)] rounded-2xl border border-line bg-s1 p-0 text-t1 backdrop:bg-inv/30 backdrop:backdrop-blur-sm open:[animation:fade-up_300ms_var(--ease-menu)]"
         onClick={(e) => { if (e.target === ref.current) ref.current?.close() }}>
-        <label className="sr-only" htmlFor="palette-q">Search commands</label>
-        <input id="palette-q" autoFocus value={q} onChange={(e) => { setQ(e.target.value); setI(0) }} placeholder="Search sections or start as maker / publisher…"
+        <label className="sr-only" htmlFor="palette-q">{t.chrome.paletteSearchLabel}</label>
+        <input id="palette-q" autoFocus value={q} onChange={(e) => { setQ(e.target.value); setI(0) }} placeholder={t.chrome.palettePlaceholder}
           className="w-full border-b border-line bg-transparent px-4 py-3.5 text-base outline-none"
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') { e.preventDefault(); setI((n) => Math.min(n + 1, list.length - 1)) }
@@ -46,7 +48,7 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
             if (e.key === 'Enter' && list[i]) go(list[i])
           }} role="combobox" aria-expanded="true" aria-controls="palette-list" aria-activedescendant={list[i] ? `cmd-${list[i].id}` : undefined} />
         {list.length ? (
-          <ul id="palette-list" role="listbox" aria-label="Commands" className="max-h-80 overflow-auto p-2">
+          <ul id="palette-list" role="listbox" aria-label={t.chrome.paletteListLabel} className="max-h-80 overflow-auto p-2">
             {list.map((c, n) => (
               <li key={c.id} id={`cmd-${c.id}`} role="option" aria-selected={n === i} onMouseEnter={() => setI(n)} onClick={() => go(c)}
                 className={`flex min-h-11 cursor-pointer items-center justify-between rounded-lg px-3 text-sm ${n === i ? 'bg-s2' : ''}`}>
@@ -55,9 +57,9 @@ export function CommandPalette({ commands }: { commands: Command[] }) {
             ))}
           </ul>
         ) : (
-          <div className="flex items-center gap-3 p-4 text-sm text-t2"><Blip /> Nothing called “{q}”. Try “maker”, “publisher” or “pricing”.</div>
+          <div className="flex items-center gap-3 p-4 text-sm text-t2"><Blip /> {t.chrome.paletteEmpty(q)}</div>
         )}
-        <p className="border-t border-line px-4 py-2 font-mono text-[11px] text-t2">↑↓ move · ↵ open · esc close · ? opens this</p>
+        <p className="border-t border-line px-4 py-2 font-mono text-[11px] text-t2">{t.chrome.paletteHint}</p>
       </dialog>
     </>
   )

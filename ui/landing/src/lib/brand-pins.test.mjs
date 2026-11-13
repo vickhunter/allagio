@@ -13,9 +13,9 @@ test('the brand constant is Allagio', () => {
 
 test('the footer working-name sentence is pinned', () => {
   const source = readFileSync(resolve(landing, 'src/content.ts'), 'utf8')
-  const footer = readFileSync(resolve(landing, 'src/site/Footer.tsx'), 'utf8')
+  const en = readFileSync(resolve(landing, 'src/i18n/en.ts'), 'utf8')
   assert.match(source, /export const workingName = 'Allagio is a working name\.'/)
-  assert.match(footer, /\{workingName\}/)
+  assert.match(en, /\$\{workingName\}/)
 })
 
 test('the agents page title is Allagio', () => {

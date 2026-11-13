@@ -4,22 +4,11 @@ import { motion, useInView } from "motion/react"
 import { cn } from "@/lib/utils"
 import { BorderBeam } from "@/components/ui/border-beam"
 import { RetroGrid } from "@/components/ui/retro-grid"
-import { JoinPrompt, joinLead, joinPrompt } from "@/components/join-prompt.mjs"
+import { JoinPrompt, joinPrompt } from "@/components/join-prompt.mjs"
 import { SetupSequence } from "@/home/SetupSequence"
-import {
-  ctaMakerHref,
-  ctaMakerLabel,
-  ctaPublisherHref,
-  ctaPublisherLabel,
-  heroH1,
-  heroSupport,
-  manualSetup,
-  noSignIn,
-  setupHref,
-  setupLabel,
-  setupSteps,
-} from "@/home/hero-copy.mjs"
+import { setupHref } from "@/home/hero-copy.mjs"
 import { withSource } from "@/lib/source"
+import { useLocale } from "@/i18n"
 
 const fadeUpVariants = {
   initial: { opacity: 0, y: 24 },
@@ -47,6 +36,7 @@ export function Hero({ source }: { source: string }) {
   const fadeInRef = useRef(null)
   const fadeInInView = useInView(fadeInRef, { once: true })
   const reducedMotion = usePrefersReducedMotion()
+  const { t } = useLocale()
 
   return (
     <section id="hero" aria-labelledby="hero-h">
@@ -67,7 +57,7 @@ export function Hero({ source }: { source: string }) {
                 initial={false}
                 transition={{ duration: 0.5, ease }}
               >
-                Allagio · agent to agent
+                {t.hero.eyebrow}
               </motion.p>
               <motion.h1
                 id="hero-h"
@@ -78,7 +68,7 @@ export function Hero({ source }: { source: string }) {
                 initial={false}
                 transition={{ duration: 0.6, delay: 0.1, ease, type: "spring" }}
               >
-                {heroH1}
+                {t.hero.h1}
               </motion.h1>
               <motion.p
                 className="text-muted-foreground max-w-2xl text-lg font-medium tracking-tight text-balance md:text-xl"
@@ -87,7 +77,7 @@ export function Hero({ source }: { source: string }) {
                 initial={false}
                 transition={{ duration: 0.6, delay: 0.2, ease, type: "spring" }}
               >
-                {heroSupport}
+                {t.hero.support}
               </motion.p>
             </div>
 
@@ -101,19 +91,19 @@ export function Hero({ source }: { source: string }) {
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a
                   className="inline-flex min-h-11 items-center rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md"
-                  href={withSource(ctaMakerHref, source)}
+                  href={withSource(t.hero.ctaMakerHref, source)}
                   data-track="hero_cta"
                   data-track-to="makers"
                 >
-                  {ctaMakerLabel}
+                  {t.hero.ctaMaker}
                 </a>
                 <a
                   className="inline-flex min-h-11 items-center rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md"
-                  href={withSource(ctaPublisherHref, source)}
+                  href={withSource(t.hero.ctaPublisherHref, source)}
                   data-track="hero_cta"
                   data-track-to="publishers"
                 >
-                  {ctaPublisherLabel}
+                  {t.hero.ctaPublisher}
                 </a>
               </div>
               <a
@@ -123,7 +113,7 @@ export function Hero({ source }: { source: string }) {
                 data-track="secondary_click"
                 data-track-to="agents"
               >
-                {setupLabel}
+                {t.chrome.setupCta}
               </a>
             </motion.div>
           </div>
@@ -136,6 +126,7 @@ export function Hero({ source }: { source: string }) {
 // The manual-bearer setup card, rendered below the fold on the homepage (the
 // hero leads with what the deal does; this is the how). Content unchanged.
 export function ConnectionCard() {
+  const { t } = useLocale()
   return (
     <div className="relative mx-auto w-full max-w-4xl">
       <div
@@ -148,27 +139,30 @@ export function ConnectionCard() {
       <div className="relative overflow-hidden rounded-2xl border border-line bg-card/80 shadow-sm backdrop-blur-sm">
         <div className="grid gap-6 p-6 text-left md:grid-cols-[minmax(0,1fr)_minmax(280px,.85fr)] md:p-8">
           <div className="flex flex-col justify-center gap-3">
-            <p className="eyebrow">Connection</p>
+            <p className="eyebrow">{t.connect.eyebrow}</p>
             <h2 className="h-display text-2xl font-semibold tracking-tight text-t1 md:text-3xl">
-              You send the bearer yourself.
+              {t.connect.heading}
             </h2>
-            <p className="text-base leading-relaxed text-t2">
-              {joinLead}. {manualSetup} This page does not issue a token.
-            </p>
+            <p className="text-base leading-relaxed text-t2">{t.connect.lead}</p>
             <details className="setup-details mt-2">
-              <summary>Setup details</summary>
-              <p>{joinLead}</p>
+              <summary>{t.connect.summary}</summary>
+              <p>{t.connect.joinLead}</p>
               <p>{joinPrompt}</p>
               <p>
                 <a href="/llms.txt">llms.txt</a>
               </p>
-              {setupSteps.map((step) => (
+              {t.connect.steps.map((step) => (
                 <p key={step}>{step}</p>
               ))}
-              <p>{noSignIn}</p>
+              <p>{t.connect.noSignIn}</p>
             </details>
             <div id="join" className="mt-2">
-              <JoinPrompt line={false} />
+              <JoinPrompt
+                line={false}
+                copyLabel={t.connect.copyLabel}
+                copiedLabel={t.connect.copiedLabel}
+                copiedStatus={t.connect.copiedStatus}
+              />
             </div>
           </div>
           <SetupSequence />

@@ -1,11 +1,12 @@
 import { BadgePercent, Compass, ShieldCheck } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { whyCards, whyHeading, whyTrust } from '@/home/why-copy.mjs'
+import { useLocale } from '@/i18n'
 
 const icons = [Compass, BadgePercent, ShieldCheck]
 
 export function Why() {
+  const { t } = useLocale()
   return (
     <section id="why" aria-labelledby="why-h" className="border-t border-line bg-s1">
       <div className="container mx-auto px-4 py-16 md:px-8 md:py-20">
@@ -14,11 +15,11 @@ export function Why() {
             id="why-h"
             className="h-display text-3xl font-semibold tracking-tighter text-balance text-t1 sm:text-5xl"
           >
-            {whyHeading}
+            {t.why.heading}
           </h2>
         </div>
         <div className="mx-auto mt-12 grid max-w-5xl gap-6 sm:grid-cols-3">
-          {whyCards.map((card, i) => {
+          {t.why.cards.map((card, i) => {
             const Icon = icons[i]
             return (
               <Card
@@ -41,7 +42,7 @@ export function Why() {
           })}
         </div>
         <p className="mx-auto mt-10 max-w-2xl text-center text-sm leading-relaxed text-t2">
-          {whyTrust}
+          {t.why.trust}
         </p>
       </div>
     </section>
