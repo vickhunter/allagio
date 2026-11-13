@@ -63,6 +63,8 @@ func joinInferSide(method, path string) string {
 	switch {
 	case method == http.MethodPost && (path == "/v1/placements" || path == "/v1/placements/:id/commit" || path == "/v1/placements/:id/receipt"):
 		return "publisher"
+	case method == http.MethodGet && path == "/v1/maker/getting-started":
+		return "maker"
 	case path == "/v1/maker/offers" && (method == http.MethodGet || method == http.MethodPost):
 		return "maker"
 	case method == http.MethodPost && path == "/v1/maker/offers/:id/submit":

@@ -35,7 +35,9 @@ func mountJoinTokens(t *testing.T, db *database.DB, perMinute int) (*AgentEntry,
 	r.POST("/v1/agent-tokens/revoke", entry.RevokeAgentToken)
 	r.POST("/v1/agent-tokens/:id/revoke", entry.RevokeAgentTokenByID)
 	offers := &OffersHandler{DB: db}
+	products := &ProductsHandler{DB: db}
 	maker := r.Group("/v1/maker", middleware.MakerKeyAuth(db, h.resource()))
+	maker.GET("/getting-started", products.GettingStarted)
 	maker.GET("/offers", offers.List)
 	maker.POST("/offers", offers.Create)
 	maker.POST("/offers/:id/submit", offers.Submit)

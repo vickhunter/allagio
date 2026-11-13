@@ -13,6 +13,12 @@ import (
 // flow from documentation.
 func (h *ProductsHandler) GettingStarted(c *gin.Context) {
 	maker := makerID(c)
+	// An offer-scoped project key must stay inside its one offer: answer for
+	// that offer only, never the maker's other products.
+	if offerID := c.GetString("offer_scope_id"); offerID != "" {
+		h.gettingStartedOfferScope(c, offerID)
+		return
+	}
 	products, err := h.DB.ListProducts(c.Request.Context(), maker)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load products"})
@@ -24,19 +30,28 @@ func (h *ProductsHandler) GettingStarted(c *gin.Context) {
 		return
 	}
 
-	steps := []gin.H{
-		{"tool": "register_maker", "done": true, "note": "this key authenticates as a maker"},
-		{"tool": "register_product", "done": len(products) > 0},
-		{"tool": "run_assessment", "done": false},
-		{"tool": "create_offer", "done": len(offers) > 0},
-		{"tool": "submit_offer", "done": false},
-	}
-
-	next := gin.H{}
 	var product *database.Product
 	if len(products) > 0 {
 		product = &products[0]
 	}
+	// Offers are maker-wide; the recipe only follows the product it picked.
+	var productOffer *database.Offer
+	for i := range offers {
+		if product != nil && offers[i].ProductID == product.ID {
+			productOffer = &offers[i]
+			break
+		}
+	}
+
+	steps := []gin.H{
+		{"tool": "register_maker", "done": true, "note": "this key authenticates as a maker"},
+		{"tool": "register_product", "done": len(products) > 0},
+		{"tool": "run_assessment", "done": false},
+		{"tool": "create_offer", "done": productOffer != nil},
+		{"tool": "submit_offer", "done": false},
+	}
+
+	next := gin.H{}
 	switch {
 	case product == nil:
 		next = gin.H{
@@ -45,14 +60,13 @@ func (h *ProductsHandler) GettingStarted(c *gin.Context) {
 			"why":  "no product registered yet — the assessment probes the live landing page",
 		}
 	case product.ReadinessStatus != "ready":
-		steps[2]["done"] = false
 		steps[2]["note"] = "product readiness_status is " + product.ReadinessStatus
 		next = gin.H{
 			"tool": "run_assessment",
 			"args": gin.H{"product_id": product.ID},
 			"why":  "product \"" + product.Name + "\" is not ready — run_assessment returns fix_hints with what to fix, then run it again",
 		}
-	case len(offers) == 0:
+	case productOffer == nil:
 		steps[2]["done"] = true
 		next = gin.H{
 			"tool": "create_offer",
@@ -61,7 +75,7 @@ func (h *ProductsHandler) GettingStarted(c *gin.Context) {
 		}
 	default:
 		steps[2]["done"] = true
-		latest := offers[0]
+		latest := productOffer
 		switch latest.Status {
 		case "draft":
 			next = gin.H{
@@ -92,5 +106,43 @@ func (h *ProductsHandler) GettingStarted(c *gin.Context) {
 		"steps":     steps,
 		"next_step": next,
 		"tip":       "call get_started again after each step to stay on the guided path",
+	})
+}
+
+// gettingStartedOfferScope answers the recipe for an offer-scoped project key:
+// the only step left is that offer's own state, so it never lists the maker's
+// other products or offers.
+func (h *ProductsHandler) gettingStartedOfferScope(c *gin.Context, offerID string) {
+	offer, err := h.DB.GetOfferForMaker(c.Request.Context(), makerID(c), offerID)
+	if err != nil || offer == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "key is scoped to a different offer"})
+		return
+	}
+	var next gin.H
+	switch offer.Status {
+	case "draft":
+		next = gin.H{
+			"tool": "submit_offer",
+			"args": gin.H{"offer_id": offer.ID},
+			"why":  "the draft offer is ready to submit for review",
+		}
+	case "submitted":
+		next = gin.H{
+			"tool": "get_offer",
+			"args": gin.H{"offer_id": offer.ID},
+			"why":  "the offer is in review — poll get_offer; placements still need owner approval",
+		}
+	default:
+		next = gin.H{
+			"tool": "get_offer",
+			"args": gin.H{"offer_id": offer.ID},
+			"why":  "the offer is " + offer.Status,
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"recipe":       "register_maker → register_product → run_assessment → create_offer → submit_offer",
+		"offer_scoped": true,
+		"next_step":    next,
+		"tip":          "this key is scoped to one offer — a full maker key unlocks the whole recipe",
 	})
 }
