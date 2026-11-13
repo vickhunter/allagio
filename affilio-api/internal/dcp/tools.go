@@ -3,6 +3,7 @@ package dcp
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // Tool is one DCP verb exposed to agents over MCP.
@@ -11,6 +12,16 @@ type Tool struct {
 	Description string                 `json:"description"`
 	InputSchema map[string]interface{} `json:"inputSchema"`
 	call        func(c *Client, args map[string]interface{}) (map[string]interface{}, error)
+}
+
+// Title is the human label directories show for the verb ("check_deals" →
+// "Check deals"). The Claude connectors directory requires one per tool.
+func (t Tool) Title() string {
+	s := strings.ReplaceAll(t.Name, "_", " ")
+	if s == "" {
+		return t.Name
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
 
 func schema(required []string, props map[string]interface{}) map[string]interface{} {

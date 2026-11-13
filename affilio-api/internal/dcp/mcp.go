@@ -67,6 +67,7 @@ func HandleMessage(client *Client, raw []byte) []byte {
 		for _, tool := range all {
 			tools = append(tools, map[string]interface{}{
 				"name":        tool.Name,
+				"title":       tool.Title(),
 				"description": tool.Description,
 				"inputSchema": tool.InputSchema,
 			})

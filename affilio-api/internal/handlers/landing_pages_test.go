@@ -62,10 +62,10 @@ func TestBuiltLandingPagesAndLLMsTxt(t *testing.T) {
 		body    string
 		noindex bool
 	}{
-		{"/privacy", "text/html; charset=utf-8", pages["privacy"], true},
-		{"/privacy/", "text/html; charset=utf-8", pages["privacy"], true},
-		{"/terms", "text/html; charset=utf-8", pages["terms"], true},
-		{"/terms/", "text/html; charset=utf-8", pages["terms"], true},
+		{"/privacy", "text/html; charset=utf-8", pages["privacy"], false},
+		{"/privacy/", "text/html; charset=utf-8", pages["privacy"], false},
+		{"/terms", "text/html; charset=utf-8", pages["terms"], false},
+		{"/terms/", "text/html; charset=utf-8", pages["terms"], false},
 		{"/agents", "text/html; charset=utf-8", pages["agents"], false},
 		{"/agents/", "text/html; charset=utf-8", pages["agents"], false},
 	}
@@ -115,7 +115,7 @@ func TestBuiltLandingPagesAndLLMsTxt(t *testing.T) {
 	}
 }
 
-func TestRepoDraftPagesSendNoindexAndDraftLine(t *testing.T) {
+func TestRepoLegalPagesAreFinalAndIndexable(t *testing.T) {
 	const draftLine = "Draft. This text is not final and has not been approved yet."
 	dir := "../../../affilio-wp/admin/build"
 	for _, name := range []string{"privacy", "terms"} {
@@ -130,11 +130,11 @@ func TestRepoDraftPagesSendNoindexAndDraftLine(t *testing.T) {
 		if rec.Code != http.StatusOK {
 			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body.String())
 		}
-		if rec.Header().Get("X-Robots-Tag") != "noindex" {
-			t.Fatalf("%s X-Robots-Tag %q", path, rec.Header().Get("X-Robots-Tag"))
+		if got := rec.Header().Get("X-Robots-Tag"); got != "" {
+			t.Fatalf("%s X-Robots-Tag %q", path, got)
 		}
-		if !strings.Contains(rec.Body.String(), draftLine) {
-			t.Fatalf("%s body missing draft line", path)
+		if strings.Contains(rec.Body.String(), draftLine) {
+			t.Fatalf("%s body still shows the draft line", path)
 		}
 	}
 	agentsBody, err := os.ReadFile(filepath.Join(dir, "landing-v9", "agents", "index.html"))
@@ -163,9 +163,11 @@ func TestRepoDraftPagesSendNoindexAndDraftLine(t *testing.T) {
 }
 
 func TestLegalPagesNoindexUntilApproved(t *testing.T) {
-	if LEGAL_PAGES_APPROVED {
-		t.Fatal("LEGAL_PAGES_APPROVED defaults to false")
+	if !LEGAL_PAGES_APPROVED {
+		t.Fatal("LEGAL_PAGES_APPROVED defaults to true")
 	}
+	LEGAL_PAGES_APPROVED = false
+	t.Cleanup(func() { LEGAL_PAGES_APPROVED = true })
 	dir := t.TempDir()
 	writeBuiltPage(t, dir, "privacy", "<!doctype html><title>Privacy</title>")
 	writeBuiltPage(t, dir, "terms", "<!doctype html><title>Terms</title>")
@@ -268,7 +270,6 @@ func TestLegalPagesNoindexUntilApproved(t *testing.T) {
 	}
 
 	LEGAL_PAGES_APPROVED = true
-	t.Cleanup(func() { LEGAL_PAGES_APPROVED = false })
 	for _, path := range append(noindex, open...) {
 		if got := robots(path, http.StatusOK); got != "" {
 			t.Fatalf("approved %s X-Robots-Tag %q", path, got)

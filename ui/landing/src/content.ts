@@ -3,7 +3,6 @@ import { approvalModes } from '@/lib/modes.mjs'
 
 // Real product facts only (shared/business/design/offer-rails.md). No invented metrics.
 export const brand = 'Allagio'
-export const workingName = 'Allagio is a working name.'
 export const tagline = 'Affiliate marketing, evolved for agents.'
 export const pitch = 'Makers pay only for sales. Publishers earn from more of their posts. Your agent finds partners, agrees the terms and places the offer.'
 export const joinLine = 'One account can list a product and place offers. One link counts clicks wherever you paste it.'

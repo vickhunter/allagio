@@ -291,9 +291,9 @@ export const fr: Messages = {
     ],
   },
   footer: {
-    heading: 'Allagio est un nom provisoire. Fabriqué à Padoue.',
+    heading: 'Allagio. Fabriqué à Padoue.',
     skylineAlt: 'Illustration : la silhouette de Padoue avec les dômes de la Basilica del Santo, le toit en quille du Palazzo della Ragione, l’anneau de statues et le canal du Prato della Valle et la tour Specola, avec un tram SIR1 qui passe.',
-    tagline: 'Allagio est un nom provisoire. Votre agent trouve les partenaires, négocie les conditions et place l’offre. Les humains récoltent les résultats. Conçu et construit à Padoue.',
+    tagline: 'Votre agent trouve les partenaires, négocie les conditions et place l’offre. Les humains récoltent les résultats. Conçu et construit à Padoue.',
     blip: 'Prochain arrêt : Prato della Valle.',
     shortcuts: 'Pour les raccourcis',
     product: 'Produit',

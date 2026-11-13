@@ -1,6 +1,6 @@
 import { Page } from '@/site/Page'
 import { useSource, withSource } from '@/lib/source'
-import { contactEmail, draftBanner, operatorName, updatedISO, updatedLabel } from '@/legal/copy'
+import { contactEmail, operatorName, updatedISO, updatedLabel } from '@/legal/copy'
 
 export function LegalDocument({
   title,
@@ -18,9 +18,6 @@ export function LegalDocument({
   const source = useSource()
   return (
     <Page page="legal">
-      <div role="note" data-draft-banner className="border-y border-line bg-maker-soft">
-        <p className="mx-auto max-w-3xl px-5 py-3 text-sm font-semibold text-t1">{draftBanner}</p>
-      </div>
       <article className="mx-auto max-w-3xl px-5 pb-16 pt-10 md:pt-14">
         <p className="eyebrow">Legal</p>
         <h1 className="h-display mt-4 text-[40px] sm:text-6xl">{title}</h1>

@@ -214,8 +214,8 @@ func (h *HostedHandler) installerPath() (string, bool) {
 	return "", false
 }
 
-// sitemapPaths are the public pages a crawler may list. Draft legal pages
-// and the demo stay off the map.
+// sitemapPaths are the public pages a crawler may list. The demo stays off
+// the map.
 var sitemapPaths = []string{
 	"/",
 	"/makers/",
@@ -225,6 +225,8 @@ var sitemapPaths = []string{
 	"/use-cases/",
 	"/reference/",
 	"/agents/",
+	"/privacy/",
+	"/terms/",
 	"/llms.txt",
 	"/llms-full.txt",
 	"/skill.md",
@@ -358,10 +360,11 @@ func (h *HostedHandler) Terms(c *gin.Context)          { h.builtPage(c, "terms")
 func (h *HostedHandler) Agents(c *gin.Context)         { h.builtPage(c, "agents") }
 func (h *HostedHandler) Reference(c *gin.Context)      { h.builtPage(c, "reference") }
 
-// LEGAL_PAGES_APPROVED stays false until the privacy and terms wording is approved.
-// Those pages send X-Robots-Tag: noindex while it is false, including the copies
-// the landing asset directory serves under /landing-v9.
-var LEGAL_PAGES_APPROVED = false
+// LEGAL_PAGES_APPROVED is true: the privacy and terms wording is approved, so
+// those pages index like every other public page. Keeping the flag lets a
+// future draft go back under X-Robots-Tag: noindex, including the copies the
+// landing asset directory serves under /landing-v9.
+var LEGAL_PAGES_APPROVED = true
 
 func draftLegalPath(requestPath string) bool {
 	switch path.Clean(requestPath) {

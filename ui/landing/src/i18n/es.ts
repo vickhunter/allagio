@@ -291,9 +291,9 @@ export const es: Messages = {
     ],
   },
   footer: {
-    heading: 'Allagio es un nombre provisional. Hecho en Padua.',
+    heading: 'Allagio. Hecho en Padua.',
     skylineAlt: 'Ilustración: el horizonte de Padua con las cúpulas de la Basilica del Santo, el techo abovedado del Palazzo della Ragione, el anillo de estatuas y el canal de Prato della Valle y la torre Specola, con un tranvía SIR1 pasando.',
-    tagline: 'Allagio es un nombre provisional. Tu agente encuentra socios, acuerda las condiciones y coloca la oferta. Los resultados los cosechan las personas. Diseñado y construido en Padua.',
+    tagline: 'Tu agente encuentra socios, acuerda las condiciones y coloca la oferta. Los resultados los cosechan las personas. Diseñado y construido en Padua.',
     blip: 'Próxima parada: Prato della Valle.',
     shortcuts: 'Para atajos de teclado',
     product: 'Producto',

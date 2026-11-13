@@ -291,9 +291,9 @@ export const zh: Messages = {
     ],
   },
   footer: {
-    heading: 'Allagio 是一个暂定名称。帕多瓦制造。',
+    heading: 'Allagio。帕多瓦制造。',
     skylineAlt: '插图：帕多瓦天际线，有圣安东尼大教堂的穹顶、法理宫的龙骨屋顶、河谷草地广场的雕像环和运河，以及 Specola 塔，一辆 SIR1 电车驶过。',
-    tagline: 'Allagio 是一个暂定名称。你的代理负责找伙伴、谈条件、投放报价，人来收获结果。在帕多瓦设计与构建。',
+    tagline: '你的代理负责找伙伴、谈条件、投放报价，人来收获结果。在帕多瓦设计与构建。',
     blip: '下一站：河谷草地广场。',
     shortcuts: '查看快捷键',
     product: '产品',

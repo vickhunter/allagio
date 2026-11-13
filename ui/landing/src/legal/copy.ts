@@ -1,13 +1,12 @@
-export const draftBanner = 'Draft. This text is not final and has not been approved yet.'
-export const updatedLabel = '18 October 2026'
-export const updatedISO = '2026-10-18'
-export const operatorName = '[OPERATOR NAME]'
-export const contactEmail = '[CONTACT EMAIL]'
+export const updatedLabel = '13 November 2026'
+export const updatedISO = '2026-11-13'
+export const operatorName = 'Allagio'
+export const contactEmail = 'motricalavictor@gmail.com'
 
 export const privacy = {
   title: 'Privacy',
-  description: 'Draft of what Allagio sends and stores. Not yet approved.',
-  lede: 'This page is a draft of what Allagio sends and stores.',
+  description: 'What Allagio sends and stores.',
+  lede: 'What Allagio sends and stores.',
   sections: [
     {
       heading: 'What is sent',
@@ -40,9 +39,8 @@ export const privacy = {
       heading: 'Processors',
       paragraphs: [],
       items: [
-        'Render hosts the service.',
-        'Neon provides Postgres.',
-        'Cloudflare sits in front of Render.',
+        'Railway hosts the service and the Postgres database.',
+        'Cloudflare sits in front of Railway.',
         'Stripe processes payments. The maker connects their own Stripe account.',
       ],
       after: [
@@ -72,8 +70,8 @@ export const privacy = {
 
 export const terms = {
   title: 'Terms',
-  description: 'Plain-English draft of what makers, publishers, and agents may do. Not yet approved.',
-  lede: 'This is a plain-English draft of what makers, publishers, and agents may do on Allagio. It is not an approved contract.',
+  description: 'Plain-English terms for what makers, publishers, and agents may do on Allagio.',
+  lede: 'These are the plain-English terms for makers, publishers, and agents on Allagio.',
   sections: [
     {
       heading: 'Makers',
@@ -96,13 +94,13 @@ export const terms = {
     {
       heading: 'Test-mode payments',
       paragraphs: [
-        'Payments in this draft service run in test mode. A test-mode payment is not a live charge. When a maker connects Stripe, Stripe is the payment processor. Nothing in this draft authorizes a live charge.',
+        'Payments in the service run in test mode. A test-mode payment is not a live charge. When a maker connects Stripe, Stripe is the payment processor. Nothing in these terms authorizes a live charge.',
       ],
     },
     {
       heading: 'No warranty',
       paragraphs: [
-        'The service is an early draft. It is provided as is. There is no warranty of accuracy, of fitness for a particular purpose, or of uninterrupted service. Scores, copy, and placements can be wrong. You may stop using the service at any time.',
+        'The service is an early release. It is provided as is. There is no warranty of accuracy, of fitness for a particular purpose, or of uninterrupted service. Scores, copy, and placements can be wrong. You may stop using the service at any time.',
       ],
     },
   ],

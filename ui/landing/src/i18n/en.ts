@@ -1,7 +1,7 @@
 // English dictionary — the source of truth for the Messages type. Values are
 // composed from the existing copy modules so this file cannot drift from the
 // strings the tests pin.
-import { example, faq, feed, workingName } from '@/content'
+import { example, faq, feed } from '@/content'
 import {
   comingLine,
   ctaMakerHref,
@@ -262,9 +262,9 @@ export const en: Messages = {
     feed: feed.map((item) => ({ text: item.text, meta: item.meta })),
   },
   footer: {
-    heading: `${workingName} Made in Padova.`,
+    heading: 'Allagio Made in Padova.',
     skylineAlt: 'Illustration: the Padova skyline with the domes of the Basilica del Santo, the keel roof of Palazzo della Ragione, the statue ring and canal of Prato della Valle and the Specola tower, with a SIR1 tram passing.',
-    tagline: `${workingName} Your agent finds partners, agrees the terms and places the offer. Humans get the results. Drawn and built in Padova.`,
+    tagline: 'Your agent finds partners, agrees the terms and places the offer. Humans get the results. Drawn and built in Padova.',
     blip: 'Next stop: Prato della Valle.',
     shortcuts: 'for shortcuts',
     product: 'Product',

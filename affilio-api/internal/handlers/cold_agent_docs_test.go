@@ -311,8 +311,8 @@ func TestColdAgentEntrance(t *testing.T) {
 	for _, path := range []string{"/privacy.md", "/terms.md", "/landing-v9/privacy.md", "/landing-v9/terms.md"} {
 		rec := httptest.NewRecorder()
 		r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
-		if rec.Header().Get("X-Robots-Tag") != "noindex" {
-			t.Fatalf("%s robots %q", path, rec.Header().Get("X-Robots-Tag"))
+		if got := rec.Header().Get("X-Robots-Tag"); got != "" {
+			t.Fatalf("%s robots %q", path, got)
 		}
 	}
 }
