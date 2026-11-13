@@ -1,0 +1,97 @@
+ui/landing/src/i18n/index.tsx
+  s_7e484d91fceb6c::t_94c69032a31d9b 56,62-64
+  s_7e484d91fceb6c::t_09fa3c6777076e 1
+ui/landing/src/components/hero-2.tsx
+  s_7e484d91fceb6c::t_ff55f3459803ba 101
+  s_7e484d91fceb6c::t_7ebfe5a95a0256 50
+  s_7e484d91fceb6c::t_f63c7b212ecf30 74
+  s_7e484d91fceb6c::t_5068a4d968af9c 110
+affilio-wp/admin/build/home.html
+  s_7e484d91fceb6c::t_398c037670f2ea 11-17
+affilio-wp/admin/build/landing-v9/agents/index.html
+  s_7e484d91fceb6c::t_66a0ade599ab58 10-11
+affilio-wp/admin/build/landing-v9/assets/Directory-DmjZ07oD.js
+  s_7e484d91fceb6c::t_28b23804ba00b5 1
+affilio-wp/admin/build/landing-v9/assets/Document-YbtViBgv.js
+  s_7e484d91fceb6c::t_245fad3e1bab0f 1
+affilio-wp/admin/build/landing-v9/assets/Page-CfcNx7ZT.js
+  s_7e484d91fceb6c::t_df4cfeac047f64 9
+affilio-wp/admin/build/landing-v9/assets/PostPreview-CsMvRTyY.js
+  s_7e484d91fceb6c::t_6250f7fc8b0e3e 1
+affilio-wp/admin/build/landing-v9/assets/SignInChoice-DOe2uYjy.js
+  s_7e484d91fceb6c::t_4b36abc973fe1f 1
+affilio-wp/admin/build/landing-v9/assets/agents-ewsy4TXf.js
+  s_7e484d91fceb6c::t_692253fd10f223 1
+affilio-wp/admin/build/landing-v9/assets/badge-gRiDmVid.js
+  s_7e484d91fceb6c::t_86e610b356c8d1 1
+affilio-wp/admin/build/landing-v9/assets/card-ACDjEtiB.js
+  s_7e484d91fceb6c::t_87fb1eb92a6324 1
+affilio-wp/admin/build/landing-v9/assets/handshake-uqg_Xkom.js
+  s_7e484d91fceb6c::t_3f279e36e6b5a7 1
+affilio-wp/admin/build/landing-v9/assets/index-sm3Meg2B.js
+  s_7e484d91fceb6c::t_86bd75f4e993bf 1,225
+affilio-wp/admin/build/landing-v9/assets/makers-B8tTan0V.js
+  s_7e484d91fceb6c::t_30e6124cd5b0d6 1
+affilio-wp/admin/build/landing-v9/assets/notFound-DvS07elb.js
+  s_7e484d91fceb6c::t_bf07a7151f30ad 1
+affilio-wp/admin/build/landing-v9/assets/privacy-BCvuHBF3.js
+  s_7e484d91fceb6c::t_9b274d0c654ada 1
+affilio-wp/admin/build/landing-v9/assets/profile-DH0AvGOv.js
+  s_7e484d91fceb6c::t_a0fcabb121d56a 1
+affilio-wp/admin/build/landing-v9/assets/protocol-BIuBAMlQ.js
+  s_7e484d91fceb6c::t_d1625ece146f43 1
+affilio-wp/admin/build/landing-v9/assets/publishers-C3mML2kH.js
+  s_7e484d91fceb6c::t_0c5acf85ecbe46 1
+affilio-wp/admin/build/landing-v9/assets/publishersSetup-D8v0Nddc.js
+  s_7e484d91fceb6c::t_76d61d6f03da68 1
+affilio-wp/admin/build/landing-v9/assets/reference-BTps5W5v.js
+  s_7e484d91fceb6c::t_c8ff38cf190467 1
+affilio-wp/admin/build/landing-v9/assets/terms-BBlrVfiY.js
+  s_7e484d91fceb6c::t_cf3fc141ef6244 1
+affilio-wp/admin/build/landing-v9/assets/useCases-DfcF_XLV.js
+  s_7e484d91fceb6c::t_85d1fff4926dd5 1
+affilio-wp/admin/build/landing-v9/assets/x-DLVB1FJI.js
+  s_7e484d91fceb6c::t_3efe4f25d129c9 1
+affilio-wp/admin/build/landing-v9/assets/you-BWjUne0J.js
+  s_7e484d91fceb6c::t_2c11dcc2ad3f91 1
+affilio-wp/admin/build/landing-v9/not-found/index.html
+  s_7e484d91fceb6c::t_6333efea986460 9-10
+affilio-wp/admin/build/landing-v9/privacy/index.html
+  s_7e484d91fceb6c::t_42111e1f4b547c 12-14
+affilio-wp/admin/build/landing-v9/profile/index.html
+  s_7e484d91fceb6c::t_10979d8692322b 9-13
+affilio-wp/admin/build/landing-v9/reference/index.html
+  s_7e484d91fceb6c::t_563da1b86c0dcc 11-12
+affilio-wp/admin/build/landing-v9/terms/index.html
+  s_7e484d91fceb6c::t_f1514e5f30a510 12-14
+affilio-wp/admin/build/landing-v9/use-cases/index.html
+  s_7e484d91fceb6c::t_65aa5e8d0f4b54 11-13
+affilio-wp/admin/build/makers.html
+  s_7e484d91fceb6c::t_f5168931a09082 11-17
+affilio-wp/admin/build/protocol.html
+  s_7e484d91fceb6c::t_38bb0b29bafccf 11-12
+affilio-wp/admin/build/publishers-setup.html
+  s_7e484d91fceb6c::t_80213a669cbffc 11-14
+affilio-wp/admin/build/publishers.html
+  s_7e484d91fceb6c::t_e3cc08550756c5 11-17
+affilio-wp/admin/build/use-cases.html
+  s_7e484d91fceb6c::t_8d40e2a057ce1d 11-13
+affilio-wp/admin/build/you.html
+  s_7e484d91fceb6c::t_cb941de43bd7d5 11-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f29bd36b3ce7d28daf9bb2d28d0f028d4afe06a0",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
