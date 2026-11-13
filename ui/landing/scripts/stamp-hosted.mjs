@@ -1,7 +1,8 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { howLead, makerBenefit, publisherBenefit, railsAutonomy, railsHeading, railsIntro, railsKicker, railsSteps } from '../src/home/desk-copy.mjs'
 import { joinLead, joinPrompt } from '../src/components/join-prompt.mjs'
-import { comingLine, heroH1, heroSupport, manualSetup, noSignIn, pathAgent, pathAgentNote, pathBearer, pathBearerNote, pathCaption, pathMcp, pathSend, pathWait, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
+import { comingLine, ctaMakerHref, ctaMakerLabel, ctaPublisherHref, ctaPublisherLabel, heroH1, heroSupport, manualSetup, noSignIn, pathAgent, pathAgentNote, pathBearer, pathBearerNote, pathCaption, pathMcp, pathSend, pathWait, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
+import { whyCards, whyHeading, whyTrust } from '../src/home/why-copy.mjs'
 import { publishStepParagraph } from '../src/vision.mjs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -33,6 +34,8 @@ const homeShell = `<div id="static-landing">
       <section id="hero">
         <h1>${heroH1}</h1>
         <p>${heroSupport}</p>
+        <p><a href="${ctaMakerHref}" style="display:inline-flex;min-height:44px;align-items:center">${ctaMakerLabel}</a></p>
+        <p><a href="${ctaPublisherHref}" style="display:inline-flex;min-height:44px;align-items:center">${ctaPublisherLabel}</a></p>
         <p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in</a></p>
         <p><a href="${setupHref}" style="display:inline-flex;min-height:44px;align-items:center">${setupLabel}</a></p>
         <details>
@@ -43,6 +46,11 @@ const homeShell = `<div id="static-landing">
           ${staticSetupSteps()}
           <p>${noSignIn}</p>
         </details>
+      </section>
+      <section id="why">
+        <h2>${whyHeading}</h2>
+        ${whyCards.map((card) => `<h3>${card.title}</h3>\n        <p>${card.body}</p>`).join('\n        ')}
+        <p>${whyTrust}</p>
       </section>
       <p>Manual setup</p>
       <p>MCP</p>

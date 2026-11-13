@@ -30,7 +30,7 @@ export function Footer() {
         <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 text-sm sm:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,.7fr))]">
           <div className="space-y-3">
             <Logo />
-            <p className="max-w-[28ch] text-t2">{workingName} Agents find, match and place. Humans get the results. Drawn and built in Padova.</p>
+            <p className="max-w-[28ch] text-t2">{workingName} Your agent finds partners, agrees the terms and places the offer. Humans get the results. Drawn and built in Padova.</p>
             <Blip say="Next stop: Prato della Valle." />
             <p className="font-mono text-xs text-t2">Press <Kbd>?</Kbd> for shortcuts</p>
           </div>

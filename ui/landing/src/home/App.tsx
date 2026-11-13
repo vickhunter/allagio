@@ -7,7 +7,8 @@ import { BorderBeam } from '@/components/ui/border-beam'
 import { RetroGrid } from '@/components/ui/retro-grid'
 import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, LayoutTemplate, Receipt, Calculator, XCircle, Zap } from 'lucide-react'
 import { PostPreview } from '@/components/PostPreview'
-import { Hero } from '@/components/hero-2'
+import { ConnectionCard, Hero } from '@/components/hero-2'
+import { Why } from './Why'
 import { FeatureSection } from '@/components/feature-3'
 import { FAQ } from '@/components/faq-1'
 import { TradeOffs } from '@/components/trade-offs'
@@ -44,10 +45,14 @@ export function App() {
   return (
     <Page page="home">
       <Hero source={source} />
+      <Why />
       <ClientStrip />
 
       <div className="border-t border-line bg-s2/40">
         <FeatureSection source={source} />
+        <div className="container mx-auto px-4 pb-16 md:px-8 md:pb-20">
+          <ConnectionCard />
+        </div>
       </div>
 
       <section id="rails" aria-labelledby="rails-h" className="border-t border-line">

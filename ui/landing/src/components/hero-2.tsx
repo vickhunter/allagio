@@ -7,6 +7,10 @@ import { RetroGrid } from "@/components/ui/retro-grid"
 import { JoinPrompt, joinLead, joinPrompt } from "@/components/join-prompt.mjs"
 import { SetupSequence } from "@/home/SetupSequence"
 import {
+  ctaMakerHref,
+  ctaMakerLabel,
+  ctaPublisherHref,
+  ctaPublisherLabel,
   heroH1,
   heroSupport,
   manualSetup,
@@ -94,8 +98,23 @@ export function Hero({ source }: { source: string }) {
               transition={{ duration: 0.6, delay: 0.3, ease, type: "spring" }}
               className="flex w-full flex-col items-center gap-3"
             >
-              <div id="join">
-                <JoinPrompt line={false} />
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <a
+                  className="inline-flex min-h-11 items-center rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md"
+                  href={withSource(ctaMakerHref, source)}
+                  data-track="hero_cta"
+                  data-track-to="makers"
+                >
+                  {ctaMakerLabel}
+                </a>
+                <a
+                  className="inline-flex min-h-11 items-center rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md"
+                  href={withSource(ctaPublisherHref, source)}
+                  data-track="hero_cta"
+                  data-track-to="publishers"
+                >
+                  {ctaPublisherLabel}
+                </a>
               </div>
               <a
                 className="inline-flex min-h-11 items-center font-semibold text-setup underline underline-offset-4 hover:no-underline"
@@ -108,52 +127,55 @@ export function Hero({ source }: { source: string }) {
               </a>
             </motion.div>
           </div>
-
-          <motion.div
-            animate={fadeInInView ? "animate" : "initial"}
-            variants={fadeUpVariants}
-            initial={false}
-            transition={{ duration: 1.2, delay: 0.4, ease, type: "spring" }}
-            className="relative mx-auto mt-12 w-full max-w-4xl"
-          >
-            <div
-              className={cn(
-                "absolute inset-0 bottom-1/2 h-full w-full transform-gpu blur-[120px] filter",
-                "bg-[linear-gradient(to_bottom,var(--color-pub-soft),transparent_30%)]"
-              )}
-              aria-hidden="true"
-            />
-            <div className="relative overflow-hidden rounded-2xl border border-line bg-card/80 shadow-sm backdrop-blur-sm">
-              <div className="grid gap-6 p-6 text-left md:grid-cols-[minmax(0,1fr)_minmax(280px,.85fr)] md:p-8">
-                <div className="flex flex-col justify-center gap-3">
-                  <p className="eyebrow">Connection</p>
-                  <h2 className="h-display text-2xl font-semibold tracking-tight text-t1 md:text-3xl">
-                    You send the bearer yourself.
-                  </h2>
-                  <p className="text-base leading-relaxed text-t2">
-                    {joinLead}. {manualSetup} This page does not issue a token.
-                  </p>
-                  <details className="setup-details mt-2">
-                    <summary>Setup details</summary>
-                    <p>{joinLead}</p>
-                    <p>{joinPrompt}</p>
-                    <p>
-                      <a href="/llms.txt">llms.txt</a>
-                    </p>
-                    {setupSteps.map((step) => (
-                      <p key={step}>{step}</p>
-                    ))}
-                    <p>{noSignIn}</p>
-                  </details>
-                </div>
-                <SetupSequence />
-              </div>
-              <BorderBeam size={160} />
-              <BorderBeam size={160} delay={7} />
-            </div>
-          </motion.div>
         </div>
       </div>
     </section>
+  )
+}
+
+// The manual-bearer setup card, rendered below the fold on the homepage (the
+// hero leads with what the deal does; this is the how). Content unchanged.
+export function ConnectionCard() {
+  return (
+    <div className="relative mx-auto w-full max-w-4xl">
+      <div
+        className={cn(
+          "absolute inset-0 bottom-1/2 h-full w-full transform-gpu blur-[120px] filter",
+          "bg-[linear-gradient(to_bottom,var(--color-pub-soft),transparent_30%)]"
+        )}
+        aria-hidden="true"
+      />
+      <div className="relative overflow-hidden rounded-2xl border border-line bg-card/80 shadow-sm backdrop-blur-sm">
+        <div className="grid gap-6 p-6 text-left md:grid-cols-[minmax(0,1fr)_minmax(280px,.85fr)] md:p-8">
+          <div className="flex flex-col justify-center gap-3">
+            <p className="eyebrow">Connection</p>
+            <h2 className="h-display text-2xl font-semibold tracking-tight text-t1 md:text-3xl">
+              You send the bearer yourself.
+            </h2>
+            <p className="text-base leading-relaxed text-t2">
+              {joinLead}. {manualSetup} This page does not issue a token.
+            </p>
+            <details className="setup-details mt-2">
+              <summary>Setup details</summary>
+              <p>{joinLead}</p>
+              <p>{joinPrompt}</p>
+              <p>
+                <a href="/llms.txt">llms.txt</a>
+              </p>
+              {setupSteps.map((step) => (
+                <p key={step}>{step}</p>
+              ))}
+              <p>{noSignIn}</p>
+            </details>
+            <div id="join" className="mt-2">
+              <JoinPrompt line={false} />
+            </div>
+          </div>
+          <SetupSequence />
+        </div>
+        <BorderBeam size={160} />
+        <BorderBeam size={160} delay={7} />
+      </div>
+    </div>
   )
 }
