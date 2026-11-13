@@ -411,6 +411,7 @@ func main() {
 	maker.Use(middleware.MakerKeyAuth(db, oauthResources...))
 	maker.Use(middleware.LimitOfferScope())
 	{
+		maker.GET("/getting-started", products.GettingStarted)
 		maker.POST("/products", products.Create)
 		maker.GET("/products", products.List)
 		maker.GET("/products/:id", products.Get)

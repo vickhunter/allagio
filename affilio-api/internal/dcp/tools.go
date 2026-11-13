@@ -70,6 +70,14 @@ func bodyWithout(args map[string]interface{}, keys ...string) map[string]interfa
 // Tools is DCP v0.1's maker verb set. Order is presentation order in agents.
 var Tools = []Tool{
 	{
+		Name:        "get_started",
+		Description: "Start here. Returns the ordered maker recipe (register_maker → register_product → run_assessment → create_offer → submit_offer), which steps are already done for this key, and next_step with the exact tool and arguments to call. Call it again after each step to stay on the guided path instead of reading documentation.",
+		InputSchema: schema(nil, map[string]interface{}{}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			return c.Do(http.MethodGet, "/v1/maker/getting-started", nil)
+		},
+	},
+	{
 		Name:        "register_maker",
 		Description: "Register a new maker account on Allagio. Returns the maker_id and the api_key to use for every other tool (set it as " + EnvAPIKey + ").",
 		InputSchema: schema([]string{"email"}, map[string]interface{}{

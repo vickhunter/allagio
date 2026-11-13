@@ -57,7 +57,7 @@ func HandleMessage(client *Client, raw []byte) []byte {
 				"title":   ServerTitle,
 				"version": "0.2.0",
 			},
-			"instructions": "Use the owner's existing agent. Makers prepare products and offers for review. Publishers find_opportunities, prepare_placement, wait for separate owner approval, commit_placement, publish approved copy with disclosure through their own tool, then record_placement_receipt. Poll list_agent_tasks to resume. undo_placement calls the API in the same request, with no delay. restore_placement does not call the API; it returns a sign in again link to the dashboard. Approval and payout confirmation are not agent tools. A scoped publisher key cannot join through legacy endpoints. Do not claim a sale, publication or payout is independently verified without evidence.",
+			"instructions": "Call get_started first — it returns the ordered recipe and the exact next_step to call; repeat after each step. Use the owner's existing agent. Makers prepare products and offers for review. Publishers find_opportunities, prepare_placement, wait for separate owner approval, commit_placement, publish approved copy with disclosure through their own tool, then record_placement_receipt. Poll list_agent_tasks to resume. undo_placement calls the API in the same request, with no delay. restore_placement does not call the API; it returns a sign in again link to the dashboard. Approval and payout confirmation are not agent tools. A scoped publisher key cannot join through legacy endpoints. Do not claim a sale, publication or payout is independently verified without evidence.",
 		}
 	case "ping":
 		resp.Result = map[string]interface{}{}

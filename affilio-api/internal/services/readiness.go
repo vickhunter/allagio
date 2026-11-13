@@ -83,6 +83,7 @@ var (
 	actionTagPattern        = regexp.MustCompile(`(?is)<(a|button)\b([^>]*)>(.*?)</(a|button)>`)
 	hrefAttrPattern         = regexp.MustCompile(`(?i)\bhref\s*=\s*["']([^"']*)["']`)
 	htmlTagPattern          = regexp.MustCompile(`(?s)<script.*?</script>|<style.*?</style>|<[^>]*>`)
+	appShellScriptPattern   = regexp.MustCompile(`(?i)<script[^>]*\bsrc\s*=`)
 )
 
 func (e *ReadinessEngine) Assess(ctx context.Context, product ReadinessProduct) ReadinessResult {
@@ -92,6 +93,7 @@ func (e *ReadinessEngine) Assess(ctx context.Context, product ReadinessProduct) 
 	}
 
 	site := e.fetchPage(ctx, product.WebsiteURL)
+	shell := looksLikeAppShell(site)
 	checkout, providerWarning := e.checkCheckoutPresent(ctx, product, site)
 	checks := []ReadinessCheck{
 		e.checkSiteReachable(site),
@@ -111,6 +113,30 @@ func (e *ReadinessEngine) Assess(ctx context.Context, product ReadinessProduct) 
 	}
 	if providerWarning != nil {
 		checks = append(checks, *providerWarning)
+	}
+	if shell {
+		// The probe saw an empty JavaScript shell, so marker checks fail for the
+		// wrong reason: links exist in the browser DOM, not in the served HTML.
+		// Say so directly — the fix is prerendering, not "add a privacy link".
+		checks = append(checks, ReadinessCheck{
+			Key:    "client_rendered_shell",
+			Kind:   "probe",
+			Gate:   false,
+			Status: "warn",
+			Score:  40,
+			Evidence:    "the landing page is a client-rendered app shell: script bundles load but the served HTML has almost no visible text",
+			Remediation: "Serve prerendered or static HTML for the landing page (SSR, SSG, or a prerender service) so crawlers and agents see the content without executing JavaScript.",
+		})
+		for i := range checks {
+			if checks[i].Status != "fail" {
+				continue
+			}
+			switch checks[i].Key {
+			case "privacy_policy", "terms", "onboarding_flow", "checkout_present":
+				checks[i].Evidence += "; the page looks like a client-rendered app shell, so the marker may exist in the browser DOM but not in the served HTML"
+				checks[i].Remediation = "Serve prerendered or static HTML so crawlers read the links without executing JavaScript. " + checks[i].Remediation
+			}
+		}
 	}
 
 	result := ReadinessResult{}
@@ -578,6 +604,19 @@ func (e *ReadinessEngine) checkDocsPresent(ctx context.Context, docsURL string) 
 	}
 	check.Remediation = "Make the documentation reachable with real content."
 	return check
+}
+
+var shellLinkPattern = regexp.MustCompile(`(?i)<a\b[^>]*\bhref\s*=`)
+
+// looksLikeAppShell reports whether the fetch returned a JavaScript app shell:
+// a bundle <script src> loads, the stripped text is thin, and there are almost
+// no anchor links — a real landing page always links somewhere. Crawlers that
+// do not execute JavaScript then see a blank page.
+func looksLikeAppShell(page fetchedPage) bool {
+	if !page.OK || !appShellScriptPattern.MatchString(page.Body) {
+		return false
+	}
+	return len(stripHTML(page.Body)) < 250 && len(shellLinkPattern.FindAllString(page.Body, -1)) < 3
 }
 
 func checkBodyMarker(site fetchedPage, key string, pattern *regexp.Regexp, gate bool, passEvidence, remediation string) ReadinessCheck {

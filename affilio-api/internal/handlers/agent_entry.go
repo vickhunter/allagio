@@ -409,7 +409,38 @@ func (h *AgentEntry) CreateAgentAccount(c *gin.Context) {
 		resp["api_key"] = makerKey
 		resp["key_header"] = "X-Maker-Key"
 	}
+	h.notifyAccountRegistered(c, req.Role, req.Name, strings.ToLower(req.Email))
 	c.JSON(http.StatusCreated, resp)
+}
+
+// notifyAccountRegistered fires the account.registered event when an agent
+// opens an account — the "an agent just registered your product" moment the
+// owner should hear about. The freshly created agent owner has no webhook
+// configured yet, so the notification goes to every owner already registered
+// under the same email. Best-effort and async; a missing webhook is fine.
+func (h *AgentEntry) notifyAccountRegistered(c *gin.Context, role, name, email string) {
+	payload, err := json.Marshal(map[string]any{
+		"type":  "account.registered",
+		"role":  role,
+		"name":  name,
+		"email": email,
+	})
+	if err != nil {
+		return
+	}
+	owners, err := h.DB.OwnersByEmail(c.Request.Context(), email)
+	if err != nil {
+		return
+	}
+	sent := map[string]bool{}
+	for _, owner := range owners {
+		url, secret, err := h.DB.OwnerNotify(c.Request.Context(), owner.ID)
+		if err != nil || url == "" || secret == "" || sent[url] {
+			continue
+		}
+		sent[url] = true
+		go postSignedWebhook(url, secret, payload)
+	}
 }
 
 func (h *AgentEntry) AgentSignals(c *gin.Context) {

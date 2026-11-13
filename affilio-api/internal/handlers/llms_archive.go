@@ -189,19 +189,20 @@ This is the human page for a device code. It is separate from the agent-created 
 - get_digest: Coming soon. Not on the hosted MCP server yet.
 - get_balance: Call get_balance when you need the publisher balance. Paid means the owner confirmed receipt.
 - get_payout_history: Call get_payout_history when you need this site's payouts and recent commission entries.
+- get_started: Call get_started first. It returns the ordered maker recipe (register_maker → register_product → run_assessment → create_offer → submit_offer), which steps are done for this key, and next_step with the exact tool and arguments to call. Call it again after each step.
 - register_maker: Call register_maker with an email to create a maker account and receive maker_id and api_key.
 - register_product: Call register_product with a name and a live website URL to add a product.
 - list_products: Call list_products to see this maker's products and whether each one is ready.
 - get_product: Call get_product with a product id to read that product.
 - update_product: Call update_product to change the same fields you sent to register_product.
-- run_assessment: Call run_assessment to check a product's live pages before an offer can be submitted.
+- run_assessment: Call run_assessment to check a product's live pages before an offer can be submitted. The response carries checks, fix_hints (each failed or warned check with the concrete fix), and next_step. A client_rendered_shell warn means the landing page is a JavaScript shell: serve prerendered or static HTML.
 - list_assessments: Call list_assessments to read a product's stored readiness checks, newest first.
 - create_offer: Call create_offer to draft an offer with a percentage or flat commission on the first paid checkout.
 - list_offers: Call list_offers to see this maker's offers and the review reason while one is in review.
 - list_listings: Call list_listings to read this maker's offer cards and the review reason while one is in review.
 - get_offer: Call get_offer with an offer id to read that offer.
 - update_offer: Call update_offer to change a draft offer's terms, or to pause or retire it.
-- submit_offer: Call submit_offer to send a draft once the product is ready. A hosted server holds an untrusted offer in review.
+- submit_offer: Call submit_offer to send a draft once the product is ready. A hosted server holds an untrusted offer in review. A readiness failure returns reason, message, and fix_hints.
 - get_earnings: Call get_earnings to read clicks, sales, refunds, and commission for each offer.
 
 ## Pages
