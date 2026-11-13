@@ -3,17 +3,9 @@ import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 import { Marquee } from "@/components/ui/marquee"
-import { example, feed } from "@/content"
+import { feed } from "@/content"
 import { signInHref, withSource } from "@/lib/source"
-
-const firstRow = feed.slice(0, 3)
-const secondRow = feed.slice(3)
-
-const whoLabel: Record<string, string> = {
-  maker: "Maker",
-  agent: "Agent",
-  pub: "Publisher",
-}
+import { useLocale } from "@/i18n"
 
 const FeedCard = ({
   who,
@@ -24,6 +16,12 @@ const FeedCard = ({
   text: string
   meta: string
 }) => {
+  const { t } = useLocale()
+  const whoLabel: Record<string, string> = {
+    maker: t.cta.whoMaker,
+    agent: t.cta.whoAgent,
+    pub: t.cta.whoPublisher,
+  }
   return (
     <figure
       className={cn(
@@ -39,7 +37,10 @@ const FeedCard = ({
 }
 
 export function CallToAction({ source }: { source: string }) {
+  const { t } = useLocale()
   const signIn = signInHref("/owner", source)
+  const firstRow = t.cta.feed.slice(0, 3).map((item, i) => ({ ...item, who: feed[i].who }))
+  const secondRow = t.cta.feed.slice(3).map((item, i) => ({ ...item, who: feed[i + 3].who }))
   return (
     <section id="cta" aria-labelledby="cta-h">
       <div className="container mx-auto flex w-full flex-col items-center justify-center p-4 md:p-10">
@@ -67,24 +68,22 @@ export function CallToAction({ source }: { source: string }) {
             </Marquee>
           </div>
           <div className="z-10 flex flex-col items-center text-center">
-            <p className="eyebrow">Worked example · illustrative</p>
+            <p className="eyebrow">{t.cta.eyebrow}</p>
             <h2
               id="cta-h"
               className="h-display mt-3 max-w-xl text-3xl font-semibold tracking-tighter text-balance text-t1 sm:text-4xl"
             >
-              On a {example.price} sale at {example.commission}, the publisher
-              earns {example.publisher}.
+              {t.cta.heading}
             </h2>
             <p className="mt-3 max-w-xl text-base text-balance text-t2">
-              Give your agent this line to start. Copying it does not create a
-              token.
+              {t.cta.lead}
             </p>
             <div className="mt-5 flex flex-col items-center gap-3">
               <a
                 href="#join"
                 className={cn(buttonVariants({ size: "lg" }), "rounded-full px-6")}
               >
-                Back to the join line
+                {t.cta.primary}
               </a>
               <div className="flex flex-wrap items-center justify-center gap-4">
                 <a
@@ -96,7 +95,7 @@ export function CallToAction({ source }: { source: string }) {
                     "group rounded-full px-6"
                   )}
                 >
-                  Sign in with Google
+                  {t.cta.signIn}
                   <ChevronRight
                     className="ml-1 size-4 transition-all duration-300 ease-out group-hover:translate-x-1"
                     aria-hidden="true"
@@ -108,7 +107,7 @@ export function CallToAction({ source }: { source: string }) {
                   data-track-to="agents"
                   className="inline-flex min-h-11 items-center font-semibold text-t2 underline underline-offset-4 hover:no-underline"
                 >
-                  MCP and setup
+                  {t.cta.setup}
                 </a>
               </div>
             </div>

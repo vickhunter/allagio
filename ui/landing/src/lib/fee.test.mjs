@@ -36,7 +36,7 @@ test('home, makers, and the how-it-works figure do not type the maker figure', (
   }
   const content = readFileSync(resolve(root, 'src/content.ts'), 'utf8')
   const makers = readFileSync(resolve(root, 'src/makers/App.tsx'), 'utf8')
-  const home = readFileSync(resolve(root, 'src/home/App.tsx'), 'utf8')
+  const home = readFileSync(resolve(root, 'src/i18n/en.ts'), 'utf8')
   const figure = readFileSync(resolve(root, 'public/how-it-works/index.html'), 'utf8')
   assert.match(content, /from '@\/lib\/fee\.mjs'/)
   assert.match(makers, /example\.maker/)

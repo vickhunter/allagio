@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Logo } from '@/components/Logo'
 import { CommandPalette, type Command } from '@/components/CommandPalette'
 import { signInHref, useSource, withSource } from '@/lib/source'
-import { useCaseLinks } from '@/use-cases/links.mjs'
+import { LangSwitcher } from '@/i18n/LangSwitcher'
+import { useLocale } from '@/i18n'
 import { ChevronDown } from 'lucide-react'
 
 export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup' | 'legal' | 'agents' | 'you' | 'use-cases' | 'reference' | 'missing'
@@ -22,6 +23,7 @@ export const siteCommands: Command[] = [
 // sign-in + primary CTA right. Below 1280px the destinations sit in a labelled menu.
 export function Header({ page }: { page: PageKey }) {
   const source = useSource()
+  const { t } = useLocale()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
@@ -35,6 +37,10 @@ export function Header({ page }: { page: PageKey }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
   const current = page === 'setup' ? 'publishers' : page
+  const commands = useMemo(
+    () => siteCommands.map((command) => ({ ...command, label: t.chrome.commands[command.id as keyof typeof t.chrome.commands] ?? command.label })),
+    [t]
+  )
   const link = (href: string, label: string, key: PageKey) => (
     <a href={withSource(href, source)} aria-current={current === key ? 'page' : undefined} data-track="nav_click" data-track-to={key}
       className={`inline-flex min-h-11 min-w-11 items-center whitespace-nowrap rounded-full px-3 text-t1 transition-colors duration-150 hover:bg-s2 ${current === key ? 'bg-s2 font-semibold' : ''}`}>{label}</a>
@@ -44,20 +50,20 @@ export function Header({ page }: { page: PageKey }) {
       <div className="site-bar">
         <Logo />
         <button ref={menuRef} type="button" className="site-menu-btn" aria-expanded={open} aria-controls="site-menu" onClick={() => setOpen((value) => !value)}>
-          {open ? 'Close menu' : 'Menu'}
+          {open ? t.chrome.menuClose : t.chrome.menu}
         </button>
         <nav id="site-menu" aria-label="Main" className={open ? 'site-menu is-open text-sm' : 'site-menu text-sm'}>
-          {link('/you/', 'Your limits', 'you')}
-          {link('/makers/', 'Makers', 'makers')}
-          {link('/publishers/', 'Publishers', 'publishers')}
+          {link('/you/', t.chrome.navYourLimits, 'you')}
+          {link('/makers/', t.chrome.navMakers, 'makers')}
+          {link('/publishers/', t.chrome.navPublishers, 'publishers')}
           <div className="group relative">
             <a href={withSource('/use-cases/', source)} aria-current={current === 'use-cases' ? 'page' : undefined} data-track="nav_click" data-track-to="use-cases"
               className={`inline-flex min-h-11 min-w-11 items-center gap-1 whitespace-nowrap rounded-full px-3 text-t1 transition-colors duration-150 hover:bg-s2 ${current === 'use-cases' ? 'bg-s2 font-semibold' : ''}`}>
-              Use cases
+              {t.chrome.navUseCases}
               <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 text-t2 transition-transform duration-150 group-hover:rotate-180 group-focus-within:rotate-180" />
             </a>
             <div className="invisible absolute left-1/2 top-full z-40 hidden w-64 -translate-x-1/2 translate-y-1 rounded-xl border border-line bg-white p-1.5 opacity-0 shadow-lg transition-all duration-150 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 xl:block">
-              {useCaseLinks.map((item) => (
+              {t.chrome.useCaseLinks.map((item) => (
                 <a
                   key={item.id}
                   href={withSource(`/use-cases/#${item.id}`, source)}
@@ -70,18 +76,22 @@ export function Header({ page }: { page: PageKey }) {
               ))}
             </div>
           </div>
-          {link('/protocol/', 'Protocol', 'protocol')}
-          {link('/agents', 'Agents', 'agents')}
-          <span className="xl:hidden">{link('/reference', 'Reference', 'reference')}</span>
+          {link('/protocol/', t.chrome.navProtocol, 'protocol')}
+          {link('/agents', t.chrome.navAgents, 'agents')}
+          <span className="xl:hidden">{link('/reference', t.chrome.navReference, 'reference')}</span>
           <span className="sm:hidden">
             <a href={signInHref('/owner', source)} data-track="nav_signin"
-              className="inline-flex min-h-11 min-w-11 items-center rounded-full px-3 font-semibold text-t1 transition-colors duration-150 hover:bg-s2">Sign in</a>
+              className="inline-flex min-h-11 min-w-11 items-center rounded-full px-3 font-semibold text-t1 transition-colors duration-150 hover:bg-s2">{t.chrome.signIn}</a>
+          </span>
+          <span className="sm:hidden mt-1 flex px-3">
+            <LangSwitcher />
           </span>
         </nav>
         <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-          <CommandPalette commands={siteCommands.map((command) => ({ ...command, href: command.href.startsWith('#') ? command.href : withSource(command.href, source) }))} />
-          <a href={signInHref('/owner', source)} data-track="nav_signin" className="hidden min-h-11 items-center whitespace-nowrap rounded-full px-3 text-[13px] font-semibold text-t2 transition-colors duration-150 hover:bg-s2 hover:text-t1 sm:inline-flex">Sign in</a>
-          <a href={withSource('/landing-v9/agents/', source)} data-track="nav_cta" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-t1 px-4 text-[13px] font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md">Set up your agent</a>
+          <LangSwitcher className="hidden sm:inline-flex" />
+          <CommandPalette commands={commands.map((command) => ({ ...command, href: command.href.startsWith('#') ? command.href : withSource(command.href, source) }))} />
+          <a href={signInHref('/owner', source)} data-track="nav_signin" className="hidden min-h-11 items-center whitespace-nowrap rounded-full px-3 text-[13px] font-semibold text-t2 transition-colors duration-150 hover:bg-s2 hover:text-t1 sm:inline-flex">{t.chrome.signIn}</a>
+          <a href={withSource('/landing-v9/agents/', source)} data-track="nav_cta" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-t1 px-4 text-[13px] font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md">{t.chrome.setupCta}</a>
         </div>
       </div>
     </header>

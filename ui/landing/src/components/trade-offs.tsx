@@ -2,24 +2,10 @@ import { Check, X } from "lucide-react"
 import { motion } from "motion/react"
 
 import { reducedMotion } from "@/lib/utils"
-
-const withOrp = [
-  "Your agent negotiates and executes the deal — the decide step still waits for a person.",
-  "One wire for affiliate offers, sponsorships, link exchanges and agent partnerships.",
-  "Signed envelopes and a protocol receipt per deal — GET /orp/proof/:id returns it.",
-  "No platform lock-in — ORP is an open wire; Apache-2.0 is planned.",
-  "Money moves on external rails — Allagio records the deal, it does not pay out.",
-]
-
-const withoutOrp = [
-  "A person reads every DM and email thread by hand.",
-  "Terms scatter across inboxes — nothing portable to audit.",
-  "Attribution lives in spreadsheets, reconciled by hand.",
-  "Each new counterparty means a bespoke integration.",
-  "No shared receipts — a dispute falls back to screenshots.",
-]
+import { useLocale } from "@/i18n"
 
 export function TradeOffs() {
+  const { t } = useLocale()
   const reveal = reducedMotion()
     ? {}
     : {
@@ -31,16 +17,15 @@ export function TradeOffs() {
     <section id="trade-offs" aria-labelledby="trade-offs-h">
       <div className="container mx-auto px-4 py-16 md:px-8 md:py-24">
         <div className="mx-auto max-w-5xl text-center">
-          <p className="eyebrow">Honest trade-offs</p>
+          <p className="eyebrow">{t.tradeoffs.eyebrow}</p>
           <h2
             id="trade-offs-h"
             className="h-display mt-3 text-3xl font-semibold tracking-tighter text-balance text-t1 sm:text-5xl"
           >
-            With ORP, or by hand.
+            {t.tradeoffs.heading}
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-t2">
-            Same deals, different wiring. Allagio runs ORP in test mode today —
-            no real money moves.
+            {t.tradeoffs.lead}
           </p>
         </div>
         <div className="mx-auto mt-12 grid max-w-4xl gap-6 sm:grid-cols-2">
@@ -55,14 +40,14 @@ export function TradeOffs() {
             />
             <div className="flex flex-wrap items-center gap-2.5">
               <h3 className="text-xl font-semibold tracking-tight text-t1">
-                With Allagio (ORP)
+                {t.tradeoffs.withTitle}
               </h3>
               <span className="rounded-full border border-pub/30 bg-pub-soft px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide text-pub">
-                test mode
+                {t.tradeoffs.chip}
               </span>
             </div>
             <ul className="mt-5 grid gap-3.5">
-              {withOrp.map((item) => (
+              {t.tradeoffs.withItems.map((item) => (
                 <li
                   key={item}
                   className="flex gap-3 text-[15px] leading-relaxed text-t1"
@@ -82,10 +67,10 @@ export function TradeOffs() {
             className="rounded-2xl border border-line bg-s2/50 p-6 transition-shadow duration-300 hover:shadow-md"
           >
             <h3 className="text-xl font-semibold tracking-tight text-t1">
-              Without it, by hand
+              {t.tradeoffs.withoutTitle}
             </h3>
             <ul className="mt-5 grid gap-3.5">
-              {withoutOrp.map((item) => (
+              {t.tradeoffs.withoutItems.map((item) => (
                 <li
                   key={item}
                   className="flex gap-3 text-[15px] leading-relaxed text-t2"

@@ -396,4 +396,5 @@ body{margin:0;font-weight:500}
   .scalar-rail{display:block;position:sticky;top:64px;padding:28px 12px 28px 16px}
   .compare{grid-template-columns:1fr 1fr}
   .split{grid-template-columns:minmax(0,.9fr) minmax(280px,.8fr);align-items:center;column-gap:48px}
-}
+}:lang(zh){--font-sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;--font-display:var(--font-sans);--font-mono:ui-monospace,"SF Mono",Menlo,monospace}
+:lang(hi){--font-sans:"Noto Sans Devanagari","Nirmala UI",system-ui,sans-serif;--font-display:var(--font-sans);--font-mono:ui-monospace,"SF Mono",Menlo,monospace}

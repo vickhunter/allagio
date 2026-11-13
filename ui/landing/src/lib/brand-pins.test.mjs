@@ -13,9 +13,10 @@ test('the brand constant is Allagio', () => {
 
 test('the footer sign-off sentence is pinned', () => {
   const source = readFileSync(resolve(landing, 'src/content.ts'), 'utf8')
-  const footer = readFileSync(resolve(landing, 'src/site/Footer.tsx'), 'utf8')
+  const en = readFileSync(resolve(landing, 'src/i18n/en.ts'), 'utf8')
   assert.equal(source.includes('workingName'), false)
-  assert.match(footer, /Agents find, match and place\. Humans get the results\./)
+  assert.equal(en.includes('workingName'), false)
+  assert.match(en, /Your agent finds partners, agrees the terms and places the offer\./)
 })
 
 test('the agents page title is Allagio', () => {

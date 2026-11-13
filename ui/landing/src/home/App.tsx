@@ -1,5 +1,4 @@
 import { Page } from '@/site/Page'
-import { example } from '@/content'
 import { Vision } from './Vision'
 import { ClientStrip } from '@/components/client-strip'
 import { BentoCard, BentoGrid } from '@/components/ui/bento-grid'
@@ -7,14 +6,14 @@ import { BorderBeam } from '@/components/ui/border-beam'
 import { RetroGrid } from '@/components/ui/retro-grid'
 import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, LayoutTemplate, Receipt, Calculator, XCircle, Zap } from 'lucide-react'
 import { PostPreview } from '@/components/PostPreview'
-import { Hero } from '@/components/hero-2'
+import { ConnectionCard, Hero } from '@/components/hero-2'
+import { Why } from './Why'
 import { FeatureSection } from '@/components/feature-3'
 import { FAQ } from '@/components/faq-1'
 import { TradeOffs } from '@/components/trade-offs'
 import { CallToAction } from '@/components/call-to-action-1'
 import { useOfferConfig, useSource, withSource } from '@/lib/source'
-import { comingLine } from '@/home/hero-copy.mjs'
-import { makerBenefit, publisherBenefit, railsAutonomy, railsHeading, railsIntro, railsKicker, railsSteps } from '@/home/desk-copy.mjs'
+import { useLocale } from '@/i18n'
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
 
@@ -41,53 +40,55 @@ function Rows({ items }: { items: string[] }) {
 export function App() {
   const source = useSource()
   const { plugin } = useOfferConfig()
+  const { t } = useLocale()
   return (
     <Page page="home">
       <Hero source={source} />
+      <Why />
       <ClientStrip />
 
       <div className="border-t border-line bg-s2/40">
         <FeatureSection source={source} />
+        <div className="container mx-auto px-4 pb-16 md:px-8 md:pb-20">
+          <ConnectionCard />
+        </div>
       </div>
 
       <section id="rails" aria-labelledby="rails-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <div className="max-w-2xl">
-            <p className="kicker">{railsKicker}</p>
-            <h2 id="rails-h">{railsHeading}</h2>
-            <p>{railsIntro}</p>
-            <p className="mt-4 text-[15px] leading-relaxed text-t2">{railsAutonomy}</p>
-            <p><a className={linkClass} href={withSource('/protocol/', source)}>The protocol</a></p>
+            <p className="kicker">{t.rails.kicker}</p>
+            <h2 id="rails-h">{t.rails.heading}</h2>
+            <p>{t.rails.intro}</p>
+            <p className="mt-4 text-[15px] leading-relaxed text-t2">{t.rails.autonomy}</p>
+            <p><a className={linkClass} href={withSource('/protocol/', source)}>{t.rails.protocolLink}</a></p>
           </div>
           <figure className="mt-10">
-            <figcaption className="sr-only">The deal, end to end</figcaption>
+            <figcaption className="sr-only">{t.rails.figcaption}</figcaption>
             <BentoGrid className="auto-rows-[13rem] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {railsSteps.map((step, i) => {
-                const [name, ...rest] = step.split(' — ')
-                return (
-                  <BentoCard
-                    key={name}
-                    name={name}
-                    description={rest.join(' — ')}
-                    Icon={stepIcons[i]}
-                    href={withSource('/reference', source)}
-                    cta="Reference"
-                    className={
-                      i === 0
+              {t.rails.steps.map((step, i) => (
+                <BentoCard
+                  key={step.name}
+                  name={step.name}
+                  description={step.body}
+                  Icon={stepIcons[i]}
+                  href={withSource('/reference', source)}
+                  cta={t.rails.cta}
+                  className={
+                    i === 0
+                      ? 'bg-s1 col-span-1 sm:col-span-2 lg:col-span-2'
+                      : i === t.rails.steps.length - 1
                         ? 'bg-s1 col-span-1 sm:col-span-2 lg:col-span-2'
-                        : i === railsSteps.length - 1
-                          ? 'bg-s1 col-span-1 sm:col-span-2 lg:col-span-2'
-                          : 'bg-s1 col-span-1'
-                    }
-                    background={
-                      <>
-                        <div className={`absolute inset-0 ${cardWashes[i]}`} />
-                        {i === 0 ? <BorderBeam size={140} duration={7} borderWidth={1.5} /> : null}
-                      </>
-                    }
-                  />
-                )
-              })}
+                        : 'bg-s1 col-span-1'
+                  }
+                  background={
+                    <>
+                      <div className={`absolute inset-0 ${cardWashes[i]}`} />
+                      {i === 0 ? <BorderBeam size={140} duration={7} borderWidth={1.5} /> : null}
+                    </>
+                  }
+                />
+              ))}
             </BentoGrid>
           </figure>
         </div>
@@ -95,47 +96,47 @@ export function App() {
 
       <section id="makers" aria-labelledby="makers-h" className="split border-t border-line bg-s2/50">
         <div>
-          <p className="kicker">Makers</p>
-          <h2 id="makers-h">{makerBenefit}</h2>
-          <p>Agents put your product in content that fits. The worked sale is an example, not a result from the picture.</p>
-          <Rows items={['A commission is a share of a sale.', 'A new site waits for a person before publish.', `${example.product} · ${example.price} · ${example.commission} commission.`]} />
-          <p><a className={linkClass} href={withSource('/makers/', source)}>Makers</a></p>
+          <p className="kicker">{t.makers.kicker}</p>
+          <h2 id="makers-h">{t.makers.heading}</h2>
+          <p>{t.makers.lead}</p>
+          <Rows items={t.makers.rows} />
+          <p><a className={linkClass} href={withSource('/makers/', source)}>{t.makers.link}</a></p>
         </div>
         <figure className="piece group relative overflow-hidden transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-maker/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          <figcaption className="flex items-center gap-2"><Calculator aria-hidden="true" className="h-4 w-4 text-maker" />Worked sale</figcaption>
-          <p>{example.product}</p>
-          <p>{example.price} · {example.commission} commission</p>
-          <p>On a {example.price} sale at {example.commission}, the publisher earns {example.publisher}. A {example.fee} fee is paid by the maker, so the maker keeps {example.maker}.</p>
+          <figcaption className="flex items-center gap-2"><Calculator aria-hidden="true" className="h-4 w-4 text-maker" />{t.makers.workedCaption}</figcaption>
+          <p>{t.makers.exampleProduct}</p>
+          <p>{t.makers.workedTerms}</p>
+          <p>{t.makers.workedBody}</p>
         </figure>
       </section>
 
       <section id="publishers" aria-labelledby="publishers-h" className="split border-t border-line">
         <div>
-          <p className="kicker">Publishers</p>
-          <h2 id="publishers-h">{publisherBenefit}</h2>
-          <p>Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.</p>
-          <Rows items={['One labelled box, marked sponsored.', comingLine, 'Undo stops clicks at the link right away.']} />
-          <p><a className={linkClass} href={withSource('/publishers/', source)}>Publishers</a></p>
+          <p className="kicker">{t.publishers.kicker}</p>
+          <h2 id="publishers-h">{t.publishers.heading}</h2>
+          <p>{t.publishers.lead}</p>
+          <Rows items={t.publishers.rows} />
+          <p><a className={linkClass} href={withSource('/publishers/', source)}>{t.publishers.link}</a></p>
         </div>
         <figure className="piece group relative overflow-hidden transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-lg">
           <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-pub/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          <figcaption className="flex items-center gap-2"><LayoutTemplate aria-hidden="true" className="h-4 w-4 text-pub" />Placement</figcaption>
-          <p>After the matching part of the post.</p>
-          <p className="piece-note">Illustrative. Not a live placement on your site.</p>
+          <figcaption className="flex items-center gap-2"><LayoutTemplate aria-hidden="true" className="h-4 w-4 text-pub" />{t.publishers.placementCaption}</figcaption>
+          <p>{t.publishers.placementBody}</p>
+          <p className="piece-note">{t.publishers.placementNote}</p>
         </figure>
       </section>
 
       <section id="compare" aria-labelledby="compare-h" className="compare border-t border-line bg-s1">
-        <h2 id="compare-h" className="sr-only">With and without a labelled offer</h2>
+        <h2 id="compare-h" className="sr-only">{t.compare.heading}</h2>
         <article className="relative border border-line">
-          <h3 className="flex items-center gap-2.5"><XCircle aria-hidden="true" className="h-6 w-6 text-t2" />A post, before an offer</h3>
-          <p>Nothing is inserted. Some posts get no offer.</p>
+          <h3 className="flex items-center gap-2.5"><XCircle aria-hidden="true" className="h-6 w-6 text-t2" />{t.compare.beforeTitle}</h3>
+          <p>{t.compare.beforeBody}</p>
         </article>
         <article className="relative overflow-hidden border border-pub/30 bg-s1 shadow-md">
           <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-pub/70 to-transparent" />
-          <h3 className="flex items-center gap-2.5"><CheckCircle2 aria-hidden="true" className="h-6 w-6 text-pub" />A labelled placement you can refuse</h3>
-          <p>One box, marked sponsored. Prepare waits until you approve.</p>
+          <h3 className="flex items-center gap-2.5"><CheckCircle2 aria-hidden="true" className="h-6 w-6 text-pub" />{t.compare.afterTitle}</h3>
+          <p>{t.compare.afterBody}</p>
         </article>
       </section>
 
@@ -148,9 +149,9 @@ export function App() {
       <section id="post-preview" aria-labelledby="preview-h" className="relative overflow-hidden border-t border-line bg-s2/50">
         <RetroGrid aria-hidden="true" className="opacity-100" opacity={0.3} lightLineColor="rgb(63 92 53)" />
         <div className="relative mx-auto max-w-3xl px-5 py-16 md:py-20">
-          <p className="kicker">On your post</p>
-          <h2 id="preview-h" className="h-display mt-3 text-3xl">See it on a real post.</h2>
-          <p className="mt-4 text-lg leading-relaxed text-t2">Paste a post URL. See where an offer would sit.</p>
+          <p className="kicker">{t.previewSection.kicker}</p>
+          <h2 id="preview-h" className="h-display mt-3 text-3xl">{t.previewSection.heading}</h2>
+          <p className="mt-4 text-lg leading-relaxed text-t2">{t.previewSection.lead}</p>
           <div className="mt-8">
             <PostPreview />
           </div>
@@ -172,7 +173,7 @@ export function App() {
       {plugin ? (
         <div className="border-t border-line">
           <div className="mx-auto max-w-3xl px-5 py-10 text-center">
-            <a className={linkClass} href="/downloads/offer-rails.zip" data-track="zip_download">Download WordPress plugin</a>
+            <a className={linkClass} href="/downloads/offer-rails.zip" data-track="zip_download">{t.plugin.download}</a>
           </div>
         </div>
       ) : null}

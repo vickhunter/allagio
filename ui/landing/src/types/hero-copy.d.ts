@@ -1,6 +1,10 @@
 declare module '@/home/hero-copy.mjs' {
   export const heroH1: string
   export const heroSupport: string
+  export const ctaMakerLabel: string
+  export const ctaMakerHref: string
+  export const ctaPublisherLabel: string
+  export const ctaPublisherHref: string
   export const manualSetup: string
   export const comingLine: string
   export const setupLabel: string

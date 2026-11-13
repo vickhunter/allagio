@@ -1,13 +1,13 @@
 import { Marquee } from '@/components/ui/marquee'
 import { clientMarks } from '@/components/join-prompt.mjs'
-
-const heading = 'Runs in the agents you already use.'
+import { useLocale } from '@/i18n'
 
 export function ClientStrip() {
+  const { t } = useLocale()
   return (
-    <section id="clients" aria-labelledby="clients-h" className="border-t border-line bg-s1 py-10">
-      <h2 id="clients-h" className="sr-only">{heading}</h2>
-      <p aria-hidden="true" className="text-center text-[13px] font-semibold uppercase tracking-[0.14em] text-t2">{heading}</p>
+    <section id="clients" aria-labelledby="clients-h" className="border-t border-line py-10">
+      <h2 id="clients-h" className="sr-only">{t.clients.heading}</h2>
+      <p aria-hidden="true" className="text-center text-[13px] font-semibold uppercase tracking-[0.14em] text-t2">{t.clients.heading}</p>
       <Marquee pauseOnHover className="mt-6 [--duration:28s]" repeat={2}>
         {clientMarks.map((mark) => (
           <span
@@ -23,7 +23,7 @@ export function ClientStrip() {
       </Marquee>
       <p className="mt-6 text-center">
         <a href="/agents" data-track="clients-agents" className="text-[13px] font-semibold text-t1 underline decoration-line underline-offset-4 transition-colors hover:decoration-t1">
-          Install guides for every client
+          {t.clients.link}
         </a>
       </p>
     </section>
