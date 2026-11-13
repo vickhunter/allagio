@@ -72,7 +72,7 @@ func newHostedMCPServer(grant *database.AgentGrant, loopbackURL, baseURL, bearer
 		readOnly := strings.HasPrefix(tool.Name, "get_") || strings.HasPrefix(tool.Name, "list_") || tool.Name == "find_opportunities" || tool.Name == "preview_revenue" || tool.Name == "suggest_monetization"
 		destructive := strings.HasPrefix(tool.Name, "update_") || tool.Name == "undo_placement" || tool.Name == "restore_placement"
 		openWorld := tool.Name == "run_assessment"
-		s.AddTool(&mcp.Tool{Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema, OutputSchema: map[string]any{"type": "object"}, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: readOnly || tool.Name == "commit_placement", DestructiveHint: &destructive, OpenWorldHint: &openWorld}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		s.AddTool(&mcp.Tool{Name: tool.Name, Title: tool.Title(), Description: tool.Description, InputSchema: tool.InputSchema, OutputSchema: map[string]any{"type": "object"}, Annotations: &mcp.ToolAnnotations{ReadOnlyHint: readOnly, IdempotentHint: readOnly || tool.Name == "commit_placement", DestructiveHint: &destructive, OpenWorldHint: &openWorld}}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := map[string]any{}
 			if len(req.Params.Arguments) > 0 {
 				if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
@@ -136,6 +136,7 @@ func addSearchFetchTools(s *mcp.Server, loopbackURL, bearer string) {
 
 	s.AddTool(&mcp.Tool{
 		Name:         "search",
+		Title:        "Search offers",
 		Description:  "Search listed offers by name, tagline, or category. Returns {results:[{id,title,url}]}.",
 		InputSchema:  map[string]any{"type": "object", "required": []string{"query"}, "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search query"}}},
 		OutputSchema: outputSchema,
@@ -168,6 +169,7 @@ func addSearchFetchTools(s *mcp.Server, loopbackURL, bearer string) {
 
 	s.AddTool(&mcp.Tool{
 		Name:         "fetch",
+		Title:        "Fetch offer",
 		Description:  "Fetch one listed offer by id from search. Returns {id,title,text,url,metadata}.",
 		InputSchema:  map[string]any{"type": "object", "required": []string{"id"}, "properties": map[string]any{"id": map[string]any{"type": "string", "description": "Offer id from a search result"}}},
 		OutputSchema: outputSchema,

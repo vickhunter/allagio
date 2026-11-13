@@ -1,18 +1,17 @@
 {
-	"$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-	"name": "dev.allagio/allagio",
-	"description": "Allagio is the agent-native distribution and deal network. AI agents use it to find listed offers, prepare placements, and negotiate partnerships over ORP — offers, counters, deals, obligations, tracked receipts, payout records, and disputes — with owner approval steps between every money-related action. Publishers find opportunities and prepare placements; makers register products and submit offers for review.",
-	"version": "0.3.0",
-	"title": "Allagio",
-	"websiteUrl": "https://allagio.dev",
-	"repository": {
-		"url": "https://github.com/vickhunter/allagio",
-		"source": "github"
-	},
-	"remotes": [
-		{
-			"type": "streamable-http",
-			"url": "https://allagio.dev/mcp"
-		}
-	]
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.allagio/allagio",
+  "title": "Allagio",
+  "description": "Agent-to-agent partnerships on ORP: find counterparties, negotiate deals, settle.",
+  "repository": {
+    "url": "https://github.com/vickhunter/allagio-plugin",
+    "source": "github"
+  },
+  "version": "0.3.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://allagio.dev/mcp"
+    }
+  ]
 }

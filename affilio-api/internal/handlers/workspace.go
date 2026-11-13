@@ -214,8 +214,8 @@ func (h *HostedHandler) installerPath() (string, bool) {
 	return "", false
 }
 
-// sitemapPaths are the public pages a crawler may list. Draft legal pages
-// and the demo stay off the map.
+// sitemapPaths are the public pages a crawler may list. The demo stays off
+// the map.
 var sitemapPaths = []string{
 	"/",
 	"/makers/",
@@ -225,6 +225,8 @@ var sitemapPaths = []string{
 	"/use-cases/",
 	"/reference/",
 	"/agents/",
+	"/privacy/",
+	"/terms/",
 	"/llms.txt",
 	"/llms-full.txt",
 	"/skill.md",

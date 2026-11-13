@@ -224,7 +224,12 @@ func TestSitemapUsesConfiguredOrigin(t *testing.T) {
 			t.Fatalf("missing %s\n%s", loc, body)
 		}
 	}
-	if strings.Contains(body, "/privacy") || strings.Contains(body, "/terms") || strings.Contains(body, "agent-card") {
+	for _, loc := range []string{"https://allagio.example/privacy/", "https://allagio.example/terms/"} {
+		if !strings.Contains(body, "<loc>"+loc+"</loc>") {
+			t.Fatalf("missing %s\n%s", loc, body)
+		}
+	}
+	if strings.Contains(body, "agent-card") {
 		t.Fatalf("sitemap lists a held path\n%s", body)
 	}
 	card := httptest.NewRecorder()

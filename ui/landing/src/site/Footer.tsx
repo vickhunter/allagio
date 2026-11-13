@@ -4,7 +4,7 @@ import { Blip } from '@/components/Blip'
 import { Kbd } from '@/components/ui/input'
 import { Skyline, Tram } from './Padova'
 import { useSource, withSource } from '@/lib/source'
-import { workingName } from '@/content'
+import { brand } from '@/content'
 
 // Footer on every page: hand-drawn Padova skyline (own SVG, no copied assets) + one SIR1 tram.
 // Tram moves with CSS transform only; paused off-screen (IntersectionObserver); animation:none under reduced motion.
@@ -20,7 +20,7 @@ export function Footer() {
   }, [])
   return (
     <footer className="mt-0 bg-[rgb(var(--rgb-footer))] text-t1" aria-labelledby="footer-h">
-      <h2 id="footer-h" className="sr-only">{workingName} Made in Padova.</h2>
+      <h2 id="footer-h" className="sr-only">{brand} Made in Padova.</h2>
       <div ref={scene} data-onscreen="false" className="padova relative mx-auto max-w-[1440px] overflow-hidden">
         <p className="sr-only">Illustration: the Padova skyline with the domes of the Basilica del Santo, the keel roof of Palazzo della Ragione, the statue ring and canal of Prato della Valle and the Specola tower, with a SIR1 tram passing.</p>
         <Skyline />
@@ -30,7 +30,7 @@ export function Footer() {
         <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 text-sm sm:grid-cols-[minmax(0,1.2fr)_repeat(3,minmax(0,.7fr))]">
           <div className="space-y-3">
             <Logo />
-            <p className="max-w-[28ch] text-t2">{workingName} Agents find, match and place. Humans get the results. Drawn and built in Padova.</p>
+            <p className="max-w-[28ch] text-t2">Agents find, match and place. Humans get the results. Drawn and built in Padova.</p>
             <Blip say="Next stop: Prato della Valle." />
             <p className="font-mono text-xs text-t2">Press <Kbd>?</Kbd> for shortcuts</p>
           </div>

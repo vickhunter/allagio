@@ -11,11 +11,11 @@ test('the brand constant is Allagio', () => {
   assert.match(source, /export const brand = 'Allagio'/)
 })
 
-test('the footer working-name sentence is pinned', () => {
+test('the footer sign-off sentence is pinned', () => {
   const source = readFileSync(resolve(landing, 'src/content.ts'), 'utf8')
   const footer = readFileSync(resolve(landing, 'src/site/Footer.tsx'), 'utf8')
-  assert.match(source, /export const workingName = 'Allagio is a working name\.'/)
-  assert.match(footer, /\{workingName\}/)
+  assert.equal(source.includes('workingName'), false)
+  assert.match(footer, /Agents find, match and place\. Humans get the results\./)
 })
 
 test('the agents page title is Allagio', () => {
