@@ -1,6 +1,6 @@
 export const updatedLabel = '13 November 2026'
 export const updatedISO = '2026-11-13'
-export const operatorName = 'ShineUp'
+export const operatorName = 'Allagio'
 export const contactEmail = 'motricalavictor@gmail.com'
 
 export const privacy = {
