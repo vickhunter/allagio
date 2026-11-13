@@ -47,7 +47,7 @@ export function Hero({ source }: { source: string }) {
           aria-hidden="true"
         />
         {reducedMotion ? null : <RetroGrid className="z-0" />}
-        <div className="z-10 container mx-auto flex flex-col px-4 pt-24 pb-10 md:px-10 md:pt-32 md:pb-16">
+        <div className="relative z-10 container mx-auto flex flex-col px-4 pt-24 pb-10 md:px-10 md:pt-32 md:pb-16">
           <div className="flex flex-col items-center gap-6 text-center">
             <div className="flex max-w-3xl flex-col items-center gap-4">
               <motion.p
@@ -71,7 +71,7 @@ export function Hero({ source }: { source: string }) {
                 {t.hero.h1}
               </motion.h1>
               <motion.p
-                className="text-muted-foreground max-w-2xl text-lg font-medium tracking-tight text-balance md:text-xl"
+                className="max-w-2xl text-lg font-medium tracking-tight text-balance text-t2 md:text-xl"
                 animate={fadeInInView ? "animate" : "initial"}
                 variants={fadeUpVariants}
                 initial={false}
@@ -98,7 +98,7 @@ export function Hero({ source }: { source: string }) {
                   {t.hero.ctaMaker}
                 </a>
                 <a
-                  className="inline-flex min-h-11 items-center rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md"
+                  className="inline-flex min-h-11 items-center rounded-full border border-line bg-s0 px-6 text-sm font-semibold text-t1 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md"
                   href={withSource(t.hero.ctaPublisherHref, source)}
                   data-track="hero_cta"
                   data-track-to="publishers"
@@ -107,7 +107,7 @@ export function Hero({ source }: { source: string }) {
                 </a>
               </div>
               <a
-                className="inline-flex min-h-11 items-center font-semibold text-setup underline underline-offset-4 hover:no-underline"
+                className="inline-flex min-h-11 items-center font-semibold text-t1 underline underline-offset-4 hover:no-underline"
                 href={withSource(setupHref, source)}
                 data-primary-action
                 data-track="secondary_click"

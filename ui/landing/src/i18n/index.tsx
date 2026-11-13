@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Messages } from './messages'
 import { en } from './en'
 import { zh } from './zh'
@@ -53,14 +53,15 @@ export function LangProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.lang = lang
   }, [lang])
-  const setLang = (next: Lang) => {
+  const setLang = useCallback((next: Lang) => {
     setLangState(next)
     try { window.localStorage.setItem(STORAGE_KEY, next) } catch { /* private mode */ }
     const url = new URL(window.location.href)
     url.searchParams.set('lang', next)
     window.history.replaceState(null, '', url)
-  }
-  return <LangContext.Provider value={{ lang, t: bundles[lang], setLang }}>{children}</LangContext.Provider>
+  }, [])
+  const value = useMemo(() => ({ lang, t: bundles[lang], setLang }), [lang, setLang])
+  return <LangContext.Provider value={value}>{children}</LangContext.Provider>
 }
 
 export function useLocale(): Locale {
