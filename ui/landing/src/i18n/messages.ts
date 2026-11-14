@@ -10,6 +10,19 @@ export type QA = { q: string; a: string }
 export type ErrorCopy = { message: string; next: string }
 export type NamedNote = { name: string; note: string }
 
+export type ShowcaseId = 'x' | 'pinterest' | 'instagram' | 'tiktok' | 'youtube' | 'newsletter' | 'blog' | 'podcast'
+export type ShowcaseMock = { author: string; handle: string; title: string; body: string; offer: string; meta: string }
+export type ShowcasePlatform = {
+  id: ShowcaseId
+  name: string
+  partnership: string
+  terms: string
+  parties: string[]
+  offerStep: string
+  counterStep: string
+  mock: ShowcaseMock
+}
+
 export interface Messages {
   chrome: {
     skipToContent: string
@@ -133,6 +146,20 @@ export interface Messages {
     kicker: string
     heading: string
     lead: string
+    tryLabel: string
+  }
+  showcase: {
+    exampleTag: string
+    footnote: string
+    partnershipLabel: string
+    termsLabel: string
+    partiesLabel: string
+    timelineLabel: string
+    agreedStep: string
+    approvedStep: string
+    liveStep: string
+    tabsLabel: string
+    platforms: ShowcasePlatform[]
   }
   preview: {
     ariaLabel: string

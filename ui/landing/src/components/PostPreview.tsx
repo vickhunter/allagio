@@ -5,7 +5,8 @@ import { roleReturn, signInHref, useSource } from '@/lib/source'
 import { PreviewStatus, barCount, codeFromStatus, fixtureBody, previewTimeoutMs, rateLimitPauseMs, readPreviewFixture, slotAfterBar } from '@/lib/preview-map.mjs'
 import { adaptPreview, groupsFixtureBody, includeUnverifiedFixture, readNotifyIntent, storeNotifyIntent, type PreviewGroups, type ReadFailure, type UnverifiedProgram, type VerifiedOffer } from '@/lib/preview-groups.mjs'
 import { useLocale } from '@/i18n'
-import type { ErrorCopy } from '@/i18n/messages'
+import type { ErrorCopy, ShowcaseId } from '@/i18n/messages'
+import { PlatformPostFrame, platformFromHostname } from '@/components/platform-frames'
 
 // Signed-out preview. The URL stays in the field. previewFixture skips the network.
 type Phase = 'idle' | 'loading' | 'ready' | 'unread' | 'error'
@@ -106,19 +107,20 @@ function SuggestedCard({ program }: { program: UnverifiedProgram }) {
   )
 }
 
-function PostCard({ preview }: { preview: PreviewGroups }) {
+function PostCard({ preview, platform }: { preview: PreviewGroups; platform: ShowcaseId }) {
   const { t } = useLocale()
   const suggestion = preview.suggestion
+  const mock = {
+    author: preview.author || t.preview.postFallback,
+    handle: '',
+    title: preview.title,
+    body: preview.excerpt || '',
+    offer: suggestion?.line || preview.title,
+    meta: suggestion?.note || '',
+  }
   return (
-    <article className="mt-3 rounded-xl border border-line bg-s0 p-4" aria-label={t.preview.ariaLabel}>
-      <p className="text-[13px] font-semibold text-t1">{preview.author || t.preview.postFallback}</p>
-      <p className="mt-1 text-[15px] leading-relaxed text-t1">{preview.excerpt || preview.title}</p>
-      {suggestion && (
-        <p className="mt-3 text-[15px] leading-relaxed">
-          <mark className="post-hi">{suggestion.line}</mark>
-        </p>
-      )}
-      {suggestion?.note && <p className="mt-2 text-[12px] text-t2">{suggestion.note}</p>}
+    <article className="mt-3" aria-label={t.preview.ariaLabel}>
+      <PlatformPostFrame platform={platform} mock={mock} tag={t.preview.sponsored} />
     </article>
   )
 }
@@ -179,6 +181,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
   const ticket = useRef(0)
   const flight = useRef<AbortController | null>(null)
   const [url, setUrl] = useState('')
+  const [platform, setPlatform] = useState<ShowcaseId>('blog')
   const [phase, setPhase] = useState<Phase>('idle')
   const [preview, setPreview] = useState<PreviewGroups | null>(null)
   const [errorCode, setErrorCode] = useState<number | null>(null)
@@ -224,6 +227,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
       return
     }
     stopFlight()
+    setPlatform(platformFromHostname(parsedUrl.hostname))
     const mine = ticket.current
     const controller = new AbortController()
     flight.current = controller
@@ -313,7 +317,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
             <button type="button" onClick={tryAnother} className={`${outlineClass} mt-4`}>{t.preview.tryAnother}</button>
           </div>
         )}
-        {phase === 'ready' && preview && <PostCard preview={preview} />}
+        {phase === 'ready' && preview && <PostCard preview={preview} platform={platform} />}
         {phase === 'ready' && preview?.kind === 'groups' && <GroupsView preview={preview} approveHref={approveHref} statusId={id} titleLevel={titleLevel} />}
         {phase === 'ready' && preview?.kind === 'closest' && (
           <div>

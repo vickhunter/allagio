@@ -6,6 +6,7 @@ import { BorderBeam } from '@/components/ui/border-beam'
 import { RetroGrid } from '@/components/ui/retro-grid'
 import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, LayoutTemplate, Receipt, Calculator, XCircle, Zap } from 'lucide-react'
 import { PostPreview } from '@/components/PostPreview'
+import { PlatformShowcase } from '@/components/PlatformShowcase'
 import { ConnectionCard, Hero } from '@/components/hero-2'
 import { Why } from './Why'
 import { FeatureSection } from '@/components/feature-3'
@@ -159,11 +160,19 @@ export function App() {
 
       <section id="post-preview" aria-labelledby="preview-h" className="relative overflow-hidden border-t border-line bg-s2/50">
         <RetroGrid aria-hidden="true" className="opacity-100" opacity={0.3} lightLineColor="rgb(63 92 53)" />
-        <div className="relative mx-auto max-w-3xl px-5 py-16 md:py-20">
+        <div className="relative mx-auto max-w-6xl px-5 py-16 md:py-20">
           <p className="kicker">{t.previewSection.kicker}</p>
           <h2 id="preview-h" className="h-display mt-3 text-3xl">{t.previewSection.heading}</h2>
-          <p className="mt-4 text-lg leading-relaxed text-t2">{t.previewSection.lead}</p>
-          <div className="mt-8">
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">{t.previewSection.lead}</p>
+          <div className="mt-10">
+            <PlatformShowcase />
+          </div>
+          <div className="mt-12 flex items-center gap-4">
+            <span className="h-px flex-1 bg-line" aria-hidden="true" />
+            <span className="text-[13px] font-semibold uppercase tracking-[0.12em] text-t2">{t.previewSection.tryLabel}</span>
+            <span className="h-px flex-1 bg-line" aria-hidden="true" />
+          </div>
+          <div className="mx-auto mt-8 max-w-3xl">
             <PostPreview />
           </div>
         </div>
