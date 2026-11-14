@@ -11,7 +11,7 @@ export type ErrorCopy = { message: string; next: string }
 export type NamedNote = { name: string; note: string }
 
 export type ShowcaseId = 'x' | 'pinterest' | 'instagram' | 'tiktok' | 'youtube' | 'newsletter' | 'blog' | 'podcast'
-export type ShowcaseMock = { author: string; handle: string; title: string; body: string; offer: string; meta: string }
+export type ShowcaseMock = { author: string; handle: string; title: string; body: string; offer: string; meta: string; link?: { title: string; domain: string } }
 export type ShowcasePlatform = {
   id: ShowcaseId
   name: string

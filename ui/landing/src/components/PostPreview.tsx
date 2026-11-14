@@ -301,7 +301,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
         <p id={`${id}-public`} className="text-[13px] leading-relaxed text-t2">{t.preview.publicNote}</p>
         <button type="submit" disabled={phase === 'loading' || paused} aria-busy={phase === 'loading'} className={outlineClass}>{t.preview.submit}</button>
       </form>
-      <div id={`${id}-status`} role="status" aria-live="polite" aria-atomic="true" aria-busy={phase === 'loading'} className="mt-4 min-h-8 break-words text-[15px] leading-relaxed text-t1">
+      <div id={`${id}-status`} role="status" aria-live="polite" aria-atomic="true" aria-busy={phase === 'loading'} className="mt-4 break-words text-[15px] leading-relaxed text-t1 empty:mt-0">
         {phase === 'loading' && <p>{t.preview.loading}</p>}
         {phase === 'error' && copy && (
           <div>

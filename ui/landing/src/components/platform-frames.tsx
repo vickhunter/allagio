@@ -55,6 +55,15 @@ function XFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
         <span className="ml-auto font-display text-lg font-bold text-t1" aria-hidden="true">𝕏</span>
       </div>
       <p className="mt-3 text-[15px] leading-relaxed text-t1">{mock.body}</p>
+      {mock.link && (
+        <div className="mt-3 overflow-hidden rounded-xl border border-line" aria-hidden="true">
+          <div className="h-24 bg-linear-to-r from-setup/70 via-pub/60 to-amber-300/70" />
+          <div className="bg-s1 p-2.5">
+            <p className="truncate text-xs font-semibold text-t1">{mock.link.title}</p>
+            <p className="mt-0.5 truncate text-xs text-t2">{mock.link.domain}</p>
+          </div>
+        </div>
+      )}
       <OfferBlock line={mock.offer} tag={tag} />
       <div className="mt-3 flex items-center justify-between text-t2" aria-hidden="true">
         <MessageCircle className="h-4 w-4" />
@@ -124,7 +133,7 @@ function TikTokFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
         <Bookmark className="h-6 w-6" />
         <Share2 className="h-6 w-6" />
       </div>
-      <div className="absolute bottom-0 left-0 right-0 p-3">
+      <div className="absolute bottom-0 left-0 right-0 p-3 pr-12">
         <p className="text-sm font-semibold text-white">@{mock.author}</p>
         <p className="mt-1 text-[13px] leading-snug text-white/90">{mock.body}</p>
         <OfferBlock line={mock.offer} tag={tag} dark />
@@ -174,6 +183,10 @@ function NewsletterFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
       <div className="p-4">
         <p className="font-display text-lg font-bold leading-snug text-t1">{mock.title}</p>
         <p className="mt-2 text-sm leading-relaxed text-t1">{mock.body}</p>
+        <div className="mt-3 grid gap-2" aria-hidden="true">
+          <div className="h-2 w-full rounded-full bg-s2" />
+          <div className="h-2 w-3/4 rounded-full bg-s2" />
+        </div>
         <OfferBlock line={mock.offer} tag={tag} />
         <p className="mt-3 border-t border-line pt-2 text-xs text-t2">{mock.meta}</p>
       </div>
@@ -183,14 +196,21 @@ function NewsletterFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
 
 function BlogFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-s0 p-5">
-      <p className="text-xs text-t2">{mock.author}{mock.meta ? ` · ${mock.meta}` : ''}</p>
-      <p className="mt-1 font-display text-xl font-bold leading-snug text-t1">{mock.title}</p>
-      <p className="mt-3 text-[15px] leading-relaxed text-t1">{mock.body}</p>
-      <OfferBlock line={mock.offer} tag={tag} />
-      <div className="mt-4 grid gap-2" aria-hidden="true">
-        <div className="h-2.5 w-full rounded-full bg-s2" />
-        <div className="h-2.5 w-4/5 rounded-full bg-s2" />
+    <div className="overflow-hidden rounded-2xl border border-line bg-s0">
+      <div className="relative h-28 bg-linear-to-r from-s2 via-pub-soft to-setup-soft" aria-hidden="true">
+        <div className="absolute left-5 top-1/2 h-10 w-16 -translate-y-1/2 rounded-lg bg-s1/80 shadow-sm" />
+        <div className="absolute right-8 top-1/2 h-14 w-14 -translate-y-1/2 rounded-full bg-pub/30" />
+      </div>
+      <div className="p-5">
+        <p className="text-xs text-t2">{mock.author}{mock.meta ? ` · ${mock.meta}` : ''}</p>
+        <p className="mt-1 font-display text-xl font-bold leading-snug text-t1">{mock.title}</p>
+        <p className="mt-3 text-[15px] leading-relaxed text-t1">{mock.body}</p>
+        <OfferBlock line={mock.offer} tag={tag} />
+        <div className="mt-4 grid gap-2" aria-hidden="true">
+          <div className="h-2.5 w-full rounded-full bg-s2" />
+          <div className="h-2.5 w-11/12 rounded-full bg-s2" />
+          <div className="h-2.5 w-4/5 rounded-full bg-s2" />
+        </div>
       </div>
     </div>
   )

@@ -221,6 +221,7 @@ export const en: Messages = {
           body: 'Shipped the new CI pipeline today. Build time went from 14 minutes to 4 — the trick was caching the dependency graph.',
           offer: 'Sponsored · Acme Deploy — deploy previews in one click, from $0',
           meta: '',
+          link: { title: 'Caching the dependency graph — a field guide', domain: 'acme.dev' },
         },
       },
       {

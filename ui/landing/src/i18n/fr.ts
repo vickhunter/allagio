@@ -237,6 +237,7 @@ export const fr: Messages = {
           body: 'Nouveau pipeline CI livré aujourd’hui. Le build est passé de 14 minutes à 4 — le secret : mettre en cache le graphe de dépendances.',
           offer: 'Sponsorisé · Acme Deploy — des previews de déploiement en un clic, dès $0',
           meta: '',
+          link: { title: 'Mettre en cache le graphe de dépendances — guide pratique', domain: 'acme.dev' },
         },
       },
       {

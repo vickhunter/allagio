@@ -237,6 +237,7 @@ export const es: Messages = {
           body: 'Lancé el nuevo pipeline de CI hoy. El build pasó de 14 minutos a 4 — el truco fue cachear el grafo de dependencias.',
           offer: 'Patrocinado · Acme Deploy — previews de deploy en un clic, desde $0',
           meta: '',
+          link: { title: 'Cacheando el grafo de dependencias — guía práctica', domain: 'acme.dev' },
         },
       },
       {

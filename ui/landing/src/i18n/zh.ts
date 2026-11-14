@@ -237,6 +237,7 @@ export const zh: Messages = {
           body: '今天上线了新的 CI 流水线。构建时间从 14 分钟降到 4 分钟——秘诀是缓存依赖图。',
           offer: '赞助 · Acme Deploy —— 一键部署预览，$0 起',
           meta: '',
+          link: { title: '缓存依赖图——实战指南', domain: 'acme.dev' },
         },
       },
       {

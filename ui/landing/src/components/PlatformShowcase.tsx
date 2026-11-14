@@ -171,8 +171,10 @@ export function PlatformShowcase() {
             transition={{ duration: 0.3 }}
             className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]"
           >
-            <div className="relative overflow-hidden rounded-2xl border border-line bg-s1 p-4 shadow-sm sm:p-5">
-              <PlatformPostFrame platform={platform.id} mock={platform.mock} tag={t.showcase.exampleTag} />
+            <div className="relative flex flex-col justify-center overflow-hidden rounded-2xl border border-line bg-s1 p-4 shadow-sm [background-image:radial-gradient(circle,rgb(var(--rgb-line))_1px,transparent_1px)] [background-size:18px_18px] sm:p-6">
+              <div className="w-full rounded-2xl">
+                <PlatformPostFrame platform={platform.id} mock={platform.mock} tag={t.showcase.exampleTag} />
+              </div>
               <BorderBeam size={140} duration={8} borderWidth={1.5} />
             </div>
             <DealPanel platform={platform} />
