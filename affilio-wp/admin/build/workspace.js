@@ -366,7 +366,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         // showing false empty bars there.
         const days = Math.min(30, Math.max(1, Math.ceil((today - Math.min(...stamps)) / 864e5) + 1));
         const buckets = Array(days).fill(0);
-        stamps.forEach(t => { const i = Math.min(days - 1, Math.max(0, days - 1 - Math.floor((today - t) / 864e5))); buckets[i]++; });
+        stamps.forEach(t => { const i = Math.min(days - 1, days - 1 - Math.floor((today - t) / 864e5)); if (i >= 0) buckets[i]++; });
         const max = Math.max(1, ...buckets);
         const bw = 100 / days;
         const bars = buckets.map((n, i) => {
