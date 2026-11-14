@@ -172,10 +172,18 @@ const setupShell = `<div id="static-landing">
 
 const hideShellWhenJs = '<style>@media (scripting:enabled){#static-landing{display:none}}</style>'
 
+// Crawlers and agents read the no-JS shell only — without this nav they never
+// reach /privacy, /terms or the docs, which also fails the readiness markers.
+const shellFooter = `<footer><nav aria-label="Site"><a href="/makers/">Makers</a> <a href="/publishers/">Publishers</a> <a href="/protocol/">Protocol</a> <a href="/agents">Agents</a> <a href="/use-cases/">Use cases</a> <a href="/llms.txt">llms.txt</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a></nav></footer>`
+
 function stamp(file, fallback = shell) {
   let html = readFileSync(file, 'utf8')
   if (!html.includes('name="or-install"')) html = html.replace('</head>', `    ${meta}\n    ${hideShellWhenJs}\n  </head>`)
-  if (!html.includes('id="static-landing"')) html = html.replace('<div id="root"></div>', `${fallback}\n    <div id="root"></div>`)
+  if (!html.includes('id="static-landing"')) {
+    const cut = fallback.lastIndexOf('</div>')
+    const body = cut === -1 ? fallback : fallback.slice(0, cut) + shellFooter + '\n  ' + fallback.slice(cut)
+    html = html.replace('<div id="root"></div>', `${body}\n    <div id="root"></div>`)
+  }
   return html
 }
 
