@@ -1,0 +1,42 @@
+{
+  "name": "Allagio",
+  "short_name": "Allagio",
+  "description": "The Open Rails Protocol for agents",
+  "icons": [
+    {
+      "src": "/landing-v9/brand/favicon-16.png",
+      "sizes": "16x16",
+      "type": "image/png"
+    },
+    {
+      "src": "/landing-v9/brand/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/landing-v9/brand/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/landing-v9/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/landing-v9/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/landing-v9/brand/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "theme_color": "#F7F7EF",
+  "background_color": "#F7F7EF",
+  "display": "standalone",
+  "start_url": "/"
+}

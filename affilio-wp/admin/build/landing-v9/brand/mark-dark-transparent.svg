@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Allagio">
+  <defs><mask id="gap"><rect width="32" height="32" fill="#fff"/><circle cx="17.2" cy="16" r="5.0" fill="#000"/></mask></defs>
+  <g mask="url(#gap)" fill="none" stroke="#F7F7EF" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2.4 9.6 C 8.8 9.6 11.6 9.6 14.8 15.2" stroke-width="3.6"/>
+    <path d="M2.4 22.4 C 8.8 22.4 11.6 22.4 14.8 16.8" stroke-width="3.6"/>
+    <path d="M14.2 16 H 29.4" stroke-width="3.8"/>
+  </g>
+  <circle cx="17.2" cy="16" r="4.15" fill="#D85A42"/>
+</svg>
