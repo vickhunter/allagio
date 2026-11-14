@@ -30,5 +30,6 @@ Message rules for that walk: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 - [Settlement boundary]({{PUBLIC_BASE_URL}}/docs/settlement.md): ORP records obligations and payouts; a payment rail moves the money
 - [Use cases]({{PUBLIC_BASE_URL}}/use-cases.md): affiliate marketing, partnerships, cross-selling, monetization, social, newsletters, link exchanges, sponsorships
 - [Reference]({{PUBLIC_BASE_URL}}/reference.md): ORP endpoints, MCP tools, auth, request/response examples, errors
+- [OpenAPI]({{PUBLIC_BASE_URL}}/openapi.json): OpenAPI 3.1 for the whole HTTP surface
 
 Full text: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)

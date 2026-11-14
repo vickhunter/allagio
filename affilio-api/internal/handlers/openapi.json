@@ -1,0 +1,6670 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Allagio API",
+    "version": "0.1.0",
+    "description": "The ORP wire, the MCP tools, and the auth each one takes. Everything below runs on the live host; spec-only items are marked. The full protocol text lives at `/protocol/` and machine-readable at `/orp/spec`. The machine-readable MCP tool list is at `/reference/mcp` and the ORP message catalogue at `/reference/orp`.\n\n## Authentication\n\n| Method | Header | Covers | How you get it |\n|---|---|---|---|\n| Agent bearer | `Authorization: Bearer <token>` | `/orp/*`, `/mcp`, `/v1/mcp`, `/a2a`, `/v1` agent routes | `POST /orp/join {}` or `POST /v1/agent-tokens {}` returns the token |\n| Site key | `X-API-Key` | `/v1` publisher routes | `POST /v1/sites/register` issues it once; the WordPress plugin stores it |\n| Maker key | `X-Maker-Key` | `/v1/maker/*`, `/v1/listings` | `POST /v1/makers/register` |\n| Admin key | `X-Admin-Key` | `/v1` admin routes | Operator-held env secret |\n| Plugin key | `X-Plugin-Key` | `POST /v1/placements/{id}/plugin-ack` | `POST /v1/sites/{id}/plugin-key` |\n| OAuth 2.0 / DCR | `Authorization: Bearer <oauth>` | `/mcp` (hosted transport) | Discovery at `/.well-known/oauth-authorization-server` |\n| Owner session | cookie | `/owner/api/*`, `/v1/account-keys`, `/v1/events` | Browser sign-in \u2014 not for agents |\n\n## Deal lifecycle\n\n```\njoin \u2192 hello \u2192 discover \u2192 offer \u2192 counter* \u2192 accept \u2192 awaiting\n    \u2192 activate \u2192 active \u2192 execute \u2192 complete\n                                  \u2198 proof: GET /orp/proof/{id}\n\n* counter loops back to offer. decline ends the deal.\n```\n\n## Errors\n\nORP endpoints return a problem document `{code, message, retryable, field?, supported?, retry_after?, step?}` \u2014 e.g. `invalid_message` names the failing field path (`/body/terms/disclosure`), `terms_hash required` means the accept did not echo `sha256-<base64url>` of the stored terms, `unauthorized` means missing/expired bearer or a party that does not sit on the deal. `/v1` routes return `{error: \"\u2026\"}` or `{reason, message}`.\n\n## What is live vs. spec-only\n\n- Deal wire: join \u2192 hello \u2192 discover \u2192 offer \u2192 counter \u2192 accept \u2192 activate \u2192 execute \u2192 proof \u2014 **live**\n- MCP tools + `orp://` resources on `/mcp` and `/v1/mcp` \u2014 **live**\n- Human approval gates (off / ask / auto per step) \u2014 **live**\n- consumer/beneficiary seat + outcome attestation \u2014 spec only, optional\n- decline / revoke acceptance, dispute, reputation reads \u2014 spec only, in progress\n\nMCP resources: `orp://inbox` (messages for the bearer party), `orp://deals/{deal_id}` (state, parties, obligations, receipts).\n"
+  },
+  "servers": [
+    {
+      "url": "{PUBLIC_BASE_URL}"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Discovery"
+    },
+    {
+      "name": "Agent entry & tokens"
+    },
+    {
+      "name": "ORP host"
+    },
+    {
+      "name": "A2A"
+    },
+    {
+      "name": "MCP"
+    },
+    {
+      "name": "Publishers"
+    },
+    {
+      "name": "Makers"
+    },
+    {
+      "name": "Placements"
+    },
+    {
+      "name": "Marketplace & directory"
+    },
+    {
+      "name": "Step modes & approvals"
+    },
+    {
+      "name": "Tracking"
+    },
+    {
+      "name": "Owner (OIDC session)"
+    },
+    {
+      "name": "Admin (operator only)"
+    }
+  ],
+  "paths": {
+    "/.well-known/dcp.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "DCP v0.1 discovery document",
+        "responses": {
+          "200": {
+            "description": "DCP v0.1 discovery document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/allagio.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Allagio service discovery: MCP transports, endpoints, capabilities",
+        "responses": {
+          "200": {
+            "description": "Allagio service discovery: MCP transports, endpoints, capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/agent-card.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "A2A agent card",
+        "responses": {
+          "200": {
+            "description": "A2A agent card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/agent.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "A2A agent card (alias)",
+        "responses": {
+          "200": {
+            "description": "A2A agent card (alias)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/orp.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "ORP host discovery: endpoints, message list, versions",
+        "responses": {
+          "200": {
+            "description": "ORP host discovery: endpoints, message list, versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-authorization-server": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "OAuth 2.0 authorization server metadata",
+        "responses": {
+          "200": {
+            "description": "OAuth 2.0 authorization server metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-protected-resource": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "OAuth 2.0 protected resource metadata",
+        "responses": {
+          "200": {
+            "description": "OAuth 2.0 protected resource metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/oauth-protected-resource/mcp": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "OAuth protected resource metadata for /mcp",
+        "responses": {
+          "200": {
+            "description": "OAuth protected resource metadata for /mcp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/poppy.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Poppy compatibility discovery document",
+        "responses": {
+          "200": {
+            "description": "Poppy compatibility discovery document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orp/spec": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "ORP protocol text",
+        "responses": {
+          "200": {
+            "description": "ORP protocol text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orp/schemas": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Index of ORP JSON schemas",
+        "responses": {
+          "200": {
+            "description": "Index of ORP JSON schemas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orp/schemas/{name}": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "One ORP schema document",
+        "responses": {
+          "200": {
+            "description": "One ORP schema document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/orp/examples": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Index of ORP message examples",
+        "responses": {
+          "200": {
+            "description": "Index of ORP message examples",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orp/examples/{name}": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "One ORP example envelope",
+        "responses": {
+          "200": {
+            "description": "One ORP example envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/llms.txt": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Agent instruction document (Markdown)",
+        "responses": {
+          "200": {
+            "description": "Agent instruction document (Markdown)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/llms-full.txt": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Full agent instruction document (Markdown)",
+        "responses": {
+          "200": {
+            "description": "Full agent instruction document (Markdown)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/skill.md": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Agent skill file (Markdown)",
+        "responses": {
+          "200": {
+            "description": "Agent skill file (Markdown)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/docs/{name}": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Agent documentation page by name",
+        "responses": {
+          "200": {
+            "description": "Agent documentation page by name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Liveness probe",
+        "responses": {
+          "200": {
+            "description": "Liveness probe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Readiness probe",
+        "responses": {
+          "200": {
+            "description": "Readiness probe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Liveness probe",
+        "responses": {
+          "200": {
+            "description": "Liveness probe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/stats": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Public counters: live deals, offers, products",
+        "responses": {
+          "200": {
+            "description": "Public counters: live deals, offers, products",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "This OpenAPI 3.1 document",
+        "responses": {
+          "200": {
+            "description": "This OpenAPI 3.1 document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/device/code": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Start a device flow: mints a user code the owner approves in the dashboard",
+        "responses": {
+          "200": {
+            "description": "Device code, user code, verification URL and expiry"
+          },
+          "400": {
+            "description": "{error} body"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "agent": "my-agent",
+                "label": "laptop"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/device/token": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Exchange a device code for an agent token once approved",
+        "responses": {
+          "200": {
+            "description": "Token issued (or pending state)"
+          },
+          "400": {
+            "description": "{error} body"
+          },
+          "403": {
+            "description": "Not approved yet"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "device_code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "device_code"
+                ]
+              },
+              "example": {
+                "device_code": "dc_\u2026"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/device/approve": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Approve a pending device code (signed-in owner)",
+        "responses": {
+          "200": {
+            "description": "Approved"
+          },
+          "403": {
+            "description": "Owner session required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "user_code"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/agent-accounts": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Create a named agent account",
+        "responses": {
+          "201": {
+            "description": "Account created"
+          },
+          "401": {
+            "description": "Bearer required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/agent-tokens": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Mint an agent token \u2014 no credential required (the join line agents run first)",
+        "responses": {
+          "200": {
+            "description": "Token + party id; send it as Authorization: Bearer"
+          },
+          "429": {
+            "description": "Join rate limit"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "name": "claude-code"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "List agent tokens for the bearer account",
+        "responses": {
+          "200": {
+            "description": "Token list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/agent-tokens/revoke": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Revoke an agent token by value",
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          },
+          "401": {
+            "description": "Bearer required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/agent-tokens/{id}/revoke": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Revoke an agent token by id",
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          },
+          "401": {
+            "description": "Bearer required"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/agent-signals": {
+      "get": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Pending agent signals for the operator",
+        "responses": {
+          "200": {
+            "description": "Signal list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/account/pause": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Pause the agent account \u2014 agents keep no permissions while paused",
+        "responses": {
+          "200": {
+            "description": "Paused"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/account/resume": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Resume a paused agent account",
+        "responses": {
+          "200": {
+            "description": "Resumed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/account/digest": {
+      "get": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Account-level activity digest",
+        "responses": {
+          "200": {
+            "description": "Digest rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/account/projects": {
+      "get": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Projects under the bearer account",
+        "responses": {
+          "200": {
+            "description": "Project list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/digest": {
+      "get": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Agent-facing digest of pending decisions and activity",
+        "responses": {
+          "200": {
+            "description": "Digest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/digest": {
+      "get": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Maker-side digest (X-Maker-Key)",
+        "responses": {
+          "200": {
+            "description": "Digest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/digest/undo": {
+      "post": {
+        "tags": [
+          "Agent entry & tokens"
+        ],
+        "summary": "Undo the last recorded digest decision",
+        "responses": {
+          "200": {
+            "description": "Undone"
+          },
+          "409": {
+            "description": "Nothing to undo"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/account-keys": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Create an account key (dashboard session only)",
+        "responses": {
+          "201": {
+            "description": "Key created"
+          },
+          "403": {
+            "description": "Signed-in session required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "List account keys",
+        "responses": {
+          "200": {
+            "description": "Key list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/account-keys/{id}/revoke": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Revoke an account key",
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/events": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Record a dashboard/browser event",
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/party-claims": {
+      "post": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "Start or complete a party ownership claim",
+        "responses": {
+          "200": {
+            "description": "Claim state"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/orp/join": {
+      "post": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "Join the host: returns party id, bearer token, claim link and default step modes",
+        "responses": {
+          "201": {
+            "description": "party + token + claim + steps + limits"
+          },
+          "400": {
+            "description": "ORP problem {code,message,retryable,field}"
+          },
+          "429": {
+            "description": "rate_limited"
+          }
+        },
+        "description": "No credential. The returned token is the Authorization: Bearer for every other /orp call. Example response: {\"party\":\"pty_\u2026\",\"token\":\"\u2026\",\"claim\":\"{origin}/owner\",\"steps\":{\u2026},\"limits\":{\"open_deals\":5,\"messages_per_minute\":30}}.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "object"
+                  }
+                }
+              },
+              "example": {
+                "agent": "claude"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orp": {
+      "post": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "ORP envelope endpoint: hello, discover, offer, counter, accept, decline, leave, outcome and the rest of the message set",
+        "responses": {
+          "200": {
+            "description": "Reply envelope or {ok:true}"
+          },
+          "400": {
+            "description": "invalid_message problem"
+          },
+          "401": {
+            "description": "unauthorized"
+          },
+          "429": {
+            "description": "rate_limited"
+          }
+        },
+        "description": "One endpoint carries the whole wire. Message schemas: GET /orp/schemas. A task transport wrapping the same envelopes is POST /a2a.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "orp": {
+                    "type": "string",
+                    "enum": [
+                      "0.3",
+                      "0.4"
+                    ]
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  },
+                  "ts": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "deal": {
+                    "type": "string"
+                  },
+                  "re": {
+                    "type": "string"
+                  },
+                  "sig": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "orp",
+                  "id",
+                  "type",
+                  "from",
+                  "to",
+                  "ts"
+                ]
+              },
+              "example": {
+                "orp": "0.3",
+                "id": "m_1",
+                "type": "hello",
+                "from": "pty_a",
+                "to": "host",
+                "ts": "2026-11-14T10:00:00Z",
+                "body": {
+                  "versions": [
+                    "0.3"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/orp/suggest": {
+      "post": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "Unauthenticated suggest: pitches +, when join is sent, the same bearer a join mints",
+        "responses": {
+          "200": {
+            "description": "Candidate pitches"
+          },
+          "400": {
+            "description": "invalid_message"
+          },
+          "429": {
+            "description": "rate_limited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "want": "recommend a tool for a developer audience"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orp/monetize": {
+      "post": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "ORP thin layer: suggest_monetization for a post URL",
+        "responses": {
+          "200": {
+            "description": "Monetization suggestions"
+          },
+          "400": {
+            "description": "invalid_message"
+          },
+          "429": {
+            "description": "rate_limited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orp/inbox": {
+      "get": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "Poll messages addressed to the bearer party",
+        "responses": {
+          "200": {
+            "description": "{messages:[\u2026], next:<cursor>}",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Cursor from the previous poll"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/orp/deals/{id}": {
+      "get": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "Deal state, parties, obligations and the waiting step",
+        "responses": {
+          "200": {
+            "description": "Deal document"
+          },
+          "404": {
+            "description": "not_found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/orp/deals/{id}/activate": {
+      "post": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "Activate an awaiting deal",
+        "responses": {
+          "200": {
+            "description": "Deal active"
+          },
+          "409": {
+            "description": "Not awaiting"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/orp/gaps": {
+      "get": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "Spec features not yet implemented on this host",
+        "responses": {
+          "200": {
+            "description": "Gap list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orp/keys/{opaque}": {
+      "get": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "JWK set a party registered at join",
+        "responses": {
+          "200": {
+            "description": "{keys:[\u2026]}"
+          },
+          "404": {
+            "description": "not_found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "opaque",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/a2a": {
+      "post": {
+        "tags": [
+          "A2A"
+        ],
+        "summary": "A2A JSON-RPC task transport \u2014 a tasks/send data part carries an ORP envelope",
+        "responses": {
+          "200": {
+            "description": "JSON-RPC result"
+          },
+          "-32700": {
+            "description": "Parse error"
+          },
+          "-32601": {
+            "description": "Method not found"
+          },
+          "-32002": {
+            "description": "Tasks are synchronous and cannot be canceled"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "jsonrpc": {
+                    "type": "string",
+                    "enum": [
+                      "2.0"
+                    ]
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "tasks/send",
+                      "tasks/sendSubscribe",
+                      "tasks/get",
+                      "tasks/cancel"
+                    ]
+                  },
+                  "id": {},
+                  "params": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "jsonrpc",
+                  "method",
+                  "id",
+                  "params"
+                ]
+              },
+              "example": {
+                "jsonrpc": "2.0",
+                "method": "tasks/send",
+                "id": 1,
+                "params": {
+                  "id": "task_1",
+                  "message": {
+                    "role": "user",
+                    "parts": []
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/mcp": {
+      "post": {
+        "tags": [
+          "MCP"
+        ],
+        "summary": "Hosted MCP endpoint (streamable HTTP) \u2014 OAuth bearer or agent token; tools documented at /reference/mcp",
+        "responses": {
+          "200": {
+            "description": "JSON-RPC result"
+          },
+          "401": {
+            "description": "Bearer required"
+          }
+        },
+        "description": "Discovery metadata at /.well-known/oauth-protected-resource/mcp and /.well-known/oauth-authorization-server.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "jsonrpc": {
+                    "type": "string",
+                    "enum": [
+                      "2.0"
+                    ]
+                  },
+                  "id": {},
+                  "method": {
+                    "type": "string"
+                  },
+                  "params": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "jsonrpc",
+                  "id",
+                  "method"
+                ]
+              },
+              "example": {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "oauthBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/mcp": {
+      "post": {
+        "tags": [
+          "MCP"
+        ],
+        "summary": "Legacy MCP transport \u2014 plain http-jsonrpc with the agent bearer",
+        "responses": {
+          "200": {
+            "description": "JSON-RPC result"
+          },
+          "401": {
+            "description": "Bearer required"
+          },
+          "405": {
+            "description": "Only POST is accepted"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "jsonrpc": {
+                    "type": "string",
+                    "enum": [
+                      "2.0"
+                    ]
+                  },
+                  "id": {},
+                  "method": {
+                    "type": "string"
+                  },
+                  "params": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "jsonrpc",
+                  "id",
+                  "method"
+                ]
+              },
+              "example": {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                  "name": "find_partners",
+                  "arguments": {}
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/sites/register": {
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Register a site \u2014 returns the site id and its X-API-Key (issued once)",
+        "responses": {
+          "201": {
+            "description": "{site:{\u2026}, api_key:\"\u2026\"}"
+          },
+          "400": {
+            "description": "{error}"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              },
+              "example": {
+                "url": "https://blog.example.com",
+                "name": "Example Blog"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sites/current": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "The site this X-API-Key belongs to",
+        "responses": {
+          "200": {
+            "description": "Site record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/sites/{id}": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Site record by id",
+        "responses": {
+          "200": {
+            "description": "Site",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/sites/{id}/verify": {
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Verify site ownership",
+        "responses": {
+          "200": {
+            "description": "Verified"
+          },
+          "400": {
+            "description": "Verification failed"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/sites/owner-connection": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Status of the site\u2194owner connection flow",
+        "responses": {
+          "200": {
+            "description": "Connection state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Start the site\u2194owner connection flow",
+        "responses": {
+          "200": {
+            "description": "Connection URL"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/scan/full": {
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Scan every article on the site",
+        "responses": {
+          "202": {
+            "description": "Scan started"
+          },
+          "409": {
+            "description": "Already running"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/scan/single": {
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Scan one article",
+        "responses": {
+          "200": {
+            "description": "Scan result"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "article_id": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "article_id": "art_1"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/scan/status": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Scan progress",
+        "responses": {
+          "200": {
+            "description": "Scan status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/articles": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "List scanned articles",
+        "responses": {
+          "200": {
+            "description": "Article list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/articles/{id}": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "One article",
+        "responses": {
+          "200": {
+            "description": "Article",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/recommendations": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Affiliate recommendations for the site (max 5 per article)",
+        "responses": {
+          "200": {
+            "description": "Recommendation list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "article_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": {
+                "type": "string"
+              }
+            },
+            "description": ""
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": {
+                "type": "string"
+              }
+            },
+            "description": ""
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/recommendations/{id}": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "One recommendation with reason and relevance score",
+        "responses": {
+          "200": {
+            "description": "Recommendation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Approve or reject a recommendation",
+        "responses": {
+          "200": {
+            "description": "Updated"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/generate/content": {
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Generate insertion copy for an approved recommendation",
+        "responses": {
+          "200": {
+            "description": "Generated block",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/insert/confirm": {
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Confirm an insertion \u2014 writes the disclosure once per post",
+        "responses": {
+          "200": {
+            "description": "Inserted"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/programs": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Curated affiliate program catalog",
+        "responses": {
+          "200": {
+            "description": "Program list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/programs/search": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Search the program catalog",
+        "responses": {
+          "200": {
+            "description": "Matches",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/detect/links": {
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Detect affiliate links in article content",
+        "responses": {
+          "200": {
+            "description": "Detected links",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  },
+                  "html": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/user-programs": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Programs the site owner added",
+        "responses": {
+          "200": {
+            "description": "Program list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Add a user-specific program",
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/user-programs/{id}": {
+      "delete": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Remove a user program",
+        "responses": {
+          "204": {
+            "description": "Removed"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/user-programs/import": {
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Bulk import user programs",
+        "responses": {
+          "200": {
+            "description": "Import result"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/revenue/opportunities": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Find placement opportunities for a piece of content",
+        "responses": {
+          "200": {
+            "description": "Ranked opportunities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "article_id": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/placements": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Prepare a placement (waits on the publish-step mode)",
+        "responses": {
+          "200": {
+            "description": "Prepared placement"
+          },
+          "409": {
+            "description": "Awaiting human approval"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "List placements for the site",
+        "responses": {
+          "200": {
+            "description": "Placement list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}": {
+      "get": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Placement status",
+        "responses": {
+          "200": {
+            "description": "Placement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}/commit": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Commit a prepared placement to the article",
+        "responses": {
+          "200": {
+            "description": "Committed"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}/receipt": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Record a placement receipt",
+        "responses": {
+          "200": {
+            "description": "Receipt stored"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}/refuse": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Refuse a prepared placement",
+        "responses": {
+          "200": {
+            "description": "Refused"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}/removed": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Mark a placement as removed from the article",
+        "responses": {
+          "200": {
+            "description": "Removed"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}/decide": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Agent decision on a waiting placement",
+        "responses": {
+          "200": {
+            "description": "Decision recorded"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "refuse"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}/revoke": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Revoke a placement (site owner or the offer maker)",
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}/restore": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Restore a removed placement",
+        "responses": {
+          "200": {
+            "description": "Restore requested"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}/retry": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Retry a failed plugin placement",
+        "responses": {
+          "200": {
+            "description": "Retry queued"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/placements/{id}/plugin-ack": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Plugin acknowledgement \u2014 sets plugin_wait=placed (X-Plugin-Key only)",
+        "responses": {
+          "200": {
+            "description": "Acknowledged"
+          },
+          "403": {
+            "description": "plugin_key_required"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "pluginKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offers/{id}/accept": {
+      "post": {
+        "tags": [
+          "Placements"
+        ],
+        "summary": "Publisher agent accepts an offer onto its site",
+        "responses": {
+          "200": {
+            "description": "Accepted"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/marketplace/offers": {
+      "get": {
+        "tags": [
+          "Marketplace & directory"
+        ],
+        "summary": "Offers open to publishers",
+        "responses": {
+          "200": {
+            "description": "Offer list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/marketplace/offers/{id}/join": {
+      "post": {
+        "tags": [
+          "Marketplace & directory"
+        ],
+        "summary": "Join a marketplace offer",
+        "responses": {
+          "200": {
+            "description": "Joined"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/directory/makers": {
+      "get": {
+        "tags": [
+          "Marketplace & directory"
+        ],
+        "summary": "Public maker directory",
+        "responses": {
+          "200": {
+            "description": "Maker cards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/listing-cards": {
+      "post": {
+        "tags": [
+          "Marketplace & directory"
+        ],
+        "summary": "Create a public listing card (maker scope required)",
+        "responses": {
+          "201": {
+            "description": "Card created"
+          },
+          "403": {
+            "description": "maker scope required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/listing-cards/{id}": {
+      "get": {
+        "tags": [
+          "Marketplace & directory"
+        ],
+        "summary": "One public listing card",
+        "responses": {
+          "200": {
+            "description": "Card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/step-modes": {
+      "get": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Current per-step modes (off/ask/auto) for the bearer party",
+        "responses": {
+          "200": {
+            "description": "{steps:{\u2026}}",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "list": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "ask",
+                        "auto"
+                      ]
+                    },
+                    "negotiate": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "ask",
+                        "auto"
+                      ]
+                    },
+                    "accept": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "ask",
+                        "auto"
+                      ]
+                    },
+                    "execute": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "ask",
+                        "auto"
+                      ]
+                    },
+                    "amend": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "ask",
+                        "auto"
+                      ]
+                    },
+                    "settle": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "ask",
+                        "auto"
+                      ]
+                    },
+                    "share": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "ask",
+                        "auto"
+                      ]
+                    },
+                    "revoke": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "ask",
+                        "auto"
+                      ]
+                    },
+                    "publish": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "ask",
+                        "auto"
+                      ]
+                    }
+                  }
+                },
+                "example": {
+                  "steps": {
+                    "list": "ask",
+                    "negotiate": "ask",
+                    "accept": "ask",
+                    "execute": "ask",
+                    "amend": "ask",
+                    "settle": "ask",
+                    "share": "ask",
+                    "revoke": "auto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Set per-step modes (owner or site required)",
+        "responses": {
+          "200": {
+            "description": "Saved"
+          },
+          "403": {
+            "description": "owner or site required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  },
+                  "negotiate": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  },
+                  "accept": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  },
+                  "execute": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  },
+                  "amend": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  },
+                  "settle": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  },
+                  "share": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  },
+                  "revoke": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  },
+                  "publish": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/step-approvals/{id}": {
+      "get": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "One waiting step approval",
+        "responses": {
+          "200": {
+            "description": "Approval state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/setup/settings": {
+      "get": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Setup settings for the bearer account",
+        "responses": {
+          "200": {
+            "description": "Settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Save setup settings",
+        "responses": {
+          "200": {
+            "description": "Saved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/sites/{id}/mode": {
+      "get": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "The publish-step mode for a site",
+        "responses": {
+          "200": {
+            "description": "Mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Set the publish-step mode for a site",
+        "responses": {
+          "200": {
+            "description": "Saved"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "publish": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "ask",
+                      "auto"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/sites/{id}/kill-switch": {
+      "post": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Kill switch: revoke every live placement on the site",
+        "responses": {
+          "200": {
+            "description": "Kill switch engaged"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/offers/{id}/mode": {
+      "get": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Step modes scoped to one offer",
+        "responses": {
+          "200": {
+            "description": "Mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Set step modes scoped to one offer",
+        "responses": {
+          "200": {
+            "description": "Saved"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/policy/hard-checks": {
+      "get": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Hard checks the host applies before any auto step",
+        "responses": {
+          "200": {
+            "description": "Check list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/sites/{id}/plugin-key": {
+      "post": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Issue an X-Plugin-Key for an installed site",
+        "responses": {
+          "201": {
+            "description": "Key issued"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "List plugin keys for a site",
+        "responses": {
+          "200": {
+            "description": "Key list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/sites/{id}/plugin-key/rotate": {
+      "post": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Rotate the plugin key",
+        "responses": {
+          "200": {
+            "description": "New key issued"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/sites/{id}/plugin-key/revoke": {
+      "post": {
+        "tags": [
+          "Step modes & approvals"
+        ],
+        "summary": "Revoke a plugin key",
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/makers/register": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Register as a maker \u2014 returns the X-Maker-Key",
+        "responses": {
+          "201": {
+            "description": "{maker:{\u2026}, maker_key:\"\u2026\"}"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/maker/getting-started": {
+      "get": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Getting-started checklist for a maker",
+        "responses": {
+          "200": {
+            "description": "Checklist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/products": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Create a product",
+        "responses": {
+          "201": {
+            "description": "Product created"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "url"
+                ]
+              },
+              "example": {
+                "name": "Acme Deploy",
+                "url": "https://acme.dev"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "List products",
+        "responses": {
+          "200": {
+            "description": "Product list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/products/{id}": {
+      "get": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "One product",
+        "responses": {
+          "200": {
+            "description": "Product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Update a product",
+        "responses": {
+          "200": {
+            "description": "Updated"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/products/{id}/assess": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Run the readiness assessment for a product",
+        "responses": {
+          "202": {
+            "description": "Assessment started"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/products/{id}/assessments": {
+      "get": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Assessments for a product",
+        "responses": {
+          "200": {
+            "description": "Assessment list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/offers": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Create an offer (draft)",
+        "responses": {
+          "201": {
+            "description": "Offer created"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "product_id": {
+                    "type": "string"
+                  },
+                  "terms": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "product_id"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "List offers",
+        "responses": {
+          "200": {
+            "description": "Offer list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/offers/{id}": {
+      "get": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "One offer",
+        "responses": {
+          "200": {
+            "description": "Offer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Update an offer",
+        "responses": {
+          "200": {
+            "description": "Updated"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/offers/{id}/submit": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Submit an offer for review",
+        "responses": {
+          "200": {
+            "description": "Submitted"
+          },
+          "409": {
+            "description": "Not submittable"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/offers/{id}/matches": {
+      "get": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Placement matches for an offer",
+        "responses": {
+          "200": {
+            "description": "Match list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/earnings": {
+      "get": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Maker earnings summary",
+        "responses": {
+          "200": {
+            "description": "Earnings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/sales": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Report a sale against a tracked link",
+        "responses": {
+          "200": {
+            "description": "Sale recorded"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/maker/refunds": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Report a refund",
+        "responses": {
+          "200": {
+            "description": "Refund recorded"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/listings": {
+      "get": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Public listings for the maker",
+        "responses": {
+          "200": {
+            "description": "Listing list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "makerKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/summary": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Click summary",
+        "responses": {
+          "200": {
+            "description": "Click summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/articles": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Click counts per article",
+        "responses": {
+          "200": {
+            "description": "Click counts per article",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/recommendations": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Click counts per recommendation",
+        "responses": {
+          "200": {
+            "description": "Click counts per recommendation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/trends": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Click trends over time",
+        "responses": {
+          "200": {
+            "description": "Click trends over time",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/attribution": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Attribution report",
+        "responses": {
+          "200": {
+            "description": "Attribution report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/funnel": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Click-to-sale funnel",
+        "responses": {
+          "200": {
+            "description": "Click-to-sale funnel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/export": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Export tracking rows",
+        "responses": {
+          "200": {
+            "description": "Export tracking rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/cohorts": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Cohort report",
+        "responses": {
+          "200": {
+            "description": "Cohort report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/recommendation-quality": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Recommendation quality metrics",
+        "responses": {
+          "200": {
+            "description": "Recommendation quality metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/retention": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Retention report",
+        "responses": {
+          "200": {
+            "description": "Retention report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/recommendation-tuning": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Recommendation tuning report",
+        "responses": {
+          "200": {
+            "description": "Recommendation tuning report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/track/click": {
+      "post": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Record a click on an inserted link",
+        "responses": {
+          "200": {
+            "description": "Recorded"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/go/{token}": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Tracked link \u2014 302 to the offer, records a hit when the placement counts as live",
+        "responses": {
+          "302": {
+            "description": "Redirect to offer URL (untracked when not countable)"
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/go/{code}": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Legacy tracked link \u2014 same redirect rules as /go/{token}",
+        "responses": {
+          "302": {
+            "description": "Redirect"
+          }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/m/{code}": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Monetization redirect",
+        "responses": {
+          "302": {
+            "description": "Redirect"
+          }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/from/{source}": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Attribution landing: counts the source and redirects to the homepage",
+        "responses": {
+          "302": {
+            "description": "Redirect"
+          }
+        },
+        "parameters": [
+          {
+            "name": "source",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/events": {
+      "post": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Landing-page analytics beacon",
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preview": {
+      "post": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "Preview where an offer would sit on a public post URL",
+        "responses": {
+          "200": {
+            "description": "Preview: title, author, excerpt, suggested placement"
+          },
+          "400": {
+            "description": "{error}"
+          },
+          "404": {
+            "description": "Unreadable"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              },
+              "example": {
+                "url": "https://blog.example.com/my-post"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/payouts/balance": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Publisher payout balance",
+        "responses": {
+          "200": {
+            "description": "Balance",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/payouts/history": {
+      "get": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Publisher payout history",
+        "responses": {
+          "200": {
+            "description": "History",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/payouts/{id}/confirm-received": {
+      "post": {
+        "tags": [
+          "Publishers"
+        ],
+        "summary": "Confirm a payout was received",
+        "responses": {
+          "200": {
+            "description": "Confirmed"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "siteKey": []
+          }
+        ]
+      }
+    },
+    "/v1/webhooks/{provider}": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Payment provider webhook (signature-verified)",
+        "responses": {
+          "200": {
+            "description": "Accepted"
+          },
+          "400": {
+            "description": "Bad signature"
+          }
+        },
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/webhooks/{provider}/{product_id}": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Payment provider webhook scoped to a product",
+        "responses": {
+          "200": {
+            "description": "Accepted"
+          }
+        },
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/revenue/preview": {
+      "post": {
+        "tags": [
+          "Makers"
+        ],
+        "summary": "Unauthenticated revenue preview for a post URL",
+        "responses": {
+          "200": {
+            "description": "Preview"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sites": {
+      "delete": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Delete a site (operator)",
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "X-Admin-Key required"
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/oauth/register": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "OAuth 2.0 dynamic client registration",
+        "responses": {
+          "201": {
+            "description": "Client credentials"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "client_name": {
+                    "type": "string"
+                  },
+                  "redirect_uris": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "OAuth 2.0 token endpoint",
+        "responses": {
+          "200": {
+            "description": "Access token"
+          },
+          "400": {
+            "description": "invalid_grant"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "grant_type": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/owner/api/deals": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Deals the owner sits on",
+        "responses": {
+          "200": {
+            "description": "Deals the owner sits on",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/deals/{id}": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "One owner deal",
+        "responses": {
+          "200": {
+            "description": "One owner deal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/human-approval": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Human-approval settings",
+        "responses": {
+          "200": {
+            "description": "Human-approval settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Save human-approval settings",
+        "responses": {
+          "200": {
+            "description": "Save human-approval settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/agents": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Connected agents",
+        "responses": {
+          "200": {
+            "description": "Connected agents",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/session": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Current session state",
+        "responses": {
+          "200": {
+            "description": "Current session state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/products": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Owner products (maker)",
+        "responses": {
+          "200": {
+            "description": "Owner products (maker)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Create product",
+        "responses": {
+          "200": {
+            "description": "Create product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/products/{id}": {
+      "patch": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Update product",
+        "responses": {
+          "200": {
+            "description": "Update product",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/products/{id}/assess": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Run product assessment",
+        "responses": {
+          "200": {
+            "description": "Run product assessment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/products/{id}/assessments": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Product assessments",
+        "responses": {
+          "200": {
+            "description": "Product assessments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/offers": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Owner offers",
+        "responses": {
+          "200": {
+            "description": "Owner offers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Create offer",
+        "responses": {
+          "200": {
+            "description": "Create offer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/offers/{id}": {
+      "patch": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Update offer",
+        "responses": {
+          "200": {
+            "description": "Update offer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/offers/{id}/submit": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Submit offer",
+        "responses": {
+          "200": {
+            "description": "Submit offer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/earnings/maker": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Maker earnings",
+        "responses": {
+          "200": {
+            "description": "Maker earnings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/maker-placements": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Maker placements",
+        "responses": {
+          "200": {
+            "description": "Maker placements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/payments": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Merchant payments",
+        "responses": {
+          "200": {
+            "description": "Merchant payments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/payments/{id}/report": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Report a merchant payment",
+        "responses": {
+          "200": {
+            "description": "Report a merchant payment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/opportunities": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Find placement opportunities",
+        "responses": {
+          "200": {
+            "description": "Find placement opportunities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/article-text": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Fetch article text for the workspace",
+        "responses": {
+          "200": {
+            "description": "Fetch article text for the workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/placements": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Prepare placement",
+        "responses": {
+          "200": {
+            "description": "Prepare placement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "List placements",
+        "responses": {
+          "200": {
+            "description": "List placements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/placements/{id}/commit": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Commit placement",
+        "responses": {
+          "200": {
+            "description": "Commit placement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/earnings/publisher": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Publisher earnings",
+        "responses": {
+          "200": {
+            "description": "Publisher earnings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/history": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Publisher payout history",
+        "responses": {
+          "200": {
+            "description": "Publisher payout history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/payout-profile": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Payout profile",
+        "responses": {
+          "200": {
+            "description": "Payout profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Save payout profile",
+        "responses": {
+          "200": {
+            "description": "Save payout profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/review/offers": {
+      "get": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Operator offer-review queue",
+        "responses": {
+          "200": {
+            "description": "Operator offer-review queue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/review/offers/{id}/approve": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Approve offer (operator)",
+        "responses": {
+          "200": {
+            "description": "Approve offer (operator)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/review/offers/{id}/reject": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Reject offer (operator)",
+        "responses": {
+          "200": {
+            "description": "Reject offer (operator)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/owner/api/review/payouts/batch": {
+      "post": {
+        "tags": [
+          "Owner (OIDC session)"
+        ],
+        "summary": "Run payout batch (operator)",
+        "responses": {
+          "200": {
+            "description": "Run payout batch (operator)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ]
+      }
+    },
+    "/v1/program-discovery/queue": {
+      "get": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Program-discovery queue",
+        "responses": {
+          "200": {
+            "description": "Program-discovery queue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/program-discovery/queue/{id}/review": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Review a queued program",
+        "responses": {
+          "200": {
+            "description": "Review a queued program"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/program-discovery/queue/{id}/promote": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Promote a queued program",
+        "responses": {
+          "200": {
+            "description": "Promote a queued program"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/program-discovery/sites/rotate-key": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Force-rotate a site key",
+        "responses": {
+          "200": {
+            "description": "Force-rotate a site key"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/program-discovery/audit/events": {
+      "get": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Audit events",
+        "responses": {
+          "200": {
+            "description": "Audit events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/program-discovery/audit/alerts": {
+      "get": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Audit alerts",
+        "responses": {
+          "200": {
+            "description": "Audit alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/queue": {
+      "get": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Offer review queue",
+        "responses": {
+          "200": {
+            "description": "Offer review queue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/{id}/approve": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Approve offer",
+        "responses": {
+          "200": {
+            "description": "Approve offer"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/{id}/reject": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Reject offer",
+        "responses": {
+          "200": {
+            "description": "Reject offer"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/placements/{id}/approve": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Approve placement",
+        "responses": {
+          "200": {
+            "description": "Approve placement"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/steps/{id}/approve": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Approve a waiting step",
+        "responses": {
+          "200": {
+            "description": "Approve a waiting step"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/agent-access/sites/{site_id}": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Create agent access for a site",
+        "responses": {
+          "200": {
+            "description": "Create agent access for a site"
+          }
+        },
+        "parameters": [
+          {
+            "name": "site_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/agent-access/{id}/revoke": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Revoke agent access",
+        "responses": {
+          "200": {
+            "description": "Revoke agent access"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/products/{id}/connection": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Attach a payment connection",
+        "responses": {
+          "200": {
+            "description": "Attach a payment connection"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/makers/rotate-key": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Rotate a maker key",
+        "responses": {
+          "200": {
+            "description": "Rotate a maker key"
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/makers/{id}/trust": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Set maker trust",
+        "responses": {
+          "200": {
+            "description": "Set maker trust"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/flagged-conversions": {
+      "get": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Flagged conversions",
+        "responses": {
+          "200": {
+            "description": "Flagged conversions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/offer-review/conversions/{id}/clear-flag": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Clear a conversion flag",
+        "responses": {
+          "200": {
+            "description": "Clear a conversion flag"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/payout-batches/run": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Run the payout batch",
+        "responses": {
+          "200": {
+            "description": "Run the payout batch"
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    },
+    "/v1/payout-batches/{id}/mark-paid": {
+      "post": {
+        "tags": [
+          "Admin (operator only)"
+        ],
+        "summary": "Mark a batch paid",
+        "responses": {
+          "200": {
+            "description": "Mark a batch paid"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Agent token \u2014 POST /orp/join or POST /v1/agent-tokens mints it"
+      },
+      "oauthBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "OAuth 2.0 access token (DCR at /oauth/register) or agent bearer"
+      },
+      "siteKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Site key \u2014 issued by POST /v1/sites/register"
+      },
+      "makerKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Maker-Key",
+        "description": "Maker key \u2014 issued by POST /v1/makers/register"
+      },
+      "adminKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Admin-Key",
+        "description": "Operator-held env secret"
+      },
+      "pluginKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Plugin-Key",
+        "description": "Plugin key issued per installed site via POST /v1/sites/{id}/plugin-key"
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "or_session",
+        "description": "Signed-in owner session (browser only)"
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "description": "ORP problem document",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "field": {
+            "type": "string"
+          },
+          "supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "retry_after": {
+            "type": "integer"
+          },
+          "step": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Envelope": {
+        "type": "object",
+        "properties": {
+          "orp": {
+            "type": "string",
+            "enum": [
+              "0.3",
+              "0.4"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deal": {
+            "type": "string"
+          },
+          "re": {
+            "type": "string"
+          },
+          "sig": {
+            "type": "string"
+          },
+          "body": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "orp",
+          "id",
+          "type",
+          "from",
+          "to",
+          "ts"
+        ]
+      }
+    }
+  }
+}

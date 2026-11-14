@@ -87,6 +87,7 @@ func ServeAllagioDiscovery(publicBase string) gin.HandlerFunc {
 				"install": base + "/agents",
 				"llms":    base + "/llms.txt",
 				"spec":    base + "/orp/spec",
+				"openapi": base + "/openapi.json",
 			},
 		})
 	}
