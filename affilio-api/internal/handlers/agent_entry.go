@@ -82,6 +82,7 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.GET("/v1/agent-tokens", h.ListAgentTokens)
 	r.POST("/v1/agent-tokens/revoke", h.RevokeAgentToken)
 	r.POST("/v1/agent-tokens/:id/revoke", h.RevokeAgentTokenByID)
+	r.GET("/v1/stats", h.PublicStats)
 	r.GET("/v1/step-modes", h.GetStepModes)
 	r.PUT("/v1/step-modes", h.PutStepModes)
 	r.GET("/v1/step-approvals/:id", h.GetStepApproval)

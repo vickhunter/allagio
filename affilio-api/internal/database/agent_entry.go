@@ -1268,3 +1268,12 @@ func (d *DB) LatestModeChange(ctx context.Context, siteID, offerID string) (acto
 	err = d.Pool.QueryRow(ctx, `SELECT actor, COALESCE(user_id::text,''), to_mode, created_at FROM mode_changes WHERE offer_id=$1 ORDER BY created_at DESC LIMIT 1`, offerID).Scan(&actor, &userID, &toMode, &at)
 	return
 }
+
+// PublicStats returns the aggregate counters shown on the public landing page.
+func (d *DB) PublicStats(ctx context.Context) (deals, offers, products int64, err error) {
+	err = d.Pool.QueryRow(ctx, `SELECT
+		(SELECT COUNT(*) FROM orp_deals),
+		(SELECT COUNT(*) FROM offers WHERE status='listed'),
+		(SELECT COUNT(*) FROM products)`).Scan(&deals, &offers, &products)
+	return
+}

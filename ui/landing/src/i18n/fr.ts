@@ -137,6 +137,10 @@ export const fr: Messages = {
     ],
     cta: 'Référence',
   },
+  counter: {
+    kicker: 'Des accords, déjà sur les rails',
+    caption: 'accords négociés sur l’Open Rails Protocol',
+  },
   makers: {
     kicker: 'Pour les marques',
     heading: 'Payez seulement quand ça vend.',
@@ -150,6 +154,7 @@ export const fr: Messages = {
     workedCaption: 'Exemple de vente',
     workedTerms: `${example.price} · ${example.commission} de commission`,
     workedBody: `Sur une vente de ${example.price} avec ${example.commission} de commission, l’éditeur perçoit ${example.publisher}. La marque paie des frais de ${example.fee}, il lui reste donc ${example.maker}.`,
+    workedTicker: 'pour l’éditeur',
     exampleProduct: product,
   },
   publishers: {

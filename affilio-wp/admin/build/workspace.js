@@ -351,14 +351,22 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     const field = (name, label, value = '', attributes = '', full = false) => `<label class="${full ? 'full' : ''}">${label}<input name="${name}" value="${escape(value)}" ${attributes}></label>`;
     const copyCommand = value => `<div class="copy-field setup-command"><div class="row"><span class="eyebrow">RUN IN YOUR PRODUCT REPOSITORY</span><button type="button" class="copy-action" data-copy>Copy command</button></div><pre>${escape(value)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div>`;
     const empty = (title, text) => `<div class="empty"><h3>${title}</h3><p>${text}</p></div>`;
+    const skeletonLines = n => '<div class="skeleton sk-l"></div>'.repeat(n);
+    const skeletonSection = (lines = 3) => `<section aria-hidden="true"><div class="skeleton sk-h"></div>${skeletonLines(lines)}</section>`;
+    const skeletonStats = (n = 3) => `<div class="stat-grid" aria-hidden="true">${'<div class="stat-card"><div class="skeleton sk-l"></div><div class="skeleton sk-v"></div><div class="skeleton sk-l"></div></div>'.repeat(n)}</div>`;
+    const skeletonPage = () => skeletonStats(3) + skeletonSection() + skeletonSection();
+    const statCard = (label, value, note = '') => `<div class="stat-card"><span class="stat-label">${label}</span><p class="stat-value">${value}</p>${note ? `<p class="stat-note">${note}</p>` : ''}</div>`;
+    const busy = on => root.setAttribute('aria-busy', on ? 'true' : 'false');
     const accountForm = (role) => `<section><h2>${role === 'maker' ? 'Connect your builder account' : 'Connect your publisher account'}</h2><form method="post" action="/owner/accounts"><input type="hidden" name="csrf" value="${escape(csrf)}"><input type="hidden" name="role" value="${role}">${role === 'publisher' ? field('domain','Your content domain','','placeholder="your-blog.com"') : ''}<details><summary>Connect an existing account</summary>${field('api_key','Existing owner key','','type="password" autocomplete="off"')}</details><button>Connect account</button></form></section>`;
     const commission = offer => offer.commission_type === 'percentage' ? `${offer.commission_value}% of the first purchase` : `${money(offer.commission_value,offer.currency || offer.commission_currency)} per first purchase`;
     let session;
     const overview = async () => {
         const makerHref = session.maker ? '/owner/products' : '/owner/products?setup=maker';
         const makerLabel = session.maker ? 'Open products' : 'Start as a builder';
+        busy(true);
         let rail = railMarkup(describeProduct(null, []), false);
         if (session.maker) {
+            root.innerHTML = skeletonStats(3) + skeletonSection(2);
             try {
                 const [{products},{offers}] = await Promise.all([api('/products'),api('/offers')]);
                 OfferSeen.remember(offers);
@@ -367,11 +375,14 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
                 rail = `<section class="offer-rail" aria-label="Offer progress"><p class="offer-rail-kicker">Offer rail</p><p class="station-detail">${escape(error.message)} Open products to retry.</p></section>`;
             }
         }
+        busy(false);
         root.innerHTML = `${rail}<div class="grid"><section><span class="eyebrow">BUILDERS</span><h2>Give your product an offer.</h2><p>Connect your existing agent, prepare your checkout and choose the commission you want to offer.</p><a class="button" data-primary-action href="${makerHref}">${makerLabel} ↗</a></section><section><span class="eyebrow">PUBLISHERS</span><h2>Find a useful recommendation.</h2><p>Match an article to relevant products, approve the exact placement and publish a tracked link.</p><a class="button secondary" href="${session.publisher ? '/owner/placements' : '/owner/settings'}">${session.publisher ? 'Open placements' : 'Connect your content'} ↗</a></section></div><section><h2>One setup. Your own agent.</h2><p>Run this command in your product repository. Setup installs the integration skills and connects your agent. Checkout wiring, Stripe connection and verification are separate steps.</p>${copyCommand(session.install_command)}<p class="caption">The npm package offer-rails is not published yet. This command uses the installer archive on this host.</p><p class="caption">Node 20+ · Codex CLI handoff · Cursor and Claude configuration</p></section>`;
     };
     const productForm = (product, primaryRegister, registered) => `<section><h2>${product ? 'Edit product' : 'Register a product'}</h2><form data-product="${escape(product?.id || '')}"><div class="form-grid">${field('name','Product name',product?.name,'required maxlength="255"')}${field('website_url','Website',product?.website_url,'type="url" required maxlength="512"')}${field('tagline','What does it help people do?',product?.tagline,'required maxlength="512"',true)}${field('docs_url','Documentation URL',product?.docs_url,'type="url"')}${field('pricing_url','Pricing URL',product?.pricing_url,'type="url"')}${field('primary_category','Category',product?.primary_category,'placeholder="developer tools" autocomplete="off"')}${field('keywords','Topics, separated by commas',(product?.keywords || []).join(', '),'placeholder="postgres, monitoring, debugging" autocomplete="off"')}</div><p class="caption">Your product remains private until its offer is reviewed and listed.</p><button ${!product && primaryRegister ? 'data-primary-action' : 'class="secondary"'}>${product ? 'Save changes' : 'Register product'}</button>${product ? '<button type="button" class="secondary" data-cancel-edit>Cancel</button>' : ''}${registered ? '<p id="product-registered" class="success" role="status" tabindex="-1">Product registered. It is in your list.</p>' : ''}</form></section>`;
     const productsPage = async (options = {}) => {
         if (!session.maker) { root.innerHTML = '<section><h2>Start your builder account</h2><p>Your account can hold products and referral offers.</p><a class="button" data-primary-action href="/owner/products?setup=maker">Create builder account</a></section>'; return; }
+        busy(true);
+        root.innerHTML = skeletonPage();
         let products, offers;
         try {
             const loaded = await Promise.all([api('/products'), api('/offers')]);
@@ -399,7 +410,9 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             const isFocus = product.id === focus.product?.id;
             const assessPrimary = isFocus && kind === 'ready';
             const stripePrimary = isFocus && kind === 'stripe';
-            return `<section><div class="row"><h3>${escape(product.name)}</h3>${pill(product.readiness_status)}</div><p>${escape(product.tagline)}</p><p><a href="${escape(product.website_url)}" target="_blank" rel="noopener noreferrer">${escape(product.website_url)}</a></p><div class="actions"><button type="button" class="secondary" data-edit="${product.id}">Edit</button><button type="button" class="${assessPrimary ? '' : 'secondary'}" ${assessPrimary ? 'data-primary-action' : ''} data-assess="${product.id}">Check readiness</button><a class="button${stripePrimary ? '' : ' secondary'}" ${stripePrimary ? 'data-primary-action' : ''} href="/owner/products/${product.id}/connection">Connect Stripe</a><button type="button" class="secondary" data-checks="${product.id}">View checks</button></div><p class="assessment-status" data-assessment-live="${product.id}" aria-live="polite"></p><div data-assessment="${product.id}">${isFocus ? checksMarkup(focusChecks) : ''}</div></section>`;
+            const score = Number(product.readiness_score || 0);
+            const meter = score > 0 ? `<div class="meter" role="img" aria-label="Readiness ${score} out of 100"><span style="width:${Math.min(100, score)}%"></span></div><p class="meter-label">Readiness ${score}/100</p>` : '';
+            return `<section><div class="row"><h3>${escape(product.name)}</h3>${pill(product.readiness_status)}</div>${meter}<p>${escape(product.tagline)}</p><p><a href="${escape(product.website_url)}" target="_blank" rel="noopener noreferrer">${escape(product.website_url)}</a></p><div class="actions"><button type="button" class="secondary" data-edit="${product.id}">Edit</button><button type="button" class="${assessPrimary ? '' : 'secondary'}" ${assessPrimary ? 'data-primary-action' : ''} data-assess="${product.id}">Check readiness</button><a class="button${stripePrimary ? '' : ' secondary'}" ${stripePrimary ? 'data-primary-action' : ''} href="/owner/products/${product.id}/connection">Connect Stripe</a><button type="button" class="secondary" data-checks="${product.id}">View checks</button></div><p class="assessment-status" data-assessment-live="${product.id}" aria-live="polite"></p><div data-assessment="${product.id}">${isFocus ? checksMarkup(focusChecks) : ''}</div></section>`;
         };
         const offerSection = offer => {
             const returned = offer.status === 'draft' && OfferSeen.returned(offer.id);
@@ -422,7 +435,9 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const ordered = focus.product ? [focus.product, ...products.filter(product => product.id !== focus.product.id)] : products;
         const showForm = !products.length || options.keepForm;
         const formBlock = showForm ? productForm(null, !products.length && kind === 'product', !!options.registered) : `<p><button type="button" class="secondary" data-add-product>Add product</button></p>`;
-        root.innerHTML = `${railMarkup(focus, true)}<div id="product-form">${formBlock}</div>${products.length ? '' : empty('Your first product starts here.','Register its website and topics so relevant publishers can find it.')}${products.length ? '<h2>Your products</h2>' + ordered.map(productSection).join('') : ''}<h2>Your referral offers</h2>${offers.length ? offers.map(offerSection).join('') : empty('Choose what a referral is worth.','Create an offer after registering your product.')}${offerCreator()}<div id="maker-placements"></div>`;
+        const stats = `<div class="stat-grid">${statCard('Products', products.length, products.length ? `${products.filter(product => product.readiness_status === 'ready').length} ready` : 'none registered yet')}${statCard('Offers', offers.length, offers.length ? `${offers.filter(offer => offer.status === 'listed').length} listed · ${offers.filter(offer => offer.status === 'submitted').length} in review` : 'no offers yet')}${statCard('Draft offers', offers.filter(offer => offer.status === 'draft').length, 'ready to submit')}</div>`;
+        busy(false);
+        root.innerHTML = `${railMarkup(focus, true)}${stats}<div id="product-form">${formBlock}</div>${products.length ? '' : empty('Your first product starts here.','Register its website and topics so relevant publishers can find it.')}${products.length ? '<h2>Your products' + '</h2>' + ordered.map(productSection).join('') : ''}<h2>Your referral offers</h2>${offers.length ? offers.map(offerSection).join('') : empty('Choose what a referral is worth.','Create an offer after registering your product.')}${offerCreator()}<div id="maker-placements"><div class="skeleton sk-h"></div>${skeletonLines(2)}</div>`;
         api('/maker-placements').then(data => {
             const slot = document.getElementById('maker-placements');
             if (!slot) return;
@@ -466,6 +481,8 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             });
         }));
         root.querySelectorAll('[data-checks]').forEach(button => button.addEventListener('click', () => run(button, async () => {
+            const checkSlot = root.querySelector(`[data-assessment="${button.dataset.checks}"]`);
+            if (checkSlot) checkSlot.innerHTML = skeletonLines(3);
             const result = await api(`/products/${button.dataset.checks}/assessments`);
             showChecks(button.dataset.checks, result.assessments?.[0]?.checks || []);
             const fail = root.querySelector(`[data-assessment="${button.dataset.checks}"] .check.fail .field-error`);
@@ -549,7 +566,10 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     };
     const placementsPage = async () => {
         if (!session.publisher) { root.innerHTML = '<section><h2>Connect your content first.</h2><p>Install the WordPress plugin, connect your site, then use its publisher connection action. You can also create a publisher account for another publishing tool.</p><a class="button secondary" href="/downloads/offer-rails.zip">Download WordPress plugin</a></section>' + accountForm('publisher'); return; }
+        busy(true);
+        root.innerHTML = skeletonStats(2) + skeletonSection(3) + skeletonSection(3);
         const {placements} = await api('/placements');
+        busy(false);
         root.innerHTML = `<section><h2>Find a relevant offer</h2><form data-find><div class="form-grid">${field('surface_url','Published article URL','','type="url"',true)}<label class="full">What is this article about?<textarea name="context" minlength="10" maxlength="12000" required placeholder="Paste the article or describe its topic and audience."></textarea></label></div><button>Find opportunities</button></form><div id="opportunity-results"></div></section><h2>Placement inbox</h2>${placements.length ? placements.map(placement => `<section><div class="row"><a href="/owner/placements/${placement.id}">${escape(placement.surface_url)}</a>${pill(placementStatusLabel(placement))}</div><p>${escape(placement.copy)}</p><a href="/owner/placements/${placement.id}">Review placement ↗</a></section>`).join('') : empty('Your recommendations will appear here.','Start with an article where a product can help its readers.')}`;
         root.querySelector('[data-find]').addEventListener('submit',event => {
             event.preventDefault(); const form = event.currentTarget; const values = Object.fromEntries(new FormData(form));
@@ -582,17 +602,23 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     const table = (headers, rows) => `<div class="table-wrap"><table><thead><tr>${headers.map(header => `<th>${header}</th>`).join('')}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(value => `<td>${value}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
     const conversionTable = (rows) => Array.isArray(rows) && rows.length ? `<section><h2>Sales and refunds</h2><p class="caption">A refund is applied only when its source is at least as trusted as the sale. A less trusted refund stays in review and does not change the commission.</p>${table(['Kind','Trust','Refund status','Amount','Reason'], rows.map(row => [escape(row.kind), escape(row.trust_level || ''), escape(row.refund_status || ''), escape(money(row.amount, row.currency)), escape(row.reason || '')]))}</section>` : '';
     const earningsPage = async () => {
-        root.innerHTML = '<p>Commissions are paid directly by merchants. Test and live activity remain separate. A reported payment becomes received only after the publisher confirms it.</p>';
+        busy(true);
+        root.innerHTML = '<p>Commissions are paid directly by merchants. Test and live activity remain separate. A reported payment becomes received only after the publisher confirms it.</p><div id="earnings-loading">' + skeletonStats(2) + skeletonSection(4) + '</div>';
+        const loaded = () => { document.getElementById('earnings-loading')?.remove(); };
         if (session.maker) {
             const [data,payments] = await Promise.all([api('/earnings/maker'),api('/payments')]);
+            loaded();
             root.insertAdjacentHTML('beforeend',`<section><h2>Your product referrals</h2>${data.offers.length ? table(['Product','Mode','Clicks','Purchases','Refunds','Revenue','Commission'],data.offers.map(offer => [escape(offer.product_name),pill(offer.mode),offer.clicks,offer.sales,offer.refunds,escape(money(offer.revenue,offer.currency)),escape(money(offer.commission,offer.currency))])) : empty('No attributed activity yet.','Listed offers and purchases will appear here as publishers refer readers.')}</section>${conversionTable(data.conversions)}`);
             root.insertAdjacentHTML('beforeend',`<section><h2>Pay your publishers</h2><p>Send payment using the publisher's instructions, then record its reference. Reporting a payment does not move money or confirm receipt.</p>${payments.payouts.length ? payments.payouts.map(payout => `<div class="card"><h3>${escape(payout.domain)}</h3><p>${escape(money(payout.amount,payout.currency))} · ${pill(payout.mode)} · ${pill(payout.status)}</p><p>${escape(payout.instructions || 'Contact the publisher through their site to arrange payment.')}</p>${payout.status === 'pending' && payout.mode === 'live' ? `<form data-report-payment="${payout.id}">${field('reference','Payment reference','','required maxlength="255"')}<label><input type="checkbox" name="sent" required> I have sent this payment outside Allagio.</label><button>Report payment sent</button></form>` : `<p class="caption">${payout.received ? 'Publisher confirmed receipt.' : 'Publisher receipt has not been confirmed.'}</p>`}</div>`).join('') : '<p>No payout batches due yet. Cleared commissions are batched by the operator.</p>'}</section>`);
             root.querySelectorAll('[data-report-payment]').forEach(form => form.addEventListener('submit',event => { event.preventDefault(); run(form.querySelector('button'),async () => { const data = new FormData(form); await api(`/payments/${form.dataset.reportPayment}/report`,'POST',{reference:data.get('reference'),sent:data.get('sent') === 'on'}); await earningsPage(); report('Payment reported. The publisher must confirm receipt separately.'); }); }));
         }
         if (session.publisher) {
             const [data,history] = await Promise.all([api('/earnings/publisher'),api('/history')]);
+            loaded();
             root.insertAdjacentHTML('beforeend',`<section><h2>Your publisher commissions</h2>${data.balances.length ? table(['Currency','Mode','Pending','Cleared','Reserved','Payment reported','Received'],data.balances.map(balance => [escape(balance.currency),pill(balance.mode),escape(money(balance.pending,balance.currency)),escape(money(balance.cleared_unpaid,balance.currency)),escape(money(balance.reserved,balance.currency)),escape(money(balance.payment_reported,balance.currency)),escape(money(balance.paid,balance.currency))])) : empty('No commissions recorded yet.','Publish an approved placement and share it with readers who can benefit from the product.')}</section><section><h2>Commission history</h2><p class="caption">A refund is applied only when its source is at least as trusted as the sale. A less trusted refund stays in review and does not change the commission.</p>${history.ledger.length ? table(['Product','Mode','Kind','Amount','Status','Trust','Refund status'],history.ledger.map(entry => [escape(entry.product_name),pill(entry.mode),escape(entry.kind),escape(money(entry.amount,entry.currency)),escape(entry.status),escape(entry.trust_level || ''),escape(entry.refund_status || '')])) : '<p>No purchase or refund records yet.</p>'}</section>${conversionTable(history.conversions)}<section><h2>Merchant payment reports</h2>${history.payouts.length ? history.payouts.map(payout => `<div class="card">${escape(money(payout.amount,payout.currency))} · ${pill(payout.mode)} · ${pill(payout.status)}${payout.status === 'paid' && !payout.received_at && payout.mode === 'live' ? `<form method="post" action="/owner/payouts/${payout.id}/confirm-received"><input type="hidden" name="csrf" value="${escape(csrf)}"><button>Confirm funds arrived</button></form>` : payout.received_at ? '<p>You confirmed receipt.</p>' : ''}</div>`).join('') : '<p>No merchant payment reports yet.</p>'}</section>`);
         }
+        busy(false);
+        loaded();
         if (!session.maker && !session.publisher) root.insertAdjacentHTML('beforeend',empty('Connect a product or publisher account.','Your activity will be recorded here once you start referring customers.'));
     };
     const settingsPage = async () => {
@@ -628,7 +654,10 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     };
     const reviewPage = async () => {
         if (!session.operator) { root.innerHTML = empty('Operator access required.','Offer review is available only to the configured operator.'); return; }
+        busy(true);
+        root.innerHTML = skeletonPage();
         const {queue} = await api('/review/offers');
+        busy(false);
         root.innerHTML = queue.length ? queue.map(offer => `<section><h2>${escape(offer.product_name)}</h2><p>${escape(offer.product_tagline)}</p><p><a href="${escape(offer.website_url)}" target="_blank" rel="noopener noreferrer">${escape(offer.website_url)}</a></p><p>${escape(commission(offer))} · ${escape(offer.commission_currency)} · readiness ${escape(offer.readiness_status)}</p><p>${escape(offer.terms)}</p><div class="actions"><button data-review="${offer.id}" data-decision="approve">List offer</button><button class="secondary" data-review="${offer.id}" data-decision="reject">Return to draft</button></div></section>`).join('') : empty('No offers waiting for review.','New submitted offers will appear here.');
         root.insertAdjacentHTML('beforeend','<section><h2>Prepare commission payouts</h2><p>Batch cleared live commissions by merchant and publisher. This reserves the commissions and lets merchants report their external payments.</p><form data-batch><label>Minimum payout amount<input name="minimum" type="number" min="0.01" step="0.01" value="25" required></label><button>Prepare live payout batches</button></form></section>');
         root.querySelector('[data-batch]').addEventListener('submit',event => { event.preventDefault(); const form = event.currentTarget; run(form.querySelector('button'),async () => { const data = await api('/review/payouts/batch','POST',{min_payout:Number(new FormData(form).get('minimum')),include_test_mode:false}); report(`${data.payouts.length} payout batches prepared. No money was transferred.`); }); });
