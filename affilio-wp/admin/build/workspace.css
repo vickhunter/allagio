@@ -93,3 +93,7 @@ button[data-primary-action]:hover,a.button[data-primary-action]:hover{box-shadow
 .meter>span{display:block;height:100%;background:var(--green);border-radius:999px}
 .meter-label{font-size:var(--text-caption);color:var(--muted)}
 @media(prefers-reduced-motion:reduce){.skeleton::after{animation:none}}
+.spark svg{display:block;width:100%;height:40px;margin:10px 0 4px}
+.spark rect{fill:var(--action)}
+.spark rect.spark-empty{fill:var(--line)}
+.spark .stat-note{display:flex;justify-content:space-between}
