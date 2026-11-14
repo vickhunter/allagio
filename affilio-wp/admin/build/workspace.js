@@ -389,6 +389,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             products = loaded[0].products || [];
             offers = loaded[1].offers || [];
         } catch (error) {
+            busy(false);
             root.innerHTML = `<section class="offer-rail"><p class="offer-rail-kicker">Offer rail</p><h2>Products could not be loaded.</h2><p class="field-error" role="alert" tabindex="-1">${escape(error.message)}</p><button type="button" data-primary-action data-retry-products>Retry</button></section>`;
             const alert = root.querySelector('[role="alert"]');
             scrollFocus(alert);
@@ -443,7 +444,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             if (!slot) return;
             const items = data.placements || [];
             slot.innerHTML = `<h2>Publisher placements</h2>${items.length ? items.map(placement => `<section><div class="row">${escape(placement.surface_url)} ${pill(placementStatusLabel(placement))}</div><p>${escape(placement.copy)}</p></section>`).join('') : empty('No publisher placements yet.','Placements of your offers show up here, including ones a publisher has removed.')}`;
-        }).catch(() => {});
+        }).catch(() => { const slot = root.querySelector('#maker-placements'); if (slot) slot.innerHTML = ''; });
         root.querySelector('[data-product]')?.addEventListener('submit', saveProduct);
         root.querySelector('[data-add-product]')?.addEventListener('click', () => {
             document.getElementById('product-form').innerHTML = productForm(null, false, false);
@@ -483,7 +484,9 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         root.querySelectorAll('[data-checks]').forEach(button => button.addEventListener('click', () => run(button, async () => {
             const checkSlot = root.querySelector(`[data-assessment="${button.dataset.checks}"]`);
             if (checkSlot) checkSlot.innerHTML = skeletonLines(3);
-            const result = await api(`/products/${button.dataset.checks}/assessments`);
+            let result;
+            try { result = await api(`/products/${button.dataset.checks}/assessments`); }
+            catch (error) { if (checkSlot) checkSlot.innerHTML = `<p class="field-error">${escape(error.message)}</p>`; throw error; }
             showChecks(button.dataset.checks, result.assessments?.[0]?.checks || []);
             const fail = root.querySelector(`[data-assessment="${button.dataset.checks}"] .check.fail .field-error`);
             if (fail) scrollFocus(fail);
@@ -766,6 +769,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
                 await ensureAwake();
                 return boot();
             }
+            busy(false);
             root.textContent = '';
             report(error.message, true);
         }
