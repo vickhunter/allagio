@@ -1,0 +1,1 @@
+import{d as e,l as t}from"./Page-Bd0Swl_W.js";import{r as n,t as r}from"./Document-BHJ7Vtyk.js";var i=e();function a(){return(0,i.jsx)(r,{title:n.title,lede:n.lede,sections:n.sections,otherHref:`/privacy`,otherLabel:`Read the privacy draft`})}t(`terms`,(0,i.jsx)(a,{}));
