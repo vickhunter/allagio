@@ -13,6 +13,7 @@ export const example = {
   price: euro(notebookSplit.saleCents),
   commission: `${notebookSplit.commissionBps / 100}%`,
   publisher: euro(notebookSplit.publisherCents),
+  publisherCents: notebookSplit.publisherCents,
   maker: euro(notebookSplit.makerCents),
   fee: euro(notebookSplit.feeCents),
 }

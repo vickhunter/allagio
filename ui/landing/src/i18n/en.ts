@@ -137,6 +137,10 @@ export const en: Messages = {
     }),
     cta: 'Reference',
   },
+  counter: {
+    kicker: 'Deals, already on the rails',
+    caption: 'deals negotiated on the Open Rails Protocol',
+  },
   makers: {
     kicker: 'Makers',
     heading: makerBenefit,
@@ -150,6 +154,7 @@ export const en: Messages = {
     workedCaption: 'Worked sale',
     workedTerms: `${example.price} · ${example.commission} commission`,
     workedBody: `On a ${example.price} sale at ${example.commission}, the publisher earns ${example.publisher}. A ${example.fee} fee is paid by the maker, so the maker keeps ${example.maker}.`,
+    workedTicker: 'earned by the publisher',
     exampleProduct: example.product,
   },
   publishers: {

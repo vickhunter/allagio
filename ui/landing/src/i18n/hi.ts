@@ -137,6 +137,10 @@ export const hi: Messages = {
     ],
     cta: 'संदर्भ',
   },
+  counter: {
+    kicker: 'डीलें, पहले से पटरियों पर',
+    caption: 'Open Rails Protocol पर बातचीत किए गए डील',
+  },
   makers: {
     kicker: 'मेकर्स',
     heading: 'सिर्फ बिक्री पर भुगतान।',
@@ -150,6 +154,7 @@ export const hi: Messages = {
     workedCaption: 'बिक्री का उदाहरण',
     workedTerms: `${example.price} · ${example.commission} कमीशन`,
     workedBody: `${example.price} की बिक्री पर ${example.commission} कमीशन में, पब्लिशर को ${example.publisher} मिलते हैं। मेकर ${example.fee} शुल्क देता है, इसलिए मेकर के पास ${example.maker} बचते हैं।`,
+    workedTicker: 'पब्लिशर को',
     exampleProduct: product,
   },
   publishers: {

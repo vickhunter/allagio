@@ -13,6 +13,8 @@ import { FAQ } from '@/components/faq-1'
 import { TradeOffs } from '@/components/trade-offs'
 import { CallToAction } from '@/components/call-to-action-1'
 import { useOfferConfig, useSource, withSource } from '@/lib/source'
+import { NumberTicker } from '@/components/ui/number-ticker'
+import { example } from '@/content'
 import { useLocale } from '@/i18n'
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
@@ -107,6 +109,15 @@ export function App() {
           <figcaption className="flex items-center gap-2"><Calculator aria-hidden="true" className="h-4 w-4 text-maker" />{t.makers.workedCaption}</figcaption>
           <p>{t.makers.exampleProduct}</p>
           <p>{t.makers.workedTerms}</p>
+          <p className="mt-2 flex items-baseline gap-2">
+            <NumberTicker
+              value={example.publisherCents / 100}
+              decimalPlaces={2}
+              prefix="€"
+              className="text-3xl font-semibold tracking-tight text-maker"
+            />
+            <span className="text-sm text-t2">{t.makers.workedTicker}</span>
+          </p>
           <p>{t.makers.workedBody}</p>
         </figure>
       </section>

@@ -137,6 +137,10 @@ export const zh: Messages = {
     ],
     cta: '参考',
   },
+  counter: {
+    kicker: '交易已在轨道上',
+    caption: '在 Open Rails Protocol 上协商达成的交易',
+  },
   makers: {
     kicker: '品牌方',
     heading: '只为成交付费。',
@@ -150,6 +154,7 @@ export const zh: Messages = {
     workedCaption: '成交示例',
     workedTerms: `${example.price} · ${example.commission} 佣金`,
     workedBody: `一笔 ${example.price} 的成交、佣金 ${example.commission}，发布者可得 ${example.publisher}。品牌方另付 ${example.fee} 费用，因此品牌方净得 ${example.maker}。`,
+    workedTicker: '归发布者',
     exampleProduct: product,
   },
   publishers: {

@@ -89,6 +89,7 @@ export interface Messages {
     steps: { name: string; body: string }[]
     cta: string
   }
+  counter: { kicker: string; caption: string }
   makers: {
     kicker: string
     heading: string
@@ -98,6 +99,7 @@ export interface Messages {
     workedCaption: string
     workedTerms: string
     workedBody: string
+    workedTicker: string
     exampleProduct: string
   }
   publishers: {
