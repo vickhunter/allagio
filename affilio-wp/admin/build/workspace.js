@@ -360,7 +360,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     const sparkline = (dates, label, days = 30) => {
         const today = new Date(); today.setUTCHours(0,0,0,0);
         const buckets = Array(days).fill(0);
-        (dates || []).forEach(value => { const t = new Date(value); if (!isNaN(t)) { const i = days - 1 - Math.floor((today - t) / 864e5); if (i >= 0 && i < days) buckets[i]++; } });
+        (dates || []).forEach(value => { const t = new Date(value); if (!isNaN(t)) { const i = Math.min(days - 1, Math.max(0, days - 1 - Math.floor((today - t) / 864e5))); buckets[i]++; } });
         const max = Math.max(1, ...buckets);
         const bw = 100 / days;
         const bars = buckets.map((n, i) => {
