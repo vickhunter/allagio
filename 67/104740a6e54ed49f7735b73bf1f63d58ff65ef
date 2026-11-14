@@ -1,0 +1,57 @@
+ui/landing/src/components/platform-frames.tsx
+  s_7e484d91fceb6c::t_af5807a53cfbfa 11
+  s_7e484d91fceb6c::t_65b2c6c524bd38 1-10,12-241
+ui/landing/src/i18n/en.ts
+  s_7e484d91fceb6c::t_ca4edfacd76e94 193-345
+ui/landing/src/components/PostPreview.tsx
+  s_7e484d91fceb6c::t_cec03f21864d9d 8-9
+  s_7e484d91fceb6c::t_a5bdb20e752446 184
+  s_7e484d91fceb6c::t_cd4d8ba3b6924c 320
+  s_7e484d91fceb6c::t_7fa907867f81a6 110,113-120,122-123
+  s_7e484d91fceb6c::t_2f5ef512188531 230
+ui/landing/src/i18n/es.ts
+  s_7e484d91fceb6c::t_74460bfd3b0a41 209-361
+ui/landing/src/home/App.tsx
+  s_7e484d91fceb6c::t_a2882a6b6e8be4 170-171,173
+  s_7e484d91fceb6c::t_0f0fb22acb41ab 9
+  s_7e484d91fceb6c::t_8d4bfbfd9f117b 163,166-169,172,174-175
+ui/landing/src/i18n/zh.ts
+  s_7e484d91fceb6c::t_44ad8d3dd6d656 209-361
+ui/landing/src/i18n/hi.ts
+  s_7e484d91fceb6c::t_7a2b16f79b67a0 209-361
+ui/landing/src/i18n/messages.ts
+  s_7e484d91fceb6c::t_b34ecceb6a96d9 13-25
+  s_7e484d91fceb6c::t_a96481e1c657f9 149-162
+ui/landing/src/i18n/fr.ts
+  s_7e484d91fceb6c::t_1c3051b59aee25 209-361
+ui/landing/src/components/PlatformShowcase.tsx
+  s_7e484d91fceb6c::t_629636018d2495 1-188
+affilio-wp/admin/build/landing-v9/assets/Page-BTVWg9ka.css
+  s_7e484d91fceb6c::t_ffbcb0a014f5d3 2
+affilio-wp/admin/build/landing-v9/assets/PostPreview-Bo7jPnD2.js
+  s_7e484d91fceb6c::t_4b292c21cf799b 1
+affilio-wp/admin/build/landing-v9/assets/index-DSrlcj5l.js
+  s_7e484d91fceb6c::t_b81e1665b8bd7c 1-2,18,24,36-42,49-50,225
+affilio-wp/admin/build/landing-v9/assets/profile-DBrvsMso.js
+  s_7e484d91fceb6c::t_b8ef6dc20b8cd1 1
+affilio-wp/admin/build/landing-v9/assets/share-2-Ct6jXvNE.js
+  s_7e484d91fceb6c::t_40d3770767bb2a 1
+affilio-wp/admin/build/landing-v9/assets/useCases-CDNpbbV5.js
+  s_7e484d91fceb6c::t_8828a279d17c9f 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "67104740a6e54ed49f7735b73bf1f63d58ff65ef",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}

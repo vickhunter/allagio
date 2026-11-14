@@ -1,0 +1,51 @@
+ui/landing/src/components/PlatformShowcase.tsx
+  s_7e484d91fceb6c::t_65c8314438c28b 174-177
+ui/landing/src/components/platform-frames.tsx
+  s_7e484d91fceb6c::t_d07d2a9d0e9a68 136
+  s_7e484d91fceb6c::t_56530f4c116e73 199-213
+  s_7e484d91fceb6c::t_7fbe426e874636 65
+  s_7e484d91fceb6c::t_19a39e59ef941d 58-64,66
+  s_7e484d91fceb6c::t_0d6671ca964bfd 186-189
+ui/landing/src/i18n/messages.ts
+  s_7e484d91fceb6c::t_4672dfd1fe5bbd 14
+ui/landing/src/components/PostPreview.tsx
+  s_7e484d91fceb6c::t_0c0b376097cac9 304
+affilio-wp/admin/build/landing-v9/assets/Page-By2tjJ0Q.css
+  s_7e484d91fceb6c::t_064dc7e7545e62 2
+affilio-wp/admin/build/landing-v9/assets/PostPreview-D2K4MFZF.js
+  s_7e484d91fceb6c::t_7d6d8358b2513b 1
+affilio-wp/admin/build/landing-v9/assets/index-DsnnJ4dL.js
+  s_7e484d91fceb6c::t_3ecc57d00d87a9 1,225
+affilio-wp/admin/build/landing-v9/assets/profile-CyQovbhW.js
+  s_7e484d91fceb6c::t_255273c6e0cd13 1
+affilio-wp/admin/build/landing-v9/assets/share-2-BcphbJOA.js
+  s_7e484d91fceb6c::t_757adadbb65ca3 1
+affilio-wp/admin/build/landing-v9/assets/useCases-BjUgKdUJ.js
+  s_7e484d91fceb6c::t_7afa8757fca608 1
+ui/landing/src/i18n/en.ts
+  s_7e484d91fceb6c::t_e4f48725121835 224
+ui/landing/src/i18n/es.ts
+  s_7e484d91fceb6c::t_f71dd4f7cfcda4 240
+ui/landing/src/i18n/fr.ts
+  s_7e484d91fceb6c::t_874d4932a9f172 240
+ui/landing/src/i18n/hi.ts
+  s_7e484d91fceb6c::t_b282643167d894 240
+ui/landing/src/i18n/zh.ts
+  s_7e484d91fceb6c::t_dee855752560a4 240
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "afa1f87ad29f452051328862c0a72f601971a583",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
