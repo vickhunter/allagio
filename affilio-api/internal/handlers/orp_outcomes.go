@@ -8,13 +8,15 @@ import (
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
+	"affilio-api/internal/services"
 )
 
 // OutcomeStats is one sweep's tally for the worker's log line.
 type OutcomeStats struct {
-	Deals  int
-	Sent   int
-	Finals int
+	Deals     int
+	Sent      int
+	Finals    int
+	Rechecked int
 }
 
 // SweepORPOutcomes runs one outcome pass (SPEC 14.1). Every active deal
@@ -23,7 +25,7 @@ type OutcomeStats struct {
 // party in that party owner's inbox. The period marker and the inbox copies
 // commit in one transaction, so a repeated or crashed sweep sends nothing
 // twice.
-func SweepORPOutcomes(ctx context.Context, db *database.DB, publicBaseURL string, now time.Time) (OutcomeStats, error) {
+func SweepORPOutcomes(ctx context.Context, db *database.DB, publicBaseURL string, now time.Time, fetch ...proofFetchFunc) (OutcomeStats, error) {
 	var stats OutcomeStats
 	_, dns := orp.Origin(publicBaseURL, "", "")
 	due, err := db.ListORPOutcomeDue(ctx, now, 200)
@@ -44,6 +46,15 @@ func SweepORPOutcomes(ctx context.Context, db *database.DB, publicBaseURL string
 			}
 		}
 	}
+	fetcher := proofFetchFunc((&services.ReadinessEngine{}).FetchPublicPage)
+	if len(fetch) > 0 && fetch[0] != nil {
+		fetcher = fetch[0]
+	}
+	checked, err := sweepORPRechecks(ctx, db, dns, fetcher, now)
+	if err != nil {
+		return stats, err
+	}
+	stats.Rechecked = checked
 	return stats, nil
 }
 
