@@ -1,6 +1,11 @@
+## November 15 — weekly owner digest email
+
+Owners now get a weekly activity digest by email: `DigestEmailRunner` (hourly tick, started in main only when SMTP is configured) mails each due owner a plain-text summary built from the same `AccountDigest` the workspace uses — live-now count, clicks, test-mode publisher/maker earnings, per-project lines, and a link to `/owner`. New columns `owners.digest_opt_out` and `owners.digest_sent_at` (migration 063) drive spacing and the unsubscribe; `/owner/settings` gains a "Weekly digest email" checkbox posting to `POST /owner/digest`. Transport is generic SMTP (`services.Mailer` via net/smtp with STARTTLS + auth when `SMTP_USER` is set, 10s dial / 15s deadlines) configured by `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `DIGEST_FROM` (default `Allagio <digest@allagio.dev>`); with no `SMTP_HOST` the runner never starts and nothing changes. `TestDigestEmailRunnerSendsOnlyDueOwners` pins due/opt-out/never-sent/no-email selection plus mark-sent, and `TestDigestEmailBodyListsProjectsAndTotals` pins the body shape.
+
 ## November 15 — settlement boundary doc for agents
 
 New doc `GET /docs/settlement.md` (listed in the agent docs index): states crisply that ORP is the record of obligations, not a payment rail — terms hold `pay` obligations, receipts verify work, payout records track money through `held → payable → sent → paid`, and the rail (stripe, paypal, wise, x402, manual) moves the funds with its transfer reference landing on the payout record as `ref`. Positions x402 as a rail a payout can name rather than a competitor, notes AP2-style signed mandates as acceptable `pay`-obligation evidence, and restates the deliberate exclusions (no escrow/KYC/tax/SLA, no account numbers in messages, no self-marked payments). Pointer to spec §14.
+
 
 ## November 15 — free-product readiness: payment_provider=none skips checkout/pricing gates
 
