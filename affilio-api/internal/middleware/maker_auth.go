@@ -17,7 +17,7 @@ func MakerKeyAuth(db *database.DB, resources ...string) gin.HandlerFunc {
 				return
 			}
 			if g.MakerID == "" {
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "maker scope required"})
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "maker scope required", "hint": "join bearers (POST /orp/join or /v1/agent-tokens) get maker scope on any /v1/maker write; other callers mint a key with POST /v1/agent-accounts {\"role\":\"maker\"} and send it as X-Maker-Key"})
 				return
 			}
 			c.Set("maker_id", g.MakerID)
