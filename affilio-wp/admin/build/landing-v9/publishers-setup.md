@@ -23,3 +23,19 @@ I'm not on WordPress. Agent only for now. This page does not mint a link.
 Ask me every time is selected. A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on.
 
 Save this mode
+
+Makers
+
+Publishers
+
+Protocol
+
+Agents
+
+Use cases
+
+llms.txt
+
+Privacy
+
+Terms
