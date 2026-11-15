@@ -57,6 +57,7 @@ func telegramTestClient(api string) *services.TelegramClient {
 func telegramMsg(chatID int64, text string) *services.TelegramMessage {
 	var m services.TelegramMessage
 	m.Chat.ID = chatID
+	m.Chat.Type = "private"
 	m.From.Username = "vick"
 	m.From.FirstName = "Vic"
 	m.Text = text
@@ -146,7 +147,7 @@ func TestTelegramDMNotifiesLinkedOwner(t *testing.T) {
 	ownerID := insertDigestOwner(t, db, "dm@example.com", false, nil)
 
 	// Unlinked owner gets nothing.
-	telegramDM(ctx, db, tg, ownerID, "deal waiting")
+	telegramDM(db, tg, ownerID, "deal waiting")
 	fake.mu.Lock()
 	if len(fake.sent) != 0 {
 		t.Fatalf("expected no dm before link, got %v", fake.sent)
@@ -156,17 +157,69 @@ func TestTelegramDMNotifiesLinkedOwner(t *testing.T) {
 	if err := db.BindTelegramChat(ctx, ownerID, 4242, "vick"); err != nil {
 		t.Fatalf("bind: %v", err)
 	}
-	telegramDM(ctx, db, tg, ownerID, "deal waiting")
+	telegramDM(db, tg, ownerID, "deal waiting")
 	if got := fake.last(t); got != "deal waiting" {
 		t.Fatalf("dm text mismatch: %q", got)
 	}
 
 	// A disabled client is a no-op.
-	telegramDM(ctx, db, &services.TelegramClient{}, ownerID, "never sent")
+	telegramDM(db, &services.TelegramClient{}, ownerID, "never sent")
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
 	if len(fake.sent) != 1 {
 		t.Fatalf("disabled client should not send: %v", fake.sent)
+	}
+}
+
+func TestTelegramGroupChatIsRefused(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	fake := &fakeTelegram{}
+	srv := httptest.NewServer(fake.handler())
+	defer srv.Close()
+	r := telegramRunner(db, telegramTestClient(srv.URL))
+
+	ownerID := insertDigestOwner(t, db, "grp@example.com", false, nil)
+	code := "GROUPCD1"
+	if err := db.CreateTelegramLinkCode(ctx, ownerID, services.HashAPIKey(code), time.Now().Add(15*time.Minute)); err != nil {
+		t.Fatalf("create code: %v", err)
+	}
+	m := telegramMsg(-999, "/link "+code)
+	m.Chat.Type = "group"
+	r.handle(ctx, m)
+
+	if got := fake.last(t); !strings.Contains(got, "direct messages") {
+		t.Fatalf("group /link should be refused: %q", got)
+	}
+	chatID, _, _ := db.OwnerTelegram(ctx, ownerID)
+	if chatID != 0 {
+		t.Fatalf("group chat must not bind: chat=%d", chatID)
+	}
+}
+
+func TestTelegramRelinkStealsChatFromPreviousOwner(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	first := insertDigestOwner(t, db, "first@example.com", false, nil)
+	second := insertDigestOwner(t, db, "second@example.com", false, nil)
+	if err := db.BindTelegramChat(ctx, first, 9090, "one"); err != nil {
+		t.Fatalf("bind first: %v", err)
+	}
+	if err := db.BindTelegramChat(ctx, second, 9090, "two"); err != nil {
+		t.Fatalf("bind second: %v", err)
+	}
+
+	chatID, _, _ := db.OwnerTelegram(ctx, first)
+	if chatID != 0 {
+		t.Fatalf("previous owner must lose the chat: chat=%d", chatID)
+	}
+	o, err := db.OwnerByTelegramChat(ctx, 9090)
+	if err != nil || o == nil || o.ID != second {
+		t.Fatalf("chat must resolve to the new owner only: %+v err=%v", o, err)
 	}
 }
 
