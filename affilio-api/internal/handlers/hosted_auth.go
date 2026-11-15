@@ -52,6 +52,8 @@ type HostedHandler struct {
 	pluginZipKey    string
 	pluginZipBody   []byte
 	pluginZipBuilds int
+	// Telegram is the bot client used to show the bot name in settings.
+	Telegram *services.TelegramClient
 }
 
 func ValidatePublicURL(raw string) error {

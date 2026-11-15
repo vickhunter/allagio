@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -9,12 +10,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -51,18 +54,35 @@ func (h *ORPHost) notifyWaiting(c *gin.Context, effect database.ORPEffect) {
 		return
 	}
 	url, secret, err := h.Entry.DB.OwnerNotify(c.Request.Context(), ownerID)
-	if err != nil || url == "" || secret == "" {
+	if err == nil && url != "" && secret != "" {
+		if payload, err := json.Marshal(map[string]any{
+			"type":    "deal.waiting",
+			"deal":    dealID,
+			"waiting": waiting,
+		}); err == nil {
+			go postSignedWebhook(url, secret, payload)
+		}
+	}
+	go telegramDM(h.Entry.DB, h.Entry.Telegram, ownerID, fmt.Sprintf("A deal (%s) is waiting on your party — act at %s/owner", dealID, strings.TrimRight(h.Entry.BaseURL, "/")))
+}
+
+// telegramDM pushes the same owner-facing events the webhook channel gets to
+// a linked Telegram chat. It always runs on a detached context: callers invoke
+// it from request handlers whose context dies with the response. Nil-safe and
+// best-effort: an unlinked or unconfigured owner simply gets nothing.
+func telegramDM(db *database.DB, tg *services.TelegramClient, ownerID, text string) {
+	if tg == nil || !tg.Enabled() || db == nil {
 		return
 	}
-	payload, err := json.Marshal(map[string]any{
-		"type":    "deal.waiting",
-		"deal":    dealID,
-		"waiting": waiting,
-	})
-	if err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	chatID, _, err := db.OwnerTelegram(ctx, ownerID)
+	if err != nil || chatID == 0 {
 		return
 	}
-	go postSignedWebhook(url, secret, payload)
+	if err := tg.SendMessage(ctx, chatID, text); err != nil {
+		log.Printf("telegram: dm to owner %s failed: %v", ownerID, err)
+	}
 }
 
 func postSignedWebhook(url, secret string, payload []byte) {
@@ -120,6 +140,37 @@ func (h *HostedHandler) notifySection(c *gin.Context, o *database.Owner) (templa
 	if err != nil {
 		return "", err
 	}
+	chatID, tgUser, err := h.DB.OwnerTelegram(c.Request.Context(), o.ID)
+	if err != nil {
+		return "", err
+	}
+	botEnabled := h.Telegram != nil && h.Telegram.Enabled()
+	b.WriteString(`<section id="telegram"><h2>Telegram</h2>`)
+	if chatID != 0 {
+		label := "chat " + fmt.Sprint(chatID)
+		if tgUser != "" {
+			label = "@" + template.HTMLEscapeString(tgUser)
+		}
+		fmt.Fprintf(&b, `<p>Linked to <strong>%s</strong>. Deal-waiting alerts, assessment results and registration notices arrive as direct messages; /status and /earnings answer from the bot.</p>`, label)
+		b.WriteString(`<form method="post" action="/owner/telegram/unlink"><input type="hidden" name="csrf" value="`)
+		b.WriteString(template.HTMLEscapeString(o.CSRF))
+		b.WriteString(`"><button>Unlink Telegram</button></form>`)
+	} else if botEnabled {
+		bot := "the Allagio bot"
+		if h.Telegram.Username != "" {
+			bot = "@" + template.HTMLEscapeString(h.Telegram.Username)
+		}
+		fmt.Fprintf(&b, `<p>Talk to your account from Telegram: deal alerts and /status / /earnings as direct messages. Generate a link code, then send <code>/link CODE</code> to %s.</p>`, bot)
+		if code := strings.TrimSpace(c.Query("tg")); code != "" {
+			fmt.Fprintf(&b, `<p>Your one-time code (valid ~15 min): <code>%s</code> — send <code>/link %s</code> to %s.</p>`, template.HTMLEscapeString(code), template.HTMLEscapeString(code), bot)
+		}
+		b.WriteString(`<form method="post" action="/owner/telegram/code"><input type="hidden" name="csrf" value="`)
+		b.WriteString(template.HTMLEscapeString(o.CSRF))
+		b.WriteString(`"><button>Generate link code</button></form>`)
+	} else {
+		b.WriteString(`<p class="caption">The Telegram channel is not enabled on this deployment.</p>`)
+	}
+	b.WriteString(`</section>`)
 	b.WriteString(`<section id="digest"><h2>Weekly digest email</h2>`)
 	b.WriteString(`<p>A short summary each week: what went live, clicks, and test-mode earnings, mailed to your sign-in address.</p><form method="post" action="/owner/digest">`)
 	b.WriteString(`<input type="hidden" name="csrf" value="`)
@@ -130,6 +181,38 @@ func (h *HostedHandler) notifySection(c *gin.Context, o *database.Owner) (templa
 	}
 	b.WriteString(`> Send me the weekly digest</label><button>Save</button></form></section>`)
 	return template.HTML(b.String()), nil
+}
+
+// CreateTelegramCodeForm mints the one-time code an owner sends to the bot as
+// /link CODE; the code shows once in the settings page flash (?tg=).
+func (h *HostedHandler) CreateTelegramCodeForm(c *gin.Context) {
+	o := ownerFrom(c)
+	if h.Telegram == nil || !h.Telegram.Enabled() {
+		// No bot is polling this deployment: a minted code could never be
+		// claimed, so don't offer one.
+		c.Redirect(http.StatusSeeOther, "/owner/settings")
+		return
+	}
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	code := strings.ToUpper(hex.EncodeToString(b[:]))
+	if err := h.DB.CreateTelegramLinkCode(c.Request.Context(), o.ID, services.HashAPIKey(code), time.Now().Add(15*time.Minute)); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Redirect(http.StatusSeeOther, "/owner/settings?tg="+code)
+}
+
+func (h *HostedHandler) UnlinkTelegramForm(c *gin.Context) {
+	o := ownerFrom(c)
+	if err := h.DB.UnlinkTelegram(c.Request.Context(), o.ID); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Redirect(http.StatusSeeOther, "/owner/settings")
 }
 
 func (h *HostedHandler) SaveDigestForm(c *gin.Context) {
