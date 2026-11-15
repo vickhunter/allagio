@@ -1,0 +1,23 @@
+affilio-api/internal/handlers/orp_outcomes.go
+  s_7e484d91fceb6c::t_5d727ee5e4dba3 28,49-57
+  s_7e484d91fceb6c::t_df8883a05e8d64 11
+  s_7e484d91fceb6c::t_e786094b9c2583 16-19
+affilio-api/internal/database/orp_rechecks.go
+  s_7e484d91fceb6c::t_b9cf433574c938 1-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9aa28e5af64de2e50b44be12c6df66f527a275f9",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
