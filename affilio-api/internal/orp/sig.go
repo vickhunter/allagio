@@ -76,6 +76,44 @@ func KeyMatches(jwk map[string]any, kid string) bool {
 	return stored == kid
 }
 
+// Signer signs host-issued records — the deal certificate and any signed
+// receipt — so a party can verify them offline against the public JWK the
+// discovery document lists under keys.
+type Signer struct {
+	Kid string
+	Key ed25519.PrivateKey
+}
+
+// PublicJWK is the verifying half of the signer, shaped like a party JWK.
+func (s *Signer) PublicJWK() map[string]any {
+	pub, _ := s.Key.Public().(ed25519.PublicKey)
+	return map[string]any{
+		"kty": "OKP", "crv": "Ed25519",
+		"x": base64.RawURLEncoding.EncodeToString(pub),
+		"kid": s.Kid, "alg": "EdDSA", "use": "sig",
+	}
+}
+
+// Sign returns obj with a sig field in the same compact form party envelopes
+// use: base64url(header) + ".." + base64url(Ed25519 over the JCS of obj minus
+// sig). VerifyEnvelopeSig checks the result.
+func (s *Signer) Sign(obj map[string]any) map[string]any {
+	unsigned := make(map[string]any, len(obj))
+	for key, item := range obj {
+		if key != "sig" {
+			unsigned[key] = item
+		}
+	}
+	header, _ := json.Marshal(map[string]any{"alg": "EdDSA", "kid": s.Kid})
+	signature := ed25519.Sign(s.Key, []byte(Canonicalize(unsigned)))
+	out := make(map[string]any, len(unsigned)+1)
+	for key, item := range unsigned {
+		out[key] = item
+	}
+	out["sig"] = base64.RawURLEncoding.EncodeToString(header) + ".." + base64.RawURLEncoding.EncodeToString(signature)
+	return out
+}
+
 // VerifyEnvelopeSig checks sig against the public JWK over the JCS form of the
 // envelope minus sig. The header is a base64url JSON object with alg EdDSA and
 // a kid; the signature is Ed25519. A malformed header, an unknown kid, or a

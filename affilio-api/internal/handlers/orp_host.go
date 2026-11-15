@@ -34,6 +34,9 @@ type ORPHost struct {
 	// FederationFetch is the host-to-host fetch seam (discovery, keys, relay).
 	// Nil uses the SSRF-guarded readiness client.
 	FederationFetch fedFetch
+	// Signer signs host-issued records (the deal certificate). Nil disables
+	// signing: discovery publishes no keys and the certificate endpoint is 503.
+	Signer *orp.Signer
 }
 
 // Mount registers the ORP routes. POST /orp is the message endpoint.
@@ -44,6 +47,7 @@ func (h *ORPHost) Mount(r gin.IRouter) {
 	r.POST(MonetizationSuggestPath, h.Monetize)
 	r.POST("/orp/join", h.Join)
 	r.GET("/orp/keys/:opaque", h.PartyKeysEndpoint)
+	r.GET("/orp/deals/:id/certificate", h.DealCertificate)
 	r.POST("/v1/party-claims", h.PartyClaim)
 	r.GET("/claim/:code", h.ClaimPage)
 	r.POST("/claim/:code", h.ClaimPost)
@@ -89,6 +93,10 @@ func (h *ORPHost) claimsMode() string {
 // Discovery is GET /.well-known/orp.json. It requires no credential.
 func (h *ORPHost) Discovery(c *gin.Context) {
 	origin, dns := h.origin(c)
+	if h.Signer != nil {
+		writeORP(c, http.StatusOK, orp.DiscoveryDocument(origin, dns, h.claimsMode(), h.Signer.PublicJWK()), true)
+		return
+	}
 	writeORP(c, http.StatusOK, orp.DiscoveryDocument(origin, dns, h.claimsMode()), true)
 }
 
