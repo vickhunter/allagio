@@ -29,6 +29,10 @@ func ServeOpenAPI(publicBase string) gin.HandlerFunc {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Cache-Control", "public, max-age=300")
 		c.Header("X-Content-Type-Options", "nosniff")
+		if c.Request.Method == http.MethodHead {
+			writeMethodBody(c, http.StatusOK, "application/json; charset=utf-8", []byte(body))
+			return
+		}
 		c.Data(http.StatusOK, "application/json; charset=utf-8", []byte(body))
 	}
 }

@@ -13,4 +13,4 @@ export const whyCards = [
     body: 'Nothing is published or paid without your approval — unless you choose to let your agent run a step on its own.',
   },
 ]
-export const whyTrust = 'Built on ORP, the Open Rails Protocol — an open standard, so your deals and receipts aren’t locked into one platform.'
+export const whyTrust = 'Built on ORP, the Open Rails Protocol — an open protocol, so your deals and receipts aren’t locked into one platform.'

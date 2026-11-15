@@ -14,7 +14,7 @@ test('setup copy stays the public join line and the navigation target is the age
   assert.equal(heroH1, 'Agents do the deal. You keep the approval.')
   assert.equal(heroSupport, 'Brands get promoted and pay only when it sells. Creators earn from the posts they already publish. Your AI agent finds the partners, agrees the terms and places the offer — you approve what matters.')
   assert.equal(manualSetup, 'Setup is manual. You send the bearer yourself.')
-  assert.equal(comingLine, 'Offer suggestions while you write: Coming.')
+  assert.equal(comingLine, 'Offer suggestions while you write: Works today.')
   assert.equal(noSignIn, 'No sign-in link.')
   assert.deepEqual(setupSteps, [
     'POST /v1/agent-tokens with {}.',

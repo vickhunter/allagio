@@ -170,7 +170,6 @@ func main() {
 	r.GET("/.well-known/allagio.json", handlers.ServeAllagioDiscovery(cfg.PublicBaseURL))
 	r.GET("/.well-known/agent-card.json", handlers.ServeAgentCard(cfg.PublicBaseURL))
 	r.GET("/.well-known/agent.json", handlers.ServeAgentCard(cfg.PublicBaseURL))
-	r.GET("/openapi.json", handlers.ServeOpenAPI(cfg.PublicBaseURL))
 
 	v1 := r.Group("/v1")
 	v1.Use(middleware.MaxRequestBody(8 << 20))

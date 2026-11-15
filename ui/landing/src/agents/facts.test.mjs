@@ -50,7 +50,7 @@ test('llms.txt matches the agent facts', () => {
   assert.equal(text.includes('The deal stays awaiting'), false)
   assert.match(text, /409 state_conflict/)
   assert.match(text, /The obligation state becomes claimed/)
-  assert.match(text, /Execute does not read proof_url/)
+  assert.match(text, /the host fetches that page and issues a receipt/)
   assert.match(text, /id is 8 to 128 characters of letters, digits, underscore, dot, colon, or hyphen/)
   assert.match(text, /A 6-character id is HTTP 400 invalid_message on \/id/)
   assert.match(text, /A hello body requires versions/)

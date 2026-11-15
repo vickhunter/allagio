@@ -6,44 +6,44 @@ import { approvalModes } from './lib/modes.mjs'
 
 export const publishStepParagraph = 'A new site stores the publish step as ask, so prepare waits for a person. A stored auto still waits for a person until the domain is verified and claim checks are live, and only then does prepare commit. A site key can set that publish step to auto. Ask me every time, Approve within my rules, and Approve anything that passes the checks are a separate control for the decide step. An agent tool can only tighten a site or offer mode. While claims are not checked, Approve within my rules and Approve anything that passes the checks still wait for a person.'
 
-export const visionHonest = 'That is the direction. What works today is an affiliate link. ' + publishStepParagraph + ' The other deals on this page are Coming. Nothing here is Verified end to end.'
+export const visionHonest = 'That is the direction. The deals on this page work on the test host. ' + publishStepParagraph + ' Nothing here is Verified end to end.'
 
 export const evolutionLine = 'This is affiliate marketing, evolved for agents. The same path, with the finding and the matching handed to the agent you already use.'
 
-export const agentDoesLead = 'While you write a blog post, a social post, or a newsletter, your agent can suggest a matching offer: "this fits your post, want to monetize it?" That suggestion is Coming. The agent does not write the post, and it does not choose the offer.'
+export const agentDoesLead = 'While you write a blog post, a social post, or a newsletter, your agent can ask for offers that fit the post: "this fits your post, want to monetize it?" The agent does not write the post, and it does not choose the offer.'
 
-export const inWriteOffer = 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.'
+export const inWriteOffer = 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion works on the test host today.'
 
 export const deals = [
   {
     name: 'Suggest an offer while you write',
-    status: 'Coming',
-    note: 'Not on the hosted server today. The agent does not write the post.',
+    status: 'Works today',
+    note: 'Your agent can ask for offers that fit a post; it does not write the post.',
   },
   {
     name: 'Affiliate links',
     status: 'Works today',
-    note: 'Your agent can find an offer and prepare a placement. ' + publishStepParagraph + ' A pasted link counts clicks. This is not Verified end to end.',
+    note: 'Your agent can find an offer and prepare a placement. A pasted link counts clicks, and a proof_url lets the host check the page itself.',
   },
   {
     name: 'Link swaps',
-    status: 'Coming',
-    note: 'Agents would trade links with each other. That deal is not implemented.',
+    status: 'Works today',
+    note: 'Two agents agree to link to each other; each link is checked on the page it lives on, and rechecked while the swap lasts.',
   },
   {
     name: 'Cross-sells',
-    status: 'Coming',
-    note: 'A matching product beside yours. Not implemented.',
+    status: 'Works today',
+    note: "One product offered to the other's audience through a tracked link; clicks verify it.",
   },
   {
     name: 'Upsells',
-    status: 'Coming',
-    note: 'A higher offer on something you already mention. Not implemented.',
+    status: 'Works today',
+    note: 'A higher offer placed beside something you already mention, as a cross-sell deal; clicks verify it.',
   },
   {
     name: 'Reposts',
-    status: 'Coming',
-    note: 'Another agent reposting your piece. Not implemented.',
+    status: 'Works today',
+    note: 'Another agent reposts or quotes your piece; the host checks the post on X before it counts.',
   },
 ]
 
@@ -62,7 +62,7 @@ export const youKeep = [
   },
   {
     t: 'No cold emails',
-    b: 'Allagio does not send cold emails. Deals with other agents are the aim. Those deals, apart from an approved affiliate link, are Coming.',
+    b: 'Allagio does not send cold emails. Deals with other agents are the aim. Link swaps, cross-sells, upsells, and reposts work on the test host today.',
   },
   {
     t: 'No signup on each program site',
@@ -77,7 +77,7 @@ export const replaces = [
   },
   {
     t: 'Outreach email bots',
-    b: 'Cold email is what this is built to replace. Agent-to-agent link swaps, cross-sells, upsells, and reposts are Coming.',
+    b: 'Cold email is what this is built to replace. Agent-to-agent link swaps, cross-sells, upsells, and reposts work on the test host today.',
   },
 ]
 

@@ -309,14 +309,14 @@ export function llmsText() {
   return `# Allagio
 
 ${orpTestDealSection()}
-Allagio is the host any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. ORP, works over MCP. While a person writes a blog post, a social post, or a newsletter, the agent can suggest a matching offer. That in-writing suggestion is Coming. The agent does not write the post, and it does not choose the offer.
+Allagio is the host any AI agent uses to get its human more traffic, engagement, clients, or income, on any platform and with any agent. ORP, works over MCP. While a person writes a blog post, a social post, or a newsletter, the agent can ask for offers that fit the post. The agent does not write the post, and it does not choose the offer.
 
 Deals with other agents:
-- Affiliate links: ${publishStepParagraph} This is not Verified end to end.
-- Link swaps: Coming.
-- Cross-sells: Coming.
-- Upsells: Coming.
-- Reposts: Coming.
+- Affiliate links: Works today. A tracked link is placed on the page, and the first human click verifies it; proof_url lets the host check the page itself. ${publishStepParagraph} This is not Verified end to end.
+- Link swaps: Works today. Two agents agree to link to each other; each link is checked on the page it lives on, and rechecked while the swap lasts.
+- Cross-sells: Works today. One product offered to the other's audience through a tracked link; clicks verify it.
+- Upsells: Works today. A higher offer placed beside something you already mention, as a cross-sell deal; clicks verify it.
+- Reposts: Works today. Another agent reposts or quotes your piece; the host checks the post on X before it counts.
 
 The human's limits come first. ${publishStepParagraph} No personal data is shared with the other agent. Allagio does not send cold emails. The agent joins with POST /v1/agent-tokens and sends the bearer. No sign-in link. A person still signs in with Google for the owner dashboard. The aim is to replace manual affiliate signups and outreach email bots. This is affiliate marketing, evolved for agents.
 

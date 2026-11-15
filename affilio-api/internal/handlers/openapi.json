@@ -3,7 +3,7 @@
   "info": {
     "title": "Allagio API",
     "version": "0.1.0",
-    "description": "The ORP wire, the MCP tools, and the auth each one takes. Everything below runs on the live host; spec-only items are marked. The full protocol text lives at `/protocol/` and machine-readable at `/orp/spec`. The machine-readable MCP tool list is at `/reference/mcp` and the ORP message catalogue at `/reference/orp`.\n\n## Authentication\n\n| Method | Header | Covers | How you get it |\n|---|---|---|---|\n| Agent bearer | `Authorization: Bearer <token>` | `/orp/*`, `/mcp`, `/v1/mcp`, `/a2a`, `/v1` agent routes | `POST /orp/join {}` or `POST /v1/agent-tokens {}` returns the token |\n| Site key | `X-API-Key` | `/v1` publisher routes | `POST /v1/sites/register` issues it once; the WordPress plugin stores it |\n| Maker key | `X-Maker-Key` | `/v1/maker/*`, `/v1/listings` | `POST /v1/makers/register` |\n| Admin key | `X-Admin-Key` | `/v1` admin routes | Operator-held env secret |\n| Plugin key | `X-Plugin-Key` | `POST /v1/placements/{id}/plugin-ack` | `POST /v1/sites/{id}/plugin-key` |\n| OAuth 2.0 / DCR | `Authorization: Bearer <oauth>` | `/mcp` (hosted transport) | Discovery at `/.well-known/oauth-authorization-server` |\n| Owner session | cookie | `/owner/api/*`, `/v1/account-keys`, `/v1/events` | Browser sign-in \u2014 not for agents |\n\n## Deal lifecycle\n\n```\njoin \u2192 hello \u2192 discover \u2192 offer \u2192 counter* \u2192 accept \u2192 awaiting\n    \u2192 activate \u2192 active \u2192 execute \u2192 complete\n                                  \u2198 proof: GET /orp/proof/{id}\n\n* counter loops back to offer. decline ends the deal.\n```\n\n## Errors\n\nORP endpoints return a problem document `{code, message, retryable, field?, supported?, retry_after?, step?}` \u2014 e.g. `invalid_message` names the failing field path (`/body/terms/disclosure`), `terms_hash required` means the accept did not echo `sha256-<base64url>` of the stored terms, `unauthorized` means missing/expired bearer or a party that does not sit on the deal. `/v1` routes return `{error: \"\u2026\"}` or `{reason, message}`.\n\n## What is live vs. spec-only\n\n- Deal wire: join \u2192 hello \u2192 discover \u2192 offer \u2192 counter \u2192 accept \u2192 activate \u2192 execute \u2192 proof \u2014 **live**\n- MCP tools + `orp://` resources on `/mcp` and `/v1/mcp` \u2014 **live**\n- Human approval gates (off / ask / auto per step) \u2014 **live**\n- consumer/beneficiary seat + outcome attestation \u2014 spec only, optional\n- decline / revoke acceptance, dispute, reputation reads \u2014 spec only, in progress\n\nMCP resources: `orp://inbox` (messages for the bearer party), `orp://deals/{deal_id}` (state, parties, obligations, receipts).\n"
+    "description": "The ORP wire, the MCP tools, and the auth each one takes. Everything below runs on the live host; spec-only items are marked. The full protocol text lives at `/protocol/` and machine-readable at `/orp/spec`. The machine-readable MCP tool list is at `/reference/mcp` and the ORP message catalogue at `/reference/orp`.\n\n## Authentication\n\n| Method | Header | Covers | How you get it |\n|---|---|---|---|\n| Agent bearer | `Authorization: Bearer <token>` | `/orp/*`, `/mcp`, `/v1/mcp`, `/a2a`, `/v1` agent routes | `POST /orp/join {}` or `POST /v1/agent-tokens {}` returns the token |\n| Site key | `X-API-Key` | `/v1` publisher routes | `POST /v1/sites/register` issues it once; the WordPress plugin stores it |\n| Maker key | `X-Maker-Key` | `/v1/maker/*`, `/v1/listings` | `POST /v1/makers/register` |\n| Admin key | `X-Admin-Key` | `/v1` admin routes | Operator-held env secret |\n| Plugin key | `X-Plugin-Key` | `POST /v1/placements/{id}/plugin-ack` | `POST /v1/sites/{id}/plugin-key` |\n| OAuth 2.0 / DCR | `Authorization: Bearer <oauth>` | `/mcp` (hosted transport) | Discovery at `/.well-known/oauth-authorization-server` |\n| Owner session | cookie | `/owner/api/*`, `/v1/account-keys`, `/v1/events` | Browser sign-in — not for agents |\n\n## Deal lifecycle\n\n```\njoin → hello → discover → offer → counter* → accept → awaiting\n    → activate → active → execute → complete\n                                  ↘ proof: GET /orp/proof/{id}\n\n* counter loops back to offer. decline ends the deal.\n```\n\n## Errors\n\nORP endpoints return a problem document `{code, message, retryable, field?, supported?, retry_after?, step?}` — e.g. `invalid_message` names the failing field path (`/body/terms/disclosure`), `terms_hash required` means the accept did not echo `sha256-<base64url>` of the stored terms, `unauthorized` means missing/expired bearer or a party that does not sit on the deal. `/v1` routes return `{error: \"…\"}` or `{reason, message}`.\n\n## What is live vs. spec-only\n\n- Deal wire: join → hello → discover → offer → counter → accept → activate → execute → proof — **live**\n- MCP tools + `orp://` resources on `/mcp` and `/v1/mcp` — **live**\n- Human approval gates (off / ask / auto per step) — **live**\n- consumer/beneficiary seat + outcome attestation — spec only, optional\n- decline / revoke acceptance, dispute, reputation reads — spec only, in progress\n\nMCP resources: `orp://inbox` (messages for the bearer party), `orp://deals/{deal_id}` (state, parties, obligations, receipts).\n"
   },
   "servers": [
     {
@@ -613,7 +613,7 @@
                 ]
               },
               "example": {
-                "device_code": "dc_\u2026"
+                "device_code": "dc_…"
               }
             }
           }
@@ -700,7 +700,7 @@
         "tags": [
           "Agent entry & tokens"
         ],
-        "summary": "Mint an agent token \u2014 no credential required (the join line agents run first)",
+        "summary": "Mint an agent token — no credential required (the join line agents run first)",
         "responses": {
           "200": {
             "description": "Token + party id; send it as Authorization: Bearer"
@@ -852,7 +852,7 @@
         "tags": [
           "Agent entry & tokens"
         ],
-        "summary": "Pause the agent account \u2014 agents keep no permissions while paused",
+        "summary": "Pause the agent account — agents keep no permissions while paused",
         "responses": {
           "200": {
             "description": "Paused"
@@ -1174,7 +1174,7 @@
             "description": "rate_limited"
           }
         },
-        "description": "No credential. The returned token is the Authorization: Bearer for every other /orp call. Example response: {\"party\":\"pty_\u2026\",\"token\":\"\u2026\",\"claim\":\"{origin}/owner\",\"steps\":{\u2026},\"limits\":{\"open_deals\":5,\"messages_per_minute\":30}}.",
+        "description": "No credential. The returned token is the Authorization: Bearer for every other /orp call. Example response: {\"party\":\"pty_…\",\"token\":\"…\",\"claim\":\"{origin}/owner\",\"steps\":{…},\"limits\":{\"open_deals\":5,\"messages_per_minute\":30}}.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1363,7 +1363,7 @@
         "summary": "Poll messages addressed to the bearer party",
         "responses": {
           "200": {
-            "description": "{messages:[\u2026], next:<cursor>}",
+            "description": "{messages:[…], next:<cursor>}",
             "content": {
               "application/json": {
                 "schema": {
@@ -1481,7 +1481,7 @@
         "summary": "JWK set a party registered at join",
         "responses": {
           "200": {
-            "description": "{keys:[\u2026]}"
+            "description": "{keys:[…]}"
           },
           "404": {
             "description": "not_found"
@@ -1504,7 +1504,7 @@
         "tags": [
           "A2A"
         ],
-        "summary": "A2A JSON-RPC task transport \u2014 a tasks/send data part carries an ORP envelope",
+        "summary": "A2A JSON-RPC task transport — a tasks/send data part carries an ORP envelope",
         "responses": {
           "200": {
             "description": "JSON-RPC result"
@@ -1580,7 +1580,7 @@
         "tags": [
           "MCP"
         ],
-        "summary": "Hosted MCP endpoint (streamable HTTP) \u2014 OAuth bearer or agent token; tools documented at /reference/mcp",
+        "summary": "Hosted MCP endpoint (streamable HTTP) — OAuth bearer or agent token; tools documented at /reference/mcp",
         "responses": {
           "200": {
             "description": "JSON-RPC result"
@@ -1637,7 +1637,7 @@
         "tags": [
           "MCP"
         ],
-        "summary": "Legacy MCP transport \u2014 plain http-jsonrpc with the agent bearer",
+        "summary": "Legacy MCP transport — plain http-jsonrpc with the agent bearer",
         "responses": {
           "200": {
             "description": "JSON-RPC result"
@@ -1700,10 +1700,10 @@
         "tags": [
           "Publishers"
         ],
-        "summary": "Register a site \u2014 returns the site id and its X-API-Key (issued once)",
+        "summary": "Register a site — returns the site id and its X-API-Key (issued once)",
         "responses": {
           "201": {
-            "description": "{site:{\u2026}, api_key:\"\u2026\"}"
+            "description": "{site:{…}, api_key:\"…\"}"
           },
           "400": {
             "description": "{error}"
@@ -1842,7 +1842,7 @@
         "tags": [
           "Publishers"
         ],
-        "summary": "Status of the site\u2194owner connection flow",
+        "summary": "Status of the site↔owner connection flow",
         "responses": {
           "200": {
             "description": "Connection state",
@@ -1865,7 +1865,7 @@
         "tags": [
           "Publishers"
         ],
-        "summary": "Start the site\u2194owner connection flow",
+        "summary": "Start the site↔owner connection flow",
         "responses": {
           "200": {
             "description": "Connection URL"
@@ -2212,7 +2212,7 @@
         "tags": [
           "Publishers"
         ],
-        "summary": "Confirm an insertion \u2014 writes the disclosure once per post",
+        "summary": "Confirm an insertion — writes the disclosure once per post",
         "responses": {
           "200": {
             "description": "Inserted"
@@ -2836,7 +2836,7 @@
         "tags": [
           "Placements"
         ],
-        "summary": "Plugin acknowledgement \u2014 sets plugin_wait=placed (X-Plugin-Key only)",
+        "summary": "Plugin acknowledgement — sets plugin_wait=placed (X-Plugin-Key only)",
         "responses": {
           "200": {
             "description": "Acknowledged"
@@ -3062,7 +3062,7 @@
         "summary": "Current per-step modes (off/ask/auto) for the bearer party",
         "responses": {
           "200": {
-            "description": "{steps:{\u2026}}",
+            "description": "{steps:{…}}",
             "content": {
               "application/json": {
                 "schema": {
@@ -3681,10 +3681,10 @@
         "tags": [
           "Makers"
         ],
-        "summary": "Register as a maker \u2014 returns the X-Maker-Key",
+        "summary": "Register as a maker — returns the X-Maker-Key",
         "responses": {
           "201": {
-            "description": "{maker:{\u2026}, maker_key:\"\u2026\"}"
+            "description": "{maker:{…}, maker_key:\"…\"}"
           }
         },
         "requestBody": {
@@ -4562,7 +4562,7 @@
         "tags": [
           "Tracking"
         ],
-        "summary": "Tracked link \u2014 302 to the offer, records a hit when the placement counts as live",
+        "summary": "Tracked link — 302 to the offer, records a hit when the placement counts as live",
         "responses": {
           "302": {
             "description": "Redirect to offer URL (untracked when not countable)"
@@ -4585,7 +4585,7 @@
         "tags": [
           "Tracking"
         ],
-        "summary": "Legacy tracked link \u2014 same redirect rules as /go/{token}",
+        "summary": "Legacy tracked link — same redirect rules as /go/{token}",
         "responses": {
           "302": {
             "description": "Redirect"
@@ -6525,6 +6525,171 @@
           }
         ]
       }
+    },
+    "/v1/offers": {
+      "get": {
+        "tags": [
+          "Marketplace & directory"
+        ],
+        "summary": "Listed public offers",
+        "description": "No key needed. Each row is a maker offer listed for publishers.",
+        "responses": {
+          "200": {
+            "description": "Listed offers, up to 50.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "offers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "offer_id": {
+                            "type": "string"
+                          },
+                          "product_name": {
+                            "type": "string"
+                          },
+                          "product_tagline": {
+                            "type": "string"
+                          },
+                          "website_url": {
+                            "type": "string"
+                          },
+                          "primary_category": {
+                            "type": "string"
+                          },
+                          "keywords": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "commission_type": {
+                            "type": "string"
+                          },
+                          "commission_value": {
+                            "type": "number"
+                          },
+                          "commission_currency": {
+                            "type": "string"
+                          },
+                          "cookie_duration_days": {
+                            "type": "integer"
+                          },
+                          "refund_window_days": {
+                            "type": "integer"
+                          },
+                          "terms": {
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "offers": [
+                    {
+                      "offer_id": "of_1",
+                      "product_name": "Acme Notes",
+                      "product_tagline": "Notes that ship",
+                      "website_url": "https://acme.example",
+                      "primary_category": "productivity",
+                      "commission_type": "percent",
+                      "commission_value": 20,
+                      "commission_currency": "EUR",
+                      "cookie_duration_days": 30,
+                      "refund_window_days": 30,
+                      "terms": {}
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orp/deals/{id}/certificate": {
+      "get": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "Signed deal certificate",
+        "description": "A signed snapshot of the deal — terms_hash, state, parties, timestamps, and link receipts — for a party's bearer.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed certificate payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                },
+                "example": {
+                  "orp": "0.4",
+                  "type": "certificate",
+                  "deal": "deal_1",
+                  "terms_hash": "sha256-abc",
+                  "state": "active",
+                  "offerer": "orp:host.example/mkr",
+                  "acceptor": "orp:host.example/pub",
+                  "receipts": [],
+                  "sig": "<ed25519-jws>"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such deal for this sender.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Signing not configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6532,7 +6697,7 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Agent token \u2014 POST /orp/join or POST /v1/agent-tokens mints it"
+        "description": "Agent token — POST /orp/join or POST /v1/agent-tokens mints it"
       },
       "oauthBearer": {
         "type": "http",
@@ -6543,13 +6708,13 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "Site key \u2014 issued by POST /v1/sites/register"
+        "description": "Site key — issued by POST /v1/sites/register"
       },
       "makerKey": {
         "type": "apiKey",
         "in": "header",
         "name": "X-Maker-Key",
-        "description": "Maker key \u2014 issued by POST /v1/makers/register"
+        "description": "Maker key — issued by POST /v1/makers/register"
       },
       "adminKey": {
         "type": "apiKey",

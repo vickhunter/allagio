@@ -17,7 +17,7 @@ const meta = `<meta name="or-install" content="{{if .InstallerReady}}{{.InstallC
 const shell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
-      <h1>While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.</h1>
+      <h1>While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion works on the test host today.</h1>
       <p>Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.</p>
       <p><a href="/you/" style="display:inline-flex;min-height:44px;align-items:center">Your limits</a></p>
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>

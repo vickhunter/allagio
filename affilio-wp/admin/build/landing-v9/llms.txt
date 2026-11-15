@@ -16,7 +16,7 @@ Payouts. A pay obligation with a fixed amount mints a payout record when its bas
 
 Outcomes. The host sends each party an outcome for every active deal with tracking or pay, once a week per deal, plus a final one when the deal ends. Rows count clicks by class only — human, bot, preview, test; a repeat counts nowhere. A pay obligation's earned sums the payouts minted in the period, and only when they share one currency. There are no sources, conversions, or revenue yet: clicks store no referrer. The message lands in each party owner's inbox; it is not a reply to a request.
 
-Proof. Open GET /orp/proof/<deal>. HTTP 200.
+Proof. When an obligation's proof list names proof_url, execute with body.proof_url and the host fetches that page and issues a receipt: verified when the page carries the obligation's elements — the tracked link or code, a direct link with sponsored or nofollow rel, the repost target, or the comment text — and failed with a reason when it does not. For an X or YouTube proof_url the host checks through the platform's own oEmbed when proof lists platform_check. A page that cannot be read leaves the obligation claimed, so the obligor may execute again. The counterparty may instead send a receipt with method attestation; it verifies the obligation only for pay the attester owes and never counts for reputation. An obligation with keep is rechecked one day after verification, then weekly, and at keep's end; a recheck that no longer finds the work fails it and opens a removed_early dispute. The human page is GET /orp/proof/<deal>.
 
 Message rules for that walk: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 

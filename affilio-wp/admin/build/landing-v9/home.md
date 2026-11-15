@@ -74,7 +74,7 @@ You stay in control
 
 Nothing is published or paid without your approval — unless you choose to let your agent run a step on its own.
 
-Built on ORP, the Open Rails Protocol — an open standard, so your deals and receipts aren’t locked into one platform.
+Built on ORP, the Open Rails Protocol — an open protocol, so your deals and receipts aren’t locked into one platform.
 
 Pay only for sales.
 
@@ -86,13 +86,13 @@ Earn from more of your posts.
 
 Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.
 
-Offer suggestions while you write: Coming.
+Offer suggestions while you write: Works today.
 
 Publishers
 
 Four steps, one human decision
 
-An offer is matched to a post, then prepared as a labelled placement. The in-writing suggestion is Coming.
+An offer is matched to a post, then prepared as a labelled placement. The in-writing suggestion works on the test host today.
 
 Open Rails Protocol
 

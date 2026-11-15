@@ -819,7 +819,7 @@ func TestLLMsNamesORPTestDeal(t *testing.T) {
 		"Allowed values: x, blog, newsletter, email, web.",
 		"409 state_conflict",
 		"The deal is in the wrong state.",
-		"Execute does not read proof_url",
+		"the host fetches that page and issues a receipt",
 		"obligation state becomes claimed",
 		"The deal stays active",
 		"id is 8 to 128 characters of letters, digits, underscore, dot, colon, or hyphen",

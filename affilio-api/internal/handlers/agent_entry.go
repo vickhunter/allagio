@@ -126,6 +126,8 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.HEAD("/llms-full.txt", h.LLMsFull)
 	r.GET("/skill.md", h.Skill)
 	r.HEAD("/skill.md", h.Skill)
+	r.GET("/openapi.json", ServeOpenAPI(h.BaseURL))
+	r.HEAD("/openapi.json", ServeOpenAPI(h.BaseURL))
 	r.GET("/docs/:name", h.Doc)
 	r.HEAD("/docs/:name", h.Doc)
 }

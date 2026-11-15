@@ -49,7 +49,7 @@ test('the home first screen connects the agent with a setup link and the public 
       const details = page.locator('.setup-details')
       assert.match(await details.innerText(), new RegExp(joinPrompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
       assert.equal(await details.locator('a[href="/llms.txt"]').count(), 1)
-      const coming = page.locator('#publishers').getByText('Offer suggestions while you write: Coming.')
+      const coming = page.locator('#publishers').getByText('Offer suggestions while you write: Works today.')
       assert.equal(await coming.count(), 1)
       if (viewport.width < 768) {
         await page.getByRole('button', { name: 'Menu', exact: true }).click()

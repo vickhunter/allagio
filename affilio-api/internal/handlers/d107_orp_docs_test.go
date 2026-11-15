@@ -172,7 +172,7 @@ func docContentType(t *testing.T, path string) string {
 		return "text/plain"
 	case path == "/skill.md" || strings.HasSuffix(path, ".md"):
 		return "text/markdown"
-	case path == "/.well-known/orp.json" || path == "/.well-known/dcp.json" || strings.HasPrefix(path, "/orp/schemas") || strings.HasPrefix(path, "/orp/examples"):
+	case path == "/openapi.json" || path == "/.well-known/orp.json" || path == "/.well-known/dcp.json" || strings.HasPrefix(path, "/orp/schemas") || strings.HasPrefix(path, "/orp/examples"):
 		return "application/json"
 	case strings.HasPrefix(path, "/landing-v9/"):
 		return "text/html"

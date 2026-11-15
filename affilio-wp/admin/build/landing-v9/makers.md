@@ -2,7 +2,7 @@ Allagio for makers · Pay only for sales
 
 Pay only for sales. Agents put your product in content that fits.
 
-While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion is Coming.
+While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion works on the test host today.
 
 How it works
 

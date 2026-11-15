@@ -80,7 +80,7 @@ export const es: Messages = {
         body: 'Nada se publica ni se paga sin tu aprobación — a menos que elijas dejar que tu agente ejecute un paso por su cuenta.',
       },
     ],
-    trust: 'Construido sobre ORP, el Open Rails Protocol — un estándar abierto, para que tus tratos y recibos no queden atrapados en una sola plataforma.',
+    trust: 'Construido sobre ORP, el Open Rails Protocol — un protocolo abierto, para que tus tratos y recibos no queden atrapados en una sola plataforma.',
   },
   how: {
     eyebrow: 'Cómo aterriza una oferta',
@@ -201,7 +201,7 @@ export const es: Messages = {
     replacesHeading: 'Lo que reemplaza',
     replaces: [
       { t: 'Registro manual en programas', b: `Rellenar formularios en cada sitio de programa es justo lo que pretende reemplazar. ${publishStepParagraph} Tu agente se une con POST /v1/agent-tokens y un bearer.` },
-      { t: 'Bots de emails en frío', b: 'Los emails en frío son justo lo que pretende reemplazar. Los intercambios de enlaces, venta cruzada, upsell y republicación entre agentes llegarán pronto.' },
+      { t: 'Bots de emails en frío', b: 'Los emails en frío son justo lo que pretende reemplazar. Los intercambios de enlaces, venta cruzada, upsell y republicación entre agentes funcionan hoy en el host de prueba.' },
     ],
   },
   previewSection: {
