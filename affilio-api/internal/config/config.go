@@ -45,7 +45,8 @@ type Config struct {
 	PolarWebhookSecret        string
 
 	// Outbound email for the owner weekly digest. Disabled unless
-	// SMTPHost and DigestFrom are set; SMTPPort defaults to 587.
+	// SMTPHost and DigestFrom are set; SMTPPort defaults to 587
+	// (STARTTLS); 465 uses implicit TLS.
 	SMTPHost     string
 	SMTPPort     string
 	SMTPUser     string

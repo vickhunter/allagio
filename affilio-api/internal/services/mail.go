@@ -45,7 +45,16 @@ func (m *Mailer) Send(_ context.Context, to, subject, body string) error {
 		port = "587"
 	}
 	addr := net.JoinHostPort(m.Host, port)
-	conn, err := (&net.Dialer{Timeout: 10 * time.Second}).Dial("tcp", addr)
+	tlsConfig := &tls.Config{ServerName: m.Host, MinVersion: tls.VersionTLS12}
+	var conn net.Conn
+	var err error
+	// Port 465 is implicit TLS (e.g. smtp.mx.cloudflare.net); other ports
+	// upgrade with STARTTLS below.
+	if port == "465" {
+		conn, err = tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", addr, tlsConfig)
+	} else {
+		conn, err = (&net.Dialer{Timeout: 10 * time.Second}).Dial("tcp", addr)
+	}
 	if err != nil {
 		return err
 	}
@@ -55,9 +64,11 @@ func (m *Mailer) Send(_ context.Context, to, subject, body string) error {
 		return err
 	}
 	defer client.Close()
-	if ok, _ := client.Extension("STARTTLS"); ok {
-		if err = client.StartTLS(&tls.Config{ServerName: m.Host, MinVersion: tls.VersionTLS12}); err != nil {
-			return err
+	if port != "465" {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err = client.StartTLS(tlsConfig); err != nil {
+				return err
+			}
 		}
 	}
 	if m.User != "" {
