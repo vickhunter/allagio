@@ -44,6 +44,14 @@ type Config struct {
 	LemonSqueezyWebhookSecret string
 	PolarWebhookSecret        string
 
+	// Outbound email for the owner weekly digest. Disabled unless
+	// SMTPHost and DigestFrom are set; SMTPPort defaults to 587.
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPassword string
+	DigestFrom   string
+
 	// ClaimsCheck is the resolved CLAIMS_CHECK mode: stub, real, or off-local.
 	ClaimsCheck    string
 	claimsCheckErr error
@@ -102,6 +110,11 @@ func Load() Config {
 		StripeWebhookSecret:       os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		LemonSqueezyWebhookSecret: os.Getenv("LEMONSQUEEZY_WEBHOOK_SECRET"),
 		PolarWebhookSecret:        os.Getenv("POLAR_WEBHOOK_SECRET"),
+		SMTPHost:                  os.Getenv("SMTP_HOST"),
+		SMTPPort:                  os.Getenv("SMTP_PORT"),
+		SMTPUser:                  os.Getenv("SMTP_USER"),
+		SMTPPassword:              os.Getenv("SMTP_PASSWORD"),
+		DigestFrom:                getEnvValue("DIGEST_FROM", "Allagio <digest@allagio.dev>"),
 		ClaimsCheck:               claims,
 		claimsCheckErr:            claimsErr,
 	}

@@ -116,7 +116,29 @@ func (h *HostedHandler) notifySection(c *gin.Context, o *database.Owner) (templa
 		b.WriteString(`<p class="caption">A signing secret is set. Verify <code>X-Allagio-Signature</code> as <code>t=&lt;unix&gt;,v1=&lt;hmac-sha256 hex of t+body&gt;</code>.</p>`)
 	}
 	b.WriteString(`</section>`)
+	optOut, _, err := h.DB.OwnerDigestPrefs(c.Request.Context(), o.ID)
+	if err != nil {
+		return "", err
+	}
+	b.WriteString(`<section id="digest"><h2>Weekly digest email</h2>`)
+	b.WriteString(`<p>A short summary each week: what went live, clicks, and test-mode earnings, mailed to your sign-in address.</p><form method="post" action="/owner/digest">`)
+	b.WriteString(`<input type="hidden" name="csrf" value="`)
+	b.WriteString(template.HTMLEscapeString(o.CSRF))
+	b.WriteString(`"><label><input type="checkbox" name="digest" value="on"`)
+	if !optOut {
+		b.WriteString(` checked`)
+	}
+	b.WriteString(`> Send me the weekly digest</label><button>Save</button></form></section>`)
 	return template.HTML(b.String()), nil
+}
+
+func (h *HostedHandler) SaveDigestForm(c *gin.Context) {
+	o := ownerFrom(c)
+	if err := h.DB.SetOwnerDigestOptOut(c.Request.Context(), o.ID, c.PostForm("digest") != "on"); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Redirect(http.StatusSeeOther, "/owner/settings")
 }
 
 func (h *HostedHandler) SaveNotifyForm(c *gin.Context) {

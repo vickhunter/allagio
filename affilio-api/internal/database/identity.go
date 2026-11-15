@@ -125,6 +125,45 @@ func (d *DB) SetOwnerNotify(ctx context.Context, ownerID, url, secret string) er
 	return err
 }
 
+// OwnerDigestPrefs reports whether the owner opted out of the weekly digest
+// email and when the last one was sent (nil when never).
+func (d *DB) OwnerDigestPrefs(ctx context.Context, ownerID string) (optOut bool, sentAt *time.Time, err error) {
+	err = d.Pool.QueryRow(ctx, `SELECT digest_opt_out, digest_sent_at FROM owners WHERE id=$1`, ownerID).Scan(&optOut, &sentAt)
+	return optOut, sentAt, err
+}
+
+func (d *DB) SetOwnerDigestOptOut(ctx context.Context, ownerID string, optOut bool) error {
+	_, err := d.Pool.Exec(ctx, `UPDATE owners SET digest_opt_out=$2 WHERE id=$1`, ownerID, optOut)
+	return err
+}
+
+// OwnersDueForDigest lists owners with an email address who have not opted
+// out and whose last digest went out before `since` (or never).
+func (d *DB) OwnersDueForDigest(ctx context.Context, since time.Time, limit int) ([]Owner, error) {
+	rows, err := d.Pool.Query(ctx, `SELECT id::text, email, name, COALESCE(site_id::text,''), COALESCE(maker_id::text,'')
+FROM owners
+WHERE email <> '' AND NOT digest_opt_out AND (digest_sent_at IS NULL OR digest_sent_at < $1)
+ORDER BY digest_sent_at NULLS FIRST LIMIT $2`, since, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Owner
+	for rows.Next() {
+		var o Owner
+		if err = rows.Scan(&o.ID, &o.Email, &o.Name, &o.SiteID, &o.MakerID); err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
+func (d *DB) MarkDigestSent(ctx context.Context, ownerID string) error {
+	_, err := d.Pool.Exec(ctx, `UPDATE owners SET digest_sent_at=NOW() WHERE id=$1`, ownerID)
+	return err
+}
+
 func (d *DB) BindOwnerAccount(ctx context.Context, ownerID, role, accountID string) (bool, error) {
 	query := `UPDATE owners SET site_id=$2 WHERE id=$1 AND site_id IS NULL`
 	if role == "maker" {
