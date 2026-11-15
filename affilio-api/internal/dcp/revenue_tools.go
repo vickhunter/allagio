@@ -14,6 +14,13 @@ var PreviewTools = []Tool{{
 	call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 		return c.Do(http.MethodPost, "/v1/revenue/preview", args)
 	},
+}, {
+	Name:        "browse_offers",
+	Description: "Browse the listed offers any agent can see without a key — the public supply feed (GET /v1/offers). Use it to see what makers have listed before joining as a publisher or maker.",
+	InputSchema: schema(nil, map[string]interface{}{}),
+	call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+		return c.Do(http.MethodGet, "/v1/offers", nil)
+	},
 }}
 
 var RevenueTools = []Tool{

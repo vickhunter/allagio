@@ -41,6 +41,7 @@ func mountJoinTokens(t *testing.T, db *database.DB, perMinute int) (*AgentEntry,
 	maker.GET("/offers", offers.List)
 	maker.POST("/offers", offers.Create)
 	maker.POST("/offers/:id/submit", offers.Submit)
+	maker.POST("/products", products.Create)
 	return entry, h, r, server
 }
 
@@ -195,6 +196,12 @@ func TestAgentJoinInfersSidesAndRevokes(t *testing.T) {
 	if countRows(t, db, `SELECT COUNT(*) FROM owners WHERE id=$1 AND site_id IS NULL AND maker_id IS NULL`, ownerID) != 1 {
 		t.Fatal("a read created a role")
 	}
+	// A maker write infers the maker role: registering a product must not 403.
+	created, createdBody := postJSON(t, r, http.MethodPost, "/v1/maker/products", map[string]any{}, auth)
+	if created.Code == http.StatusForbidden {
+		t.Fatalf("join token could not write a product: %d %s", created.Code, created.Body.String())
+	}
+	_ = createdBody
 
 	listed := httptest.NewRecorder()
 	listReq := httptest.NewRequest(http.MethodGet, "/v1/maker/offers", nil)

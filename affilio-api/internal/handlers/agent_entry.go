@@ -83,6 +83,7 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.POST("/v1/agent-tokens/revoke", h.RevokeAgentToken)
 	r.POST("/v1/agent-tokens/:id/revoke", h.RevokeAgentTokenByID)
 	r.GET("/v1/stats", h.PublicStats)
+	r.GET("/v1/offers", h.PublicOffers)
 	r.GET("/v1/step-modes", h.GetStepModes)
 	r.PUT("/v1/step-modes", h.PutStepModes)
 	r.GET("/v1/step-approvals/:id", h.GetStepApproval)
@@ -1016,7 +1017,7 @@ func (h *AgentEntry) CreateListing(c *gin.Context) {
 		return
 	}
 	if actor.MakerID == "" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "maker scope required"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "maker scope required", "hint": "join bearers (POST /orp/join or /v1/agent-tokens) get maker scope on any /v1/maker write; other callers mint a key with POST /v1/agent-accounts {\"role\":\"maker\"} and send it as X-Maker-Key"})
 		return
 	}
 	body, err := readJSONBody(c, 8192)
@@ -1999,7 +2000,7 @@ func (h *AgentEntry) offerAllowed(c *gin.Context, actor entryActor, offerID stri
 		return false
 	}
 	if actor.MakerID == "" {
-		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "maker scope required"})
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "maker scope required", "hint": "join bearers (POST /orp/join or /v1/agent-tokens) get maker scope on any /v1/maker write; other callers mint a key with POST /v1/agent-accounts {\"role\":\"maker\"} and send it as X-Maker-Key"})
 		return false
 	}
 	_, makerID, _, err := h.DB.OfferFacts(c.Request.Context(), offerID)

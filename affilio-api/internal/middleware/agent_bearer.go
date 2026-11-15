@@ -63,11 +63,14 @@ func joinInferSide(method, path string) string {
 	switch {
 	case method == http.MethodPost && (path == "/v1/placements" || path == "/v1/placements/:id/commit" || path == "/v1/placements/:id/receipt"):
 		return "publisher"
+	// A write anywhere under /v1/maker/ is a maker action — products,
+	// assessments, offers, sales reports — so it infers the maker role.
+	// Reads stay role-free: a bare GET must not create an owner role.
+	case method != http.MethodGet && strings.HasPrefix(path, "/v1/maker/"):
+		return "maker"
 	case method == http.MethodGet && path == "/v1/maker/getting-started":
 		return "maker"
-	case path == "/v1/maker/offers" && (method == http.MethodGet || method == http.MethodPost):
-		return "maker"
-	case method == http.MethodPost && path == "/v1/maker/offers/:id/submit":
+	case method == http.MethodGet && path == "/v1/maker/offers":
 		return "maker"
 	default:
 		return ""

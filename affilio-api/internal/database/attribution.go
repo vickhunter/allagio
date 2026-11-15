@@ -67,6 +67,42 @@ ORDER BY o.created_at DESC`, siteID)
 	return out, rows.Err()
 }
 
+// ListPublicOffers returns the listed offers for the public feed: the same
+// offer terms a publisher sees, minus site-scoped fields (ranking, tracking).
+func (d *DB) ListPublicOffers(ctx context.Context, limit int) ([]MarketplaceOffer, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := d.Pool.Query(ctx, `
+SELECT o.id, p.name, COALESCE(p.tagline,''), p.website_url, COALESCE(p.primary_category,''),
+       COALESCE(p.keywords,'{}'), COALESCE(p.tags,'{}'),
+       o.commission_type, o.commission_value, o.commission_currency,
+       o.cookie_duration_days, o.refund_window_days, COALESCE(o.terms,''),
+       o.program_id
+FROM offers o
+JOIN products p ON p.id = o.product_id
+WHERE o.status='listed'
+ORDER BY o.created_at DESC
+LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []MarketplaceOffer{}
+	for rows.Next() {
+		var m MarketplaceOffer
+		if err := rows.Scan(&m.OfferID, &m.ProductName, &m.ProductTagline, &m.WebsiteURL, &m.PrimaryCategory,
+			&m.Keywords, &m.Tags,
+			&m.CommissionType, &m.CommissionValue, &m.CommissionCurrency,
+			&m.CookieDurationDays, &m.RefundWindowDays, &m.Terms,
+			&m.ProgramID); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 // JoinOffer creates the campaign for an offer x site pair, or re-activates the
 // existing one; the tracking code is stable for the life of the campaign.
 func (d *DB) JoinOffer(ctx context.Context, offerID, siteID, trackingCode string) (campaignID, code string, err error) {

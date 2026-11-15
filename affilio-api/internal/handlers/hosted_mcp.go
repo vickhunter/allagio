@@ -33,7 +33,10 @@ func hostedTools(g *database.AgentGrant) []dcp.Tool {
 func hostedToolList(g *database.AgentGrant) []dcp.Tool {
 	tools := append([]dcp.Tool{}, dcp.PreviewTools...)
 	tools = append(tools, dcp.MonetizationTools...)
-	if g.MakerID != "" {
+	// Join bearers see the maker verbs even before a maker exists: their first
+	// call on a /v1/maker route infers the role, so the guided path must be
+	// visible at tools/list.
+	if g.MakerID != "" || g.Join {
 		for _, t := range dcp.Tools {
 			if t.Name != "register_maker" {
 				tools = append(tools, t)
