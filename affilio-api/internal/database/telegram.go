@@ -39,9 +39,22 @@ func (d *DB) ClaimTelegramCode(ctx context.Context, codeHash string) (ownerID st
 	return ownerID, true, nil
 }
 
+// BindTelegramChat attaches a chat to an owner. A chat belongs to one owner at
+// a time: linking it elsewhere first strips it from any previous owner, so
+// both owners' alerts can never pile into one chat.
 func (d *DB) BindTelegramChat(ctx context.Context, ownerID string, chatID int64, username string) error {
-	_, err := d.Pool.Exec(ctx, `UPDATE owners SET telegram_chat_id=$2, telegram_username=$3 WHERE id=$1`, ownerID, chatID, username)
-	return err
+	tx, err := d.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `UPDATE owners SET telegram_chat_id=NULL, telegram_username='' WHERE telegram_chat_id=$1 AND id<>$2`, chatID, ownerID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `UPDATE owners SET telegram_chat_id=$2, telegram_username=$3 WHERE id=$1`, ownerID, chatID, username); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // OwnerByTelegramChat resolves a bound chat back to its owner; nil when the
