@@ -96,6 +96,7 @@ Message rules for that walk: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 - [Listing card]({{PUBLIC_BASE_URL}}/docs/listing-card.md): the only scan payload that may be uploaded
 - [Modes]({{PUBLIC_BASE_URL}}/docs/modes.md): manual, auto, and yolo
 - [Account]({{PUBLIC_BASE_URL}}/docs/account.md): account keys and the account digest
+- [Settlement boundary]({{PUBLIC_BASE_URL}}/docs/settlement.md): ORP records obligations and payouts; a payment rail moves the money
 - [Use cases]({{PUBLIC_BASE_URL}}/use-cases.md): affiliate marketing, partnerships, cross-selling, monetization, social, newsletters, link exchanges, sponsorships
 - [Reference]({{PUBLIC_BASE_URL}}/reference.md): ORP endpoints, MCP tools, auth, request/response examples, errors
 
@@ -496,8 +497,30 @@ Send the account key as ` + "`X-API-Key`" + ` for the publisher site, or ` + "`X
 ` + "`GET /v1/policy/hard-checks`" + ` is the single source the UI renders. It returns ` + "`checks`" + ` of ` + "`check_id`" + ` and ` + "`check_text`" + ` from the same list a 422 uses. The UI does not keep a second copy. There is no push channel; clients poll placement status.
 `
 
+const settlementDoc = `# Settlement boundary
+
+ORP is the record of obligations, not a payment rail. A deal's terms say what each party must do — a ` + "`pay`" + ` obligation included. ORP then records what happened: receipts verify the work, outcome rows count the results, and payout records track the money. Money itself never moves through ORP.
+
+## What settles where
+
+- **ORP** holds the obligation, the evidence it was done (receipts, tracked clicks, conversions), what is owed (payout ` + "`amount`" + `), and what state it is in: ` + "`held`" + ` → ` + "`payable`" + ` → ` + "`sent`" + ` → ` + "`paid`" + `, with ` + "`reversed`" + `/` + "`failed`" + ` for the bad paths.
+- **The rail** moves the money: ` + "`stripe`" + `, ` + "`paypal`" + `, ` + "`wise`" + `, ` + "`x402`" + `, ` + "`manual`" + `, or any rail the parties agree. The rail's own transfer reference lands on the payout record as ` + "`ref`" + ` — the payment proof attaches to the settlement record, the settlement record attaches to the deal.
+
+x402 is a settlement rail a payout can name, not something ORP competes with: x402 moves the payment, ORP remembers why it moved and whether it counted. The same holds for AP2-style authorization — a signed payment mandate is evidence a ` + "`pay`" + ` obligation's proof list can accept.
+
+## What ORP deliberately does not do
+
+- **No escrow, KYC, tax forms, or payout SLA.** A host that needs them describes its own terms in ` + "`policies.terms`" + `.
+- **No account numbers.** Bank details, card data and tax ids never appear in an ORP message.
+- **No self-marked payments.** Only the host records payouts; the payee answers ` + "`confirm`" + ` or ` + "`not_received`" + `. If nothing is paid by ` + "`due`" + `, the payee opens a dispute with ` + "`claim: not_paid`" + `.
+
+Spec: §14 (outcomes and payouts) in ` + "`/orp/spec`" + `.
+`
+
 func agentDoc(name string) (string, bool) {
 	switch name {
+	case "settlement.md":
+		return settlementDoc, true
 	case "device-login.md":
 		return deviceLoginDoc, true
 	case "settings.md":

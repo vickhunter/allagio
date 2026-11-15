@@ -298,6 +298,10 @@ func main() {
 	}
 	go webhooks.RunWorker(workerCtx)
 	go handlers.PurgeClickSignals(workerCtx, db)
+	mailer := &services.Mailer{Host: cfg.SMTPHost, Port: cfg.SMTPPort, User: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.DigestFrom}
+	if mailer.Enabled() {
+		go (&handlers.DigestEmailRunner{DB: db, Mailer: mailer, BaseURL: cfg.PublicBaseURL}).RunWorker(workerCtx)
+	}
 	mcp := &handlers.MCPHandler{
 		LoopbackURL: "http://127.0.0.1:" + cfg.Port,
 		RateLimiter: handlers.NewIPRateLimiter(240, time.Minute),
