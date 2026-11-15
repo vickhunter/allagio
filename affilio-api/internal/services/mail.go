@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
+	"net/mail"
 	"net/smtp"
 	"strings"
 	"time"
@@ -54,7 +56,7 @@ func (m *Mailer) Send(_ context.Context, to, subject, body string) error {
 	}
 	defer client.Close()
 	if ok, _ := client.Extension("STARTTLS"); ok {
-		if err = client.StartTLS(nil); err != nil {
+		if err = client.StartTLS(&tls.Config{ServerName: m.Host, MinVersion: tls.VersionTLS12}); err != nil {
 			return err
 		}
 	}
@@ -63,7 +65,13 @@ func (m *Mailer) Send(_ context.Context, to, subject, body string) error {
 			return err
 		}
 	}
-	if err = client.Mail(m.From); err != nil {
+	// MAIL FROM takes a bare mailbox; DIGEST_FROM may carry a display name
+	// ("Allagio <digest@allagio.dev>") which belongs in the From: header only.
+	envelope := m.From
+	if parsed, parseErr := mail.ParseAddress(m.From); parseErr == nil {
+		envelope = parsed.Address
+	}
+	if err = client.Mail(envelope); err != nil {
 		return err
 	}
 	if err = client.Rcpt(to); err != nil {

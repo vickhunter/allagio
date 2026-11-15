@@ -137,13 +137,15 @@ func (d *DB) SetOwnerDigestOptOut(ctx context.Context, ownerID string, optOut bo
 	return err
 }
 
-// OwnersDueForDigest lists owners with an email address who have not opted
-// out and whose last digest went out before `since` (or never).
+// OwnersDueForDigest lists owners with a deliverable email address who have
+// not opted out and whose last digest went out before `since` (or never).
+// Synthetic join owners (…@agents.invalid) are excluded: their mail bounces,
+// which keeps digest_sent_at NULL and would starve real owners every batch.
 func (d *DB) OwnersDueForDigest(ctx context.Context, since time.Time, limit int) ([]Owner, error) {
 	rows, err := d.Pool.Query(ctx, `SELECT id::text, email, name, COALESCE(site_id::text,''), COALESCE(maker_id::text,'')
 FROM owners
-WHERE email <> '' AND NOT digest_opt_out AND (digest_sent_at IS NULL OR digest_sent_at < $1)
-ORDER BY digest_sent_at NULLS FIRST LIMIT $2`, since, limit)
+WHERE email <> '' AND email NOT LIKE '%@agents.invalid' AND NOT digest_opt_out AND (digest_sent_at IS NULL OR digest_sent_at < $1)
+ORDER BY digest_sent_at NULLS LAST LIMIT $2`, since, limit)
 	if err != nil {
 		return nil, err
 	}

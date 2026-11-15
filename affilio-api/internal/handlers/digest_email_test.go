@@ -41,6 +41,7 @@ func TestDigestEmailRunnerSendsOnlyDueOwners(t *testing.T) {
 	overdue := insertDigestOwner(t, db, "overdue@example.com", false, &stale)
 	insertDigestOwner(t, db, "optout@example.com", true, nil)
 	insertDigestOwner(t, db, "", false, nil)
+	insertDigestOwner(t, db, "join-abc@agents.invalid", false, nil)
 
 	mailer := &fakeMailer{}
 	r := &DigestEmailRunner{DB: db, Mailer: mailer, BaseURL: "https://allagio.dev"}
