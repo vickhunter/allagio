@@ -1,3 +1,7 @@
+## November 15 — mailer implicit TLS for Cloudflare Email Service
+
+`services.Mailer` now dials implicit TLS (`tls.Dial`) when `SMTP_PORT=465` instead of plain-TCP-then-STARTTLS, so the digest can send through Cloudflare Email Service's authenticated SMTP (`smtp.mx.cloudflare.net:465`, user `api_token`, password = API token with Email Sending:Edit). Port 587 and the empty default keep the STARTTLS path; no new env vars.
+
 ## November 15 — open-source prep: LICENSE, README, SECURITY, CONTRIBUTING
 
 Prepped the repo for flipping to public: root `LICENSE` (Apache-2.0, same license the ORP spec already uses, Copyright 2026 Allagio), a root `README.md` covering what Allagio/ORP is, the agent cold path (`POST /v1/agent-tokens` → llms.txt), repo layout and quickstart, `SECURITY.md` (report via motricalavictor@gmail.com, scope notes — credential classes, admin-key leak rule, sig/certificate forgery as high-severity), and `CONTRIBUTING.md` (house rules incl. the doc-twin sync and migration-harness requirements).
