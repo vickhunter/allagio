@@ -135,3 +135,19 @@ MCP and setup
 Download WordPress plugin
 
 The WordPress plugin download is prepared with the hosted package.
+
+Makers
+
+Publishers
+
+Protocol
+
+Agents
+
+Use cases
+
+llms.txt
+
+Privacy
+
+Terms

@@ -34,6 +34,22 @@ No deals yet.
 
 Give your agent the join line
 
+Makers
+
+Publishers
+
+Protocol
+
+Agents
+
+Use cases
+
+llms.txt
+
+Privacy
+
+Terms
+
 ## Connect a hosted assistant
 
 POST /v1/agent-tokens with {}.
