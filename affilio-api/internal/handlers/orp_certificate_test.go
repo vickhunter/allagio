@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"affilio-api/internal/orp"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,10 +24,16 @@ func TestDealCertificateSignedAndVerifiable(t *testing.T) {
 	if err := db.Pool.QueryRow(ctx, `INSERT INTO owners(issuer,subject,email,name,source) VALUES('iss','sub','cert@example.com','Cert','direct') RETURNING id::text`).Scan(&ownerID); err != nil {
 		t.Fatalf("insert owner: %v", err)
 	}
+	// A join bearer whose owner sits on the deal.
+	partyGrant, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("certtok"), "orat_crt", "ip-cert", "http://allagio.test/mcp", "Agent", "join:cert", "join-cert@agents.invalid", nil)
+	if err != nil {
+		t.Fatalf("join token: %v", err)
+	}
+	party := orp.MemberParty("allagio.test", partyGrant.OwnerID)
 	receipts := `[{"obligation":"place","id":"rcpt_1","method":"link","verified_at":"2026-11-15T00:00:00Z"}]`
 	tracking := `{"tracking":"trk","clicks":[],"link_receipts":` + receipts + `}`
 	if _, err := db.Pool.Exec(ctx, `INSERT INTO orp_deals(id, acceptor_owner, offerer_party, acceptor_party, terms, terms_hash, state, obligations, tracking, created_at, updated_at)
-VALUES('deal_cert_1',$1,'orp:test/p_offer','orp:test/p_accept','{"title":"deal"}','sha256:abc','active','[]',$2,NOW(),NOW())`, ownerID, tracking); err != nil {
+VALUES('deal_cert_1',$1,$2,'orp:test/p_accept','{"title":"deal"}','sha256:abc','active','[]',$3,NOW(),NOW())`, ownerID, party, tracking); err != nil {
 		t.Fatalf("insert deal: %v", err)
 	}
 
@@ -38,9 +45,31 @@ VALUES('deal_cert_1',$1,'orp:test/p_offer','orp:test/p_accept','{"title":"deal"}
 	r.GET("/.well-known/orp.json", host.Discovery)
 	r.GET("/orp/deals/:id/certificate", host.DealCertificate)
 
+	// No bearer → 401.
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/orp/deals/deal_cert_1/certificate", nil)
 	req.Host = "allagio.test"
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated certificate status %d", rec.Code)
+	}
+	// A bearer whose owner is not on the deal → 404.
+	if _, err := db.CreateAgentJoinToken(ctx, services.HashAPIKey("stranger"), "orat_st", "ip-str", "http://allagio.test/mcp", "Agent", "join:str", "join-str@agents.invalid", nil); err != nil {
+		t.Fatalf("stranger token: %v", err)
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/orp/deals/deal_cert_1/certificate", nil)
+	req.Host = "allagio.test"
+	req.Header.Set("Authorization", "Bearer stranger")
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("non-party certificate status %d", rec.Code)
+	}
+	// The deal party gets the signed certificate.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/orp/deals/deal_cert_1/certificate", nil)
+	req.Host = "allagio.test"
+	req.Header.Set("Authorization", "Bearer certtok")
 	r.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("certificate status %d: %s", rec.Code, rec.Body.String())

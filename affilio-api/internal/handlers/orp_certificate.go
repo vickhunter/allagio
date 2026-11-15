@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"affilio-api/internal/orp"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,20 +16,29 @@ import (
 // publishes under keys). Terms themselves stay off the response; the hash
 // binds them, so whoever holds the terms proves the agreement by recomputing
 // the hash. Receipt bodies are verification artifacts already emitted to the
-// parties, so they are included verbatim.
+// parties, so they are included verbatim. Fetching requires the same bearer
+// and party membership as GET /orp/deals/:id — a certificate is carried by a
+// party, never browsed: deal ids appear in public proof URLs, so a public
+// endpoint would let anyone enumerate deal relationships.
 func (h *ORPHost) DealCertificate(c *gin.Context) {
 	if h.Signer == nil {
 		writeORP(c, http.StatusServiceUnavailable, map[string]any{"error": "signing_not_configured"}, false)
 		return
 	}
+	_, dns := h.origin(c)
+	grant, ok := h.bearer(c, dns)
+	if !ok {
+		return
+	}
+	party := orp.MemberParty(dns, grant.OwnerID)
 	id := c.Param("id")
 	deal, found, err := h.Entry.DB.GetORPDeal(c.Request.Context(), id)
 	if err != nil {
-		writeORP(c, http.StatusInternalServerError, map[string]any{"error": "read_failed"}, false)
+		h.writeProblem(c, dns, party, "", internalProblem(), false)
 		return
 	}
-	if !found {
-		writeORP(c, http.StatusNotFound, map[string]any{"error": "not_found"}, false)
+	if !found || !h.onDealParty(party, deal) {
+		h.writeProblem(c, dns, party, "", orp.Problem{Status: http.StatusNotFound, Code: "not_found", Message: "No such deal for this sender."}, false)
 		return
 	}
 	now := time.Now().UTC()
