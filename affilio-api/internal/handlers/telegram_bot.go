@@ -72,6 +72,14 @@ func (r *TelegramRunner) handle(ctx context.Context, m *services.TelegramMessage
 		}
 	}
 
+	// A group chat id is shared by every member: binding it would expose
+	// the owner's status, earnings and alerts to all of them. Commands are
+	// private-chat only.
+	if m.Chat.Type != "" && m.Chat.Type != "private" {
+		reply("Accounts only link over direct messages — please DM me instead.")
+		return
+	}
+
 	switch cmd {
 	case "/start", "/help":
 		reply(r.helpText(m.From.FirstName))
