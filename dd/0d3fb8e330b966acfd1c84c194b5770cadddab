@@ -1,0 +1,89 @@
+affilio-api/internal/orp/envelope.go
+  s_7e484d91fceb6c::t_4db76bdb3fca65 289-291
+affilio-api/internal/handlers/orp_host.go
+  s_7e484d91fceb6c::t_600cfa8f088254 325
+  s_7e484d91fceb6c::t_03de53ddd3d070 34-36
+affilio-api/internal/orp/terms.go
+  s_7e484d91fceb6c::t_753c62d01b6aa0 335-371
+  s_7e484d91fceb6c::t_191979a9a28cc9 164
+  s_7e484d91fceb6c::t_314ab1905b8263 129-163,165-233
+  s_7e484d91fceb6c::t_cd25111bc6c2de 304-306
+affilio-api/internal/handlers/orp_trust.go
+  s_7e484d91fceb6c::t_59d72bac466de3 263-267
+affilio-api/internal/orp/payouts.go
+  s_7e484d91fceb6c::t_42f30eded295ed 25-28,30-49,56,58,60-69,71
+  s_7e484d91fceb6c::t_687aec8f4cc88f 119,124,131
+affilio-api/internal/handlers/orp_deal.go
+  s_7e484d91fceb6c::t_e9fc579059bd88 817-821
+  s_7e484d91fceb6c::t_9bfc27698cab83 964-976
+  s_7e484d91fceb6c::t_2f4604a753ff05 995
+affilio-api/internal/handlers/orp_proofs_test.go
+  s_7e484d91fceb6c::t_08e786c4ddca90 643,646-648
+  s_7e484d91fceb6c::t_fbb085b67326b1 609
+  s_7e484d91fceb6c::t_562189e6ea0e29 1-608,610-642,644-645,649-650
+affilio-api/internal/handlers/orp_deal_test.go
+  s_7e484d91fceb6c::t_b52e6d7c9f800a 202
+affilio-api/internal/handlers/orp_counter_test.go
+  s_7e484d91fceb6c::t_a9a0d117f0e793 14
+affilio-api/internal/handlers/orp_payouts.go
+  s_7e484d91fceb6c::t_38d5408a47026d 85-99
+  s_7e484d91fceb6c::t_d63b8fa5af4f95 42,46-55
+affilio-api/internal/handlers/orp_proof.go
+  s_7e484d91fceb6c::t_c452a73b6f8b67 118
+  s_7e484d91fceb6c::t_fba7b1c404f931 544
+  s_7e484d91fceb6c::t_13c22869a480bc 93
+  s_7e484d91fceb6c::t_5b941f87b5f0f8 706
+  s_7e484d91fceb6c::t_09c0c22c8246ce 1-78,80-86,88-92,94-117,119-346,348-378,391-512,514-543,545-566,575,577,581,583-584,586,588,591-592,594-596,598,604-605,609-610,613-614,623-624,629-630,637-638,642-643,653,665-667,675-676,680,691,695,702,704-705,708,711-713,715,719,724,726,731
+  s_7e484d91fceb6c::t_6a3f4c24fe6e7c 347
+  s_7e484d91fceb6c::t_08621abb1c3027 379-390,701
+  s_7e484d91fceb6c::t_66c99d9c52e09c 79
+  s_7e484d91fceb6c::t_1a279529aad3c4 87
+  s_7e484d91fceb6c::t_1d534b7a06e833 513
+  s_7e484d91fceb6c::t_7dda79dd8d7d3e 567-569,572-574
+  s_7e484d91fceb6c::t_dd335fb057cf83 576
+  s_7e484d91fceb6c::t_ee6f0d2a40bc88 578-580
+  s_7e484d91fceb6c::t_663853eede6448 582
+  s_7e484d91fceb6c::t_1e817605a70b6b 585
+  s_7e484d91fceb6c::t_0c078969f17e18 587
+  s_7e484d91fceb6c::t_bae861acfd9915 589-590
+  s_7e484d91fceb6c::t_1dbe4ade9e6e8f 593
+  s_7e484d91fceb6c::t_56b7fa953d4bad 597
+  s_7e484d91fceb6c::t_e8f2d6d2355afa 599-603
+  s_7e484d91fceb6c::t_be81b9b578c0f0 606-608
+  s_7e484d91fceb6c::t_ce4eb1e97b19a0 611-612
+  s_7e484d91fceb6c::t_a825841027f1e4 615-617,620-622
+  s_7e484d91fceb6c::t_d1c0dff450b21b 625-628
+  s_7e484d91fceb6c::t_a94113be3b1d4d 631-636
+  s_7e484d91fceb6c::t_7f506dee026243 639-641
+  s_7e484d91fceb6c::t_1df4c051129af2 644-646,650-652
+  s_7e484d91fceb6c::t_3f596aa441ee55 654-656,662-664
+  s_7e484d91fceb6c::t_a7065fae65dfaa 668-670,672-674
+  s_7e484d91fceb6c::t_bda6f7556fa05f 677-679
+  s_7e484d91fceb6c::t_9fb641981e6e11 681-683,688-690
+  s_7e484d91fceb6c::t_0e9f4a169f69ed 692-694
+  s_7e484d91fceb6c::t_1e55a3d9e0b682 696-700
+  s_7e484d91fceb6c::t_56802f48a338d9 703
+  s_7e484d91fceb6c::t_17118b776c2796 707
+  s_7e484d91fceb6c::t_3c18ec7774f4eb 709-710
+  s_7e484d91fceb6c::t_6ddd10f670f28c 714
+  s_7e484d91fceb6c::t_8c10bad54c024b 716-718
+  s_7e484d91fceb6c::t_780e211180a25f 720-723
+  s_7e484d91fceb6c::t_2ae7c2fb62bc64 725
+  s_7e484d91fceb6c::t_f3ffe7428bbe12 727-730
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "dd0d3fb8e330b966acfd1c84c194b5770cadddab",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
