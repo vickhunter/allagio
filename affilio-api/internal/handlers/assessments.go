@@ -146,7 +146,7 @@ func (h *AssessmentsHandler) notifyOwner(c *gin.Context, product *database.Produ
 			go postSignedWebhook(url, secret, payload)
 		}
 	}
-	go telegramDM(c.Request.Context(), h.DB, h.Telegram, ownerID, fmt.Sprintf("Readiness check finished for %s: score %d (%s) — %s/owner", product.Name, result.Score, result.Status, strings.TrimRight(h.BaseURL, "/")))
+	go telegramDM(h.DB, h.Telegram, ownerID, fmt.Sprintf("Readiness check finished for %s: score %d (%s) — %s/owner", product.Name, result.Score, result.Status, strings.TrimRight(h.BaseURL, "/")))
 }
 
 func (h *AssessmentsHandler) List(c *gin.Context) {

@@ -444,7 +444,7 @@ func (h *AgentEntry) notifyAccountRegistered(c *gin.Context, role, name, email s
 			sent[url] = true
 			go postSignedWebhook(url, secret, payload)
 		}
-		go telegramDM(c.Request.Context(), h.DB, h.Telegram, owner.ID, fmt.Sprintf("An agent registered %s (%s) for %s — review it at %s/owner", name, role, email, strings.TrimRight(h.BaseURL, "/")))
+		go telegramDM(h.DB, h.Telegram, owner.ID, fmt.Sprintf("An agent registered %s (%s) for %s — review it at %s/owner", name, role, email, strings.TrimRight(h.BaseURL, "/")))
 	}
 }
 

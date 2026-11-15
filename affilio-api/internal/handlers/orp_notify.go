@@ -63,16 +63,19 @@ func (h *ORPHost) notifyWaiting(c *gin.Context, effect database.ORPEffect) {
 			go postSignedWebhook(url, secret, payload)
 		}
 	}
-	go telegramDM(c.Request.Context(), h.Entry.DB, h.Entry.Telegram, ownerID, fmt.Sprintf("A deal (%s) is waiting on your party — act at %s/owner", dealID, strings.TrimRight(h.Entry.BaseURL, "/")))
+	go telegramDM(h.Entry.DB, h.Entry.Telegram, ownerID, fmt.Sprintf("A deal (%s) is waiting on your party — act at %s/owner", dealID, strings.TrimRight(h.Entry.BaseURL, "/")))
 }
 
 // telegramDM pushes the same owner-facing events the webhook channel gets to
-// a linked Telegram chat. Nil-safe and best-effort: an unlinked or
-// unconfigured owner simply gets nothing.
-func telegramDM(ctx context.Context, db *database.DB, tg *services.TelegramClient, ownerID, text string) {
+// a linked Telegram chat. It always runs on a detached context: callers invoke
+// it from request handlers whose context dies with the response. Nil-safe and
+// best-effort: an unlinked or unconfigured owner simply gets nothing.
+func telegramDM(db *database.DB, tg *services.TelegramClient, ownerID, text string) {
 	if tg == nil || !tg.Enabled() || db == nil {
 		return
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 	chatID, _, err := db.OwnerTelegram(ctx, ownerID)
 	if err != nil || chatID == 0 {
 		return
@@ -141,6 +144,7 @@ func (h *HostedHandler) notifySection(c *gin.Context, o *database.Owner) (templa
 	if err != nil {
 		return "", err
 	}
+	botEnabled := h.Telegram != nil && h.Telegram.Enabled()
 	b.WriteString(`<section id="telegram"><h2>Telegram</h2>`)
 	if chatID != 0 {
 		label := "chat " + fmt.Sprint(chatID)
@@ -151,9 +155,9 @@ func (h *HostedHandler) notifySection(c *gin.Context, o *database.Owner) (templa
 		b.WriteString(`<form method="post" action="/owner/telegram/unlink"><input type="hidden" name="csrf" value="`)
 		b.WriteString(template.HTMLEscapeString(o.CSRF))
 		b.WriteString(`"><button>Unlink Telegram</button></form>`)
-	} else {
+	} else if botEnabled {
 		bot := "the Allagio bot"
-		if h.Telegram != nil && h.Telegram.Username != "" {
+		if h.Telegram.Username != "" {
 			bot = "@" + template.HTMLEscapeString(h.Telegram.Username)
 		}
 		fmt.Fprintf(&b, `<p>Talk to your account from Telegram: deal alerts and /status / /earnings as direct messages. Generate a link code, then send <code>/link CODE</code> to %s.</p>`, bot)
@@ -163,6 +167,8 @@ func (h *HostedHandler) notifySection(c *gin.Context, o *database.Owner) (templa
 		b.WriteString(`<form method="post" action="/owner/telegram/code"><input type="hidden" name="csrf" value="`)
 		b.WriteString(template.HTMLEscapeString(o.CSRF))
 		b.WriteString(`"><button>Generate link code</button></form>`)
+	} else {
+		b.WriteString(`<p class="caption">The Telegram channel is not enabled on this deployment.</p>`)
 	}
 	b.WriteString(`</section>`)
 	b.WriteString(`<section id="digest"><h2>Weekly digest email</h2>`)
@@ -181,6 +187,12 @@ func (h *HostedHandler) notifySection(c *gin.Context, o *database.Owner) (templa
 // /link CODE; the code shows once in the settings page flash (?tg=).
 func (h *HostedHandler) CreateTelegramCodeForm(c *gin.Context) {
 	o := ownerFrom(c)
+	if h.Telegram == nil || !h.Telegram.Enabled() {
+		// No bot is polling this deployment: a minted code could never be
+		// claimed, so don't offer one.
+		c.Redirect(http.StatusSeeOther, "/owner/settings")
+		return
+	}
 	var b [4]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		c.Status(http.StatusInternalServerError)
