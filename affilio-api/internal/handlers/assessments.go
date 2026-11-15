@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +18,10 @@ import (
 type AssessmentsHandler struct {
 	DB     *database.DB
 	Engine *services.ReadinessEngine
+	// Telegram pushes assessment.finished to a linked chat; BaseURL builds
+	// the workspace link in that message.
+	Telegram *services.TelegramClient
+	BaseURL  string
 }
 
 type assessRequest struct {
@@ -129,21 +134,19 @@ func (h *AssessmentsHandler) notifyOwner(c *gin.Context, product *database.Produ
 		return
 	}
 	url, secret, err := h.DB.OwnerNotify(c.Request.Context(), ownerID)
-	if err != nil || url == "" || secret == "" {
-		return
+	if err == nil && url != "" && secret != "" {
+		if payload, err := json.Marshal(map[string]any{
+			"type":             "assessment.finished",
+			"product_id":       product.ID,
+			"product":          product.Name,
+			"readiness_score":  result.Score,
+			"readiness_status": result.Status,
+			"fix_hints":        fixHints(result.Checks),
+		}); err == nil {
+			go postSignedWebhook(url, secret, payload)
+		}
 	}
-	payload, err := json.Marshal(map[string]any{
-		"type":             "assessment.finished",
-		"product_id":       product.ID,
-		"product":          product.Name,
-		"readiness_score":  result.Score,
-		"readiness_status": result.Status,
-		"fix_hints":        fixHints(result.Checks),
-	})
-	if err != nil {
-		return
-	}
-	go postSignedWebhook(url, secret, payload)
+	go telegramDM(c.Request.Context(), h.DB, h.Telegram, ownerID, fmt.Sprintf("Readiness check finished for %s: score %d (%s) — %s/owner", product.Name, result.Score, result.Status, strings.TrimRight(h.BaseURL, "/")))
 }
 
 func (h *AssessmentsHandler) List(c *gin.Context) {
