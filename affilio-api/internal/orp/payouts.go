@@ -22,30 +22,53 @@ type PlannedPayout struct {
 	Hold            time.Duration
 }
 
-// ObligationState is the stored state row of one deal obligation.
+// ObligationState is the stored state row of one deal obligation. Method is
+// the receipt method that verified it and Attester the party that attested,
+// both empty for other methods (P3: an attestation releases only the
+// attester's own money).
 type ObligationState struct {
-	ID    string
-	State string
+	ID       string
+	State    string
+	Method   string
+	Attester string
+}
+
+// done reports whether the obligation counts as finished for this payer. A
+// waived row always counts; a verified row counts for everyone except when
+// it was verified by attestation, which counts only for the attester.
+func (row ObligationState) done(payer string) bool {
+	if row.State == "waived" {
+		return true
+	}
+	if row.State != "verified" {
+		return false
+	}
+	if row.Method == "attestation" && row.Attester != payer {
+		return false
+	}
+	return true
 }
 
 // PlanPayouts reads the terms obligations against the deal's obligation
 // states. A pay obligation's by is the offerer or acceptor role, so the
 // payer is that role's party and the payee is the other side.
 func PlanPayouts(obligations []map[string]any, states []ObligationState, offererParty, acceptorParty string) []PlannedPayout {
-	stateOf := map[string]string{}
+	stateOf := map[string]ObligationState{}
 	for _, row := range states {
-		stateOf[row.ID] = row.State
+		stateOf[row.ID] = row
 	}
-	nonPayDone := true
-	for _, ob := range obligations {
-		action, _ := ob["action"].(string)
-		if action == "pay" {
-			continue
+	nonPayDoneFor := func(payer string) bool {
+		for _, ob := range obligations {
+			action, _ := ob["action"].(string)
+			if action == "pay" {
+				continue
+			}
+			id, _ := ob["id"].(string)
+			if !stateOf[id].done(payer) {
+				return false
+			}
 		}
-		id, _ := ob["id"].(string)
-		if stateOf[id] != "verified" && stateOf[id] != "waived" {
-			nonPayDone = false
-		}
+		return true
 	}
 	var out []PlannedPayout
 	for _, ob := range obligations {
@@ -93,19 +116,19 @@ func PlanPayouts(obligations []map[string]any, states []ObligationState, offerer
 		}
 		switch {
 		case after != "":
-			if stateOf[after] != "verified" {
+			if !stateOf[after].done(payer) {
 				continue
 			}
 			planned.BasisObligation = after
 		case per == "deal":
-			if !nonPayDone {
+			if !nonPayDoneFor(payer) {
 				continue
 			}
 		case per == "placement":
 			for _, other := range obligations {
 				otherAction, _ := other["action"].(string)
 				otherID, _ := other["id"].(string)
-				if otherAction == "place" && stateOf[otherID] == "verified" {
+				if otherAction == "place" && stateOf[otherID].done(payer) {
 					row := planned
 					row.BasisObligation = otherID
 					out = append(out, row)

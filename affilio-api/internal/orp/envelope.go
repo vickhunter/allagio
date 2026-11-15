@@ -286,6 +286,9 @@ func checkHandledBody(version, typ string, body map[string]any) (Problem, bool) 
 	case "payout":
 		problem, bad := checkPayoutBody(body)
 		return relabelVersion(version, problem, bad)
+	case "receipt":
+		problem, bad := checkReceiptBody(body)
+		return relabelVersion(version, problem, bad)
 	default:
 		return Problem{}, false
 	}

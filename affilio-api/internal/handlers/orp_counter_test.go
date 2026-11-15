@@ -11,7 +11,7 @@ import (
 
 func counterTerms() map[string]any {
 	terms := testTerms()
-	terms["note"] = "countered"
+	terms["title"] = "countered"
 	return terms
 }
 

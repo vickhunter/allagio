@@ -31,6 +31,9 @@ type ORPHost struct {
 	// FetchPage fetches a public page for space marker verification. Nil uses
 	// the SSRF-guarded readiness fetcher.
 	FetchPage func(ctx context.Context, rawURL string) (body string, ok bool)
+	// FetchProof fetches a proof_url page for obligation verification. Nil
+	// uses the SSRF-guarded readiness fetcher.
+	FetchProof func(ctx context.Context, rawURL string) (body string, status int, ok bool)
 	// FederationFetch is the host-to-host fetch seam (discovery, keys, relay).
 	// Nil uses the SSRF-guarded readiness client.
 	FederationFetch fedFetch
@@ -319,7 +322,7 @@ func (h *ORPHost) Envelope(c *gin.Context) {
 	case msg.Type == "reputation":
 		h.reputation(c, dns, msg, hash)
 	case msg.Type == "receipt":
-		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the host issues a receipt."}), database.ORPEffect{})
+		h.receipt(c, dns, msg, hash, grant.OwnerID)
 	case orp.IsHostOnly(msg.Type):
 		h.finish(c, msg, hash, http.StatusForbidden, h.errorDoc(dns, msg, orp.HostOnly()), database.ORPEffect{})
 	default:

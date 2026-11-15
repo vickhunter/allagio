@@ -39,10 +39,20 @@ func (h *ORPHost) sweepPayouts(c *gin.Context, dns string) {
 	}
 	for _, deal := range deals {
 		states := make([]orp.ObligationState, 0, len(deal.States))
+		keepUntil := map[string]time.Time{}
 		for _, row := range deal.States {
 			id, _ := row["id"].(string)
 			state, _ := row["state"].(string)
-			states = append(states, orp.ObligationState{ID: id, State: state})
+			method, _ := row["method"].(string)
+			attester, _ := row["attester"].(string)
+			states = append(states, orp.ObligationState{ID: id, State: state, Method: method, Attester: attester})
+			// A verified obligation still inside its keep rechecks holds the
+			// money that depends on it until the final check passes (P6).
+			if next, _ := row["next_check"].(string); next != "" {
+				if until, err := time.Parse(time.RFC3339, str(row["keep_until"])); err == nil {
+					keepUntil[id] = until
+				}
+			}
 		}
 		ownerOf := func(party string) string {
 			switch party {
@@ -72,7 +82,21 @@ func (h *ORPHost) sweepPayouts(c *gin.Context, dns string) {
 			if payout.PayerOwner == "" || payout.PayeeOwner == "" {
 				continue
 			}
-			if plan.Hold > 0 {
+			var keepHold time.Time
+			if until, ok := keepUntil[plan.BasisObligation]; ok {
+				keepHold = until
+			}
+			if plan.BasisObligation == "" {
+				for _, until := range keepUntil {
+					if until.After(keepHold) {
+						keepHold = until
+					}
+				}
+			}
+			if keepHold.After(now) {
+				payout.HoldUntil = &keepHold
+				payout.State = "held"
+			} else if plan.Hold > 0 {
 				until := now.Add(plan.Hold)
 				payout.HoldUntil = &until
 				payout.State = "held"

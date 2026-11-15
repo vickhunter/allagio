@@ -260,6 +260,11 @@ func (h *ORPHost) repEvents(ctx context.Context, subject string) ([]orp.RepEvent
 			if obligorOf(deal, by) != subject {
 				continue
 			}
+			// P7: an attestation carries no public evidence, so it never
+			// enters a reputation event — not even as a zero-weight one.
+			if method, _ := row["method"].(string); method == "attestation" {
+				continue
+			}
 			for _, cp := range cps {
 				switch row["state"] {
 				case "verified":

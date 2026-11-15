@@ -199,7 +199,7 @@ func TestORPTestDealProof(t *testing.T) {
 	}
 
 	receiptRec, receiptBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("receipt", "m_d092c_rcpt01", publisher, map[string]any{}), bearerHeader(pubToken))
-	if receiptRec.Code != http.StatusForbidden || receiptBody["body"].(map[string]any)["message"] != "Only the host issues a receipt." {
+	if receiptRec.Code != http.StatusBadRequest || receiptBody["body"].(map[string]any)["code"] != "invalid_message" {
 		t.Fatalf("receipt %d %s", receiptRec.Code, receiptRec.Body.String())
 	}
 	payRec, payBody := postJSON(t, r, http.MethodPost, "/orp", orpEnvelope("payout", "m_d092c_paymsg", publisher, map[string]any{}), bearerHeader(pubToken))
@@ -418,7 +418,7 @@ func TestORPLLMsWalkthrough(t *testing.T) {
 		"Allowed values: x, blog, newsletter, email, web.",
 		"409 state_conflict",
 		"The deal is in the wrong state.",
-		"Execute does not read proof_url",
+		"the host fetches that page and issues a receipt",
 		"obligation state becomes claimed",
 		"The deal stays active",
 		`{"obligation":"place"}`,

@@ -814,6 +814,11 @@ func (h *ORPHost) counter(c *gin.Context, dns string, msg orp.Message, hash, own
 		h.finish(c, msg, hash, http.StatusBadRequest, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusBadRequest, Code: "bad_request", Message: "terms is required."}), database.ORPEffect{})
 		return
 	}
+	if problem, bad := orp.CheckTerms(terms, "/body/terms"); bad {
+		problem.Status = http.StatusBadRequest
+		h.finish(c, msg, hash, http.StatusBadRequest, h.errorDoc(dns, msg, problem), database.ORPEffect{})
+		return
+	}
 	hashOfTerms := orp.TermsHash(terms)
 	if given, _ := msg.Body["terms_hash"].(string); given != "" && given != hashOfTerms {
 		h.finish(c, msg, hash, http.StatusConflict, h.errorDoc(dns, msg, orp.Problem{Status: http.StatusConflict, Code: "terms_mismatch", Message: "terms_hash does not match the terms."}), database.ORPEffect{})
@@ -956,6 +961,19 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
 	}
+	var receipts []database.ORPInboxItem
+	if proofURL, _ := msg.Body["proof_url"].(string); proofURL != "" {
+		var rows []map[string]any
+		if err := json.Unmarshal(obligations, &rows); err == nil {
+			origin, _ := h.origin(c)
+			next, body, receiptID := h.verifyProof(c.Request.Context(), origin, deal, obligation, terms, proofURL, rows, now)
+			if next != nil {
+				obligations = next
+				parties, version := dealProofParties(deal)
+				receipts = receiptInbox(dns, msg.ID, deal.ID, version, parties, body, receiptID, now)
+			}
+		}
+	}
 	prior := deal.UpdatedAt
 	deal.Obligations = obligations
 	deal.UpdatedAt = now.UTC()
@@ -974,7 +992,7 @@ func (h *ORPHost) execute(c *gin.Context, dns string, msg orp.Message, hash, own
 		UpdateObligations: obligations,
 		ExpectUpdatedAt:   prior,
 		UpdatedAt:         now.UTC(),
-		Inbox:             h.dealInbox(dns, msg.ID, deal, now),
+		Inbox:             append(h.dealInbox(dns, msg.ID, deal, now), receipts...),
 	})
 }
 

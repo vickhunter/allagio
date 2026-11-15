@@ -126,6 +126,111 @@ func checkExecuteBody(body map[string]any) (Problem, bool) {
 	return Problem{}, false
 }
 
+var receiptBodyKeys = map[string]bool{
+	"obligation": true, "result": true, "method": true, "at": true,
+	"url": true, "found": true, "reason": true, "settlement": true,
+	"next_check": true,
+}
+
+var receiptResults = map[string]bool{"verified": true, "failed": true, "partial": true}
+
+var receiptReasons = map[string]bool{
+	"not_found": true, "link_missing": true, "rel_missing": true,
+	"disclosure_missing": true, "content_mismatch": true, "removed": true,
+	"unreachable": true, "too_early": true, "too_late": true,
+	"not_public": true, "other": true,
+}
+
+var receiptFoundKeys = map[string]bool{
+	"link": true, "code": true, "destination": true, "rel": true,
+	"clicks": true, "disclosure": true, "target": true, "content": true,
+}
+
+// checkReceiptBody validates the ReceiptBody shape the schema fixes: the
+// required quartet plus the optional public-evidence fields.
+func checkReceiptBody(body map[string]any) (Problem, bool) {
+	if problem, bad := unknownKey(body, receiptBodyKeys, "/body"); bad {
+		return problem, true
+	}
+	obligation, _ := body["obligation"].(string)
+	if !obligationPattern.MatchString(obligation) {
+		return Invalid("The message is not valid ORP 0.3.", "/body/obligation"), true
+	}
+	result, _ := body["result"].(string)
+	if !receiptResults[result] {
+		return Invalid("The message is not valid ORP 0.3.", "/body/result"), true
+	}
+	method, _ := body["method"].(string)
+	if !proofMethods[method] && !extPattern.MatchString(method) {
+		return Invalid("The message is not valid ORP 0.3.", "/body/method"), true
+	}
+	at, _ := body["at"].(string)
+	if at == "" {
+		return Invalid("The message is not valid ORP 0.3.", "/body/at"), true
+	}
+	if _, err := time.Parse(time.RFC3339, at); err != nil {
+		return Invalid("The message is not valid ORP 0.3.", "/body/at"), true
+	}
+	if raw, present := body["url"]; present {
+		text, ok := raw.(string)
+		if !ok || !validURL(text) {
+			return Invalid("The message is not valid ORP 0.3.", "/body/url"), true
+		}
+	}
+	if raw, present := body["reason"]; present {
+		text, ok := raw.(string)
+		if !ok || !receiptReasons[text] {
+			return Invalid("The message is not valid ORP 0.3.", "/body/reason"), true
+		}
+	}
+	if raw, present := body["found"]; present {
+		obj, ok := raw.(map[string]any)
+		if !ok {
+			return Invalid("The message is not valid ORP 0.3.", "/body/found"), true
+		}
+		for key, value := range obj {
+			if !receiptFoundKeys[key] {
+				return Invalid("The message is not valid ORP 0.3.", "/body/found/"+escapePointer(key)), true
+			}
+			if key == "clicks" {
+				if n, ok := whole(value); !ok || n < 0 {
+					return Invalid("The message is not valid ORP 0.3.", "/body/found/clicks"), true
+				}
+			} else if _, ok := value.(bool); !ok {
+				return Invalid("The message is not valid ORP 0.3.", "/body/found/"+escapePointer(key)), true
+			}
+		}
+	}
+	if _, present := body["settlement"]; present {
+		obj, ok := body["settlement"].(map[string]any)
+		if !ok {
+			return Invalid("The message is not valid ORP 0.3.", "/body/settlement"), true
+		}
+		if problem, bad := unknownKey(obj, map[string]bool{"rail": true, "ref": true, "amount": true}, "/body/settlement"); bad {
+			return problem, true
+		}
+		if rail, _ := obj["rail"].(string); !railPattern.MatchString(rail) {
+			return Invalid("The message is not valid ORP 0.3.", "/body/settlement/rail"), true
+		}
+		if _, ok := obj["amount"].(map[string]any); !ok {
+			return Invalid("The message is not valid ORP 0.3.", "/body/settlement/amount"), true
+		}
+		if ref, present := obj["ref"]; present {
+			text, ok := ref.(string)
+			if !ok || utf8.RuneCountInString(text) > 200 {
+				return Invalid("The message is not valid ORP 0.3.", "/body/settlement/ref"), true
+			}
+		}
+	}
+	if problem, bad := optionalTimestamp(body, "next_check", "/body/next_check"); bad {
+		return problem, true
+	}
+	if problem, bad := personalIn(body, "/body"); bad {
+		return problem, true
+	}
+	return Problem{}, false
+}
+
 func checkAcceptSpaces(value any) (Problem, bool) {
 	raw, ok := value.([]any)
 	if !ok || len(raw) > 10 {
@@ -196,6 +301,9 @@ func checkTerms(terms map[string]any, path string) (Problem, bool) {
 			needsDisclosure = true
 		}
 	}
+	if problem, bad := directPayConflict(raw, path); bad {
+		return problem, true
+	}
 	if categories, present := terms["categories"]; present {
 		if problem, bad := checkCategories(categories, path+"/categories"); bad {
 			return problem, true
@@ -220,6 +328,43 @@ func checkTerms(terms map[string]any, path string) (Problem, bool) {
 	}
 	if problem, bad := personalIn(terms, path); bad {
 		return problem, true
+	}
+	return Problem{}, false
+}
+
+// directPayConflict is T11: a place obligation whose content links straight
+// to the destination has no tracking entry, so a per-click or per-conversion
+// pay naming it in after could never be counted.
+func directPayConflict(raw []any, path string) (Problem, bool) {
+	direct := map[string]bool{}
+	for _, item := range raw {
+		obj, _ := item.(map[string]any)
+		if obj["action"] != "place" {
+			continue
+		}
+		content, _ := obj["content"].(map[string]any)
+		if on, _ := content["direct"].(bool); on {
+			if id, _ := obj["id"].(string); id != "" {
+				direct[id] = true
+			}
+		}
+	}
+	if len(direct) == 0 {
+		return Problem{}, false
+	}
+	for i, item := range raw {
+		obj, _ := item.(map[string]any)
+		if obj["action"] != "pay" {
+			continue
+		}
+		per, _ := obj["per"].(string)
+		if per != "click" && per != "conversion" {
+			continue
+		}
+		after, _ := obj["after"].(string)
+		if direct[after] {
+			return Invalid("The message is not valid ORP 0.3.", path+"/obligations/"+itoa(i)+"/after"), true
+		}
 	}
 	return Problem{}, false
 }
