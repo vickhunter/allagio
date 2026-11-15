@@ -191,7 +191,7 @@ This is the human page for a device code. It is separate from the agent-created 
 - get_payout_history: Call get_payout_history when you need this site's payouts and recent commission entries.
 - get_started: Call get_started first. It returns the ordered maker recipe (register_maker → register_product → run_assessment → create_offer → submit_offer), which steps are done for this key, and next_step with the exact tool and arguments to call. Call it again after each step.
 - register_maker: Call register_maker with an email to create a maker account and receive maker_id and api_key.
-- register_product: Call register_product with a name and a live website URL to add a product.
+- register_product: Call register_product with a name and a live website URL to add a product. For a free product — a protocol, free tool, or anything with no paid checkout — pass payment_provider="none": the readiness check then does not require a checkout or pricing page.
 - list_products: Call list_products to see this maker's products and whether each one is ready.
 - get_product: Call get_product with a product id to read that product.
 - update_product: Call update_product to change the same fields you sent to register_product.

@@ -99,7 +99,7 @@ func (e *ReadinessEngine) Assess(ctx context.Context, product ReadinessProduct) 
 		e.checkSiteReachable(site),
 		checkout,
 		e.checkRefParamSurvives(ctx, product.WebsiteURL, product.PricingURL, refParam),
-		e.checkPricingPage(ctx, product.PricingURL),
+		e.checkPricingPage(ctx, product),
 		e.checkDocsPresent(ctx, product.DocsURL),
 		checkBodyMarker(site, "privacy_policy", privacyMarkerPattern, true,
 			"Privacy Policy link found on the landing page.",
@@ -433,6 +433,12 @@ func detectCheckoutProvider(haystack string) (string, string) {
 
 func (e *ReadinessEngine) checkCheckoutPresent(ctx context.Context, product ReadinessProduct, site fetchedPage) (ReadinessCheck, *ReadinessCheck) {
 	check := ReadinessCheck{Key: "checkout_present", Kind: "probe", Gate: true}
+	if declaresFreeProduct(product) {
+		check.Status = "pass"
+		check.Score = 100
+		check.Evidence = "product declares payment_provider=none — no checkout required for a free product"
+		return check, nil
+	}
 	bodies := site.Body
 	if product.PricingURL != "" && product.PricingURL != product.WebsiteURL {
 		pricing := e.fetchPage(ctx, product.PricingURL)
@@ -443,7 +449,7 @@ func (e *ReadinessEngine) checkCheckoutPresent(ctx context.Context, product Read
 	if strings.TrimSpace(product.CheckoutURL) == "" && !pageHasCheckoutAction(bodies) {
 		check.Status = "fail"
 		check.Evidence = "no checkout, buy, or sign-up link found on the landing or pricing page"
-		check.Remediation = "Add a buy, subscribe, checkout, or sign-up link on the landing or pricing page, or set a checkout URL. Allagio does not require a particular payment provider."
+		check.Remediation = "Add a buy, subscribe, checkout, or sign-up link on the landing or pricing page, or set a checkout URL. Allagio does not require a particular payment provider. If the product is free, set payment_provider=none to skip this check."
 		return check, nil
 	}
 	check.Status = "pass"
@@ -556,12 +562,25 @@ func (e *ReadinessEngine) pricingLinkDrops(ctx context.Context, pricingURL, webs
 	return attributionLinkDrops(page.Body, page.FinalURL.String(), refParam, probeValue)
 }
 
-func (e *ReadinessEngine) checkPricingPage(ctx context.Context, pricingURL string) ReadinessCheck {
+func (e *ReadinessEngine) checkPricingPage(ctx context.Context, product ReadinessProduct) ReadinessCheck {
 	check := ReadinessCheck{Key: "pricing_page", Kind: "probe", Gate: true}
+	pricingURL := product.PricingURL
+	freeProduct := declaresFreeProduct(product)
+	if freeProduct {
+		// A free product does not owe anyone a price. A pricing_url, when one is
+		// given, is still checked — but as advisory only, never a listing gate.
+		check.Gate = false
+	}
 	if strings.TrimSpace(pricingURL) == "" {
+		if freeProduct {
+			check.Status = "pass"
+			check.Score = 100
+			check.Evidence = "no pricing_url — not required for a free product (payment_provider=none)"
+			return check
+		}
 		check.Status = "fail"
 		check.Evidence = "no pricing_url provided"
-		check.Remediation = "Publish a pricing page and set pricing_url; publishers convert better when the price is visible."
+		check.Remediation = "Publish a pricing page and set pricing_url; publishers convert better when the price is visible. If the product is free, set payment_provider=none instead."
 		return check
 	}
 	page := e.fetchPage(ctx, pricingURL)
@@ -577,8 +596,20 @@ func (e *ReadinessEngine) checkPricingPage(ctx context.Context, pricingURL strin
 	} else {
 		check.Evidence = "pricing page resolves but no price found"
 	}
-	check.Remediation = "Make the pricing page reachable and state an actual price."
+	if freeProduct {
+		check.Status = "warn"
+		check.Score = 60
+		check.Remediation = "Optional for a free product: make the pricing page reachable, or drop pricing_url."
+		return check
+	}
+	check.Remediation = "Make the pricing page reachable and state an actual price. If the product is free, set payment_provider=none instead."
 	return check
+}
+
+// declaresFreeProduct reports whether the maker opted the product out of
+// commerce checks by declaring payment_provider=none.
+func declaresFreeProduct(product ReadinessProduct) bool {
+	return strings.EqualFold(strings.TrimSpace(product.PaymentProvider), "none")
 }
 
 func (e *ReadinessEngine) checkDocsPresent(ctx context.Context, docsURL string) ReadinessCheck {

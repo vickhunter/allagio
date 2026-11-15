@@ -256,6 +256,69 @@ func TestReadinessAssessPassesGatesForHealthySite(t *testing.T) {
 	}
 }
 
+func TestReadinessFreeProductSkipsCheckoutAndPricingGates(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body>
+<h1>OpenProto</h1>
+<a href="/join?via=dtr-probe">Get started</a> <a href="/privacy">Privacy Policy</a> <a href="/terms">Terms</a>
+</body></html>`))
+	})
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("<html><body>" + longDocs() + "</body></html>"))
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	result := testEngine().Assess(context.Background(), ReadinessProduct{
+		Name:            "OpenProto",
+		WebsiteURL:      server.URL,
+		DocsURL:         server.URL + "/docs",
+		PaymentProvider: "none",
+	})
+	for _, key := range []string{"checkout_present", "pricing_page"} {
+		check := findCheck(t, result.Checks, key)
+		if check.Status != "pass" {
+			t.Fatalf("expected %s to pass for a free product, got %s (%s)", key, check.Status, check.Evidence)
+		}
+	}
+	if result.Status != "ready" {
+		t.Fatalf("expected ready, got %s: %+v", result.Status, result.Checks)
+	}
+}
+
+func TestReadinessFreeProductPricingURLIsAdvisoryOnly(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body>
+<a href="/join?via=dtr-probe">Get started</a> <a href="/privacy">Privacy Policy</a> <a href="/terms">Terms</a>
+</body></html>`))
+	})
+	mux.HandleFunc("/pricing", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`<html><body>All features are free forever.</body></html>`))
+	})
+	mux.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("<html><body>" + longDocs() + "</body></html>"))
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	result := testEngine().Assess(context.Background(), ReadinessProduct{
+		Name:            "OpenProto",
+		WebsiteURL:      server.URL,
+		PricingURL:      server.URL + "/pricing",
+		DocsURL:         server.URL + "/docs",
+		PaymentProvider: "none",
+	})
+	check := findCheck(t, result.Checks, "pricing_page")
+	if check.Status == "fail" || check.Gate {
+		t.Fatalf("a free product's pricing page must be advisory only, got %+v", check)
+	}
+	if result.Status != "ready" {
+		t.Fatalf("expected ready, got %s: %+v", result.Status, result.Checks)
+	}
+}
+
 func TestRefParamCheckCatchesCTAThatDropsTheParameter(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
