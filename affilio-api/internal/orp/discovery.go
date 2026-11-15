@@ -91,8 +91,8 @@ func discoveryDescription(origin string) string {
 
 // DiscoveryDocument is GET /.well-known/orp.json. conformance is omitted:
 // this host does not claim L0, L1, L2, or L3.
-func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
-	return map[string]any{
+func DiscoveryDocument(origin, dns, claimsMode string, hostKeys ...map[string]any) map[string]any {
+	doc := map[string]any{
 		"orp":         []any{Version04, Version},
 		"host":        HostParty(dns),
 		"name":        TestingName,
@@ -113,6 +113,14 @@ func DiscoveryDocument(origin, dns, claimsMode string) map[string]any {
 			},
 		},
 	}
+	if len(hostKeys) > 0 {
+		keys := make([]any, 0, len(hostKeys))
+		for _, jwk := range hostKeys {
+			keys = append(keys, jwk)
+		}
+		doc["keys"] = keys
+	}
+	return doc
 }
 
 // Capabilities is what a 0.3 hello lists. It does not claim a conformance

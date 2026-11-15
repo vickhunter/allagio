@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/sha256"
 	"io"
 	"log"
 	"net"
@@ -18,6 +20,7 @@ import (
 	"affilio-api/internal/handlers"
 	"affilio-api/internal/middleware"
 	"affilio-api/internal/migrations"
+	"affilio-api/internal/orp"
 	"affilio-api/internal/services"
 	"affilio-api/internal/version"
 
@@ -335,10 +338,15 @@ func main() {
 		log.Printf("local session auth enabled for %s", base)
 	}
 	agentEntry.Mount(r)
+	// The host signing key derives deterministically from API_KEY_SECRET: no
+	// new env to manage, stable across restarts, secret never leaves the box.
+	hostSeed := sha256.Sum256([]byte("orp-host-signing:" + cfg.APIKeySecret))
+	hostSigner := &orp.Signer{Kid: "host", Key: ed25519.NewKeyFromSeed(hostSeed[:])}
 	(&handlers.ORPHost{
 		Entry:          agentEntry,
 		SuggestLimiter: handlers.NewIPRateLimiter(30, time.Minute),
 		MessageLimiter: handlers.NewIPRateLimiter(30, time.Minute),
+		Signer:         hostSigner,
 	}).Mount(r)
 	(&handlers.A2A{Entry: agentEntry, Engine: r}).Mount(r)
 	signals := v1.Group("/agent-signals")
