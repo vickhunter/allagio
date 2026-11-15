@@ -28,7 +28,8 @@ type TelegramUpdate struct {
 
 type TelegramMessage struct {
 	Chat struct {
-		ID int64 `json:"id"`
+		ID   int64  `json:"id"`
+		Type string `json:"type"` // "private", "group", "supergroup", "channel"
 	} `json:"chat"`
 	From struct {
 		Username  string `json:"username"`
