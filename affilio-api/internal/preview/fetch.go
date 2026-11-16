@@ -130,7 +130,7 @@ func (f Fetcher) Fetch(ctx context.Context, rawURL string) (Page, error) {
 		if err != nil {
 			return Page{}, err
 		}
-		page.Image = pageImageURL(string(body), rawURL)
+		page.Image = pageImageURL(string(body), resp.Request.URL.String())
 		return page, nil
 	}
 	if !jsonContent(resp.Header.Get("Content-Type")) {
