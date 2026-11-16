@@ -1,0 +1,21 @@
+ui/landing/src/lib/preview-groups.mjs
+  s_7e484d91fceb6c::t_4bafa959f5a770 13
+ui/landing/src/lib/preview-groups.test.mjs
+  s_7e484d91fceb6c::t_4a49519973183c 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e8075f4a889db11e7402f260b3e739844a405153",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
