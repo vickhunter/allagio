@@ -1,3 +1,15 @@
+## November 16 — preview hardening, demo card polish, and live API docs
+
+**`/api/preview` fetch blocklist** now covers the reserved IPv4 ranges the predicates miss: `0.0.0.0/8` (this-network), `192.0.0.0/24` (IETF protocol assignments), `198.18.0.0/15` (benchmarking), and `240.0.0.0/4` (reserved + broadcast), checked per redirect hop like the existing private/loopback/CGNAT rules.
+
+**Paste-a-post card** (`PostPreview.tsx`): the result carries a "Demo" badge, shows the page's `og:image`/`twitter:image` when the preview response includes one (new `image` field, resolved absolute http(s) only — it is rendered as an `<img>`, never fetched), and the notify-me intent no longer persists the pasted URL — localStorage keeps only a timestamped marker.
+
+**Platform showcase** (`PlatformShowcase.tsx`): the rotating tabs get an explicit pause/resume button (auto-rotation still pauses on hover/focus), and the panel reserves its tallest observed height so tab switches no longer shift the page.
+
+**Mobile header** (`site/Header.tsx`): the menu closes on outside tap and after following any link inside it, not just Escape.
+
+**Docs**: `GET /docs` serves an interactive Scalar API reference against the live `/openapi.json`, and `GET /docs/mcp.md` is the new MCP reference (transport, join auth, tool surface). Both are linked from `llms.txt`; `/orp/spec` already serves the ORP protocol text.
+
 ## November 15 — deal-kind end-to-end coverage for the advertised types
 
 `TestORP04EveryAdvertisedDealKind` walks every deal kind the landing page advertises through the real ORP API — offer, counterparties sign, active — so the "Works today" labels are pinned by an executable check rather than copy. Cases: mutual `place` obligations in one deal for link swaps (`swap`) and link exchanges (`link_exchange`, two tracked links minted), a `cross_sell` placement (covers upsells, which the docs describe as a cross-sell deal), and a `repost` obligation with link proof.

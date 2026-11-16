@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   AtSign,
@@ -9,7 +9,9 @@ import {
   Mail,
   Mic,
   Music2,
+  Pause,
   Pin,
+  Play,
   Radio,
   SquarePlay,
 } from 'lucide-react'
@@ -109,13 +111,27 @@ export function PlatformShowcase() {
   const platforms = t.showcase.platforms
   const [active, setActive] = useState(0)
   const [paused, setPaused] = useState(false)
+  const [manualPaused, setManualPaused] = useState(false)
   const platform = platforms[active]
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [panelMinH, setPanelMinH] = useState(0)
 
   useEffect(() => {
-    if (reduced || paused) return
+    if (reduced || paused || manualPaused) return
     const timer = window.setInterval(() => setActive((i) => (i + 1) % platforms.length), 5000)
     return () => window.clearInterval(timer)
-  }, [reduced, paused, platforms.length])
+  }, [reduced, paused, manualPaused, platforms.length])
+
+  // Reserve the tallest panel height seen so tab switches don't move the page.
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => {
+      setPanelMinH((height) => Math.max(height, el.offsetHeight))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const last = platforms.length - 1
@@ -136,7 +152,7 @@ export function PlatformShowcase() {
         role="tablist"
         aria-label={t.showcase.tabsLabel}
         onKeyDown={handleKeyDown}
-        className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {platforms.map((item, i) => {
           const Icon = tabIcons[item.id]
@@ -160,8 +176,18 @@ export function PlatformShowcase() {
             </button>
           )
         })}
+        <button
+          type="button"
+          aria-pressed={manualPaused}
+          aria-label={manualPaused ? t.showcase.resumeLabel : t.showcase.pauseLabel}
+          title={manualPaused ? t.showcase.resumeLabel : t.showcase.pauseLabel}
+          onClick={() => setManualPaused((value) => !value)}
+          className="inline-flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-full border border-line bg-s1 text-t2 transition-colors hover:text-t1"
+        >
+          {manualPaused ? <Play className="h-3.5 w-3.5" aria-hidden="true" /> : <Pause className="h-3.5 w-3.5" aria-hidden="true" />}
+        </button>
       </div>
-      <div id="showcase-panel" role="tabpanel" aria-labelledby={`showcase-tab-${platform.id}`} className="mt-5">
+      <div id="showcase-panel" role="tabpanel" aria-labelledby={`showcase-tab-${platform.id}`} className="mt-5" style={panelMinH ? { minHeight: panelMinH } : undefined} ref={panelRef}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={platform.id}

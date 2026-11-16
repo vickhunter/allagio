@@ -212,6 +212,8 @@ export const fr: Messages = {
   },
   showcase: {
     exampleTag: 'Allagio · Exemple',
+    pauseLabel: 'Mettre la rotation en pause',
+    resumeLabel: 'Reprendre la rotation',
     footnote: 'Exemples illustratifs. Les conditions sont négociées par votre agent et approuvées par vous ; Allagio est en mode test et ne déplace aucun argent.',
     partnershipLabel: 'Partenariat',
     termsLabel: 'Conditions',
@@ -374,6 +376,7 @@ export const fr: Messages = {
     approve: 'Approuver vos placements',
     sponsored: 'Sponsorisé, via Allagio',
     unverified: 'Non vérifié',
+    demo: 'Démo',
     postFallback: 'Publication',
     notify: 'M’avertir quand une correspondance arrive',
     saved: 'Enregistré dans ce navigateur.',

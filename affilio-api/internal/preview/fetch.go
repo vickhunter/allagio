@@ -49,6 +49,7 @@ type Page struct {
 	Title  string
 	Text   string
 	Author string
+	Image  string
 }
 
 // Document is the raw body of one public response.
@@ -125,7 +126,12 @@ func (f Fetcher) Fetch(ctx context.Context, rawURL string) (Page, error) {
 		if !htmlContent(resp.Header.Get("Content-Type")) {
 			return Page{}, ErrFetch
 		}
-		return pageFromHTML(string(body))
+		page, err := pageFromHTML(string(body))
+		if err != nil {
+			return Page{}, err
+		}
+		page.Image = pageImageURL(string(body), rawURL)
+		return page, nil
 	}
 	if !jsonContent(resp.Header.Get("Content-Type")) {
 		if htmlContent(resp.Header.Get("Content-Type")) {
@@ -407,6 +413,15 @@ func hostKey(host string) string {
 
 var (
 	cgnatNet = mustCIDR("100.64.0.0/10")
+	// Reserved IPv4 ranges that are not covered by net.IP predicates:
+	// this-network, IETF protocol assignments, benchmarking, and the
+	// reserved/broadcast block.
+	blockedNets = []*net.IPNet{
+		mustCIDR("0.0.0.0/8"),
+		mustCIDR("192.0.0.0/24"),
+		mustCIDR("198.18.0.0/15"),
+		mustCIDR("240.0.0.0/4"),
+	}
 )
 
 func mustCIDR(cidr string) *net.IPNet {
@@ -429,8 +444,15 @@ func blockedIP(ip net.IP) bool {
 	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
 		return true
 	}
-	if v4 := ip.To4(); v4 != nil && cgnatNet.Contains(v4) {
-		return true
+	if v4 := ip.To4(); v4 != nil {
+		if cgnatNet.Contains(v4) {
+			return true
+		}
+		for _, network := range blockedNets {
+			if network.Contains(v4) {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -531,6 +553,32 @@ func unreadableStatus(kind string, code int) bool {
 		return true
 	}
 	return kind != kindHTML && code == http.StatusNotFound
+}
+
+// pageImageURL returns the og:image or twitter:image URL for a page,
+// resolved against the page URL. Anything that is not an absolute
+// http(s) image is dropped.
+func pageImageURL(raw, rawURL string) string {
+	metas := readMeta(raw)
+	ref := firstMeta(metas, "og:image")
+	if ref == "" {
+		ref = firstMeta(metas, "twitter:image")
+	}
+	if ref == "" {
+		return ""
+	}
+	base, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	resolved, err := base.Parse(strings.TrimSpace(ref))
+	if err != nil || resolved == nil {
+		return ""
+	}
+	if resolved.Scheme != "https" && resolved.Scheme != "http" {
+		return ""
+	}
+	return resolved.String()
 }
 
 func pageFromHTML(raw string) (Page, error) {

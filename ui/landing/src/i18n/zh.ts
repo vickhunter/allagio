@@ -212,6 +212,8 @@ export const zh: Messages = {
   },
   showcase: {
     exampleTag: 'Allagio · 示例',
+    pauseLabel: '暂停轮播',
+    resumeLabel: '继续轮播',
     footnote: '示意示例。条款由你的代理协商并经你批准；Allagio 处于测试模式，不动真实资金。',
     partnershipLabel: '合作类型',
     termsLabel: '条款',
@@ -374,6 +376,7 @@ export const zh: Messages = {
     approve: '批准你的投放',
     sponsored: '赞助内容，来自 Allagio',
     unverified: '未验证',
+    demo: '演示',
     postFallback: '帖子',
     notify: '有匹配加入时通知我',
     saved: '已保存在此浏览器。',

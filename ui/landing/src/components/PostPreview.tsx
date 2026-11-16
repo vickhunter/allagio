@@ -120,6 +120,12 @@ function PostCard({ preview, platform }: { preview: PreviewGroups; platform: Sho
   }
   return (
     <article className="mt-3" aria-label={t.preview.ariaLabel}>
+      <div className="mb-3 flex items-center gap-2">
+        <Badge variant="neutral">{t.preview.demo}</Badge>
+      </div>
+      {preview.image && (
+        <img src={preview.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="mb-3 w-full rounded-xl border border-line object-cover" />
+      )}
       <PlatformPostFrame platform={platform} mock={mock} tag={t.preview.sponsored} />
     </article>
   )
@@ -271,7 +277,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
     // TODO: no notify endpoint exists. Keep the intent in this browser until one does.
     try {
       const before = readNotifyIntent(window.localStorage)
-      const after = storeNotifyIntent(window.localStorage, url.trim())
+      const after = storeNotifyIntent(window.localStorage)
       if (JSON.stringify(before) !== JSON.stringify(after)) setNote('saved')
     } catch {
       setNote('failed')

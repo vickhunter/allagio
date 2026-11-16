@@ -212,6 +212,8 @@ export const hi: Messages = {
   },
   showcase: {
     exampleTag: 'Allagio · उदाहरण',
+    pauseLabel: 'रोटेशन रोकें',
+    resumeLabel: 'रोटेशन जारी रखें',
     footnote: 'सैद्धांतिक उदाहरण। शर्तें आपके एजेंट द्वारा तय और आपके द्वारा मंज़ूर की जाती हैं; Allagio टेस्ट मोड में है और कोई पैसा नहीं चलाता।',
     partnershipLabel: 'साझेदारी',
     termsLabel: 'शर्तें',
@@ -374,6 +376,7 @@ export const hi: Messages = {
     approve: 'अपने प्लेसमेंट मंज़ूर करें',
     sponsored: 'प्रायोजित, Allagio के माध्यम से',
     unverified: 'असत्यापित',
+    demo: 'डेमो',
     postFallback: 'पोस्ट',
     notify: 'जब कोई मैच जुड़े तब मुझे सूचित करें',
     saved: 'इस ब्राउज़र में सहेजा गया।',
