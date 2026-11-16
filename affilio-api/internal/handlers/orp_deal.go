@@ -1234,6 +1234,10 @@ func (h *ORPHost) finishRaw(c *gin.Context, msg orp.Message, hash string, status
 			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the obligor may revoke this obligation."}, false)
 			return
 		}
+		if errors.Is(err, database.ErrORPMsgChain) {
+			h.writeProblem(c, dns, msg.From, msg.ID, orp.Problem{Status: http.StatusConflict, Code: "chain_broken", Message: "prev is not the hash of the sender's previous message in the deal."}, false)
+			return
+		}
 		h.writeProblem(c, dns, msg.From, msg.ID, internalProblem(), false)
 		return
 	}
@@ -1241,6 +1245,9 @@ func (h *ORPHost) finishRaw(c *gin.Context, msg orp.Message, hash string, status
 }
 
 func (h *ORPHost) store(c *gin.Context, msg orp.Message, hash string, status int, raw []byte, effect database.ORPEffect) (database.ORPSaved, error) {
+	if msg.Deal != "" && effect.MsgChain == nil {
+		effect.MsgChain = &database.ORPMsgChain{Deal: msg.Deal, Party: msg.From, Prev: msg.Prev, Hash: hash}
+	}
 	saved, err := h.Entry.DB.CommitORP(c.Request.Context(), database.ORPRecord{
 		Party: msg.From, ID: msg.ID, Hash: hash, Status: status, Reply: raw,
 	}, effect)

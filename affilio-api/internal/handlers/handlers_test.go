@@ -131,7 +131,7 @@ func splitKeywordDSN(raw string) []string {
 
 func applyMigrations(t *testing.T, db *database.DB) {
 	t.Helper()
-	applyMigrationsThrough(t, db, "065_orp_chain_settlement.sql")
+	applyMigrationsThrough(t, db, "066_orp_msg_chain.sql")
 }
 
 // setupTestDBThrough connects in zone and applies migrations through last,
@@ -278,6 +278,7 @@ func migrationFiles() []string {
 		"063_owner_digest.sql",
 		"064_owner_telegram.sql",
 		"065_orp_chain_settlement.sql",
+		"066_orp_msg_chain.sql",
 	}
 }
 
@@ -286,6 +287,9 @@ func truncateAll(db *database.DB) error {
 DO $$ BEGIN
     IF to_regclass('public.orp_messages') IS NOT NULL THEN
         EXECUTE 'TRUNCATE TABLE orp_inbox, orp_deals, orp_offers, orp_messages RESTART IDENTITY CASCADE';
+    END IF;
+    IF to_regclass('public.orp_msg_chain') IS NOT NULL THEN
+        EXECUTE 'TRUNCATE TABLE orp_msg_chain RESTART IDENTITY CASCADE';
     END IF;
     IF to_regclass('public.orp_payouts') IS NOT NULL THEN
         EXECUTE 'TRUNCATE TABLE orp_payouts RESTART IDENTITY CASCADE';

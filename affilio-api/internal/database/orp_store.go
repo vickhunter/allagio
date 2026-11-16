@@ -31,6 +31,10 @@ var ErrORPOpenerUnknown = errors.New("orp opener unknown")
 // ErrORPNotObligor is an obligation revoke whose sender is not the obligor.
 var ErrORPNotObligor = errors.New("orp obligor")
 
+// ErrORPMsgChain is an E8 violation: prev does not name the sender's previous
+// message in the deal, or prev is missing after the sender started chaining.
+var ErrORPMsgChain = errors.New("orp message chain")
+
 // ORPRepeatWindow is how soon a later human click follows the previous
 // counted click on the same tracking entry before it is stored as repeat.
 // A click at exactly this gap still counts. The click instant is stored in
@@ -158,6 +162,52 @@ type ORPEffect struct {
 	// DisputeWithdrawFrom is the party attempting to withdraw the open dispute.
 	// Stored dispute messages must name that party as the single opener.
 	DisputeWithdrawFrom string
+	// Chain carries the E8 envelope for one party message that names a deal.
+	// Set on every stored party message with a deal field.
+	MsgChain *ORPMsgChain
+}
+
+// ORPMsgChain is one link in a sender's per-deal hash chain.
+type ORPMsgChain struct {
+	Deal  string
+	Party string
+	Prev  string
+	Hash  string
+}
+
+// applyORPMsgChain is E8: the locked row is the sender's previous message hash in
+// this deal. A missing row means the sender has sent nothing in this deal, so a
+// prev has no message to point at. Once used_prev latches, every later message
+// must carry the matching prev.
+func applyORPMsgChain(ctx context.Context, tx pgx.Tx, chain *ORPMsgChain) error {
+	var lastHash string
+	var usedPrev bool
+	err := tx.QueryRow(ctx, `
+SELECT last_hash, used_prev FROM orp_msg_chain
+WHERE deal_id=$1 AND party=$2 FOR UPDATE`, chain.Deal, chain.Party).Scan(&lastHash, &usedPrev)
+	if errors.Is(err, pgx.ErrNoRows) {
+		if chain.Prev != "" {
+			return ErrORPMsgChain
+		}
+		_, err = tx.Exec(ctx, `
+INSERT INTO orp_msg_chain(deal_id, party, last_hash, used_prev)
+VALUES($1,$2,$3,false)`, chain.Deal, chain.Party, chain.Hash)
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	if chain.Prev == "" {
+		if usedPrev {
+			return ErrORPMsgChain
+		}
+	} else if chain.Prev != lastHash {
+		return ErrORPMsgChain
+	}
+	_, err = tx.Exec(ctx, `
+UPDATE orp_msg_chain SET last_hash=$3, used_prev=used_prev OR $4, updated_at=now()
+WHERE deal_id=$1 AND party=$2`, chain.Deal, chain.Party, chain.Hash, chain.Prev != "")
+	return err
 }
 
 // ORPSaved is the reply that should be written. Reused means an earlier
@@ -241,6 +291,11 @@ WHERE party=$1 AND message_id=$2`, rec.Party, rec.ID).Scan(&storedHash, &saved.S
 }
 
 func applyORPEffect(ctx context.Context, tx pgx.Tx, effect ORPEffect) error {
+	if effect.MsgChain != nil {
+		if err := applyORPMsgChain(ctx, tx, effect.MsgChain); err != nil {
+			return err
+		}
+	}
 	if effect.Offer != nil {
 		offer := effect.Offer
 		if _, err := tx.Exec(ctx, `

@@ -82,6 +82,7 @@ type Message struct {
 	Body   map[string]any
 	Deal   string
 	Re     string
+	Prev   string
 	HasSig bool
 }
 
@@ -184,6 +185,7 @@ func ParseEnvelope(value any) (Message, Problem, bool) {
 		if !ok || !hashPattern.MatchString(text) {
 			return Message{}, Invalid(label, "/prev"), false
 		}
+		msg.Prev = text
 	}
 	if sig, present := obj["sig"]; present {
 		text, ok := sig.(string)
