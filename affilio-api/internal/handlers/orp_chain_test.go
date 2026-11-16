@@ -247,6 +247,13 @@ func TestORPChainPayoutMismatchTakesNewRef(t *testing.T) {
 		t.Fatalf("sweep skips mismatch: %d %v", n, err)
 	}
 
+	// A ref that settled nothing does not reserve the transaction.
+	chainDeal(t, r, makerToken, maker, pubToken, publisher, "m2")
+	secondID, _ := lastPayoutRecord(t, inboxMessages(t, r, pubToken))["payout"].(string)
+	if rec, _ := postJSON(t, r, http.MethodPost, "/orp/payouts/"+secondID+"/sent", map[string]any{"ref": chainTestTx}, bearerHeader(makerToken)); rec.Code != http.StatusOK {
+		t.Fatalf("unverified ref must not reserve the tx %d %s", rec.Code, rec.Body.String())
+	}
+
 	// The payer fixes the ref; the payee can still confirm by hand.
 	other := "0x" + strings.Repeat("3", 64)
 	rec, doc = postJSON(t, r, http.MethodPost, "/orp/payouts/"+payoutID+"/sent", map[string]any{"ref": other}, bearerHeader(makerToken))
@@ -254,7 +261,11 @@ func TestORPChainPayoutMismatchTakesNewRef(t *testing.T) {
 		t.Fatalf("corrected ref %d %s", rec.Code, rec.Body.String())
 	}
 	answer := orpEnvelope("payout", "m_chain_confirm_1", publisher, map[string]any{"payout": payoutID, "answer": "confirm"})
-	answer["deal"] = lastPayoutDeal(t, inboxMessages(t, r, pubToken))
+	first, _, err := db.GetORPPayout(ctx, payoutID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer["deal"] = first.DealID
 	rec, body := postJSON(t, r, http.MethodPost, "/orp", answer, bearerHeader(pubToken))
 	if rec.Code != http.StatusOK || body["body"].(map[string]any)["state"] != "paid" {
 		t.Fatalf("payee confirm %d %s", rec.Code, rec.Body.String())
@@ -262,18 +273,6 @@ func TestORPChainPayoutMismatchTakesNewRef(t *testing.T) {
 	if n, err := SweepORPChainPayouts(ctx, db, entry.BaseURL, host.Chain, time.Now()); err != nil || n != 0 {
 		t.Fatalf("sweep after confirm: %d %v", n, err)
 	}
-}
-
-func lastPayoutDeal(t *testing.T, messages []any) string {
-	t.Helper()
-	deal := ""
-	for _, item := range messages {
-		msg, _ := item.(map[string]any)
-		if msg["type"] == "payout" {
-			deal, _ = msg["deal"].(string)
-		}
-	}
-	return deal
 }
 
 func TestPayoutWalletsForm(t *testing.T) {

@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// ErrORPRefUsed is returned when a chain transaction already settles
-// another payout.
+// ErrORPRefUsed is returned when a chain transaction already settled
+// another payout. A ref that settled nothing reserves nothing.
 var ErrORPRefUsed = errors.New("orp payout: transaction already used")
 
 // RecordORPPayoutRef stores the payer's transfer reference. A payable payout
@@ -21,6 +21,13 @@ func (d *DB) RecordORPPayoutRef(ctx context.Context, id, ref, chainTx string, no
 	var tx *string
 	status := (*string)(nil)
 	if chainTx != "" {
+		var used bool
+		if err := d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM orp_payouts WHERE chain_tx=$1 AND chain_status='verified' AND id<>$2)`, chainTx, id).Scan(&used); err != nil {
+			return ORPPayout{}, false, err
+		}
+		if used {
+			return ORPPayout{}, false, ErrORPRefUsed
+		}
 		tx = &chainTx
 		pending := "pending"
 		status = &pending
@@ -41,8 +48,18 @@ RETURNING `+orpPayoutCols, id, now, ref, tx, status))
 }
 
 // SetORPPayoutChain records one chain read on a sent payout. verified moves
-// it to paid; any other status keeps it sent.
+// it to paid; any other status keeps it sent. A transaction another payout
+// settled first is a mismatch with reason tx_used.
 func (d *DB) SetORPPayoutChain(ctx context.Context, id, chainTx, status, reason string, now time.Time) (ORPPayout, bool, error) {
+	p, ok, err := d.setORPPayoutChain(ctx, id, chainTx, status, reason, now)
+	var pgErr *pgconn.PgError
+	if status == "verified" && errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return d.setORPPayoutChain(ctx, id, chainTx, "mismatch", "tx_used", now)
+	}
+	return p, ok, err
+}
+
+func (d *DB) setORPPayoutChain(ctx context.Context, id, chainTx, status, reason string, now time.Time) (ORPPayout, bool, error) {
 	p, err := scanORPPayout(d.Pool.QueryRow(ctx, `
 UPDATE orp_payouts SET chain_status=$3, chain_reason=NULLIF($4,''), chain_checked_at=$5,
   state=CASE WHEN $3='verified' THEN 'paid' ELSE state END
