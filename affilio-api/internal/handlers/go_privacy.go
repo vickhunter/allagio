@@ -16,6 +16,7 @@ import (
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/middleware"
+	"affilio-api/internal/outbound"
 	"github.com/gin-gonic/gin"
 )
 
@@ -162,9 +163,9 @@ type landingProbe struct {
 var (
 	landingCache     sync.Map
 	landingReachable = probeLanding
-	landingClient    = &http.Client{Timeout: 1500 * time.Millisecond, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-		return http.ErrUseLastResponse
-	}}
+	// landingResolver is the public-address dialer for offer landing probes.
+	// Tests that serve a page on 127.0.0.1 set AllowLoopback.
+	landingResolver outbound.Resolver
 )
 
 func init() {
@@ -180,14 +181,16 @@ func probeLanding(raw string) bool {
 			return entry.ok
 		}
 	}
-	req, err := http.NewRequest(http.MethodHead, raw, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+	resp, err := landingResolver.Do(ctx, http.MethodHead, raw, nil, outbound.Options{
+		Timeout:    1500 * time.Millisecond,
+		NoRedirect: true,
+	})
 	ok := false
 	if err == nil {
-		resp, doErr := landingClient.Do(req)
-		if doErr == nil {
-			ok = landingUp(resp.StatusCode, nil)
-			resp.Body.Close()
-		}
+		ok = landingUp(resp.StatusCode, nil)
+		resp.Body.Close()
 	}
 	landingCache.Store(raw, landingProbe{ok: ok, at: time.Now()})
 	return ok

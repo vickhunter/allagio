@@ -114,6 +114,7 @@ func (g *AIContentGenerator) generateWithClaude(ctx context.Context, input Conte
 	}
 	client := g.Client
 	if client == nil {
+		//allagio:outbound operator-config CLAUDE_API_URL, default api.anthropic.com
 		client = &http.Client{Timeout: 20 * time.Second}
 	}
 	payload := claudeGenRequest{

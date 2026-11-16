@@ -34,6 +34,7 @@ func (s *StripeAPI) get(ctx context.Context, key, path string, out any) error {
 	req.SetBasicAuth(key, "")
 	client := s.HTTP
 	if client == nil {
+		//allagio:outbound fixed-host Stripe API
 		client = &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	}
 	resp, err := client.Do(req)

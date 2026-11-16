@@ -369,5 +369,11 @@ func validDomain(domain string) bool {
 	if !ok || (port != "" && !numericPort(port)) {
 		return false
 	}
-	return validHost(host)
+	if !validHost(host) {
+		return false
+	}
+	if loopbackDomain(host) && !allowLocalPublisherHosts {
+		return false
+	}
+	return true
 }

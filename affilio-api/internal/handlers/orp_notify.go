@@ -1,26 +1,36 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
+	"affilio-api/internal/outbound"
 	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
+
+// allowLoopbackNotify is false in production. Tests set it so a httptest
+// server on 127.0.0.1 or localhost can be saved and can receive a signed
+// webhook. Private, link-local, and metadata addresses stay blocked either way.
+var allowLoopbackNotify bool
+
+// webhookGuard is the process resolver. Tests replace LookupIP and DialContext.
+var webhookGuard outbound.Resolver
 
 // notifyWaiting fires the owner's deal-waiting webhook when an effect just
 // stored a waiting marker — a new deal's waiting, or an updated one from a
@@ -85,32 +95,108 @@ func telegramDM(db *database.DB, tg *services.TelegramClient, ownerID, text stri
 	}
 }
 
-func postSignedWebhook(url, secret string, payload []byte) {
+func postSignedWebhook(rawURL, secret string, payload []byte) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	_ = deliverSignedWebhook(ctx, rawURL, secret, payload)
+}
+
+func deliverSignedWebhook(ctx context.Context, rawURL, secret string, payload []byte) error {
+	guard := guardFor(rawURL)
+	if err := notifyTargetAllowed(ctx, rawURL, allowLoopbackNotify); err != nil {
+		return err
+	}
 	ts := fmt.Sprint(time.Now().Unix())
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(ts))
 	mac.Write(payload)
 	sig := fmt.Sprintf("t=%s,v1=%s", ts, hex.EncodeToString(mac.Sum(nil)))
-	client := &http.Client{Timeout: 4 * time.Second}
+	header := http.Header{
+		"Content-Type":        []string{"application/json"},
+		"X-Allagio-Signature": []string{sig},
+	}
+	var last error
 	for attempt := 0; attempt < 2; attempt++ {
 		if attempt == 1 {
-			time.Sleep(2 * time.Second)
-		}
-		req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(payload))
-		if err != nil {
-			return
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Allagio-Signature", sig)
-		resp, err := client.Do(req)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode < 500 {
-				return
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(2 * time.Second):
 			}
+		}
+		// Check again so a DNS change between attempts cannot retarget the post.
+		if err := guard.Check(ctx, rawURL); err != nil {
+			return err
+		}
+		resp, err := sendOwnerWebhook(ctx, guard, rawURL, payload, header)
+		if err != nil {
+			if errors.Is(err, outbound.ErrBlocked) || errors.Is(err, outbound.ErrInvalid) {
+				return err
+			}
+			last = err
 			continue
 		}
+		resp.Body.Close()
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			// Redirects are not followed. A 307 or 308 would resend the signed body.
+			return fmt.Errorf("webhook redirect %d", resp.StatusCode)
+		}
+		if resp.StatusCode < 500 {
+			return nil
+		}
+		last = fmt.Errorf("status %d", resp.StatusCode)
 	}
+	if last == nil {
+		last = errors.New("webhook failed")
+	}
+	return last
+}
+
+// sendOwnerWebhook is the guarded poster. Redirects are checked with the same
+// blocked-address rule as the first hop, and the dial uses the pinned IP.
+func sendOwnerWebhook(ctx context.Context, guard outbound.Resolver, rawURL string, payload []byte, header http.Header) (*http.Response, error) {
+	return guard.Do(ctx, http.MethodPost, rawURL, payload, outbound.Options{
+		Timeout:    4 * time.Second,
+		Header:     header,
+		NoRedirect: true,
+	})
+}
+
+func guardFor(raw string) outbound.Resolver {
+	guard := webhookGuard
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err == nil && allowLoopbackNotify && parsed.Scheme == "http" && loopbackName(parsed.Hostname()) {
+		guard.AllowLoopback = true
+	}
+	return guard
+}
+
+// notifyTargetAllowed is the save-time and send-time URL policy.
+// Production accepts only https URLs whose addresses are public.
+// allowLoopback additionally accepts http://127.0.0.1 and http://localhost,
+// which is how tests receive a webhook on httptest. It does not accept
+// private, link-local, or metadata addresses.
+func notifyTargetAllowed(ctx context.Context, raw string, allowLoopback bool) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Hostname() == "" || parsed.User != nil {
+		return outbound.ErrInvalid
+	}
+	loopback := allowLoopback && parsed.Scheme == "http" && loopbackName(parsed.Hostname())
+	if parsed.Scheme != "https" && !loopback {
+		return outbound.ErrInvalid
+	}
+	guard := webhookGuard
+	guard.AllowLoopback = loopback
+	return guard.Check(ctx, raw)
+}
+
+func loopbackName(host string) bool {
+	host = strings.Trim(strings.ToLower(host), "[]")
+	return host == "localhost" || host == "127.0.0.1"
 }
 
 func newNotifySecret() string {
@@ -226,8 +312,8 @@ func (h *HostedHandler) SaveDigestForm(c *gin.Context) {
 
 func (h *HostedHandler) SaveNotifyForm(c *gin.Context) {
 	o := ownerFrom(c)
-	url := strings.TrimSpace(c.PostForm("url"))
-	if url != "" && !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://127.0.0.1") && !strings.HasPrefix(url, "http://localhost") {
+	rawURL := strings.TrimSpace(c.PostForm("url"))
+	if err := notifyTargetAllowed(c.Request.Context(), rawURL, allowLoopbackNotify); err != nil {
 		c.Status(http.StatusBadRequest)
 		return
 	}
@@ -236,13 +322,13 @@ func (h *HostedHandler) SaveNotifyForm(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-	if url != "" && secret == "" {
+	if rawURL != "" && secret == "" {
 		secret = newNotifySecret()
 	}
-	if url == "" {
+	if rawURL == "" {
 		secret = ""
 	}
-	if err := h.DB.SetOwnerNotify(c.Request.Context(), o.ID, url, secret); err != nil {
+	if err := h.DB.SetOwnerNotify(c.Request.Context(), o.ID, rawURL, secret); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
 	}

@@ -146,6 +146,9 @@ func TestOfferHeadProbeTreats403And405AsUp(t *testing.T) {
 		{http.StatusGone, false},
 		{http.StatusInternalServerError, false},
 	}
+	prev := landingResolver
+	landingResolver.AllowLoopback = true
+	t.Cleanup(func() { landingResolver = prev })
 	for _, tc := range cases {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(tc.status)

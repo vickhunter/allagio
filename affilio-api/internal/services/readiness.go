@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"affilio-api/internal/outbound"
 )
 
 // ReadinessEngine answers "is this product actually distributable?" before any
@@ -119,11 +121,11 @@ func (e *ReadinessEngine) Assess(ctx context.Context, product ReadinessProduct) 
 		// wrong reason: links exist in the browser DOM, not in the served HTML.
 		// Say so directly — the fix is prerendering, not "add a privacy link".
 		checks = append(checks, ReadinessCheck{
-			Key:    "client_rendered_shell",
-			Kind:   "probe",
-			Gate:   false,
-			Status: "warn",
-			Score:  40,
+			Key:         "client_rendered_shell",
+			Kind:        "probe",
+			Gate:        false,
+			Status:      "warn",
+			Score:       40,
 			Evidence:    "the landing page is a client-rendered app shell: script bundles load but the served HTML has almost no visible text",
 			Remediation: "Serve prerendered or static HTML for the landing page (SSR, SSG, or a prerender service) so crawlers and agents see the content without executing JavaScript.",
 		})
@@ -169,7 +171,8 @@ type fetchedPage struct {
 }
 
 func (e *ReadinessEngine) httpClient() *http.Client {
-	client := &http.Client{Timeout: 10 * time.Second}
+	//allagio:outbound fixed-host readiness replaces this transport with the public-address dial
+	client := outbound.NewClient(10*time.Second, nil, nil)
 	if e.Client != nil {
 		copy := *e.Client
 		client = &copy
@@ -177,17 +180,18 @@ func (e *ReadinessEngine) httpClient() *http.Client {
 	if e.AllowPrivateHosts {
 		return client
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport := outbound.CloneTransport()
 	if existing, ok := client.Transport.(*http.Transport); ok {
 		transport = existing.Clone()
+		transport.Proxy = nil
 	}
-	transport.Proxy = nil
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		host, _, err := net.SplitHostPort(address)
 		if err != nil {
 			return nil, err
 		}
 		if e.publicOriginHost(host) {
+			//allagio:outbound fixed-host PUBLIC_BASE_URL is the only private origin readiness may probe
 			return (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, address)
 		}
 		return e.dialPublic(ctx, network, address)
@@ -222,7 +226,7 @@ func (e *ReadinessEngine) dialPublic(ctx context.Context, network, address strin
 		if e != nil && e.DialContext != nil {
 			conn, dialErr = e.DialContext(ctx, network, target)
 		} else {
-			conn, dialErr = (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, target)
+			conn, dialErr = outbound.DialPublic(ctx, network, target, 10*time.Second)
 		}
 		if dialErr == nil {
 			return conn, nil
@@ -275,6 +279,9 @@ func mustProbeCIDR(cidr string) *net.IPNet {
 // blockedProbeIP matches the preview fetcher. IPv4-mapped IPv6 is judged as IPv4.
 // The carrier-grade NAT range is not covered by net.IP.IsPrivate.
 func blockedProbeIP(ip net.IP) bool {
+	if outbound.BlockedIP(ip) {
+		return true
+	}
 	if ip == nil {
 		return true
 	}

@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"affilio-api/internal/outbound"
 )
 
 type DiscoveryEnrichment struct {
@@ -85,14 +87,16 @@ func fetchMetadata(ctx context.Context, rawURL string, client *http.Client) (str
 	if err != nil || parsed.Host == "" {
 		return "", ""
 	}
+	var resp *http.Response
 	if client == nil {
-		client = &http.Client{Timeout: 4 * time.Second}
+		resp, err = (outbound.Resolver{}).Do(ctx, http.MethodGet, parsed.String(), nil, outbound.Options{Timeout: 4 * time.Second})
+	} else {
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+		if reqErr != nil {
+			return "", ""
+		}
+		resp, err = client.Do(req)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
-	if err != nil {
-		return "", ""
-	}
-	resp, err := client.Do(req)
 	if err != nil {
 		return "", ""
 	}

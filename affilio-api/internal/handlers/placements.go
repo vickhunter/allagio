@@ -20,6 +20,7 @@ import (
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
+	"affilio-api/internal/outbound"
 	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -680,13 +681,25 @@ func hostWithoutPort(host string) string {
 	return strings.Trim(strings.TrimSuffix(host, "."), "[]")
 }
 
-func localPublisherHost(host string) bool {
-	host = hostWithoutPort(host)
+// allowLocalPublisherHosts is false in production. Tests set it so a site
+// on 127.0.0.1, ::1, localhost, or *.localhost can be registered and its
+// article text fetched from that host. Private and metadata addresses stay blocked.
+var allowLocalPublisherHosts bool
+
+// articleResolver is the process resolver for article text. Tests replace the dial.
+var articleResolver outbound.Resolver
+
+func loopbackDomain(host string) bool {
+	host = strings.Trim(strings.ToLower(hostWithoutPort(host)), "[]")
 	switch host {
 	case "127.0.0.1", "::1", "localhost":
 		return true
 	}
 	return strings.HasSuffix(host, ".localhost")
+}
+
+func localPublisherHost(host string) bool {
+	return allowLocalPublisherHosts && loopbackDomain(host)
 }
 
 func registeredHostPort(domain string) (host, port string) {
@@ -706,6 +719,9 @@ func surfaceURLProblem(raw, siteDomain string) string {
 	}
 	u, err := url.Parse(raw)
 	host, port := registeredHostPort(siteDomain)
+	if err == nil && !allowLocalPublisherHosts && (loopbackDomain(u.Hostname()) || loopbackDomain(host)) {
+		return httpsRule
+	}
 	if err != nil || u.Hostname() == "" || u.User != nil || !strings.EqualFold(u.Hostname(), host) || (port != "" && u.Port() != port) {
 		return registered
 	}
@@ -765,24 +781,19 @@ func fetchArticleText(ctx context.Context, raw string) (string, error) {
 		return "", err
 	}
 	host := parsed.Hostname()
-	client := &http.Client{
-		Timeout: 8 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 3 {
-				return errors.New("too many redirects")
-			}
+	guard := articleResolver
+	guard.AllowLoopback = localPublisherHost(host)
+	resp, err := guard.Do(ctx, http.MethodGet, raw, nil, outbound.Options{
+		Timeout:       8 * time.Second,
+		RedirectLimit: 3,
+		Header:        http.Header{"User-Agent": []string{"Allagio/article-text"}},
+		BeforeRedirect: func(req *http.Request) error {
 			if req.URL.Hostname() != host || req.URL.User != nil {
 				return errors.New("redirect left the article host")
 			}
 			return nil
 		},
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("User-Agent", "Allagio/article-text")
-	resp, err := client.Do(req)
+	})
 	if err != nil {
 		return "", err
 	}

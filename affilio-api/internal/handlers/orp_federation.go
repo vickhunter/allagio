@@ -17,8 +17,12 @@ import (
 // SSRF-guarded readiness client.
 type fedFetch func(ctx context.Context, method, rawURL string, payload []byte) (body string, status int, ok bool)
 
+// federationEngine is the readiness client federation uses. Tests replace it
+// to prove a redirect to a private address is refused. Production leaves it.
+var federationEngine = func() *services.ReadinessEngine { return &services.ReadinessEngine{} }
+
 func defaultFedFetch(ctx context.Context, method, rawURL string, payload []byte) (string, int, bool) {
-	e := &services.ReadinessEngine{}
+	e := federationEngine()
 	if method == http.MethodPost {
 		return e.PostPublicJSON(ctx, rawURL, payload)
 	}

@@ -49,6 +49,14 @@ func TestGuardBlocksEachRange(t *testing.T) {
 		{"ipv4-mapped cgnat", "::ffff:100.64.1.1"},
 		{"ipv4-mapped multicast", "::ffff:224.0.0.1"},
 		{"ipv4-mapped unspecified", "::ffff:0.0.0.0"},
+		{"this-network", "0.1.2.3"},
+		{"benchmark", "198.18.0.1"},
+		{"reserved", "240.0.0.1"},
+		{"broadcast", "255.255.255.255"},
+		{"nat64", "64:ff9b::8.8.8.8"},
+		{"6to4", "2002:0808:0808::"},
+		{"ipv4-compatible", "::8.8.8.8"},
+		{"site-local", "fec0::1"},
 	}
 	allowed := []string{
 		"8.8.8.8",

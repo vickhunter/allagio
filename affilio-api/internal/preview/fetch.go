@@ -18,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"affilio-api/internal/outbound"
 )
 
 const (
@@ -197,8 +199,7 @@ func (f Fetcher) client(pins *pinSet) *http.Client {
 }
 
 func (f Fetcher) clientFor(pins *pinSet, origin *url.URL) *http.Client {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.Proxy = nil
+	transport := outbound.CloneTransport()
 	transport.ForceAttemptHTTP2 = false
 	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
 	tlsConfig := &tls.Config{NextProtos: []string{"http/1.1"}}
@@ -223,21 +224,18 @@ func (f Fetcher) clientFor(pins *pinSet, origin *url.URL) *http.Client {
 		if f.DialContext != nil {
 			return f.DialContext(ctx, network, target)
 		}
-		return (&net.Dialer{Timeout: fetchTimeout}).DialContext(ctx, network, target)
+		return outbound.DialPublic(ctx, network, target, fetchTimeout)
 	}
-	return &http.Client{
-		Timeout:   fetchTimeout,
-		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= maxRedirects+1 {
-				return ErrFetch
-			}
-			if origin != nil && !sameDocumentOrigin(origin, req.URL) {
-				return ErrFetch
-			}
-			return f.admit(req.Context(), pins, req.URL.String())
-		},
-	}
+	//allagio:outbound fixed-host preview client dials only the pinned address
+	return outbound.NewClient(fetchTimeout, transport, func(req *http.Request, via []*http.Request) error {
+		if len(via) >= maxRedirects+1 {
+			return ErrFetch
+		}
+		if origin != nil && !sameDocumentOrigin(origin, req.URL) {
+			return ErrFetch
+		}
+		return f.admit(req.Context(), pins, req.URL.String())
+	})
 }
 
 // screen is the address check Fetch runs before it dials.
@@ -405,34 +403,10 @@ func hostKey(host string) string {
 	return strings.ToLower(host)
 }
 
-var (
-	cgnatNet = mustCIDR("100.64.0.0/10")
-)
-
-func mustCIDR(cidr string) *net.IPNet {
-	_, network, err := net.ParseCIDR(cidr)
-	if err != nil {
-		panic(err)
-	}
-	return network
-}
-
 // blockedIP reports addresses a preview must not dial.
-// IPv4-mapped IPv6 is unwrapped and judged as IPv4.
+// The check lives in outbound so every caller shares it.
 func blockedIP(ip net.IP) bool {
-	if ip == nil {
-		return true
-	}
-	if v4 := ip.To4(); v4 != nil {
-		ip = v4
-	}
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
-		return true
-	}
-	if v4 := ip.To4(); v4 != nil && cgnatNet.Contains(v4) {
-		return true
-	}
-	return false
+	return outbound.BlockedIP(ip)
 }
 
 var (

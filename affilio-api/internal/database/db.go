@@ -46,6 +46,7 @@ func Connect(ctx context.Context, url string) (*DB, error) {
 		// Railway private networking uses IPv6. Bound that attempt so a
 		// blackholed AAAA record cannot consume the caller's whole deadline
 		// before the IPv4 dial starts.
+		//allagio:outbound operator-config DATABASE_URL host
 		return dialWithFallback(ctx, (&net.Dialer{}).DialContext, addr, 2*time.Second)
 	}
 
