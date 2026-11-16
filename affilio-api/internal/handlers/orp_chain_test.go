@@ -229,6 +229,16 @@ func TestORPChainPayoutMismatchTakesNewRef(t *testing.T) {
 	chainDeal(t, r, makerToken, maker, pubToken, publisher, "m")
 	payoutID, _ := lastPayoutRecord(t, inboxMessages(t, r, pubToken))["payout"].(string)
 
+	if err := db.SaveStepModes(ctx, ownerOfParty(maker), "", database.StepModes{Payout: "off"}); err != nil {
+		t.Fatal(err)
+	}
+	if rec, _ := postJSON(t, r, http.MethodPost, "/orp/payouts/"+payoutID+"/sent", map[string]any{"ref": chainTestTx}, bearerHeader(makerToken)); rec.Code != http.StatusForbidden {
+		t.Fatalf("payout step off %d %s", rec.Code, rec.Body.String())
+	}
+	if err := db.SaveStepModes(ctx, ownerOfParty(maker), "", database.StepModes{Payout: "ask"}); err != nil {
+		t.Fatal(err)
+	}
+
 	rec, doc := postJSON(t, r, http.MethodPost, "/orp/payouts/"+payoutID+"/sent", map[string]any{"ref": chainTestTx}, bearerHeader(makerToken))
 	if rec.Code != http.StatusOK || doc["chain"].(map[string]any)["status"] != "mismatch" || doc["chain"].(map[string]any)["reason"] != "no_matching_transfer" {
 		t.Fatalf("short transfer %d %s", rec.Code, rec.Body.String())

@@ -293,6 +293,15 @@ func (h *ORPHost) PayoutSent(c *gin.Context) {
 		h.writeProblem(c, dns, "", "", orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "Only the payer reports a payout sent."}, false)
 		return
 	}
+	mode, err := h.modeFor(c, p.PayerOwner, database.StepPayout)
+	if err != nil {
+		h.writeProblem(c, dns, "", "", internalProblem(), false)
+		return
+	}
+	if mode == database.ModeOff {
+		h.writeProblem(c, dns, "", "", orp.Problem{Status: http.StatusForbidden, Code: "forbidden", Message: "The payer's payout step is off: the owner marks it sent on the dashboard."}, false)
+		return
+	}
 	if chainpay.IsChainRail(p.Rail) && ref == "" {
 		h.writeProblem(c, dns, "", "", orp.Invalid("A chain rail needs the transaction as ref.", "/ref"), false)
 		return
