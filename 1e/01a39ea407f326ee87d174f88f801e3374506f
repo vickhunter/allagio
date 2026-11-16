@@ -1,0 +1,47 @@
+STATUS.md
+  s_7e484d91fceb6c::t_d117856f40f18e 16-19
+affilio-api/internal/handlers/orp_deal.go
+  s_7e484d91fceb6c::t_912f25a90423e9 1238-1240
+  s_7e484d91fceb6c::t_4420139d9b91e6 1250
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_917d0e0c95643a 179-181,183-185,187-189,191-192,194-201,203-204,206-207,209-210
+  s_7e484d91fceb6c::t_b50248b8a5025d 35,37
+  s_7e484d91fceb6c::t_5b511611763e11 165-166,168-169,172-176
+  s_7e484d91fceb6c::t_4f4f7aee8ae3ea 296-298
+  s_7e484d91fceb6c::t_f4571db822c26c 177
+affilio-api/internal/migrations/066_orp_msg_chain.sql
+  s_7e484d91fceb6c::t_6925704c23c0c8 2-4,6-12
+affilio-api/internal/handlers/orp_chain_test.go
+  s_7e484d91fceb6c::t_b4c24cfe4b001a 1-3,7,12,14,18-19,37-38,40,76-77,86,94,101,104,107-108,116-117,123,129,134,138,139,159,163,167,171,172,206,217-219,228-229,236,239,242,245,246,254,260,280,284-286,310,314,317-318
+affilio-api/internal/orp/envelope.go
+  s_7e484d91fceb6c::t_0160103d34257a 85
+  s_7e484d91fceb6c::t_4f1ef488e7e2fb 188
+affilio-api/internal/handlers/handlers_test.go
+  s_7e484d91fceb6c::t_1d86d9be054d62 293
+affilio-api/internal/handlers/agent_docs.go
+  s_7e484d91fceb6c::t_3d0cf3418c5e21 80
+affilio-api/internal/handlers/llms_archive.go
+  s_7e484d91fceb6c::t_c205c0b731dc10 50
+affilio-wp/admin/build/landing-v9/llms-full.txt
+  s_7e484d91fceb6c::t_17b0f33959e5bf 44
+affilio-wp/admin/build/landing-v9/llms.txt
+  s_7e484d91fceb6c::t_b75526438b52fa 11
+ui/landing/public/llms.txt
+  s_7e484d91fceb6c::t_470279ec3d37dc 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1e01a39ea407f326ee87d174f88f801e3374506f",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}

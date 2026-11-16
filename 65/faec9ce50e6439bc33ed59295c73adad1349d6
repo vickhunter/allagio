@@ -1,0 +1,23 @@
+affilio-api/internal/database/orp_store.go
+  s_7e484d91fceb6c::t_77b3281c7784c2 183-188,190-194,197
+STATUS.md
+  s_7e484d91fceb6c::t_c9b0c824ba8799 2,8
+affilio-api/internal/handlers/orp_chain_test.go
+  s_7e484d91fceb6c::t_57cacff3a2845b 11,286,317-318
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "65faec9ce50e6439bc33ed59295c73adad1349d6",
+  "prompts": {},
+  "sessions": {
+    "s_7e484d91fceb6c": {
+      "agent_id": {
+        "tool": "windsurf",
+        "id": "attractive-failing",
+        "model": "unknown"
+      },
+      "human_author": "vickhunter <motricalavictor@gmail.com>"
+    }
+  }
+}
