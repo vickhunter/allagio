@@ -30,7 +30,7 @@ func NewOIDCLogin(ctx context.Context, issuer, clientID, clientSecret, callbackU
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || clientID == "" || clientSecret == "" {
 		return nil, errors.New("OIDC requires an HTTPS issuer, client ID and client secret")
 	}
-	//allagio:outbound fixed-host configured OIDC issuer
+	//allagio:outbound operator-config OIDC_ISSUER
 	client := &http.Client{Timeout: 10 * time.Second}
 	ctx = oidc.ClientContext(ctx, client)
 	p, err := oidc.NewProvider(ctx, issuer)

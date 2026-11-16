@@ -6,13 +6,17 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"affilio-api/internal/database"
 	"affilio-api/internal/outbound"
 	"affilio-api/internal/preview"
 	"affilio-api/internal/services"
+
+	"github.com/gin-gonic/gin"
 )
 
 // TestOutboundSSRFTargetsFail is the shared table for the three outbound
@@ -35,7 +39,7 @@ func TestOutboundSSRFTargetsFail(t *testing.T) {
 		{"10.x", "http://10.2.3.4/secret", false},
 		{"redirect", "http://public.example/r", true},
 	}
-	paths := []string{"preview", "federation", "webhook"}
+	paths := []string{"preview", "federation", "webhook", "article"}
 
 	for _, path := range paths {
 		for _, target := range targets {
@@ -64,6 +68,32 @@ func TestOutboundSSRFTargetsFail(t *testing.T) {
 			})
 		}
 	}
+
+	t.Run("deliver/10.x", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		err := deliverSignedWebhook(ctx, "https://10.2.3.4/secret", "secret", []byte(`{"type":"deal.waiting"}`))
+		if !errors.Is(err, outbound.ErrBlocked) {
+			t.Fatalf("deliverSignedWebhook: %v", err)
+		}
+	})
+	t.Run("save/10.x", func(t *testing.T) {
+		gin.SetMode(gin.TestMode)
+		h := &HostedHandler{}
+		r := gin.New()
+		r.POST("/owner/notify", func(c *gin.Context) {
+			c.Set("owner", &database.Owner{})
+			h.SaveNotifyForm(c)
+		})
+		form := url.Values{"url": {"https://10.2.3.4/secret"}}
+		req := httptest.NewRequest(http.MethodPost, "/owner/notify", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("SaveNotifyForm status %d body %s", rec.Code, rec.Body.String())
+		}
+	})
 }
 
 func runOutboundPath(t *testing.T, ctx context.Context, path, raw string, redirect bool, dial func(context.Context, string, string) (net.Conn, error)) error {
@@ -107,11 +137,26 @@ func runOutboundPath(t *testing.T, ctx context.Context, path, raw string, redire
 		if resp != nil && resp.Body != nil {
 			resp.Body.Close()
 		}
+		if redirect && err == nil && resp != nil && resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			return errors.New("webhook redirect")
+		}
 		if err == nil {
 			return nil
 		}
 		if !errors.Is(err, outbound.ErrBlocked) {
 			t.Fatalf("webhook: %v", err)
+		}
+		return err
+	case "article":
+		prev := articleResolver
+		articleResolver = outbound.Resolver{DialContext: dial}
+		if redirect {
+			articleResolver.LookupIP = publicLookup
+		}
+		t.Cleanup(func() { articleResolver = prev })
+		_, err := fetchArticleText(ctx, raw)
+		if err == nil {
+			return nil
 		}
 		return err
 	default:
@@ -197,6 +242,12 @@ func TestNotifyURLPolicy(t *testing.T) {
 	}
 	if err := notifyTargetAllowed(ctx, "", false); err != nil {
 		t.Fatal(err)
+	}
+	if validDomain("127.0.0.1") || validDomain("127.0.0.1:8080") || validDomain("localhost") || validDomain("localhost:9") || validDomain("blog.localhost") {
+		t.Fatal("prod accepted a loopback domain")
+	}
+	if !validDomain("publisher.example") {
+		t.Fatal("public domain rejected")
 	}
 	for _, raw := range []string{"http://127.0.0.1:8080/hook", "http://localhost/hook"} {
 		if err := notifyTargetAllowed(ctx, raw, true); err != nil {

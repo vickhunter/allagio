@@ -681,13 +681,25 @@ func hostWithoutPort(host string) string {
 	return strings.Trim(strings.TrimSuffix(host, "."), "[]")
 }
 
-func localPublisherHost(host string) bool {
-	host = hostWithoutPort(host)
+// allowLocalPublisherHosts is false in production. Tests set it so a site
+// on 127.0.0.1, ::1, localhost, or *.localhost can be registered and its
+// article text fetched from that host. Private and metadata addresses stay blocked.
+var allowLocalPublisherHosts bool
+
+// articleResolver is the process resolver for article text. Tests replace the dial.
+var articleResolver outbound.Resolver
+
+func loopbackDomain(host string) bool {
+	host = strings.Trim(strings.ToLower(hostWithoutPort(host)), "[]")
 	switch host {
 	case "127.0.0.1", "::1", "localhost":
 		return true
 	}
 	return strings.HasSuffix(host, ".localhost")
+}
+
+func localPublisherHost(host string) bool {
+	return allowLocalPublisherHosts && loopbackDomain(host)
 }
 
 func registeredHostPort(domain string) (host, port string) {
@@ -707,6 +719,9 @@ func surfaceURLProblem(raw, siteDomain string) string {
 	}
 	u, err := url.Parse(raw)
 	host, port := registeredHostPort(siteDomain)
+	if err == nil && !allowLocalPublisherHosts && (loopbackDomain(u.Hostname()) || loopbackDomain(host)) {
+		return httpsRule
+	}
 	if err != nil || u.Hostname() == "" || u.User != nil || !strings.EqualFold(u.Hostname(), host) || (port != "" && u.Port() != port) {
 		return registered
 	}
@@ -766,9 +781,8 @@ func fetchArticleText(ctx context.Context, raw string) (string, error) {
 		return "", err
 	}
 	host := parsed.Hostname()
-	// A site registered as loopback or *.localhost may be fetched there.
-	// Any other host stays on the public-address dial, including redirects.
-	guard := outbound.Resolver{AllowLoopback: localPublisherHost(host)}
+	guard := articleResolver
+	guard.AllowLoopback = localPublisherHost(host)
 	resp, err := guard.Do(ctx, http.MethodGet, raw, nil, outbound.Options{
 		Timeout:       8 * time.Second,
 		RedirectLimit: 3,

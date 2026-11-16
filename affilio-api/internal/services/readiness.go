@@ -171,6 +171,7 @@ type fetchedPage struct {
 }
 
 func (e *ReadinessEngine) httpClient() *http.Client {
+	//allagio:outbound fixed-host readiness replaces this transport with the public-address dial
 	client := outbound.NewClient(10*time.Second, nil, nil)
 	if e.Client != nil {
 		copy := *e.Client
@@ -179,11 +180,11 @@ func (e *ReadinessEngine) httpClient() *http.Client {
 	if e.AllowPrivateHosts {
 		return client
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport := outbound.CloneTransport()
 	if existing, ok := client.Transport.(*http.Transport); ok {
 		transport = existing.Clone()
+		transport.Proxy = nil
 	}
-	transport.Proxy = nil
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		host, _, err := net.SplitHostPort(address)
 		if err != nil {
@@ -278,6 +279,9 @@ func mustProbeCIDR(cidr string) *net.IPNet {
 // blockedProbeIP matches the preview fetcher. IPv4-mapped IPv6 is judged as IPv4.
 // The carrier-grade NAT range is not covered by net.IP.IsPrivate.
 func blockedProbeIP(ip net.IP) bool {
+	if outbound.BlockedIP(ip) {
+		return true
+	}
 	if ip == nil {
 		return true
 	}

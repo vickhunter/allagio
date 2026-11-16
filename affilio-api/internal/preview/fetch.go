@@ -199,8 +199,7 @@ func (f Fetcher) client(pins *pinSet) *http.Client {
 }
 
 func (f Fetcher) clientFor(pins *pinSet, origin *url.URL) *http.Client {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.Proxy = nil
+	transport := outbound.CloneTransport()
 	transport.ForceAttemptHTTP2 = false
 	transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
 	tlsConfig := &tls.Config{NextProtos: []string{"http/1.1"}}
@@ -227,6 +226,7 @@ func (f Fetcher) clientFor(pins *pinSet, origin *url.URL) *http.Client {
 		}
 		return outbound.DialPublic(ctx, network, target, fetchTimeout)
 	}
+	//allagio:outbound fixed-host preview client dials only the pinned address
 	return outbound.NewClient(fetchTimeout, transport, func(req *http.Request, via []*http.Request) error {
 		if len(via) >= maxRedirects+1 {
 			return ErrFetch

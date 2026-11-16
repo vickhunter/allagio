@@ -54,7 +54,7 @@ func (c *TelegramClient) client() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
 	}
-	//allagio:outbound fixed-host Telegram Bot API
+	//allagio:outbound operator-config TELEGRAM_API_BASE, default api.telegram.org
 	return &http.Client{Timeout: 45 * time.Second}
 }
 

@@ -13,6 +13,14 @@ import (
 )
 
 func TestSurfaceURLProblem(t *testing.T) {
+	if surfaceURLProblem("http://127.0.0.1:8088/post", "127.0.0.1") == "" || surfaceURLProblem("http://localhost/post", "localhost") == "" || surfaceURLProblem("https://blog.localhost/post", "blog.localhost") == "" {
+		t.Fatal("prod accepted a loopback article")
+	}
+	if validDomain("127.0.0.1") || validDomain("127.0.0.1:8080") || validDomain("localhost") || validDomain("localhost:9") || validDomain("blog.localhost") {
+		t.Fatal("prod accepted a loopback domain")
+	}
+	allowLocalPublisherHosts = true
+	t.Cleanup(func() { allowLocalPublisherHosts = false })
 	if problem := surfaceURLProblem("http://[::1]/post", "::1"); problem != "" {
 		t.Fatal(problem)
 	}
@@ -48,6 +56,8 @@ func TestSurfaceURLProblem(t *testing.T) {
 }
 
 func TestPrepareSurfaceURLAllowsLocalHTTP(t *testing.T) {
+	allowLocalPublisherHosts = true
+	t.Cleanup(func() { allowLocalPublisherHosts = false })
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	gin.SetMode(gin.TestMode)
@@ -122,6 +132,8 @@ func TestOwnerFindURLOptionalAndShortTopic(t *testing.T) {
 }
 
 func TestOwnerArticleTextFetch(t *testing.T) {
+	allowLocalPublisherHosts = true
+	t.Cleanup(func() { allowLocalPublisherHosts = false })
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	article := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

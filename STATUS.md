@@ -1,3 +1,7 @@
+## November 16 — owner webhooks and article text refuse loopback
+
+Article-text fetch and publisher signup no longer accept `127.0.0.1`, `localhost`, or `*.localhost` unless a test sets `allowLocalPublisherHosts`. Webhook delivery does not follow redirects, so a 307 cannot resend the signed body. The outbound vet tool is `golang.org/x/tools` v0.52.0, and `scripts/check.sh` fails if that vet prints a finding. `BlockedIP` also refuses the this-network, benchmarking, reserved, NAT64, 6to4, IPv4-compatible, and site-local ranges.
+
 ## November 16 — owner webhooks refuse private addresses
 
 Owner webhook URLs are checked when they are saved and again when the event is posted. The post uses the same public-address check and pinned dial as page preview, so a loopback, private, link-local, or metadata target is refused, including after a redirect or a DNS change. Production no longer accepts `http://127.0.0.1` or `http://localhost`; tests can still opt into those two names. `scripts/check.sh` runs the outbound-HTTP vet check and the Go tests that do not need a database. `scripts/install-hooks.sh` installs that check as an opt-in pre-push hook. Neither is wired into Railway or GitHub Actions.

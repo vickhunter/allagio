@@ -87,8 +87,7 @@ func (r Resolver) Do(ctx context.Context, method, rawURL string, body []byte, op
 	if limit <= 0 {
 		limit = defaultRedirects
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.Proxy = nil
+	transport := CloneTransport()
 	transport.DisableKeepAlives = true
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		return r.dialPinned(ctx, network, address, pins, timeout)
@@ -235,8 +234,17 @@ func parseURL(raw string) (*url.URL, error) {
 	return parsed, nil
 }
 
+// CloneTransport copies the process transport and drops any proxy.
+// Callers outside this package use it instead of http.DefaultTransport.
+func CloneTransport() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	return transport
+}
+
 // NewClient is the production http.Client constructor. Callers outside this
 // package build a transport and a redirect policy; they do not write the literal.
+// Each call site needs an //allagio:outbound marker.
 func NewClient(timeout time.Duration, transport http.RoundTripper, checkRedirect func(*http.Request, []*http.Request) error) *http.Client {
 	if timeout <= 0 {
 		timeout = defaultTimeout
@@ -292,7 +300,15 @@ func hostKey(host string) string {
 	return strings.ToLower(host)
 }
 
-var cgnatNet = mustCIDR("100.64.0.0/10")
+var (
+	cgnatNet     = mustCIDR("100.64.0.0/10")
+	thisNet      = mustCIDR("0.0.0.0/8")
+	benchNet     = mustCIDR("198.18.0.0/15")
+	reservedNet  = mustCIDR("240.0.0.0/4")
+	nat64Net     = mustCIDR("64:ff9b::/96")
+	sixToFourNet = mustCIDR("2002::/16")
+	siteLocalNet = mustCIDR("fec0::/10")
+)
 
 func mustCIDR(cidr string) *net.IPNet {
 	_, network, err := net.ParseCIDR(cidr)
@@ -304,6 +320,7 @@ func mustCIDR(cidr string) *net.IPNet {
 
 // BlockedIP reports addresses a public fetch must not dial.
 // IPv4-mapped IPv6 is unwrapped and judged as IPv4.
+// IPv4-compatible IPv6 (::a.b.c.d) is blocked outright.
 // The preview fetcher and every other outbound caller share this check.
 func BlockedIP(ip net.IP) bool {
 	if ip == nil {
@@ -311,12 +328,36 @@ func BlockedIP(ip net.IP) bool {
 	}
 	if v4 := ip.To4(); v4 != nil {
 		ip = v4
+	} else if ipv4Compatible(ip) {
+		return true
 	}
 	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
 		return true
 	}
-	if v4 := ip.To4(); v4 != nil && cgnatNet.Contains(v4) {
+	if v4 := ip.To4(); v4 != nil {
+		if cgnatNet.Contains(v4) || thisNet.Contains(v4) || benchNet.Contains(v4) || reservedNet.Contains(v4) {
+			return true
+		}
+		return false
+	}
+	v6 := ip.To16()
+	if v6 == nil {
 		return true
 	}
-	return false
+	return nat64Net.Contains(v6) || sixToFourNet.Contains(v6) || siteLocalNet.Contains(v6)
+}
+
+// ipv4Compatible reports the deprecated ::a.b.c.d form (first 96 bits zero).
+// IPv4-mapped ::ffff:a.b.c.d is not this form; To4 already unwrapped it.
+func ipv4Compatible(ip net.IP) bool {
+	v6 := ip.To16()
+	if v6 == nil || ip.To4() != nil {
+		return false
+	}
+	for i := 0; i < 12; i++ {
+		if v6[i] != 0 {
+			return false
+		}
+	}
+	return true
 }

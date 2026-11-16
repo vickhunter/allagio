@@ -137,6 +137,10 @@ func deliverSignedWebhook(ctx context.Context, rawURL, secret string, payload []
 			continue
 		}
 		resp.Body.Close()
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			// Redirects are not followed. A 307 or 308 would resend the signed body.
+			return fmt.Errorf("webhook redirect %d", resp.StatusCode)
+		}
 		if resp.StatusCode < 500 {
 			return nil
 		}
@@ -152,8 +156,9 @@ func deliverSignedWebhook(ctx context.Context, rawURL, secret string, payload []
 // blocked-address rule as the first hop, and the dial uses the pinned IP.
 func sendOwnerWebhook(ctx context.Context, guard outbound.Resolver, rawURL string, payload []byte, header http.Header) (*http.Response, error) {
 	return guard.Do(ctx, http.MethodPost, rawURL, payload, outbound.Options{
-		Timeout: 4 * time.Second,
-		Header:  header,
+		Timeout:    4 * time.Second,
+		Header:     header,
+		NoRedirect: true,
 	})
 }
 
