@@ -110,10 +110,14 @@ func checkChainPayout(ctx context.Context, db *database.DB, verifier *chainpay.V
 		return p
 	}
 	network, tx := p.ChainTx[:cut], p.ChainTx[cut+1:]
-	wallets, err := db.ORPPayoutWallets(ctx, p.PayeeOwner)
-	if err != nil {
-		log.Printf("orp chain payout %s: %v", p.ID, err)
-		return p
+	payTo := p.ChainPayTo
+	if payTo == "" {
+		wallets, err := db.ORPPayoutWallets(ctx, p.PayeeOwner)
+		if err != nil {
+			log.Printf("orp chain payout %s: %v", p.ID, err)
+			return p
+		}
+		payTo = wallets[network]
 	}
 	var units *big.Int
 	if u, ok := chainpay.Units(network, p.AmountMinor, p.Currency); ok {
@@ -122,7 +126,7 @@ func checkChainPayout(ctx context.Context, db *database.DB, verifier *chainpay.V
 	result := verifier.Verify(ctx, chainpay.Check{
 		Network:   network,
 		Tx:        tx,
-		PayTo:     wallets[network],
+		PayTo:     payTo,
 		MinUnits:  units,
 		NotBefore: p.CreatedAt.Add(-chainNotBeforeSkew),
 	})
@@ -181,32 +185,33 @@ func (h *ORPHost) sweepChainForOwner(c *gin.Context, dns, ownerID string) {
 }
 
 // refProblem validates a reported ref for the payout's rail. It returns the
-// chain transaction key, empty off chain rails.
-func refProblem(ctx context.Context, db *database.DB, p database.ORPPayout, ref string) (string, string, error) {
+// chain transaction key and the payee wallet to check, both empty off chain
+// rails, or a problem message.
+func refProblem(ctx context.Context, db *database.DB, p database.ORPPayout, ref string) (chainTx, payTo, message string, err error) {
 	if !chainpay.IsChainRail(p.Rail) {
 		if utf8.RuneCountInString(ref) > 200 || strings.IndexFunc(ref, unicode.IsControl) >= 0 {
-			return "", "ref is at most 200 characters with no control characters.", nil
+			return "", "", "ref is at most 200 characters with no control characters.", nil
 		}
-		return "", "", nil
+		return "", "", "", nil
 	}
 	network, tx, ok := chainpay.ParseRef(p.Rail, ref)
 	if !ok {
 		if p.Rail == chainpay.RailX402 {
-			return "", "ref on x402 is <caip2 network>:<0x transaction hash>, for example eip155:8453:0x…", nil
+			return "", "", "ref on x402 is <caip2 network>:<0x transaction hash>, for example eip155:8453:0x…", nil
 		}
-		return "", "ref on " + p.Rail + " is the 0x transaction hash.", nil
+		return "", "", "ref on " + p.Rail + " is the 0x transaction hash.", nil
 	}
 	if _, ok := chainpay.Units(network, p.AmountMinor, p.Currency); !ok {
-		return "", "A chain rail settles USD payouts in USDC only.", nil
+		return "", "", "A chain rail settles USD payouts in USDC only.", nil
 	}
 	wallets, err := db.ORPPayoutWallets(ctx, p.PayeeOwner)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if wallets[network] == "" {
-		return "", "The payee has no wallet on " + network + ".", nil
+		return "", "", "The payee has no wallet on " + network + ".", nil
 	}
-	return network + ":" + tx, "", nil
+	return network + ":" + tx, wallets[network], "", nil
 }
 
 // Payout is GET /orp/payouts/:id for the payer or the payee. A sent chain
@@ -306,7 +311,7 @@ func (h *ORPHost) PayoutSent(c *gin.Context) {
 		h.writeProblem(c, dns, "", "", orp.Invalid("A chain rail needs the transaction as ref.", "/ref"), false)
 		return
 	}
-	chainTx, message, err := refProblem(ctx, h.Entry.DB, p, ref)
+	chainTx, payTo, message, err := refProblem(ctx, h.Entry.DB, p, ref)
 	if err != nil {
 		h.writeProblem(c, dns, "", "", internalProblem(), false)
 		return
@@ -316,7 +321,7 @@ func (h *ORPHost) PayoutSent(c *gin.Context) {
 		return
 	}
 	now := h.now()
-	sent, ok, err := h.Entry.DB.RecordORPPayoutRef(ctx, p.ID, ref, chainTx, now)
+	sent, ok, err := h.Entry.DB.RecordORPPayoutRef(ctx, p.ID, ref, chainTx, payTo, now)
 	if errors.Is(err, database.ErrORPRefUsed) {
 		h.writeProblem(c, dns, "", "", orp.Problem{Status: http.StatusConflict, Code: "state_conflict", Message: "This transaction already settles another payout."}, false)
 		return

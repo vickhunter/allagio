@@ -341,7 +341,7 @@ func (h *HostedHandler) SendORPPayout(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	chainTx, message, err := refProblem(ctx, h.DB, p, ref)
+	chainTx, payTo, message, err := refProblem(ctx, h.DB, p, ref)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -356,7 +356,7 @@ func (h *HostedHandler) SendORPPayout(c *gin.Context) {
 	if ref == "" {
 		sent, ok, err = h.DB.SettleORPPayout(ctx, p.ID, now)
 	} else {
-		sent, ok, err = h.DB.RecordORPPayoutRef(ctx, p.ID, ref, chainTx, now)
+		sent, ok, err = h.DB.RecordORPPayoutRef(ctx, p.ID, ref, chainTx, payTo, now)
 	}
 	if errors.Is(err, database.ErrORPRefUsed) {
 		c.String(http.StatusConflict, "This transaction already settles another payout.")

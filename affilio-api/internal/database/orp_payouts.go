@@ -37,22 +37,23 @@ type ORPPayout struct {
 	ChainStatus    string
 	ChainReason    string
 	ChainCheckedAt *time.Time
+	ChainPayTo     string
 }
 
 func scanORPPayout(row interface {
 	Scan(...any) error
 }) (ORPPayout, error) {
 	var p ORPPayout
-	var basisObligation, answer, ref, chainTx, chainStatus, chainReason *string
+	var basisObligation, answer, ref, chainTx, chainStatus, chainReason, chainPayTo *string
 	err := row.Scan(&p.ID, &p.DealID, &p.Obligation, &basisObligation,
 		&p.PayerOwner, &p.PayerParty, &p.PayeeOwner, &p.PayeeParty,
 		&p.State, &p.AmountMinor, &p.Currency, &p.Rail, &p.Basis,
 		&p.HoldUntil, &p.SentAt, &p.AnsweredAt, &answer, &p.CreatedAt,
-		&ref, &chainTx, &chainStatus, &chainReason, &p.ChainCheckedAt)
+		&ref, &chainTx, &chainStatus, &chainReason, &p.ChainCheckedAt, &chainPayTo)
 	for _, pair := range []struct {
 		from *string
 		to   *string
-	}{{ref, &p.Ref}, {chainTx, &p.ChainTx}, {chainStatus, &p.ChainStatus}, {chainReason, &p.ChainReason}} {
+	}{{ref, &p.Ref}, {chainTx, &p.ChainTx}, {chainStatus, &p.ChainStatus}, {chainReason, &p.ChainReason}, {chainPayTo, &p.ChainPayTo}} {
 		if pair.from != nil {
 			*pair.to = *pair.from
 		}
@@ -69,7 +70,7 @@ func scanORPPayout(row interface {
 const orpPayoutCols = `id, deal_id, obligation, basis_obligation, payer_owner::text,
 payer_party, payee_owner::text, payee_party, state, amount_minor, currency,
 rail, basis, hold_until, sent_at, answered_at, answer, created_at,
-ref, chain_tx, chain_status, chain_reason, chain_checked_at`
+ref, chain_tx, chain_status, chain_reason, chain_checked_at, chain_pay_to`
 
 // AdvanceORPHolds moves held payouts whose hold has passed to payable and
 // returns them so the caller can apply the payer's settle step and notify.

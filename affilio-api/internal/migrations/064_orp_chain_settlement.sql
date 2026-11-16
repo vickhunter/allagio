@@ -11,6 +11,9 @@ ALTER TABLE orp_payouts ADD COLUMN IF NOT EXISTS chain_status TEXT
   CHECK (chain_status IN ('pending','verified','mismatch','unavailable'));
 ALTER TABLE orp_payouts ADD COLUMN IF NOT EXISTS chain_reason TEXT;
 ALTER TABLE orp_payouts ADD COLUMN IF NOT EXISTS chain_checked_at TIMESTAMPTZ;
+-- The payee wallet in force when the payer reported the ref: a later wallet
+-- change does not fail a transfer already made.
+ALTER TABLE orp_payouts ADD COLUMN IF NOT EXISTS chain_pay_to TEXT;
 
 CREATE UNIQUE INDEX IF NOT EXISTS orp_payouts_chain_tx
   ON orp_payouts(chain_tx) WHERE chain_status='verified';

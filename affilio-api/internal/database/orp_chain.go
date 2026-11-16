@@ -16,8 +16,9 @@ var ErrORPRefUsed = errors.New("orp payout: transaction already used")
 // RecordORPPayoutRef stores the payer's transfer reference. A payable payout
 // moves to sent. A sent payout not yet confirmed takes a corrected ref, so a
 // payer can fix a wrong hash. chainTx is empty on a rail the host does not
-// read; otherwise the chain check starts pending.
-func (d *DB) RecordORPPayoutRef(ctx context.Context, id, ref, chainTx string, now time.Time) (ORPPayout, bool, error) {
+// read; otherwise the chain check starts pending against payTo, the payee
+// wallet in force now.
+func (d *DB) RecordORPPayoutRef(ctx context.Context, id, ref, chainTx, payTo string, now time.Time) (ORPPayout, bool, error) {
 	var tx *string
 	status := (*string)(nil)
 	if chainTx != "" {
@@ -34,9 +35,10 @@ func (d *DB) RecordORPPayoutRef(ctx context.Context, id, ref, chainTx string, no
 	}
 	p, err := scanORPPayout(d.Pool.QueryRow(ctx, `
 UPDATE orp_payouts SET state='sent', sent_at=COALESCE(sent_at,$2), ref=$3,
-  chain_tx=$4, chain_status=$5, chain_reason=NULL, chain_checked_at=NULL
+  chain_tx=$4, chain_status=$5, chain_reason=NULL, chain_checked_at=NULL,
+  chain_pay_to=NULLIF($6,'')
 WHERE id=$1 AND (state='payable' OR (state='sent' AND COALESCE(chain_status,'')<>'verified'))
-RETURNING `+orpPayoutCols, id, now, ref, tx, status))
+RETURNING `+orpPayoutCols, id, now, ref, tx, status, payTo))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ORPPayout{}, false, nil
 	}

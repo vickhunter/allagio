@@ -181,6 +181,11 @@ func TestORPChainPayoutVerifiedOnChain(t *testing.T) {
 		t.Fatalf("sent doc %s", rec.Body.String())
 	}
 
+	// A wallet change after the ref does not fail the transfer already made.
+	if err := db.SetORPPayoutWallet(ctx, ownerOfParty(publisher), "eip155:84532", "0x"+strings.Repeat("d", 40)); err != nil {
+		t.Fatal(err)
+	}
+
 	// Deep enough: the next read marks it paid and both inboxes get it.
 	rpc.setHead(0x64 + 5)
 	rec, doc = postJSON(t, r, http.MethodGet, "/orp/payouts/"+payoutID, nil, bearerHeader(pubToken))
