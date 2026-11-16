@@ -1,5 +1,0 @@
-<<<<<<<< HEAD:affilio-wp/admin/build/landing-v9/assets/x-DwfFOG9a.js
-import{r as e}from"./Page-Ckqv3CNA.js";var t={name:`arrow-right`,size:24,node:[[`path`,{d:`M5 12h14`,key:`1ays0h`}],[`path`,{d:`m12 5 7 7-7 7`,key:`xquz4c`}]]};t.node;var n=e(t),r={name:`check`,size:24,node:[[`path`,{d:`M20 6 9 17l-5-5`,key:`1gmf2c`}]]};r.node;var i=e(r),a={name:`x`,size:24,node:[[`path`,{d:`M18 6 6 18`,key:`1bl5f8`}],[`path`,{d:`m6 6 12 12`,key:`d8bk6v`}]]};a.node;var o=e(a);export{i as n,n as r,o as t};
-========
-import{r as e}from"./Page-DO-5f5VA.js";var t={name:`arrow-right`,size:24,node:[[`path`,{d:`M5 12h14`,key:`1ays0h`}],[`path`,{d:`m12 5 7 7-7 7`,key:`xquz4c`}]]};t.node;var n=e(t),r={name:`check`,size:24,node:[[`path`,{d:`M20 6 9 17l-5-5`,key:`1gmf2c`}]]};r.node;var i=e(r),a={name:`x`,size:24,node:[[`path`,{d:`M18 6 6 18`,key:`1bl5f8`}],[`path`,{d:`m6 6 12 12`,key:`d8bk6v`}]]};a.node;var o=e(a);export{i as n,n as r,o as t};
->>>>>>>> 97b0270 (fix(preview): block reserved IP ranges, mark previews as demos, show page images):affilio-wp/admin/build/landing-v9/assets/x-D9grD7pd.js

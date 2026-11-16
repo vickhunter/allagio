@@ -14,7 +14,8 @@ if (!outDir) {
 mkdirSync(outDir, { recursive: true })
 
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.txt': 'text/plain', '.md': 'text/markdown' }
-const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+// 200x112 (16:9) grey png so the image slot shows realistic proportions
+const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAMgAAABwCAAAAAA4aM0qAAAALklEQVR4nO3BAQ0AAADCoPdPbQ43oAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4G0x0gABM8W0uwAAAABJRU5ErkJggg==', 'base64')
 
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://x')
@@ -87,7 +88,7 @@ await page.locator('input[name="post-url"]').fill('https://journal.example/field
 await page.locator('[data-post-preview] form button[type="submit"]').click()
 console.log('preview submitted')
 await page.waitForSelector('[data-post-preview] article', { timeout: 15000 })
-await page.locator('[data-post-preview] article').scrollIntoViewIfNeeded()
+await page.locator('[data-post-preview] [role="status"]').scrollIntoViewIfNeeded()
 await page.waitForTimeout(900)
 await page.screenshot({ path: join(outDir, 'preview-1440.png') })
 await page.close()

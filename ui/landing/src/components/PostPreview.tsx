@@ -124,7 +124,7 @@ function PostCard({ preview, platform }: { preview: PreviewGroups; platform: Sho
         <Badge variant="neutral">{t.preview.demo}</Badge>
       </div>
       {preview.image && (
-        <img src={preview.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="mb-3 w-full rounded-xl border border-line object-cover" />
+        <img src={preview.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="mb-3 aspect-video w-full rounded-xl border border-line object-cover" />
       )}
       <PlatformPostFrame platform={platform} mock={mock} tag={t.preview.sponsored} />
     </article>
@@ -162,11 +162,9 @@ function GroupsView({ preview, approveHref, statusId, titleLevel }: { preview: P
       if (i === at) rows.push(<OfferCard key="offer" offer={offer} label={slotName} />)
     }
   }
-  const titleClass = 'break-words font-display text-2xl font-bold tracking-tight'
   const groupLevel = titleLevel === 2 ? 3 : 4
   return (
     <div>
-      {titleLevel === 2 ? <h2 className={titleClass}>{preview.title}</h2> : <h3 className={titleClass}>{preview.title}</h3>}
       {offer && (
         <section aria-labelledby={`${statusId}-verified`} className="mt-4">
           <GroupHeading level={groupLevel} id={`${statusId}-verified`}>{t.preview.verifiedHeading}</GroupHeading>
@@ -327,7 +325,6 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
         {phase === 'ready' && preview?.kind === 'groups' && <GroupsView preview={preview} approveHref={approveHref} statusId={id} titleLevel={titleLevel} />}
         {phase === 'ready' && preview?.kind === 'closest' && (
           <div>
-            {titleLevel === 2 ? <h2 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h2> : <h3 className="break-words font-display text-2xl font-bold tracking-tight">{preview.title}</h3>}
             <p className="mt-3">{t.preview.closestLead}</p>
             <SuggestedGroup id={`${id}-closest`} heading={t.preview.closestHeading} programs={preview.closest} level={titleLevel === 2 ? 3 : 4} />
             <button type="button" onClick={notify} className={`${outlineClass} mt-4`}>{t.preview.notify}</button>
