@@ -51,8 +51,10 @@ func (m *Mailer) Send(_ context.Context, to, subject, body string) error {
 	// Port 465 is implicit TLS (e.g. smtp.mx.cloudflare.net); other ports
 	// upgrade with STARTTLS below.
 	if port == "465" {
+		//allagio:outbound fixed-host configured SMTP server
 		conn, err = tls.DialWithDialer(&net.Dialer{Timeout: 10 * time.Second}, "tcp", addr, tlsConfig)
 	} else {
+		//allagio:outbound fixed-host configured SMTP server
 		conn, err = (&net.Dialer{Timeout: 10 * time.Second}).Dial("tcp", addr)
 	}
 	if err != nil {

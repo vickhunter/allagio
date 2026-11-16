@@ -28,7 +28,8 @@ func NewClient(baseURL, makerKey string) *Client {
 	return &Client{
 		BaseURL:  strings.TrimRight(baseURL, "/"),
 		MakerKey: makerKey,
-		HTTP:     &http.Client{Timeout: 30 * time.Second},
+		//allagio:outbound fixed-host configured Allagio API base
+		HTTP: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -76,6 +77,7 @@ func (c *Client) request(method, path string, payload interface{}, authHeader, a
 	}
 	client := c.HTTP
 	if client == nil {
+		//allagio:outbound fixed-host configured Allagio API base
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
 	resp, err := client.Do(req)

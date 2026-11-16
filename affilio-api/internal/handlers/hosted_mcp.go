@@ -85,6 +85,7 @@ func newHostedMCPServer(grant *database.AgentGrant, loopbackURL, baseURL, bearer
 			client := dcp.NewClient(loopbackURL, "")
 			client.Bearer = bearer
 			client.Context = ctx
+			//allagio:outbound fixed-host this process loopback API
 			client.HTTP = &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 			out, err := dcp.CallTool(client, tool.Name, args)
 			if err != nil {
@@ -116,6 +117,7 @@ func addSearchFetchTools(s *mcp.Server, loopbackURL, bearer string) {
 		client := dcp.NewClient(loopbackURL, "")
 		client.Bearer = bearer
 		client.Context = ctx
+		//allagio:outbound fixed-host this process loopback API
 		client.HTTP = &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 		out, err := client.DoSite(http.MethodGet, "/v1/marketplace/offers", nil)
 		if err != nil {

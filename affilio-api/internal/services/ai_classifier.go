@@ -81,6 +81,7 @@ func (c *AIClassifier) classifyWithClaude(ctx context.Context, detections []Link
 	}
 	client := c.Client
 	if client == nil {
+		//allagio:outbound fixed-host Anthropic API
 		client = &http.Client{Timeout: 12 * time.Second}
 	}
 	payload := claudeMessageRequest{

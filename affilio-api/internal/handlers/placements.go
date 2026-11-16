@@ -20,6 +20,7 @@ import (
 
 	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
+	"affilio-api/internal/outbound"
 	"affilio-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -765,24 +766,20 @@ func fetchArticleText(ctx context.Context, raw string) (string, error) {
 		return "", err
 	}
 	host := parsed.Hostname()
-	client := &http.Client{
-		Timeout: 8 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 3 {
-				return errors.New("too many redirects")
-			}
+	// A site registered as loopback or *.localhost may be fetched there.
+	// Any other host stays on the public-address dial, including redirects.
+	guard := outbound.Resolver{AllowLoopback: localPublisherHost(host)}
+	resp, err := guard.Do(ctx, http.MethodGet, raw, nil, outbound.Options{
+		Timeout:       8 * time.Second,
+		RedirectLimit: 3,
+		Header:        http.Header{"User-Agent": []string{"Allagio/article-text"}},
+		BeforeRedirect: func(req *http.Request) error {
 			if req.URL.Hostname() != host || req.URL.User != nil {
 				return errors.New("redirect left the article host")
 			}
 			return nil
 		},
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("User-Agent", "Allagio/article-text")
-	resp, err := client.Do(req)
+	})
 	if err != nil {
 		return "", err
 	}

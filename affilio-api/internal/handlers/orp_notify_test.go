@@ -32,6 +32,9 @@ func TestORPNotifyWaitingWebhook(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	allowLoopbackNotify = true
+	t.Cleanup(func() { allowLoopbackNotify = false })
+
 	entry, r := trustHost(t)
 	makerToken, maker := joinParty(t, r)
 	_, publisher := joinParty(t, r)
