@@ -180,20 +180,23 @@ type ORPMsgChain struct {
 // prev has no message to point at. Once used_prev latches, every later message
 // must carry the matching prev.
 func applyORPMsgChain(ctx context.Context, tx pgx.Tx, chain *ORPMsgChain) error {
-	var lastHash string
-	var usedPrev bool
-	err := tx.QueryRow(ctx, `
-SELECT last_hash, used_prev FROM orp_msg_chain
-WHERE deal_id=$1 AND party=$2 FOR UPDATE`, chain.Deal, chain.Party).Scan(&lastHash, &usedPrev)
-	if errors.Is(err, pgx.ErrNoRows) {
-		if chain.Prev != "" {
-			return ErrORPMsgChain
-		}
-		_, err = tx.Exec(ctx, `
+	// Claim the row first: a bare SELECT FOR UPDATE locks nothing when the
+	// sender has no row yet, so two concurrent first messages could both
+	// pass. ON CONFLICT DO NOTHING makes the row exist for exactly one
+	// winner; the loser then sees the winner's hash below and is evaluated
+	// against it rather than erroring on the unique key.
+	_, err := tx.Exec(ctx, `
 INSERT INTO orp_msg_chain(deal_id, party, last_hash, used_prev)
-VALUES($1,$2,$3,false)`, chain.Deal, chain.Party, chain.Hash)
+VALUES($1,$2,'',false)
+ON CONFLICT (deal_id, party) DO NOTHING`, chain.Deal, chain.Party)
+	if err != nil {
 		return err
 	}
+	var lastHash string
+	var usedPrev bool
+	err = tx.QueryRow(ctx, `
+SELECT last_hash, used_prev FROM orp_chain
+WHERE deal_id=$1 AND party=$2 FOR UPDATE`, chain.Deal, chain.Party).Scan(&lastHash, &usedPrev)
 	if err != nil {
 		return err
 	}
