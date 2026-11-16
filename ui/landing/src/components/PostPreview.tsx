@@ -120,13 +120,10 @@ function PostCard({ preview, platform }: { preview: PreviewGroups; platform: Sho
   }
   return (
     <article className="mt-3" aria-label={t.preview.ariaLabel}>
-      <div className="mb-3 flex items-center gap-2">
-        <Badge variant="neutral">{t.preview.demo}</Badge>
-      </div>
       {preview.image && (
         <img src={preview.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="mb-3 aspect-video w-full rounded-xl border border-line object-cover" />
       )}
-      <PlatformPostFrame platform={platform} mock={mock} tag={t.preview.sponsored} />
+      <PlatformPostFrame platform={platform} mock={mock} tag={t.preview.sponsored} demo={t.preview.demo} />
     </article>
   )
 }

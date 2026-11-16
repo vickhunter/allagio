@@ -4713,6 +4713,10 @@ export const catalog = {
         {
           "name": "messages/40-payout-confirm.json",
           "json": "{\n  \"orp\": \"0.3\",\n  \"type\": \"payout\",\n  \"id\": \"m_pub_0201\",\n  \"ts\": \"2026-12-02T09:00:00Z\",\n  \"from\": \"orp:hub.example/p_Vb3nR8sYc1Qe6\",\n  \"to\": \"orp:hub.example/host\",\n  \"deal\": \"deal_aff_9wQz\",\n  \"body\": {\n    \"payout\": \"po_aff_9wQz_1\",\n    \"answer\": \"confirm\"\n  }\n}"
+        },
+        {
+          "name": "messages/41-payout-paid-chain.json",
+          "json": "{\n  \"orp\": \"0.3\",\n  \"type\": \"payout\",\n  \"id\": \"m_host_0301\",\n  \"ts\": \"2026-11-16T10:00:12Z\",\n  \"from\": \"orp:hub.example/host\",\n  \"to\": \"orp:hub.example/p_Vb3nR8sYc1Qe6\",\n  \"deal\": \"deal_spn_4kTq\",\n  \"body\": {\n    \"payout\": \"po_spn_4kTq_1\",\n    \"obligation\": \"fee\",\n    \"state\": \"paid\",\n    \"amount\": {\n      \"amount_minor\": 1500,\n      \"currency\": \"USD\"\n    },\n    \"rail\": \"usdc.base\",\n    \"ref\": \"0x9f2c1e5b7a3d4c6e8f0a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6\",\n    \"basis\": \"receipt\",\n    \"at\": \"2026-11-16T10:00:12Z\"\n  }\n}"
         }
       ],
       "invalid": [
@@ -7928,6 +7932,6 @@ export const catalog = {
     "sdk/src/validate.mjs"
   ],
   "sdkReadme": "# ORP reference host\n\nIn-process host and a thin client for the conformance suite. Party behavior is HTTP. The scheduler hooks (`advanceBusiness`, `runDueChecks`, `registerPage`, `markTestPool`, `failNextRecheck`, `resolveDispute`) are in-process on the reference host. The host speaks ORP 0.4 and 0.3. The Allagio hosted API speaks 0.4 and 0.3. `CLAIMS_CHECK` on that host stays a stub, so claim fields stay `unknown`.\n\n`claims: \"real\"` checks destinations against the in-memory page catalog. It does not fetch a page and it is not the hosted `CLAIMS_CHECK` setting. `stub` and `none` leave an offer unchecked.\n\nThe provider test token and owner tokens are generated per host and kept in the local store. They are not production secrets.",
-  "exampleCount": 51,
+  "exampleCount": 52,
   "invalidCount": 56
 }

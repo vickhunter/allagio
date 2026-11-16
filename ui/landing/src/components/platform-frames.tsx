@@ -15,6 +15,7 @@ import {
   SquarePlay,
 } from 'lucide-react'
 
+import { Badge } from '@/components/ui/badge'
 import type { ShowcaseId, ShowcaseMock } from '@/i18n/messages'
 
 export function platformFromHostname(hostname: string): ShowcaseId {
@@ -28,10 +29,13 @@ export function platformFromHostname(hostname: string): ShowcaseId {
   return 'blog'
 }
 
-function OfferBlock({ line, tag, dark }: { line: string; tag: string; dark?: boolean }) {
+function OfferBlock({ line, tag, demo, dark }: { line: string; tag: string; demo?: string; dark?: boolean }) {
   return (
     <div className={dark ? 'mt-3 rounded-lg border border-white/25 bg-white/10 p-2.5' : 'mt-3 rounded-lg border border-pub/30 bg-pub-soft/60 p-2.5'}>
-      <p className={dark ? 'text-[10px] font-semibold uppercase tracking-wider text-white/80' : 'text-[10px] font-semibold uppercase tracking-wider text-pub'}>{tag}</p>
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span className={dark ? 'text-[10px] font-semibold uppercase tracking-wider text-white/80' : 'text-[10px] font-semibold uppercase tracking-wider text-pub'}>{tag}</span>
+        {demo && <Badge variant="neutral" className="px-1.5 py-0 text-[9px]">{demo}</Badge>}
+      </span>
       <p className={dark ? 'mt-1 text-[13px] leading-snug text-white' : 'mt-1 text-[13px] leading-snug text-t1'}>
         <mark className="post-hi">{line}</mark>
       </p>
@@ -43,7 +47,7 @@ function Avatar() {
   return <div className="h-10 w-10 shrink-0 rounded-full bg-linear-to-br from-setup to-pub" aria-hidden="true" />
 }
 
-function XFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
+function XFrame({ mock, tag, demo }: { mock: ShowcaseMock; tag: string; demo?: string }) {
   return (
     <div className="rounded-2xl border border-line bg-s0 p-4">
       <div className="flex items-center gap-3">
@@ -64,7 +68,7 @@ function XFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
           </div>
         </div>
       )}
-      <OfferBlock line={mock.offer} tag={tag} />
+      <OfferBlock line={mock.offer} tag={tag} demo={demo} />
       <div className="mt-3 flex items-center justify-between text-t2" aria-hidden="true">
         <MessageCircle className="h-4 w-4" />
         <Repeat2 className="h-4 w-4" />
@@ -75,7 +79,7 @@ function XFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
   )
 }
 
-function PinterestFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
+function PinterestFrame({ mock, tag, demo }: { mock: ShowcaseMock; tag: string; demo?: string }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-s0">
       <div className="relative aspect-[4/5] bg-linear-to-br from-amber-200 via-orange-100 to-stone-300">
@@ -89,14 +93,14 @@ function PinterestFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
       <div className="p-4">
         <p className="font-display text-base font-bold text-t1">{mock.title}</p>
         <p className="mt-1 text-sm leading-relaxed text-t2">{mock.body}</p>
-        <OfferBlock line={mock.offer} tag={tag} />
+        <OfferBlock line={mock.offer} tag={tag} demo={demo} />
         <p className="mt-2 text-xs text-t2">{mock.handle}</p>
       </div>
     </div>
   )
 }
 
-function InstagramFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
+function InstagramFrame({ mock, tag, demo }: { mock: ShowcaseMock; tag: string; demo?: string }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-s0">
       <div className="flex items-center gap-2.5 p-3">
@@ -116,13 +120,13 @@ function InstagramFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
         </div>
         <p className="mt-2 text-sm font-semibold text-t1">{mock.meta}</p>
         <p className="mt-1 text-sm leading-relaxed text-t1"><span className="font-semibold">{mock.author} </span>{mock.body}</p>
-        <OfferBlock line={mock.offer} tag={tag} />
+        <OfferBlock line={mock.offer} tag={tag} demo={demo} />
       </div>
     </div>
   )
 }
 
-function TikTokFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
+function TikTokFrame({ mock, tag, demo }: { mock: ShowcaseMock; tag: string; demo?: string }) {
   return (
     <div className="relative mx-auto aspect-[9/16] max-h-[430px] w-full max-w-[242px] overflow-hidden rounded-2xl bg-t1">
       <div className="absolute inset-0 bg-linear-to-b from-stone-600 via-stone-500 to-amber-700/80" aria-hidden="true" />
@@ -136,7 +140,7 @@ function TikTokFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
       <div className="absolute bottom-0 left-0 right-0 p-3 pr-12">
         <p className="text-sm font-semibold text-white">@{mock.author}</p>
         <p className="mt-1 text-[13px] leading-snug text-white/90">{mock.body}</p>
-        <OfferBlock line={mock.offer} tag={tag} dark />
+        <OfferBlock line={mock.offer} tag={tag} demo={demo} dark />
         <p className="mt-2 flex items-center gap-1.5 truncate text-xs text-white/80">
           <Music2 className="h-3 w-3 shrink-0" aria-hidden="true" />{mock.meta}
         </p>
@@ -145,7 +149,7 @@ function TikTokFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
   )
 }
 
-function YouTubeFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
+function YouTubeFrame({ mock, tag, demo }: { mock: ShowcaseMock; tag: string; demo?: string }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-s0">
       <div className="relative flex aspect-video items-center justify-center bg-linear-to-br from-stone-700 via-stone-600 to-setup/70">
@@ -163,14 +167,14 @@ function YouTubeFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
         </div>
         <div className="mt-3 rounded-xl bg-s2/60 p-3">
           <p className="text-[13px] leading-relaxed text-t2">{mock.body}</p>
-          <OfferBlock line={mock.offer} tag={tag} />
+          <OfferBlock line={mock.offer} tag={tag} demo={demo} />
         </div>
       </div>
     </div>
   )
 }
 
-function NewsletterFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
+function NewsletterFrame({ mock, tag, demo }: { mock: ShowcaseMock; tag: string; demo?: string }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-s0">
       <div className="flex items-center gap-2.5 border-b border-line p-3">
@@ -187,14 +191,14 @@ function NewsletterFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
           <div className="h-2 w-full rounded-full bg-s2" />
           <div className="h-2 w-3/4 rounded-full bg-s2" />
         </div>
-        <OfferBlock line={mock.offer} tag={tag} />
+        <OfferBlock line={mock.offer} tag={tag} demo={demo} />
         <p className="mt-3 border-t border-line pt-2 text-xs text-t2">{mock.meta}</p>
       </div>
     </div>
   )
 }
 
-function BlogFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
+function BlogFrame({ mock, tag, demo }: { mock: ShowcaseMock; tag: string; demo?: string }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-s0">
       <div className="relative h-28 bg-linear-to-r from-s2 via-pub-soft to-setup-soft" aria-hidden="true">
@@ -205,7 +209,7 @@ function BlogFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
         <p className="text-xs text-t2">{mock.author}{mock.meta ? ` · ${mock.meta}` : ''}</p>
         <p className="mt-1 font-display text-xl font-bold leading-snug text-t1">{mock.title}</p>
         <p className="mt-3 text-[15px] leading-relaxed text-t1">{mock.body}</p>
-        <OfferBlock line={mock.offer} tag={tag} />
+        <OfferBlock line={mock.offer} tag={tag} demo={demo} />
         <div className="mt-4 grid gap-2" aria-hidden="true">
           <div className="h-2.5 w-full rounded-full bg-s2" />
           <div className="h-2.5 w-11/12 rounded-full bg-s2" />
@@ -218,7 +222,7 @@ function BlogFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
 
 const waveHeights = [10, 22, 14, 30, 18, 26, 12, 34, 20, 28, 14, 24, 10, 30, 16, 26, 12, 20, 32, 14, 22, 10, 28, 18, 24, 12, 30, 16, 20, 26]
 
-function PodcastFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
+function PodcastFrame({ mock, tag, demo }: { mock: ShowcaseMock; tag: string; demo?: string }) {
   return (
     <div className="rounded-2xl border border-line bg-s0 p-4">
       <div className="flex items-center gap-3">
@@ -236,7 +240,7 @@ function PodcastFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
           <div key={i} className="w-1 rounded-full bg-pub/70" style={{ height: `${height}px` }} />
         ))}
       </div>
-      <OfferBlock line={mock.offer} tag={tag} />
+      <OfferBlock line={mock.offer} tag={tag} demo={demo} />
       <p className="mt-2 flex items-center gap-1.5 text-xs text-t2">
         <ListMusic className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />{mock.meta}
       </p>
@@ -244,7 +248,7 @@ function PodcastFrame({ mock, tag }: { mock: ShowcaseMock; tag: string }) {
   )
 }
 
-const frames: Record<ShowcaseId, (props: { mock: ShowcaseMock; tag: string }) => ReactNode> = {
+const frames: Record<ShowcaseId, (props: { mock: ShowcaseMock; tag: string; demo?: string }) => ReactNode> = {
   x: XFrame,
   pinterest: PinterestFrame,
   instagram: InstagramFrame,
@@ -255,7 +259,7 @@ const frames: Record<ShowcaseId, (props: { mock: ShowcaseMock; tag: string }) =>
   podcast: PodcastFrame,
 }
 
-export function PlatformPostFrame({ platform, mock, tag }: { platform: ShowcaseId; mock: ShowcaseMock; tag: string }) {
+export function PlatformPostFrame({ platform, mock, tag, demo }: { platform: ShowcaseId; mock: ShowcaseMock; tag: string; demo?: string }) {
   const Frame = frames[platform] ?? frames.blog
-  return <Frame mock={mock} tag={tag} />
+  return <Frame mock={mock} tag={tag} demo={demo} />
 }
