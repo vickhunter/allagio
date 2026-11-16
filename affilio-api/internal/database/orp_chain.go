@@ -10,7 +10,8 @@ import (
 )
 
 // ErrORPRefUsed is returned when a chain transaction already settled
-// another payout. A ref that settled nothing reserves nothing.
+// another payout: verified on the chain, or on a payout the payee confirmed.
+// A ref that settled nothing reserves nothing.
 var ErrORPRefUsed = errors.New("orp payout: transaction already used")
 
 // RecordORPPayoutRef stores the payer's transfer reference. A payable payout
@@ -22,8 +23,8 @@ func (d *DB) RecordORPPayoutRef(ctx context.Context, id, ref, chainTx, payTo str
 	var tx *string
 	status := (*string)(nil)
 	if chainTx != "" {
-		var used bool
-		if err := d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM orp_payouts WHERE chain_tx=$1 AND chain_status='verified' AND id<>$2)`, chainTx, id).Scan(&used); err != nil {
+		used, err := d.orpChainTxUsed(ctx, chainTx, id)
+		if err != nil {
 			return ORPPayout{}, false, err
 		}
 		if used {
@@ -53,12 +54,30 @@ RETURNING `+orpPayoutCols, id, now, ref, tx, status, payTo))
 // it to paid; any other status keeps it sent. A transaction another payout
 // settled first is a mismatch with reason tx_used.
 func (d *DB) SetORPPayoutChain(ctx context.Context, id, chainTx, status, reason string, now time.Time) (ORPPayout, bool, error) {
+	if status == "verified" {
+		used, err := d.orpChainTxUsed(ctx, chainTx, id)
+		if err != nil {
+			return ORPPayout{}, false, err
+		}
+		if used {
+			return d.setORPPayoutChain(ctx, id, chainTx, "mismatch", "tx_used", now)
+		}
+	}
 	p, ok, err := d.setORPPayoutChain(ctx, id, chainTx, status, reason, now)
 	var pgErr *pgconn.PgError
 	if status == "verified" && errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return d.setORPPayoutChain(ctx, id, chainTx, "mismatch", "tx_used", now)
 	}
 	return p, ok, err
+}
+
+// orpChainTxUsed reports whether another payout already settled with this
+// transaction.
+func (d *DB) orpChainTxUsed(ctx context.Context, chainTx, id string) (bool, error) {
+	var used bool
+	err := d.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM orp_payouts
+WHERE chain_tx=$1 AND id<>$2 AND (chain_status='verified' OR state='paid'))`, chainTx, id).Scan(&used)
+	return used, err
 }
 
 func (d *DB) setORPPayoutChain(ctx context.Context, id, chainTx, status, reason string, now time.Time) (ORPPayout, bool, error) {

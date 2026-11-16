@@ -278,6 +278,10 @@ func TestORPChainPayoutMismatchTakesNewRef(t *testing.T) {
 	if n, err := SweepORPChainPayouts(ctx, db, entry.BaseURL, host.Chain, time.Now()); err != nil || n != 0 {
 		t.Fatalf("sweep after confirm: %d %v", n, err)
 	}
+	// The ref on a payout the payee confirmed cannot settle another one.
+	if rec, _ := postJSON(t, r, http.MethodPost, "/orp/payouts/"+secondID+"/sent", map[string]any{"ref": other}, bearerHeader(makerToken)); rec.Code != http.StatusConflict {
+		t.Fatalf("confirmed ref reused %d %s", rec.Code, rec.Body.String())
+	}
 }
 
 func TestPayoutWalletsForm(t *testing.T) {
