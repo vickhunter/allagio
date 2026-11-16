@@ -53,6 +53,13 @@ type Config struct {
 	SMTPPassword string
 	DigestFrom   string
 
+	// Chain rail RPC for dev.allagio.settle-chain. Read-only JSON-RPC URLs
+	// for Base and Base Sepolia; "off" disables a network.
+	ChainRPCBase        string
+	ChainRPCBaseSepolia string
+	// ChainConfirmations is the block depth a chain payout needs.
+	ChainConfirmations int64
+
 	// Outbound Telegram channel for owners: a long-polling bot plus direct
 	// messages for the same events the owner webhook gets. Disabled unless
 	// TelegramBotToken is set; TelegramAPIBase exists for tests.
@@ -91,6 +98,9 @@ func Load() Config {
 		Host:                   os.Getenv("HOST"),
 		POCReportPath:          os.Getenv("POC_REPORT_PATH"),
 		PublicBaseURL:          os.Getenv("PUBLIC_BASE_URL"),
+		ChainRPCBase:           envDefault("ORP_CHAIN_RPC_BASE", "https://mainnet.base.org"),
+		ChainRPCBaseSepolia:    envDefault("ORP_CHAIN_RPC_BASE_SEPOLIA", "https://sepolia.base.org"),
+		ChainConfirmations:     chainConfirmations(os.Getenv("ORP_CHAIN_CONFIRMATIONS")),
 		UIAssetsPath:           os.Getenv("UI_ASSETS_PATH"),
 		DownloadsPath:          os.Getenv("DOWNLOADS_PATH"),
 		OperatorOwnerID:        os.Getenv("OPERATOR_OWNER_ID"),
@@ -209,4 +219,20 @@ func getEnvValue(key, defaultValue string) string {
 		return v
 	}
 	return defaultValue
+}
+
+func envDefault(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return fallback
+}
+
+// chainConfirmations reads ORP_CHAIN_CONFIRMATIONS. Empty or invalid is 10.
+func chainConfirmations(raw string) int64 {
+	n, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
+	if err != nil || n < 1 {
+		return 10
+	}
+	return n
 }

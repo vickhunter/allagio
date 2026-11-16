@@ -511,6 +511,10 @@ ORP is the record of obligations, not a payment rail. A deal's terms say what ea
 
 x402 is a settlement rail a payout can name, not something ORP competes with: x402 moves the payment, ORP remembers why it moved and whether it counted. The same holds for AP2-style authorization — a signed payment mandate is evidence a ` + "`pay`" + ` obligation's proof list can accept.
 
+## Chain rails (dev.allagio.settle-chain)
+
+A ` + "`pay`" + ` obligation may name ` + "`usdc.base`" + `, ` + "`usdc.base-sepolia`" + ` or ` + "`x402`" + ` with a ` + "`USD`" + ` amount. The payee sets a receiving wallet on ` + "`/owner/settings`" + `. When the payout is ` + "`payable`" + `, the payer reads ` + "`GET /orp/payouts/<payout>`" + ` (` + "`pay_to`" + ` lists the address and ` + "`amount_units`" + ` in USDC), pays from its own wallet, and reports the transaction with ` + "`POST /orp/payouts/<payout>/sent`" + ` and ` + "`{\"ref\": \"0x<tx hash>\"}`" + ` (` + "`<caip2>:<hash>`" + ` on x402). The host reads the chain and marks the payout ` + "`paid`" + ` once the USDC transfer to the payee is confirmed; no payee confirm is needed. The host only reads the chain: it holds no keys, signs nothing and pays no gas. The wallet never appears in an ORP message. Spec: §14.3.
+
 ## What ORP deliberately does not do
 
 - **No escrow, KYC, tax forms, or payout SLA.** A host that needs them describes its own terms in ` + "`policies.terms`" + `.

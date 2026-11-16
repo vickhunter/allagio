@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"affilio-api/internal/chainpay"
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
 
@@ -128,7 +130,9 @@ func (h *ORPHost) settlePayout(c *gin.Context, dns string, p database.ORPPayout,
 		log.Printf("orp payout settle mode: %v", err)
 		mode = database.ModeAsk
 	}
-	if mode != database.ModeAuto {
+	// A chain rail is paid from the payer's own wallet: the host cannot
+	// drive it, so the payout waits for the payer's ref.
+	if mode != database.ModeAuto || chainpay.IsChainRail(p.Rail) {
 		h.inboxPayout(c, dns, p, now)
 		return
 	}
@@ -148,11 +152,7 @@ func (h *ORPHost) inboxPayout(c *gin.Context, dns string, p database.ORPPayout, 
 }
 
 func insertPayoutRecords(ctx context.Context, db *database.DB, dns string, p database.ORPPayout, now time.Time) {
-	view := orp.PayoutView{
-		ID: p.ID, Obligation: p.Obligation, State: p.State,
-		AmountMinor: p.AmountMinor, Currency: p.Currency,
-		Rail: p.Rail, Basis: p.Basis, HoldUntil: p.HoldUntil,
-	}
+	view := payoutView(p)
 	for _, target := range []struct {
 		party string
 		owner string
@@ -204,25 +204,26 @@ func (h *ORPHost) payout(c *gin.Context, dns string, msg orp.Message, hash, owne
 	if updated.State == "paid" {
 		h.inboxPayout(c, dns, updated, now)
 	}
-	view := orp.PayoutView{
-		ID: updated.ID, Obligation: updated.Obligation, State: updated.State,
-		AmountMinor: updated.AmountMinor, Currency: updated.Currency,
-		Rail: updated.Rail, Basis: updated.Basis, HoldUntil: updated.HoldUntil,
-	}
+	view := payoutView(updated)
 	h.finish(c, msg, hash, http.StatusOK, orp.PayoutRecord(dns, msg.From, msg.Deal, view, now), database.ORPEffect{})
 }
 
 // payoutsSection lists deal payouts on the owner settings page. A payable
 // payout waits for the owner's send; the rest show their state.
 func (h *HostedHandler) payoutsSection(c *gin.Context, o *database.Owner) (template.HTML, error) {
+	wallets, err := h.walletsSection(c, o)
+	if err != nil {
+		return "", err
+	}
 	payouts, err := h.DB.ORPPayoutsForOwner(c.Request.Context(), o.ID)
 	if err != nil {
 		return "", err
 	}
 	if len(payouts) == 0 {
-		return "", nil
+		return wallets, nil
 	}
 	var b strings.Builder
+	b.WriteString(string(wallets))
 	b.WriteString(`<section id="deal-payouts"><h2>Deal payouts</h2><p>Money your deals owe or owe you. ORP records the state; the rail moves the money.</p>`)
 	for _, p := range payouts {
 		b.WriteString(`<div class="deal"><h3><code>`)
@@ -233,12 +234,55 @@ func (h *HostedHandler) payoutsSection(c *gin.Context, o *database.Owner) (templ
 		b.WriteString(template.HTMLEscapeString(p.Rail))
 		b.WriteString(` · `)
 		b.WriteString(template.HTMLEscapeString(p.State))
-		if p.State == "payable" && p.PayerOwner == o.ID {
+		if p.Ref != "" {
+			b.WriteString(` · ref <code>`)
+			b.WriteString(template.HTMLEscapeString(p.Ref))
+			b.WriteString(`</code>`)
+		}
+		if p.ChainStatus != "" {
+			b.WriteString(` · chain `)
+			b.WriteString(template.HTMLEscapeString(p.ChainStatus))
+			if p.ChainReason != "" {
+				b.WriteString(` (`)
+				b.WriteString(template.HTMLEscapeString(p.ChainReason))
+				b.WriteString(`)`)
+			}
+		}
+		chain := chainpay.IsChainRail(p.Rail)
+		awaitsRef := p.State == "payable" || (chain && p.State == "sent" && p.ChainStatus != "verified")
+		if awaitsRef && p.PayerOwner == o.ID {
+			if chain {
+				payTo, err := payToFor(c.Request.Context(), h.DB, p)
+				if err != nil {
+					return "", err
+				}
+				if len(payTo) == 0 {
+					b.WriteString(`</p><p class="caption">The payee has not set a wallet for this rail yet.`)
+				}
+				for _, item := range payTo {
+					target, _ := item.(map[string]any)
+					b.WriteString(`</p><p class="caption">Pay `)
+					b.WriteString(template.HTMLEscapeString(formatMinor(p.AmountMinor, "USDC")))
+					b.WriteString(` on `)
+					b.WriteString(template.HTMLEscapeString(target["network"].(string)))
+					b.WriteString(` to <code>`)
+					b.WriteString(template.HTMLEscapeString(target["address"].(string)))
+					b.WriteString(`</code>, then paste the transaction as <code>`)
+					b.WriteString(template.HTMLEscapeString(target["ref"].(string)))
+					b.WriteString(`</code>.`)
+				}
+			}
 			b.WriteString(`</p><form method="post" action="/owner/orp-payouts/`)
 			b.WriteString(template.HTMLEscapeString(p.ID))
 			b.WriteString(`/sent"><input type="hidden" name="csrf" value="`)
 			b.WriteString(template.HTMLEscapeString(o.CSRF))
-			b.WriteString(`"><button>Mark sent</button></form><p>`)
+			b.WriteString(`"><label>Transfer ref<input type="text" name="ref" maxlength="200"`)
+			if chain {
+				b.WriteString(` required placeholder="0x… transaction hash"`)
+			} else {
+				b.WriteString(` placeholder="optional"`)
+			}
+			b.WriteString(`></label><button>Mark sent</button></form><p>`)
 		}
 		b.WriteString(`</p></div>`)
 	}
@@ -280,24 +324,52 @@ func twoDigits(n int64) string {
 // is manual, so sent is a record that the transfer went out.
 func (h *HostedHandler) SendORPPayout(c *gin.Context) {
 	o := ownerFrom(c)
-	p, found, err := h.DB.GetORPPayout(c.Request.Context(), c.Param("id"))
+	ctx := c.Request.Context()
+	p, found, err := h.DB.GetORPPayout(ctx, c.Param("id"))
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
-	if !found || p.PayerOwner != o.ID || p.State != "payable" {
+	chain := chainpay.IsChainRail(p.Rail)
+	resend := chain && p.State == "sent" && p.ChainStatus != "verified"
+	if !found || p.PayerOwner != o.ID || (p.State != "payable" && !resend) {
 		c.Status(http.StatusNotFound)
 		return
 	}
+	ref := strings.TrimSpace(c.PostForm("ref"))
+	if chain && ref == "" {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	chainTx, payTo, message, err := refProblem(ctx, h.DB, p, ref)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	if message != "" {
+		c.String(http.StatusBadRequest, message)
+		return
+	}
 	now := time.Now().UTC()
-	sent, ok, err := h.DB.SettleORPPayout(c.Request.Context(), p.ID, now)
+	var sent database.ORPPayout
+	var ok bool
+	if ref == "" {
+		sent, ok, err = h.DB.SettleORPPayout(ctx, p.ID, now)
+	} else {
+		sent, ok, err = h.DB.RecordORPPayoutRef(ctx, p.ID, ref, chainTx, payTo, now)
+	}
+	if errors.Is(err, database.ErrORPRefUsed) {
+		c.String(http.StatusConflict, "This transaction already settles another payout.")
+		return
+	}
 	if err != nil || !ok {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
 	base, err := url.Parse(strings.TrimRight(h.BaseURL, "/"))
 	if err == nil {
-		insertPayoutRecords(c.Request.Context(), h.DB, base.Host, sent, now)
+		insertPayoutRecords(ctx, h.DB, base.Host, sent, now)
+		checkChainPayout(ctx, h.DB, h.Chain, base.Host, sent, now)
 	}
 	c.Redirect(http.StatusSeeOther, "/owner/settings")
 }

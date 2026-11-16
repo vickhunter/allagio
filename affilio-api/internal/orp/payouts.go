@@ -226,6 +226,9 @@ func PayoutRecord(dns, to, dealID string, p PayoutView, now time.Time) map[strin
 	if p.HoldUntil != nil && p.State == "held" {
 		body["hold_until"] = Stamp(*p.HoldUntil)
 	}
+	if p.Ref != "" {
+		body["ref"] = p.Ref
+	}
 	return envelope(dns, to, "", dealID, "payout", body, now)
 }
 
@@ -240,4 +243,6 @@ type PayoutView struct {
 	Rail        string
 	Basis       string
 	HoldUntil   *time.Time
+	// Ref is the rail's own transfer reference, once the payer reports it.
+	Ref string
 }

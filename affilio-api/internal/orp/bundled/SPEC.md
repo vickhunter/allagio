@@ -1070,7 +1070,30 @@ A `payout` record tracks money one obligation owes. ORP never holds money. The r
 }
 ```
 
-Escrow, KYC, tax forms, payout SLAs and settlement profiles for specific rails are not in 0.3. A host that needs them MUST describe them in `policies.terms`.
+Escrow, KYC, tax forms, payout SLAs and settlement profiles for specific rails are not in 0.3. A host that needs them MUST describe them in `policies.terms`. [§14.3](#143-chain-settlement-profile-devallagiosettle-chain) is an optional settlement profile. It adds no message and no message field.
+
+### 14.3 Chain settlement profile (`dev.allagio.settle-chain`)
+
+This is an optional host profile for payouts paid in USDC on Base. A host that serves it lists `dev.allagio.settle-chain` in discovery `capabilities.ext`. Every message it produces is a valid 0.3 message: the payout record already carries `ref`.
+
+The host only reads the chain. It holds no keys, signs no transaction, pays no gas, and never holds the money. The payer pays from its own wallet by any means, x402 included.
+
+| Rail | Network | Token | `ref` |
+|---|---|---|---|
+| `usdc.base` | `eip155:8453` (Base) | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | The `0x` transaction hash. |
+| `usdc.base-sepolia` | `eip155:84532` (Base Sepolia) | USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | The `0x` transaction hash. |
+| `x402` | Either network above | USDC | `<caip2>:<hash>`: the `network` and `transaction` of the x402 settlement response. |
+
+- **C1 Currency.** A chain rail pays a `USD` amount in USDC. `amount_minor` cents become token units at 6 decimals, so 1500 is 15000000.
+- **C2 Wallet.** The payee sets a receiving address per network on its host. The address never appears in an ORP message. The host shows it only to the payer of that payout, as `pay_to` on `GET /orp/payouts/{id}`. The host checks the transfer against the wallet in force when the payer reported the `ref`. A later wallet change does not fail it.
+- **C3 Sent.** The payer reports the transfer with `POST /orp/payouts/{id}/sent` and `{"ref": "<ref>"}`. A chain rail needs `ref`. The payout moves from `payable` to `sent`, and the payout record carries `ref`. A `settle` step of `auto` does not release a chain payout: the host cannot drive the payer's wallet. When the payer's `settle` step is `off`, the agent endpoint refuses with HTTP 403 and the owner marks the payout sent on the host's dashboard.
+- **C4 Paid.** The host reads the transaction receipt. The payout is `paid` when the transaction succeeded, emitted a USDC `Transfer` to the payee's address for at least the amount, is at the host's confirmation depth (10 blocks by default), and sits in a block no older than the payout (10 minutes of clock skew allowed). The chain read is a provider event under §14.2. No payee `confirm` is needed.
+- **C5 One transaction, one payout.** A transaction that settled one payout, verified on the chain or on a payout the payee confirmed, is refused on another with HTTP 409 `state_conflict`. A `ref` that settled nothing reserves nothing. If two payouts name the same transaction, the first one verified keeps it, and the other gets chain status `mismatch` with reason `tx_used`.
+- **C6 Mismatch.** A reverted transaction, a wrong token, payee or amount, or a transfer older than the payout leaves the payout `sent` with chain status `mismatch`. The payer can send a corrected `ref`. The payee can still answer `confirm`, or dispute with `claim: not_paid` by `due`.
+- **C7 Pending.** A transaction not found yet or not deep enough stays `sent` with chain status `pending`. The host reads it again on `GET /orp/payouts/{id}`, on an inbox read, and in the daily sweep.
+- **C8 Not escrow.** Nothing is locked before the payout is `payable`. A transfer on the chain is final: P5 reverses a payout only while it is `held` or `payable`, and a dispute on a paid payout resolves outside the chain.
+
+`GET /orp/payouts/{id}` takes the payer's or the payee's bearer and returns `record` (the `payout` record message for the caller), `chain` (`tx` as `<caip2>:<hash>`, `status`, `reason`, `checked_at`) once a chain `ref` is reported, and, for the payer only, `pay_to`: a list of `network`, `token`, `address`, `amount_units`, and the `ref` shape to send back. `POST /orp/payouts/{id}/sent` returns the same document. Only the payer may send. A `ref` on another rail is stored as given, up to 200 characters.
 
 ---
 
@@ -1479,6 +1502,6 @@ The hosted service now serves a testing slice of ORP 0.3 and ORP 0.4. The discov
 | `checks.claims: real` | `CLAIMS_CHECK` defaults to `stub` in release. This document does not change it. Discovery only reports the configured mode. |
 | Step modes `auto`, `ask`, `off` | Placement publish defaults to `ask` (#73). The step names differ. |
 | Schemas and this document | `GET /orp/schemas/` and `GET /orp/schemas/<name>.json` serve the JSON Schemas. `GET /orp/examples/` serves the examples. `GET /orp/spec` serves this document. `GET /orp/gaps` serves the ranked pitfalls. Each schema `$id` is `https://offer-rails.onrender.com/orp/schemas/` plus the file path. |
-| `payout` records | Hosted keeps a commission ledger (`/v1/payouts/*`). Payouts are manual. This testing host does not settle an ORP deal. |
+| `payout` records | Hosted keeps a commission ledger (`/v1/payouts/*`). Payouts are manual. This testing host moves no money for an ORP deal. It serves `dev.allagio.settle-chain` ([§14.3](#143-chain-settlement-profile-devallagiosettle-chain)): a payout on `usdc.base`, `usdc.base-sepolia` or `x402` is marked `paid` when the host reads the payer's USDC transfer on Base. |
 
 The cold-agent walkthrough is the ORP 0-3 test deal section of [llms.txt](https://offer-rails.onrender.com/llms.txt#orp-0-3-test-deal). Ranked pitfalls and their dispositions are in [GAPS.md](https://offer-rails.onrender.com/orp/gaps). This document is [served here](https://offer-rails.onrender.com/orp/spec).

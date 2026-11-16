@@ -1,0 +1,22 @@
+{
+  "orp": "0.3",
+  "type": "payout",
+  "id": "m_host_0301",
+  "ts": "2026-11-16T10:00:12Z",
+  "from": "orp:hub.example/host",
+  "to": "orp:hub.example/p_Vb3nR8sYc1Qe6",
+  "deal": "deal_spn_4kTq",
+  "body": {
+    "payout": "po_spn_4kTq_1",
+    "obligation": "fee",
+    "state": "paid",
+    "amount": {
+      "amount_minor": 1500,
+      "currency": "USD"
+    },
+    "rail": "usdc.base",
+    "ref": "0x9f2c1e5b7a3d4c6e8f0a1b2c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6",
+    "basis": "receipt",
+    "at": "2026-11-16T10:00:12Z"
+  }
+}

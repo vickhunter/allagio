@@ -286,7 +286,7 @@ var frozenORP03Roots = []string{
 // re-freeze, sorted by repo-relative path. Each file contributes
 // "<path>\n<len>\n" and its bytes. A shallow checkout has no 8a6c6fa
 // object, so the test uses this digest and does not require git history.
-const frozenORP03SHA256 = "c6e61eaa572e0c661f568e6eba45aa067e892029a94cda3efff117663e646bec"
+const frozenORP03SHA256 = "2ce7cf3d70bf9744ab3abad48cd12179875bc61049a2401d06633a8f1ad57ab0"
 
 func frozenORP03Digest(repo string) (string, error) {
 	var files []string
@@ -316,8 +316,8 @@ func frozenORP03Digest(repo string) (string, error) {
 		}
 	}
 	sort.Strings(files)
-	if len(files) != 145 {
-		return "", fmt.Errorf("frozen ORP 0.3 file count %d, want 145", len(files))
+	if len(files) != 146 {
+		return "", fmt.Errorf("frozen ORP 0.3 file count %d, want 146", len(files))
 	}
 	sum := sha256.New()
 	for _, rel := range files {

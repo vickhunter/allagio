@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"affilio-api/internal/chainpay"
 	"affilio-api/internal/database"
 	"affilio-api/internal/middleware"
 	"affilio-api/internal/services"
@@ -47,6 +48,8 @@ type HostedHandler struct {
 	// TrustedPlatform is a dedicated client-IP header name. When set, that
 	// header is the event-limit key and Gin's TrustedPlatform.
 	TrustedPlatform string
+	// Chain reads chain rails when an owner marks a chain payout sent.
+	Chain *chainpay.Verifier
 
 	pluginZipMu     sync.Mutex
 	pluginZipKey    string
