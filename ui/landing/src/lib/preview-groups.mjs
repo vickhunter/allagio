@@ -10,6 +10,7 @@ export const suggestedNote = "Not on Allagio yet. Payouts go through the company
 export const closestLead = 'No listed program lines up — a matching partner would take the highlighted line.'
 export const notifyLabel = 'Notify me when a match joins'
 export const notifyStorageKey = 'offer-rails.preview.notify'
+export const notifyLimit = 20
 export const readNext = 'Make the post public or paste another link'
 
 // TODO: no notify endpoint exists. Callers store the URL locally and do not contact the server.
