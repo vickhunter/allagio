@@ -55,6 +55,8 @@ type HostedHandler struct {
 	pluginZipKey    string
 	pluginZipBody   []byte
 	pluginZipBuilds int
+	// Telegram is the bot client used to show the bot name in settings.
+	Telegram *services.TelegramClient
 }
 
 func ValidatePublicURL(raw string) error {
@@ -349,7 +351,7 @@ func setPublicDocHeaders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Referrer-Policy", "strict-origin")
-	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+	c.Header("Content-Security-Policy", "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self' data: https:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 }
 
 // cleanedRouteRedirect is a 301 target when path.Clean changes the path onto

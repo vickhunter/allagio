@@ -1,0 +1,9 @@
+ALTER TABLE owners ADD COLUMN IF NOT EXISTS telegram_chat_id BIGINT;
+ALTER TABLE owners ADD COLUMN IF NOT EXISTS telegram_username TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS owner_telegram_codes (
+    code_hash TEXT PRIMARY KEY,
+    owner_id UUID NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL
+);

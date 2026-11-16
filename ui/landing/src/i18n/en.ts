@@ -196,6 +196,8 @@ export const en: Messages = {
   },
   showcase: {
     exampleTag: 'Allagio · Example',
+    pauseLabel: 'Pause rotation',
+    resumeLabel: 'Resume rotation',
     footnote: 'Illustrative examples. Terms are agreed by your agent and approved by you; Allagio is in test mode and moves no money.',
     partnershipLabel: 'Partnership',
     termsLabel: 'Terms',
@@ -358,6 +360,7 @@ export const en: Messages = {
     approve: 'Approve your placements',
     sponsored: 'Sponsored, via Allagio',
     unverified: 'Unverified',
+    demo: 'Demo',
     postFallback: 'Post',
     notify: notifyLabel,
     saved: 'Saved in this browser.',

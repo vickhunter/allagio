@@ -166,6 +166,8 @@ func TestORPDocumentLinks(t *testing.T) {
 func docContentType(t *testing.T, path string) string {
 	t.Helper()
 	switch {
+	case path == "/docs":
+		return "text/html"
 	case path == "/orp/spec" || path == "/orp/gaps" || strings.HasPrefix(path, "/docs/"):
 		return "text/markdown"
 	case path == "/llms.txt" || path == "/llms-full.txt":

@@ -320,6 +320,18 @@ func main() {
 	if mailer.Enabled() {
 		go (&handlers.DigestEmailRunner{DB: db, Mailer: mailer, BaseURL: cfg.PublicBaseURL}).RunWorker(workerCtx)
 	}
+	tg := &services.TelegramClient{Token: cfg.TelegramBotToken, API: cfg.TelegramAPIBase}
+	if tg.Enabled() {
+		if err := tg.GetMe(ctx); err != nil {
+			log.Printf("telegram: getMe failed: %v", err)
+		}
+		go (&handlers.TelegramRunner{DB: db, TG: tg, BaseURL: cfg.PublicBaseURL}).RunWorker(workerCtx)
+		assessments.Telegram = tg
+		assessments.BaseURL = cfg.PublicBaseURL
+		if hosted != nil {
+			hosted.Telegram = tg
+		}
+	}
 	mcp := &handlers.MCPHandler{
 		LoopbackURL: "http://127.0.0.1:" + cfg.Port,
 		RateLimiter: handlers.NewIPRateLimiter(240, time.Minute),
@@ -347,6 +359,7 @@ func main() {
 		StatusLimiter:      handlers.NewPlacementPollLimiter(),
 		ClaimsCheck:        cfg.ClaimsCheck,
 		AssetsPath:         cfg.UIAssetsPath,
+		Telegram:           tg,
 	}
 	if hosted != nil {
 		agentEntry.Owner = hosted.RequireOwnerSession

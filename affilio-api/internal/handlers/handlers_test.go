@@ -131,7 +131,7 @@ func splitKeywordDSN(raw string) []string {
 
 func applyMigrations(t *testing.T, db *database.DB) {
 	t.Helper()
-	applyMigrationsThrough(t, db, "064_orp_chain_settlement.sql")
+	applyMigrationsThrough(t, db, "065_orp_chain_settlement.sql")
 }
 
 // setupTestDBThrough connects in zone and applies migrations through last,
@@ -276,7 +276,8 @@ func migrationFiles() []string {
 		"061_payout_ask_default.sql",
 		"062_orp_outcomes.sql",
 		"063_owner_digest.sql",
-		"064_orp_chain_settlement.sql",
+		"064_owner_telegram.sql",
+		"065_orp_chain_settlement.sql",
 	}
 }
 

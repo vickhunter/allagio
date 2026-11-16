@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -51,8 +52,10 @@ type AgentEntry struct {
 	TrustedPlatform string
 	// beforeJoinBearer runs after the step actor is loaded and before the
 	// join-bearer check. Tests revoke the token between those two lookups.
-	beforeJoinBearer   func()
-	DeviceLimiter      *IPRateLimiter
+	beforeJoinBearer func()
+	DeviceLimiter    *IPRateLimiter
+	// Telegram pushes owner-facing events to a linked chat when configured.
+	Telegram           *services.TelegramClient
 	Now                func() time.Time
 	PluginOfflineAfter time.Duration
 	StatusLimiter      *IPRateLimiter
@@ -128,6 +131,8 @@ func (h *AgentEntry) Mount(r gin.IRouter) {
 	r.HEAD("/skill.md", h.Skill)
 	r.GET("/openapi.json", ServeOpenAPI(h.BaseURL))
 	r.HEAD("/openapi.json", ServeOpenAPI(h.BaseURL))
+	r.GET("/docs", ServeScalarDocs())
+	r.HEAD("/docs", ServeScalarDocs())
 	r.GET("/docs/:name", h.Doc)
 	r.HEAD("/docs/:name", h.Doc)
 }
@@ -439,11 +444,11 @@ func (h *AgentEntry) notifyAccountRegistered(c *gin.Context, role, name, email s
 	sent := map[string]bool{}
 	for _, owner := range owners {
 		url, secret, err := h.DB.OwnerNotify(c.Request.Context(), owner.ID)
-		if err != nil || url == "" || secret == "" || sent[url] {
-			continue
+		if err == nil && url != "" && secret != "" && !sent[url] {
+			sent[url] = true
+			go postSignedWebhook(url, secret, payload)
 		}
-		sent[url] = true
-		go postSignedWebhook(url, secret, payload)
+		go telegramDM(h.DB, h.Telegram, owner.ID, fmt.Sprintf("An agent registered %s (%s) for %s — review it at %s/owner", name, role, email, strings.TrimRight(h.BaseURL, "/")))
 	}
 }
 

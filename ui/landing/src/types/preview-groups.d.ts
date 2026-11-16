@@ -22,6 +22,7 @@ declare module '@/lib/preview-groups.mjs' {
     title: string
     author: string
     excerpt: string
+    image: string
     suggestion: PreviewSuggestion | null
     verified: VerifiedOffer[]
     suggested: UnverifiedProgram[]
@@ -37,6 +38,6 @@ declare module '@/lib/preview-groups.mjs' {
   export function groupPreview(body: unknown, options?: { includeFixture?: boolean }): PreviewGroups
   export function adaptPreview(body: unknown, options?: { includeFixture?: boolean }): PreviewGroups
   export function orderedNames(grouped: PreviewGroups): string[]
-  export function readNotifyIntent(storage: Pick<Storage, 'getItem'>): string[]
-  export function storeNotifyIntent(storage: Pick<Storage, 'getItem' | 'setItem'>, url: string): string[]
+  export function readNotifyIntent(storage: Pick<Storage, 'getItem'>): { at: number }[]
+  export function storeNotifyIntent(storage: Pick<Storage, 'getItem' | 'setItem'>): { at: number }[]
 }

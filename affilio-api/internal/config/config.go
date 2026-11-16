@@ -60,6 +60,12 @@ type Config struct {
 	// ChainConfirmations is the block depth a chain payout needs.
 	ChainConfirmations int64
 
+	// Outbound Telegram channel for owners: a long-polling bot plus direct
+	// messages for the same events the owner webhook gets. Disabled unless
+	// TelegramBotToken is set; TelegramAPIBase exists for tests.
+	TelegramBotToken string
+	TelegramAPIBase  string
+
 	// ClaimsCheck is the resolved CLAIMS_CHECK mode: stub, real, or off-local.
 	ClaimsCheck    string
 	claimsCheckErr error
@@ -126,6 +132,8 @@ func Load() Config {
 		SMTPUser:                  os.Getenv("SMTP_USER"),
 		SMTPPassword:              os.Getenv("SMTP_PASSWORD"),
 		DigestFrom:                getEnvValue("DIGEST_FROM", "Allagio <digest@allagio.dev>"),
+		TelegramBotToken:          os.Getenv("TELEGRAM_BOT_TOKEN"),
+		TelegramAPIBase:           os.Getenv("TELEGRAM_API_BASE"),
 		ClaimsCheck:               claims,
 		claimsCheckErr:            claimsErr,
 	}
