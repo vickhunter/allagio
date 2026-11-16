@@ -49,6 +49,7 @@ type previewResponse struct {
 	Author        string             `json:"author,omitempty"`
 	Excerpt       string             `json:"excerpt,omitempty"`
 	Image         string             `json:"image,omitempty"`
+	Demo          bool               `json:"demo"`
 	Offer         *previewOfferCard  `json:"offer"`
 	Offers        []previewOfferCard `json:"offers,omitempty"`
 	Slot          *string            `json:"slot"`
@@ -82,6 +83,7 @@ func (h *PreviewHandler) Preview(c *gin.Context) {
 	out.Author = page.Author
 	out.Excerpt = previewExcerpt(page.Text)
 	out.Image = page.Image
+	out.Demo = true
 	out.Suggestion = suggestLine(out)
 	c.JSON(http.StatusOK, out)
 }

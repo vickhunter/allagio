@@ -152,7 +152,7 @@ export function PlatformShowcase() {
         role="tablist"
         aria-label={t.showcase.tabsLabel}
         onKeyDown={handleKeyDown}
-        className="flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-proximity items-center gap-2 overflow-x-auto scroll-mt-24 pb-1 [-ms-overflow-style:none] [mask-image:linear-gradient(to_right,black_calc(100%-2.5rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {platforms.map((item, i) => {
           const Icon = tabIcons[item.id]
@@ -167,7 +167,7 @@ export function PlatformShowcase() {
               tabIndex={selected ? 0 : -1}
               onClick={() => setActive(i)}
               className={cn(
-                'inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors',
+                'inline-flex min-h-11 shrink-0 snap-start scroll-ml-2 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors',
                 selected ? 'border-t1 bg-t1 text-s0' : 'border-line bg-s1 text-t2 hover:text-t1'
               )}
             >
@@ -201,7 +201,7 @@ export function PlatformShowcase() {
               <div className="w-full rounded-2xl">
                 <PlatformPostFrame platform={platform.id} mock={platform.mock} tag={t.showcase.exampleTag} />
               </div>
-              <BorderBeam size={140} duration={8} borderWidth={1.5} />
+              {!reduced && <BorderBeam size={140} duration={8} borderWidth={1.5} />}
             </div>
             <DealPanel platform={platform} />
           </motion.div>

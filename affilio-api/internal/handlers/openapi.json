@@ -4680,7 +4680,57 @@
         "summary": "Preview where an offer would sit on a public post URL",
         "responses": {
           "200": {
-            "description": "Preview: title, author, excerpt, suggested placement"
+            "description": "Preview: title, author, excerpt, page image, suggested placement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "author": {
+                      "type": "string"
+                    },
+                    "excerpt": {
+                      "type": "string"
+                    },
+                    "image": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "og:image / twitter:image or oEmbed thumbnail, absolute http(s) only"
+                    },
+                    "demo": {
+                      "type": "boolean",
+                      "description": "Always true — previews are examples, never live placements"
+                    },
+                    "offer": {
+                      "type": "object",
+                      "description": "Best-matching offer card",
+                      "nullable": true
+                    },
+                    "offers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "slot": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "suggestion": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "demo",
+                    "suggestion"
+                  ]
+                }
+              }
+            }
           },
           "400": {
             "description": "{error}"

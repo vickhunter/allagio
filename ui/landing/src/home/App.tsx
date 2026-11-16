@@ -159,7 +159,7 @@ export function App() {
         </div>
       </div>
 
-      <section id="post-preview" aria-labelledby="preview-h" className="relative overflow-hidden border-t border-line bg-s2/50">
+      <section id="post-preview" aria-labelledby="preview-h" className="relative scroll-mt-24 overflow-hidden border-t border-line bg-s2/50">
         <RetroGrid aria-hidden="true" className="opacity-100" opacity={0.3} lightLineColor="rgb(63 92 53)" />
         <div className="relative mx-auto max-w-6xl px-5 py-16 md:py-20">
           <p className="kicker">{t.previewSection.kicker}</p>

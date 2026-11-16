@@ -287,7 +287,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
   return (
     <div data-post-preview data-preview-state={view} className="min-w-0 max-w-full rounded-2xl border border-line bg-s1 p-5">
       <form noValidate onSubmit={onSubmit} className="grid gap-3">
-        <label htmlFor={id} className="text-[15px] font-semibold text-t1">{t.preview.label}</label>
+        <label htmlFor={id} className="scroll-mt-24 text-[15px] font-semibold text-t1">{t.preview.label}</label>
         <Input
           id={id}
           ref={inputRef}

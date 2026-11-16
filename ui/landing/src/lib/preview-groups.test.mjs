@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { fixtureBody } from './preview-map.mjs'
-import { adaptPreview, closestLead, groupsFixtureBody, includeUnverifiedFixture, notifyLabel, notifyLimit, orderedNames, publicLinksNote, readFailureCopy, readNext, readNotifyIntent, storeNotifyIntent, suggestedNote, unverifiedFixture } from './preview-groups.mjs'
+import { adaptPreview, closestLead, groupsFixtureBody, includeUnverifiedFixture, notifyLabel, orderedNames, publicLinksNote, readFailureCopy, readNext, readNotifyIntent, storeNotifyIntent, suggestedNote, unverifiedFixture } from './preview-groups.mjs'
 
 function memory() {
   const data = new Map()

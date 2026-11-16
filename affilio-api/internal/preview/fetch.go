@@ -422,6 +422,12 @@ var (
 		mustCIDR("198.18.0.0/15"),
 		mustCIDR("240.0.0.0/4"),
 	}
+	// Reserved IPv6 ranges the predicates miss.
+	blockedV6Nets = []*net.IPNet{
+		mustCIDR("64:ff9b::/96"), // NAT64 — v4 space in disguise
+		mustCIDR("2001:db8::/32"), // documentation range
+		mustCIDR("100::/64"),      // discard-only
+	}
 )
 
 func mustCIDR(cidr string) *net.IPNet {
@@ -450,6 +456,13 @@ func blockedIP(ip net.IP) bool {
 		}
 		for _, network := range blockedNets {
 			if network.Contains(v4) {
+				return true
+			}
+		}
+	}
+	if ip.To4() == nil {
+		for _, network := range blockedV6Nets {
+			if network.Contains(ip) {
 				return true
 			}
 		}
@@ -595,20 +608,22 @@ func pageFromHTML(raw string) (Page, error) {
 
 func pageFromOEmbed(kind string, body []byte) (Page, error) {
 	var doc struct {
-		Title      string `json:"title"`
-		AuthorName string `json:"author_name"`
-		HTML       string `json:"html"`
+		Title        string `json:"title"`
+		AuthorName   string `json:"author_name"`
+		HTML         string `json:"html"`
+		ThumbnailURL string `json:"thumbnail_url"`
 	}
 	if err := json.Unmarshal(body, &doc); err != nil {
 		return Page{}, ErrFetch
 	}
+	thumbnail := publicImageURL(doc.ThumbnailURL)
 	if kind == kindYouTube {
 		title := cleanLine(doc.Title)
 		text := strings.TrimSpace(title + "\n\n" + cleanLine(doc.AuthorName))
 		if title == "" || strings.TrimSpace(text) == "" {
 			return Page{}, ErrUnreadable
 		}
-		return Page{Title: title, Text: text}, nil
+		return Page{Title: title, Text: text, Image: thumbnail}, nil
 	}
 	_, text := extractPage(doc.HTML)
 	text = strings.TrimSpace(text)
@@ -708,6 +723,23 @@ func firstMeta(metas map[string][]string, key string) string {
 		return ""
 	}
 	return values[0]
+}
+
+// publicImageURL keeps only absolute http(s) image URLs; anything else
+// (relative paths, data: URIs, other schemes) returns empty.
+func publicImageURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || len(raw) > 2048 {
+		return ""
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return ""
+	}
+	return raw
 }
 
 func loginWall(raw string) bool {

@@ -10,7 +10,6 @@ export const suggestedNote = "Not on Allagio yet. Payouts go through the company
 export const closestLead = 'No listed program lines up — a matching partner would take the highlighted line.'
 export const notifyLabel = 'Notify me when a match joins'
 export const notifyStorageKey = 'offer-rails.preview.notify'
-export const notifyLimit = 20
 export const readNext = 'Make the post public or paste another link'
 
 // TODO: no notify endpoint exists. Callers store the URL locally and do not contact the server.
@@ -197,6 +196,7 @@ export function groupPreview(body, options = {}) {
     author: textOf(body && body.author),
     excerpt: textOf(body && body.excerpt),
     image: textOf(body && body.image),
+    demo: (body && body.demo) === true,
     suggestion,
     verified,
     suggested,
@@ -225,7 +225,7 @@ export function adaptPreview(body, options = {}) {
   const readFailure = classifyReadFailure(body)
   const title = textOf(body && body.title)
   if (readFailure) {
-    return { title, author: '', excerpt: '', image: '', suggestion: null, verified: [], suggested: [], closest: [], readFailure, kind: 'unreadable', slot: null }
+    return { title, author: '', excerpt: '', image: '', demo: false, suggestion: null, verified: [], suggested: [], closest: [], readFailure, kind: 'unreadable', slot: null }
   }
   return groupPreview(body, options)
 }
