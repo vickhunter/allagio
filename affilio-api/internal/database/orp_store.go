@@ -195,7 +195,7 @@ ON CONFLICT (deal_id, party) DO NOTHING`, chain.Deal, chain.Party)
 	var lastHash string
 	var usedPrev bool
 	err = tx.QueryRow(ctx, `
-SELECT last_hash, used_prev FROM orp_chain
+SELECT last_hash, used_prev FROM orp_msg_chain
 WHERE deal_id=$1 AND party=$2 FOR UPDATE`, chain.Deal, chain.Party).Scan(&lastHash, &usedPrev)
 	if err != nil {
 		return err
