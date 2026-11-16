@@ -159,6 +159,8 @@ export interface Messages {
     approvedStep: string
     liveStep: string
     tabsLabel: string
+    pauseLabel: string
+    resumeLabel: string
     platforms: ShowcasePlatform[]
   }
   preview: {
@@ -174,6 +176,7 @@ export interface Messages {
     approve: string
     sponsored: string
     unverified: string
+    demo: string
     postFallback: string
     notify: string
     saved: string

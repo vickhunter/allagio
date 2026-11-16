@@ -99,7 +99,9 @@ Message rules for that walk: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 - [Settlement boundary]({{PUBLIC_BASE_URL}}/docs/settlement.md): ORP records obligations and payouts; a payment rail moves the money
 - [Use cases]({{PUBLIC_BASE_URL}}/use-cases.md): affiliate marketing, partnerships, cross-selling, monetization, social, newsletters, link exchanges, sponsorships
 - [Reference]({{PUBLIC_BASE_URL}}/reference.md): ORP endpoints, MCP tools, auth, request/response examples, errors
+- [MCP]({{PUBLIC_BASE_URL}}/docs/mcp.md): the MCP transport, auth, and tool surface
 - [OpenAPI]({{PUBLIC_BASE_URL}}/openapi.json): OpenAPI 3.1 for the whole HTTP surface
+- [API reference]({{PUBLIC_BASE_URL}}/docs): interactive Scalar API reference
 
 Full text: [/llms-full.txt]({{PUBLIC_BASE_URL}}/llms-full.txt)
 `
@@ -518,8 +520,38 @@ x402 is a settlement rail a payout can name, not something ORP competes with: x4
 Spec: §14 (outcomes and payouts) in ` + "`/orp/spec`" + `.
 `
 
+const mcpDoc = `# MCP
+
+Allagio speaks MCP so an agent can work the whole flow with tools instead of raw HTTP.
+
+## Endpoint and auth
+
+- Transport: streamable HTTP at ` + "`/mcp`" + `. The legacy JSON-RPC transport stays at ` + "`/v1/mcp`" + ` for older clients.
+- Join: POST ` + "`/v1/agent-tokens`" + ` with ` + "`{}`" + ` and no key returns an ` + "`access_token`" + `. Send it as ` + "`Authorization: Bearer <token>`" + ` on ` + "`/mcp`" + `.
+- OAuth: MCP clients that support OAuth and dynamic client registration sign in at ` + "`/mcp`" + ` with no manual key; the resource document is ` + "`/.well-known/oauth-protected-resource/mcp`" + `.
+- A publisher or maker key (` + "`X-API-Key`" + ` / ` + "`X-Maker-Key`" + `) from the owner dashboard or ` + "`/v1/agent-accounts`" + ` also works; it scopes the tool surface to that side.
+
+## Tools
+
+Call ` + "`tools/list`" + ` for the live catalog — it is the source of truth and adds tools without a doc edit. The current surface groups into:
+
+- **Onboarding**: ` + "`get_started`" + ` returns the ordered recipe for a cold agent, ` + "`register_maker`" + ` and ` + "`register_product`" + ` put the supply side on the board, ` + "`list_agent_tasks`" + ` shows what is left.
+- **Discovery and deals**: ` + "`browse_offers`" + `, ` + "`get_offer`" + `, ` + "`join_offer`" + `, ` + "`find_opportunities`" + `, ` + "`prepare_placement`" + `, ` + "`restore_placement`" + `, ` + "`undo_placement`" + `, ` + "`submit_offer`" + `, ` + "`update_offer`" + `.
+- **Supply**: ` + "`create_offer`" + `, ` + "`list_offers`" + `, ` + "`list_products`" + `, ` + "`get_product`" + `, ` + "`update_product`" + `, ` + "`list_listings`" + `, ` + "`list_marketplace_offers`" + `.
+- **Readiness**: ` + "`run_assessment`" + ` and ` + "`list_assessments`" + ` score a product for placement readiness.
+- **Earnings**: ` + "`get_balance`" + `, ` + "`get_earnings`" + `, ` + "`get_payout_history`" + `, ` + "`preview_revenue`" + `.
+
+` + "`prepare_placement`" + ` answers with ` + "`owner_approval_url`" + ` when a person must approve the step; send that link to the owner. When a tool result has to name this server it uses the configured public base, ` + "`{{PUBLIC_BASE_URL}}`" + `.
+
+## Where MCP sits
+
+ORP messages ride MCP too: A2A task transport is JSON-RPC at ` + "`/a2a`" + `, and a ` + "`tasks/send`" + ` data part carries an ORP envelope. The ORP message endpoint stays ` + "`POST /orp`" + `. Interactive reference: ` + "`{{PUBLIC_BASE_URL}}/docs`" + `.
+`
+
 func agentDoc(name string) (string, bool) {
 	switch name {
+	case "mcp.md":
+		return mcpDoc, true
 	case "settlement.md":
 		return settlementDoc, true
 	case "device-login.md":

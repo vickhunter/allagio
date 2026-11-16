@@ -92,10 +92,6 @@ function isV1GoSegment(path) {
   return /(?:^|\/)v1\/go(?:\/|$)/.test(path)
 }
 
-function notifyKey(url) {
-  return textOf(url).replace(/\/+$/, '').toLowerCase()
-}
-
 function topicTokens(text) {
   return new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 3))
 }
@@ -200,6 +196,7 @@ export function groupPreview(body, options = {}) {
     title,
     author: textOf(body && body.author),
     excerpt: textOf(body && body.excerpt),
+    image: textOf(body && body.image),
     suggestion,
     verified,
     suggested,
@@ -228,7 +225,7 @@ export function adaptPreview(body, options = {}) {
   const readFailure = classifyReadFailure(body)
   const title = textOf(body && body.title)
   if (readFailure) {
-    return { title, author: '', excerpt: '', suggestion: null, verified: [], suggested: [], closest: [], readFailure, kind: 'unreadable', slot: null }
+    return { title, author: '', excerpt: '', image: '', suggestion: null, verified: [], suggested: [], closest: [], readFailure, kind: 'unreadable', slot: null }
   }
   return groupPreview(body, options)
 }
@@ -241,21 +238,17 @@ export function orderedNames(grouped) {
 export function readNotifyIntent(storage) {
   try {
     const parsed = JSON.parse(storage.getItem(notifyStorageKey) || '[]')
-    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string' && item.trim()) : []
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item.at === 'number') : []
   } catch {
     return []
   }
 }
 
-export function storeNotifyIntent(storage, url) {
-  // TODO: no notify endpoint exists. This writes the post URL in this browser and does not call a server.
+export function storeNotifyIntent(storage) {
+  // TODO: no notify endpoint exists. Keep only the intent timestamp in this
+  // browser — the pasted URL is never persisted.
   const previous = readNotifyIntent(storage)
-  const value = textOf(url)
-  if (!value) return previous
-  const key = notifyKey(value)
-  const urls = previous.filter((item) => notifyKey(item) !== key)
-  urls.push(value)
-  const capped = urls.slice(-notifyLimit)
-  if (JSON.stringify(capped) !== JSON.stringify(previous)) storage.setItem(notifyStorageKey, JSON.stringify(capped))
-  return capped
+  const next = [...previous, { at: Date.now() }].slice(-notifyLimit)
+  storage.setItem(notifyStorageKey, JSON.stringify(next))
+  return next
 }

@@ -26,6 +26,7 @@ export function Header({ page }: { page: PageKey }) {
   const { t } = useLocale()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLButtonElement>(null)
+  const navRef = useRef<HTMLElement>(null)
   useEffect(() => {
     if (!open) return
     const onKey = (event: KeyboardEvent) => {
@@ -33,8 +34,17 @@ export function Header({ page }: { page: PageKey }) {
       setOpen(false)
       menuRef.current?.focus()
     }
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (navRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('pointerdown', onPointerDown)
+    }
   }, [open])
   const current = page === 'setup' ? 'publishers' : page
   const commands = useMemo(
@@ -52,7 +62,7 @@ export function Header({ page }: { page: PageKey }) {
         <button ref={menuRef} type="button" className="site-menu-btn" aria-expanded={open} aria-controls="site-menu" onClick={() => setOpen((value) => !value)}>
           {open ? t.chrome.menuClose : t.chrome.menu}
         </button>
-        <nav id="site-menu" aria-label="Main" className={open ? 'site-menu is-open text-sm' : 'site-menu text-sm'}>
+        <nav ref={navRef} id="site-menu" aria-label="Main" className={open ? 'site-menu is-open text-sm' : 'site-menu text-sm'} onClick={(event) => { if ((event.target as HTMLElement).closest('a')) setOpen(false) }}>
           {link('/you/', t.chrome.navYourLimits, 'you')}
           {link('/makers/', t.chrome.navMakers, 'makers')}
           {link('/publishers/', t.chrome.navPublishers, 'publishers')}

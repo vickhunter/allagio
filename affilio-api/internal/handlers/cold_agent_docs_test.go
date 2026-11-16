@@ -386,7 +386,7 @@ func TestNonDocSlashRedirectKeepsMainHeaders(t *testing.T) {
 
 func assertPublicDocHeaders(t *testing.T, rec *httptest.ResponseRecorder) {
 	t.Helper()
-	if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("Referrer-Policy") != "strict-origin" || rec.Header().Get("Content-Security-Policy") != "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" {
+	if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("Referrer-Policy") != "strict-origin" || rec.Header().Get("Content-Security-Policy") != "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; img-src 'self' data: https:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'" {
 		t.Fatalf("public headers cache %q nosniff %q referrer %q csp %q", rec.Header().Get("Cache-Control"), rec.Header().Get("X-Content-Type-Options"), rec.Header().Get("Referrer-Policy"), rec.Header().Get("Content-Security-Policy"))
 	}
 }
