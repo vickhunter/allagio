@@ -6690,6 +6690,95 @@
           }
         }
       }
+    },
+    "/orp/payouts/{id}": {
+      "get": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "One payout for its payer or payee: the payout record, the chain read, and pay_to (payer only) on a chain rail (dev.allagio.settle-chain)",
+        "responses": {
+          "200": {
+            "description": "Payout document: record, chain, pay_to"
+          },
+          "404": {
+            "description": "not_found"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/orp/payouts/{id}/sent": {
+      "post": {
+        "tags": [
+          "ORP host"
+        ],
+        "summary": "Payer reports the transfer with the rail's ref; a chain rail is read at once and marked paid when it matches",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "usdc.base / usdc.base-sepolia: the 0x transaction hash. x402: <caip2>:<hash>. Other rails: the rail's own reference."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payout document: record, chain, pay_to"
+          },
+          "400": {
+            "description": "invalid_message"
+          },
+          "403": {
+            "description": "forbidden: not the payer"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "409": {
+            "description": "state_conflict"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
     }
   },
   "components": {

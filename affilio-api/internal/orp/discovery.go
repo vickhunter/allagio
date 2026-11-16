@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"affilio-api/internal/chainpay"
 	"affilio-api/internal/config"
 )
 
@@ -104,7 +105,7 @@ func DiscoveryDocument(origin, dns, claimsMode string, hostKeys ...map[string]an
 		"auth": map[string]any{
 			"bearer": true,
 		},
-		"capabilities": CapabilitiesFor(Version04, claimsMode),
+		"capabilities": hostCapabilities(claimsMode),
 		"legacy": map[string]any{
 			"dcp": map[string]any{
 				"version":   "0.1",
@@ -146,5 +147,13 @@ func CapabilitiesFor(version, claimsMode string) map[string]any {
 	}
 	messages := append([]any{}, caps["messages"].([]any)...)
 	caps["messages"] = append(messages, "leave", "seat")
+	return caps
+}
+
+// hostCapabilities is the discovery document's capability set: the 0.4 set
+// plus the extensions this host serves.
+func hostCapabilities(claimsMode string) map[string]any {
+	caps := CapabilitiesFor(Version04, claimsMode)
+	caps["ext"] = []any{chainpay.Profile}
 	return caps
 }

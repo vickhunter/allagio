@@ -29,17 +29,34 @@ type ORPPayout struct {
 	AnsweredAt      *time.Time
 	Answer          string
 	CreatedAt       time.Time
+	// Ref is the rail's transfer reference the payer reported. ChainTx is
+	// <caip2>:<hash> on a chain rail, and ChainStatus is the host's last
+	// read of it (dev.allagio.settle-chain).
+	Ref            string
+	ChainTx        string
+	ChainStatus    string
+	ChainReason    string
+	ChainCheckedAt *time.Time
 }
 
 func scanORPPayout(row interface {
 	Scan(...any) error
 }) (ORPPayout, error) {
 	var p ORPPayout
-	var basisObligation, answer *string
+	var basisObligation, answer, ref, chainTx, chainStatus, chainReason *string
 	err := row.Scan(&p.ID, &p.DealID, &p.Obligation, &basisObligation,
 		&p.PayerOwner, &p.PayerParty, &p.PayeeOwner, &p.PayeeParty,
 		&p.State, &p.AmountMinor, &p.Currency, &p.Rail, &p.Basis,
-		&p.HoldUntil, &p.SentAt, &p.AnsweredAt, &answer, &p.CreatedAt)
+		&p.HoldUntil, &p.SentAt, &p.AnsweredAt, &answer, &p.CreatedAt,
+		&ref, &chainTx, &chainStatus, &chainReason, &p.ChainCheckedAt)
+	for _, pair := range []struct {
+		from *string
+		to   *string
+	}{{ref, &p.Ref}, {chainTx, &p.ChainTx}, {chainStatus, &p.ChainStatus}, {chainReason, &p.ChainReason}} {
+		if pair.from != nil {
+			*pair.to = *pair.from
+		}
+	}
 	if basisObligation != nil {
 		p.BasisObligation = *basisObligation
 	}
@@ -51,7 +68,8 @@ func scanORPPayout(row interface {
 
 const orpPayoutCols = `id, deal_id, obligation, basis_obligation, payer_owner::text,
 payer_party, payee_owner::text, payee_party, state, amount_minor, currency,
-rail, basis, hold_until, sent_at, answered_at, answer, created_at`
+rail, basis, hold_until, sent_at, answered_at, answer, created_at,
+ref, chain_tx, chain_status, chain_reason, chain_checked_at`
 
 // AdvanceORPHolds moves held payouts whose hold has passed to payable and
 // returns them so the caller can apply the payer's settle step and notify.

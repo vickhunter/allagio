@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"affilio-api/internal/chainpay"
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
 
@@ -40,6 +41,9 @@ type ORPHost struct {
 	// Signer signs host-issued records (the deal certificate). Nil disables
 	// signing: discovery publishes no keys and the certificate endpoint is 503.
 	Signer *orp.Signer
+	// Chain reads chain rails for dev.allagio.settle-chain. Nil records a
+	// reported ref without reading the chain.
+	Chain *chainpay.Verifier
 }
 
 // Mount registers the ORP routes. POST /orp is the message endpoint.
@@ -51,6 +55,8 @@ func (h *ORPHost) Mount(r gin.IRouter) {
 	r.POST("/orp/join", h.Join)
 	r.GET("/orp/keys/:opaque", h.PartyKeysEndpoint)
 	r.GET("/orp/deals/:id/certificate", h.DealCertificate)
+	r.GET("/orp/payouts/:id", h.Payout)
+	r.POST("/orp/payouts/:id/sent", h.PayoutSent)
 	r.POST("/v1/party-claims", h.PartyClaim)
 	r.GET("/claim/:code", h.ClaimPage)
 	r.POST("/claim/:code", h.ClaimPost)

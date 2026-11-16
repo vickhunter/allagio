@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"affilio-api/internal/chainpay"
 	"affilio-api/internal/config"
 	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
@@ -102,6 +103,23 @@ func runOutcomes(cfg config.Config) {
 		log.Fatalf("outcome sweep: %v", err)
 	}
 	log.Printf("outcome sweep done: deals=%d sent=%d finals=%d", stats.Deals, stats.Sent, stats.Finals)
+	paid, err := handlers.SweepORPChainPayouts(ctx, db, cfg.PublicBaseURL, chainVerifier(cfg), time.Now())
+	if err != nil {
+		log.Fatalf("chain payout sweep: %v", err)
+	}
+	log.Printf("chain payout sweep done: paid=%d", paid)
+}
+
+// chainVerifier is the read-only chain reader for dev.allagio.settle-chain.
+// A network set to off is not read.
+func chainVerifier(cfg config.Config) *chainpay.Verifier {
+	rpc := map[string]string{}
+	for network, url := range map[string]string{"eip155:8453": cfg.ChainRPCBase, "eip155:84532": cfg.ChainRPCBaseSepolia} {
+		if url != "" && url != "off" {
+			rpc[network] = url
+		}
+	}
+	return &chainpay.Verifier{RPC: rpc, Confirmations: cfg.ChainConfirmations, Client: &http.Client{Timeout: 10 * time.Second}}
 }
 
 func main() {
@@ -251,7 +269,7 @@ func main() {
 		cfg.PublicBaseURL = strings.TrimRight(cfg.PublicBaseURL, "/")
 		redirects.HomeURL = cfg.PublicBaseURL + "/"
 		assessments.Engine.PublicBaseURL = cfg.PublicBaseURL
-		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments, ClaimsCheck: cfg.ClaimsCheck, TrustedProxies: cfg.TrustedProxies, Render: cfg.Render, TrustedPlatform: cfg.TrustedPlatform}
+		hosted = &handlers.HostedHandler{DB: db, BaseURL: cfg.PublicBaseURL, LoopbackURL: "http://127.0.0.1:" + cfg.Port, Limiter: handlers.NewIPRateLimiter(240, time.Minute), Payments: &handlers.MerchantConnectionsHandler{DB: db, Cipher: connectionCipher, Verifier: &services.StripeAPI{}, BaseURL: cfg.PublicBaseURL}, AssetsPath: cfg.UIAssetsPath, DownloadsPath: cfg.DownloadsPath, OperatorID: cfg.OperatorOwnerID, Assessments: assessments, ClaimsCheck: cfg.ClaimsCheck, TrustedProxies: cfg.TrustedProxies, Render: cfg.Render, TrustedPlatform: cfg.TrustedPlatform, Chain: chainVerifier(cfg)}
 		if err = hosted.LoadWorkspace(); err != nil {
 			log.Fatalf("workspace assets failed: %v", err)
 		}
@@ -351,6 +369,7 @@ func main() {
 		SuggestLimiter: handlers.NewIPRateLimiter(30, time.Minute),
 		MessageLimiter: handlers.NewIPRateLimiter(30, time.Minute),
 		Signer:         hostSigner,
+		Chain:          chainVerifier(cfg),
 	}).Mount(r)
 	(&handlers.A2A{Entry: agentEntry, Engine: r}).Mount(r)
 	signals := v1.Group("/agent-signals")

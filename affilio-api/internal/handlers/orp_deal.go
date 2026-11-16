@@ -38,6 +38,7 @@ func (h *ORPHost) Inbox(c *gin.Context) {
 		return
 	}
 	h.sweepPayouts(c, dns)
+	h.sweepChainForOwner(c, dns, grant.OwnerID)
 	after := int64(0)
 	if raw := strings.TrimSpace(c.Query("after")); raw != "" {
 		n, err := strconv.ParseInt(raw, 10, 64)

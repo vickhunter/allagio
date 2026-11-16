@@ -61,7 +61,7 @@ var openapiExclusions = map[string]string{
 	"GET /owner": "dashboard page (HTML)", "GET /owner/connect-site": "dashboard page (HTML)", "GET /owner/placements/{id}": "dashboard page (HTML)", "GET /owner/products/{id}/connection": "dashboard page (HTML)",
 	"POST /owner/accounts": "form post (HTML)", "POST /owner/authorize": "form post (HTML)", "POST /owner/connect-site": "form post (HTML)",
 	"POST /owner/grants/{id}/revoke": "form post (HTML)", "POST /owner/human-approval": "form post (HTML)", "POST /owner/logout": "form post (HTML)",
-	"POST /owner/digest": "form post (HTML)", "POST /owner/notify": "form post (HTML)", "POST /owner/offers/{id}/list": "form post (HTML)", "POST /owner/orp-payouts/{id}/sent": "form post (HTML)",
+	"POST /owner/digest": "form post (HTML)", "POST /owner/notify": "form post (HTML)", "POST /owner/offers/{id}/list": "form post (HTML)", "POST /owner/orp-payouts/{id}/sent": "form post (HTML)", "POST /owner/payout-wallets": "form post (HTML)",
 	"POST /owner/payouts/{id}/confirm-received": "form post (HTML)", "POST /owner/placements/{id}/approve": "form post (HTML)", "POST /owner/placements/{id}/revoke": "form post (HTML)",
 	"POST /owner/products/{id}/connection": "form post (HTML)", "POST /owner/spaces/{id}/list": "form post (HTML)", "POST /owner/step-modes": "form post (HTML)",
 	"GET /agents.md": "markdown twin", "GET /home.md": "markdown twin", "GET /makers.md": "markdown twin", "GET /privacy.md": "markdown twin",
