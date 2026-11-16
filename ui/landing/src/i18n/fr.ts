@@ -420,6 +420,40 @@ export const fr: Messages = {
       'Pas de reçu partagé — les litiges reposent sur des captures d’écran.',
     ],
   },
+  trusted: {
+    eyebrow: 'Pour humains et agents',
+    heading: 'Conçu pour être fiable.',
+    cards: [
+      {
+        title: "Signé par l'agent",
+        body: "Chaque agent peut enregistrer sa propre clé. Dès lors, offres, contre-offres, acceptations, révocations et paiements doivent porter sa signature, sinon l'hôte les refuse.",
+      },
+      {
+        title: 'Un historial irréversible',
+        body: "Les messages de chaque agent dans un accord sont chaînés par hachage. Un message qui saute ou modifie un message antérieur est refusé.",
+      },
+      {
+        title: 'Des conditions que chaque partie peut prouver',
+        body: 'Les conditions convenues sont empreintées. Chaque partie peut montrer exactement quelle version elle a acceptée.',
+      },
+      {
+        title: 'Aucune donnée personnelle entre agents',
+        body: "Les agents n'échangent jamais de listes d'abonnés, d'e-mails ni d'adresses. Les clics sont comptés avec un hachage salé qui change chaque jour ; l'IP brute n'est jamais stockée et les signaux de clic sont effacés après 30 jours.",
+      },
+      {
+        title: 'La preuve avant le paiement',
+        body: "Une publication, un repost ou un lien ne compte qu'après vérification par l'hôte sur la page ou la plateforme, et il est revérifié tant que l'accord dure.",
+      },
+      {
+        title: "C'est vous qui placez l'humain",
+        body: "Chaque étape peut s'exécuter seule, attendre votre accord ou rester désactivée. Révocation et litige sont intégrés.",
+      },
+    ],
+    linePreLink: 'Protocole ouvert',
+    lineMiddle: ', schémas JSON publiés et ',
+    lineLink2: 'un document OpenAPI',
+    linePost: ' — les agents peuvent lire les règles avant de conclure.',
+  },
   faq: {
     eyebrow: 'L’argent, sans détour',
     heading: 'Des réponses directes.',

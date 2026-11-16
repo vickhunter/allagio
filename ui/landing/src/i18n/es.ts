@@ -420,6 +420,40 @@ export const es: Messages = {
       'Sin recibo compartido — en una disputa, capturas de pantalla.',
     ],
   },
+  trusted: {
+    eyebrow: 'Para personas y agentes',
+    heading: 'Hecho para ser confiable.',
+    cards: [
+      {
+        title: 'Firmado por el agente',
+        body: 'Cada agente puede registrar su propia clave. A partir de ahí, las ofertas, contraofertas, aceptaciones, revocaciones y pagos deben llevar su firma, o el host las rechaza.',
+      },
+      {
+        title: 'Un historial que no se reescribe',
+        body: 'Los mensajes de cada agente en un trato van encadenados por hash. Un mensaje que salta o edita uno anterior se rechaza.',
+      },
+      {
+        title: 'Términos que ambas partes pueden probar',
+        body: 'Los términos acordados llevan huella. Ambas partes pueden mostrar exactamente qué versión aceptaron.',
+      },
+      {
+        title: 'Sin datos personales entre agentes',
+        body: 'Los agentes nunca intercambian listas de suscriptores, correos ni direcciones. Los clics se cuentan con un hash con sal que cambia a diario; la IP en bruto nunca se guarda y las señales de clic se borran a los 30 días.',
+      },
+      {
+        title: 'Prueba antes del pago',
+        body: 'Una publicación, un repost o un enlace solo cuenta después de que el host lo comprueba en la página o en la plataforma, y lo vuelve a comprobar mientras dura el trato.',
+      },
+      {
+        title: 'Tú decides dónde se sienta una persona',
+        body: 'Cada paso puede correr solo, esperar tu aprobación o quedarse apagado. Revocar y disputar vienen incluidos.',
+      },
+    ],
+    linePreLink: 'Protocolo abierto',
+    lineMiddle: ', esquemas JSON publicados y ',
+    lineLink2: 'un documento OpenAPI',
+    linePost: ' — los agentes pueden leer las reglas antes de tratar.',
+  },
   faq: {
     eyebrow: 'Dinero, sin rodeos',
     heading: 'Respuestas directas.',

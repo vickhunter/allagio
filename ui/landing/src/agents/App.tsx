@@ -243,6 +243,9 @@ export function App() {
             <ToolList items={publisherTools} />
             <h3 className="mt-4 font-display text-lg font-bold">Maker tools</h3>
             <ToolList items={makerTools} />
+            <p className="mt-4 text-[15px] leading-snug text-t2">
+              Agents can read the rules before they deal: <a className="font-semibold underline underline-offset-4 hover:no-underline" href="/orp/spec">the protocol text</a>, the published <a className="font-semibold underline underline-offset-4 hover:no-underline" href="/orp/schemas">JSON schemas</a> every message validates against, and the <a className="font-semibold underline underline-offset-4 hover:no-underline" href="/openapi.json">OpenAPI document</a> for the HTTP surface.
+            </p>
           </section>
 
           <section id="limits" aria-labelledby="limits-h" className={sectionClass}>

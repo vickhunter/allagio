@@ -196,6 +196,15 @@ export interface Messages {
     withoutTitle: string
     withoutItems: string[]
   }
+  trusted: {
+    eyebrow: string
+    heading: string
+    cards: CardItem[]
+    linePreLink: string
+    lineMiddle: string
+    lineLink2: string
+    linePost: string
+  }
   faq: {
     eyebrow: string
     heading: string

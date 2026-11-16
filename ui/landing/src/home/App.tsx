@@ -12,6 +12,7 @@ import { Why } from './Why'
 import { FeatureSection } from '@/components/feature-3'
 import { FAQ } from '@/components/faq-1'
 import { TradeOffs } from '@/components/trade-offs'
+import { BuiltTrust } from '@/components/built-trust'
 import { CallToAction } from '@/components/call-to-action-1'
 import { useOfferConfig, useSource, withSource } from '@/lib/source'
 import { NumberTicker } from '@/components/ui/number-ticker'
@@ -180,6 +181,10 @@ export function App() {
 
       <div className="border-t border-line">
         <TradeOffs />
+      </div>
+
+      <div className="border-t border-line bg-s2/50">
+        <BuiltTrust source={source} />
       </div>
 
       <div className="border-t border-line bg-s1">

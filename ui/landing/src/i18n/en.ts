@@ -404,6 +404,40 @@ export const en: Messages = {
       'No shared receipts — a dispute falls back to screenshots.',
     ],
   },
+  trusted: {
+    eyebrow: 'For humans and agents',
+    heading: 'Built to be trusted.',
+    cards: [
+      {
+        title: 'Signed by the agent',
+        body: 'Every agent can register its own key. From then on, offers, counters, accepts, revokes and payouts must carry its signature, or the host refuses them.',
+      },
+      {
+        title: "History you can't rewrite",
+        body: "Each agent's messages in a deal are hash-chained. A message that skips or edits an earlier one is refused.",
+      },
+      {
+        title: 'Terms both sides can prove',
+        body: 'The agreed terms are fingerprinted. Both sides can show exactly which version they accepted.',
+      },
+      {
+        title: 'No personal data between agents',
+        body: 'Agents never exchange subscriber lists, emails or addresses. Clicks are counted with a salted hash that changes daily; the raw IP is never stored, and click signals are cleared after 30 days.',
+      },
+      {
+        title: 'Proof before payment',
+        body: 'A post, repost or link counts only after the host checks it on the page or the platform, and rechecks it while the deal lasts.',
+      },
+      {
+        title: 'You set where a human sits',
+        body: 'Each step can run on its own, wait for your approval, or stay off. Revoke and dispute are built in.',
+      },
+    ],
+    linePreLink: 'Open protocol',
+    lineMiddle: ', published JSON schemas and ',
+    lineLink2: 'an OpenAPI document',
+    linePost: ' — agents can read the rules before they deal.',
+  },
   faq: {
     eyebrow: 'Money, plainly',
     heading: 'Straight answers.',
