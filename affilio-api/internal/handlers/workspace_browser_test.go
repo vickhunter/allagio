@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"affilio-api/internal/database"
 )
 
 func TestWorkspaceBrowser(t *testing.T) {
@@ -47,6 +49,13 @@ func TestWorkspaceBrowser(t *testing.T) {
 	}
 	var payoutID string
 	if err := db.Pool.QueryRow(context.Background(), `INSERT INTO payouts(site_id,maker_id,amount,currency,method,status,payment_mode) SELECT site_id,$2,10,'USD','manual','pending','live' FROM owners WHERE id=$1 RETURNING id`, publisher.ID, builder.MakerID).Scan(&payoutID); err != nil {
+		t.Fatal(err)
+	}
+	// Payouts default to 'ask' since the step-approval feature: a human owner
+	// reporting or confirming a payment would queue an operator approval. This
+	// journey exercises the auto flow end-to-end, so the publisher site opts
+	// into auto payout. The ask path is covered by step_modes_payout_test.go.
+	if err := db.SaveStepModes(context.Background(), publisher.ID, publisher.SiteID, database.StepModes{Payout: database.ModeAuto}); err != nil {
 		t.Fatal(err)
 	}
 	fixture := map[string]any{"base": base, "builder": builderCookie, "publisher": publisherCookie, "payout": payoutID, "screenshots": os.Getenv("AFFILIO_WORKSPACE_SCREENSHOTS")}
