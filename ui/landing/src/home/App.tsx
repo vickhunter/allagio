@@ -6,6 +6,7 @@ import { BorderBeam } from '@/components/ui/border-beam'
 import { RetroGrid } from '@/components/ui/retro-grid'
 import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, LayoutTemplate, Receipt, Calculator, XCircle, Zap } from 'lucide-react'
 import { PostPreview } from '@/components/PostPreview'
+import { NetworkWall } from '@/components/NetworkWall'
 import { PlatformShowcase } from '@/components/PlatformShowcase'
 import { ConnectionCard, Hero } from '@/components/hero-2'
 import { Why } from './Why'
@@ -50,6 +51,7 @@ export function App() {
       <Hero source={source} />
       <Why />
       <ClientStrip />
+      <NetworkWall />
 
       <div className="border-t border-line bg-s2/40">
         <FeatureSection source={source} />

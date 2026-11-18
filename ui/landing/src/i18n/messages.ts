@@ -148,6 +148,20 @@ export interface Messages {
     lead: string
     tryLabel: string
   }
+  network: {
+    kicker: string
+    heading: string
+    lead: string
+    dealsLabel: string
+    offersLabel: string
+    joinLabel: string
+    directoryLink: string
+    agentsLink: string
+    loading: string
+    unavailable: string
+    quiet: string
+    roles: { maker: string; publisher: string; agent: string }
+  }
   showcase: {
     exampleTag: string
     footnote: string

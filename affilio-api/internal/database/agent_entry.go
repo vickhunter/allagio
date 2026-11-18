@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -1276,4 +1277,75 @@ func (d *DB) PublicStats(ctx context.Context) (deals, offers, products int64, er
 		(SELECT COUNT(*) FROM offers WHERE status='listed'),
 		(SELECT COUNT(*) FROM products)`).Scan(&deals, &offers, &products)
 	return
+}
+
+// PublicPartyFace is everything the public deal wall may show about one
+// owner. A name only ever comes from a listed, live standing offer — being
+// in the makers directory is the consent to be named. Sites mark the owner
+// a publisher for the anonymized label.
+type PublicPartyFace struct {
+	HasSite     bool
+	HasAnyOffer bool
+	// ListedTerms is the newest listed offer's terms; the caller applies the
+	// expiry check and picks display fields (orp lives above this package).
+	ListedTerms json.RawMessage
+}
+
+// RecentORPDeals returns the newest deals for the public network feed. The
+// caller must not expose deal ids: a public id would let anyone enumerate
+// deal relationships (see DealCertificate).
+func (d *DB) RecentORPDeals(ctx context.Context, limit int) ([]ORPDeal, error) {
+	rows, err := d.Pool.Query(ctx, `
+SELECT id, COALESCE(offer_id,''), COALESCE(offerer_owner::text,''), acceptor_owner::text,
+       offerer_party, acceptor_party, terms, terms_hash, state, COALESCE(waiting,'null'),
+       obligations, bound, parties, tracking, updated_at, created_at
+FROM orp_deals ORDER BY updated_at DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ORPDeal{}
+	for rows.Next() {
+		var deal ORPDeal
+		if err := rows.Scan(&deal.ID, &deal.OfferID, &deal.OffererOwner, &deal.AcceptorOwner,
+			&deal.OffererParty, &deal.AcceptorParty, &deal.Terms, &deal.TermsHash, &deal.State,
+			&deal.Waiting, &deal.Obligations, &deal.Bound, &deal.Parties, &deal.Tracking,
+			&deal.UpdatedAt, &deal.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, deal)
+	}
+	return out, rows.Err()
+}
+
+// PublicPartyFaces resolves, per owner, what the public deal wall may show.
+// ownerIDs must be uuid strings; bad values return an error, so callers pass
+// only ids that came out of the owners/orp tables.
+func (d *DB) PublicPartyFaces(ctx context.Context, ownerIDs []string) (map[string]PublicPartyFace, error) {
+	faces := map[string]PublicPartyFace{}
+	if len(ownerIDs) == 0 {
+		return faces, nil
+	}
+	rows, err := d.Pool.Query(ctx, `
+SELECT o.id::text,
+       o.site_id IS NOT NULL,
+       EXISTS(SELECT 1 FROM orp_offers f WHERE f.owner_id = o.id),
+       (SELECT f.terms FROM orp_offers f WHERE f.owner_id = o.id AND f.listed
+        ORDER BY f.created_at DESC LIMIT 1)
+FROM owners o WHERE o.id = ANY($1::uuid[])`, ownerIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var face PublicPartyFace
+		var listedTerms []byte
+		if err := rows.Scan(&id, &face.HasSite, &face.HasAnyOffer, &listedTerms); err != nil {
+			return nil, err
+		}
+		face.ListedTerms = listedTerms
+		faces[id] = face
+	}
+	return faces, rows.Err()
 }
