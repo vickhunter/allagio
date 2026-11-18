@@ -20,9 +20,11 @@ test('partyText appends the host for foreign parties', () => {
   assert.equal(partyText(face, roles).text, 'an agent · agents.example')
 })
 
-test('commissionText renders percents, fixed amounts, and hides zero', () => {
-  assert.equal(commissionText({ commission_type: 'percent', commission_value: 30 }), '30%')
-  assert.match(commissionText({ commission_type: 'fixed', commission_value: 500, commission_currency: 'EUR' }), /5/)
+test('commissionText renders percents, recurring, flat amounts, and hides zero', () => {
+  assert.equal(commissionText({ commission_type: 'percentage', commission_value: 30 }), '30%')
+  assert.equal(commissionText({ commission_type: 'recurring', commission_value: 15 }), '15% recurring')
+  // flat commission_value is in major currency units — 500 means €500, not €5
+  assert.match(commissionText({ commission_type: 'flat', commission_value: 500, commission_currency: 'EUR' }), /500/)
   assert.equal(commissionText({ commission_value: 0 }), '')
   assert.equal(commissionText({}), '')
 })

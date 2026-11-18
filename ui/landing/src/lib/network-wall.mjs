@@ -24,13 +24,13 @@ const fixtures = {
     {
       offer_id: 'off_1', product_name: 'Vibe Sales', product_tagline: 'Checkout links your storefront can sell itself',
       website_url: 'https://vibesales.example', primary_category: 'software', keywords: [], tags: [],
-      commission_type: 'percent', commission_value: 30, commission_currency: 'EUR',
+      commission_type: 'percentage', commission_value: 30, commission_currency: 'EUR',
       cookie_duration_days: 30, refund_window_days: 14, terms: {},
     },
     {
       offer_id: 'off_2', product_name: 'Goji Analytics', product_tagline: 'Privacy-first analytics for small teams',
       website_url: 'https://goji.example', primary_category: 'software', keywords: [], tags: [],
-      commission_type: 'percent', commission_value: 25, commission_currency: 'USD',
+      commission_type: 'flat', commission_value: 25, commission_currency: 'USD',
       cookie_duration_days: 45, refund_window_days: 30, terms: {},
     },
   ],
@@ -72,7 +72,8 @@ export function partyText(face, roleWords) {
 
 export function commissionText(offer) {
   if (!offer || offer.commission_value == null || offer.commission_value === 0) return ''
-  if (offer.commission_type === 'percent') return offer.commission_value + '%'
-  const value = offer.commission_value / 100
-  return new Intl.NumberFormat(undefined, { style: 'currency', currency: offer.commission_currency || 'EUR' }).format(value)
+  if (offer.commission_type === 'percentage') return offer.commission_value + '%'
+  if (offer.commission_type === 'recurring') return offer.commission_value + '% recurring'
+  // flat: commission_value is already in major currency units
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: offer.commission_currency || 'EUR' }).format(offer.commission_value)
 }
