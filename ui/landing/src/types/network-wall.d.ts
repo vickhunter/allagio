@@ -2,7 +2,6 @@ declare module '@/lib/network-wall.mjs' {
   export interface Face {
     listed: boolean
     name?: string
-    url?: string
     role?: string
     host?: string
   }
@@ -29,6 +28,6 @@ declare module '@/lib/network-wall.mjs' {
   export function dealsFixtureData(): { deals: WallDeal[]; offers: WallOffer[] }
   export function listRecentDeals(fetchImpl?: typeof fetch): Promise<WallDeal[]>
   export function listPublicOffers(fetchImpl?: typeof fetch): Promise<WallOffer[]>
-  export function partyText(face: Face, roleWords: Record<string, string>): { text: string; url: string; named: boolean }
+  export function partyText(face: Face, roleWords: Record<string, string>): { text: string; named: boolean }
   export function commissionText(offer: { commission_type?: string; commission_value?: number; commission_currency?: string }): string
 }

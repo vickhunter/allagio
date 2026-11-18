@@ -24,10 +24,7 @@ function ago(iso: string, lang: Lang) {
 }
 
 function Party({ face, roles }: { face: Face; roles: Record<string, string> }) {
-  const { text, url, named } = partyText(face, roles)
-  if (named && url) {
-    return <a className="min-w-0 truncate font-semibold underline underline-offset-4" href={url}>{text}</a>
-  }
+  const { text, named } = partyText(face, roles)
   return <span className={`min-w-0 truncate ${named ? 'font-semibold' : 'text-t2'}`}>{text}</span>
 }
 

@@ -98,11 +98,9 @@ func partyFace(party, ownerID string, faces map[string]database.PublicPartyFace,
 	}
 	if terms, err := decodeObject(face.ListedTerms); err == nil && len(terms) > 0 && !orp.OfferExpired(terms, now) {
 		if title := orp.TermsTitle(terms); title != "" {
-			out := gin.H{"listed": true, "name": title}
-			if site, ok := terms["url"].(string); ok && site != "" {
-				out["url"] = site
-			}
-			return out
+			// Listed parties are named only — validated terms carry no url and
+			// the directory itself exposes titles without links.
+			return gin.H{"listed": true, "name": title}
 		}
 	}
 	switch {

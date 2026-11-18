@@ -76,7 +76,7 @@ func TestPublicDealsWallLabels(t *testing.T) {
 	expiredID := insertDealOwner(t, db, "expired-wall@example.com", "")
 	ghostID := insertDealOwner(t, db, "ghost-wall@example.com", "")
 
-	insertORPOffer(t, db, "off_wall_named", makerID, `{"title":"Vibe Sales","url":"https://vibesales.example"}`, true)
+	insertORPOffer(t, db, "off_wall_named", makerID, `{"title":"Vibe Sales"}`, true)
 	insertORPOffer(t, db, "off_wall_expired", expiredID, `{"title":"Expired Co","expires_at":"2000-01-01T00:00:00Z"}`, true)
 
 	// Named maker ↔ anonymous publisher.
@@ -118,7 +118,6 @@ func TestPublicDealsWallLabels(t *testing.T) {
 			Offerer  struct {
 				Listed bool   `json:"listed"`
 				Name   string `json:"name"`
-				URL    string `json:"url"`
 				Role   string `json:"role"`
 				Host   string `json:"host"`
 			} `json:"offerer"`
@@ -140,7 +139,7 @@ func TestPublicDealsWallLabels(t *testing.T) {
 	}
 
 	named := body.Deals[byKind["affiliate"]]
-	if !named.Offerer.Listed || named.Offerer.Name != "Vibe Sales" || named.Offerer.URL != "https://vibesales.example" {
+	if !named.Offerer.Listed || named.Offerer.Name != "Vibe Sales" {
 		t.Fatalf("listed offerer %#v", named.Offerer)
 	}
 	if named.Acceptor.Role != "publisher" || named.Acceptor.Listed {

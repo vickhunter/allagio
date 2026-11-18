@@ -11,13 +11,13 @@ const fixtures = {
     },
     {
       kind: 'affiliate', state: 'active', updated_at: new Date(Date.now() - 3 * 3600000).toISOString(), parties: 2,
-      offerer: { listed: true, name: 'Vibe Sales', url: 'https://vibesales.example' },
+      offerer: { listed: true, name: 'Vibe Sales' },
       acceptor: { listed: false, role: 'publisher' },
     },
     {
       kind: 'link_exchange', state: 'awaiting', updated_at: new Date(Date.now() - 26 * 3600000).toISOString(), parties: 2,
       offerer: { listed: false, role: 'agent', host: 'agents.example' },
-      acceptor: { listed: true, name: 'Goji Analytics', url: 'https://goji.example' },
+      acceptor: { listed: true, name: 'Goji Analytics' },
     },
   ],
   offers: [
@@ -63,11 +63,11 @@ export async function listPublicOffers(fetchImpl = fetch) {
 // name; everyone else is a role word ("a publisher", "an agent"). Host is
 // appended for foreign parties ("an agent · agents.example").
 export function partyText(face, roleWords) {
-  if (face && face.listed && face.name) return { text: face.name, url: face.url || '', named: true }
+  if (face && face.listed && face.name) return { text: face.name, named: true }
   const role = (face && face.role) || 'agent'
   let text = roleWords[role] || roleWords.agent || 'an agent'
   if (face && face.host) text += ' · ' + face.host
-  return { text, url: '', named: false }
+  return { text, named: false }
 }
 
 export function commissionText(offer) {

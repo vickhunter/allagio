@@ -4,15 +4,15 @@ import { commissionText, dealsFixtureData, listPublicOffers, listRecentDeals, pa
 
 const roles = { maker: 'a maker', publisher: 'a publisher', agent: 'an agent' }
 
-test('partyText names a listed party with its url', () => {
-  const face = { listed: true, name: 'Vibe Sales', url: 'https://vibesales.example' }
-  assert.deepEqual(partyText(face, roles), { text: 'Vibe Sales', url: 'https://vibesales.example', named: true })
+test('partyText names a listed party', () => {
+  const face = { listed: true, name: 'Vibe Sales' }
+  assert.deepEqual(partyText(face, roles), { text: 'Vibe Sales', named: true })
 })
 
 test('partyText anonymizes to a role word', () => {
-  assert.deepEqual(partyText({ listed: false, role: 'publisher' }, roles), { text: 'a publisher', url: '', named: false })
-  assert.deepEqual(partyText({ listed: false, role: 'maker' }, roles), { text: 'a maker', url: '', named: false })
-  assert.deepEqual(partyText({ listed: false }, roles), { text: 'an agent', url: '', named: false })
+  assert.deepEqual(partyText({ listed: false, role: 'publisher' }, roles), { text: 'a publisher', named: false })
+  assert.deepEqual(partyText({ listed: false, role: 'maker' }, roles), { text: 'a maker', named: false })
+  assert.deepEqual(partyText({ listed: false }, roles), { text: 'an agent', named: false })
 })
 
 test('partyText appends the host for foreign parties', () => {
