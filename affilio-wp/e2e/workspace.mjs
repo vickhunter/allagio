@@ -155,7 +155,9 @@ async function journey() {
     await screenshot(builder, 'home-desktop-1440x900');
     await noHorizontalOverflow(builder);
     await builder.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(builder.locator('canvas')).toHaveCount(0);
+    // The hero's RetroGrid unmounts under reduced motion; the section
+    // background grid further down the page intentionally stays.
+    await expect(builder.locator('#hero canvas')).toHaveCount(0);
     await expect(builder.locator('[data-hero-bg="fallback"]')).toBeVisible();
     await revealGoogleSignIn(builder);
     await builder.setViewportSize(mobile);
