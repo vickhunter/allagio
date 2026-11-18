@@ -55,7 +55,11 @@ func TestWorkspaceBrowser(t *testing.T) {
 	// reporting or confirming a payment would queue an operator approval. This
 	// journey exercises the auto flow end-to-end, so the publisher site opts
 	// into auto payout. The ask path is covered by step_modes_payout_test.go.
-	if err := db.SaveStepModes(context.Background(), publisher.ID, publisher.SiteID, database.StepModes{Payout: database.ModeAuto}); err != nil {
+	var publisherSiteID string
+	if err := db.Pool.QueryRow(context.Background(), `SELECT site_id::text FROM owners WHERE id=$1`, publisher.ID).Scan(&publisherSiteID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SaveStepModes(context.Background(), publisher.ID, publisherSiteID, database.StepModes{Payout: database.ModeAuto}); err != nil {
 		t.Fatal(err)
 	}
 	fixture := map[string]any{"base": base, "builder": builderCookie, "publisher": publisherCookie, "payout": payoutID, "screenshots": os.Getenv("AFFILIO_WORKSPACE_SCREENSHOTS")}
