@@ -91,6 +91,12 @@ func TestPublicDealsWallLabels(t *testing.T) {
 	insertORPDeal(t, db, "deal_wall_3",
 		`{"kind":"link_exchange","title":"deal"}`, "", "orp:otherhost.net/x_foreign",
 		pubID, "orp:allagio.test/"+pubID, "proposed")
+	// No acceptor seat yet: syncColumns stores the offerer's owner as a
+	// fallback AcceptorOwner, but with no acceptor party the right side must
+	// stay anonymous rather than echo the listed offerer.
+	insertORPDeal(t, db, "deal_wall_4",
+		`{"kind":"sponsored","title":"deal"}`, makerID, "orp:allagio.test/"+makerID,
+		makerID, "", "awaiting")
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -125,8 +131,8 @@ func TestPublicDealsWallLabels(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if len(body.Deals) != 3 {
-		t.Fatalf("expected 3 deals, got %d", len(body.Deals))
+	if len(body.Deals) != 4 {
+		t.Fatalf("expected 4 deals, got %d", len(body.Deals))
 	}
 	byKind := map[string]int{}
 	for i, deal := range body.Deals {
@@ -155,6 +161,14 @@ func TestPublicDealsWallLabels(t *testing.T) {
 	foreign := body.Deals[byKind["link_exchange"]]
 	if foreign.Offerer.Role != "agent" || foreign.Offerer.Host != "otherhost.net" {
 		t.Fatalf("foreign party %#v", foreign.Offerer)
+	}
+
+	open := body.Deals[byKind["sponsored"]]
+	if !open.Offerer.Listed || open.Offerer.Name != "Vibe Sales" {
+		t.Fatalf("open-seat offerer %#v", open.Offerer)
+	}
+	if open.Acceptor.Listed || open.Acceptor.Role != "agent" {
+		t.Fatalf("empty acceptor seat must not name the offerer %#v", open.Acceptor)
 	}
 
 	// Deal ids must never appear in the payload.

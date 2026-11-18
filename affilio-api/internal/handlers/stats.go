@@ -66,13 +66,20 @@ func (h *AgentEntry) PublicDeals(c *gin.Context) {
 		if many, err := orp.DecodeMany(deal.Parties); err == nil && len(many.Seats) > 0 {
 			parties = len(many.Seats)
 		}
+		// A deal with no acceptor seat stores the first seat's owner as a
+		// fallback AcceptorOwner; without a party id there is no counterparty
+		// to name, so the right side stays anonymous.
+		acceptor := gin.H{"listed": false, "role": "agent"}
+		if deal.AcceptorParty != "" {
+			acceptor = partyFace(deal.AcceptorParty, deal.AcceptorOwner, faces, local, now)
+		}
 		out = append(out, gin.H{
 			"kind":       kind,
 			"state":      deal.State,
 			"updated_at": deal.UpdatedAt.UTC().Format(time.RFC3339),
 			"parties":    parties,
 			"offerer":    partyFace(deal.OffererParty, deal.OffererOwner, faces, local, now),
-			"acceptor":   partyFace(deal.AcceptorParty, deal.AcceptorOwner, faces, local, now),
+			"acceptor":   acceptor,
 		})
 	}
 	c.Header("Cache-Control", "public, max-age=60")
