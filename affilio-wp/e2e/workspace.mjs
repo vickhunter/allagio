@@ -45,7 +45,7 @@ async function assertHydratedHome(page) {
     await expect(page.getByRole('region', { name: 'What your agent does' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'What you keep control of' })).toBeVisible();
     await expect(page.getByRole('region', { name: 'What it replaces' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'See it on a real post.', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Any content. Any partnership.', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Straight answers.', exact: true })).toBeVisible();
     await expect(page.locator('summary').filter({ hasText: 'Setup details' })).toBeVisible();
     await expect(page.locator('details a[href="/llms.txt"]')).toHaveCount(1);
@@ -112,7 +112,7 @@ async function expectAssertionFailure(check, needles) {
     console.log(message);
 }
 async function proveMissingContent() {
-    const headingContext = await browser.newContext({ viewport: desktop });
+    const headingContext = await browser.newContext({ javaScriptEnabled: false, viewport: desktop });
     contexts.push(headingContext);
     const headingPage = await headingContext.newPage();
     await headingPage.route(fixture.base + '/', async route => {
@@ -147,8 +147,7 @@ async function journey() {
     await builder.goto(fixture.base + '/');
     await assertHydratedHome(builder);
     await copyJoinLine(builder);
-    await builder.getByRole('button', { name: 'Pause motion', exact: true }).click();
-    await expect(builder.getByRole('button', { name: 'Play motion', exact: true })).toBeVisible();
+    // The hero has no manual motion toggle; reduced motion is driven by prefers-reduced-motion below.
     if (fixture.screenshots) {
         await mkdir(fixture.screenshots, { recursive: true });
         await builder.screenshot({ path: join(fixture.screenshots, 'hero.png') });
@@ -156,7 +155,9 @@ async function journey() {
     await screenshot(builder, 'home-desktop-1440x900');
     await noHorizontalOverflow(builder);
     await builder.emulateMedia({ reducedMotion: 'reduce' });
-    await expect(builder.locator('canvas')).toHaveCount(0);
+    // The hero's RetroGrid unmounts under reduced motion; the section
+    // background grid further down the page intentionally stays.
+    await expect(builder.locator('#hero canvas')).toHaveCount(0);
     await expect(builder.locator('[data-hero-bg="fallback"]')).toBeVisible();
     await revealGoogleSignIn(builder);
     await builder.setViewportSize(mobile);
@@ -164,7 +165,7 @@ async function journey() {
     await screenshot(builder, 'home-mobile-390x844');
     await builder.setViewportSize(desktop);
     await builder.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect(builder.getByRole('button', { name: 'Play motion', exact: true })).toBeVisible();
+    await expect(builder.locator('#hero canvas')).toHaveCount(1);
     const fallbackContext = await browser.newContext({ javaScriptEnabled: false, viewport: mobile });
     contexts.push(fallbackContext);
     const fallbackPage = await fallbackContext.newPage();

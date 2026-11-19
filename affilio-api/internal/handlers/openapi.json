@@ -522,6 +522,26 @@
         }
       }
     },
+    "/v1/deals/recent": {
+      "get": {
+        "tags": [
+          "Discovery"
+        ],
+        "summary": "Recent deals for the public network wall — kind, state, timing and a display label per party. Parties are named only when directory-listed; deal ids are never exposed.",
+        "responses": {
+          "200": {
+            "description": "Newest deals: kind, state, updated_at, parties, offerer/acceptor labels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/openapi.json": {
       "get": {
         "tags": [
