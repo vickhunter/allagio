@@ -77,7 +77,7 @@ go run ./cmd/server                 # Starts API on :8080
 | `STRIPE_WEBHOOK_SECRET` | No  | (empty)                                          | Stripe webhook signature secret (Allagio conversions) |
 | `LEMONSQUEEZY_WEBHOOK_SECRET` | No | (empty)                                     | Lemon Squeezy webhook signature secret |
 | `POLAR_WEBHOOK_SECRET` | No   | (empty)                                          | Polar webhook signature secret |
-| `CLAIMS_CHECK`     | No       | `stub` when `GIN_MODE=release`, otherwise `off-local` | `stub` holds an untrusted offer in review. `off-local` is local and dev only and keeps the four listing checks. `real` compares the listing card with the merchant page and is allowed in release. A hosted server with an empty value stays on `stub`. |
+| `CLAIMS_CHECK`     | No       | `stub` when `GIN_MODE=release`, otherwise `off-local` | `stub` skips the claims check and flags the listing advisory `claims`. `off-local` is local and dev only and keeps the four listing checks. `real` compares the listing card with the merchant page and is allowed in release. A hosted server with an empty value stays on `stub`. Every submission lists regardless — check failures are advisory flags on the submit response, never a human-review hold. |
 
 *AI features fall back to safe defaults when `CLAUDE_API_KEY` is empty.
 

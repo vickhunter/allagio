@@ -31,10 +31,12 @@ const (
 	readinessFailMessage   = "This product has not passed readiness assessment. Fix the failed checks, then submit again."
 )
 
-// failedListingCheck is the server gate for an untrusted maker. The order is
-// claims, reachability, minimum relevance, then the cap. A trusted maker does
-// not use this gate. real replaces the numeric stub with the page checker.
-// stub and off-local keep the numeric stub and the HEAD probe.
+// failedListingCheck runs the automated listing checks for an untrusted
+// maker. The order is claims, reachability, minimum relevance, then the cap.
+// A trusted maker skips them. The result is advisory: Submit lists the offer
+// regardless and reports the reason on the response. real replaces the
+// numeric stub with the page checker. stub and off-local keep the numeric
+// stub and the HEAD probe.
 func failedListingCheck(ctx context.Context, db *database.DB, mode string, offer database.Offer, product database.Product, listed int) (string, string, bool, error) {
 	if claimsReal(mode) {
 		reason, message, err := compareOfferClaims(ctx, db, product.MakerID, product.ID, offer)

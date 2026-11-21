@@ -119,8 +119,8 @@ func (h *OfferReviewHandler) Reject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "draft", "offer_id": offer.ID, "note": payload.Note})
 }
 
-// claimsOnPublish is the second claims check. Submit already held an untrusted
-// offer. Publish runs again so a "90%" claim cannot be listed.
+// claimsOnPublish is the second claims check on a queued (legacy 'submitted')
+// offer. Publish runs it again so a "90%" claim cannot be listed.
 func (h *OfferReviewHandler) claimsOnPublish(c *gin.Context, offer *database.Offer) (string, string, bool, error) {
 	var product database.Product
 	err := h.DB.Pool.QueryRow(c.Request.Context(), `SELECT maker_id::text, name, COALESCE(tagline,''), COALESCE(website_url,''), COALESCE(primary_category,''), COALESCE(keywords,'{}'), COALESCE(tags,'{}')

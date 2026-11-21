@@ -256,7 +256,7 @@ var Tools = []Tool{
 	},
 	{
 		Name:        "submit_offer",
-		Description: "Submit a draft offer. Requires the product's readiness to be 'ready'. A connected payment provider is not required. On a hosted server the claims check defaults to stub and stays there: hosted refuses real. Local real compares the listing card with the merchant page. Local off-local lists when the claims check, the cached HEAD check, minimum relevance, and the cap all pass. Trusted makers list directly. A readiness failure returns reason and message.",
+		Description: "Submit a draft offer. Requires the product's readiness to be 'ready'. A connected payment provider is not required. Every submission is approved automatically and lists — there is no human review wait; automated checks still run and report their outcome as an advisory review_reason/message on the response (claims, head, relevance, or caps). On a hosted server the claims check defaults to stub and stays there: hosted refuses real. Local real compares the listing card with the merchant page. Local off-local runs the claims check, the cached HEAD check, minimum relevance, and the cap. A readiness failure returns reason and message.",
 		InputSchema: schema([]string{"offer_id"}, map[string]interface{}{
 			"offer_id": str("Offer id"),
 		}),

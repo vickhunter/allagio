@@ -66,16 +66,9 @@ func listedOffer(t *testing.T, db *database.DB, r *gin.Engine, makerKey string) 
 		"refund_window_days": 30,
 	})
 	offerID := offer["id"].(string)
-	rec, _ := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("submit: expected 200, got %d", rec.Code)
-	}
-	req := httptest.NewRequest(http.MethodPost, "/v1/offer-review/"+offerID+"/approve", nil)
-	req.Header.Set("X-Admin-Key", "admin-secret")
-	arec := httptest.NewRecorder()
-	r.ServeHTTP(arec, req)
-	if arec.Code != http.StatusOK {
-		t.Fatalf("approve: expected 200, got %d: %s", arec.Code, arec.Body.String())
+	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
+	if rec.Code != http.StatusOK || body["status"] != "listed" {
+		t.Fatalf("submit must auto-approve to listed, got %d %v", rec.Code, body)
 	}
 	return offerID
 }

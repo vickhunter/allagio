@@ -92,7 +92,7 @@ func TestClaimsCheckRealListsWhenPageMatches(t *testing.T) {
 	}
 }
 
-func TestClaimsCheckRealHoldsWhenPageDiffers(t *testing.T) {
+func TestClaimsCheckRealFlagsWhenPageDiffers(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	makerID, makerKey := createTestMaker(t, db)
@@ -103,17 +103,13 @@ func TestClaimsCheckRealHoldsWhenPageDiffers(t *testing.T) {
 	useMerchantPage(t, "https://northwind.example.com", merchantPage{OK: true, Body: merchantFixture(t, "merchant_price.html")})
 
 	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
-	if rec.Code != http.StatusOK || body["status"] != "submitted" {
+	if rec.Code != http.StatusOK || body["status"] != "listed" {
 		t.Fatalf("real submit: %d %v", rec.Code, body)
 	}
 	requireReview(t, body, reviewReasonClaims, entry.PageClaimMessage(entry.PageReasonPrice))
-	assertReviewOnReads(t, r, makerKey, offerID, reviewReasonClaims, entry.PageClaimMessage(entry.PageReasonPrice))
-	_, again := doJSON(t, r, http.MethodGet, "/v1/maker/offers/"+offerID, makerKey, nil)
-	if again["message"] != body["message"] || again["review_reason"] != body["review_reason"] {
-		t.Fatalf("recompute changed the reason: %v then %v", body, again)
-	}
-	if queueLen(t, r) != 1 {
-		t.Fatal("a price miss must stay in review")
+	assertListedOnReads(t, r, makerKey, offerID)
+	if queueLen(t, r) != 0 {
+		t.Fatal("a price miss lists with an advisory flag, not a queue hold")
 	}
 
 	trustMaker(t, r, makerID)
@@ -129,7 +125,7 @@ func TestClaimsCheckRealHoldsWhenPageDiffers(t *testing.T) {
 	requireReview(t, listedBody, nil, nil)
 }
 
-func TestClaimsCheckRealHeadMissUsesHeadReason(t *testing.T) {
+func TestClaimsCheckRealHeadMissListsWithAdvisory(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	makerID, makerKey := createTestMaker(t, db)
@@ -140,11 +136,11 @@ func TestClaimsCheckRealHeadMissUsesHeadReason(t *testing.T) {
 	useMerchantPage(t, "https://northwind.example.com", merchantPage{})
 
 	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
-	if rec.Code != http.StatusOK || body["status"] != "submitted" {
+	if rec.Code != http.StatusOK || body["status"] != "listed" {
 		t.Fatalf("real submit: %d %v", rec.Code, body)
 	}
 	requireReview(t, body, reviewReasonHead, reviewHeadMessage)
-	assertReviewOnReads(t, r, makerKey, offerID, reviewReasonHead, reviewHeadMessage)
+	assertListedOnReads(t, r, makerKey, offerID)
 }
 
 func TestRestoreAndRetryUsePageClaims(t *testing.T) {
@@ -226,7 +222,7 @@ func TestRestoreAndRetryUsePageClaims(t *testing.T) {
 	}
 }
 
-func TestRealClaimsInReleaseListsMatchAndHoldsMismatch(t *testing.T) {
+func TestRealClaimsInReleaseListsMatchAndFlagsMismatch(t *testing.T) {
 	mode, err := config.ResolveClaimsCheck("release", "real")
 	if err != nil || mode != config.ClaimsReal {
 		t.Fatalf("hosted real: %q %v", mode, err)
@@ -276,14 +272,14 @@ func TestRealClaimsInReleaseListsMatchAndHoldsMismatch(t *testing.T) {
 	requireReview(t, listedBody, nil, nil)
 
 	held, heldBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+missOffer+"/submit", makerKey, nil)
-	if held.Code != http.StatusOK || heldBody["status"] != "submitted" {
+	if held.Code != http.StatusOK || heldBody["status"] != "listed" {
 		t.Fatalf("mismatched claim: %d %v", held.Code, heldBody)
 	}
 	requireReview(t, heldBody, reviewReasonClaims, entry.PageClaimMessage(entry.PageReasonPrice))
 
 	broken, brokenBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+brokenOffer+"/submit", makerKey, nil)
-	if broken.Code != http.StatusOK || brokenBody["status"] != "submitted" || brokenBody["review_reason"] != reviewReasonClaims {
-		t.Fatalf("broken page must be held with a reason, not 500: %d %v", broken.Code, brokenBody)
+	if broken.Code != http.StatusOK || brokenBody["status"] != "listed" || brokenBody["review_reason"] != reviewReasonClaims {
+		t.Fatalf("broken page must list with a reason, not 500: %d %v", broken.Code, brokenBody)
 	}
 }
 

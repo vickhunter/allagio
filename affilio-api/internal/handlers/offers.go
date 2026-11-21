@@ -216,29 +216,20 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 		c.JSON(http.StatusConflict, body)
 		return
 	}
-	// Trusted makers skip the human review queue: their submissions list directly.
+	// Every submission lists. There is no human review gate: automated check
+	// results ride along on the response as an advisory reason and message so
+	// the maker knows what to fix, without the offer ever waiting on a queue.
 	trusted, err := h.DB.IsMakerTrusted(c.Request.Context(), makerID(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 		return
 	}
 	if trusted {
-		h.listOffer(c, offer, product)
+		h.listOffer(c, offer, product, "", "")
 		return
 	}
 	if claimsHeld(h.ClaimsCheck) {
-		if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
-			return
-		}
-		body := gin.H{
-			"id":            offer.ID,
-			"status":        "submitted",
-			"review_reason": reviewReasonClaims,
-			"message":       reviewClaimsNotLive,
-		}
-		attachClaimsCheck(body, h.ClaimsCheck, "submitted", reviewReasonClaims)
-		c.JSON(http.StatusOK, body)
+		h.listOffer(c, offer, product, reviewReasonClaims, reviewClaimsNotLive)
 		return
 	}
 	listed, err := h.DB.CountListedOffers(c.Request.Context(), makerID(c))
@@ -251,27 +242,28 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
 		return
 	}
-	if failed {
-		if err := h.DB.UpdateOfferStatus(c.Request.Context(), offer.ID, "submitted"); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to submit offer"})
-			return
-		}
-		body := gin.H{"id": offer.ID, "status": "submitted", "review_reason": reason, "message": message}
-		attachClaimsCheck(body, h.ClaimsCheck, "submitted", reason)
-		c.JSON(http.StatusOK, body)
-		return
+	if !failed {
+		reason, message = "", ""
 	}
-	h.listOffer(c, offer, product)
+	h.listOffer(c, offer, product, reason, message)
 }
 
-func (h *OffersHandler) listOffer(c *gin.Context, offer *database.Offer, product *database.Product) {
+// listOffer promotes the offer and answers with status listed. A nonempty
+// reason/message pair is an advisory flag from the automated checks: the
+// offer lists regardless, and the maker can see what to improve.
+func (h *OffersHandler) listOffer(c *gin.Context, offer *database.Offer, product *database.Product, reason, message string) {
 	programID, err := h.DB.PromoteOffer(c.Request.Context(), offer.ID, offerSlug(product.Name, offer.ID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list offer"})
 		return
 	}
-	body := gin.H{"id": offer.ID, "status": "listed", "program_id": programID, "review_reason": nil, "message": nil}
-	attachClaimsCheck(body, h.ClaimsCheck, "listed", "")
+	var reviewReason, reviewMessage any
+	if reason != "" {
+		reviewReason = reason
+		reviewMessage = message
+	}
+	body := gin.H{"id": offer.ID, "status": "listed", "program_id": programID, "review_reason": reviewReason, "message": reviewMessage}
+	attachClaimsCheck(body, h.ClaimsCheck, "listed", reason)
 	c.JSON(http.StatusOK, body)
 }
 

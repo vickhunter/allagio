@@ -81,7 +81,7 @@ func (h *ProductsHandler) GettingStarted(c *gin.Context) {
 			next = gin.H{
 				"tool": "submit_offer",
 				"args": gin.H{"offer_id": latest.ID},
-				"why":  "the draft offer is ready to submit for review",
+				"why":  "the draft offer is ready to submit — it lists right away",
 			}
 		case "submitted":
 			steps[4]["done"] = true
@@ -124,7 +124,7 @@ func (h *ProductsHandler) gettingStartedOfferScope(c *gin.Context, offerID strin
 		next = gin.H{
 			"tool": "submit_offer",
 			"args": gin.H{"offer_id": offer.ID},
-			"why":  "the draft offer is ready to submit for review",
+			"why":  "the draft offer is ready to submit — it lists right away",
 		}
 	case "submitted":
 		next = gin.H{

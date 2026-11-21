@@ -62,19 +62,19 @@ func TestUntrustedMakerListsWhenChecksPass(t *testing.T) {
 	}
 }
 
-func TestUntrustedMakerClaimsFailureStaysInReview(t *testing.T) {
-	assertReviewFailure(t, "Northwind Ledger saves 99 percent.", reviewReasonClaims, reviewClaimsMessage)
+func TestUntrustedMakerClaimsFlagListsAnyway(t *testing.T) {
+	assertListedWithAdvisory(t, "Northwind Ledger saves 99 percent.", reviewReasonClaims, reviewClaimsMessage)
 }
 
-func TestUntrustedMakerHeadFailureStaysInReview(t *testing.T) {
+func TestUntrustedMakerHeadFlagListsAnyway(t *testing.T) {
 	prev := landingReachable
 	landingReachable = func(string) bool { return false }
 	t.Cleanup(func() { landingReachable = prev })
-	assertReviewFailure(t, passingTerms("Northwind Ledger", 20), reviewReasonHead, reviewHeadMessage)
+	assertListedWithAdvisory(t, passingTerms("Northwind Ledger", 20), reviewReasonHead, reviewHeadMessage)
 }
 
-func TestUntrustedMakerRelevanceFailureStaysInReview(t *testing.T) {
-	assertReviewFailure(t, "A handy tool for teams.", reviewReasonRelevance, reviewRelevanceMessage)
+func TestUntrustedMakerRelevanceFlagListsAnyway(t *testing.T) {
+	assertListedWithAdvisory(t, "A handy tool for teams.", reviewReasonRelevance, reviewRelevanceMessage)
 }
 
 func TestUntrustedMakerCapsFailureStaysInReview(t *testing.T) {
@@ -97,11 +97,14 @@ WHERE p.maker_id=$1 AND o.status='listed'`, makerID).Scan(&listed); err != nil |
 	productID, offerID := createDraftOffer(t, r, makerKey, "Northwind Ledger", "https://northwind.example.com", passingTerms("Northwind Ledger", 20), 20)
 	markProductReady(t, db, productID)
 	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
-	if rec.Code != http.StatusOK || body["status"] != "submitted" {
+	if rec.Code != http.StatusOK || body["status"] != "listed" {
 		t.Fatalf("cap: %d %v", rec.Code, body)
 	}
 	requireReview(t, body, reviewReasonCaps, reviewCapsMessage)
-	assertReviewOnReads(t, r, makerKey, offerID, reviewReasonCaps, reviewCapsMessage)
+	assertListedOnReads(t, r, makerKey, offerID)
+	if queueLen(t, r) != 0 {
+		t.Fatal("a listed offer must not sit in the review queue")
+	}
 }
 
 func TestReadinessFailureMapsReviewReason(t *testing.T) {
@@ -147,7 +150,7 @@ func TestReadinessFailureMapsReviewReason(t *testing.T) {
 	requireReview(t, body, nil, nil)
 }
 
-func assertReviewFailure(t *testing.T, terms, reason, message string) {
+func assertListedWithAdvisory(t *testing.T, terms, reason, message string) {
 	t.Helper()
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -156,24 +159,29 @@ func assertReviewFailure(t *testing.T, terms, reason, message string) {
 	productID, offerID := createDraftOffer(t, r, makerKey, "Northwind Ledger", "https://northwind.example.com", terms, 20)
 	markProductReady(t, db, productID)
 	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
-	if rec.Code != http.StatusOK || body["status"] != "submitted" {
+	if rec.Code != http.StatusOK || body["status"] != "listed" {
 		t.Fatalf("%s: %d %v", reason, rec.Code, body)
 	}
 	requireReview(t, body, reason, message)
-	assertReviewOnReads(t, r, makerKey, offerID, reason, message)
-	if queueLen(t, r) != 1 {
-		t.Fatalf("%s offer must stay in the review queue", reason)
+	assertListedOnReads(t, r, makerKey, offerID)
+	if queueLen(t, r) != 0 {
+		t.Fatalf("%s offer must list without waiting on the review queue", reason)
 	}
 }
 
-func assertReviewOnReads(t *testing.T, r *gin.Engine, makerKey, offerID, reason, message string) {
+// assertListedOnReads verifies the offer reads as listed with empty review
+// fields: an advisory flag rides on the submit response only.
+func assertListedOnReads(t *testing.T, r *gin.Engine, makerKey, offerID string) {
 	t.Helper()
 	_, got := doJSON(t, r, http.MethodGet, "/v1/maker/offers/"+offerID, makerKey, nil)
-	requireReview(t, got, reason, message)
+	requireReview(t, got, nil, nil)
+	if got["status"] != "listed" {
+		t.Fatalf("offer status %v", got["status"])
+	}
 	_, offers := doJSON(t, r, http.MethodGet, "/v1/maker/offers", makerKey, nil)
-	requireReview(t, itemByID(t, offers, "offers", offerID), reason, message)
+	requireReview(t, itemByID(t, offers, "offers", offerID), nil, nil)
 	_, listings := doJSON(t, r, http.MethodGet, "/v1/listings", makerKey, nil)
-	requireReview(t, itemByID(t, listings, "listings", offerID), reason, message)
+	requireReview(t, itemByID(t, listings, "listings", offerID), nil, nil)
 }
 
 func createDraftOffer(t *testing.T, r *gin.Engine, makerKey, name, website, terms string, commission float64) (string, string) {

@@ -34,13 +34,9 @@ func TestMarketplaceRanksOffersBySiteProfile(t *testing.T) {
 			"commission_value": 20,
 		})
 		offerID := offer["id"].(string)
-		doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
-		req := httptest.NewRequest(http.MethodPost, "/v1/offer-review/"+offerID+"/approve", nil)
-		req.Header.Set("X-Admin-Key", "admin-secret")
-		rec := httptest.NewRecorder()
-		r.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("approve %s: %d %s", name, rec.Code, rec.Body.String())
+		_, submitBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
+		if submitBody["status"] != "listed" {
+			t.Fatalf("submit %s must auto-approve to listed, got %v", name, submitBody)
 		}
 		return offerID
 	}
