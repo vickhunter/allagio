@@ -196,7 +196,7 @@ export async function listCommand(io) {
     return { exitCode: 1 };
   }
   let status = current.json.status;
-  let review = null;
+  let review = reviewFailure(current.json);
   if (status === 'draft') {
     const submitted = await apiRequest(io, `/v1/maker/offers/${offerID}/submit`, { method: 'POST', headers });
     review = reviewFailure(submitted.json);
