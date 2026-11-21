@@ -130,8 +130,11 @@ function textField(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : '';
 }
 
+// reviewFailure reads the check outcome off a submit (or readiness refusal)
+// response. On a listed offer it is an advisory flag, not a hold: the offer
+// went live anyway and the maker should still see what to fix.
 function reviewFailure(body) {
-  if (!body || typeof body !== 'object' || body.status === 'listed') return null;
+  if (!body || typeof body !== 'object') return null;
   const check = textField(body.review_reason) || textField(body.reason);
   if (!check) return null;
   const message = textField(body.message) || textField(body.error);
@@ -193,7 +196,7 @@ export async function listCommand(io) {
     return { exitCode: 1 };
   }
   let status = current.json.status;
-  let review = null;
+  let review = reviewFailure(current.json);
   if (status === 'draft') {
     const submitted = await apiRequest(io, `/v1/maker/offers/${offerID}/submit`, { method: 'POST', headers });
     review = reviewFailure(submitted.json);
@@ -203,11 +206,11 @@ export async function listCommand(io) {
       io.stdout(`${JSON.stringify(submitted.json)}\n`);
       return { exitCode: 1 };
     }
-    if (!review) status = submitted.json.status;
+    if (submitted.json && submitted.json.status) status = submitted.json.status;
   }
   io.stdout(`listing_card: ${config.listing_card_id || 'none'}\n`);
   io.stdout(`offer: ${offerID}\n`);
-  if (review) {
+  if (review && status === 'submitted') {
     io.stdout('status: in review\n');
     io.stdout('live: false\n');
     io.stdout(`check: ${review.check}\n`);
@@ -216,6 +219,11 @@ export async function listCommand(io) {
   } else {
     io.stdout(`status: ${status}\n`);
     io.stdout(`live: ${status === 'listed'}\n`);
+    if (review) {
+      io.stdout(`check: ${review.check}\n`);
+      if (review.message) io.stdout(`message: ${review.message}\n`);
+      io.stdout(`next: ${review.next}\n`);
+    }
   }
   const mode = await serverMode(io, headers);
   if (!mode) return { exitCode: 1 };

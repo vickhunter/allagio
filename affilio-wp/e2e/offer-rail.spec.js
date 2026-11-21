@@ -42,6 +42,7 @@ const state = {
   healthFails: 0,
   failProductCreate: false,
   stripeForm: false,
+  legacySubmit: false,
 };
 
 function reset() {
@@ -62,6 +63,7 @@ function reset() {
   state.healthFails = 0;
   state.failProductCreate = false;
   state.stripeForm = false;
+  state.legacySubmit = false;
 }
 
 function readBody(req) {
@@ -183,8 +185,8 @@ async function handle(req, res) {
     if (!product || product.readiness_status !== 'ready') {
       return send(res, 409, { error: 'product has not passed readiness assessment', readiness_status: product?.readiness_status || 'unassessed', hint: 'run POST /v1/maker/products/:id/assess and fix the failing checks' });
     }
-    offer.status = 'submitted';
-    return send(res, 200, { offer });
+    offer.status = state.legacySubmit ? 'submitted' : 'listed';
+    return send(res, 200, { offer, id: offer.id, status: offer.status, program_id: 'prog-' + offer.id, review_reason: null, message: null });
   }
   if (pathname === '/owner/api/review/offers' && req.method === 'GET') {
     const queue = state.offers.filter(offer => offer.status === 'submitted').map(offer => {
@@ -376,7 +378,7 @@ async function createOffer(page) {
   await page.getByLabel('Commission value', { exact: true }).fill('20');
   await page.getByLabel('Referral destination', { exact: true }).fill('https://rail-tool.example');
   await page.getByRole('button', { name: 'Create offer', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Submit for review', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Submit and list', exact: true })).toBeVisible();
 }
 
 let server;
@@ -439,20 +441,19 @@ async function journey(page, width) {
   await shot(page, `after-owner-rail-offer-${width}`);
 
   await createOffer(page);
-  await onePrimary(page, 'Submit for review');
+  await onePrimary(page, 'Submit and list');
   await expect(page.locator('[data-station="offer"]')).toHaveClass(/is-done/);
   await fits(page);
   await shot(page, `after-owner-rail-submit-${width}`);
 
-  await page.getByRole('button', { name: 'Submit for review', exact: true }).click();
-  await onePrimary(page, 'Waiting for the operator to list this offer');
+  await page.getByRole('button', { name: 'Submit and list', exact: true }).click();
+  await onePrimary(page, 'Listed. Publishers can place this offer.');
   await expect(page.locator('[data-station="submitted"]')).toHaveClass(/is-done/);
   await fits(page);
   await shot(page, `after-owner-rail-submitted-${width}`);
 
   const operator = await page.context().newPage();
   await operator.goto(base + '/owner/review');
-  await operator.getByRole('button', { name: 'List offer', exact: true }).click();
   await expect(operator.getByText('No offers waiting for review.')).toBeVisible();
   await operator.close();
 
@@ -530,7 +531,7 @@ test('the rail reaches ready and offer with no provider connected', async ({ bro
   await expect(stripe).toHaveClass(/is-optional/);
   await expect(stripe).not.toHaveClass(/is-done/);
   await expect(page.locator('[data-station="submitted"]')).toHaveAttribute('aria-current', 'step');
-  await onePrimary(page, 'Submit for review');
+  await onePrimary(page, 'Submit and list');
   await context.close();
 });
 
@@ -543,7 +544,7 @@ test('submit before readiness keeps the error in view', async ({ browser }) => {
     await registerProduct(page, 'Early Submit');
     await createOffer(page);
     await expect(page.locator('[data-primary-action]')).toHaveText('Check readiness');
-    await page.getByRole('button', { name: 'Submit for review', exact: true }).click();
+    await page.getByRole('button', { name: 'Submit and list', exact: true }).click();
     await expect(page.locator('#workspace-feedback')).toContainText('product has not passed readiness assessment');
     await expect(page.locator('#workspace-feedback')).toHaveAttribute('aria-hidden', 'true');
     const error = page.locator('.field-error').first();
@@ -572,7 +573,8 @@ test('returned draft, network failure, and assessment running', async ({ browser
   await page.getByRole('link', { name: 'Connect Stripe', exact: true }).click();
   await page.getByRole('link', { name: 'Return to your products', exact: true }).click();
   await createOffer(page);
-  await page.getByRole('button', { name: 'Submit for review', exact: true }).click();
+  await page.evaluate(async endpoint => { await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ legacySubmit: true }) }); }, base + '/__test/mode');
+  await page.getByRole('button', { name: 'Submit and list', exact: true }).click();
   await onePrimary(page, 'Waiting for the operator to list this offer');
   const operator = await context.newPage();
   await operator.goto(base + '/owner/review');
@@ -582,7 +584,7 @@ test('returned draft, network failure, and assessment running', async ({ browser
   const returned = page.locator('[id^="offer-returned-"]');
   await expect(returned).toBeVisible();
   await expect(returned).toContainText('returned this offer to draft');
-  await onePrimary(page, 'Submit for review');
+  await onePrimary(page, 'Submit and list');
   await fits(page);
   await shot(page, 'after-owner-rail-returned-1440');
 
@@ -675,7 +677,7 @@ test('new offer collapses once an offer exists', async ({ browser }) => {
     await createOffer(page);
     await expect(page.getByRole('button', { name: 'New offer', exact: true })).toBeVisible();
     await expect(page.locator('[data-new-offer]')).toHaveCount(0);
-    await onePrimary(page, 'Submit for review');
+    await onePrimary(page, 'Submit and list');
     await fits(page);
     await frame(page, `after-products-collapsed-${viewport.width}`);
     await page.getByRole('button', { name: 'New offer', exact: true }).focus();
@@ -698,7 +700,7 @@ test('new offer collapses once an offer exists', async ({ browser }) => {
     const box = await error.boundingBox();
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
-    await onePrimary(page, 'Submit for review');
+    await onePrimary(page, 'Submit and list');
     await context.close();
   }
 });
@@ -728,10 +730,10 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     await expect(page.getByRole('heading', { name: 'Setup & agents', level: 1 })).toBeVisible();
     await expect(page.locator('.agent-line pre')).toHaveText(`Read ${base}/SKILL.md and connect this site to Allagio`);
     await expect(page.locator('[data-skill-status]')).toContainText('Coming soon');
-    await expect(page.locator('[data-rail-plain]')).toHaveText('Your referral offer is saved. Next: submit it for review.');
+    await expect(page.locator('[data-rail-plain]')).toHaveText('Your referral offer is saved. Next: submit it to list it.');
     const humans = page.locator('.task-list');
     await expect(humans).toContainText('Checkout is optional');
-    await expect(humans).toContainText('An operator approves the offer before it is listed.');
+    await expect(humans).toContainText('Submit the offer — it lists right away, no operator approval.');
     await expect(page.getByRole('heading', { name: 'Connect your existing agent' })).toBeVisible();
     await expect(page.locator('.setup-command pre')).toHaveCount(1);
     const copy = page.getByRole('button', { name: 'Copy line', exact: true });
@@ -755,7 +757,7 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
   const page = await context.newPage();
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto(base + '/owner/settings');
-  await expect(page.locator('[data-rail-plain]')).toHaveText('Your referral offer is saved. Next: submit it for review.');
+  await expect(page.locator('[data-rail-plain]')).toHaveText('Your referral offer is saved. Next: submit it to list it.');
   await page.getByRole('button', { name: 'Copy line', exact: true }).click();
   await expect(page.locator('.agent-line .copy-status')).toContainText('Copied');
   await page.waitForTimeout(4000);

@@ -8,7 +8,7 @@ import (
 	"affilio-api/internal/config"
 )
 
-func TestClaimsCheckStubKeepsUntrustedSubmitted(t *testing.T) {
+func TestClaimsCheckStubListsUntrustedWithAdvisory(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
 	makerID, makerKey := createTestMaker(t, db)
@@ -17,13 +17,13 @@ func TestClaimsCheckStubKeepsUntrustedSubmitted(t *testing.T) {
 	markProductReady(t, db, productID)
 
 	rec, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
-	if rec.Code != http.StatusOK || body["status"] != "submitted" {
+	if rec.Code != http.StatusOK || body["status"] != "listed" {
 		t.Fatalf("stub submit: %d %v", rec.Code, body)
 	}
 	requireReview(t, body, reviewReasonClaims, reviewClaimsNotLive)
-	assertReviewOnReads(t, r, makerKey, offerID, reviewReasonClaims, reviewClaimsNotLive)
-	if queueLen(t, r) != 1 {
-		t.Fatal("a stubbed offer must stay in the review queue")
+	assertListedOnReads(t, r, makerKey, offerID, reviewReasonClaims, reviewClaimsNotLive)
+	if queueLen(t, r) != 0 {
+		t.Fatal("a stubbed offer lists without waiting on the review queue")
 	}
 
 	trustMaker(t, r, makerID)
@@ -39,8 +39,8 @@ func TestClaimsCheckStubKeepsUntrustedSubmitted(t *testing.T) {
 	requireReview(t, listedBody, nil, nil)
 
 	rec, body = doJSON(t, r, http.MethodGet, "/v1/maker/offers/"+offerID, makerKey, nil)
-	if body["status"] != "submitted" {
-		t.Fatalf("the earlier untrusted offer must stay submitted, got %d %v", rec.Code, body["status"])
+	if body["status"] != "listed" {
+		t.Fatalf("the earlier untrusted offer must stay listed, got %d %v", rec.Code, body["status"])
 	}
 	requireReview(t, body, reviewReasonClaims, reviewClaimsNotLive)
 }

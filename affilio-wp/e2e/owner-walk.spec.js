@@ -9,8 +9,7 @@ const { randomUUID } = require('node:crypto');
 //   When they register a product whose site is /demo
 //   And readiness reports ready
 //   And they create an offer and submit it
-//   Then the offer waits for review
-//   And the operator lists it
+//   Then the offer lists immediately — no operator gate
 
 const build = path.resolve(__dirname, '../admin/build');
 const template = fs.readFileSync(path.join(build, 'workspace.html'), 'utf8');
@@ -100,8 +99,8 @@ async function handle(req, res) {
     const offer = state.offers.find(item => item.id === submit[1]);
     const product = state.products.find(item => item.id === offer.product_id);
     if (product.readiness_status !== 'ready') return send(res, 409, { error: 'product has not passed readiness assessment', hint: 'run POST /v1/maker/products/:id/assess' });
-    offer.status = 'submitted';
-    return send(res, 200, { id: offer.id, status: 'submitted' });
+    offer.status = 'listed';
+    return send(res, 200, { id: offer.id, status: 'listed', program_id: 'prog-' + offer.id, review_reason: null, message: null });
   }
   if (pathname === '/owner/api/review/offers' && req.method === 'GET') {
     const queue = state.offers.filter(offer => offer.status === 'submitted').map(offer => {
@@ -142,7 +141,7 @@ test.afterAll(async () => {
   await new Promise(resolve => server.close(resolve));
 });
 
-test('owner walk registers /demo, submits, and an operator lists the offer', async ({ page }) => {
+test('owner walk registers /demo, submits, and the offer lists immediately', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(base + '/owner/products');
   await expect(page.getByRole('link', { name: 'Offer review' })).toHaveAttribute('href', '/owner/review');
@@ -162,12 +161,11 @@ test('owner walk registers /demo, submits, and an operator lists the offer', asy
   await page.getByLabel('Commission value', { exact: true }).fill('15');
   await page.getByLabel('Referral destination', { exact: true }).fill(base + '/demo');
   await page.getByRole('button', { name: 'Create offer', exact: true }).click();
-  await page.getByRole('button', { name: 'Submit for review', exact: true }).click();
-  await expect(page.getByText('Awaiting operator review')).toBeVisible();
+  await page.getByRole('button', { name: 'Submit and list', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause offer', exact: true })).toBeVisible();
   await expect(page.locator('body')).not.toContainText('/v1/');
 
   await page.goto(base + '/owner/review');
-  await page.getByRole('button', { name: 'List offer', exact: true }).click();
   await expect(page.getByText('No offers waiting for review.')).toBeVisible();
   await page.goto(base + '/owner/products');
   await expect(page.locator('[data-station="listed"]')).toHaveClass(/is-done/);

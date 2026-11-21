@@ -31,9 +31,12 @@ The monetizable unit.
 commission_currency, cookie_duration_days, refund_window_days, landing_url,
 ref_param, terms, program_id, created_at, updated_at}`
 - `commission_type`: `percentage | flat | recurring`
-- `status` lifecycle: `draft → submitted → listed ↔ paused → retired`, with
-  `submitted → draft` on rejection/withdrawal. Listing is a network decision
-  (human or automated review), never a maker self-transition.
+- `status` lifecycle: `draft → listed ↔ paused → retired` — submitting
+  auto-approves and lists immediately, with automated check results stored
+  on the row as an advisory `review_reason`/`review_message` (reported on the
+  submit response and later reads until resubmission clears them). `submitted` is a
+  legacy state kept for pre-auto-approval rows (`submitted → listed` on
+  admin approval, `submitted → draft` on rejection/withdrawal).
 
 ## Campaign
 An offer × publisher relationship. `{id, offer_id, site_id, status,

@@ -368,8 +368,12 @@ func TestStubUntrustedNinetyPercentNeverGoesLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	submitted, submittedBody := doJSON(t, makers, http.MethodPost, "/v1/maker/offers/"+heldID+"/submit", makerKey, nil)
-	if submitted.Code != http.StatusOK || submittedBody["status"] != "submitted" || submittedBody["review_reason"] != "claims" {
-		t.Fatalf("stub submit: %d %v", submitted.Code, submittedBody)
+	if submitted.Code != http.StatusOK || submittedBody["status"] != "listed" || submittedBody["review_reason"] != "claims" {
+		t.Fatalf("stub submit lists with an advisory, got %d %v", submitted.Code, submittedBody)
+	}
+	// Seed the legacy queue state to exercise the claims gate on publish.
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='submitted' WHERE id=$1`, heldID); err != nil {
+		t.Fatal(err)
 	}
 	blocked, blockedBody := adminJSON(t, makers, http.MethodPost, "/v1/offer-review/"+heldID+"/approve", nil)
 	if blocked.Code != http.StatusConflict || blockedBody["review_reason"] != "claims" || blockedBody["status"] != "submitted" {
@@ -386,8 +390,11 @@ func TestStubUntrustedNinetyPercentNeverGoesLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	held, heldBody := doJSON(t, makers, http.MethodPost, "/v1/maker/offers/"+honestID+"/submit", makerKey, nil)
-	if held.Code != http.StatusOK || heldBody["status"] != "submitted" {
+	if held.Code != http.StatusOK || heldBody["status"] != "listed" {
 		t.Fatalf("honest stub submit: %d %v", held.Code, heldBody)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='submitted' WHERE id=$1`, honestID); err != nil {
+		t.Fatal(err)
 	}
 	published, publishedBody := adminJSON(t, makers, http.MethodPost, "/v1/offer-review/"+honestID+"/approve", nil)
 	if published.Code != http.StatusOK || publishedBody["status"] != "listed" {
@@ -889,8 +896,12 @@ func TestAdminApproveMatchesOfferClaimsText(t *testing.T) {
 		t.Fatal(err)
 	}
 	submitted, submittedBody := doJSON(t, makers, http.MethodPost, "/v1/maker/offers/"+heldID+"/submit", makerKey, nil)
-	if submitted.Code != http.StatusOK || submittedBody["status"] != "submitted" {
+	if submitted.Code != http.StatusOK || submittedBody["status"] != "listed" {
 		t.Fatalf("submit: %d %v", submitted.Code, submittedBody)
+	}
+	// Seed the legacy queue state; the row then shows the held claims reason.
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='submitted' WHERE id=$1`, heldID); err != nil {
+		t.Fatal(err)
 	}
 	row, rowBody := doJSON(t, makers, http.MethodGet, "/v1/maker/offers/"+heldID, makerKey, nil)
 	if row.Code != http.StatusOK || rowBody["message"] != reviewClaimsNotLive || rowBody["review_reason"] != reviewReasonClaims {

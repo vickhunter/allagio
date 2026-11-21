@@ -216,9 +216,12 @@ func TestProductOfferLifecycle(t *testing.T) {
 	}
 	markProductReady(t, db, productID)
 
-	rec, _ = doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
+	rec, submitBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("submit offer: expected 200, got %d", rec.Code)
+	}
+	if submitBody["status"] != "listed" {
+		t.Fatalf("submit must auto-approve to listed, got %v", submitBody)
 	}
 
 	// Second submit must fail: only draft offers can be submitted.
@@ -227,7 +230,7 @@ func TestProductOfferLifecycle(t *testing.T) {
 		t.Fatalf("expected 409 for double submit, got %d", rec.Code)
 	}
 
-	// Admin queue shows the submitted offer.
+	// The review queue stays empty: submissions are approved automatically.
 	req := httptest.NewRequest(http.MethodGet, "/v1/offer-review/queue", nil)
 	req.Header.Set("X-Admin-Key", "admin-secret")
 	qrec := httptest.NewRecorder()
@@ -241,23 +244,14 @@ func TestProductOfferLifecycle(t *testing.T) {
 	if err := json.Unmarshal(qrec.Body.Bytes(), &queueBody); err != nil {
 		t.Fatalf("queue decode: %v", err)
 	}
-	if len(queueBody.Queue) != 1 || queueBody.Queue[0]["id"] != offerID {
-		t.Fatalf("expected offer in review queue, got %v", queueBody.Queue)
+	if len(queueBody.Queue) != 0 {
+		t.Fatalf("expected an empty review queue, got %v", queueBody.Queue)
 	}
 
-	// Approve promotes into affiliate_programs with source=distributoor.
-	req = httptest.NewRequest(http.MethodPost, "/v1/offer-review/"+offerID+"/approve", nil)
-	req.Header.Set("X-Admin-Key", "admin-secret")
-	arec := httptest.NewRecorder()
-	r.ServeHTTP(arec, req)
-	if arec.Code != http.StatusOK {
-		t.Fatalf("approve: expected 200, got %d: %s", arec.Code, arec.Body.String())
-	}
-	var approveBody map[string]interface{}
-	_ = json.Unmarshal(arec.Body.Bytes(), &approveBody)
-	programID, _ := approveBody["program_id"].(string)
+	// Submit itself promotes into affiliate_programs with source=distributoor.
+	programID, _ := submitBody["program_id"].(string)
 	if programID == "" {
-		t.Fatalf("expected program_id in approve response, got %v", approveBody)
+		t.Fatalf("expected program_id in submit response, got %v", submitBody)
 	}
 
 	var source, name string
@@ -311,6 +305,13 @@ func TestOfferRejectReturnsToDraft(t *testing.T) {
 	offerID := offer["id"].(string)
 	markProductReady(t, db, product["id"].(string))
 	doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offerID+"/submit", makerKey, nil)
+	// Submissions auto-approve; seed the legacy queue state to exercise reject.
+	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='submitted' WHERE id=$1`, offerID); err != nil {
+		t.Fatal(err)
+	}
+	if queueLen(t, r) != 1 {
+		t.Fatal("the seeded submitted offer must appear in the review queue")
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/offer-review/"+offerID+"/reject", newJSONRequest(t, http.MethodPost, "", map[string]interface{}{
 		"note": "landing page is broken",
@@ -464,8 +465,8 @@ VALUES ($1,'Absent','https://absent.example','saas',NULL) RETURNING id`, makerID
 		"commission_value": 8,
 	})
 	submitted, body := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+offer["id"].(string)+"/submit", makerKey, nil)
-	if submitted.Code != http.StatusOK || body["status"] != "submitted" {
-		t.Fatalf("empty provider must submit, got %d %v", submitted.Code, body)
+	if submitted.Code != http.StatusOK || body["status"] != "listed" {
+		t.Fatalf("empty provider must submit and auto-approve, got %d %v", submitted.Code, body)
 	}
 }
 
@@ -497,8 +498,8 @@ func TestSubmitDoesNotRequireAPaymentConnection(t *testing.T) {
 	// A second offer is created after the first submit so the trusted path can list.
 	firstID := blocked["id"].(string)
 	early, earlyBody := doJSON(t, r, http.MethodPost, "/v1/maker/offers/"+firstID+"/submit", makerKey, nil)
-	if early.Code != http.StatusOK || earlyBody["status"] != "submitted" {
-		t.Fatalf("ready product with no provider connection must submit, got %d %v", early.Code, earlyBody)
+	if early.Code != http.StatusOK || earlyBody["status"] != "listed" {
+		t.Fatalf("ready product with no provider connection must submit and auto-approve, got %d %v", early.Code, earlyBody)
 	}
 	if hint, _ := earlyBody["hint"].(string); strings.Contains(hint, "/v1/") || strings.Contains(fmt.Sprint(earlyBody["error"]), "/v1/") {
 		t.Fatalf("submit response must not name an API path: %v", earlyBody)

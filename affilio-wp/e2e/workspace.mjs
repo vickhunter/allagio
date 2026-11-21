@@ -217,8 +217,8 @@ async function journey() {
     await builder.getByLabel('Commission value', { exact: true }).fill('20');
     await builder.getByLabel('Referral destination', { exact: true }).fill('https://browser-tool.example');
     await builder.getByRole('button', { name: 'Create offer', exact: true }).click();
-    await expect(builder.getByRole('button', { name: 'Submit for review', exact: true })).toBeVisible();
-    await builder.getByRole('button', { name: 'Submit for review', exact: true }).click();
+    await expect(builder.getByRole('button', { name: 'Submit and list', exact: true })).toBeVisible();
+    await builder.getByRole('button', { name: 'Submit and list', exact: true }).click();
     await expect(builder.locator('#workspace-feedback')).toContainText('product has not passed readiness assessment');
     await screenshot(builder, 'products');
     await builder.goto(fixture.base + '/owner/review');

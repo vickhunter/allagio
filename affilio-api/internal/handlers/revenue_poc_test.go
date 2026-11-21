@@ -458,8 +458,10 @@ func TestTwoIndependentStdioAgentsRevenueLoop(t *testing.T) {
 	adminJSON(t, r, http.MethodPost, "/v1/offer-review/products/"+productID+"/connection", map[string]interface{}{"signing_secret": testStripeSecret, "currency": "USD", "live_mode": false})
 	offer := maker.call(t, "create_offer", map[string]interface{}{"product_id": productID, "commission_type": "percentage", "commission_value": 20, "refund_window_days": 30})
 	offerID := offer["id"].(string)
-	maker.call(t, "submit_offer", map[string]interface{}{"offer_id": offerID})
-	adminJSON(t, r, http.MethodPost, "/v1/offer-review/"+offerID+"/approve", nil)
+	submitted := maker.call(t, "submit_offer", map[string]interface{}{"offer_id": offerID})
+	if submitted["status"] != "listed" {
+		t.Fatalf("submit must auto-approve to listed, got %v", submitted)
+	}
 	content := "Email inbox productivity tutorial: evaluate InboxPilot for organizing email."
 	matched := publisher.call(t, "find_opportunities", map[string]interface{}{"context": content})
 	if matched["status"] != "matched" {

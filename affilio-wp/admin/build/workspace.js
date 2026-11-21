@@ -288,7 +288,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         if (next === 'offer') return focus.state.done.stripe
             ? 'Stripe test mode is connected. Next: create a referral offer.'
             : 'Your product is ready. Next: create a referral offer.';
-        if (next === 'submitted') return 'Your referral offer is saved. Next: submit it for review.';
+        if (next === 'submitted') return 'Your referral offer is saved. Next: submit it to list it.';
         if (next === 'listed') return 'Your offer is submitted. Next: an operator lists it.';
         if (!next && focus.offer?.status === 'paused') return 'This offer is paused. Resume it when you want publishers to place it.';
         if (!next && focus.offer?.status === 'listed') return 'This offer is listed. Publishers can place it.';
@@ -297,7 +297,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     const humanSteps = focus => {
         const steps = [];
         if (!focus.state.done.stripe) steps.push('Checkout is optional. Connect a provider when you want one.');
-        if (!focus.state.done.listed) steps.push('An operator approves the offer before it is listed.');
+        if (!focus.state.done.listed) steps.push('Submit the offer — it lists right away, no operator approval.');
         return steps;
     };
     const stationDetail = (id, focus, returned) => {
@@ -306,7 +306,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         if (id === 'ready') return product?.readiness_status === 'failing' ? 'Readiness failed. Fix the checks below, then run it again.' : 'Run the readiness check against the live site.';
         if (id === 'stripe') return stripe?.known && stripe.live_mode ? 'Live mode is connected. This step needs Stripe test mode.' : 'Checkout is optional until a provider is connected.';
         if (id === 'offer') return 'Create the referral offer.';
-        if (id === 'submitted') return returned ? 'The operator returned this offer. Update it and submit again.' : 'Submit the offer for operator review.';
+        if (id === 'submitted') return returned ? 'The operator returned this offer. Update it and submit again.' : 'Submit the offer — it lists right away.';
         if (id === 'listed') return 'Waiting for the operator to list this offer.';
         return '';
     };
@@ -400,7 +400,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         busy(false);
         root.innerHTML = `${rail}<div class="grid"><section><span class="eyebrow">BUILDERS</span><h2>Give your product an offer.</h2><p>Connect your existing agent, prepare your checkout and choose the commission you want to offer.</p><a class="button" data-primary-action href="${makerHref}">${makerLabel} ↗</a></section><section><span class="eyebrow">PUBLISHERS</span><h2>Find a useful recommendation.</h2><p>Match an article to relevant products, approve the exact placement and publish a tracked link.</p><a class="button secondary" href="${session.publisher ? '/owner/placements' : '/owner/settings'}">${session.publisher ? 'Open placements' : 'Connect your content'} ↗</a></section></div><section><h2>One setup. Your own agent.</h2><p>Run this command in your product repository. Setup installs the integration skills and connects your agent. Checkout wiring, Stripe connection and verification are separate steps.</p>${copyCommand(session.install_command)}<p class="caption">The npm package offer-rails is not published yet. This command uses the installer archive on this host.</p><p class="caption">Node 20+ · Codex CLI handoff · Cursor and Claude configuration</p></section>`;
     };
-    const productForm = (product, primaryRegister, registered) => `<section><h2>${product ? 'Edit product' : 'Register a product'}</h2><form data-product="${escape(product?.id || '')}"><div class="form-grid">${field('name','Product name',product?.name,'required maxlength="255"')}${field('website_url','Website',product?.website_url,'type="url" required maxlength="512"')}${field('tagline','What does it help people do?',product?.tagline,'required maxlength="512"',true)}${field('docs_url','Documentation URL',product?.docs_url,'type="url"')}${field('pricing_url','Pricing URL',product?.pricing_url,'type="url"')}${field('primary_category','Category',product?.primary_category,'placeholder="developer tools" autocomplete="off"')}${field('keywords','Topics, separated by commas',(product?.keywords || []).join(', '),'placeholder="postgres, monitoring, debugging" autocomplete="off"')}</div><p class="caption">Your product remains private until its offer is reviewed and listed.</p><button ${!product && primaryRegister ? 'data-primary-action' : 'class="secondary"'}>${product ? 'Save changes' : 'Register product'}</button>${product ? '<button type="button" class="secondary" data-cancel-edit>Cancel</button>' : ''}${registered ? '<p id="product-registered" class="success" role="status" tabindex="-1">Product registered. It is in your list.</p>' : ''}</form></section>`;
+    const productForm = (product, primaryRegister, registered) => `<section><h2>${product ? 'Edit product' : 'Register a product'}</h2><form data-product="${escape(product?.id || '')}"><div class="form-grid">${field('name','Product name',product?.name,'required maxlength="255"')}${field('website_url','Website',product?.website_url,'type="url" required maxlength="512"')}${field('tagline','What does it help people do?',product?.tagline,'required maxlength="512"',true)}${field('docs_url','Documentation URL',product?.docs_url,'type="url"')}${field('pricing_url','Pricing URL',product?.pricing_url,'type="url"')}${field('primary_category','Category',product?.primary_category,'placeholder="developer tools" autocomplete="off"')}${field('keywords','Topics, separated by commas',(product?.keywords || []).join(', '),'placeholder="postgres, monitoring, debugging" autocomplete="off"')}</div><p class="caption">Your product stays private until its offer is submitted and listed.</p><button ${!product && primaryRegister ? 'data-primary-action' : 'class="secondary"'}>${product ? 'Save changes' : 'Register product'}</button>${product ? '<button type="button" class="secondary" data-cancel-edit>Cancel</button>' : ''}${registered ? '<p id="product-registered" class="success" role="status" tabindex="-1">Product registered. It is in your list.</p>' : ''}</form></section>`;
     const productsPage = async (options = {}) => {
         if (!session.maker) { root.innerHTML = '<section><h2>Start your builder account</h2><p>Your account can hold products and referral offers.</p><a class="button" data-primary-action href="/owner/products?setup=maker">Create builder account</a></section>'; return; }
         busy(true);
@@ -442,7 +442,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             const submitPrimary = kind === 'submitted' && offer.id === focus.offer?.id;
             const returnedNote = returned ? `<p class="field-error" role="alert" tabindex="-1" id="offer-returned-${offer.id}">The operator returned this offer to draft. Update it and submit again. The review note is not available from the API.</p>` : '';
             const action = offer.status === 'draft'
-                ? `<button type="button" class="${submitPrimary ? '' : 'secondary'}" ${submitPrimary ? 'data-primary-action' : ''} data-submit-offer="${offer.id}">Submit for review</button>`
+                ? `<button type="button" class="${submitPrimary ? '' : 'secondary'}" ${submitPrimary ? 'data-primary-action' : ''} data-submit-offer="${offer.id}">Submit and list</button>`
                 : offer.status === 'listed' || offer.status === 'paused'
                     ? `<button type="button" class="secondary" data-offer="${offer.id}" data-status="${offer.status === 'listed' ? 'paused' : 'listed'}">${offer.status === 'listed' ? 'Pause offer' : 'Resume offer'}</button>`
                     : '<p class="caption">Awaiting operator review. Listing does not promise traffic or purchases.</p>';
@@ -514,14 +514,15 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             if (fail) scrollFocus(fail);
         })));
         root.querySelectorAll('[data-submit-offer]').forEach(button => button.addEventListener('click', () => run(button, async () => {
-            try { await api(`/offers/${button.dataset.submitOffer}/submit`, 'POST', {}); }
+            let submitted;
+            try { submitted = await api(`/offers/${button.dataset.submitOffer}/submit`, 'POST', {}); }
             catch (error) {
                 error.displayed = true;
                 showIssue(button, 'submit-error-' + button.dataset.submitOffer, error.message);
                 throw error;
             }
             await productsPage();
-            report('Offer submitted. Its current status is shown below.');
+            report(submitted && submitted.review_reason ? `Offer listed — automated check flagged ${submitted.review_reason}: ${submitted.message}` : 'Offer listed. Its current status is shown below.');
         })));
         root.querySelectorAll('[data-offer]').forEach(button => button.addEventListener('click', () => run(button, async () => { await api(`/offers/${button.dataset.offer}`, 'PATCH', {status:button.dataset.status}); await productsPage(); })));
         const bindNewOffer = form => {
@@ -540,7 +541,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
                     try { await api('/offers', 'POST', values); }
                     catch (error) { showFormIssue(form, error); throw error; }
                     await productsPage();
-                    report('Offer created. Check readiness and submit it for review. Checkout is optional.');
+                    report('Offer created. Check readiness and submit it to list. Checkout is optional.');
                 });
             });
         };
@@ -656,7 +657,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         } catch { /* unpublished skill stays coming soon */ }
         const agentLine = `Read ${skillURL} and connect this site to Allagio`;
         let progress = 'Start a builder account to see offer progress.';
-        let humans = ['Create a builder account before an agent can register a product.', 'An operator approves the offer before it is listed.'];
+        let humans = ['Create a builder account before an agent can register a product.', 'Submit an offer and it lists right away — automated checks run, no operator wait.'];
         if (session.maker) {
             try {
                 const [{products},{offers}] = await Promise.all([api('/products'), api('/offers')]);
