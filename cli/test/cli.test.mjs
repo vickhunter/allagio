@@ -359,7 +359,8 @@ test('list prints the readiness message next step from reason and message', asyn
   const result = await run(['list'], io);
   assert.equal(result.exitCode, 0);
   const text = stdout();
-  assert.match(text, /status: in review/);
+  assert.match(text, /status: draft/);
+  assert.equal(text.includes('in review'), false);
   assert.match(text, /^check: head$/m);
   assert.match(text, /^message: This product has not passed readiness assessment\. Fix the failed checks, then submit again\.$/m);
   assert.match(text, /^next: Fix the failed checks, then submit again\.$/m);
@@ -399,6 +400,20 @@ test('list does not call a bare submitted offer in review', async () => {
   assert.match(text, /status: submitted/);
   assert.equal(text.includes('in review'), false);
   assert.match(text, /^mode_preselected: yolo$/m);
+});
+
+test('list reports a paused offer with a stored advisory, not in review', async () => {
+  const offer = '55555555-5555-4555-8555-555555555555';
+  const { io, stdout, calls } = projectIO(offer, [
+    { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'paused', review_reason: 'claims', message: 'check landing claims' } },
+    { method: 'GET', path: '/v1/setup/settings', body: { mode: 'manual', mode_preselected: 'yolo' } },
+  ]);
+  const result = await run(['list'], io);
+  const text = stdout();
+  assert.match(text, /status: paused/);
+  assert.equal(text.includes('in review'), false);
+  assert.match(text, /^check: claims$/m);
+  assert.equal(calls.some((call) => call.method === 'POST'), false);
 });
 
 test('digest prints the mode and mode_preselected the server returns', async () => {

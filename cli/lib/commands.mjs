@@ -210,7 +210,7 @@ export async function listCommand(io) {
   }
   io.stdout(`listing_card: ${config.listing_card_id || 'none'}\n`);
   io.stdout(`offer: ${offerID}\n`);
-  if (review && status !== 'listed') {
+  if (review && status === 'submitted') {
     io.stdout('status: in review\n');
     io.stdout('live: false\n');
     io.stdout(`check: ${review.check}\n`);
