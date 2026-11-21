@@ -266,7 +266,7 @@ LIMIT $1 OFFSET $2`, limit, offset)
 		var item OfferReviewItem
 		if err := rows.Scan(
 			&item.ID, &item.Offer.ProductID, &item.Offer.Status, &item.CommissionType, &item.CommissionValue, &item.CommissionUnit, &item.CommissionCurrency,
-			&item.CookieDurationDays, &item.RefundWindowDays, &item.LandingURL, &item.RefParam, &item.Terms, &item.Offer.ProgramID, &item.Offer.CreatedAt, &item.Offer.UpdatedAt,
+			&item.CookieDurationDays, &item.RefundWindowDays, &item.LandingURL, &item.RefParam, &item.Terms, &item.Offer.ProgramID, &item.Offer.ReviewReason, &item.Offer.ReviewMessage, &item.Offer.CreatedAt, &item.Offer.UpdatedAt,
 			&item.ProductName, &item.ProductTagline, &item.WebsiteURL, &item.PrimaryCategory,
 			&item.ReadinessScore, &item.ReadinessStatus,
 			&item.MakerEmail, &item.MakerName,

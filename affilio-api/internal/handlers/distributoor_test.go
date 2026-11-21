@@ -309,6 +309,9 @@ func TestOfferRejectReturnsToDraft(t *testing.T) {
 	if _, err := db.Pool.Exec(context.Background(), `UPDATE offers SET status='submitted' WHERE id=$1`, offerID); err != nil {
 		t.Fatal(err)
 	}
+	if queueLen(t, r) != 1 {
+		t.Fatal("the seeded submitted offer must appear in the review queue")
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/offer-review/"+offerID+"/reject", newJSONRequest(t, http.MethodPost, "", map[string]interface{}{
 		"note": "landing page is broken",
