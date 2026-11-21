@@ -32,8 +32,9 @@ commission_currency, cookie_duration_days, refund_window_days, landing_url,
 ref_param, terms, program_id, created_at, updated_at}`
 - `commission_type`: `percentage | flat | recurring`
 - `status` lifecycle: `draft → listed ↔ paused → retired` — submitting
-  auto-approves and lists immediately, with automated check results riding
-  the response as an advisory `review_reason`/`message`. `submitted` is a
+  auto-approves and lists immediately, with automated check results stored
+  on the row as an advisory `review_reason`/`review_message` (reported on the
+  submit response and later reads until resubmission clears them). `submitted` is a
   legacy state kept for pre-auto-approval rows (`submitted → listed` on
   admin approval, `submitted → draft` on rejection/withdrawal).
 

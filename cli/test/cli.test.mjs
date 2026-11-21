@@ -283,7 +283,7 @@ function projectIO(offer, routes) {
   return { io, stdout, calls };
 }
 
-test('list prints in review when a check fails and does not set a mode', async () => {
+test('list prints listed with the check advisory and does not set a mode', async () => {
   const offer = '11111111-1111-4111-8111-111111111111';
   const { io, stdout, calls } = projectIO(offer, [
     { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
@@ -292,7 +292,7 @@ test('list prints in review when a check fails and does not set a mode', async (
       path: `/v1/maker/offers/${offer}/submit`,
       body: {
         id: offer,
-        status: 'submitted',
+        status: 'listed',
         review_reason: 'relevance',
         message: 'Relevance is below the minimum.',
       },
@@ -302,17 +302,18 @@ test('list prints in review when a check fails and does not set a mode', async (
   const result = await run(['list'], io);
   assert.equal(result.exitCode, 0);
   const text = stdout();
-  assert.match(text, /status: in review/);
+  assert.match(text, /status: listed/);
+  assert.match(text, /^live: true$/m);
   assert.match(text, /^check: relevance$/m);
   assert.match(text, /^message: Relevance is below the minimum\.$/m);
   assert.match(text, /^next: Submit again after this check passes\.$/m);
   assert.match(text, /^mode: manual$/m);
   assert.match(text, /^mode_preselected: yolo$/m);
-  assert.equal(text.includes('status: listed'), false);
+  assert.equal(text.includes('in review'), false);
   assert.equal(calls.some((call) => call.method === 'PUT' || call.url.includes('/mode')), false);
 });
 
-test('list prints the claims stub hold from review_reason and message', async () => {
+test('list lists with the claims stub advisory from review_reason and message', async () => {
   const offer = '66666666-6666-4666-8666-666666666666';
   const { io, stdout } = projectIO(offer, [
     { method: 'GET', path: `/v1/maker/offers/${offer}`, body: { id: offer, status: 'draft' } },
@@ -321,7 +322,7 @@ test('list prints the claims stub hold from review_reason and message', async ()
       path: `/v1/maker/offers/${offer}/submit`,
       body: {
         id: offer,
-        status: 'submitted',
+        status: 'listed',
         review_reason: 'claims',
         claims_check: 'not_checked',
         message: 'Claims are not checked yet.',
@@ -332,13 +333,14 @@ test('list prints the claims stub hold from review_reason and message', async ()
   const result = await run(['list'], io);
   assert.equal(result.exitCode, 0);
   const text = stdout();
-  assert.match(text, /status: in review/);
+  assert.match(text, /status: listed/);
+  assert.match(text, /^live: true$/m);
   assert.match(text, /^check: claims$/m);
   assert.match(text, /^message: Claims are not checked yet\.$/m);
   assert.match(text, /^claims: not checked yet$/m);
   assert.equal(/\bchecked\b/.test(text.replace(/not checked yet/g, '')), false);
   assert.match(text, /^next: Submit again after this check passes\.$/m);
-  assert.equal(text.includes('status: listed'), false);
+  assert.equal(text.includes('in review'), false);
 });
 
 test('list prints the readiness message next step from reason and message', async () => {

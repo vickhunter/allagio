@@ -514,14 +514,15 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             if (fail) scrollFocus(fail);
         })));
         root.querySelectorAll('[data-submit-offer]').forEach(button => button.addEventListener('click', () => run(button, async () => {
-            try { await api(`/offers/${button.dataset.submitOffer}/submit`, 'POST', {}); }
+            let submitted;
+            try { submitted = await api(`/offers/${button.dataset.submitOffer}/submit`, 'POST', {}); }
             catch (error) {
                 error.displayed = true;
                 showIssue(button, 'submit-error-' + button.dataset.submitOffer, error.message);
                 throw error;
             }
             await productsPage();
-            report('Offer submitted. Its current status is shown below.');
+            report(submitted && submitted.review_reason ? `Offer listed — automated check flagged ${submitted.review_reason}: ${submitted.message}` : 'Offer listed. Its current status is shown below.');
         })));
         root.querySelectorAll('[data-offer]').forEach(button => button.addEventListener('click', () => run(button, async () => { await api(`/offers/${button.dataset.offer}`, 'PATCH', {status:button.dataset.status}); await productsPage(); })));
         const bindNewOffer = form => {

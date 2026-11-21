@@ -509,22 +509,24 @@ grep -q '^mode_preselected: yolo$' "$WORKDIR/list.out" || fail=1
 grep -q 'in review' "$WORKDIR/list.out" && fail=1
 grep -q '^mode: manual$' "$WORKDIR/digest.out" || fail=1
 grep -q '^mode_preselected: yolo$' "$WORKDIR/digest.out" || fail=1
-grep -q 'status: in review' "$WORKDIR/live-list.out" || fail=1
+grep -q 'status: listed' "$WORKDIR/live-list.out" || fail=1
+grep -q '^live: true$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^check: claims$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^message: Claims are not checked yet.$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^next: Submit again after this check passes.$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^mode: manual$' "$WORKDIR/live-list.out" || fail=1
 grep -q '^mode_preselected: yolo$' "$WORKDIR/live-list.out" || fail=1
-grep -q 'status: listed' "$WORKDIR/live-list.out" && fail=1
-[[ "$LIVE_STATUS" == "submitted" ]] || fail=1
-grep -q 'status: in review' "$WORKDIR/relevance-list.out" || fail=1
+grep -q 'status: in review' "$WORKDIR/live-list.out" && fail=1
+[[ "$LIVE_STATUS" == "listed" ]] || fail=1
+grep -q 'status: listed' "$WORKDIR/relevance-list.out" || fail=1
+grep -q '^live: true$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^check: claims$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^message: Claims are not checked yet.$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^next: Submit again after this check passes.$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^mode: manual$' "$WORKDIR/relevance-list.out" || fail=1
 grep -q '^mode_preselected: yolo$' "$WORKDIR/relevance-list.out" || fail=1
-grep -q 'status: listed' "$WORKDIR/relevance-list.out" && fail=1
-[[ "$RELEVANCE_STATUS" == "submitted" ]] || fail=1
+grep -q 'status: in review' "$WORKDIR/relevance-list.out" && fail=1
+[[ "$RELEVANCE_STATUS" == "listed" ]] || fail=1
 grep -q 'summary: Paste Forge' "$WORKDIR/digest.out" || fail=1
 grep -q 'live_now: true' "$WORKDIR/digest.out" || fail=1
 grep -q '^undo_token:' "$WORKDIR/digest.out" || fail=1
@@ -548,7 +550,7 @@ cat "$WORKDIR/kill.out"
 echo "-- untrusted maker, checks passing --"
 echo "server status: ${LIVE_STATUS}"
 cat "$WORKDIR/live-list.out"
-echo "-- untrusted maker, stub holds before relevance --"
+echo "-- untrusted maker, stub flags before relevance --"
 echo "server status: ${RELEVANCE_STATUS}"
 cat "$WORKDIR/relevance-list.out"
 if [[ "$fail" -ne 0 ]]; then
