@@ -252,6 +252,10 @@ func (h *OffersHandler) Submit(c *gin.Context) {
 // reason/message pair is an advisory flag from the automated checks: the
 // offer lists regardless, and the maker can see what to improve.
 func (h *OffersHandler) listOffer(c *gin.Context, offer *database.Offer, product *database.Product, reason, message string) {
+	if err := h.DB.UpdateOfferReview(c.Request.Context(), offer.ID, reason, message); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list offer"})
+		return
+	}
 	programID, err := h.DB.PromoteOffer(c.Request.Context(), offer.ID, offerSlug(product.Name, offer.ID))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list offer"})
@@ -390,7 +394,7 @@ func (h *OffersHandler) present(c *gin.Context, offer *database.Offer) gin.H {
 }
 
 func (h *OffersHandler) presentWith(c *gin.Context, offer *database.Offer, listed int, products map[string]*database.Product) gin.H {
-	reason, message := "", ""
+	reason, message := offer.ReviewReason, offer.ReviewMessage
 	var product *database.Product
 	if offer.Status == "submitted" {
 		if claimsHeld(h.ClaimsCheck) {
@@ -458,9 +462,6 @@ func (h *OffersHandler) reviewed(c *gin.Context, withCard bool) ([]gin.H, error)
 
 func offerJSON(o *database.Offer, reason, message string) gin.H {
 	reviewReason, reviewMessage := nullReview(reason, message)
-	if o.Status == "listed" {
-		reviewReason, reviewMessage = nil, nil
-	}
 	return gin.H{
 		"id":                   o.ID,
 		"product_id":           o.ProductID,

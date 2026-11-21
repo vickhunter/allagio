@@ -101,7 +101,7 @@ WHERE p.maker_id=$1 AND o.status='listed'`, makerID).Scan(&listed); err != nil |
 		t.Fatalf("cap: %d %v", rec.Code, body)
 	}
 	requireReview(t, body, reviewReasonCaps, reviewCapsMessage)
-	assertListedOnReads(t, r, makerKey, offerID)
+	assertListedOnReads(t, r, makerKey, offerID, reviewReasonCaps, reviewCapsMessage)
 	if queueLen(t, r) != 0 {
 		t.Fatal("a listed offer must not sit in the review queue")
 	}
@@ -163,25 +163,26 @@ func assertListedWithAdvisory(t *testing.T, terms, reason, message string) {
 		t.Fatalf("%s: %d %v", reason, rec.Code, body)
 	}
 	requireReview(t, body, reason, message)
-	assertListedOnReads(t, r, makerKey, offerID)
+	assertListedOnReads(t, r, makerKey, offerID, reason, message)
 	if queueLen(t, r) != 0 {
 		t.Fatalf("%s offer must list without waiting on the review queue", reason)
 	}
 }
 
-// assertListedOnReads verifies the offer reads as listed with empty review
-// fields: an advisory flag rides on the submit response only.
-func assertListedOnReads(t *testing.T, r *gin.Engine, makerKey, offerID string) {
+// assertListedOnReads verifies the offer reads as listed and that reads keep
+// reporting the advisory reason/message the submit response carried (nil/nil
+// when the offer listed clean).
+func assertListedOnReads(t *testing.T, r *gin.Engine, makerKey, offerID string, reason, message any) {
 	t.Helper()
 	_, got := doJSON(t, r, http.MethodGet, "/v1/maker/offers/"+offerID, makerKey, nil)
-	requireReview(t, got, nil, nil)
+	requireReview(t, got, reason, message)
 	if got["status"] != "listed" {
 		t.Fatalf("offer status %v", got["status"])
 	}
 	_, offers := doJSON(t, r, http.MethodGet, "/v1/maker/offers", makerKey, nil)
-	requireReview(t, itemByID(t, offers, "offers", offerID), nil, nil)
+	requireReview(t, itemByID(t, offers, "offers", offerID), reason, message)
 	_, listings := doJSON(t, r, http.MethodGet, "/v1/listings", makerKey, nil)
-	requireReview(t, itemByID(t, listings, "listings", offerID), nil, nil)
+	requireReview(t, itemByID(t, listings, "listings", offerID), reason, message)
 }
 
 func createDraftOffer(t *testing.T, r *gin.Engine, makerKey, name, website, terms string, commission float64) (string, string) {

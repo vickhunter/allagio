@@ -46,6 +46,8 @@ type Offer struct {
 	RefParam           string
 	Terms              string
 	ProgramID          *string
+	ReviewReason       string
+	ReviewMessage      string
 	CreatedAt          time.Time
 	UpdatedAt          time.Time
 }
@@ -167,11 +169,11 @@ RETURNING id`, o.ProductID, o.CommissionType, o.CommissionValue, o.CommissionUni
 	return id, err
 }
 
-const offerColumns = `o.id, o.product_id, o.status, o.commission_type, o.commission_value, COALESCE(o.commission_unit,''), o.commission_currency, o.cookie_duration_days, o.refund_window_days, o.landing_url, o.ref_param, COALESCE(o.terms,''), o.program_id, o.created_at, o.updated_at`
+const offerColumns = `o.id, o.product_id, o.status, o.commission_type, o.commission_value, COALESCE(o.commission_unit,''), o.commission_currency, o.cookie_duration_days, o.refund_window_days, o.landing_url, o.ref_param, COALESCE(o.terms,''), o.program_id, COALESCE(o.review_reason,''), COALESCE(o.review_message,''), o.created_at, o.updated_at`
 
 func scanOffer(row interface{ Scan(...interface{}) error }) (*Offer, error) {
 	var o Offer
-	if err := row.Scan(&o.ID, &o.ProductID, &o.Status, &o.CommissionType, &o.CommissionValue, &o.CommissionUnit, &o.CommissionCurrency, &o.CookieDurationDays, &o.RefundWindowDays, &o.LandingURL, &o.RefParam, &o.Terms, &o.ProgramID, &o.CreatedAt, &o.UpdatedAt); err != nil {
+	if err := row.Scan(&o.ID, &o.ProductID, &o.Status, &o.CommissionType, &o.CommissionValue, &o.CommissionUnit, &o.CommissionCurrency, &o.CookieDurationDays, &o.RefundWindowDays, &o.LandingURL, &o.RefParam, &o.Terms, &o.ProgramID, &o.ReviewReason, &o.ReviewMessage, &o.CreatedAt, &o.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &o, nil
@@ -217,7 +219,18 @@ WHERE o.id=$1`, offerID)
 }
 
 func (d *DB) UpdateOfferStatus(ctx context.Context, offerID, status string) error {
+	if status == "draft" {
+		_, err := d.Pool.Exec(ctx, `UPDATE offers SET status=$2, review_reason='', review_message='', updated_at=NOW() WHERE id=$1`, offerID, status)
+		return err
+	}
 	_, err := d.Pool.Exec(ctx, `UPDATE offers SET status=$2, updated_at=NOW() WHERE id=$1`, offerID, status)
+	return err
+}
+
+// UpdateOfferReview stores the advisory check outcome on a listed offer so
+// later reads report the same flag the submit response did.
+func (d *DB) UpdateOfferReview(ctx context.Context, offerID, reason, message string) error {
+	_, err := d.Pool.Exec(ctx, `UPDATE offers SET review_reason=$2, review_message=$3, updated_at=NOW() WHERE id=$1`, offerID, reason, message)
 	return err
 }
 

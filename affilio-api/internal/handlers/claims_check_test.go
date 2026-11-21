@@ -21,7 +21,7 @@ func TestClaimsCheckStubListsUntrustedWithAdvisory(t *testing.T) {
 		t.Fatalf("stub submit: %d %v", rec.Code, body)
 	}
 	requireReview(t, body, reviewReasonClaims, reviewClaimsNotLive)
-	assertListedOnReads(t, r, makerKey, offerID)
+	assertListedOnReads(t, r, makerKey, offerID, reviewReasonClaims, reviewClaimsNotLive)
 	if queueLen(t, r) != 0 {
 		t.Fatal("a stubbed offer lists without waiting on the review queue")
 	}
@@ -42,7 +42,7 @@ func TestClaimsCheckStubListsUntrustedWithAdvisory(t *testing.T) {
 	if body["status"] != "listed" {
 		t.Fatalf("the earlier untrusted offer must stay listed, got %d %v", rec.Code, body["status"])
 	}
-	requireReview(t, body, nil, nil)
+	requireReview(t, body, reviewReasonClaims, reviewClaimsNotLive)
 }
 
 func TestClaimsCheckOffLocalListsWhenChecksPass(t *testing.T) {

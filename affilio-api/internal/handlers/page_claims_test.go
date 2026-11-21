@@ -107,7 +107,7 @@ func TestClaimsCheckRealFlagsWhenPageDiffers(t *testing.T) {
 		t.Fatalf("real submit: %d %v", rec.Code, body)
 	}
 	requireReview(t, body, reviewReasonClaims, entry.PageClaimMessage(entry.PageReasonPrice))
-	assertListedOnReads(t, r, makerKey, offerID)
+	assertListedOnReads(t, r, makerKey, offerID, reviewReasonClaims, entry.PageClaimMessage(entry.PageReasonPrice))
 	if queueLen(t, r) != 0 {
 		t.Fatal("a price miss lists with an advisory flag, not a queue hold")
 	}
@@ -140,7 +140,7 @@ func TestClaimsCheckRealHeadMissListsWithAdvisory(t *testing.T) {
 		t.Fatalf("real submit: %d %v", rec.Code, body)
 	}
 	requireReview(t, body, reviewReasonHead, reviewHeadMessage)
-	assertListedOnReads(t, r, makerKey, offerID)
+	assertListedOnReads(t, r, makerKey, offerID, reviewReasonHead, reviewHeadMessage)
 }
 
 func TestRestoreAndRetryUsePageClaims(t *testing.T) {
