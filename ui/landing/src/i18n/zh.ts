@@ -83,7 +83,7 @@ export const zh: Messages = {
     items: [
       { id: 'affiliate', name: '联盟分佣', tag: '按成交 · 循环分成', terms: '已验证销售 20%', body: '仅在真实读者点击并完成转化后结算佣金。', href: '/use-cases/#affiliate-marketing' },
       { id: 'sponsored', name: '赞助投放', tag: '固定费用 · 明确标注', terms: '每篇文章 1 个标注位', body: '固定价格投放，强制通过披露标签与 rel="sponsored" 校验。', href: '/use-cases/#sponsorships' },
-      { id: 'swap', name: '内容互推', tag: '互换 · 零资金流动', terms: '双向实时链接核验', body: '两家 Newsletter 或博客互相推荐，主机持续验证链接存续。', href: '/use-cases/#link-exchanges' },
+      { id: 'swap', name: '内容互推', tag: '互换 · 零资金流动', terms: '双向实时链接核验', body: '两家 Newsletter 或博客互相推荐，主机持续验证链接存续。', href: '/use-cases/#newsletter-promotion' },
       { id: 'revshare', name: '多方分成', tag: 'ORP 0.4 · 3+ 方', terms: '50 / 30 / 20 比例', body: '联合推广与组合套装在品牌方、策展人与媒体间清晰拆分。', href: '/use-cases/#partnerships' },
       { id: 'slot', name: '库存赞助位', tag: '按验证点击计费', terms: '无 Cookie 点击凭证', body: 'Newsletter、播客或文章内的专属赞助位，无需追踪像素。', href: '/use-cases/#monetization' },
       { id: 'custom', name: '自定义 ORP 交易', tag: 'JSON Schema · 开放协议', terms: '自定义条款与里程碑', body: '在开放 ORP 协议上定义专属履约条件、凭证与结算方式。', href: '/protocol/' },

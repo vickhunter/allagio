@@ -16,7 +16,7 @@ export const siteCommands: Command[] = [
   { id: 'reference', label: 'Reference', href: '/reference' },
   { id: 'agents', label: 'MCP and setup', href: '/agents' },
   { id: 'faq', label: 'Money and FAQ', href: '#faq' },
-  { id: 'join', label: 'Join', keys: 'j', href: '#hero' },
+  { id: 'join', label: 'Join', keys: 'j', href: '#join' },
 ]
 
 // Shared header. Centered 3-zone bar: logo left, pill nav centered on wide screens,

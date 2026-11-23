@@ -79,10 +79,12 @@ test('approving at human gate transitions active -> execute -> receipt with proo
 
   const tpl = getTemplateById('affiliate')
   const envelope = buildOrpEnvelope(tpl, state)
-  assert.equal(envelope.type, 'orp.receipt')
-  assert.equal(envelope.proof_id, tpl.proofId)
-  assert.equal(envelope.proof_url, `/orp/proof/${tpl.proofId}`)
-  assert.equal(envelope.status, 'verified')
+  assert.equal(envelope.orp, '0.4')
+  assert.equal(envelope.type, 'receipt')
+  assert.equal(envelope.deal, tpl.dealId)
+  assert.equal(envelope.body.proof_id, tpl.proofId)
+  assert.equal(envelope.body.proof_url, `/orp/proof/${tpl.proofId}`)
+  assert.equal(envelope.body.status, 'verified')
 })
 
 test('approving with immediate option (reduced motion) completes directly to receipt', () => {
@@ -122,10 +124,11 @@ test('refusing halts the deal cleanly with zero placement and zero cash moved', 
   assert.equal(state.isPlaying, false)
 
   const envelope = buildOrpEnvelope(tpl, state)
-  assert.equal(envelope.type, 'orp.refuse')
-  assert.equal(envelope.status, 'halted_by_human')
-  assert.equal(envelope.placements_inserted, 0)
-  assert.equal(envelope.cash_moved, 0)
+  assert.equal(envelope.orp, '0.4')
+  assert.equal(envelope.type, 'decline')
+  assert.equal(envelope.body.reason, 'halted_by_human')
+  assert.equal(envelope.body.placements_inserted, 0)
+  assert.equal(envelope.body.cash_moved, 0)
 
   const reset = resetSimulation(state)
   assert.equal(reset.stage, 'ask')

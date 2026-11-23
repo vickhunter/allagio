@@ -458,7 +458,8 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         if (session.maker && offers.length) OfferSeen.remember(offers);
 
         const waitingDeals = deals.filter(deal => deal.waiting_on_you);
-        const pendingPlacements = placements.filter(p => p.status === 'pending' && !p.removed_at);
+        const nowMs = Date.now();
+        const pendingPlacements = placements.filter(p => p.status === 'pending' && !p.removed_at && (!p.expires_at || Date.parse(p.expires_at) > nowMs));
         const pendingCount = waitingDeals.length + pendingPlacements.length;
 
         const approvalRows = [
@@ -860,13 +861,15 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const pausedProjects = projects.filter(p => p.mode === 'manual').length;
         const activeProjects = projects.filter(p => p.mode !== 'manual').length;
         const hasPaused = pausedProjects > 0 || !!(digest && digest.paused && (digest.paused.account || digest.paused.site || digest.paused.offer));
-        const allPaused = projects.length > 0 ? activeProjects === 0 : hasPaused;
+        const allPaused = projects.length > 0 ? activeProjects === 0 : !!(digest && digest.paused && digest.paused.account);
         const isPartialPause = hasPaused && !allPaused;
         const killStatus = allPaused ? 'paused' : isPartialPause ? 'partially paused' : 'active';
         const killCopy = allPaused
             ? 'Linked sites and maker offers are paused. To stop ORP agents from negotiating deals, disconnect them below or set Agent steps to Off.'
             : isPartialPause
-                ? `${pausedProjects} of ${projects.length} linked sites/offers are paused while ${activeProjects} remain active. Pause the remaining automation or resume paused items.`
+                ? (projects.length > 0
+                    ? `${pausedProjects} of ${projects.length} linked sites/offers are paused while ${activeProjects} remain active. Pause the remaining automation or resume paused items.`
+                    : 'Some linked sites or offers are paused while others may remain active. Pause all remaining automation or resume paused items.')
                 : 'Pause linked sites and maker offers (switches them to manual approval and halts live placements). To stop ORP agents from negotiating deals, disconnect agents below or set Agent steps to Off.';
         const killActions = allPaused
             ? '<button type="button" data-primary-action data-kill-switch="resume">Resume automation</button>'

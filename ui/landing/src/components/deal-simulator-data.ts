@@ -386,7 +386,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
   },
   {
     id: 'ad_space',
-    label: 'Ad Space',
+    label: 'Inventory Slot',
     shortKind: 'space_booking',
     orpKind: 'sponsored',
     dealId: 'deal_01jv8d9space',
@@ -773,41 +773,61 @@ export function buildOrpEnvelope(template: DealTemplate, state: SimulatorState):
     refused: state.countered ? 5 : 4,
   }
   const typeMap: Record<SimulatorStage, string> = {
-    discover: 'orp.discover',
-    offer: 'orp.offer',
-    counter: 'orp.counter',
-    ask: 'orp.decide.pending',
-    active: 'orp.accept',
-    execute: 'orp.execute',
-    receipt: 'orp.receipt',
-    refused: 'orp.refuse',
+    discover: 'discover',
+    offer: 'offer',
+    counter: 'counter',
+    ask: 'offer',
+    active: 'accept',
+    execute: 'execute',
+    receipt: 'receipt',
+    refused: 'decline',
   }
 
-  const envelope: Record<string, unknown> = {
+  const fromParty =
+    state.stage === 'counter' || state.stage === 'refused' || state.stage === 'active' || state.stage === 'execute'
+      ? template.acceptor.id
+      : template.offerer.id
+  const toParty = fromParty === template.offerer.id ? template.acceptor.id : template.offerer.id
+  const msgType = typeMap[state.stage]
+
+  let body: Record<string, unknown>
+  if (state.stage === 'discover') {
+    body = { want: 'offers', kind: template.orpKind }
+  } else if (state.stage === 'active') {
+    body = { terms_hash: terms.termsHash }
+  } else if (state.stage === 'execute') {
+    body = { obligation: 'place', proof_url: `/orp/proof/${template.proofId}` }
+  } else if (state.stage === 'receipt') {
+    body = {
+      proof_id: template.proofId,
+      proof_url: `/orp/proof/${template.proofId}`,
+      terms_hash: terms.termsHash,
+      hard_checks: '9/9 passed',
+      status: 'verified',
+    }
+  } else if (state.stage === 'refused') {
+    body = {
+      reason: 'halted_by_human',
+      placements_inserted: 0,
+      cash_moved: 0,
+    }
+  } else {
+    body = {
+      id: template.dealId,
+      terms: terms.orpTerms,
+      terms_hash: terms.termsHash,
+    }
+  }
+
+  return {
     orp: '0.4',
-    type: typeMap[state.stage],
-    deal_id: template.dealId,
-    seq: seqMap[state.stage],
-    step_mode: 'ask',
-    from: state.stage === 'counter' || state.stage === 'refused' ? template.acceptor.id : template.offerer.id,
-    to: state.stage === 'counter' || state.stage === 'refused' ? template.offerer.id : template.acceptor.id,
-    terms_hash: terms.termsHash,
-    terms: terms.orpTerms,
-    signature: `${template.offerer.keyFingerprint.replace('…', '84f1')}…sig`,
+    type: msgType,
+    id: `msg_${template.dealId}_${seqMap[state.stage]}`,
+    ts: '2026-11-23T12:00:00Z',
+    from: fromParty,
+    to: toParty,
+    deal: template.dealId,
+    body,
+    sig: `ed25519..${template.offerer.keyFingerprint.replace(/[^A-Za-z0-9]/g, '').slice(0, 16)}`,
   }
-
-  if (state.stage === 'receipt') {
-    envelope.proof_id = template.proofId
-    envelope.proof_url = `/orp/proof/${template.proofId}`
-    envelope.hard_checks = '9/9 passed'
-    envelope.status = 'verified'
-  }
-
-  if (state.stage === 'refused') {
-    envelope.status = 'halted_by_human'
-    envelope.placements_inserted = 0
-    envelope.cash_moved = 0
-  }
-
-  return envelope
 }

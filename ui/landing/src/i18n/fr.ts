@@ -83,7 +83,7 @@ export const fr: Messages = {
     items: [
       { id: 'affiliate', name: 'Affiliation', tag: 'Par vente · récurrent', terms: '20% sur ventes vérifiées', body: 'Commission versée uniquement lorsqu’un lecteur vérifié clique et achète.', href: '/use-cases/#affiliate-marketing' },
       { id: 'sponsored', name: 'Placement sponsorisé', tag: 'Forfait · étiqueté', terms: '1 encart déclaré par article', body: 'Placement à tarif fixe avec mention obligatoire et vérification rel="sponsored".', href: '/use-cases/#sponsorships' },
-      { id: 'swap', name: 'Échange croisé', tag: 'Mutuel · 0 €', terms: 'Liens réciproques vérifiés', body: 'Deux newsletters ou blogs se recommandent avec vérification continue des liens.', href: '/use-cases/#link-exchanges' },
+      { id: 'swap', name: 'Échange croisé', tag: 'Mutuel · 0 €', terms: 'Liens réciproques vérifiés', body: 'Deux newsletters ou blogs se recommandent avec vérification continue des liens.', href: '/use-cases/#newsletter-promotion' },
       { id: 'revshare', name: 'Partage multi-parties', tag: 'ORP 0.4 · 3+ acteurs', terms: 'Partage 50 / 30 / 20', body: 'Co-promotions et bundles répartis proprement entre marques, curateurs et hôtes.', href: '/use-cases/#partnerships' },
       { id: 'slot', name: 'Emplacement d’inventaire', tag: 'Par clic vérifié', terms: 'Preuve de clic sans cookies', body: 'Emplacement dédié dans newsletters, podcasts ou articles sans pixels de suivi.', href: '/use-cases/#monetization' },
       { id: 'custom', name: 'Accord ORP sur mesure', tag: 'JSON Schema · protocole ouvert', terms: 'Vos propres conditions', body: 'Définissez vos jalons, preuves et rails de règlement sur le protocole ouvert ORP.', href: '/protocol/' },

@@ -198,23 +198,64 @@ func summarizeObligations(rawObls []any) []string {
 		if item == nil {
 			continue
 		}
-		typ, _ := item["type"].(string)
-		if typ == "" {
-			typ = "obligation"
+		label, _ := item["action"].(string)
+		if label == "" {
+			label, _ = item["type"].(string)
+		}
+		if label == "" {
+			label = "obligation"
 		}
 		var parts []string
-		parts = append(parts, typ)
+		parts = append(parts, label)
 		if amount, ok := item["amount"]; ok && amount != nil {
-			currency, _ := item["currency"].(string)
-			if currency != "" {
-				parts = append(parts, fmt.Sprintf("%v %s", amount, currency))
-			} else {
-				parts = append(parts, fmt.Sprintf("%v", amount))
+			if formatted := formatObligationAmount(amount, item); formatted != "" {
+				parts = append(parts, formatted)
 			}
 		} else if surface, _ := item["surface"].(string); surface != "" {
 			parts = append(parts, surface)
+		} else if dest, _ := item["destination"].(string); dest != "" {
+			parts = append(parts, dest)
 		}
 		out = append(out, strings.Join(parts, " · "))
 	}
 	return out
+}
+
+func formatObligationAmount(amount any, item map[string]any) string {
+	if m, ok := amount.(map[string]any); ok {
+		currency, _ := m["currency"].(string)
+		if minor, ok := numberToFloat(m["amount_minor"]); ok {
+			val := fmt.Sprintf("%.2f", minor/100)
+			if currency != "" {
+				return val + " " + currency
+			}
+			return val
+		}
+		if v, ok := numberToFloat(m["value"]); ok {
+			val := fmt.Sprintf("%g", v)
+			if currency != "" {
+				return val + " " + currency
+			}
+			return val
+		}
+		return ""
+	}
+	currency, _ := item["currency"].(string)
+	if currency != "" {
+		return fmt.Sprintf("%v %s", amount, currency)
+	}
+	return fmt.Sprintf("%v", amount)
+}
+
+func numberToFloat(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	default:
+		return 0, false
+	}
 }

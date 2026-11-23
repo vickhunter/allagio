@@ -126,7 +126,7 @@ export const en: Messages = {
         tag: 'Mutual · $0 moved',
         terms: 'Reciprocal verified links',
         body: 'Two newsletters, blogs, or feeds recommend each other with live link verification.',
-        href: '/use-cases/#link-exchanges',
+        href: '/use-cases/#newsletter-promotion',
       },
       {
         id: 'revshare',
