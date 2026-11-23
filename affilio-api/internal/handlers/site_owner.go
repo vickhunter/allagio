@@ -86,7 +86,7 @@ func (h *HostedHandler) CompleteSiteConnection(c *gin.Context) {
 			return
 		}
 		if issued {
-			body += `<div class="copy-field setup-command"><div class="row"><span class="eyebrow">PLUGIN KEY (SHOWN ONCE)</span><button type="button" class="copy-action" data-copy data-copied="Copied plugin key.">Copy key</button></div><pre><code>` + template.HTMLEscapeString(raw) + `</code></pre><span class="copy-status" role="status" aria-live="polite"></span></div><p class="caption">Save it in WordPress. It cannot be shown again.</p>`
+			body += `<div class="copy-field setup-command"><div class="row"><span class="eyebrow">Plugin key (shown once)</span><button type="button" class="copy-action" data-copy data-copied="Copied plugin key.">Copy key</button></div><pre><code>` + template.HTMLEscapeString(raw) + `</code></pre><span class="copy-status" role="status" aria-live="polite"></span></div><p class="caption">Save it in WordPress. It cannot be shown again.</p>`
 		}
 	}
 	body += `</section>`
