@@ -367,9 +367,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
-    const trimmed = url.trim()
-    const matchedChip = EXAMPLE_CHIPS.find((chip) => chip.url === trimmed)
-    await runPreviewForUrl(trimmed, matchedChip)
+    await runPreviewForUrl(url.trim())
   }
 
   function handleExampleClick(chip: ExampleChip) {
