@@ -67,7 +67,13 @@ function InstallTabs() {
   const extra = installs.filter((item) => !primaryIds.includes(item.id as (typeof primaryIds)[number]))
   const visible = showAll ? [...primary, ...extra] : primary
   const [active, setActive] = useState(primary[0]?.id ?? installs[0].id)
-  const current = installs.find((item) => item.id === active) ?? primary[0] ?? installs[0]
+  const current = visible.find((item) => item.id === active) ?? visible[0]
+  const toggleShowAll = () => {
+    if (showAll && !primary.some((item) => item.id === active)) {
+      setActive(primary[0]?.id ?? installs[0].id)
+    }
+    setShowAll(!showAll)
+  }
 
   return (
     <div className="mt-4">
@@ -104,7 +110,7 @@ function InstallTabs() {
         </div>
         <button
           type="button"
-          onClick={() => setShowAll((v) => !v)}
+          onClick={toggleShowAll}
           className="inline-flex min-h-11 items-center rounded-xl border border-line px-3 text-xs font-semibold text-t2 transition-colors hover:bg-s2 hover:text-t1"
         >
           {showAll ? 'Fewer clients' : `+${extra.length} more clients`}
