@@ -843,9 +843,11 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const agentLine = `Read ${skillURL} and connect this site to Allagio`;
         let progress = 'Start a builder account to see offer progress.';
         let humans = ['Create a builder account before an agent can register a product.', 'Submit an offer and it lists right away — automated checks run, no operator wait.'];
+        let hasMakerOffers = false;
         if (session.maker) {
             try {
                 const [{products},{offers}] = await Promise.all([api('/products'), api('/offers')]);
+                hasMakerOffers = Array.isArray(offers) && offers.length > 0;
                 OfferSeen.remember(offers);
                 const focus = pickFocus(products, offers);
                 progress = plainProgress(focus);
@@ -857,11 +859,11 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const humanList = humans.length ? `<ul class="task-list">${humans.map(step => `<li>${escape(step)}</li>`).join('')}</ul>` : '<p>Nothing here needs a person right now.</p>';
         const skillStatus = `<p class="caption" data-skill-status>${skillNote ? escape(skillNote) : 'The skill file is available.'}</p>`;
         const hasSite = !!session.publisher;
-        const hasMaker = !!session.maker;
-        const hasLinkedScopes = hasSite || hasMaker;
+        const hasOffers = hasMakerOffers;
+        const hasLinkedScopes = hasSite || hasOffers;
         const sitePaused = hasSite && !!(digest && digest.paused && digest.paused.site);
-        const offerPaused = hasMaker && !!(digest && digest.paused && digest.paused.offer);
-        const linkedScopesCount = (hasSite ? 1 : 0) + (hasMaker ? 1 : 0);
+        const offerPaused = hasOffers && !!(digest && digest.paused && digest.paused.offer);
+        const linkedScopesCount = (hasSite ? 1 : 0) + (hasOffers ? 1 : 0);
         const pausedScopesCount = (sitePaused ? 1 : 0) + (offerPaused ? 1 : 0);
         const allPaused = hasLinkedScopes && pausedScopesCount === linkedScopesCount;
         const isPartialPause = hasLinkedScopes && pausedScopesCount > 0 && pausedScopesCount < linkedScopesCount;
