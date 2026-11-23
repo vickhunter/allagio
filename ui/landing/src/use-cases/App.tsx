@@ -115,6 +115,7 @@ const templates: DealTemplate[] = [
         "id": "place_a",
         "by": "offerer",
         "action": "place",
+        "content": { "link": true },
         "destination": "https://partner-b.example",
         "due": "P14D",
         "proof": ["link"]
@@ -123,6 +124,7 @@ const templates: DealTemplate[] = [
         "id": "place_b",
         "by": "acceptor",
         "action": "place",
+        "content": { "link": true },
         "destination": "https://partner-a.example",
         "due": "P14D",
         "proof": ["link"]
@@ -286,6 +288,7 @@ const templates: DealTemplate[] = [
         "id": "credit",
         "by": "acceptor",
         "action": "place",
+        "content": { "link": true },
         "destination": "https://example.org/report",
         "proof": ["link"]
       }
