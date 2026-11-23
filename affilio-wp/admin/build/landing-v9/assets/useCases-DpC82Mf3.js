@@ -37,7 +37,7 @@ import{d as e,it as t,l as n,ot as r,r as i,rt as a,st as o,t as s}from"./Page-N
         "content": { "link": true },
         "destination": "https://brand.example/launch",
         "keep": "P30D",
-        "proof": ["link"]
+        "proof": ["proof_url"]
       },
       {
         "id": "pay",

@@ -78,7 +78,7 @@ const templates: DealTemplate[] = [
         "content": { "link": true },
         "destination": "https://brand.example/launch",
         "keep": "P30D",
-        "proof": ["link"]
+        "proof": ["proof_url"]
       },
       {
         "id": "pay",
