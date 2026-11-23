@@ -335,9 +335,9 @@ export function NetworkWall() {
         ) : null}
 
         {displayRows.length > 0 ? (
-          <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {displayRows.map((deal, i) => (
-              <li key={`${deal.kind}-${deal.updated_at}-${i}`}>
+              <li key={`${deal.kind}-${deal.updated_at}-${i}`} className="min-w-0">
                 <DealCard deal={deal} roles={roles} lang={lang} sandbox={showingSandbox} />
               </li>
             ))}
@@ -347,9 +347,9 @@ export function NetworkWall() {
         {offers.length > 0 ? (
           <>
             <h3 className="mt-12 text-sm font-semibold uppercase tracking-[0.12em] text-t2">{copy.offersLabel}</h3>
-            <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {offers.slice(0, 6).map((offer) => (
-                <li key={offer.offer_id}>
+                <li key={offer.offer_id} className="min-w-0">
                   <OfferCard offer={offer} joinLabel={copy.joinLabel} />
                 </li>
               ))}

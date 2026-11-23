@@ -407,7 +407,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
           autoCapitalize="off"
           spellCheck={false}
           value={url}
-          placeholder="https://example.com/your-post"
+          placeholder="https://example.com/your-post…"
           aria-invalid={errorCode === 400}
           aria-describedby={`${id}-public ${id}-status`}
           onChange={(event) => setUrl(event.target.value)}

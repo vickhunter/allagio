@@ -3,8 +3,6 @@ import { ArrowDownRight, ArrowRight, Check, Copy, Terminal, User } from "lucide-
 import { motion, useInView } from "motion/react"
 
 import { cn } from "@/lib/utils"
-import { BorderBeam } from "@/components/ui/border-beam"
-import { RetroGrid } from "@/components/ui/retro-grid"
 import { clientMarks, joinPrompt } from "@/components/join-prompt.mjs"
 import { setupHref } from "@/home/hero-copy.mjs"
 import { signInHref, withSource } from "@/lib/source"
@@ -19,25 +17,9 @@ const fadeUpVariants = {
 
 const ease = [0.21, 0.47, 0.32, 0.98] as const
 
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  )
-  useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)")
-    const handleChange = () => setReduced(query.matches)
-    query.addEventListener("change", handleChange)
-    return () => query.removeEventListener("change", handleChange)
-  }, [])
-  return reduced
-}
-
 export function Hero({ source }: { source: string }) {
   const fadeInRef = useRef(null)
   const fadeInInView = useInView(fadeInRef, { once: true })
-  const reducedMotion = usePrefersReducedMotion()
   const { t } = useLocale()
   const [audience, setAudience] = useState<HeroAudience>(() =>
     typeof window !== "undefined" && window.location.hash === "#join" ? "agent" : "human"
@@ -92,24 +74,16 @@ export function Hero({ source }: { source: string }) {
 
   return (
     <section id="hero" aria-labelledby="hero-h" className="band-light relative overflow-hidden">
-      <div
-        className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_75%_55%_at_50%_0%,rgb(var(--rgb-pub-soft)/0.85),transparent_70%)]"
-        data-hero-bg="fallback"
-        aria-hidden="true"
-      />
-      {reducedMotion ? null : <RetroGrid className="z-0 opacity-60" />}
-
       <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center px-5 pt-16 pb-14 text-center md:pt-24 md:pb-20">
-        <motion.div
+        <motion.p
           animate={fadeInInView ? "animate" : "initial"}
           variants={fadeUpVariants}
           initial={false}
           transition={{ duration: 0.45, ease }}
-          className="inline-flex items-center gap-2 rounded-full border border-line bg-s1 px-3.5 py-1.5 shadow-2xs"
+          className="eyebrow text-t2"
         >
-          <span className="h-2 w-2 rounded-full bg-pub" aria-hidden="true" />
-          <span className="eyebrow text-t1">{t.hero.eyebrow}</span>
-        </motion.div>
+          {t.hero.eyebrow}
+        </motion.p>
 
         <motion.h1
           id="hero-h"
@@ -312,8 +286,6 @@ export function Hero({ source }: { source: string }) {
                 </ol>
                 <p className="mt-2 text-xs text-t2">{t.connect.noSignIn}</p>
               </details>
-
-              {!reducedMotion && <BorderBeam size={160} duration={9} borderWidth={1.5} />}
             </div>
           )}
         </motion.div>
@@ -323,13 +295,13 @@ export function Hero({ source }: { source: string }) {
           <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-t2">
             {t.clients.heading}
           </p>
-          <ul className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5">
             {clientMarks.map((mark) => (
               <li
                 key={mark.name}
-                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-s1 px-3 py-1.5 text-xs font-semibold text-t1"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-t2 transition-colors hover:text-t1"
               >
-                <svg viewBox="0 0 24 24" width={13} height={13} role="img" aria-label={mark.name} className="shrink-0 opacity-75">
+                <svg viewBox="0 0 24 24" width={14} height={14} role="img" aria-label={mark.name} className="shrink-0 opacity-70">
                   <path d={mark.d} fill="currentColor" />
                 </svg>
                 {mark.name}

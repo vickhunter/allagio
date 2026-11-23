@@ -14,11 +14,9 @@ import {
   Play,
   RotateCcw,
   ShieldCheck,
-  Sparkles,
   UserCheck,
   Zap,
 } from 'lucide-react'
-import { BorderBeam } from '@/components/ui/border-beam'
 import { cn } from '@/lib/utils'
 import {
   DEAL_TEMPLATES,
@@ -121,52 +119,35 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
 
   return (
     <section
-      aria-labelledby="deal-simulator-h"
+      aria-label="ORP 0.4 Interactive Deal Simulator"
       data-deal-simulator
       data-template={state.templateId}
       data-stage={state.stage}
       className={cn(
-        'relative overflow-hidden rounded-3xl border border-[#F7F5F0]/12 bg-[#111310] text-[#F7F5F0] shadow-2xl',
+        'relative overflow-hidden rounded-2xl border border-[#2E2E2B] bg-[#1B1B19] text-[#F5F3EE]',
         className
       )}
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_60%_at_15%_0%,rgba(46,125,79,0.16),transparent_60%),radial-gradient(60%_50%_at_95%_10%,rgba(217,119,6,0.10),transparent_55%)]"
-      />
-
-      <div className="relative p-5 sm:p-8 lg:p-10">
-        {/* Top bar */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-[#6EE7A0]">
-              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-              ORP 0.4 · Interactive Deal Simulator
-            </p>
-            <h2
-              id="deal-simulator-h"
-              className="mt-2 font-display text-2xl font-bold tracking-[-0.03em] text-[#F7F5F0] sm:text-3xl lg:text-4xl"
-            >
-              Watch two agents negotiate — and hold the final switch.
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-[#B8BFB2] sm:text-base">
-              Pick a deal template, inspect the signed ORP wire payload, then approve, counter, or refuse at the human gate.
-            </p>
-          </div>
+      <div className="relative p-5 sm:p-7 lg:p-8">
+        {/* Compact toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-[#A2A29A]">
+            ORP 0.4 · Interactive Deal Simulator
+          </p>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleReplay}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#F7F5F0]/15 bg-[#181B17] px-3.5 text-xs font-semibold text-[#F7F5F0] transition-colors hover:border-[#2E7D4F] hover:bg-[#1E241C]"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#343430] bg-[#141413] px-3.5 text-xs font-semibold text-[#F5F3EE] transition-colors hover:border-[#52524C] hover:bg-[#22221F]"
             >
-              <Play className="h-3.5 w-3.5 text-[#6EE7A0]" aria-hidden="true" />
+              <Play className="h-3.5 w-3.5 text-[#86B89A]" aria-hidden="true" />
               Replay wire
             </button>
             <button
               type="button"
               onClick={handleReset}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#F7F5F0]/15 bg-[#181B17] px-3.5 text-xs font-semibold text-[#B8BFB2] transition-colors hover:border-[#F7F5F0]/30 hover:text-[#F7F5F0]"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#343430] bg-[#141413] px-3.5 text-xs font-semibold text-[#A2A29A] transition-colors hover:border-[#52524C] hover:text-[#F5F3EE]"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               Reset
@@ -176,15 +157,15 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
               onClick={() => setState((prev) => toggleJsonDrawer(prev))}
               aria-expanded={state.showJson}
               className={cn(
-                'inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-3.5 font-mono text-xs font-medium transition-colors',
+                'inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-3.5 font-mono text-xs font-medium transition-colors',
                 state.showJson
-                  ? 'border-[#2E7D4F] bg-[#2E7D4F]/20 text-[#6EE7A0]'
-                  : 'border-[#F7F5F0]/15 bg-[#181B17] text-[#B8BFB2] hover:border-[#F7F5F0]/30 hover:text-[#F7F5F0]'
+                  ? 'border-[#F5F3EE] bg-[#F5F3EE] text-[#141413]'
+                  : 'border-[#343430] bg-[#141413] text-[#A2A29A] hover:border-[#52524C] hover:text-[#F5F3EE]'
               )}
             >
               <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
               View ORP JSON
-              {state.showJson ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              {state.showJson ? <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}
             </button>
           </div>
         </div>
@@ -193,7 +174,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
         <div
           role="tablist"
           aria-label="ORP deal templates"
-          className="mt-6 flex flex-wrap gap-2 border-b border-[#F7F5F0]/10 pb-5"
+          className="mt-6 flex flex-wrap gap-2 border-b border-[#2E2E2B] pb-5"
         >
           {DEAL_TEMPLATES.map((item) => {
             const active = item.id === state.templateId
@@ -206,17 +187,17 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                 data-template-pill={item.id}
                 onClick={() => handleSelectTemplate(item.id)}
                 className={cn(
-                  'inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold transition-all',
+                  'inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors',
                   active
-                    ? 'border-[#2E7D4F] bg-[#2E7D4F] text-[#F7F5F0] shadow-[0_0_20px_rgba(46,125,79,0.35)]'
-                    : 'border-[#F7F5F0]/15 bg-[#181B17] text-[#B8BFB2] hover:border-[#F7F5F0]/35 hover:text-[#F7F5F0]'
+                    ? 'border-[#F5F3EE] bg-[#F5F3EE] text-[#141413]'
+                    : 'border-[#343430] bg-[#141413] text-[#A2A29A] hover:border-[#52524C] hover:text-[#F5F3EE]'
                 )}
               >
                 <span>{item.label}</span>
                 <span
                   className={cn(
-                    'rounded-full px-1.5 py-0.5 font-mono text-[10px] uppercase',
-                    active ? 'bg-[#111310]/30 text-[#F7F5F0]' : 'bg-[#111310] text-[#8E9687]'
+                    'font-mono text-[10px] uppercase',
+                    active ? 'text-[#52524C]' : 'text-[#7A7A72]'
                   )}
                 >
                   {item.orpKind}
@@ -229,9 +210,9 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
         {/* Main 2-column simulator body */}
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
           {/* Left: Named Agents + Live ORP Wire Timeline */}
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-4">
             {/* Parties bar */}
-            <div className="rounded-2xl border border-[#F7F5F0]/10 bg-[#181B17] p-4">
+            <div className="rounded-2xl border border-[#F7F5F0]/10 bg-[#1B1B19] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="font-mono text-[10px] uppercase tracking-wider text-[#8E9687]">
@@ -240,10 +221,10 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   <p className="truncate font-mono text-sm font-semibold text-[#F7F5F0]">
                     {template.offerer.handle}
                   </p>
-                  <p className="font-mono text-[11px] text-[#6EE7A0]">{template.offerer.keyFingerprint}</p>
+                  <p className="font-mono text-[11px] text-[#86B89A]">{template.offerer.keyFingerprint}</p>
                 </div>
 
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2E7D4F]/40 bg-[#2E7D4F]/15 text-[#6EE7A0]">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2E7D4F]/40 bg-[#2E7D4F]/15 text-[#86B89A]">
                   <ArrowLeftRight className="h-4 w-4" aria-hidden="true" />
                 </div>
 
@@ -261,7 +242,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
               {template.extraParty ? (
                 <div className="mt-3 flex items-center justify-between border-t border-[#F7F5F0]/10 pt-2.5 font-mono text-[11px] text-[#B8BFB2]">
                   <span>3rd seat · {template.extraParty.label}: {template.extraParty.handle}</span>
-                  <span className="text-[#6EE7A0]">{template.extraParty.keyFingerprint}</span>
+                  <span className="text-[#86B89A]">{template.extraParty.keyFingerprint}</span>
                 </div>
               ) : null}
             </div>
@@ -278,7 +259,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium text-[#F7F5F0]">{template.discoverMatch}</p>
-                  <span className="rounded-md bg-[#2E7D4F]/20 px-2 py-0.5 font-mono text-[11px] text-[#6EE7A0]">
+                  <span className="rounded-md bg-[#2E7D4F]/20 px-2 py-0.5 font-mono text-[11px] text-[#86B89A]">
                     {template.discoverScore}
                   </span>
                 </div>
@@ -297,16 +278,16 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
                   <span
                     data-terms-hash
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#F7F5F0]/12 bg-[#111310] px-2.5 py-1 font-mono text-[11px] text-[#B8BFB2]"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-[#F7F5F0]/12 bg-[#141413] px-2.5 py-1 font-mono text-[11px] text-[#B8BFB2]"
                     title={terms.termsHash}
                   >
-                    <Hash className="h-3 w-3 text-[#6EE7A0]" aria-hidden="true" />
+                    <Hash className="h-3 w-3 text-[#86B89A]" aria-hidden="true" />
                     {shortHash(terms.termsHash)}
                   </span>
                   <button
                     type="button"
                     onClick={() => setState((prev) => toggleJsonDrawer(prev))}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[#F7F5F0]/12 bg-[#111310] px-2.5 py-1 font-mono text-[11px] text-[#6EE7A0] transition-colors hover:border-[#2E7D4F]"
+                    className="inline-flex items-center gap-1 rounded-lg border border-[#F7F5F0]/12 bg-[#141413] px-2.5 py-1 font-mono text-[11px] text-[#86B89A] transition-colors hover:border-[#2E7D4F]"
                   >
                     <Code2 className="h-3 w-3" aria-hidden="true" />
                     {state.showJson ? 'Hide ORP JSON' : 'Inspect JSON'}
@@ -335,32 +316,32 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
               <li
                 data-human-gate
                 className={cn(
-                  'rounded-2xl border p-4 transition-colors',
+                  'rounded-xl border border-l-2 p-4 transition-colors',
                   isWaitingHuman
-                    ? 'border-[#D97706] bg-[#D97706]/10 shadow-[0_0_24px_rgba(217,119,6,0.14)]'
+                    ? 'border-[#343430] border-l-[#D6A65B] bg-[#141413]'
                     : isRefused
-                      ? 'border-red-500/40 bg-red-950/25'
+                      ? 'border-red-500/35 border-l-red-400 bg-[#141413]'
                       : isApprovedFlow
-                        ? 'border-[#2E7D4F]/50 bg-[#2E7D4F]/10'
-                        : 'border-[#F7F5F0]/10 bg-[#181B17]/60 opacity-60'
+                        ? 'border-[#343430] border-l-[#86B89A] bg-[#141413]'
+                        : 'border-[#2E2E2B] border-l-[#52524C] bg-[#141413]/70 opacity-60'
                 )}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#D97706]/20 font-mono text-[11px] font-bold text-[#F59E0B]">
+                    <span className="font-mono text-[11px] font-semibold text-[#D6A65B]">
                       {state.countered ? '04' : '03'}
                     </span>
-                    <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold uppercase tracking-wider text-[#F7F5F0]">
-                      <UserCheck className="h-3.5 w-3.5 text-[#F59E0B]" aria-hidden="true" />
+                    <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold uppercase tracking-wider text-[#F5F3EE]">
+                      <UserCheck className="h-3.5 w-3.5 text-[#D6A65B]" aria-hidden="true" />
                       Human Approval Gate
                     </span>
-                    <span className="rounded-md border border-[#D97706]/40 bg-[#D97706]/15 px-2 py-0.5 font-mono text-[10px] uppercase text-[#F59E0B]">
+                    <span className="rounded border border-[#343430] bg-[#1B1B19] px-2 py-0.5 font-mono text-[10px] uppercase text-[#D6A65B]">
                       ask mode
                     </span>
                   </div>
 
                   {isApprovedFlow ? (
-                    <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-[#6EE7A0]">
+                    <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-[#86B89A]">
                       <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                       Approved
                     </span>
@@ -370,11 +351,11 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                       Refused
                     </span>
                   ) : isWaitingHuman ? (
-                    <span className="font-mono text-[11px] text-[#F59E0B]">Awaiting your switch</span>
+                    <span className="font-mono text-[11px] text-[#D6A65B]">Awaiting your switch</span>
                   ) : null}
                 </div>
 
-                <p className="mt-2 text-xs leading-relaxed text-[#D4D8CE]">
+                <p className="mt-2 text-xs leading-relaxed text-[#A2A29A]">
                   {isWaitingHuman
                     ? 'Nothing publishes or moves until you decide. Approve to sign and execute, Counter to negotiate better terms, or Refuse to halt with zero placement.'
                     : isApprovedFlow
@@ -390,7 +371,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                       type="button"
                       data-action="approve"
                       onClick={() => handleDecision('approve')}
-                      className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#2E7D4F] px-4 text-sm font-semibold text-[#F7F5F0] shadow-sm transition-colors hover:bg-[#35905B]"
+                      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-[#F5F3EE] px-4 text-sm font-semibold text-[#141413] transition-opacity hover:opacity-90"
                     >
                       <Check className="h-4 w-4" aria-hidden="true" />
                       Approve Deal
@@ -401,10 +382,10 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                       disabled={state.countered}
                       onClick={() => handleDecision('counter')}
                       className={cn(
-                        'inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-4 text-sm font-semibold transition-colors',
+                        'inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-4 text-sm font-semibold transition-colors',
                         state.countered
-                          ? 'cursor-not-allowed border-[#F7F5F0]/10 bg-[#181B17] text-[#8E9687]'
-                          : 'border-[#D97706]/60 bg-[#D97706]/15 text-[#FBBF24] hover:bg-[#D97706]/25'
+                          ? 'cursor-not-allowed border-[#2E2E2B] bg-[#1B1B19] text-[#7A7A72]'
+                          : 'border-[#52524C] bg-[#1B1B19] text-[#F5F3EE] hover:border-[#D6A65B] hover:text-[#D6A65B]'
                       )}
                     >
                       <ArrowLeftRight className="h-4 w-4" aria-hidden="true" />
@@ -414,7 +395,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                       type="button"
                       data-action="refuse"
                       onClick={() => handleDecision('refuse')}
-                      className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-red-500/35 bg-red-950/30 px-4 text-sm font-semibold text-red-300 transition-colors hover:bg-red-950/60"
+                      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#343430] bg-transparent px-4 text-sm font-semibold text-[#A2A29A] transition-colors hover:border-red-400/50 hover:text-red-300"
                     >
                       <Ban className="h-4 w-4" aria-hidden="true" />
                       Refuse
@@ -434,7 +415,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                     'rounded-2xl border p-4',
                     isReceipt
                       ? 'border-[#2E7D4F] bg-[#2E7D4F]/14'
-                      : 'border-[#F7F5F0]/15 bg-[#181B17]'
+                      : 'border-[#F7F5F0]/15 bg-[#1B1B19]'
                   )}
                 >
                   <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
@@ -448,24 +429,24 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   {isReceipt ? (
                     <div className="mt-3 flex flex-col gap-2.5 border-t border-[#2E7D4F]/30 pt-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#6EE7A0]">
+                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#86B89A]">
                           <FileCheck2 className="h-4 w-4" aria-hidden="true" />
                           Verified ORP Receipt issued
                         </span>
                         <span
                           data-proof-id
-                          className="rounded-md border border-[#2E7D4F]/50 bg-[#111310] px-2.5 py-1 font-mono text-xs font-semibold text-[#6EE7A0]"
+                          className="rounded-md border border-[#2E7D4F]/50 bg-[#141413] px-2.5 py-1 font-mono text-xs font-semibold text-[#86B89A]"
                         >
                           {template.proofId}
                         </span>
                       </div>
-                      <p className="font-mono text-xs text-[#B8BFB2]">
+                      <p className="break-all font-mono text-xs text-[#B8BFB2]">
                         GET /orp/proof/{template.proofId} · hash-chained &amp; signed by both agents
                       </p>
                       <ul className="mt-1 grid gap-1.5 text-xs text-[#D4D8CE]">
                         {template.hardChecks.map((check) => (
                           <li key={check} className="flex items-center gap-2">
-                            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#6EE7A0]" aria-hidden="true" />
+                            <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#86B89A]" aria-hidden="true" />
                             <span>{check}</span>
                           </li>
                         ))}
@@ -473,7 +454,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                     </div>
                   ) : (
                     <p className="mt-3 flex items-center gap-2 text-xs text-[#B8BFB2]">
-                      <Zap className="h-3.5 w-3.5 text-[#6EE7A0]" aria-hidden="true" />
+                      <Zap className="h-3.5 w-3.5 text-[#86B89A]" aria-hidden="true" />
                       {state.stage === 'active'
                         ? 'Signing hash-chained acceptance envelope…'
                         : 'Verifying hard checks and issuing ORP Receipt…'}
@@ -495,15 +476,15 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   className="overflow-hidden rounded-2xl border border-[#F7F5F0]/15 bg-[#0B0D0A]"
                 >
                   <div className="flex items-center justify-between border-b border-[#F7F5F0]/10 px-4 py-2.5">
-                    <span className="font-mono text-xs text-[#6EE7A0]">
+                    <span className="font-mono text-xs text-[#86B89A]">
                       ORP 0.4 Wire Payload · {template.dealId}
                     </span>
                     <button
                       type="button"
                       onClick={handleCopyJson}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#F7F5F0]/15 bg-[#181B17] px-2.5 py-1 font-mono text-[11px] text-[#F7F5F0] hover:border-[#2E7D4F]"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#F7F5F0]/15 bg-[#1B1B19] px-2.5 py-1 font-mono text-[11px] text-[#F7F5F0] hover:border-[#2E7D4F]"
                     >
-                      {copiedJson ? <Check className="h-3 w-3 text-[#6EE7A0]" /> : <Copy className="h-3 w-3" />}
+                      {copiedJson ? <Check className="h-3 w-3 text-[#86B89A]" /> : <Copy className="h-3 w-3" />}
                       {copiedJson ? 'Copied' : 'Copy JSON'}
                     </button>
                   </div>
@@ -516,17 +497,14 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
           </div>
 
           {/* Right: Live Preview Artifact Panel */}
-          <div className="relative overflow-hidden rounded-2xl border border-[#F7F5F0]/12 bg-[#181B17] p-5">
-            {isReceipt && !reduced ? (
-              <BorderBeam size={180} duration={8} colorFrom="#2E7D4F" colorTo="#D97706" borderWidth={1.5} />
-            ) : null}
+          <div className="relative min-w-0 overflow-hidden rounded-xl border border-[#2E2E2B] bg-[#141413] p-5">
 
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F7F5F0]/10 pb-3.5">
               <span className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-[#B8BFB2]">
                 Resulting Artifact
               </span>
               {isReceipt ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2E7D4F]/25 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[#6EE7A0]">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2E7D4F]/25 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[#86B89A]">
                   <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                   Live · Verified
                 </span>
@@ -536,14 +514,14 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   Halted · 0 Placements
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D97706]/20 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[#FBBF24]">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#D97706]/20 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[#D6A65B]">
                   Preview · Uncommitted
                 </span>
               )}
             </div>
 
             {isRefused ? (
-              <div data-refused-preview className="mt-5 rounded-xl border border-red-500/25 bg-[#111310] p-5 text-center">
+              <div data-refused-preview className="mt-5 rounded-xl border border-red-500/25 bg-[#141413] p-5 text-center">
                 <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-red-500/15 text-red-300">
                   <Ban className="h-5 w-5" aria-hidden="true" />
                 </div>
@@ -551,7 +529,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   Zero placement. Page untouched.
                 </h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-[#B8BFB2]">
-                  Because <code className="font-mono text-xs text-[#FBBF24]">ask</code> mode gated execution, refusing the offer stopped the deal before any link or card reached your site.
+                  Because <code className="font-mono text-xs text-[#D6A65B]">ask</code> mode gated execution, refusing the offer stopped the deal before any link or card reached your site.
                 </p>
                 <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#F7F5F0]/10 pt-4 font-mono text-xs">
                   <div>
@@ -570,7 +548,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#F7F5F0]/20 bg-[#181B17] px-4 text-xs font-semibold text-[#F7F5F0] hover:border-[#2E7D4F]"
+                  className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#F7F5F0]/20 bg-[#1B1B19] px-4 text-xs font-semibold text-[#F7F5F0] hover:border-[#2E7D4F]"
                 >
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                   Re-open at human gate
@@ -581,10 +559,10 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                 {/* Light paper-contrast preview card to mirror how it sits in a real post */}
                 <div
                   className={cn(
-                    'rounded-xl border p-4 transition-all',
+                    'rounded-xl border p-4 transition-colors',
                     isReceipt
-                      ? 'border-[#2E7D4F] bg-[#F7F5F0] text-[#111310]'
-                      : 'border-[#F7F5F0]/15 bg-[#111310] text-[#F7F5F0]'
+                      ? 'border-[#2E7D4F] bg-[#F7F5F0] text-[#141413]'
+                      : 'border-[#F7F5F0]/15 bg-[#141413] text-[#F7F5F0]'
                   )}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -593,7 +571,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                         'rounded-md px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider',
                         isReceipt
                           ? 'bg-[#2E7D4F]/15 text-[#2E7D4F]'
-                          : 'bg-[#2E7D4F]/20 text-[#6EE7A0]'
+                          : 'bg-[#2E7D4F]/20 text-[#86B89A]'
                       )}
                     >
                       {artifact.badge}
@@ -627,8 +605,8 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                           className={cn(
                             'flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs',
                             isReceipt
-                              ? 'border-[#232720]/15 bg-white text-[#111310]'
-                              : 'border-[#F7F5F0]/10 bg-[#181B17] text-[#F7F5F0]'
+                              ? 'border-[#232720]/15 bg-white text-[#141413]'
+                              : 'border-[#F7F5F0]/10 bg-[#1B1B19] text-[#F7F5F0]'
                           )}
                         >
                           <div>
@@ -647,7 +625,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                     <div className="mt-3 overflow-hidden rounded-lg border border-current/15">
                       <table className="w-full text-left text-xs">
                         <thead>
-                          <tr className={isReceipt ? 'bg-[#ECEFE2] text-[#5C6257]' : 'bg-[#181B17] text-[#8E9687]'}>
+                          <tr className={isReceipt ? 'bg-[#ECEFE2] text-[#5C6257]' : 'bg-[#1B1B19] text-[#8E9687]'}>
                             <th className="px-2.5 py-1.5 font-mono font-medium">Party</th>
                             <th className="px-2.5 py-1.5 font-mono font-medium">Split</th>
                             <th className="px-2.5 py-1.5 text-right font-mono font-medium">Payout</th>
@@ -685,16 +663,16 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   {artifact.metrics.map((m) => (
                     <div
                       key={m.label}
-                      className="rounded-xl border border-[#F7F5F0]/10 bg-[#111310] p-3"
+                      className="rounded-xl border border-[#F7F5F0]/10 bg-[#141413] p-3"
                     >
                       <p className="font-mono text-[10px] uppercase tracking-wider text-[#8E9687]">{m.label}</p>
                       <p
                         className={cn(
                           'mt-1 font-mono text-sm font-semibold tabular',
                           m.accent === 'emerald'
-                            ? 'text-[#6EE7A0]'
+                            ? 'text-[#86B89A]'
                             : m.accent === 'amber'
-                              ? 'text-[#FBBF24]'
+                              ? 'text-[#D6A65B]'
                               : 'text-[#F7F5F0]'
                         )}
                       >
@@ -705,10 +683,10 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                 </div>
 
                 {/* Terms fingerprint footer */}
-                <div className="rounded-xl border border-[#F7F5F0]/10 bg-[#111310] p-3 font-mono text-[11px] text-[#B8BFB2]">
+                <div className="rounded-xl border border-[#F7F5F0]/10 bg-[#141413] p-3 font-mono text-[11px] text-[#B8BFB2]">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[#8E9687]">TERMS FINGERPRINT</span>
-                    <span className="text-[#6EE7A0]">{state.countered ? 'v2 (countered)' : 'v1 (initial)'}</span>
+                    <span className="text-[#86B89A]">{state.countered ? 'v2 (countered)' : 'v1 (initial)'}</span>
                   </div>
                   <p className="mt-1 break-all text-[#F7F5F0]">{shortHash(terms.termsHash)}</p>
                 </div>
@@ -750,7 +728,7 @@ function TimelineStep({
           ? isAmber
             ? 'border-[#D97706] bg-[#D97706]/10'
             : 'border-[#2E7D4F] bg-[#2E7D4F]/12'
-          : 'border-[#F7F5F0]/10 bg-[#181B17]'
+          : 'border-[#F7F5F0]/10 bg-[#1B1B19]'
       )}
     >
       <div className="flex items-center gap-2">
@@ -759,9 +737,9 @@ function TimelineStep({
             'inline-flex h-6 w-6 items-center justify-center rounded-full font-mono text-[11px] font-bold',
             status === 'done'
               ? isAmber
-                ? 'bg-[#D97706]/25 text-[#FBBF24]'
-                : 'bg-[#2E7D4F]/25 text-[#6EE7A0]'
-              : 'bg-[#111310] text-[#8E9687]'
+                ? 'bg-[#D97706]/25 text-[#D6A65B]'
+                : 'bg-[#2E7D4F]/25 text-[#86B89A]'
+              : 'bg-[#141413] text-[#8E9687]'
           )}
         >
           {index}
@@ -769,7 +747,7 @@ function TimelineStep({
         <span
           className={cn(
             'font-mono text-xs font-semibold uppercase tracking-wider',
-            isAmber ? 'text-[#FBBF24]' : 'text-[#6EE7A0]'
+            isAmber ? 'text-[#D6A65B]' : 'text-[#86B89A]'
           )}
         >
           {verb}
@@ -788,8 +766,8 @@ function StagePill({ label, done, active }: { label: string; done: boolean; acti
         active
           ? 'border-[#2E7D4F] bg-[#2E7D4F] text-[#F7F5F0] font-semibold'
           : done
-            ? 'border-[#2E7D4F]/50 bg-[#2E7D4F]/20 text-[#6EE7A0]'
-            : 'border-[#F7F5F0]/15 bg-[#111310] text-[#8E9687]'
+            ? 'border-[#2E7D4F]/50 bg-[#2E7D4F]/20 text-[#86B89A]'
+            : 'border-[#F7F5F0]/15 bg-[#141413] text-[#8E9687]'
       )}
     >
       {done ? <Check className="h-3 w-3" aria-hidden="true" /> : null}

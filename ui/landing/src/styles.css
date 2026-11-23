@@ -351,37 +351,36 @@ body{margin:0;font-weight:500}
 .compare h3{margin:0;font-family:var(--font-display);font-size:1.7rem;letter-spacing:-.03em}
 .compare p{margin:10px 0 0;color:rgb(var(--rgb-text-2));font-size:16px;line-height:1.45}
 
-/* High-contrast dark editorial contrast band: re-scopes surface, text, border,
-   and emerald/amber accent tokens so nested cards, NetworkWall, PostPreview,
-   and PlatformShowcase render natively on dark ink surfaces. */
+/* High-contrast dark editorial contrast band: neutral charcoal surfaces
+   with warm off-white ink and restrained sage/brass semantic tokens. */
 .band-dark{
-  --rgb-surface-0:17 19 16;
-  --rgb-surface-1:24 27 23;
-  --rgb-surface-2:33 37 31;
-  --rgb-text-1:245 245 239;
-  --rgb-text-2:168 175 162;
-  --rgb-line:46 52 43;
-  --rgb-line-strong:70 79 66;
-  --rgb-pub:74 222 128;
-  --rgb-pub-soft:20 48 31;
-  --rgb-maker:245 158 11;
-  --rgb-maker-brand:251 191 36;
-  --rgb-maker-soft:54 37 14;
-  --rgb-setup:110 168 254;
-  --rgb-setup-edge:147 197 253;
-  --rgb-setup-soft:24 38 66;
-  --rgb-moss:52 211 153;
-  --rgb-moss-edge:16 112 78;
+  --rgb-surface-0:20 20 19;
+  --rgb-surface-1:27 27 25;
+  --rgb-surface-2:36 36 33;
+  --rgb-text-1:245 243 238;
+  --rgb-text-2:162 162 154;
+  --rgb-line:46 46 43;
+  --rgb-line-strong:72 72 67;
+  --rgb-pub:134 184 154;
+  --rgb-pub-soft:26 40 32;
+  --rgb-maker:214 166 91;
+  --rgb-maker-brand:226 184 114;
+  --rgb-maker-soft:46 37 22;
+  --rgb-setup:146 174 214;
+  --rgb-setup-edge:172 196 228;
+  --rgb-setup-soft:28 36 48;
+  --rgb-moss:134 184 154;
+  --rgb-moss-edge:64 110 82;
   background-color:rgb(var(--rgb-surface-0));
   color:rgb(var(--rgb-text-1));
 }
-.band-dark .eyebrow{color:rgb(var(--rgb-pub))}
-.band-dark .kicker{color:rgb(var(--rgb-pub))}
+.band-dark .eyebrow{color:rgb(var(--rgb-text-2))}
+.band-dark .kicker{color:rgb(var(--rgb-text-2))}
 .band-dark .post-hi{
-  background:linear-gradient(100deg,rgba(74,222,128,.24),rgba(110,168,254,.24),rgba(245,158,11,.24));
+  background:rgba(214,166,91,.22);
 }
-.band-dark ::selection{background:rgba(74,222,128,.25);color:rgb(var(--rgb-text-1))}
-.band-dark :focus-visible{outline-color:rgb(var(--rgb-pub))}
+.band-dark ::selection{background:rgba(134,184,154,.25);color:rgb(var(--rgb-text-1))}
+.band-dark :focus-visible{outline-color:rgb(var(--rgb-text-1))}
 .band-dark [data-post-preview] button[type="submit"]{
   background:rgb(var(--rgb-text-1));
   color:rgb(var(--rgb-surface-0));

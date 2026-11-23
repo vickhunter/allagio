@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { Page } from '@/site/Page'
 import { Hero } from '@/components/hero-2'
-import { PlatformShowcase } from '@/components/PlatformShowcase'
+import { DealSimulator } from '@/components/DealSimulator'
 import { NetworkWall } from '@/components/NetworkWall'
 import { PostPreview } from '@/components/PostPreview'
 import { FAQ } from '@/components/faq-1'
@@ -55,17 +55,13 @@ export function App() {
       {/* Band 1: Light Editorial Hero + Human | Agent toggle + Client Strip */}
       <Hero source={source} />
 
-      {/* Band 2: Dark Contrast Band — Interactive Showcase (DealSimulator slot) */}
+      {/* Band 2: Dark Contrast Band — Interactive ORP Deal Simulator */}
       <section
         id="showcase"
         aria-labelledby="showcase-h"
-        className="band-dark relative scroll-mt-20 overflow-hidden border-t border-line"
+        className="band-dark relative scroll-mt-20 border-t border-line"
       >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgb(var(--rgb-pub)/0.14),transparent_75%)]"
-        />
-        <div className="relative mx-auto max-w-6xl px-5 py-16 md:py-24">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
           <div className="max-w-2xl">
             <p className="eyebrow">{t.showcaseBand.eyebrow}</p>
             <h2
@@ -79,7 +75,7 @@ export function App() {
             </p>
           </div>
           <div id="simulator-slot" className="mt-10 scroll-mt-24">
-            <PlatformShowcase />
+            <DealSimulator />
           </div>
         </div>
       </section>
@@ -122,30 +118,25 @@ export function App() {
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {t.templates.items.map((item, i) => {
               const Icon = templateIcons[item.id] ?? Code2
-              const accent =
-                i % 3 === 0
-                  ? 'bg-pub-soft text-pub'
-                  : i % 3 === 1
-                    ? 'bg-maker-soft text-maker'
-                    : 'bg-setup-soft text-setup'
               return (
                 <a
                   key={item.id}
                   href={withSource(item.href, source)}
                   data-track="template_card"
                   data-track-to={item.id}
-                  className="group relative flex flex-col justify-between rounded-2xl border border-line bg-s1 p-6 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-md"
+                  className="group relative flex flex-col justify-between rounded-xl border border-line bg-s1 p-6 text-left transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-s0"
                 >
                   <div>
-                    <div className="flex items-start justify-between gap-3">
-                      <span className={cn('inline-flex h-10 w-10 items-center justify-center rounded-xl', accent)}>
-                        <Icon className="h-5 w-5" aria-hidden="true" />
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="inline-flex items-center gap-2 font-mono text-xs text-t2">
+                        <span>{String(i + 1).padStart(2, '0')}</span>
+                        <Icon className="h-4 w-4 text-t1" aria-hidden="true" />
                       </span>
-                      <span className="rounded-full border border-line bg-s0 px-2.5 py-1 font-mono text-[11px] font-medium text-t2">
+                      <span className="font-mono text-[11px] font-medium text-t2">
                         {item.tag}
                       </span>
                     </div>
-                    <h3 className="mt-5 font-display text-xl font-bold tracking-tight text-t1">
+                    <h3 className="mt-4 font-display text-xl font-bold tracking-tight text-t1">
                       {item.name}
                     </h3>
                     <p className="mt-2 text-sm leading-relaxed text-t2">
@@ -155,7 +146,7 @@ export function App() {
                   <div className="mt-5 flex items-center justify-between border-t border-line/80 pt-3.5">
                     <span className="font-mono text-xs font-medium text-t1">{item.terms}</span>
                     <ArrowUpRight
-                      className="h-4 w-4 text-t2 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-t1"
+                      className="h-4 w-4 text-t2 transition-transform duration-150 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-t1"
                       aria-hidden="true"
                     />
                   </div>
@@ -167,17 +158,13 @@ export function App() {
       </section>
 
       {/* Band 4: Dark Contrast Band — Live Proof (NetworkWall + PostPreview) */}
-      <div id="live-proof" className="band-dark relative overflow-hidden border-t border-line">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_55%_45%_at_50%_0%,rgb(var(--rgb-maker)/0.10),transparent_75%)]"
-        />
+      <div id="live-proof" className="band-dark relative border-t border-line">
         <div className="relative">
           <NetworkWall />
           <section id="post-preview" aria-labelledby="preview-h" className="scroll-mt-24 mx-auto max-w-6xl px-5 pb-16 pt-2 md:pb-24">
             <div className="flex items-center gap-4">
               <span className="h-px flex-1 bg-line" aria-hidden="true" />
-              <span id="preview-h" className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-pub">
+              <span id="preview-h" className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-t2">
                 {t.previewSection.tryLabel}
               </span>
               <span className="h-px flex-1 bg-line" aria-hidden="true" />
@@ -207,48 +194,25 @@ export function App() {
 
           {/* 3 Control Modes: Off / Ask / Auto */}
           <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {t.safety.modes.map((mode) => {
+            {t.safety.modes.map((mode, idx) => {
               const Icon = modeIcons[mode.id]
               const isAsk = mode.id === 'ask'
               return (
                 <article
                   key={mode.id}
                   className={cn(
-                    'relative flex flex-col rounded-2xl border p-6',
+                    'relative flex flex-col rounded-xl border p-6',
                     isAsk
-                      ? 'border-pub/60 bg-s1 shadow-sm'
+                      ? 'border-t1 bg-s1'
                       : 'border-line bg-s1'
                   )}
                 >
-                  {isAsk ? (
-                    <div
-                      aria-hidden="true"
-                      className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-gradient-to-r from-transparent via-pub to-transparent"
-                    />
-                  ) : null}
                   <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={cn(
-                        'inline-flex h-10 w-10 items-center justify-center rounded-xl',
-                        mode.id === 'off'
-                          ? 'bg-s2 text-t2'
-                          : mode.id === 'ask'
-                            ? 'bg-pub-soft text-pub'
-                            : 'bg-maker-soft text-maker'
-                      )}
-                    >
-                      <Icon className="h-5 w-5" aria-hidden="true" />
+                    <span className="inline-flex items-center gap-2 font-mono text-xs text-t2">
+                      <span>{String(idx + 1).padStart(2, '0')}</span>
+                      <Icon className="h-4 w-4 text-t1" aria-hidden="true" />
                     </span>
-                    <span
-                      className={cn(
-                        'rounded-full px-2.5 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide',
-                        mode.id === 'ask'
-                          ? 'bg-pub-soft text-pub'
-                          : mode.id === 'auto'
-                            ? 'bg-maker-soft text-maker'
-                            : 'bg-s2 text-t2'
-                      )}
-                    >
+                    <span className="font-mono text-[11px] font-medium uppercase tracking-wide text-t2">
                       {mode.badge}
                     </span>
                   </div>
@@ -272,8 +236,8 @@ export function App() {
               {t.safety.checks.map((item, i) => {
                 const Icon = checkIcons[i] ?? ShieldCheck
                 return (
-                  <article key={item.title} className="rounded-2xl border border-line bg-s1 p-5">
-                    <Icon className="h-5 w-5 text-pub" aria-hidden="true" />
+                  <article key={item.title} className="rounded-xl border border-line bg-s1 p-5">
+                    <Icon className="h-4 w-4 text-t1" aria-hidden="true" />
                     <h4 className="mt-3 font-display text-base font-bold tracking-tight text-t1">
                       {item.title}
                     </h4>

@@ -69,7 +69,7 @@ export function Header({ page }: { page: PageKey }) {
               {t.chrome.navTemplates}
               <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 text-t2 transition-transform duration-150 group-hover:rotate-180 group-focus-within:rotate-180" />
             </a>
-            <div className="invisible absolute left-1/2 top-full z-40 hidden w-64 -translate-x-1/2 translate-y-1 rounded-xl border border-line bg-s1 p-1.5 opacity-0 shadow-lg transition-all duration-150 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 xl:block">
+            <div className="invisible absolute left-1/2 top-full z-40 hidden w-64 -translate-x-1/2 translate-y-1 rounded-xl border border-line bg-s1 p-1.5 opacity-0 shadow-lg transition-[opacity,transform,visibility] duration-150 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 xl:block">
               {t.chrome.useCaseLinks.map((item) => (
                 <a
                   key={item.id}
