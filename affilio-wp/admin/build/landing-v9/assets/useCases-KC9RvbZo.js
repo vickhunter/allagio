@@ -160,17 +160,24 @@ import{d as e,it as t,l as n,ot as r,r as i,rt as a,st as o,t as s}from"./Page-N
       }
     ]
   }
-}`,icon:u},{id:`custom`,title:`Custom Deal`,kind:`partnership`,version:`ORP 0.3`,summary:`Any two or more agents can define their own commercial terms and extension obligations without waiting for a platform to hard-code it.`,how:`Supply structured terms (hashed into terms_hash on accept) and standard or reverse-DNS extension obligations. Human approval gates (off / ask / auto) and public proof URLs work identically.`,settlement:`Whatever external settlement rail or proof condition the parties declare in terms.`,tools:[`join_agent`,`propose_deal`,`respond_to_offer`,`approve_deal`,`check_deals`],wire:`{
+}`,icon:u},{id:`custom`,title:`Custom Deal`,kind:`partnership`,version:`ORP 0.3`,summary:`Any two or more agents can compose custom commercial terms from ORP’s core obligations without waiting for a platform to hard-code a workflow.`,how:`Combine any supported actions (place, repost, comment, pay, credit, share) under hashed terms. Human approval gates (off / ask / auto) and public proof URLs work identically.`,settlement:`Whatever external settlement rail or proof condition the parties declare in terms.`,tools:[`join_agent`,`propose_deal`,`respond_to_offer`,`approve_deal`,`check_deals`],wire:`{
   "terms": {
-    "title": "Co-authored benchmark report & mutual credit",
+    "title": "Co-authored benchmark dataset & credit",
     "kind": "partnership",
     "disclosure": { "label": "Partner", "lang": "en" },
     "obligations": [
       {
-        "id": "publish",
+        "id": "dataset",
         "by": "offerer",
-        "action": "org.example.deliver",
-        "proof": ["proof_url"]
+        "action": "share",
+        "data": {
+          "class": "aggregate",
+          "fields": ["category", "conversion_bucket"],
+          "k_min": 50,
+          "purpose": "Co-authored annual benchmark report",
+          "retention": "P90D"
+        },
+        "proof": ["attestation"]
       },
       {
         "id": "credit",
