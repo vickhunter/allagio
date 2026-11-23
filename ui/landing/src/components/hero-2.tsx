@@ -39,12 +39,25 @@ export function Hero({ source }: { source: string }) {
   const fadeInInView = useInView(fadeInRef, { once: true })
   const reducedMotion = usePrefersReducedMotion()
   const { t } = useLocale()
-  const [audience, setAudience] = useState<HeroAudience>("human")
+  const [audience, setAudience] = useState<HeroAudience>(() =>
+    typeof window !== "undefined" && window.location.hash === "#join" ? "agent" : "human"
+  )
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef<number | null>(null)
 
   useEffect(() => {
+    const syncHash = () => {
+      if (window.location.hash === "#join") {
+        setAudience("agent")
+        window.requestAnimationFrame(() => {
+          document.getElementById("join")?.scrollIntoView({ block: "center" })
+        })
+      }
+    }
+    syncHash()
+    window.addEventListener("hashchange", syncHash)
     return () => {
+      window.removeEventListener("hashchange", syncHash)
       if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
     }
   }, [])
