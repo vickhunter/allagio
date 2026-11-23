@@ -19,6 +19,7 @@
   --rgb-footer:240 234 220; --rgb-footer-line:214 204 182;             /* footer: warm sand (Padova stone) */
   --dur-color:150ms; --dur-move:200ms; --dur-panel:300ms; --dur-fade:700ms;
   --ease-out:cubic-bezier(0,0,.2,1); --ease-in:cubic-bezier(.4,0,1,1); --ease-menu:cubic-bezier(.16,1,.3,1);
+  --ink:rgb(var(--rgb-text-1));
 }
 
 @theme inline {
@@ -345,10 +346,51 @@ body{margin:0;font-weight:500}
 .flow-nodes li{display:grid;place-items:center;width:140px;height:140px;border:1px solid rgb(var(--rgb-line-strong));border-radius:50%;background:#fff}
 .flow-nodes span{font-weight:700}
 .flow-nodes small{color:rgb(var(--rgb-text-2))}
-.compare{display:grid;gap:16px;width:min(1080px,calc(100% - 40px));margin:0 auto;padding:48px 0 72px}
+.compare{display:grid;gap:16px;width:100%;max-width:68rem;margin:0 auto;padding:48px 20px 72px}
 .compare article{border-radius:18px;background:rgb(var(--rgb-surface-2));padding:28px 22px}
 .compare h3{margin:0;font-family:var(--font-display);font-size:1.7rem;letter-spacing:-.03em}
 .compare p{margin:10px 0 0;color:rgb(var(--rgb-text-2));font-size:16px;line-height:1.45}
+
+/* High-contrast dark editorial contrast band: re-scopes surface, text, border,
+   and emerald/amber accent tokens so nested cards, NetworkWall, PostPreview,
+   and PlatformShowcase render natively on dark ink surfaces. */
+.band-dark{
+  --rgb-surface-0:17 19 16;
+  --rgb-surface-1:24 27 23;
+  --rgb-surface-2:33 37 31;
+  --rgb-text-1:245 245 239;
+  --rgb-text-2:168 175 162;
+  --rgb-line:46 52 43;
+  --rgb-line-strong:70 79 66;
+  --rgb-pub:74 222 128;
+  --rgb-pub-soft:20 48 31;
+  --rgb-maker:245 158 11;
+  --rgb-maker-brand:251 191 36;
+  --rgb-maker-soft:54 37 14;
+  --rgb-setup:110 168 254;
+  --rgb-setup-edge:147 197 253;
+  --rgb-setup-soft:24 38 66;
+  --rgb-moss:52 211 153;
+  --rgb-moss-edge:16 112 78;
+  background-color:rgb(var(--rgb-surface-0));
+  color:rgb(var(--rgb-text-1));
+}
+.band-dark .eyebrow{color:rgb(var(--rgb-pub))}
+.band-dark .kicker{color:rgb(var(--rgb-pub))}
+.band-dark .post-hi{
+  background:linear-gradient(100deg,rgba(74,222,128,.24),rgba(110,168,254,.24),rgba(245,158,11,.24));
+}
+.band-dark ::selection{background:rgba(74,222,128,.25);color:rgb(var(--rgb-text-1))}
+.band-dark :focus-visible{outline-color:rgb(var(--rgb-pub))}
+.band-dark [data-post-preview] button[type="submit"]{
+  background:rgb(var(--rgb-text-1));
+  color:rgb(var(--rgb-surface-0));
+  border-color:rgb(var(--rgb-text-1));
+  font-weight:600;
+}
+.band-dark [data-post-preview] button[type="submit"]:hover{opacity:.92}
+.band-light{background-color:rgb(var(--rgb-surface-0));color:rgb(var(--rgb-text-1))}
+.band-warm{background-color:rgb(var(--rgb-surface-1));color:rgb(var(--rgb-text-1))}
 .setup-details summary{display:inline-flex;min-height:44px;align-items:center;font-weight:700;cursor:pointer}
 .foot-cols{display:grid;align-content:start;gap:2px}
 .foot-cols p{margin:0 0 6px;font-size:13px;font-weight:700}

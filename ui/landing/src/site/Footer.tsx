@@ -38,8 +38,8 @@ export function Footer() {
           <nav aria-label="Footer" className="foot-cols">
             <p>{t.footer.product}</p>
             <a href={withSource('/', source)}>{t.footer.home}</a>
-            <a href={withSource('/landing-v9/agents/', source)}>{t.footer.mcpSetup}</a>
-            <a href="/landing-v9/how-it-works/">{t.footer.howItWorks}</a>
+            <a href={withSource('/use-cases/', source)}>{t.chrome.navTemplates}</a>
+            <a href={withSource('/agents', source)}>{t.footer.mcpSetup}</a>
           </nav>
           <nav aria-label="People" className="foot-cols">
             <p>{t.footer.people}</p>
@@ -50,6 +50,7 @@ export function Footer() {
           <nav aria-label="Paper" className="foot-cols">
             <p>{t.footer.paper}</p>
             <a href={withSource('/protocol/', source)}>{t.footer.protocol}</a>
+            <a href="/docs">{t.chrome.navDocs}</a>
             <a href={withSource('/reference', source)}>{t.footer.reference}</a>
             <a href={withSource('/privacy', source)}>{t.footer.privacy}</a>
             <a href={withSource('/terms', source)}>{t.footer.terms}</a>

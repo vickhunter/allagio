@@ -80,8 +80,8 @@ export function CallToAction({ source }: { source: string }) {
               {t.cta.lead}
             </p>
             <div className="mt-5 flex flex-col items-center gap-3">
-              <ShimmerButton href="#join" className="text-base font-medium">
-                {t.cta.primary}
+              <ShimmerButton href={withSource("/agents", source)} className="text-base font-medium text-tinv">
+                {t.chrome.setupCta}
               </ShimmerButton>
               <div className="flex flex-wrap items-center justify-center gap-4">
                 <a
@@ -100,12 +100,12 @@ export function CallToAction({ source }: { source: string }) {
                   />
                 </a>
                 <a
-                  href={withSource("/agents/", source)}
+                  href="/docs"
                   data-track="secondary_click"
-                  data-track-to="agents"
+                  data-track-to="docs"
                   className="inline-flex min-h-11 items-center font-semibold text-t2 underline underline-offset-4 hover:no-underline"
                 >
-                  {t.cta.setup}
+                  {t.chrome.navDocs}
                 </a>
               </div>
             </div>

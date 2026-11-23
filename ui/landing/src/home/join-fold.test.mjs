@@ -8,7 +8,12 @@ import { fileURLToPath } from 'node:url'
 import { joinPrompt } from '../components/join-prompt.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const chrome = ['/usr/local/bin/google-chrome', '/usr/bin/google-chrome'].find((path) => existsSync(path))
+const chrome = [
+  process.env.CHROME_PATH,
+  '/usr/local/bin/google-chrome',
+  '/usr/bin/google-chrome',
+  '/home/ubuntu/.local/bin/google-chrome',
+].filter(Boolean).find((path) => existsSync(path))
 
 test('the home first screen connects the agent with a setup link and the public copy control', { timeout: 60_000 }, async () => {
   assert.ok(chrome, 'chrome is required to measure the fold')
@@ -36,29 +41,30 @@ test('the home first screen connects the agent with a setup link and the public 
       assert.equal(await page.getByRole('link', { name: 'I run a site' }).count(), 0)
       const heading = page.getByRole('heading', { level: 1 })
       const headingBox = await heading.boundingBox()
-      assert.equal(await heading.innerText(), 'Agents do the deal. You keep the approval.')
+      assert.equal(await heading.innerText(), 'The open deal layer for AI agents.')
       assert.ok(headingBox && headingBox.y + headingBox.height < viewport.height)
       const setup = page.getByRole('link', { name: 'Set up your agent', exact: true }).first()
       const setupBox = await setup.boundingBox()
       assert.ok(setupBox && setupBox.y + setupBox.height < viewport.height, `${viewport.width} setup link`)
-      assert.equal(await setup.getAttribute('href'), '/landing-v9/agents/')
-      // The copy control lives in the Connection card below the fold now.
+      assert.equal(await setup.getAttribute('href'), '/agents')
+      // Switch to Agent tab in hero to verify quickstart copy & llms.txt.
+      await page.getByRole('tab', { name: 'Agent', exact: true }).click()
       const copy = page.getByRole('button', { name: 'Copy setup prompt', exact: true })
       assert.equal(await copy.count(), 1)
-      await page.locator('.setup-details summary').click()
-      const details = page.locator('.setup-details')
-      assert.match(await details.innerText(), new RegExp(joinPrompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-      assert.equal(await details.locator('a[href="/llms.txt"]').count(), 1)
-      const coming = page.locator('#publishers').getByText('Offer suggestions while you write: Works today.')
-      assert.equal(await coming.count(), 1)
-      if (viewport.width < 768) {
+      const agentPanel = page.locator('#hero-panel-agent')
+      assert.match(await agentPanel.innerText(), new RegExp(joinPrompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+      assert.equal(await agentPanel.locator('a[href="/llms.txt"]').count(), 2)
+      // Verify dark contrast bands and simulator slot exist.
+      assert.equal(await page.locator('#simulator-slot').count(), 1)
+      assert.equal(await page.locator('.band-dark').count(), 3)
+      if (viewport.width < 1280) {
         await page.getByRole('button', { name: 'Menu', exact: true }).click()
       }
-      const limits = page.locator('header').getByRole('link', { name: 'Your limits', exact: true })
-      assert.equal(await limits.count(), 1)
-      const limitsBox = await limits.boundingBox()
-      assert.ok(limitsBox && limitsBox.height >= 44)
-      assert.ok((await limits.getAttribute('href'))?.startsWith('/you'))
+      const templatesLink = page.locator('header').getByRole('link', { name: 'Templates', exact: true })
+      assert.equal(await templatesLink.count(), 1)
+      const templatesBox = await templatesLink.boundingBox()
+      assert.ok(templatesBox && templatesBox.height >= 44)
+      assert.ok((await templatesLink.getAttribute('href'))?.startsWith('/use-cases'))
       const overflow = await page.evaluate(() => ({
         inner: window.innerWidth,
         client: document.documentElement.clientWidth,

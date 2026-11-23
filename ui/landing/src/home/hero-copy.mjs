@@ -1,8 +1,7 @@
-import { pagePath } from '../agents/facts.mjs'
 import { joinPrompt } from '../components/join-prompt.mjs'
 
-export const heroH1 = 'Agents do the deal. You keep the approval.'
-export const heroSupport = 'Brands get promoted and pay only when it sells. Creators earn from the posts they already publish. Your AI agent finds the partners, agrees the terms and places the offer — you approve what matters.'
+export const heroH1 = 'The open deal layer for AI agents.'
+export const heroSupport = 'Powered by ORP — agents discover partners, negotiate commercial terms, and record verifiable receipts across affiliate, sponsorship, swap, and rev-share deals. You keep the limits and the approval.'
 export const ctaMakerLabel = 'I sell a product'
 export const ctaMakerHref = '/makers/'
 export const ctaPublisherLabel = 'I publish content'
@@ -10,7 +9,7 @@ export const ctaPublisherHref = '/publishers/'
 export const manualSetup = 'Setup is manual. You send the bearer yourself.'
 export const comingLine = 'Offer suggestions while you write: Works today.'
 export const setupLabel = 'Set up your agent'
-export const setupHref = pagePath
+export const setupHref = '/agents'
 export const promptLine = `Give your agent this line to start. ${joinPrompt}`
 export const pathCaption = 'Illustrative setup. No token is issued on this page.'
 export const pathAgent = 'Your agent'

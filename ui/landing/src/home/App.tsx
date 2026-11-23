@@ -1,206 +1,354 @@
+import {
+  ArrowRight,
+  ArrowUpRight,
+  BadgePercent,
+  Check,
+  Code2,
+  EyeOff,
+  FileSignature,
+  Hand,
+  Megaphone,
+  PauseCircle,
+  Radio,
+  Repeat2,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  X,
+  Zap,
+} from 'lucide-react'
 import { Page } from '@/site/Page'
-import { Vision } from './Vision'
-import { ClientStrip } from '@/components/client-strip'
-import { BentoCard, BentoGrid } from '@/components/ui/bento-grid'
-import { BorderBeam } from '@/components/ui/border-beam'
-import { RetroGrid } from '@/components/ui/retro-grid'
-import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, LayoutTemplate, Receipt, Calculator, XCircle, Zap } from 'lucide-react'
-import { PostPreview } from '@/components/PostPreview'
-import { NetworkWall } from '@/components/NetworkWall'
+import { Hero } from '@/components/hero-2'
 import { PlatformShowcase } from '@/components/PlatformShowcase'
-import { ConnectionCard, Hero } from '@/components/hero-2'
-import { Why } from './Why'
-import { FeatureSection } from '@/components/feature-3'
+import { NetworkWall } from '@/components/NetworkWall'
+import { PostPreview } from '@/components/PostPreview'
 import { FAQ } from '@/components/faq-1'
-import { TradeOffs } from '@/components/trade-offs'
-import { BuiltTrust } from '@/components/built-trust'
 import { CallToAction } from '@/components/call-to-action-1'
 import { useOfferConfig, useSource, withSource } from '@/lib/source'
-import { NumberTicker } from '@/components/ui/number-ticker'
-import { example } from '@/content'
 import { useLocale } from '@/i18n'
+import { cn } from '@/lib/utils'
 
-const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
-
-const stepIcons = [KeyRound, Handshake, Compass, FileSignature, CheckCircle2, Zap, Receipt]
-
-const cardWashes = [
-  'bg-[radial-gradient(120%_120%_at_0%_0%,rgba(26,110,66,0.10),transparent_60%)]',
-  'bg-[radial-gradient(120%_120%_at_100%_0%,rgba(160,110,20,0.10),transparent_60%)]',
-  'bg-[radial-gradient(120%_120%_at_0%_100%,rgba(60,80,140,0.09),transparent_60%)]',
-  'bg-[radial-gradient(120%_120%_at_100%_100%,rgba(26,110,66,0.08),transparent_60%)]',
-  'bg-[radial-gradient(120%_120%_at_0%_0%,rgba(160,110,20,0.09),transparent_60%)]',
-  'bg-[radial-gradient(120%_120%_at_100%_0%,rgba(60,80,140,0.10),transparent_60%)]',
-  'bg-[radial-gradient(120%_120%_at_100%_100%,rgba(26,110,66,0.10),transparent_60%)]',
-]
-
-function Rows({ items }: { items: string[] }) {
-  return (
-    <ul className="feature-rows">
-      {items.map((item) => <li key={item}>{item}</li>)}
-    </ul>
-  )
+const templateIcons: Record<string, typeof BadgePercent> = {
+  affiliate: BadgePercent,
+  sponsored: Megaphone,
+  swap: Repeat2,
+  revshare: Users,
+  slot: Radio,
+  custom: Code2,
 }
+
+const modeIcons = {
+  off: PauseCircle,
+  ask: Hand,
+  auto: Zap,
+} as const
+
+const checkIcons = [ShieldCheck, FileSignature, EyeOff, Sparkles]
 
 export function App() {
   const source = useSource()
   const { plugin } = useOfferConfig()
   const { t } = useLocale()
+
   return (
     <Page page="home">
+      {/* Band 1: Light Editorial Hero + Human | Agent toggle + Client Strip */}
       <Hero source={source} />
-      <Why />
-      <ClientStrip />
-      <NetworkWall />
 
-      <div className="border-t border-line bg-s2/40">
-        <FeatureSection source={source} />
-        <div className="container mx-auto px-4 pb-16 md:px-8 md:pb-20">
-          <ConnectionCard />
-        </div>
-      </div>
-
-      <section id="rails" aria-labelledby="rails-h" className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
+      {/* Band 2: Dark Contrast Band — Interactive Showcase (DealSimulator slot) */}
+      <section
+        id="showcase"
+        aria-labelledby="showcase-h"
+        className="band-dark relative scroll-mt-20 overflow-hidden border-t border-line"
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_60%_50%_at_50%_0%,rgb(var(--rgb-pub)/0.14),transparent_75%)]"
+        />
+        <div className="relative mx-auto max-w-6xl px-5 py-16 md:py-24">
           <div className="max-w-2xl">
-            <p className="kicker">{t.rails.kicker}</p>
-            <h2 id="rails-h">{t.rails.heading}</h2>
-            <p>{t.rails.intro}</p>
-            <p className="mt-4 text-[15px] leading-relaxed text-t2">{t.rails.autonomy}</p>
-            <p><a className={linkClass} href={withSource('/protocol/', source)}>{t.rails.protocolLink}</a></p>
+            <p className="eyebrow">{t.showcaseBand.eyebrow}</p>
+            <h2
+              id="showcase-h"
+              className="h-display mt-3 text-3xl font-bold tracking-tighter text-balance text-t1 sm:text-4xl md:text-5xl"
+            >
+              {t.showcaseBand.heading}
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-t2 sm:text-lg">
+              {t.showcaseBand.lead}
+            </p>
           </div>
-          <figure className="mt-10">
-            <figcaption className="sr-only">{t.rails.figcaption}</figcaption>
-            <BentoGrid className="auto-rows-[13rem] grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {t.rails.steps.map((step, i) => (
-                <BentoCard
-                  key={step.name}
-                  name={step.name}
-                  description={step.body}
-                  Icon={stepIcons[i]}
-                  href={withSource('/reference', source)}
-                  cta={t.rails.cta}
-                  className={
-                    i === 0
-                      ? 'bg-s1 col-span-1 sm:col-span-2 lg:col-span-2'
-                      : i === t.rails.steps.length - 1
-                        ? 'bg-s1 col-span-1 sm:col-span-2 lg:col-span-2'
-                        : 'bg-s1 col-span-1'
-                  }
-                  background={
-                    <>
-                      <div className={`absolute inset-0 ${cardWashes[i]}`} />
-                      {i === 0 ? <BorderBeam size={140} duration={7} borderWidth={1.5} /> : null}
-                    </>
-                  }
-                />
-              ))}
-            </BentoGrid>
-          </figure>
-        </div>
-      </section>
-
-      <section id="makers" aria-labelledby="makers-h" className="split border-t border-line bg-s2/50">
-        <div>
-          <p className="kicker">{t.makers.kicker}</p>
-          <h2 id="makers-h">{t.makers.heading}</h2>
-          <p>{t.makers.lead}</p>
-          <Rows items={t.makers.rows} />
-          <p><a className={linkClass} href={withSource('/makers/', source)}>{t.makers.link}</a></p>
-        </div>
-        <figure className="piece group relative overflow-hidden transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-maker/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          <figcaption className="flex items-center gap-2"><Calculator aria-hidden="true" className="h-4 w-4 text-maker" />{t.makers.workedCaption}</figcaption>
-          <p>{t.makers.exampleProduct}</p>
-          <p>{t.makers.workedTerms}</p>
-          <p className="mt-2 flex items-baseline gap-2">
-            <NumberTicker
-              value={example.publisherCents / 100}
-              decimalPlaces={2}
-              prefix="€"
-              className="text-3xl font-semibold tracking-tight text-maker"
-            />
-            <span className="text-sm text-t2">{t.makers.workedTicker}</span>
-          </p>
-          <p>{t.makers.workedBody}</p>
-        </figure>
-      </section>
-
-      <section id="publishers" aria-labelledby="publishers-h" className="split border-t border-line">
-        <div>
-          <p className="kicker">{t.publishers.kicker}</p>
-          <h2 id="publishers-h">{t.publishers.heading}</h2>
-          <p>{t.publishers.lead}</p>
-          <Rows items={t.publishers.rows} />
-          <p><a className={linkClass} href={withSource('/publishers/', source)}>{t.publishers.link}</a></p>
-        </div>
-        <figure className="piece group relative overflow-hidden transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-pub/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          <figcaption className="flex items-center gap-2"><LayoutTemplate aria-hidden="true" className="h-4 w-4 text-pub" />{t.publishers.placementCaption}</figcaption>
-          <p>{t.publishers.placementBody}</p>
-          <p className="piece-note">{t.publishers.placementNote}</p>
-        </figure>
-      </section>
-
-      <section id="compare" aria-labelledby="compare-h" className="compare border-t border-line bg-s1">
-        <h2 id="compare-h" className="sr-only">{t.compare.heading}</h2>
-        <article className="relative border border-line">
-          <h3 className="flex items-center gap-2.5"><XCircle aria-hidden="true" className="h-6 w-6 text-t2" />{t.compare.beforeTitle}</h3>
-          <p>{t.compare.beforeBody}</p>
-        </article>
-        <article className="relative overflow-hidden border border-pub/30 bg-s1 shadow-md">
-          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-pub/70 to-transparent" />
-          <h3 className="flex items-center gap-2.5"><CheckCircle2 aria-hidden="true" className="h-6 w-6 text-pub" />{t.compare.afterTitle}</h3>
-          <p>{t.compare.afterBody}</p>
-        </article>
-      </section>
-
-      <div className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-5 py-12 md:py-16">
-          <Vision />
-        </div>
-      </div>
-
-      <section id="post-preview" aria-labelledby="preview-h" className="relative scroll-mt-24 overflow-hidden border-t border-line bg-s2/50">
-        <RetroGrid aria-hidden="true" className="opacity-100" opacity={0.3} lightLineColor="rgb(63 92 53)" />
-        <div className="relative mx-auto max-w-6xl px-5 py-16 md:py-20">
-          <p className="kicker">{t.previewSection.kicker}</p>
-          <h2 id="preview-h" className="h-display mt-3 text-3xl">{t.previewSection.heading}</h2>
-          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">{t.previewSection.lead}</p>
-          <div className="mt-10">
+          <div id="simulator-slot" className="mt-10 scroll-mt-24">
             <PlatformShowcase />
           </div>
-          <div className="mt-12 flex items-center gap-4">
-            <span className="h-px flex-1 bg-line" aria-hidden="true" />
-            <span className="text-[13px] font-semibold uppercase tracking-[0.12em] text-t2">{t.previewSection.tryLabel}</span>
-            <span className="h-px flex-1 bg-line" aria-hidden="true" />
+        </div>
+      </section>
+
+      {/* Band 3: Light Editorial Band — Deal Templates */}
+      <section id="templates" aria-labelledby="templates-h" className="band-light border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
+          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
+            <div className="max-w-2xl">
+              <p className="eyebrow">{t.templates.eyebrow}</p>
+              <h2
+                id="templates-h"
+                className="h-display mt-3 text-3xl font-bold tracking-tighter text-balance text-t1 sm:text-4xl md:text-5xl"
+              >
+                {t.templates.heading}
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-t2 sm:text-lg">
+                {t.templates.lead}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
+              <a
+                href={withSource('/use-cases/', source)}
+                data-track="templates_all"
+                className="inline-flex min-h-11 items-center gap-1.5 text-t1 underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-t1"
+              >
+                {t.templates.allLink}
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </a>
+              <a
+                href={withSource('/protocol/', source)}
+                data-track="templates_protocol"
+                className="inline-flex min-h-11 items-center gap-1.5 text-t2 underline decoration-line underline-offset-4 transition-colors hover:text-t1 hover:decoration-t1"
+              >
+                {t.templates.protocolLink}
+              </a>
+            </div>
           </div>
-          <div className="mx-auto mt-8 max-w-3xl">
-            <PostPreview />
+
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {t.templates.items.map((item, i) => {
+              const Icon = templateIcons[item.id] ?? Code2
+              const accent =
+                i % 3 === 0
+                  ? 'bg-pub-soft text-pub'
+                  : i % 3 === 1
+                    ? 'bg-maker-soft text-maker'
+                    : 'bg-setup-soft text-setup'
+              return (
+                <a
+                  key={item.id}
+                  href={withSource(item.href, source)}
+                  data-track="template_card"
+                  data-track-to={item.id}
+                  className="group relative flex flex-col justify-between rounded-2xl border border-line bg-s1 p-6 text-left transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-md"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className={cn('inline-flex h-10 w-10 items-center justify-center rounded-xl', accent)}>
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <span className="rounded-full border border-line bg-s0 px-2.5 py-1 font-mono text-[11px] font-medium text-t2">
+                        {item.tag}
+                      </span>
+                    </div>
+                    <h3 className="mt-5 font-display text-xl font-bold tracking-tight text-t1">
+                      {item.name}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-t2">
+                      {item.body}
+                    </p>
+                  </div>
+                  <div className="mt-5 flex items-center justify-between border-t border-line/80 pt-3.5">
+                    <span className="font-mono text-xs font-medium text-t1">{item.terms}</span>
+                    <ArrowUpRight
+                      className="h-4 w-4 text-t2 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-t1"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </a>
+              )
+            })}
           </div>
         </div>
       </section>
 
-      <div className="border-t border-line">
-        <TradeOffs />
+      {/* Band 4: Dark Contrast Band — Live Proof (NetworkWall + PostPreview) */}
+      <div id="live-proof" className="band-dark relative overflow-hidden border-t border-line">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_55%_45%_at_50%_0%,rgb(var(--rgb-maker)/0.10),transparent_75%)]"
+        />
+        <div className="relative">
+          <NetworkWall />
+          <section id="post-preview" aria-labelledby="preview-h" className="scroll-mt-24 mx-auto max-w-6xl px-5 pb-16 pt-2 md:pb-24">
+            <div className="flex items-center gap-4">
+              <span className="h-px flex-1 bg-line" aria-hidden="true" />
+              <span id="preview-h" className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-pub">
+                {t.previewSection.tryLabel}
+              </span>
+              <span className="h-px flex-1 bg-line" aria-hidden="true" />
+            </div>
+            <div className="mx-auto mt-8 max-w-3xl">
+              <PostPreview />
+            </div>
+          </section>
+        </div>
       </div>
 
-      <div className="border-t border-line bg-s2/50">
-        <BuiltTrust source={source} />
-      </div>
+      {/* Band 5: Light Editorial Band — Human Approval & Safety */}
+      <section id="limits" aria-labelledby="limits-h" className="band-light border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
+          <div className="max-w-2xl">
+            <p className="eyebrow">{t.safety.eyebrow}</p>
+            <h2
+              id="limits-h"
+              className="h-display mt-3 text-3xl font-bold tracking-tighter text-balance text-t1 sm:text-4xl md:text-5xl"
+            >
+              {t.safety.heading}
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-t2 sm:text-lg">
+              {t.safety.lead}
+            </p>
+          </div>
 
-      <div className="border-t border-line bg-s1">
+          {/* 3 Control Modes: Off / Ask / Auto */}
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {t.safety.modes.map((mode) => {
+              const Icon = modeIcons[mode.id]
+              const isAsk = mode.id === 'ask'
+              return (
+                <article
+                  key={mode.id}
+                  className={cn(
+                    'relative flex flex-col rounded-2xl border p-6',
+                    isAsk
+                      ? 'border-pub/60 bg-s1 shadow-sm'
+                      : 'border-line bg-s1'
+                  )}
+                >
+                  {isAsk ? (
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-gradient-to-r from-transparent via-pub to-transparent"
+                    />
+                  ) : null}
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={cn(
+                        'inline-flex h-10 w-10 items-center justify-center rounded-xl',
+                        mode.id === 'off'
+                          ? 'bg-s2 text-t2'
+                          : mode.id === 'ask'
+                            ? 'bg-pub-soft text-pub'
+                            : 'bg-maker-soft text-maker'
+                      )}
+                    >
+                      <Icon className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded-full px-2.5 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide',
+                        mode.id === 'ask'
+                          ? 'bg-pub-soft text-pub'
+                          : mode.id === 'auto'
+                            ? 'bg-maker-soft text-maker'
+                            : 'bg-s2 text-t2'
+                      )}
+                    >
+                      {mode.badge}
+                    </span>
+                  </div>
+                  <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-t1">
+                    {mode.name}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-t2">
+                    {mode.body}
+                  </p>
+                </article>
+              )
+            })}
+          </div>
+
+          {/* Protocol Hard Checks & Safeguards */}
+          <div className="mt-10">
+            <h3 className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-t2">
+              {t.safety.checksHeading}
+            </h3>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {t.safety.checks.map((item, i) => {
+                const Icon = checkIcons[i] ?? ShieldCheck
+                return (
+                  <article key={item.title} className="rounded-2xl border border-line bg-s1 p-5">
+                    <Icon className="h-5 w-5 text-pub" aria-hidden="true" />
+                    <h4 className="mt-3 font-display text-base font-bold tracking-tight text-t1">
+                      {item.title}
+                    </h4>
+                    <p className="mt-1.5 text-sm leading-relaxed text-t2">
+                      {item.body}
+                    </p>
+                  </article>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Compact With ORP vs By Hand strip */}
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
+            <article className="rounded-2xl border border-pub/40 bg-s1 p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-display text-lg font-bold text-t1">{t.tradeoffs.withTitle}</h3>
+                <span className="rounded-full bg-pub-soft px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide text-pub">
+                  {t.tradeoffs.chip}
+                </span>
+              </div>
+              <ul className="mt-4 space-y-2.5">
+                {t.tradeoffs.withItems.slice(0, 3).map((item) => (
+                  <li key={item} className="flex gap-2.5 text-sm leading-relaxed text-t1">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-pub" aria-hidden="true" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+            <article className="rounded-2xl border border-line bg-s2/60 p-6">
+              <h3 className="font-display text-lg font-bold text-t1">{t.tradeoffs.withoutTitle}</h3>
+              <ul className="mt-4 space-y-2.5">
+                {t.tradeoffs.withoutItems.slice(0, 3).map((item) => (
+                  <li key={item} className="flex gap-2.5 text-sm leading-relaxed text-t2">
+                    <X className="mt-0.5 h-4 w-4 shrink-0 text-maker" aria-hidden="true" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          </div>
+
+          <p className="mt-8">
+            <a
+              href={withSource('/you/', source)}
+              data-track="safety_limits"
+              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-t1 underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-t1"
+            >
+              {t.safety.limitsLink}
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </a>
+          </p>
+        </div>
+      </section>
+
+      {/* Band 6: Warm Surface — FAQ + Final CTA (+ optional WordPress plugin link) + Padova Footer */}
+      <div className="band-warm border-t border-line">
         <FAQ />
       </div>
 
-      <div className="border-t border-line">
+      <div className="band-light border-t border-line">
         <CallToAction source={source} />
       </div>
 
       {plugin ? (
-        <div className="border-t border-line">
+        <div className="band-light border-t border-line">
           <div className="mx-auto max-w-3xl px-5 py-10 text-center">
-            <a className={linkClass} href="/downloads/offer-rails.zip" data-track="zip_download">{t.plugin.download}</a>
+            <a
+              className="inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline"
+              href="/downloads/offer-rails.zip"
+              data-track="zip_download"
+            >
+              {t.plugin.download}
+            </a>
           </div>
         </div>
       ) : null}

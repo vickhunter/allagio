@@ -35,8 +35,10 @@ export interface Messages {
     navMakers: string
     navPublishers: string
     navUseCases: string
+    navTemplates: string
     navProtocol: string
     navAgents: string
+    navDocs: string
     navReference: string
     useCaseLinks: { id: string; title: string }[]
     commands: Record<'home' | 'maker' | 'publisher' | 'protocol' | 'you' | 'reference' | 'agents' | 'faq' | 'join', string>
@@ -55,6 +57,37 @@ export interface Messages {
     ctaMakerHref: string
     ctaPublisher: string
     ctaPublisherHref: string
+    toggleLabel: string
+    toggleHuman: string
+    toggleAgent: string
+    ctaPrimary: string
+    ctaPreview: string
+    agentTitle: string
+    agentLead: string
+    agentDocsLink: string
+    agentGuideLink: string
+  }
+  showcaseBand: {
+    eyebrow: string
+    heading: string
+    lead: string
+  }
+  templates: {
+    eyebrow: string
+    heading: string
+    lead: string
+    items: { id: string; name: string; tag: string; terms: string; body: string; href: string }[]
+    allLink: string
+    protocolLink: string
+  }
+  safety: {
+    eyebrow: string
+    heading: string
+    lead: string
+    modes: { id: 'off' | 'ask' | 'auto'; name: string; badge: string; body: string }[]
+    checksHeading: string
+    checks: { title: string; body: string }[]
+    limitsLink: string
   }
   clients: {
     heading: string

@@ -14,9 +14,9 @@ export const siteCommands: Command[] = [
   { id: 'protocol', label: 'Protocol', href: '/protocol/' },
   { id: 'you', label: 'Your limits', href: '/you/' },
   { id: 'reference', label: 'Reference', href: '/reference' },
-  { id: 'agents', label: 'MCP and setup', href: '/landing-v9/agents/' },
+  { id: 'agents', label: 'MCP and setup', href: '/agents' },
   { id: 'faq', label: 'Money and FAQ', href: '#faq' },
-  { id: 'join', label: 'Join', keys: 'j', href: '#join' },
+  { id: 'join', label: 'Join', keys: 'j', href: '#hero' },
 ]
 
 // Shared header. Centered 3-zone bar: logo left, pill nav centered on wide screens,
@@ -63,16 +63,13 @@ export function Header({ page }: { page: PageKey }) {
           {open ? t.chrome.menuClose : t.chrome.menu}
         </button>
         <nav ref={navRef} id="site-menu" aria-label="Main" className={open ? 'site-menu is-open text-sm' : 'site-menu text-sm'} onClick={(event) => { if ((event.target as HTMLElement).closest('a')) setOpen(false) }}>
-          {link('/you/', t.chrome.navYourLimits, 'you')}
-          {link('/makers/', t.chrome.navMakers, 'makers')}
-          {link('/publishers/', t.chrome.navPublishers, 'publishers')}
           <div className="group relative">
             <a href={withSource('/use-cases/', source)} aria-current={current === 'use-cases' ? 'page' : undefined} data-track="nav_click" data-track-to="use-cases"
               className={`inline-flex min-h-11 min-w-11 items-center gap-1 whitespace-nowrap rounded-full px-3 text-t1 transition-colors duration-150 hover:bg-s2 ${current === 'use-cases' ? 'bg-s2 font-semibold' : ''}`}>
-              {t.chrome.navUseCases}
+              {t.chrome.navTemplates}
               <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 text-t2 transition-transform duration-150 group-hover:rotate-180 group-focus-within:rotate-180" />
             </a>
-            <div className="invisible absolute left-1/2 top-full z-40 hidden w-64 -translate-x-1/2 translate-y-1 rounded-xl border border-line bg-white p-1.5 opacity-0 shadow-lg transition-all duration-150 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 xl:block">
+            <div className="invisible absolute left-1/2 top-full z-40 hidden w-64 -translate-x-1/2 translate-y-1 rounded-xl border border-line bg-s1 p-1.5 opacity-0 shadow-lg transition-all duration-150 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 xl:block">
               {t.chrome.useCaseLinks.map((item) => (
                 <a
                   key={item.id}
@@ -88,7 +85,8 @@ export function Header({ page }: { page: PageKey }) {
           </div>
           {link('/protocol/', t.chrome.navProtocol, 'protocol')}
           {link('/agents', t.chrome.navAgents, 'agents')}
-          <span className="xl:hidden">{link('/reference', t.chrome.navReference, 'reference')}</span>
+          <a href="/docs" data-track="nav_click" data-track-to="docs"
+            className="inline-flex min-h-11 min-w-11 items-center whitespace-nowrap rounded-full px-3 text-t1 transition-colors duration-150 hover:bg-s2">{t.chrome.navDocs}</a>
           <span className="sm:hidden">
             <a href={signInHref('/owner', source)} data-track="nav_signin"
               className="inline-flex min-h-11 min-w-11 items-center rounded-full px-3 font-semibold text-t1 transition-colors duration-150 hover:bg-s2">{t.chrome.signIn}</a>
@@ -101,7 +99,7 @@ export function Header({ page }: { page: PageKey }) {
           <LangSwitcher className="hidden sm:inline-flex" />
           <CommandPalette commands={commands.map((command) => ({ ...command, href: command.href.startsWith('#') ? command.href : withSource(command.href, source) }))} />
           <a href={signInHref('/owner', source)} data-track="nav_signin" className="hidden min-h-11 items-center whitespace-nowrap rounded-full px-3 text-[13px] font-semibold text-t2 transition-colors duration-150 hover:bg-s2 hover:text-t1 sm:inline-flex">{t.chrome.signIn}</a>
-          <a href={withSource('/landing-v9/agents/', source)} data-track="nav_cta" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-t1 px-4 text-[13px] font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md">{t.chrome.setupCta}</a>
+          <a href={withSource('/agents', source)} data-track="nav_cta" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-t1 px-4 text-[13px] font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md">{t.chrome.setupCta}</a>
         </div>
       </div>
     </header>
