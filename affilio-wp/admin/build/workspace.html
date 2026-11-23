@@ -13,28 +13,32 @@
   <a class="skip" href="#main">Skip to content</a>
   <div class="drawer-backdrop" data-drawer-backdrop hidden></div>
   <aside class="sidebar" id="workspace-sidebar">
-    <div class="sidebar-head">
-      <a class="brand" href="/">Allagio<span class="brand-dot">↗</span></a>
-      <button type="button" class="drawer-close" data-drawer-close aria-label="Close navigation">&times;</button>
+    <div class="sidebar-sticky">
+      <div class="sidebar-head">
+        <a class="brand" href="/">Allagio<span class="brand-dot">↗</span></a>
+        <button type="button" class="drawer-close" data-drawer-close aria-label="Close navigation">&times;</button>
+      </div>
+      <div class="sidebar-body">
+        <span class="eyebrow sidebar-kicker">AGENT CONTROL PLANE</span>
+        <nav aria-label="Workspace">
+          <a href="/owner"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Overview</a>
+          <a href="/owner/products"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 5.5 8 2.5l5.5 3v5L8 13.5l-5.5-3v-5Z"/><path d="M8 8.5v5M2.5 5.5 8 8.5l5.5-3"/></svg>Products &amp; offers</a>
+          <a href="/owner/placements"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 7h6M5 10h4"/></svg>Placements</a>
+          <a href="/owner/earnings"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 11.5 6 8l2.5 2.5L13.5 5"/><path d="M10 5h3.5v3.5"/></svg>Earnings</a>
+          <a href="/owner/deals"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 8.5 5.5 5.5a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8l-1 1a2 2 0 0 1-2.8 0L5 9.8"/><path d="M13.5 7.5 10.5 4.5a2 2 0 0 0-2.8 0"/></svg>Deals</a>
+          <a href="/owner/settings"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 2v1.6M8 12.4V14M2 8h1.6M12.4 8H14M3.8 3.8l1.1 1.1M11.1 11.1l1.1 1.1M12.2 3.8l-1.1 1.1M4.9 11.1l-1.1 1.1"/></svg>Setup &amp; agents</a>
+          {{if .Operator}}<a href="/owner/review"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 8.5 6.2 11.5 13 4.5"/></svg>Offer review</a>{{end}}
+        </nav>
+        <div class="sidebar-note">
+          <span class="eyebrow">HUMAN-IN-THE-LOOP</span>
+          <p>Agents negotiate the deal.<br>You hold the approval.</p>
+        </div>
+        <footer>
+          {{if .Name}}<span class="sidebar-owner">{{.Name}}</span>{{end}}
+          <span class="pill sidebar-pill">Early access</span>
+        </footer>
+      </div>
     </div>
-    <span class="eyebrow sidebar-kicker">AGENT CONTROL PLANE</span>
-    <nav aria-label="Workspace">
-      <a href="/owner"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Overview</a>
-      <a href="/owner/products"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 5.5 8 2.5l5.5 3v5L8 13.5l-5.5-3v-5Z"/><path d="M8 8.5v5M2.5 5.5 8 8.5l5.5-3"/></svg>Products &amp; offers</a>
-      <a href="/owner/placements"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 7h6M5 10h4"/></svg>Placements</a>
-      <a href="/owner/earnings"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 11.5 6 8l2.5 2.5L13.5 5"/><path d="M10 5h3.5v3.5"/></svg>Earnings</a>
-      <a href="/owner/deals"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 8.5 5.5 5.5a2 2 0 0 1 2.8 0l2.2 2.2a2 2 0 0 1 0 2.8l-1 1a2 2 0 0 1-2.8 0L5 9.8"/><path d="M13.5 7.5 10.5 4.5a2 2 0 0 0-2.8 0"/></svg>Deals</a>
-      <a href="/owner/settings"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="2.2"/><path d="M8 2v1.6M8 12.4V14M2 8h1.6M12.4 8H14M3.8 3.8l1.1 1.1M11.1 11.1l1.1 1.1M12.2 3.8l-1.1 1.1M4.9 11.1l-1.1 1.1"/></svg>Setup &amp; agents</a>
-      {{if .Operator}}<a href="/owner/review"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 8.5 6.2 11.5 13 4.5"/></svg>Offer review</a>{{end}}
-    </nav>
-    <div class="sidebar-note">
-      <span class="eyebrow">HUMAN-IN-THE-LOOP</span>
-      <p>Agents negotiate the deal.<br>You hold the approval.</p>
-    </div>
-    <footer>
-      {{if .Name}}<span class="sidebar-owner">{{.Name}}</span>{{end}}
-      <span class="pill sidebar-pill">Early access</span>
-    </footer>
   </aside>
   <div class="work-area">
     <header class="topbar">
