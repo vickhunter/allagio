@@ -9,14 +9,14 @@
 @font-face{font-family:"Plex Mono Rail";src:url(/landing-v9/fonts/ibm-plex-mono-500.woff2) format("woff2");font-weight:500;font-display:swap}
 
 :root{
-  --rgb-surface-0:247 247 239; --rgb-surface-1:253 253 247; --rgb-surface-2:236 239 226; --rgb-surface-inv:35 39 32;
-  --rgb-text-1:35 39 32; --rgb-text-2:92 98 87; --rgb-text-inv:247 247 239; --rgb-text-inv-2:206 211 194;
-  --rgb-line:221 224 211; --rgb-line-strong:184 189 172;
-  --rgb-setup:35 82 201; --rgb-setup-edge:26 61 150; --rgb-setup-soft:232 237 250;   /* action / next step */
-  --rgb-maker:168 64 44; --rgb-maker-brand:198 79 56; --rgb-maker-soft:248 234 228;   /* makers = digest terracotta */
-  --rgb-pub:63 92 53; --rgb-pub-soft:230 238 223;                                       /* publishers = approvals olive */
-  --rgb-moss:63 92 53; --rgb-moss-edge:36 56 30;                                       /* single public action accent */
-  --rgb-footer:240 234 220; --rgb-footer-line:214 204 182;             /* footer: warm sand (Padova stone) */
+  --rgb-surface-0:247 245 240; --rgb-surface-1:255 255 255; --rgb-surface-2:239 236 228; --rgb-surface-inv:20 20 19;
+  --rgb-text-1:20 20 19; --rgb-text-2:92 91 86; --rgb-text-inv:247 245 240; --rgb-text-inv-2:170 168 160;
+  --rgb-line:227 223 214; --rgb-line-strong:201 196 184;
+  --rgb-setup:198 79 56; --rgb-setup-edge:164 60 40; --rgb-setup-soft:251 240 236;   /* single brand accent: terracotta */
+  --rgb-maker:168 64 44; --rgb-maker-brand:198 79 56; --rgb-maker-soft:251 240 236;   /* makers = terracotta */
+  --rgb-pub:92 91 86; --rgb-pub-soft:239 236 228;                                     /* publishers = warm stone */
+  --rgb-moss:198 79 56; --rgb-moss-edge:164 60 40;                                    /* single public action accent */
+  --rgb-footer:239 236 228; --rgb-footer-line:214 209 198;                            /* footer: warm stone */
   --dur-color:150ms; --dur-move:200ms; --dur-panel:300ms; --dur-fade:700ms;
   --ease-out:cubic-bezier(0,0,.2,1); --ease-in:cubic-bezier(.4,0,1,1); --ease-menu:cubic-bezier(.16,1,.3,1);
   --ink:rgb(var(--rgb-text-1));
@@ -116,7 +116,7 @@ body{margin:0;font-weight:500}
 /* One public bar, centered on a max-width track. Below 1280px the destinations sit in a labelled menu; above, a centered pill with logo left and actions right. */
 .site-bar{position:relative;display:flex;align-items:center;gap:8px;max-width:72rem;margin:0 auto;padding:4px 16px}
 .site-bar>a:first-child{flex:0 0 auto}
-.site-menu-btn{display:inline-flex;min-height:44px;min-width:44px;align-items:center;justify-content:center;border:1px solid rgb(var(--rgb-line-strong));border-radius:10px;background:rgb(var(--rgb-surface-1));padding:0 12px;font-size:16px;font-weight:700;margin-left:auto}
+.site-menu-btn{display:inline-flex;flex-shrink:0;min-height:40px;min-width:44px;align-items:center;justify-content:center;white-space:nowrap;border:1px solid rgb(var(--rgb-line-strong));border-radius:999px;background:rgb(var(--rgb-surface-1));padding:0 11px;font-size:13px;font-weight:600;margin-left:auto}
 .site-menu{display:none;min-width:0;align-items:center;gap:2px}
 .site-menu.is-open{display:flex;position:absolute;z-index:40;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:2px;border-bottom:1px solid rgb(var(--rgb-line));background:rgb(var(--rgb-surface-0));padding:8px 12px 12px}
 .site-menu a{display:inline-flex;min-height:44px;align-items:center}
@@ -369,17 +369,17 @@ body{margin:0;font-weight:500}
   --rgb-setup:146 174 214;
   --rgb-setup-edge:172 196 228;
   --rgb-setup-soft:28 36 48;
-  --rgb-moss:134 184 154;
-  --rgb-moss-edge:64 110 82;
+  --rgb-moss:217 107 82;
+  --rgb-moss-edge:164 60 40;
   background-color:rgb(var(--rgb-surface-0));
   color:rgb(var(--rgb-text-1));
 }
 .band-dark .eyebrow{color:rgb(var(--rgb-text-2))}
 .band-dark .kicker{color:rgb(var(--rgb-text-2))}
 .band-dark .post-hi{
-  background:rgba(214,166,91,.22);
+  background:rgba(198,79,56,.22);
 }
-.band-dark ::selection{background:rgba(134,184,154,.25);color:rgb(var(--rgb-text-1))}
+.band-dark ::selection{background:rgba(198,79,56,.28);color:rgb(var(--rgb-text-1))}
 .band-dark :focus-visible{outline-color:rgb(var(--rgb-text-1))}
 .band-dark [data-post-preview] button[type="submit"]{
   background:rgb(var(--rgb-text-1));

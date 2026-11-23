@@ -4,29 +4,29 @@
   --paper: #F7F5F0;
   --panel: #FFFFFF;
   --tint: #EFECE4;
-  --ink: #111310;
-  --muted: #5C6058;
+  --ink: #141413;
+  --muted: #5C5B56;
   --line: #E3DFD6;
   --line-strong: #C9C4B8;
-  --sidebar-bg: #111310;
-  --sidebar-surface: #181B17;
-  --sidebar-hover: #222620;
+  --sidebar-bg: #141413;
+  --sidebar-surface: #1C1C1A;
+  --sidebar-hover: #252522;
   --sidebar-line: rgba(255, 255, 255, 0.09);
-  --sidebar-text: #F2EFE8;
-  --sidebar-muted: #93988D;
+  --sidebar-text: #F7F5F0;
+  --sidebar-muted: #9A9890;
   --accent: #C64F38;
   --accent-soft: #FBF0EC;
   --accent-line: #ECC6BB;
-  --green: #3F6235;
-  --green-soft: #EAF2E6;
-  --green-line: #C4D9BC;
-  --amber: #9A5B13;
-  --amber-soft: #FDF5E6;
-  --amber-line: #EBD3A5;
-  --action: #2352C9;
-  --action-hover: #1C43A8;
-  --action-soft: #E8EDFA;
-  --action-ink: #FFFFFF;
+  --green: #3F5C35;
+  --green-soft: #EFECE4;
+  --green-line: #D5D0C5;
+  --amber: #8C4A27;
+  --amber-soft: #FBF0EC;
+  --amber-line: #ECC6BB;
+  --action: #141413;
+  --action-hover: #2B2B28;
+  --action-soft: #EFECE4;
+  --action-ink: #F7F5F0;
   --fail: #B23A2F;
   --fail-bg: #FBECEB;
   --fail-line: #E6C1BC;
@@ -217,8 +217,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border: 1px solid var(--line-strong);
   white-space: nowrap;
 }
-.kind-badge.kind-sponsored { background: var(--action-soft); color: var(--action); border-color: #C7D6F7; }
-.kind-badge.kind-affiliate { background: var(--green-soft); color: var(--green); border-color: var(--green-line); }
+.kind-badge.kind-sponsored { background: var(--tint); color: var(--ink); border-color: var(--line-strong); }
+.kind-badge.kind-affiliate { background: var(--tint); color: var(--ink); border-color: var(--line-strong); }
 .kind-badge.kind-swap { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
 .live-dot {
   display: inline-block;
@@ -998,7 +998,7 @@ th {
 .sk-l { height: 12px; width: 92%; margin: 10px 0; }
 .sk-v { height: 30px; width: 55%; margin: 8px 0 12px; }
 .spark svg { display: block; width: 100%; height: 42px; margin: 10px 0 4px; }
-.spark rect { fill: var(--action); }
+.spark rect { fill: var(--accent); }
 .spark rect.spark-empty { fill: var(--line); }
 .spark .stat-note { display: flex; justify-content: space-between; font-family: var(--font-mono); }
 
