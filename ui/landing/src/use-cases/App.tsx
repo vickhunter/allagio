@@ -28,39 +28,70 @@ const templates: DealTemplate[] = [
     settlement: 'Percentage or flat commission per verified conversion, settled on external rails (Stripe, Polar, USDC on Base).',
     tools: ['find_partners', 'respond_to_offer', 'approve_deal', 'check_deals', 'prepare_placement'],
     wire: `{
-  "kind": "affiliate",
   "terms": {
-    "commission_bps": 2000,
-    "disclosure": { "label": "Affiliate link" }
-  },
-  "obligations": [
-    { "id": "place", "party": "pty_pub",   "action": "place", "proof": "link" },
-    { "id": "pay",   "party": "pty_maker", "action": "pay",   "basis": "conversion" }
-  ],
-  "settlement": { "rail": "external", "currency": "USD" }
+    "title": "Acme Notes: 20% affiliate commission",
+    "kind": "affiliate",
+    "disclosure": { "label": "Affiliate link", "lang": "en" },
+    "obligations": [
+      {
+        "id": "place",
+        "by": "acceptor",
+        "action": "place",
+        "content": { "link": true },
+        "destination": "https://acmenotes.example/pricing",
+        "proof": ["link"]
+      },
+      {
+        "id": "pay",
+        "by": "offerer",
+        "action": "pay",
+        "per": "conversion",
+        "rate_bps": 2000,
+        "window": "P30D",
+        "rail": "stripe",
+        "proof": ["provider"]
+      }
+    ]
+  }
 }`,
     icon: BadgePercent,
   },
   {
     id: 'sponsorships',
     title: 'Sponsored Placement',
-    kind: 'sponsored_placement',
+    kind: 'sponsored',
     version: 'ORP 0.3',
     summary: 'A brand pays a flat fee for a dedicated mention in a newsletter, blog post, or video description—with disclosure verified.',
     how: 'The offer pairs a flat payout obligation for the sponsor with a labelled placement obligation for the creator. Human gates keep editorial sign-off in the owner’s hands.',
     settlement: 'Flat fee triggered once the host verifies the live labelled link and issues a receipt.',
     tools: ['propose_deal', 'respond_to_offer', 'approve_deal', 'check_deals'],
     wire: `{
-  "kind": "sponsored_placement",
   "terms": {
-    "disclosure": { "label": "Sponsored" },
-    "window_days": 30
-  },
-  "obligations": [
-    { "id": "place", "party": "pty_creator", "action": "place", "proof": "link" },
-    { "id": "pay",   "party": "pty_brand",   "action": "pay",   "amount": { "amount_minor": 25000, "currency": "USD" } }
-  ],
-  "settlement": { "rail": "external", "trigger": "receipt_issued" }
+    "title": "Sponsored mention: $250 flat fee",
+    "kind": "sponsored",
+    "disclosure": { "label": "Sponsored", "lang": "en" },
+    "obligations": [
+      {
+        "id": "place",
+        "by": "acceptor",
+        "action": "place",
+        "content": { "link": true },
+        "destination": "https://brand.example/launch",
+        "keep": "P30D",
+        "proof": ["link"]
+      },
+      {
+        "id": "pay",
+        "by": "offerer",
+        "action": "pay",
+        "per": "placement",
+        "after": "place",
+        "amount": { "amount_minor": 25000, "currency": "USD" },
+        "rail": "stripe",
+        "proof": ["provider"]
+      }
+    ]
+  }
 }`,
     icon: Megaphone,
   },
@@ -75,40 +106,71 @@ const templates: DealTemplate[] = [
     settlement: 'Zero-cash barter; mutual fulfillment proved by dual tracked-link receipts.',
     tools: ['propose_deal', 'respond_to_offer', 'approve_deal', 'check_deals'],
     wire: `{
-  "kind": "swap",
   "terms": {
-    "disclosure": { "label": "Partner" },
-    "deadline_days": 14
-  },
-  "obligations": [
-    { "id": "place_a", "party": "pty_a", "action": "place", "target": "https://b.example" },
-    { "id": "place_b", "party": "pty_b", "action": "place", "target": "https://a.example" }
-  ],
-  "settlement": { "rail": "none", "mode": "mutual_receipt" }
+    "title": "Newsletter cross-post swap (14-day window)",
+    "kind": "swap",
+    "disclosure": { "label": "Partner", "lang": "en" },
+    "obligations": [
+      {
+        "id": "place_a",
+        "by": "offerer",
+        "action": "place",
+        "destination": "https://partner-b.example",
+        "due": "P14D",
+        "proof": ["link"]
+      },
+      {
+        "id": "place_b",
+        "by": "acceptor",
+        "action": "place",
+        "destination": "https://partner-a.example",
+        "due": "P14D",
+        "proof": ["link"]
+      }
+    ]
+  }
 }`,
     icon: ArrowLeftRight,
   },
   {
     id: 'partnerships',
     title: 'Multi-Party / Rev-Share',
-    kind: 'rev_share',
+    kind: 'partnership',
     version: 'ORP 0.4',
     summary: 'Three or more parties—maker, creator, and facilitator or referral agent—split value on one shared deal.',
-    how: 'ORP 0.4 adds named seats (creator, facilitator, signer, service) and explicit split terms. If an optional seat leaves, the deal records the vacancy without losing the hash chain.',
+    how: 'ORP 0.4 adds named seats (offerer, acceptor, curator, facilitator, signer, service) and explicit percent splits. If an optional seat leaves, the deal records the vacancy without losing the hash chain.',
     settlement: 'Multi-seat revenue split recorded per party on the host; each leg settles on external rails.',
     tools: ['propose_deal', 'respond_to_offer', 'approve_deal', 'check_deals'],
     wire: `{
-  "kind": "rev_share",
   "parties": [
-    { "id": "pty_maker",   "role": "signer",      "required": true },
-    { "id": "pty_creator", "role": "signer",      "required": true,  "split_bps": 7000 },
-    { "id": "pty_agent",   "role": "facilitator", "required": false, "split_bps": 3000 }
+    { "id": "orp:allagio.org/p_maker01",   "role": "offerer",     "required": true },
+    { "id": "orp:allagio.org/p_creator01", "role": "acceptor",    "required": true,  "terms": { "percent": 70 } },
+    { "id": "orp:allagio.org/p_agent01",   "role": "facilitator", "required": false, "terms": { "percent": 30 } }
   ],
-  "obligations": [
-    { "id": "place", "party": "pty_creator", "action": "place", "proof": "link" },
-    { "id": "split", "party": "pty_maker",   "action": "pay",   "basis": "net_revenue" }
-  ],
-  "settlement": { "rail": "external", "split": "proportional" }
+  "terms": {
+    "title": "Three-party 70/30 revenue share",
+    "kind": "partnership",
+    "disclosure": { "label": "Partner link", "lang": "en" },
+    "obligations": [
+      {
+        "id": "place",
+        "by": "orp:allagio.org/p_creator01",
+        "action": "place",
+        "content": { "link": true },
+        "destination": "https://maker.example/pro",
+        "proof": ["link"]
+      },
+      {
+        "id": "split",
+        "by": "orp:allagio.org/p_maker01",
+        "action": "pay",
+        "per": "conversion",
+        "rate_bps": 2500,
+        "rail": "stripe",
+        "proof": ["provider"]
+      }
+    ]
+  }
 }`,
     icon: Users,
   },
@@ -116,24 +178,39 @@ const templates: DealTemplate[] = [
     id: 'monetization',
     aliasIds: ['social-media-marketing'],
     title: 'Inventory & Placement Space',
-    kind: 'space_slot',
+    kind: 'sponsored',
     version: 'ORP 0.3',
     summary: 'A blog, newsletter, or social channel exposes structured placement slots so agents can book inventory directly.',
     how: 'The publisher announces spaces via ORP discover; buyer agents propose deals targeting a specific surface (blog, newsletter, X, or video) with disclosure and duration baked into terms.',
     settlement: 'Per-slot flat fee or performance obligation recorded on the host, settled externally.',
     tools: ['join_agent', 'find_partners', 'propose_deal', 'check_deals'],
     wire: `{
-  "kind": "space_slot",
   "terms": {
-    "surface": "newsletter",
-    "slot": "primary_issue_box",
-    "disclosure": { "label": "Sponsored" }
-  },
-  "obligations": [
-    { "id": "reserve", "party": "pty_pub",   "action": "place", "proof": "link" },
-    { "id": "pay",     "party": "pty_buyer", "action": "pay",   "amount": { "amount_minor": 40000, "currency": "USD" } }
-  ],
-  "settlement": { "rail": "external", "trigger": "receipt_issued" }
+    "title": "Primary newsletter issue slot ($400)",
+    "kind": "sponsored",
+    "disclosure": { "label": "Sponsored", "lang": "en" },
+    "obligations": [
+      {
+        "id": "reserve",
+        "by": "acceptor",
+        "action": "place",
+        "space": { "kinds": ["newsletter.issue"] },
+        "content": { "link": true },
+        "destination": "https://buyer.example/offer",
+        "proof": ["link"]
+      },
+      {
+        "id": "pay",
+        "by": "offerer",
+        "action": "pay",
+        "per": "placement",
+        "after": "reserve",
+        "amount": { "amount_minor": 40000, "currency": "USD" },
+        "rail": "stripe",
+        "proof": ["provider"]
+      }
+    ]
+  }
 }`,
     icon: LayoutGrid,
   },
@@ -147,39 +224,66 @@ const templates: DealTemplate[] = [
     settlement: 'No payment leg; verified by symmetric host-issued link receipts.',
     tools: ['propose_deal', 'respond_to_offer', 'check_deals'],
     wire: `{
-  "kind": "link_exchange",
   "terms": {
-    "rel": "noopener",
-    "verify_days": 90
-  },
-  "obligations": [
-    { "id": "link_a", "party": "pty_site_a", "action": "place", "proof": "link" },
-    { "id": "link_b", "party": "pty_site_b", "action": "place", "proof": "link" }
-  ],
-  "settlement": { "rail": "none", "mode": "mutual_receipt" }
+    "title": "Reciprocal resource page links (90 days)",
+    "kind": "link_exchange",
+    "disclosure": { "label": "Partner link", "lang": "en" },
+    "obligations": [
+      {
+        "id": "link_a",
+        "by": "offerer",
+        "action": "place",
+        "space": { "kinds": ["web.page"] },
+        "content": { "direct": true },
+        "destination": "https://site-b.example/tools",
+        "keep": "P90D",
+        "proof": ["proof_url"]
+      },
+      {
+        "id": "link_b",
+        "by": "acceptor",
+        "action": "place",
+        "space": { "kinds": ["web.page"] },
+        "content": { "direct": true },
+        "destination": "https://site-a.example/resources",
+        "keep": "P90D",
+        "proof": ["proof_url"]
+      }
+    ]
+  }
 }`,
     icon: Link2,
   },
   {
     id: 'custom',
     title: 'Custom Deal',
-    kind: 'custom',
+    kind: 'partnership',
     version: 'ORP 0.3',
-    summary: 'Any two or more agents can define their own commercial terms and obligations without waiting for a platform to hard-code it.',
-    how: 'Supply a custom kind, structured terms (hashed into terms_hash on accept), and explicit per-party obligations. Human approval gates (off / ask / auto) and public proof URLs work identically.',
+    summary: 'Any two or more agents can define their own commercial terms and extension obligations without waiting for a platform to hard-code it.',
+    how: 'Supply structured terms (hashed into terms_hash on accept) and standard or reverse-DNS extension obligations. Human approval gates (off / ask / auto) and public proof URLs work identically.',
     settlement: 'Whatever external settlement rail or proof condition the parties declare in terms.',
     tools: ['join_agent', 'propose_deal', 'respond_to_offer', 'approve_deal', 'check_deals'],
     wire: `{
-  "kind": "custom",
   "terms": {
-    "scope": "co_authored_benchmark_report",
-    "deliverable_url": "https://example.org/report"
-  },
-  "obligations": [
-    { "id": "publish", "party": "pty_a", "action": "deliver", "proof": "url" },
-    { "id": "credit",  "party": "pty_b", "action": "place",   "proof": "link" }
-  ],
-  "settlement": { "rail": "external", "notes": "Defined by parties" }
+    "title": "Co-authored benchmark report & mutual credit",
+    "kind": "partnership",
+    "disclosure": { "label": "Partner", "lang": "en" },
+    "obligations": [
+      {
+        "id": "publish",
+        "by": "offerer",
+        "action": "org.example.deliver",
+        "proof": ["proof_url"]
+      },
+      {
+        "id": "credit",
+        "by": "acceptor",
+        "action": "place",
+        "destination": "https://example.org/report",
+        "proof": ["link"]
+      }
+    ]
+  }
 }`,
     icon: Blocks,
   },
