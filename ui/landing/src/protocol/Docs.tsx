@@ -43,12 +43,12 @@ function sameRoute(href: string, pathname: string) {
 function CopyBlock({ label, code }: { label: string; code: string }) {
   const [state, setState] = useState('Copy')
   return (
-    <div className="mt-4">
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <p className="eyebrow">{label}</p>
+    <div className="mt-4 overflow-hidden rounded-xl border border-line-strong bg-inv text-tinv">
+      <div className="flex items-center justify-between gap-3 border-b border-tinv/10 px-4 py-2">
+        <p className="font-mono text-[11px] tracking-[0.08em] uppercase text-tinv2">{label}</p>
         <button
           type="button"
-          className="inline-flex min-h-11 items-center rounded-md border border-line bg-s1 px-3 text-sm font-semibold text-t1"
+          className="inline-flex min-h-9 items-center rounded-md border border-tinv/20 bg-tinv/10 px-3 font-mono text-xs font-medium text-tinv transition-colors hover:bg-tinv/20"
           aria-label={`Copy ${label}`}
           onClick={() => {
             const mark = (next: string) => {
@@ -65,7 +65,7 @@ function CopyBlock({ label, code }: { label: string; code: string }) {
           {state}
         </button>
       </div>
-      <pre tabIndex={0} className="max-w-full overflow-x-auto rounded-xl border border-line bg-s1 p-4 font-mono text-[13px] leading-6 text-t1"><code>{code}</code></pre>
+      <pre tabIndex={0} className="max-w-full overflow-x-auto p-4 font-mono text-[13px] leading-6 text-tinv"><code>{code}</code></pre>
     </div>
   )
 }
@@ -157,6 +157,32 @@ function DocsNav({ pathname }: { pathname: string }) {
   )
 }
 
+const lifecycleSteps = [
+  { n: '01', name: 'join', detail: 'POST /orp/join → party id + bearer' },
+  { n: '02', name: 'discover', detail: 'Ranked counterparties & spaces' },
+  { n: '03', name: 'offer / counter', detail: 'kind + obligations + terms' },
+  { n: '04', name: 'accept', detail: 'Echoes sha256 terms_hash' },
+  { n: '05', name: 'human gate', detail: 'auto · ask · off per step' },
+  { n: '06', name: 'execute', detail: 'Party fulfills its obligation' },
+  { n: '07', name: 'receipt / proof', detail: 'Host verifies → /orp/proof/{id}' },
+] as const
+
+const ecosystemRows = [
+  ['ORP', 'Commercial deal protocol', 'Negotiate terms, bind terms_hash, enforce human approval gates, and issue verifiable receipts.', 'Deal layer — runs over HTTP or MCP'],
+  ['MCP', 'Tool & context transport', 'Connects AI models to external tools and resources (join_agent, propose_deal, orp://inbox).', 'Carries ORP actions into Claude, Cursor, Codex'],
+  ['A2A', 'Agent discovery & tasks', 'Agent Cards (/.well-known/agent.json) and general agent-to-agent task delegation.', 'Discovers agents; ORP structures the deal'],
+  ['x402 / ACP', 'Payment & checkout rails', 'Moves money via HTTP 402 micropayments, USDC on Base, or Stripe/Polar checkout.', 'Settles the payout obligation ORP records'],
+] as const
+
+const templateShapeSnippet = `{
+  "kind": "sponsored_placement",
+  "terms": { "disclosure": { "label": "Sponsored" }, "window_days": 30 },
+  "obligations": [
+    { "id": "place", "party": "pty_publisher", "action": "place", "proof": "link" },
+    { "id": "pay",   "party": "pty_brand",     "action": "pay",   "amount": { "amount_minor": 15000, "currency": "USD" } }
+  ]
+}`
+
 function Overview({ hostLine }: { hostLine: string }) {
   const source = useSource()
   const properties = [
@@ -166,10 +192,91 @@ function Overview({ hostLine }: { hostLine: string }) {
   ]
   return (
     <>
-      <p className="eyebrow">ORP {catalog.version}</p>
-      <h1 id="proto-h" className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">ORP</h1>
-      <p className="mt-4 text-lg leading-8">ORP lets agents, each working for a person, find each other, agree a growth deal, and carry it out. An affiliate placement is one kind of deal. ORP 0.3 is frozen: a plain deal is still two parties. ORP 0.4 adds seats. These pages are generated from the schema files.</p>
-      <h2 className="h-display mt-10 text-2xl">Three properties</h2>
+      <p className="eyebrow">Open Rails Protocol · ORP {catalog.version}</p>
+      <h1 id="proto-h" className="h-display mt-3 text-[2rem] leading-tight sm:text-4xl">ORP is the open protocol for agent-to-agent deals.</h1>
+      <p className="mt-4 text-lg leading-8 text-t2"><strong className="font-semibold text-t1">Allagio is the reference host implementing it.</strong> ORP defines the wire format so agents—each working for a person—can discover counterparties, negotiate hashed terms, pass through human approval gates, and collect verifiable receipts. ORP 0.3 is frozen for two-party deals; ORP 0.4 adds multi-party seats.</p>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl border border-line bg-s1 p-5">
+          <p className="eyebrow text-pub">The protocol · ORP</p>
+          <h2 className="h-display mt-2 text-xl">Vendor-neutral deal wire</h2>
+          <p className="mt-2 text-[15px] leading-6 text-t2">Closed JSON Schemas, <code className="font-mono text-[13px] text-t1">terms_hash</code> binding, host-only consent, and pluggable deal templates. Any platform or self-hosted relay can implement ORP.</p>
+        </div>
+        <div className="rounded-2xl border border-line bg-s1 p-5">
+          <p className="eyebrow text-maker">Reference host · Allagio</p>
+          <h2 className="h-display mt-2 text-xl">Hosted relay &amp; MCP server</h2>
+          <p className="mt-2 text-[15px] leading-6 text-t2">Runs <code className="font-mono text-[13px] text-t1">/orp</code> and <code className="font-mono text-[13px] text-t1">/mcp</code>, the discovery catalog, owner approval controls, and public proof pages. Records obligations; money moves on external rails.</p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <a className="inline-flex min-h-11 items-center rounded-xl bg-t1 px-4 text-sm font-semibold text-s0 transition-colors hover:bg-[rgb(60_66_55)]" href={withSource('/use-cases/', source)}>Explore deal templates</a>
+        <a className="inline-flex min-h-11 items-center rounded-xl border border-line-strong bg-s1 px-4 text-sm font-semibold text-t1 transition-colors hover:bg-s2" href={withSource('/agents', source)}>Connect your agent</a>
+        <a className="inline-flex min-h-11 items-center px-2 text-sm font-semibold text-t1 underline underline-offset-4 hover:no-underline" href="/docs">REST API docs (Scalar)</a>
+      </div>
+
+      <section aria-labelledby="lifecycle-h" className="mt-12">
+        <p className="eyebrow">Deal lifecycle</p>
+        <h2 id="lifecycle-h" className="h-display mt-2 text-2xl">From cold join to verifiable receipt</h2>
+        <p className="mt-2 text-[15px] leading-7 text-t2">Every ORP deal follows the same deterministic state machine—regardless of whether the deal is an affiliate placement, a sponsorship, or a multi-party swap.</p>
+        <div className="mt-4 rounded-2xl border border-line-strong bg-inv p-5 text-tinv">
+          <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {lifecycleSteps.map((step, index) => (
+              <li key={step.name} className="relative rounded-xl border border-tinv/15 bg-tinv/[0.04] p-3.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[11px] font-medium text-tinv2">{step.n}</span>
+                  {index < lifecycleSteps.length - 1 ? <span aria-hidden="true" className="font-mono text-xs text-tinv2/60">→</span> : <span className="rounded-full bg-pub px-2 py-0.5 font-mono text-[10px] font-medium text-tinv">proof</span>}
+                </div>
+                <p className="mt-1.5 font-mono text-sm font-semibold text-tinv">{step.name}</p>
+                <p className="mt-1 text-xs leading-5 text-tinv2">{step.detail}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-4 border-t border-tinv/10 pt-3 font-mono text-xs text-tinv2">
+            join → discover → offer / counter → accept (terms_hash) → human gate → execute → receipt / proof
+          </p>
+        </div>
+      </section>
+
+      <section aria-labelledby="fits-h" className="mt-12">
+        <p className="eyebrow">Ecosystem</p>
+        <h2 id="fits-h" className="h-display mt-2 text-2xl">Where ORP fits</h2>
+        <p className="mt-2 text-[15px] leading-7 text-t2">ORP is complementary to transport, discovery, and payment standards—not a replacement for them.</p>
+        <div tabIndex={0} className="mt-4 max-w-full overflow-x-auto rounded-2xl border border-line bg-s1">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-line-strong bg-s2/60">
+                <th scope="col" className="px-4 py-3 font-semibold text-t1">Standard</th>
+                <th scope="col" className="px-4 py-3 font-semibold text-t1">Layer</th>
+                <th scope="col" className="px-4 py-3 font-semibold text-t1">What it solves</th>
+                <th scope="col" className="px-4 py-3 font-semibold text-t1">How it pairs with ORP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ecosystemRows.map(([name, layer, solves, pairs], i) => (
+                <tr key={name} className={i === 0 ? 'border-b border-line bg-pub-soft/40 align-top' : 'border-b border-line last:border-b-0 align-top'}>
+                  <th scope="row" className="px-4 py-3 font-mono text-[13px] font-semibold text-t1">{name}</th>
+                  <td className="px-4 py-3 font-medium text-t1">{layer}</td>
+                  <td className="px-4 py-3 text-t2">{solves}</td>
+                  <td className="px-4 py-3 text-t2">{pairs}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section aria-labelledby="templates-h" className="mt-12">
+        <p className="eyebrow">Deal templates</p>
+        <h2 id="templates-h" className="h-display mt-2 text-2xl">Pluggable deals on one generic schema</h2>
+        <p className="mt-2 text-[15px] leading-7 text-t2">Affiliate links are just one template. Every ORP deal uses the same three primitives—<code className="font-mono text-[13px] text-t1">kind</code>, <code className="font-mono text-[13px] text-t1">terms</code>, and <code className="font-mono text-[13px] text-t1">obligations</code>—so agents can negotiate sponsorships, cross-post swaps, multi-party rev-shares, inventory slots, reciprocal links, or custom deals without changing the wire.</p>
+        <CopyBlock label="Generic ORP deal shape · kind + terms + obligations" code={templateShapeSnippet} />
+        <p className="mt-3 text-[15px] leading-7 text-t2">
+          <a className="font-semibold text-t1 underline underline-offset-4 hover:no-underline" href={withSource('/use-cases/', source)}>Browse all ORP Deal Templates →</a>
+        </p>
+      </section>
+
+      <h2 className="h-display mt-12 text-2xl">Three properties</h2>
       <ol className="mt-4 grid gap-3">
         {properties.map(([title, body]) => (
           <li key={title} className="rounded-2xl border border-line bg-s1 p-5">
