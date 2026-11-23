@@ -152,8 +152,7 @@ async function journey() {
     await screenshot(builder, 'home-desktop-1440x900');
     await noHorizontalOverflow(builder);
     await builder.emulateMedia({ reducedMotion: 'reduce' });
-    // The hero's RetroGrid unmounts under reduced motion; the section
-    // background grid further down the page intentionally stays.
+    // The hero uses a flat editorial surface with no decorative WebGL/canvas grid.
     await expect(builder.locator('#hero canvas')).toHaveCount(0);
     await expect(builder.locator('[data-hero-bg="fallback"]')).toBeVisible();
     await revealGoogleSignIn(builder);
@@ -162,7 +161,7 @@ async function journey() {
     await screenshot(builder, 'home-mobile-390x844');
     await builder.setViewportSize(desktop);
     await builder.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect(builder.locator('#hero canvas')).toHaveCount(1);
+    await expect(builder.locator('#hero canvas')).toHaveCount(0);
     const fallbackContext = await browser.newContext({ javaScriptEnabled: false, viewport: mobile });
     contexts.push(fallbackContext);
     const fallbackPage = await fallbackContext.newPage();
