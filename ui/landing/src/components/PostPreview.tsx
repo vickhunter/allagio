@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { FileText, Mail, ShieldCheck, Sparkles, Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { roleReturn, signInHref, useSource } from '@/lib/source'
@@ -10,6 +11,93 @@ import { PlatformPostFrame, platformFromHostname } from '@/components/platform-f
 
 // Signed-out preview. The URL stays in the field. previewFixture skips the network.
 type Phase = 'idle' | 'loading' | 'ready' | 'unread' | 'error'
+
+interface ExampleChip {
+  id: string
+  label: string
+  url: string
+  platform: ShowcaseId
+  icon: typeof FileText
+  body: Record<string, unknown>
+}
+
+const EXAMPLE_CHIPS: ExampleChip[] = [
+  {
+    id: 'dev-blog',
+    label: 'Dev blog post',
+    url: 'https://priya.dev/caching-the-dependency-graph',
+    platform: 'blog',
+    icon: FileText,
+    body: {
+      title: 'Caching the dependency graph in CI',
+      author: 'Priya · priya.dev',
+      excerpt: 'We cut monorepo build times from 14 minutes to 4 by hashing lockfile layers and persisting task outputs across runners.',
+      slot: 'after_intro',
+      demo: true,
+      offer: {
+        verified: true,
+        name: 'Acme Deploy',
+        summary: 'One-click branch previews with remote build graph caching — starts at €0/mo.',
+      },
+      suggestion: {
+        kind: 'partner_mention',
+        name: 'Acme Deploy',
+        line: 'Sponsored · Acme Deploy — remote build graph caching and branch previews in 12 seconds.',
+        note: '20% recurring · matched on CI caching & monorepo topics',
+      },
+    },
+  },
+  {
+    id: 'newsletter',
+    label: 'Newsletter issue',
+    url: 'https://designweekly.substack.com/p/border-radius-debate',
+    platform: 'newsletter',
+    icon: Mail,
+    body: {
+      title: 'Issue #214: The border-radius debate',
+      author: 'Design Weekly',
+      excerpt: 'Why modern dashboards converged on the same corner geometry, plus three crisp reads for your Friday.',
+      slot: 'mid_article',
+      demo: true,
+      offer: {
+        verified: true,
+        name: 'Frontend Notes',
+        summary: 'Reciprocal newsletter swap — weekly CSS architecture and design systems notes for 14k readers.',
+      },
+      suggestion: {
+        kind: 'partner_mention',
+        name: 'Frontend Notes',
+        line: 'Recommended partner · Frontend Notes — deep dives on CSS systems and UI craft.',
+        note: '1:1 reciprocal swap · €0 moved · verified archive proof',
+      },
+    },
+  },
+  {
+    id: 'product-review',
+    label: 'Product review',
+    url: 'https://deskgram.example/reviews/lumen-desk-lamp',
+    platform: 'blog',
+    icon: Star,
+    body: {
+      title: 'Lumen Desk Lamp review: six months on a small desk',
+      author: 'Deskgram Studio',
+      excerpt: 'Warm 3000K glare-free task lighting with a machined aluminum clamp that clears room for two monitors.',
+      slot: 'before_conclusion',
+      demo: true,
+      offer: {
+        verified: true,
+        name: 'Lumen Studio',
+        summary: 'Warm architectural task lighting built for compact home offices — 8% per sale.',
+      },
+      suggestion: {
+        kind: 'partner_mention',
+        name: 'Lumen Studio',
+        line: 'Sponsored · Lumen Desk Lamp — warm light, tiny footprint, 30-day desk trial.',
+        note: '8% per sale · matched on desk lighting & workspace gear',
+      },
+    },
+  },
+]
 
 const outlineClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line-strong bg-s0 px-5 text-center font-semibold text-t1 transition-colors duration-150 hover:bg-s2 disabled:text-t1 sm:w-auto'
 const barWidth = ['w-full', 'w-11/12', 'w-4/5', 'w-3/4']
@@ -87,11 +175,26 @@ async function loadPreview(url: string, signal: AbortSignal): Promise<PreviewGro
 function OfferCard({ offer, label }: { offer: VerifiedOffer; label: string }) {
   const { t } = useLocale()
   return (
-    <div data-offer className="my-1 rounded-xl border-2 border-pub bg-pub-soft p-4">
-      <p className="text-[13px] font-semibold text-pub">{label}</p>
-      <p className="mt-1 break-words font-display text-lg font-bold text-t1">{offer.name}</p>
+    <div
+      data-offer
+      className="my-1.5 overflow-hidden rounded-xl border-2 border-pub bg-pub-soft/85 p-4 shadow-xs"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-pub">
+          <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
+          {label}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-pub/30 bg-s1 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-pub">
+          <ShieldCheck aria-hidden="true" className="h-3 w-3" />
+          Verified match
+        </span>
+      </div>
+      <p className="mt-2 break-words font-display text-lg font-bold text-t1">{offer.name}</p>
       <p className="mt-1 break-words text-[15px] leading-relaxed text-t1">{offer.blurb}</p>
-      <p className="mt-2 text-[13px] text-t1">{t.preview.sponsored}</p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-pub/20 pt-2.5 font-mono text-[11px] text-t2">
+        <span>{t.preview.sponsored}</span>
+        <span>rel=&quot;sponsored&quot;</span>
+      </div>
     </div>
   )
 }
@@ -214,10 +317,8 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
     setNote(null)
   }
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault()
+  async function runPreviewForUrl(value: string, exampleChip?: ExampleChip) {
     if (paused || phase === 'loading') return
-    const value = url.trim()
     let parsedUrl: URL | null = null
     try { parsedUrl = new URL(value) } catch { parsedUrl = null }
     if (!parsedUrl || (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') || !parsedUrl.hostname.includes('.')) {
@@ -228,14 +329,17 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
       return
     }
     stopFlight()
-    setPlatform(platformFromHostname(parsedUrl.hostname))
+    setPlatform(exampleChip ? exampleChip.platform : platformFromHostname(parsedUrl.hostname))
     const mine = ticket.current
     const controller = new AbortController()
     flight.current = controller
     resetResult()
     setPhase('loading')
     try {
-      const result = await loadPreview(value, controller.signal)
+      const hasUrlFixture = Boolean(readPreviewFixture(window.location.search))
+      const result = exampleChip && !hasUrlFixture
+        ? await wait(320).then(() => adaptPreview(exampleChip.body, { includeFixture: false }))
+        : await loadPreview(value, controller.signal)
       if (ticket.current !== mine) return
       setPreview(result)
       if (result.readFailure) {
@@ -259,6 +363,16 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
         setPauseNonce((n) => n + 1)
       }
     }
+  }
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    await runPreviewForUrl(url.trim())
+  }
+
+  function handleExampleClick(chip: ExampleChip) {
+    setUrl(chip.url)
+    void runPreviewForUrl(chip.url, chip)
   }
 
   function tryAnother() {
@@ -299,6 +413,30 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
           onChange={(event) => setUrl(event.target.value)}
           className="min-h-12 min-w-0 bg-s0"
         />
+        <div className="flex flex-wrap items-center gap-2" aria-label="Try an example URL">
+          <span className="font-mono text-[11px] uppercase tracking-wider text-t2">Try an example:</span>
+          {EXAMPLE_CHIPS.map((chip) => {
+            const Icon = chip.icon
+            const active = url.trim() === chip.url
+            return (
+              <button
+                key={chip.id}
+                type="button"
+                data-example-chip={chip.id}
+                disabled={phase === 'loading' || paused}
+                onClick={() => handleExampleClick(chip)}
+                className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                  active
+                    ? 'border-pub bg-pub-soft text-pub'
+                    : 'border-line-strong bg-s0 text-t1 hover:border-pub hover:bg-pub-soft/50'
+                }`}
+              >
+                <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                {chip.label}
+              </button>
+            )
+          })}
+        </div>
         <p id={`${id}-public`} className="text-[13px] leading-relaxed text-t2">{t.preview.publicNote}</p>
         <button type="submit" disabled={phase === 'loading' || paused} aria-busy={phase === 'loading'} className={outlineClass}>{t.preview.submit}</button>
       </form>
