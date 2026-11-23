@@ -136,7 +136,7 @@ func holdStep(c *gin.Context, db *database.DB, step, ownerID, siteID string, pay
 }
 
 // signupGate picks the strictest site_signup mode among owners of this email.
-// Off wins over ask. No saved row stays auto, which returns an empty mode.
+// Off wins over ask. No saved row is ask.
 func signupGate(c *gin.Context, db *database.DB, owners []database.OwnerRef) (ownerID, siteID, mode string, err error) {
 	for _, owner := range owners {
 		var modes database.StepModes

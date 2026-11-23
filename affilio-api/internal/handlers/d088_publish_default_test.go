@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"affilio-api/internal/database"
 	"affilio-api/internal/dcp"
 	"affilio-api/internal/entry"
 
@@ -57,7 +58,12 @@ func TestSiteWithNoStepRowStaysPendingWhenClaimsAreLive(t *testing.T) {
 
 	got, gotBody := postJSON(t, live, http.MethodGet, "/v1/step-modes", nil, map[string]string{"X-API-Key": key})
 	modes := modeMap(t, gotBody)
-	if got.Code != http.StatusOK || modes["placement_publish"] != "ask" || modes["site_signup"] != "auto" || modes["offer_match"] != "auto" || modes["link_change"] != "auto" || modes["payout"] != "ask" {
+	for _, step := range []string{"site_signup", "offer_match", "placement_publish", "link_change", "payout", "share", "revoke"} {
+		if modes[step] != "ask" {
+			t.Fatalf("missing row %s: %d %s", step, got.Code, got.Body.String())
+		}
+	}
+	if got.Code != http.StatusOK {
 		t.Fatalf("missing row modes: %d %s", got.Code, got.Body.String())
 	}
 	if gotBody["placement_publish_effective"] != "ask" || gotBody["placement_publish_reason"] != "step_ask" {
@@ -104,7 +110,7 @@ func TestRegisterAgainDoesNotRewritePublishMode(t *testing.T) {
 		t.Fatal("an existing site with no step row gained one")
 	}
 	modes, err := db.LoadStepModes(ctx, "", oldID)
-	if err != nil || modes.PlacementPublish != "ask" || modes.OfferMatch != "auto" || modes.Payout != "ask" {
+	if err != nil || modes != (database.StepModes{SiteSignup: "ask", OfferMatch: "ask", PlacementPublish: "ask", LinkChange: "ask", Payout: "ask", Share: "ask", Revoke: "ask"}) {
 		t.Fatalf("old site read: %+v %v", modes, err)
 	}
 }

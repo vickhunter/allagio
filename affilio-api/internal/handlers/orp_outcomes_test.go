@@ -131,6 +131,7 @@ func TestORPOutcomeSweep(t *testing.T) {
 		t.Fatalf("second period %s", mustJSON(latest))
 	}
 
+	keepRevokeAuto(t, entry.DB, ownerOfParty(publisher))
 	revoke := orpEnvelope("revoke", "m_out_rvk1", publisher, map[string]any{})
 	revoke["deal"] = dealID
 	rec, body := postJSON(t, r, http.MethodPost, "/orp", revoke, bearerHeader(pubToken))

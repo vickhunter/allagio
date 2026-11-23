@@ -113,6 +113,7 @@ func TestORPRevoke(t *testing.T) {
 	makerToken, maker := joinParty(t, r)
 	pubToken, publisher := joinParty(t, r)
 	setPlacementPublish(t, entry.DB, ownerOfParty(maker), "auto")
+	keepRevokeAuto(t, entry.DB, ownerOfParty(publisher))
 
 	// scope=deal on an active deal
 	dealID, termsHash := directedDeal(t, r, makerToken, maker, publisher)
@@ -461,6 +462,7 @@ func TestORPObligationRevokeObligor(t *testing.T) {
 	pubToken, publisher := joinParty(t, r)
 	thirdToken, third := joinParty(t, r)
 	setPlacementPublish(t, entry.DB, ownerOfParty(maker), "auto")
+	keepRevokeAuto(t, entry.DB, ownerOfParty(publisher))
 
 	dealID, termsHash := directedDeal(t, r, makerToken, maker, publisher)
 	activateDeal(t, entry.DB, r, pubToken, publisher, dealID, termsHash)
@@ -631,6 +633,7 @@ func TestORPDisputeOpenerWithoutPeerOwner(t *testing.T) {
 	makerToken, maker := joinParty(t, r)
 	pubToken, publisher := joinParty(t, r)
 	setPlacementPublish(t, entry.DB, ownerOfParty(maker), "auto")
+	keepRevokeAuto(t, entry.DB, ownerOfParty(publisher))
 	dealID, termsHash := directedDeal(t, r, makerToken, maker, publisher)
 	activateDeal(t, entry.DB, r, pubToken, publisher, dealID, termsHash)
 	parties := map[string]any{"seats": []any{

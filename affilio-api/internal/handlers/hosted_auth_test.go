@@ -344,7 +344,7 @@ func TestHostedPublisherApprovalAndRealHTTPMCPClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tool := range list.Tools {
-		if tool.Name == "register_maker" || tool.Name == "register_product" || strings.Contains(tool.Name, "approve") {
+		if tool.Name == "register_maker" || tool.Name == "register_product" || (strings.Contains(tool.Name, "approve") && tool.Name != "approve_deal") {
 			t.Fatalf("publisher exposed %s", tool.Name)
 		}
 	}
@@ -389,6 +389,9 @@ func TestHostedPublisherApprovalAndRealHTTPMCPClient(t *testing.T) {
 		}
 	}
 	foreign, foreignCookie := testOwnerSession(t, h, "foreign-owner", "foreign@example.com")
+	if err = db.SaveStepModes(context.Background(), foreign.ID, "", database.StepModes{SiteSignup: database.ModeAuto}); err != nil {
+		t.Fatal(err)
+	}
 	create := ownerForm(t, h, r, foreignCookie, "/owner/accounts", url.Values{"csrf": {foreign.CSRF}, "role": {"publisher"}, "domain": {"other.example.com"}})
 	if create.Code != 303 {
 		t.Fatal(create.Body.String())

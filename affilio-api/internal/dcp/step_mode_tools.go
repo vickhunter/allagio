@@ -14,7 +14,7 @@ func init() {
 var stepModeTools = []Tool{
 	{
 		Name:        "get_step_modes",
-		Description: "Read this owner or site's step modes. Each of site_signup, offer_match, placement_publish, link_change, and payout is auto, ask, or off. " + entry.NewSitePublishDefault + " " + entry.MissingRowPublishAsk,
+		Description: "Read this owner or site's step modes. Each of site_signup, offer_match, placement_publish, link_change, payout, share, and revoke is auto, ask, or off. " + entry.NewSitePublishDefault + " " + entry.MissingRowPublishAsk,
 		InputSchema: schema(nil, map[string]interface{}{}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			return callStepModes(c, http.MethodGet, nil)
@@ -29,6 +29,8 @@ var stepModeTools = []Tool{
 			"placement_publish": str("auto, ask, or off"),
 			"link_change":       str("auto, ask, or off"),
 			"payout":            str("auto, ask, or off"),
+			"share":             str("auto, ask, or off"),
+			"revoke":            str("auto, ask, or off"),
 		}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
 			return callStepModes(c, http.MethodPut, args)

@@ -132,7 +132,7 @@ var ORPTools = []Tool{
 	},
 	{
 		Name:        "approve_deal",
-		Description: "Activate a deal that is awaiting: the counterparty accept is already stored, and this call binds the mandates and moves the deal to active. A deal still proposed or waiting on an owner step_ask answers state_conflict.",
+		Description: "Activate an awaiting ORP deal. The counterparty accept must already be stored. This binds both mandates and moves the deal to active. On a 0.3 deal this is the agent's approval of an ask: POST /orp/approve/{escalation} does not approve a 0.3 deal. A deal still proposed, or one whose accept is not stored, answers state_conflict and does not go active. When the owner turned human approval on, this answers owner_approval and does not bind.",
 		InputSchema: schema([]string{"deal_id"}, map[string]interface{}{
 			"deal_id": str("Deal id from check_deals"),
 		}),
@@ -142,6 +142,38 @@ var ORPTools = []Tool{
 				return nil, err
 			}
 			return c.Do(http.MethodPost, "/orp/deals/"+url.PathEscape(id)+"/activate", nil)
+		},
+	},
+	{
+		Name:        "execute_obligation",
+		Description: "Execute one obligation on an active ORP deal and send proof_url. The host builds the ORP execute envelope, so the caller does not. proof_url is the page the host fetches. When the obligation's proof list names proof_url, the receipt is verified or failed and the obligation records that url. This is not record_placement_receipt and it does not take a placement_id. A deal that is not active answers state_conflict.",
+		InputSchema: schema([]string{"party", "deal", "obligation", "proof_url"}, map[string]interface{}{
+			"party":      str("Your party id, the same from value the bearer belongs to"),
+			"deal":       str("Deal id from propose_deal or check_deals"),
+			"obligation": str("Obligation id on the deal, such as place_a"),
+			"proof_url":  str("HTTPS URL of the page that carries this obligation's elements"),
+		}),
+		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
+			party, err := pathArg(args, "party")
+			if err != nil {
+				return nil, err
+			}
+			deal, err := pathArg(args, "deal")
+			if err != nil {
+				return nil, err
+			}
+			obligation, err := pathArg(args, "obligation")
+			if err != nil {
+				return nil, err
+			}
+			proofURL, err := pathArg(args, "proof_url")
+			if err != nil {
+				return nil, err
+			}
+			return orpEnvelope(c, "execute", map[string]interface{}{"party": party, "deal": deal}, map[string]interface{}{
+				"obligation": obligation,
+				"proof_url":  proofURL,
+			})
 		},
 	},
 }

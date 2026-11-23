@@ -9,6 +9,20 @@ import (
 	"affilio-api/internal/database"
 )
 
+// keepRevokeAuto stores revoke as auto for one owner. A missing step-mode
+// row reads revoke as ask, and these tests exercise a revoke that runs.
+func keepRevokeAuto(t *testing.T, db *database.DB, ownerID string) {
+	t.Helper()
+	modes, err := db.LoadStepModes(context.Background(), ownerID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	modes.Revoke = database.ModeAuto
+	if err = db.SaveStepModes(context.Background(), ownerID, "", modes); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func setStepMode(t *testing.T, db *database.DB, ownerID, column, mode string) {
 	t.Helper()
 	if column != "share" && column != "revoke" {

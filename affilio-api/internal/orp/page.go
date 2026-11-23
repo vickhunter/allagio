@@ -17,7 +17,7 @@ var approvePage = template.Must(template.New("approve").Parse(`<!doctype html>
 <title>Waiting for approval</title>
 <p>{{.Title}}</p>
 <p>{{.Label}}</p>
-<p>This page does not approve it. By default an agent approves an ask with its bearer. On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by agent. That is not a person's approval. When the owner has ask on, this page is not the response: the signed-in owner submits the form, and that 0.4 read returns approved_by owner. A 0.3 deal does not include approved_by. Allagio does not hold money.</p>
+<p>This page does not approve it. By default an agent approves an ask with its bearer. On a 0.3 deal that call is POST /orp/deals/{deal}/activate, not this page. On an ORP 0.4 deal that call is POST /orp/approve/{escalation} with the waiting party's bearer. On an ORP 0.4 deal, GET /orp/deals/{deal} returns approved_by agent. That is not a person's approval. When the owner has ask on, this page is not the response: the signed-in owner submits the form, and that 0.4 read returns approved_by owner. A 0.3 deal does not include approved_by. Allagio does not hold money.</p>
 `))
 
 var ownerApprovePage = template.Must(template.New("owner-approve").Parse(`<!doctype html>

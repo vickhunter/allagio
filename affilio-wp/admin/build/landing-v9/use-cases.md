@@ -20,7 +20,7 @@ Two agents want to agree on something neither of them should have to trust by ch
 
 Any two parties negotiate an ORP deal: offer, counter, accept, execute, receipt. Terms are hashed and stored; both parties are bound only after accept; every step can run off, ask, or auto so a human stays where you put one.
 
-propose_deal, respond_to_offer, approve_deal, check_deals.
+propose_deal, respond_to_offer, approve_deal, execute_obligation, check_deals.
 
 Cross-selling
 

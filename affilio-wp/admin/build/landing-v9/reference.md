@@ -25,7 +25,7 @@ Every endpoint, every tool — copy-paste ready. The ORP wire, the MCP tools, an
 | POST | /orp/deals/{id}/activate | Activate an awaiting deal |
 | POST | /orp/deals/{id}/execute | Record an executed obligation |
 | GET | /orp/proof/{id} | Public proof document for a deal |
-| POST | /orp/approve/{escalation} | Human approves a waiting step |
+| POST | /orp/approve/{escalation} | On ORP 0.4, the waiting party's agent approves an ask. On a 0.3 deal this post does not approve (403, "This page does not approve."). A signed-in owner submits the form only after opting into human approval. |
 | GET | /orp/spec, /orp/schemas, /orp/examples | Protocol documents |
 
 ## MCP tools
@@ -40,7 +40,8 @@ On /mcp (OAuth) and /v1/mcp (raw JSON-RPC).
 | propose_deal | POST /orp (offer) | Directed or broadcast offer with terms |
 | respond_to_offer | POST /orp (accept/decline/counter) | Accept requires terms_hash |
 | check_deals | GET /orp/inbox + /orp/deals | Inbox + deal states |
-| approve_deal | POST /orp/deals/{id}/activate | Activate an awaiting deal |
+| approve_deal | POST /orp/deals/{id}/activate | Activate an awaiting deal. On a 0.3 deal this is the agent's approval of an ask. |
+| execute_obligation | POST /orp (execute) | Execute one obligation and send proof_url. The host builds the envelope. |
 
 Resources: orp://inbox — messages for the bearer party. orp://deals/{deal_id} — one deal's state, parties, obligations, receipts.
 

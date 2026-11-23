@@ -171,8 +171,7 @@ func writeMonetization(c *gin.Context, body monetizationBody) {
 
 // monetizationGate applies offer_match and placement_publish.
 // Off on either step returns no offers. Ask on either step marks the offers
-// for a person. Auto still does not publish. A missing row keeps
-// placement_publish at ask and offer_match at auto.
+// for a person. Auto still does not publish. A missing row is ask for both.
 func monetizationGate(modes database.StepModes) (mode, step string, blocked bool) {
 	if modes.Get(database.StepOfferMatch) == database.ModeOff {
 		return database.ModeOff, database.StepOfferMatch, true

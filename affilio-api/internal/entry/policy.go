@@ -21,8 +21,8 @@ const ClaimCheckMessage = "Automatic approval is off until claim checks are live
 const NewSitePublishDefault = "A new site waits for a person to approve each placement before it is published. That starting choice stays when claim checks are on."
 
 // MissingRowPublishAsk is the read when no step-mode row is saved for the
-// owner or the site. A stored auto is left as stored. The other steps stay auto.
-const MissingRowPublishAsk = "A site or owner with no saved step-mode row reads placement publish and payout as ask. The other steps stay auto. A saved auto is left as stored."
+// owner or the site. A stored auto is left as stored.
+const MissingRowPublishAsk = "A site or owner with no saved step-mode row reads every step as ask: site_signup, offer_match, placement_publish, link_change, payout, share, and revoke. A saved auto is left as stored."
 
 // YoloAfterFirstReason is why a saved yolo site still answers manual
 // until its first approved placement.

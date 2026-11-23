@@ -52,7 +52,7 @@ func TestVerifiedSiteWithoutRowAsksAndSavedAutoPublishes(t *testing.T) {
 	if len(content) > 0 {
 		text, _ = content[0].(map[string]any)["text"].(string)
 	}
-	if result["isError"] != false || !strings.Contains(text, `"placement_publish": "ask"`) || !strings.Contains(text, `"offer_match": "auto"`) || !strings.Contains(text, `"payout": "ask"`) || !strings.Contains(text, `"site_signup": "auto"`) {
+	if result["isError"] != false || !strings.Contains(text, `"placement_publish": "ask"`) || !strings.Contains(text, `"offer_match": "ask"`) || !strings.Contains(text, `"payout": "ask"`) || !strings.Contains(text, `"site_signup": "ask"`) || !strings.Contains(text, `"link_change": "ask"`) || !strings.Contains(text, `"share": "ask"`) || !strings.Contains(text, `"revoke": "ask"`) {
 		t.Fatalf("get_step_modes: %d %s", mcpRec.Code, mcpRec.Body.String())
 	}
 
@@ -66,7 +66,7 @@ func TestVerifiedSiteWithoutRowAsksAndSavedAutoPublishes(t *testing.T) {
 
 	saved := putStepModes(t, live, key, map[string]any{"placement_publish": "auto"})
 	savedModes := modeMap(t, saved)
-	if savedModes["placement_publish"] != "auto" || savedModes["offer_match"] != "auto" || saved["placement_publish_effective"] != "auto" {
+	if savedModes["placement_publish"] != "auto" || savedModes["offer_match"] != "ask" || saved["placement_publish_effective"] != "auto" {
 		t.Fatalf("agent auto: %s", saved)
 	}
 	published, publishedBody := preparePlacement(t, live, key, offerID, "https://d093b-missing.example/posts/auto", 2)

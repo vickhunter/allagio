@@ -30,7 +30,7 @@ func TestD097SuggestMonetizationAIDraft(t *testing.T) {
 	if len(offers) < 1 || len(offers) > 3 {
 		t.Fatalf("offers %d %s", len(offers), rec.Body.String())
 	}
-	if body["human_prompt"] != monetizationHumanPrompt || body["needs_human_confirm"] != true || body["mode"] != "ask" || body["step"] != "placement_publish" || body["reason"] != "" {
+	if body["human_prompt"] != monetizationHumanPrompt || body["needs_human_confirm"] != true || body["mode"] != "ask" || body["step"] != "offer_match" || body["reason"] != "" {
 		t.Fatalf("prompt body %s", rec.Body.String())
 	}
 	first := offers[0]

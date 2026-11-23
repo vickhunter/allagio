@@ -58,12 +58,7 @@ func hostedToolList(g *database.AgentGrant) []dcp.Tool {
 			}
 		}
 	}
-	for _, t := range dcp.ORPTools {
-		if t.Name == "approve_deal" {
-			continue
-		}
-		tools = append(tools, t)
-	}
+	tools = append(tools, dcp.ORPTools...)
 	return tools
 }
 
