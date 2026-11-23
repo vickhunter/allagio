@@ -248,6 +248,7 @@ export function Hero({ source }: { source: string }) {
           ) : (
             <div
               id="hero-panel-agent"
+              data-join-prompt=""
               role="tabpanel"
               aria-labelledby="hero-tab-agent"
               className="band-dark relative mt-7 w-full max-w-[46rem] overflow-hidden rounded-2xl border border-line-strong p-5 text-left shadow-xl sm:p-6"

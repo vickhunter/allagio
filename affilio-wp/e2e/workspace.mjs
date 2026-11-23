@@ -11,7 +11,7 @@ const contexts = [];
 const desktop = { width: 1440, height: 900 };
 const mobile = { width: 390, height: 844 };
 // Current approved home heading. The retired "Someone has the product" line is not on this page.
-const approvedH1 = 'Agents do the deal. You keep the approval.';
+const approvedH1 = 'The open deal layer for AI agents.';
 
 async function owner(cookie, viewport = desktop) {
     const context = await browser.newContext({ viewport });
@@ -36,23 +36,20 @@ async function assertApprovedHeading(page) {
 async function assertHydratedHome(page) {
     await assertApprovedHeading(page);
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
-    for (const name of ['Your limits', 'Makers', 'Publishers', 'Protocol', 'Agents']) {
+    for (const name of ['Templates', 'Protocol', 'Agents', 'API Docs']) {
         await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })).toBeVisible();
     }
     await expect(page.getByRole('link', { name: 'Sign in', exact: true }).first()).toBeVisible();
     await expect(page.locator('#hero')).toBeVisible();
-    await expect(page.locator('#vision')).toBeVisible();
-    await expect(page.getByRole('region', { name: 'What your agent does' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'What you keep control of' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'What it replaces' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Any content. Any partnership.', exact: true })).toBeVisible();
+    await expect(page.locator('#simulator-slot')).toBeVisible();
+    await expect(page.locator('#templates')).toBeVisible();
+    await expect(page.locator('#live-proof')).toBeVisible();
+    await expect(page.locator('#limits')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Straight answers.', exact: true })).toBeVisible();
-    await expect(page.locator('summary').filter({ hasText: 'Setup details' })).toBeVisible();
-    await expect(page.locator('details a[href="/llms.txt"]')).toHaveCount(1);
-    await expect(page.locator('#hero canvas')).toHaveCount(1);
 }
 const joinLine = 'Join with POST /v1/agent-tokens and send the bearer.';
 async function copyJoinLine(page) {
+    await page.getByRole('tab', { name: 'Agent', exact: true }).click();
     const prompt = page.locator('[data-join-prompt]');
     await prompt.getByRole('button', { name: 'Copy setup prompt', exact: true }).click();
     await expect(prompt.getByRole('status')).toHaveText('Copied.');
