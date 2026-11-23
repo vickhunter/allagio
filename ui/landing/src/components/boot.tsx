@@ -9,4 +9,12 @@ export function boot(version: string, node: ReactNode) {
   document.getElementById('static-landing')?.remove()
   installTracking()
   createRoot(document.getElementById('root')!).render(<StrictMode><LangProvider>{node}</LangProvider></StrictMode>)
+  if (window.location.hash.length > 1) {
+    const id = decodeURIComponent(window.location.hash.slice(1))
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.getElementById(id)?.scrollIntoView()
+      })
+    })
+  }
 }
