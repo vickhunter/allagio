@@ -227,9 +227,9 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
         </div>
 
         {/* Main 2-column simulator body */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+        <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
           {/* Left: Named Agents + Live ORP Wire Timeline */}
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-4">
             {/* Parties bar */}
             <div className="rounded-2xl border border-[#F7F5F0]/10 bg-[#181B17] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -459,8 +459,8 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                           {template.proofId}
                         </span>
                       </div>
-                      <p className="font-mono text-xs text-[#B8BFB2]">
-                        GET /orp/proof/{template.proofId} · hash-chained &amp; signed by both agents
+                      <p className="break-words font-mono text-xs text-[#B8BFB2]">
+                        GET /orp/proof/{template.proofId} · hash-chained &amp; signed by {template.extraParty ? 'all 3 agents' : 'both agents'}
                       </p>
                       <ul className="mt-1 grid gap-1.5 text-xs text-[#D4D8CE]">
                         {template.hardChecks.map((check) => (
@@ -492,22 +492,22 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={reduced ? undefined : { opacity: 0, height: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="overflow-hidden rounded-2xl border border-[#F7F5F0]/15 bg-[#0B0D0A]"
+                  className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-[#F7F5F0]/15 bg-[#0B0D0A]"
                 >
-                  <div className="flex items-center justify-between border-b border-[#F7F5F0]/10 px-4 py-2.5">
-                    <span className="font-mono text-xs text-[#6EE7A0]">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F7F5F0]/10 px-4 py-2.5">
+                    <span className="min-w-0 truncate font-mono text-xs text-[#6EE7A0]">
                       ORP 0.4 Wire Payload · {template.dealId}
                     </span>
                     <button
                       type="button"
                       onClick={handleCopyJson}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#F7F5F0]/15 bg-[#181B17] px-2.5 py-1 font-mono text-[11px] text-[#F7F5F0] hover:border-[#2E7D4F]"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#F7F5F0]/15 bg-[#181B17] px-2.5 py-1 font-mono text-[11px] text-[#F7F5F0] hover:border-[#2E7D4F]"
                     >
                       {copiedJson ? <Check className="h-3 w-3 text-[#6EE7A0]" /> : <Copy className="h-3 w-3" />}
                       {copiedJson ? 'Copied' : 'Copy JSON'}
                     </button>
                   </div>
-                  <pre className="max-h-72 overflow-auto p-4 font-mono text-xs leading-relaxed text-[#D4D8CE]">
+                  <pre className="max-h-72 max-w-full overflow-auto p-4 font-mono text-xs leading-relaxed text-[#D4D8CE]">
                     <code>{envelopeJson}</code>
                   </pre>
                 </motion.div>
@@ -516,7 +516,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
           </div>
 
           {/* Right: Live Preview Artifact Panel */}
-          <div className="relative overflow-hidden rounded-2xl border border-[#F7F5F0]/12 bg-[#181B17] p-5">
+          <div className="relative min-w-0 overflow-hidden rounded-2xl border border-[#F7F5F0]/12 bg-[#181B17] p-5">
             {isReceipt && !reduced ? (
               <BorderBeam size={180} duration={8} colorFrom="#2E7D4F" colorTo="#D97706" borderWidth={1.5} />
             ) : null}
@@ -644,7 +644,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   ) : null}
 
                   {artifact.ledgerRows ? (
-                    <div className="mt-3 overflow-hidden rounded-lg border border-current/15">
+                    <div className="mt-3 overflow-x-auto rounded-lg border border-current/15">
                       <table className="w-full text-left text-xs">
                         <thead>
                           <tr className={isReceipt ? 'bg-[#ECEFE2] text-[#5C6257]' : 'bg-[#181B17] text-[#8E9687]'}>
