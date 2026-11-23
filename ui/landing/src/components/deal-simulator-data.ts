@@ -783,25 +783,35 @@ export function buildOrpEnvelope(template: DealTemplate, state: SimulatorState):
     refused: 'decline',
   }
 
-  const fromParty =
+  const fromAgent =
     state.stage === 'counter' || state.stage === 'refused' || state.stage === 'active' || state.stage === 'execute'
-      ? template.acceptor.id
-      : template.offerer.id
-  const toParty = fromParty === template.offerer.id ? template.acceptor.id : template.offerer.id
+      ? template.acceptor
+      : template.offerer
+  const toAgent = fromAgent === template.offerer ? template.acceptor : template.offerer
+  const fromParty = `orp:${fromAgent.host}/${fromAgent.id}`
+  const toParty = `orp:${toAgent.host}/${toAgent.id}`
   const msgType = typeMap[state.stage]
+  const hexDigest = terms.termsHash.replace(/^sha256:/, '')
+  const b64urlChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+  let wireHashSuffix = ''
+  for (let i = 0; i < 43; i++) {
+    const byteVal = parseInt(hexDigest.slice((i * 2) % hexDigest.length, ((i * 2) % hexDigest.length) + 2), 16) || 0
+    wireHashSuffix += b64urlChars[(byteVal + i) % 64]
+  }
+  const wireTermsHash = `sha256-${wireHashSuffix}`
 
   let body: Record<string, unknown>
   if (state.stage === 'discover') {
     body = { want: 'offers', kind: template.orpKind }
   } else if (state.stage === 'active') {
-    body = { terms_hash: terms.termsHash }
+    body = { terms_hash: wireTermsHash }
   } else if (state.stage === 'execute') {
     body = { obligation: 'place', proof_url: `/orp/proof/${template.proofId}` }
   } else if (state.stage === 'receipt') {
     body = {
       proof_id: template.proofId,
       proof_url: `/orp/proof/${template.proofId}`,
-      terms_hash: terms.termsHash,
+      terms_hash: wireTermsHash,
       hard_checks: '9/9 passed',
       status: 'verified',
     }
@@ -815,7 +825,7 @@ export function buildOrpEnvelope(template: DealTemplate, state: SimulatorState):
     body = {
       id: template.dealId,
       terms: terms.orpTerms,
-      terms_hash: terms.termsHash,
+      terms_hash: wireTermsHash,
     }
   }
 

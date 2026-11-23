@@ -221,11 +221,27 @@ func summarizeObligations(rawObls []any) []string {
 	return out
 }
 
+func currencyMinorDecimals(currency string) int {
+	switch strings.ToUpper(strings.TrimSpace(currency)) {
+	case "BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF":
+		return 0
+	case "BHD", "IQD", "JOD", "KWD", "LYD", "OMR", "TND":
+		return 3
+	default:
+		return 2
+	}
+}
+
 func formatObligationAmount(amount any, item map[string]any) string {
 	if m, ok := amount.(map[string]any); ok {
 		currency, _ := m["currency"].(string)
 		if minor, ok := numberToFloat(m["amount_minor"]); ok {
-			val := fmt.Sprintf("%.2f", minor/100)
+			decimals := currencyMinorDecimals(currency)
+			scale := 1.0
+			for i := 0; i < decimals; i++ {
+				scale *= 10
+			}
+			val := fmt.Sprintf("%.*f", decimals, minor/scale)
 			if currency != "" {
 				return val + " " + currency
 			}

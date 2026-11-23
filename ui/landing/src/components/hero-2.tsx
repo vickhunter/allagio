@@ -74,6 +74,7 @@ export function Hero({ source }: { source: string }) {
 
   return (
     <section id="hero" aria-labelledby="hero-h" className="band-light relative overflow-hidden">
+      <div data-hero-bg="fallback" aria-hidden="true" className="pointer-events-none absolute inset-0" />
       <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center px-5 pt-16 pb-14 text-center md:pt-24 md:pb-20">
         <motion.p
           animate={fadeInInView ? "animate" : "initial"}
