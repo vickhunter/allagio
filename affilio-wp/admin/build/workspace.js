@@ -470,7 +470,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             ? `<section class="approval-strip is-pending" aria-label="Pending approvals"><div class="approval-strip-head"><div><span class="eyebrow">ACTION NEEDED · HUMAN APPROVAL</span><h2>${pendingCount} ${pendingCount === 1 ? 'item waits' : 'items wait'} for your sign-off</h2></div><a class="button secondary" href="/owner/deals">Open deals inbox ↗</a></div><ul class="approval-list">${approvalRows}</ul></section>`
             : `<section class="approval-strip is-clear" aria-label="Pending approvals"><div class="approval-strip-head"><div><span class="eyebrow">APPROVAL QUEUE · CLEAR</span><h2>No deals or placements waiting for your sign-off</h2></div><div class="actions"><a class="button secondary" href="/owner/deals">View deals</a><a class="button secondary" href="/owner/settings#step-modes">Autonomy rules</a></div></div></section>`;
 
-        const activeDeals = deals.filter(d => !['declined', 'revoked', 'failed'].includes(String(d.state || '').toLowerCase())).length;
+        const activeDeals = deals.filter(d => String(d.state || '').toLowerCase() === 'active').length;
         const gateActive = approvalSteps.includes('ask');
         const gateLabel = gateActive ? 'Ask' : 'Auto';
         const gateNote = gateActive ? 'Human sign-off required · <a href="/owner/settings#human-approval">Configure</a>' : 'Autonomous mode · <a href="/owner/settings#human-approval">Configure</a>';
@@ -856,24 +856,33 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         }
         const humanList = humans.length ? `<ul class="task-list">${humans.map(step => `<li>${escape(step)}</li>`).join('')}</ul>` : '<p>Nothing here needs a person right now.</p>';
         const skillStatus = `<p class="caption" data-skill-status>${skillNote ? escape(skillNote) : 'The skill file is available.'}</p>`;
-        const projects = Array.isArray(digest?.projects) ? digest.projects : [];
-        const pausedProjects = projects.filter(p => p.mode === 'manual').length;
-        const activeProjects = projects.filter(p => p.mode !== 'manual').length;
-        const hasPaused = pausedProjects > 0 || !!(digest && digest.paused && (digest.paused.account || digest.paused.site || digest.paused.offer));
-        const allPaused = projects.length > 0 ? activeProjects === 0 : hasPaused;
-        const isPartialPause = hasPaused && !allPaused;
-        const killStatus = allPaused ? 'paused' : isPartialPause ? 'partially paused' : 'active';
-        const killCopy = allPaused
-            ? 'Linked sites and maker offers are paused. To stop ORP agents from negotiating deals, disconnect them below or set Agent steps to Off.'
-            : isPartialPause
-                ? `${pausedProjects} of ${projects.length} linked sites/offers are paused while ${activeProjects} remain active. Pause the remaining automation or resume paused items.`
-                : 'Pause linked sites and maker offers (switches them to manual approval and halts live placements). To stop ORP agents from negotiating deals, disconnect agents below or set Agent steps to Off.';
-        const killActions = allPaused
-            ? '<button type="button" data-primary-action data-kill-switch="resume">Resume automation</button>'
-            : isPartialPause
-                ? '<button type="button" class="danger" data-kill-switch="pause">Pause remaining</button><button type="button" class="secondary" data-kill-switch="resume">Resume paused</button>'
-                : '<button type="button" class="danger" data-kill-switch="pause">Pause sites &amp; offers</button>';
-        const killSwitchCard = `<section id="kill-switch" class="kill-switch-card${hasPaused ? ' is-paused' : ''}"><div class="row"><div><span class="eyebrow">SAFETY CONTROL</span><h2>Emergency kill switch</h2></div>${pill(killStatus)}</div><p>${killCopy}</p><div class="actions">${killActions}</div></section>`;
+        const hasSite = !!session.publisher;
+        const hasMaker = !!session.maker;
+        const hasLinkedScopes = hasSite || hasMaker;
+        const sitePaused = hasSite && !!(digest && digest.paused && digest.paused.site);
+        const offerPaused = hasMaker && !!(digest && digest.paused && digest.paused.offer);
+        const linkedScopesCount = (hasSite ? 1 : 0) + (hasMaker ? 1 : 0);
+        const pausedScopesCount = (sitePaused ? 1 : 0) + (offerPaused ? 1 : 0);
+        const allPaused = hasLinkedScopes && pausedScopesCount === linkedScopesCount;
+        const isPartialPause = hasLinkedScopes && pausedScopesCount > 0 && pausedScopesCount < linkedScopesCount;
+        const killStatus = !hasLinkedScopes ? 'orp only' : allPaused ? 'paused' : isPartialPause ? 'partially paused' : 'active';
+        const killCopy = !hasLinkedScopes
+            ? 'No linked sites or maker offers on this account. To stop ORP agents from negotiating deals, disconnect agents below or set Agent steps to Off.'
+            : allPaused
+                ? 'Linked sites and maker offers are paused. To stop ORP agents from negotiating deals, disconnect them below or set Agent steps to Off.'
+                : isPartialPause
+                    ? (sitePaused
+                        ? 'Your linked site is paused while your maker offers remain active. Pause the remaining automation or resume paused items.'
+                        : 'Your maker offers are paused while your linked site remains active. Pause the remaining automation or resume paused items.')
+                    : 'Pause linked sites and maker offers (switches them to manual approval and halts live placements). To stop ORP agents from negotiating deals, disconnect agents below or set Agent steps to Off.';
+        const killActions = !hasLinkedScopes
+            ? '<a class="button secondary" href="#step-modes">Review agent step modes</a>'
+            : allPaused
+                ? '<button type="button" data-primary-action data-kill-switch="resume">Resume automation</button>'
+                : isPartialPause
+                    ? '<button type="button" class="danger" data-kill-switch="pause">Pause remaining</button><button type="button" class="secondary" data-kill-switch="resume">Resume paused</button>'
+                    : '<button type="button" class="danger" data-kill-switch="pause">Pause sites &amp; offers</button>';
+        const killSwitchCard = `<section id="kill-switch" class="kill-switch-card${(allPaused || isPartialPause) ? ' is-paused' : ''}"><div class="row"><div><span class="eyebrow">SAFETY CONTROL</span><h2>Emergency kill switch</h2></div>${pill(killStatus)}</div><p>${killCopy}</p><div class="actions">${killActions}</div></section>`;
         const agentsMarkup = grants.length
             ? `<div class="agent-list">${grants.map(grant => `<div class="agent-card"><div><h3>${escape(grant.client_name)}</h3><p>${pill(grant.scope)} · expires ${escape(new Date(grant.expires_at).toLocaleString())}</p></div><form method="post" action="/owner/grants/${grant.id}/revoke"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Disconnect agent</button></form></div>`).join('')}</div>`
             : empty('No agents connected yet.', 'Use the agent start line or hosted MCP URL below to connect Claude, Cursor, or Codex.');

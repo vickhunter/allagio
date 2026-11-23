@@ -666,6 +666,12 @@ pre, .command {
   white-space: nowrap;
   margin-top: 0;
 }
+.copy-action:hover, button.copy-action:not(:disabled):hover {
+  background: var(--tint);
+  border-color: var(--ink);
+  color: var(--ink);
+  box-shadow: none;
+}
 .copy-ready .copy-action { display: inline-flex; }
 .copy-status { display: block; min-height: 18px; font-size: var(--text-eyebrow); font-family: var(--font-mono); color: var(--green); line-height: 1.5; }
 .setup-command, .agent-line, .mcp-box {
