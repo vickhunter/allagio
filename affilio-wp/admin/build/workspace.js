@@ -968,7 +968,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     drawerOpen?.addEventListener('click', () => setDrawer(true));
     drawerClose?.addEventListener('click', () => setDrawer(false));
     drawerBackdrop?.addEventListener('click', () => setDrawer(false));
-    document.addEventListener('keydown', event => { if (event.key === 'Escape' && document.body.classList.contains('drawer-open')) setDrawer(false); });
+    document.addEventListener?.('keydown', event => { if (event.key === 'Escape' && document.body?.classList?.contains('drawer-open')) setDrawer(false); });
     document.querySelectorAll('.sidebar nav a').forEach(link => link.addEventListener('click', () => setDrawer(false)));
     document.querySelectorAll('nav a').forEach(link => { if (link.getAttribute('href') === location.pathname) link.setAttribute('aria-current','page'); });
     document.querySelectorAll('[data-commit-placement]').forEach(button => button.addEventListener('click',() => run(button,async () => { await api(`/placements/${button.dataset.commitPlacement}/commit`,'POST',{}); location.reload(); })));
