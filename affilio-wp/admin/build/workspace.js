@@ -834,21 +834,46 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         }
         const humanList = humans.length ? `<ul class="task-list">${humans.map(step => `<li>${escape(step)}</li>`).join('')}</ul>` : '<p>Nothing here needs a person right now.</p>';
         const skillStatus = `<p class="caption" data-skill-status>${skillNote ? escape(skillNote) : 'The skill file is available.'}</p>`;
-        const isPaused = !!(digest && digest.paused && (digest.paused.account || digest.paused.site || digest.paused.offer));
-        const killSwitchCard = `<section id="kill-switch" class="kill-switch-card${isPaused ? ' is-paused' : ''}"><div class="row"><div><span class="eyebrow">SAFETY CONTROL</span><h2>Emergency kill switch</h2></div>${pill(isPaused ? 'paused' : 'active')}</div><p>${isPaused ? 'Automation is currently paused. Agents cannot publish or run autonomous placements until you resume from this signed-in session.' : 'Immediately pause all agent automation, switch sites to manual approval, and halt live placements across your account.'}</p><div class="actions">${isPaused ? '<button type="button" data-primary-action data-kill-switch="resume">Resume automation</button>' : '<button type="button" class="danger" data-kill-switch="pause">Pause all automation</button>'}</div></section>`;
+        const projects = Array.isArray(digest?.projects) ? digest.projects : [];
+        const pausedProjects = projects.filter(p => p.mode === 'manual').length;
+        const activeProjects = projects.filter(p => p.mode !== 'manual').length;
+        const hasPaused = pausedProjects > 0 || !!(digest && digest.paused && (digest.paused.account || digest.paused.site || digest.paused.offer));
+        const allPaused = projects.length > 0 ? activeProjects === 0 : hasPaused;
+        const isPartialPause = hasPaused && !allPaused;
+        const killStatus = allPaused ? 'paused' : isPartialPause ? 'partially paused' : 'active';
+        const killCopy = allPaused
+            ? 'Linked sites and maker offers are paused. To stop ORP agents from negotiating deals, disconnect them below or set Agent steps to Off.'
+            : isPartialPause
+                ? `${pausedProjects} of ${projects.length} linked sites/offers are paused while ${activeProjects} remain active. Pause the remaining automation or resume paused items.`
+                : 'Pause linked sites and maker offers (switches them to manual approval and halts live placements). To stop ORP agents from negotiating deals, disconnect agents below or set Agent steps to Off.';
+        const killActions = allPaused
+            ? '<button type="button" data-primary-action data-kill-switch="resume">Resume automation</button>'
+            : isPartialPause
+                ? '<button type="button" class="danger" data-kill-switch="pause">Pause remaining</button><button type="button" class="secondary" data-kill-switch="resume">Resume paused</button>'
+                : '<button type="button" class="danger" data-kill-switch="pause">Pause sites &amp; offers</button>';
+        const killSwitchCard = `<section id="kill-switch" class="kill-switch-card${hasPaused ? ' is-paused' : ''}"><div class="row"><div><span class="eyebrow">SAFETY CONTROL</span><h2>Emergency kill switch</h2></div>${pill(killStatus)}</div><p>${killCopy}</p><div class="actions">${killActions}</div></section>`;
         const agentsMarkup = grants.length
             ? `<div class="agent-list">${grants.map(grant => `<div class="agent-card"><div><h3>${escape(grant.client_name)}</h3><p>${pill(grant.scope)} · expires ${escape(new Date(grant.expires_at).toLocaleString())}</p></div><form method="post" action="/owner/grants/${grant.id}/revoke"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Disconnect agent</button></form></div>`).join('')}</div>`
             : empty('No agents connected yet.', 'Use the agent start line or hosted MCP URL below to connect Claude, Cursor, or Codex.');
         root.innerHTML = `${killSwitchCard}<section><div class="row"><div><span class="eyebrow">AGENT ACCESS</span><h2>Connected agents</h2></div>${pill(String(grants.length) + ' active')}</div>${agentsMarkup}</section><section><span class="eyebrow">QUICK START</span><h2>Start an agent</h2><p>Give this line to an agent. It reads the skill file, then connects this site.</p><div class="copy-field agent-line"><div class="row"><span class="eyebrow">AGENT START</span><button type="button" class="copy-action${skillNote ? ' secondary' : ''}" data-copy data-copied="Copied. Paste it to your agent.">Copy line</button></div><pre>${escape(agentLine)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div>${skillStatus}</section><section><span class="eyebrow">MCP &amp; CLI SETUP</span><h2>Connect your existing agent</h2><p>Builders: run this in your product repository.</p>${copyCommand(session.install_command)}<p class="caption">The npm package offer-rails is not published yet. This command uses the installer archive on this host. The hosted MCP URL below is the working connection.</p><div class="copy-field mcp-box"><div class="row"><span class="eyebrow">HOSTED MCP URL</span><button type="button" class="copy-action" data-copy data-copied="Copied MCP URL.">Copy URL</button></div><pre>${escape(session.mcp_url)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div><p class="caption">Choose maker or publisher permissions in the browser consent screen. Connections last up to seven days and can be revoked here.</p></section><div class="grid"><section><span class="eyebrow">OFFER STATUS</span><h2>Where this offer stands</h2><p data-rail-plain>${escape(progress)}</p></section><section><span class="eyebrow">HUMAN CHECKLIST</span><h2>Still needs a person</h2>${humanList}</section></div>${!session.publisher ? '<section><span class="eyebrow">WORDPRESS</span><h2>WordPress publishers</h2><p>Upload and activate the plugin, connect the site, then connect its publisher account from the Distribution screen.</p><a class="button secondary" href="/downloads/offer-rails.zip">Download plugin ↓</a></section>' + accountForm('publisher') : ''}${!session.maker ? '<p><a href="/owner?setup=maker">Create a builder account ↗</a></p>' : ''}<section><span class="eyebrow">SESSION</span><h2>Account</h2><p>${escape(session.email)}</p><p class="caption">Owner ID: <code>${escape(session.owner_id)}</code></p><form method="post" action="/owner/logout"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Sign out</button></form></section>`;
-        root.querySelector('[data-kill-switch]')?.addEventListener('click', event => {
+        root.querySelectorAll('[data-kill-switch]').forEach(btn => btn.addEventListener('click', event => {
             const button = event.currentTarget;
             const action = button.dataset.killSwitch;
             run(button, async () => {
-                await v1Api(action === 'pause' ? '/account/pause' : '/account/resume', 'POST', {scope: 'all'});
-                report(action === 'pause' ? 'Emergency kill switch enabled. All automation is paused.' : 'Automation resumed for your account.');
+                const res = await v1Api(action === 'pause' ? '/account/pause' : '/account/resume', 'POST', {scope: 'all'});
+                const applied = Array.isArray(res?.applied) ? res.applied.length : 0;
+                if (action === 'pause') {
+                    report(applied > 0
+                        ? `Paused ${applied} linked ${applied === 1 ? 'site/offer' : 'sites/offers'}. Disconnect ORP agents below if you also want to halt deal negotiations.`
+                        : 'No linked sites or maker offers to pause. To stop ORP agents, disconnect them below or set Agent steps to Off.');
+                } else {
+                    report(applied > 0
+                        ? `Resumed ${applied} linked ${applied === 1 ? 'site/offer' : 'sites/offers'}.`
+                        : 'No paused sites or maker offers to resume.');
+                }
                 await settingsPage();
             });
-        });
+        }));
         if (session.publisher) {
             const profile = await api('/payout-profile');
             root.insertAdjacentHTML('beforeend',`<section><span class="eyebrow">PUBLISHER PAYOUTS</span><h2>How merchants can arrange payment</h2><p>These instructions are shared only with merchants that have a payout due to you. Use a payment contact or contact-page URL.</p><form data-payout-profile><label>Payment contact instructions<textarea name="instructions" maxlength="2000">${escape(profile.instructions)}</textarea></label><button>Save instructions</button></form></section>`);
