@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import { ArrowDownRight, ArrowRight, Check, Copy, Terminal, User } from "lucide-react"
 import { motion, useInView } from "motion/react"
 
@@ -44,6 +44,23 @@ export function Hero({ source }: { source: string }) {
   )
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef<number | null>(null)
+  const humanTabRef = useRef<HTMLButtonElement>(null)
+  const agentTabRef = useRef<HTMLButtonElement>(null)
+
+  function onTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    let next: HeroAudience | null = null
+    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      next = audience === "human" ? "agent" : "human"
+    } else if (event.key === "Home") {
+      next = "human"
+    } else if (event.key === "End") {
+      next = "agent"
+    }
+    if (!next) return
+    event.preventDefault()
+    setAudience(next)
+    ;(next === "human" ? humanTabRef : agentTabRef).current?.focus()
+  }
 
   useEffect(() => {
     const syncHash = () => {
@@ -130,12 +147,15 @@ export function Hero({ source }: { source: string }) {
             className="inline-flex items-center rounded-full border border-line-strong bg-s1 p-1 shadow-xs"
           >
             <button
+              ref={humanTabRef}
               type="button"
               role="tab"
               id="hero-tab-human"
+              tabIndex={audience === "human" ? 0 : -1}
               aria-selected={audience === "human"}
               aria-controls="hero-panel-human"
               onClick={() => setAudience("human")}
+              onKeyDown={onTabKeyDown}
               className={cn(
                 "inline-flex min-h-10 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-colors duration-150",
                 audience === "human"
@@ -147,12 +167,15 @@ export function Hero({ source }: { source: string }) {
               {t.hero.toggleHuman}
             </button>
             <button
+              ref={agentTabRef}
               type="button"
               role="tab"
               id="hero-tab-agent"
+              tabIndex={audience === "agent" ? 0 : -1}
               aria-selected={audience === "agent"}
               aria-controls="hero-panel-agent"
               onClick={() => setAudience("agent")}
+              onKeyDown={onTabKeyDown}
               className={cn(
                 "inline-flex min-h-10 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-colors duration-150",
                 audience === "agent"
