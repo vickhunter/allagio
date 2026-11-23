@@ -485,10 +485,13 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         };
         const pubBalances = Array.isArray(pubEarn.balances) ? pubEarn.balances : [];
         const livePub = pubBalances.filter(b => String(b.mode || 'live').toLowerCase() === 'live');
+        const legacyPub = pubBalances.filter(b => String(b.mode || '').toLowerCase() === 'legacy');
         const testPub = pubBalances.filter(b => String(b.mode || '').toLowerCase() === 'test');
         const pubBucketSum = b => Number(b.paid || 0) + Number(b.payment_reported || 0) + Number(b.reserved || 0) + Number(b.cleared_unpaid || 0) + Number(b.pending || 0);
         const makerOffers = Array.isArray(makerEarn.offers) ? makerEarn.offers : [];
         const liveMaker = makerOffers.filter(o => String(o.mode || 'live').toLowerCase() === 'live');
+        const legacyMaker = makerOffers.filter(o => String(o.mode || '').toLowerCase() === 'legacy');
+        const testMaker = makerOffers.filter(o => String(o.mode || '').toLowerCase() === 'test');
 
         let earningsLabel = 'Earnings';
         let earningsValue = money(0, 'USD');
@@ -496,6 +499,9 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         if (livePub.length) {
             earningsValue = sumByCurrency(livePub, pubBucketSum).join(' · ');
             earningsMeta = 'Live publisher · <a href="/owner/earnings">Open ledger</a>';
+        } else if (legacyPub.length) {
+            earningsValue = sumByCurrency(legacyPub, pubBucketSum).join(' · ');
+            earningsMeta = 'Legacy publisher · <a href="/owner/earnings">Open ledger</a>';
         } else if (testPub.length) {
             earningsValue = sumByCurrency(testPub, pubBucketSum).join(' · ');
             earningsMeta = 'Test-mode publisher · <a href="/owner/earnings">Open ledger</a>';
@@ -503,6 +509,14 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             earningsLabel = 'Commissions owed';
             earningsValue = sumByCurrency(liveMaker, o => o.commission).join(' · ');
             earningsMeta = 'Live maker · <a href="/owner/earnings">Open ledger</a>';
+        } else if (legacyMaker.length) {
+            earningsLabel = 'Commissions owed';
+            earningsValue = sumByCurrency(legacyMaker, o => o.commission).join(' · ');
+            earningsMeta = 'Legacy maker · <a href="/owner/earnings">Open ledger</a>';
+        } else if (testMaker.length) {
+            earningsLabel = 'Commissions owed';
+            earningsValue = sumByCurrency(testMaker, o => o.commission).join(' · ');
+            earningsMeta = 'Test-mode maker · <a href="/owner/earnings">Open ledger</a>';
         }
 
         const kpis = `<div class="stat-grid">`
