@@ -178,12 +178,14 @@ test.describe('public landing contrast and tap targets', () => {
       const page = await context.newPage();
       await page.goto(landing.base + '/landing', { waitUntil: 'networkidle' });
       // The home h1 is the approved line. Contrast and tap-target checks below stay.
-      await expect(page.getByRole('heading', { name: 'Agents do the deal. You keep the approval.', exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Copy setup prompt', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'The open deal layer for AI agents.', exact: true })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Set up your agent', exact: true }).first()).toBeVisible();
-      await expect(page.locator('#how')).toHaveCount(1);
-      await expect(page.locator('#publishers')).toHaveCount(1);
-      expect(await axeContrast(page, ['#hero-h', '#join-h'])).toEqual([]);
+      await expect(page.locator('#simulator-slot')).toHaveCount(1);
+      await expect(page.locator('#templates')).toHaveCount(1);
+      await expect(page.locator('#limits')).toHaveCount(1);
+      await page.getByRole('tab', { name: 'Agent', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Copy setup prompt', exact: true })).toBeVisible();
+      expect(await axeContrast(page, ['#hero-h', '#join'])).toEqual([]);
 
       for (const name of [/Sign in with Google/, /Download WordPress plugin/, /MCP and setup/]) {
         const box = await page.getByRole('link', { name }).first().boundingBox();
