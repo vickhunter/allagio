@@ -475,16 +475,41 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const gateLabel = gateActive ? 'Ask' : 'Auto';
         const gateNote = gateActive ? 'Human sign-off required · <a href="/owner/settings#human-approval">Configure</a>' : 'Autonomous mode · <a href="/owner/settings#human-approval">Configure</a>';
 
-        let earningsTotal = 0;
-        let earningsCurrency = 'USD';
-        (makerEarn.offers || []).forEach(o => { earningsTotal += Number(o.commission || 0); if (o.currency) earningsCurrency = o.currency; });
-        (pubEarn.balances || []).forEach(b => { earningsTotal += Number(b.paid || 0) + Number(b.cleared_unpaid || 0) + Number(b.pending || 0); if (b.currency) earningsCurrency = b.currency; });
+        const sumByCurrency = (rows, amountFn) => {
+            const totals = new Map();
+            rows.forEach(row => {
+                const cur = String(row.currency || 'USD').toUpperCase();
+                totals.set(cur, (totals.get(cur) || 0) + Number(amountFn(row) || 0));
+            });
+            return [...totals.entries()].map(([cur, amt]) => money(amt, cur));
+        };
+        const pubBalances = Array.isArray(pubEarn.balances) ? pubEarn.balances : [];
+        const livePub = pubBalances.filter(b => String(b.mode || 'live').toLowerCase() === 'live');
+        const testPub = pubBalances.filter(b => String(b.mode || '').toLowerCase() === 'test');
+        const pubBucketSum = b => Number(b.paid || 0) + Number(b.payment_reported || 0) + Number(b.reserved || 0) + Number(b.cleared_unpaid || 0) + Number(b.pending || 0);
+        const makerOffers = Array.isArray(makerEarn.offers) ? makerEarn.offers : [];
+        const liveMaker = makerOffers.filter(o => String(o.mode || 'live').toLowerCase() === 'live');
+
+        let earningsLabel = 'Earnings';
+        let earningsValue = money(0, 'USD');
+        let earningsMeta = '<a href="/owner/earnings">Open ledger</a>';
+        if (livePub.length) {
+            earningsValue = sumByCurrency(livePub, pubBucketSum).join(' · ');
+            earningsMeta = 'Live publisher · <a href="/owner/earnings">Open ledger</a>';
+        } else if (testPub.length) {
+            earningsValue = sumByCurrency(testPub, pubBucketSum).join(' · ');
+            earningsMeta = 'Test-mode publisher · <a href="/owner/earnings">Open ledger</a>';
+        } else if (liveMaker.length) {
+            earningsLabel = 'Commissions owed';
+            earningsValue = sumByCurrency(liveMaker, o => o.commission).join(' · ');
+            earningsMeta = 'Live maker · <a href="/owner/earnings">Open ledger</a>';
+        }
 
         const kpis = `<div class="stat-grid">`
             + statCard('Active deals', activeDeals, waitingDeals.length ? `${waitingDeals.length} waiting on you` : `${deals.length} total tracked`, waitingDeals.length ? 'is-alert' : '')
             + statCard('Connected agents', grants.length, grants.length ? '<a href="/owner/settings">Manage grants</a>' : '<a href="/owner/settings">Connect an agent</a>', grants.length ? 'is-live' : '')
             + statCard('Step mode gate', gateLabel, gateNote)
-            + statCard('Earnings', escape(money(earningsTotal, earningsCurrency)), '<a href="/owner/earnings">Open ledger</a>')
+            + statCard(earningsLabel, escape(earningsValue), earningsMeta)
             + `</div>`;
 
         const recentItems = [
