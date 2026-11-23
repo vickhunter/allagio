@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"fmt"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +24,8 @@ type ownerDeal struct {
 	Disclosure   string           `json:"disclosure,omitempty"`
 	Counterparty string           `json:"counterparty,omitempty"`
 	Parties      []ownerDealParty `json:"parties,omitempty"`
+	Obligations  []string         `json:"obligations,omitempty"`
+	ProofURL     string           `json:"proof_url,omitempty"`
 	Terms        map[string]any   `json:"terms,omitempty"`
 	WaitingOnYou bool             `json:"waiting_on_you"`
 	WaitingStep  string           `json:"waiting_step,omitempty"`
@@ -128,12 +132,21 @@ func dealHasOwner(deal database.ORPDeal, ownerID string) bool {
 }
 
 func ownerDealView(deal database.ORPDeal, ownerID, dns string) ownerDeal {
-	view := ownerDeal{ID: deal.ID, State: deal.State, UpdatedAt: deal.UpdatedAt, CreatedAt: deal.CreatedAt}
+	view := ownerDeal{
+		ID:        deal.ID,
+		State:     deal.State,
+		ProofURL:  "/orp/proof/" + url.PathEscape(deal.ID),
+		UpdatedAt: deal.UpdatedAt,
+		CreatedAt: deal.CreatedAt,
+	}
 	if terms, err := decodeObject(deal.Terms); err == nil && terms != nil {
 		view.Title = orp.TermsTitle(terms)
 		view.Disclosure = orp.DisclosureLabel(terms)
 		if kind, _ := terms["kind"].(string); kind != "" {
 			view.Kind = kind
+		}
+		if rawObls, _ := terms["obligations"].([]any); len(rawObls) > 0 {
+			view.Obligations = summarizeObligations(rawObls)
 		}
 	}
 	if len(deal.Parties) != 0 && string(deal.Parties) != "null" {
@@ -176,4 +189,32 @@ func ownerDealView(deal database.ORPDeal, ownerID, dns string) ownerDeal {
 		}
 	}
 	return view
+}
+
+func summarizeObligations(rawObls []any) []string {
+	out := make([]string, 0, len(rawObls))
+	for _, raw := range rawObls {
+		item, _ := raw.(map[string]any)
+		if item == nil {
+			continue
+		}
+		typ, _ := item["type"].(string)
+		if typ == "" {
+			typ = "obligation"
+		}
+		var parts []string
+		parts = append(parts, typ)
+		if amount, ok := item["amount"]; ok && amount != nil {
+			currency, _ := item["currency"].(string)
+			if currency != "" {
+				parts = append(parts, fmt.Sprintf("%v %s", amount, currency))
+			} else {
+				parts = append(parts, fmt.Sprintf("%v", amount))
+			}
+		} else if surface, _ := item["surface"].(string); surface != "" {
+			parts = append(parts, surface)
+		}
+		out = append(out, strings.Join(parts, " · "))
+	}
+	return out
 }

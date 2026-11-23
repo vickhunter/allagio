@@ -53,7 +53,7 @@ func (h *HostedHandler) ReviewSiteConnection(c *gin.Context) {
 	if raw := c.Query("source"); raw != "" {
 		sourceField = fmt.Sprintf(`<input type="hidden" name="source" value="%s">`, template.HTMLEscapeString(raw))
 	}
-	body := template.HTML(fmt.Sprintf(`<section><h2>Connect %s</h2><p>This connection was requested from your WordPress installation. Linking it lets you review distribution placements for this site and connect your own agent.</p><form method="post" action="/owner/connect-site"><input type="hidden" name="csrf" value="%s"><input type="hidden" name="token" value="%s">%s<button>Connect this site to my account</button></form></section>`, template.HTMLEscapeString(domain), template.HTMLEscapeString(ownerFrom(c).CSRF), template.HTMLEscapeString(token), sourceField))
+	body := template.HTML(fmt.Sprintf(`<section><span class="eyebrow">WORDPRESS CONNECTION</span><h2>Connect %s</h2><p>This connection was requested from your WordPress installation. Linking it lets you review agent placements for this site and connect your own agent.</p><form method="post" action="/owner/connect-site"><input type="hidden" name="csrf" value="%s"><input type="hidden" name="token" value="%s">%s<button data-primary-action>Connect this site to my account</button></form></section>`, template.HTMLEscapeString(domain), template.HTMLEscapeString(ownerFrom(c).CSRF), template.HTMLEscapeString(token), sourceField))
 	h.render(c, "Connect your WordPress site", "Confirm the site before continuing.", body)
 }
 
@@ -73,7 +73,7 @@ func (h *HostedHandler) CompleteSiteConnection(c *gin.Context) {
 		h.render(c, "Site connection unavailable", "This link expired, was already used, or the site/account is already connected. Return to WordPress to retry.", nil)
 		return
 	}
-	body := `<p><a class="button" href="/owner/placements">Open placements</a></p>`
+	body := `<section><span class="eyebrow">CONNECTED</span><h2>WordPress site linked</h2><div class="actions"><a class="button" data-primary-action href="/owner/placements">Open placements ↗</a><a class="button secondary" href="/owner/settings">Setup &amp; agents</a></div>`
 	var siteID string
 	if err := h.DB.Pool.QueryRow(c.Request.Context(), `SELECT COALESCE(site_id::text,'') FROM owners WHERE id=$1`, ownerID).Scan(&siteID); err != nil {
 		c.Status(500)
@@ -86,8 +86,9 @@ func (h *HostedHandler) CompleteSiteConnection(c *gin.Context) {
 			return
 		}
 		if issued {
-			body += `<p>Plugin key, shown once: <code>` + template.HTMLEscapeString(raw) + `</code></p><p>Save it in WordPress. It cannot be shown again.</p>`
+			body += `<div class="copy-field setup-command"><div class="row"><span class="eyebrow">PLUGIN KEY (SHOWN ONCE)</span><button type="button" class="copy-action" data-copy data-copied="Copied plugin key.">Copy key</button></div><pre><code>` + template.HTMLEscapeString(raw) + `</code></pre><span class="copy-status" role="status" aria-live="polite"></span></div><p class="caption">Save it in WordPress. It cannot be shown again.</p>`
 		}
 	}
+	body += `</section>`
 	h.render(c, "Your site is connected", "Return to WordPress to find offers and publish approved recommendations.", template.HTML(body))
 }

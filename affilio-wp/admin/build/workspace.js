@@ -36,7 +36,58 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     const root = document.getElementById('workspace-app');
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-    const pill = value => `<span class="pill ${value === 'test' ? 'test' : value === 'live' ? 'live' : ''}">${escape(value)}</span>`;
+    const pill = value => {
+        const raw = String(value ?? '');
+        const key = raw.toLowerCase().trim();
+        const map = {
+            test: 'test',
+            live: 'live',
+            active: 'state-active',
+            completed: 'state-completed',
+            listed: 'state-listed',
+            ready: 'state-ready',
+            committed: 'state-committed',
+            awaiting: 'state-awaiting',
+            proposed: 'state-proposed',
+            pending: 'state-pending',
+            declined: 'state-declined',
+            revoked: 'state-revoked',
+            failed: 'state-failed',
+            failing: 'state-failed',
+            paused: 'state-paused',
+        };
+        const cls = map[key] || '';
+        return `<span class="pill${cls ? ' ' + cls : ''}">${escape(raw)}</span>`;
+    };
+    const kindBadge = kind => {
+        if (!kind) return '';
+        const raw = String(kind).trim();
+        const key = raw.toLowerCase();
+        const labels = {
+            sponsored_placement: 'Sponsored placement',
+            affiliate: 'Affiliate',
+            swap: 'Swap',
+            repost: 'Repost',
+            cross_post: 'Cross-post',
+            mention: 'Mention',
+        };
+        const cls = key.includes('sponsor') ? 'kind-sponsored'
+            : key.includes('affiliate') ? 'kind-affiliate'
+            : (key.includes('swap') || key.includes('repost') || key.includes('cross')) ? 'kind-swap'
+            : '';
+        return `<span class="kind-badge${cls ? ' ' + cls : ''}" title="${escape(raw)}">${escape(labels[key] || raw.replace(/_/g, ' '))}</span>`;
+    };
+    const v1Api = async (path, method = 'GET', body) => {
+        const response = await fetch('/v1' + path, {method, credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, ...(body === undefined ? {} : {body:JSON.stringify(body)})});
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const error = new Error(data.message || data.error || 'The request could not be completed.');
+            error.status = response.status;
+            error.data = data;
+            throw error;
+        }
+        return data;
+    };
     const placementStatusLabel = placement => placement.removed_at ? `Rimosso ${String(placement.removed_at).slice(0, 10)}` : placement.status;
     const money = (value, currency) => {
         try { return new Intl.NumberFormat(undefined, {style:'currency',currency}).format(value || 0); }
@@ -355,7 +406,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     const skeletonSection = (lines = 3) => `<section aria-hidden="true"><div class="skeleton sk-h"></div>${skeletonLines(lines)}</section>`;
     const skeletonStats = (n = 3) => `<div class="stat-grid" aria-hidden="true">${'<div class="stat-card"><div class="skeleton sk-l"></div><div class="skeleton sk-v"></div><div class="skeleton sk-l"></div></div>'.repeat(n)}</div>`;
     const skeletonPage = () => skeletonStats(3) + skeletonSection() + skeletonSection();
-    const statCard = (label, value, note = '') => `<div class="stat-card"><span class="stat-label">${label}</span><p class="stat-value">${value}</p>${note ? `<p class="stat-note">${note}</p>` : ''}</div>`;
+    const statCard = (label, value, note = '', tone = '') => `<div class="stat-card${tone ? ' ' + tone : ''}"><span class="stat-label">${label}</span><p class="stat-value">${value}</p>${note ? `<p class="stat-note">${note}</p>` : ''}</div>`;
     const busy = on => root.setAttribute('aria-busy', on ? 'true' : 'false');
     const sparkline = (dates, label) => {
         const today = new Date(); today.setUTCHours(0,0,0,0);
@@ -386,19 +437,105 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const makerHref = session.maker ? '/owner/products' : '/owner/products?setup=maker';
         const makerLabel = session.maker ? 'Open products' : 'Start as a builder';
         busy(true);
-        let rail = railMarkup(describeProduct(null, []), false);
-        if (session.maker) {
-            root.innerHTML = skeletonStats(3) + skeletonSection(2);
-            try {
-                const [{products},{offers}] = await Promise.all([api('/products'),api('/offers')]);
-                OfferSeen.remember(offers);
-                rail = railMarkup(pickFocus(products, offers), false);
-            } catch (error) {
-                rail = `<section class="offer-rail" aria-label="Offer progress"><p class="offer-rail-kicker">Offer rail</p><p class="station-detail">${escape(error.message)} Open products to retry.</p></section>`;
-            }
-        }
+        root.innerHTML = skeletonStats(4) + skeletonSection(3);
+        const safe = (promise, fallback) => promise.catch(() => fallback);
+        const [dealsData, agentsData, approvalData, productsData, offersData, makerEarn, placementsData, pubEarn] = await Promise.all([
+            safe(api('/deals'), {deals: []}),
+            safe(api('/agents'), {grants: []}),
+            safe(api('/human-approval'), {steps: []}),
+            session.maker ? safe(api('/products'), {products: []}) : Promise.resolve({products: []}),
+            session.maker ? safe(api('/offers'), {offers: []}) : Promise.resolve({offers: []}),
+            session.maker ? safe(api('/earnings/maker'), {offers: []}) : Promise.resolve({offers: []}),
+            session.publisher ? safe(api('/placements'), {placements: []}) : Promise.resolve({placements: []}),
+            session.publisher ? safe(api('/earnings/publisher'), {balances: []}) : Promise.resolve({balances: []}),
+        ]);
+        const deals = dealsData.deals || [];
+        const grants = agentsData.grants || [];
+        const approvalSteps = Array.isArray(approvalData.steps) ? approvalData.steps : [];
+        const products = productsData.products || [];
+        const offers = offersData.offers || [];
+        const placements = placementsData.placements || [];
+        if (session.maker && offers.length) OfferSeen.remember(offers);
+
+        const waitingDeals = deals.filter(deal => deal.waiting_on_you);
+        const pendingPlacements = placements.filter(p => p.status === 'pending' && !p.removed_at);
+        const pendingCount = waitingDeals.length + pendingPlacements.length;
+
+        const approvalRows = [
+            ...waitingDeals.map(deal => `<li class="approval-row"><div class="approval-row-main"><p class="approval-row-title">${escape(deal.title || 'Untitled deal')}</p><div class="approval-row-meta">${kindBadge(deal.kind)}${pill(deal.state)}<span>Waiting on your ${escape(deal.waiting_step || 'approval')} step</span>${deal.counterparty ? `<span>· ${escape(deal.counterparty)}</span>` : ''}</div></div><div class="actions"><a class="button" data-primary-action href="${escape(deal.approve_url || '/owner/deals')}">Review &amp; approve ↗</a></div></li>`),
+            ...pendingPlacements.map(p => `<li class="approval-row"><div class="approval-row-main"><p class="approval-row-title">${escape(p.surface_url || 'Placement proposal')}</p><div class="approval-row-meta"><span class="kind-badge kind-affiliate">Placement</span>${pill(p.status)}<span>Awaiting owner sign-off</span></div></div><div class="actions"><a class="button" data-primary-action href="/owner/placements/${escape(p.id)}">Review placement ↗</a></div></li>`),
+        ].join('');
+
+        const approvalStrip = pendingCount > 0
+            ? `<section class="approval-strip is-pending" aria-label="Pending approvals"><div class="approval-strip-head"><div><span class="eyebrow">ACTION NEEDED · HUMAN APPROVAL</span><h2>${pendingCount} ${pendingCount === 1 ? 'item waits' : 'items wait'} for your sign-off</h2></div><a class="button secondary" href="/owner/deals">Open deals inbox ↗</a></div><ul class="approval-list">${approvalRows}</ul></section>`
+            : `<section class="approval-strip is-clear" aria-label="Pending approvals"><div class="approval-strip-head"><div><span class="eyebrow">APPROVAL QUEUE · CLEAR</span><h2>No deals or placements waiting for your sign-off</h2></div><div class="actions"><a class="button secondary" href="/owner/deals">View deals</a><a class="button secondary" href="/owner/settings#step-modes">Autonomy rules</a></div></div></section>`;
+
+        const activeDeals = deals.filter(d => !['declined', 'revoked', 'failed'].includes(String(d.state || '').toLowerCase())).length;
+        const gateActive = approvalSteps.includes('ask');
+        const gateLabel = gateActive ? 'Ask' : 'Auto';
+        const gateNote = gateActive ? 'Human sign-off required · <a href="/owner/settings#human-approval">Configure</a>' : 'Autonomous mode · <a href="/owner/settings#human-approval">Configure</a>';
+
+        const sumByCurrency = (rows, amountFn) => {
+            const totals = new Map();
+            rows.forEach(row => {
+                const cur = String(row.currency || 'USD').toUpperCase();
+                totals.set(cur, (totals.get(cur) || 0) + Number(amountFn(row) || 0));
+            });
+            return [...totals.entries()].map(([cur, amt]) => money(amt, cur));
+        };
+        const pubBalances = Array.isArray(pubEarn.balances) ? pubEarn.balances : [];
+        const pubBucketSum = b => Number(b.paid || 0) + Number(b.payment_reported || 0) + Number(b.reserved || 0) + Number(b.cleared_unpaid || 0) + Number(b.pending || 0);
+        const makerOffers = Array.isArray(makerEarn.offers) ? makerEarn.offers : [];
+        const hasNonZero = (rows, fn) => rows.some(r => Number(fn(r) || 0) !== 0);
+        const byMode = (rows, mode) => rows.filter(r => String(r.mode || 'live').toLowerCase() === mode);
+
+        const candidates = [
+            { rows: byMode(pubBalances, 'live'), fn: pubBucketSum, label: 'Earnings', meta: 'Live publisher' },
+            { rows: byMode(makerOffers, 'live'), fn: o => o.commission, label: 'Attributed commission', meta: 'Live maker' },
+            { rows: byMode(pubBalances, 'legacy'), fn: pubBucketSum, label: 'Earnings', meta: 'Legacy publisher' },
+            { rows: byMode(makerOffers, 'legacy'), fn: o => o.commission, label: 'Attributed commission', meta: 'Legacy maker' },
+            { rows: byMode(pubBalances, 'test'), fn: pubBucketSum, label: 'Earnings', meta: 'Test-mode publisher' },
+            { rows: byMode(makerOffers, 'test'), fn: o => o.commission, label: 'Attributed commission', meta: 'Test-mode maker' },
+        ];
+        const picked = candidates.find(c => hasNonZero(c.rows, c.fn));
+        const earningsLabel = picked ? picked.label : 'Earnings';
+        const earningsValue = picked ? sumByCurrency(picked.rows, picked.fn).join(' · ') : money(0, 'USD');
+        const earningsMeta = picked ? `${picked.meta} · <a href="/owner/earnings">Open ledger</a>` : '<a href="/owner/earnings">Open ledger</a>';
+
+        const kpis = `<div class="stat-grid">`
+            + statCard('Active deals', activeDeals, waitingDeals.length ? `${waitingDeals.length} waiting on you` : `${deals.length} total tracked`, waitingDeals.length ? 'is-alert' : '')
+            + statCard('Connected agents', grants.length, grants.length ? '<a href="/owner/settings">Manage grants</a>' : '<a href="/owner/settings">Connect an agent</a>', grants.length ? 'is-live' : '')
+            + statCard('Step mode gate', gateLabel, gateNote)
+            + statCard(earningsLabel, escape(earningsValue), earningsMeta)
+            + `</div>`;
+
+        const recentItems = [
+            ...deals.slice(0, 4).map(d => ({
+                title: d.title || 'Untitled deal',
+                href: '/owner/deals',
+                badge: kindBadge(d.kind),
+                status: pill(d.state),
+                ts: d.updated_at,
+                meta: d.waiting_on_you ? 'Waiting on you' : dealRoleLabel(d),
+            })),
+            ...placements.slice(0, 3).map(p => ({
+                title: p.surface_url || 'Placement',
+                href: `/owner/placements/${encodeURIComponent(p.id)}`,
+                badge: '<span class="kind-badge kind-affiliate">Placement</span>',
+                status: pill(placementStatusLabel(p)),
+                ts: p.updated_at || p.created_at,
+                meta: 'Publisher placement',
+            })),
+        ].sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0)).slice(0, 5);
+
+        const recentSection = `<section><div class="row"><div><span class="eyebrow">RECENT ACTIVITY</span><h2>Latest agent negotiations &amp; placements</h2></div><a class="button secondary" href="/owner/deals">All deals ↗</a></div>${recentItems.length
+            ? `<ul class="activity-list">${recentItems.map(item => `<li class="activity-item"><div><a class="activity-title" href="${escape(item.href)}">${escape(item.title)}</a><p class="caption" style="margin:2px 0 0">${escape(item.meta)}${item.ts ? ` · ${escape(new Date(item.ts).toLocaleString())}` : ''}</p></div><div class="deal-badges">${item.badge}${item.status}</div></li>`).join('')}</ul>`
+            : empty('No deal activity yet.', 'Connect an agent in Setup &amp; agents or register a product to start negotiating deals.')}</section>`;
+
+        const rail = session.maker ? railMarkup(pickFocus(products, offers), false) : '';
+
         busy(false);
-        root.innerHTML = `${rail}<div class="grid"><section><span class="eyebrow">BUILDERS</span><h2>Give your product an offer.</h2><p>Connect your existing agent, prepare your checkout and choose the commission you want to offer.</p><a class="button" data-primary-action href="${makerHref}">${makerLabel} ↗</a></section><section><span class="eyebrow">PUBLISHERS</span><h2>Find a useful recommendation.</h2><p>Match an article to relevant products, approve the exact placement and publish a tracked link.</p><a class="button secondary" href="${session.publisher ? '/owner/placements' : '/owner/settings'}">${session.publisher ? 'Open placements' : 'Connect your content'} ↗</a></section></div><section><h2>One setup. Your own agent.</h2><p>Run this command in your product repository. Setup installs the integration skills and connects your agent. Checkout wiring, Stripe connection and verification are separate steps.</p>${copyCommand(session.install_command)}<p class="caption">The npm package offer-rails is not published yet. This command uses the installer archive on this host.</p><p class="caption">Node 20+ · Codex CLI handoff · Cursor and Claude configuration</p></section>`;
+        root.innerHTML = `${approvalStrip}${kpis}${recentSection}${rail}<div class="grid"><section><span class="eyebrow">BUILDERS</span><h2>Give your product an offer.</h2><p>Connect your existing agent, verify readiness and publish standing terms that publisher agents can negotiate.</p><a class="button" data-primary-action href="${makerHref}">${makerLabel} ↗</a></section><section><span class="eyebrow">PUBLISHERS</span><h2>Approve every placement.</h2><p>Match articles to relevant products, enforce hard disclosure checks and keep final sign-off on what ships.</p><a class="button secondary" href="${session.publisher ? '/owner/placements' : '/owner/settings'}">${session.publisher ? 'Open placements' : 'Connect your content'} ↗</a></section></div><section><span class="eyebrow">AGENT HANDOFF</span><h2>One setup. Your own agent.</h2><p>Run this command in your repository to install the Allagio skill and connect your agent over MCP.</p>${copyCommand(session.install_command)}<p class="caption">Node 20+ · Codex CLI handoff · Cursor and Claude Code configuration</p></section>`;
     };
     const productForm = (product, primaryRegister, registered) => `<section><h2>${product ? 'Edit product' : 'Register a product'}</h2><form data-product="${escape(product?.id || '')}"><div class="form-grid">${field('name','Product name',product?.name,'required maxlength="255"')}${field('website_url','Website',product?.website_url,'type="url" required maxlength="512"')}${field('tagline','What does it help people do?',product?.tagline,'required maxlength="512"',true)}${field('docs_url','Documentation URL',product?.docs_url,'type="url"')}${field('pricing_url','Pricing URL',product?.pricing_url,'type="url"')}${field('primary_category','Category',product?.primary_category,'placeholder="developer tools" autocomplete="off"')}${field('keywords','Topics, separated by commas',(product?.keywords || []).join(', '),'placeholder="postgres, monitoring, debugging" autocomplete="off"')}</div><p class="caption">Your product stays private until its offer is submitted and listed.</p><button ${!product && primaryRegister ? 'data-primary-action' : 'class="secondary"'}>${product ? 'Save changes' : 'Register product'}</button>${product ? '<button type="button" class="secondary" data-cancel-edit>Cancel</button>' : ''}${registered ? '<p id="product-registered" class="success" role="status" tabindex="-1">Product registered. It is in your list.</p>' : ''}</form></section>`;
     const productsPage = async (options = {}) => {
@@ -647,8 +784,56 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         loaded();
         if (!session.maker && !session.publisher) root.insertAdjacentHTML('beforeend',empty('Connect a product or publisher account.','Your activity will be recorded here once you start referring customers.'));
     };
+    const enhanceStepModes = () => {
+        const section = document.getElementById('step-modes');
+        if (!section || section.dataset.enhanced === '1') return;
+        section.dataset.enhanced = '1';
+        section.querySelectorAll('label').forEach(label => {
+            const select = label.querySelector('select');
+            if (!select) return;
+            const rawText = [...label.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent).join(' ').trim();
+            const colonIdx = rawText.indexOf(':');
+            const stepTitle = colonIdx > 0 ? rawText.slice(0, colonIdx).trim() : (select.name || 'Step');
+            const stepDesc = colonIdx > 0 ? rawText.slice(colonIdx + 1).trim() : rawText;
+            [...label.childNodes].forEach(n => { if (n.nodeType === Node.TEXT_NODE) n.remove(); });
+            const copyWrap = document.createElement('span');
+            copyWrap.className = 'step-mode-copy';
+            copyWrap.innerHTML = `<span class="step-mode-title">${escape(stepTitle)}</span>${stepDesc ? `<span class="step-mode-desc">${escape(stepDesc)}</span>` : ''}`;
+            const seg = document.createElement('div');
+            seg.className = 'segmented-control';
+            seg.setAttribute('role', 'group');
+            seg.setAttribute('aria-label', `${stepTitle} mode`);
+            const modes = ['off', 'ask', 'auto'];
+            const renderSeg = () => {
+                seg.querySelectorAll('button').forEach(btn => {
+                    btn.setAttribute('aria-pressed', btn.dataset.mode === select.value ? 'true' : 'false');
+                });
+            };
+            modes.forEach(mode => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.dataset.mode = mode;
+                btn.textContent = mode === 'off' ? 'Off' : mode === 'ask' ? 'Ask' : 'Auto';
+                btn.setAttribute('aria-pressed', select.value === mode ? 'true' : 'false');
+                btn.addEventListener('click', () => {
+                    select.value = mode;
+                    select.dispatchEvent(new Event('change', {bubbles: true}));
+                    renderSeg();
+                });
+                seg.appendChild(btn);
+            });
+            select.addEventListener('change', renderSeg);
+            label.classList.add('has-segmented');
+            label.prepend(copyWrap);
+            label.appendChild(seg);
+        });
+    };
     const settingsPage = async () => {
-        const {grants} = await api('/agents');
+        enhanceStepModes();
+        const [{grants}, digest] = await Promise.all([
+            api('/agents'),
+            v1Api('/digest').catch(() => null),
+        ]);
         const skillURL = location.origin + '/SKILL.md';
         let skillNote = 'Coming soon. This skill file is not published yet.';
         try {
@@ -671,10 +856,49 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         }
         const humanList = humans.length ? `<ul class="task-list">${humans.map(step => `<li>${escape(step)}</li>`).join('')}</ul>` : '<p>Nothing here needs a person right now.</p>';
         const skillStatus = `<p class="caption" data-skill-status>${skillNote ? escape(skillNote) : 'The skill file is available.'}</p>`;
-        root.innerHTML = `<section><h2>Start an agent</h2><p>Give this line to an agent. It reads the skill file, then connects this site.</p><div class="copy-field agent-line"><div class="row"><span class="eyebrow">AGENT START</span><button type="button" class="copy-action${skillNote ? ' secondary' : ''}" data-copy data-copied="Copied. Paste it to your agent.">Copy line</button></div><pre>${escape(agentLine)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div>${skillStatus}</section><section><h2>Where this offer stands</h2><p data-rail-plain>${escape(progress)}</p></section><section><h2>Still needs a person</h2>${humanList}</section><section><h2>Connect your existing agent</h2><p>Builders: run this in your product repository.</p>${copyCommand(session.install_command)}<p class="caption">The npm package offer-rails is not published yet. This command uses the installer archive on this host. The hosted MCP URL below is the working connection.</p><p>Hosted MCP URL</p><pre>${escape(session.mcp_url)}</pre><p class="caption">Choose maker or publisher permissions in the browser consent screen. Connections last up to seven days and can be revoked here.</p></section>${!session.publisher ? '<section><h2>WordPress publishers</h2><p>Upload and activate the plugin, connect the site, then connect its publisher account from the Distribution screen.</p><a class="button secondary" href="/downloads/offer-rails.zip">Download plugin ↓</a></section>' + accountForm('publisher') : ''}${!session.maker ? '<p><a href="/owner?setup=maker">Create a builder account ↗</a></p>' : ''}<section><h2>Connected agents</h2>${grants.length ? grants.map(grant => `<div class="card"><h3>${escape(grant.client_name)}</h3><p>${escape(grant.scope)} · expires ${escape(new Date(grant.expires_at).toLocaleString())}</p><form method="post" action="/owner/grants/${grant.id}/revoke"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Disconnect agent</button></form></div>`).join('') : '<p>No agents connected yet.</p>'}</section><section><h2>Account</h2><p>${escape(session.email)}</p><p class="caption">Owner ID: ${escape(session.owner_id)}</p><form method="post" action="/owner/logout"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Sign out</button></form></section>`;
+        const projects = Array.isArray(digest?.projects) ? digest.projects : [];
+        const pausedProjects = projects.filter(p => p.mode === 'manual').length;
+        const activeProjects = projects.filter(p => p.mode !== 'manual').length;
+        const hasPaused = pausedProjects > 0 || !!(digest && digest.paused && (digest.paused.account || digest.paused.site || digest.paused.offer));
+        const allPaused = projects.length > 0 ? activeProjects === 0 : hasPaused;
+        const isPartialPause = hasPaused && !allPaused;
+        const killStatus = allPaused ? 'paused' : isPartialPause ? 'partially paused' : 'active';
+        const killCopy = allPaused
+            ? 'Linked sites and maker offers are paused. To stop ORP agents from negotiating deals, disconnect them below or set Agent steps to Off.'
+            : isPartialPause
+                ? `${pausedProjects} of ${projects.length} linked sites/offers are paused while ${activeProjects} remain active. Pause the remaining automation or resume paused items.`
+                : 'Pause linked sites and maker offers (switches them to manual approval and halts live placements). To stop ORP agents from negotiating deals, disconnect agents below or set Agent steps to Off.';
+        const killActions = allPaused
+            ? '<button type="button" data-primary-action data-kill-switch="resume">Resume automation</button>'
+            : isPartialPause
+                ? '<button type="button" class="danger" data-kill-switch="pause">Pause remaining</button><button type="button" class="secondary" data-kill-switch="resume">Resume paused</button>'
+                : '<button type="button" class="danger" data-kill-switch="pause">Pause sites &amp; offers</button>';
+        const killSwitchCard = `<section id="kill-switch" class="kill-switch-card${hasPaused ? ' is-paused' : ''}"><div class="row"><div><span class="eyebrow">SAFETY CONTROL</span><h2>Emergency kill switch</h2></div>${pill(killStatus)}</div><p>${killCopy}</p><div class="actions">${killActions}</div></section>`;
+        const agentsMarkup = grants.length
+            ? `<div class="agent-list">${grants.map(grant => `<div class="agent-card"><div><h3>${escape(grant.client_name)}</h3><p>${pill(grant.scope)} · expires ${escape(new Date(grant.expires_at).toLocaleString())}</p></div><form method="post" action="/owner/grants/${grant.id}/revoke"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Disconnect agent</button></form></div>`).join('')}</div>`
+            : empty('No agents connected yet.', 'Use the agent start line or hosted MCP URL below to connect Claude, Cursor, or Codex.');
+        root.innerHTML = `${killSwitchCard}<section><div class="row"><div><span class="eyebrow">AGENT ACCESS</span><h2>Connected agents</h2></div>${pill(String(grants.length) + ' active')}</div>${agentsMarkup}</section><section><span class="eyebrow">QUICK START</span><h2>Start an agent</h2><p>Give this line to an agent. It reads the skill file, then connects this site.</p><div class="copy-field agent-line"><div class="row"><span class="eyebrow">AGENT START</span><button type="button" class="copy-action${skillNote ? ' secondary' : ''}" data-copy data-copied="Copied. Paste it to your agent.">Copy line</button></div><pre>${escape(agentLine)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div>${skillStatus}</section><section><span class="eyebrow">MCP &amp; CLI SETUP</span><h2>Connect your existing agent</h2><p>Builders: run this in your product repository.</p>${copyCommand(session.install_command)}<p class="caption">The npm package offer-rails is not published yet. This command uses the installer archive on this host. The hosted MCP URL below is the working connection.</p><div class="copy-field mcp-box"><div class="row"><span class="eyebrow">HOSTED MCP URL</span><button type="button" class="copy-action" data-copy data-copied="Copied MCP URL.">Copy URL</button></div><pre>${escape(session.mcp_url)}</pre><span class="copy-status" role="status" aria-live="polite"></span></div><p class="caption">Choose maker or publisher permissions in the browser consent screen. Connections last up to seven days and can be revoked here.</p></section><div class="grid"><section><span class="eyebrow">OFFER STATUS</span><h2>Where this offer stands</h2><p data-rail-plain>${escape(progress)}</p></section><section><span class="eyebrow">HUMAN CHECKLIST</span><h2>Still needs a person</h2>${humanList}</section></div>${!session.publisher ? '<section><span class="eyebrow">WORDPRESS</span><h2>WordPress publishers</h2><p>Upload and activate the plugin, connect the site, then connect its publisher account from the Distribution screen.</p><a class="button secondary" href="/downloads/offer-rails.zip">Download plugin ↓</a></section>' + accountForm('publisher') : ''}${!session.maker ? '<p><a href="/owner?setup=maker">Create a builder account ↗</a></p>' : ''}<section><span class="eyebrow">SESSION</span><h2>Account</h2><p>${escape(session.email)}</p><p class="caption">Owner ID: <code>${escape(session.owner_id)}</code></p><form method="post" action="/owner/logout"><input type="hidden" name="csrf" value="${escape(csrf)}"><button class="secondary">Sign out</button></form></section>`;
+        root.querySelectorAll('[data-kill-switch]').forEach(btn => btn.addEventListener('click', event => {
+            const button = event.currentTarget;
+            const action = button.dataset.killSwitch;
+            run(button, async () => {
+                const res = await v1Api(action === 'pause' ? '/account/pause' : '/account/resume', 'POST', {scope: 'all'});
+                const applied = Array.isArray(res?.applied) ? res.applied.length : 0;
+                if (action === 'pause') {
+                    report(applied > 0
+                        ? `Paused ${applied} linked ${applied === 1 ? 'site/offer' : 'sites/offers'}. Disconnect ORP agents below if you also want to halt deal negotiations.`
+                        : 'No linked sites or maker offers to pause. To stop ORP agents, disconnect them below or set Agent steps to Off.');
+                } else {
+                    report(applied > 0
+                        ? `Resumed ${applied} linked ${applied === 1 ? 'site/offer' : 'sites/offers'}.`
+                        : 'No paused sites or maker offers to resume.');
+                }
+                await settingsPage();
+            });
+        }));
         if (session.publisher) {
             const profile = await api('/payout-profile');
-            root.insertAdjacentHTML('beforeend',`<section><h2>How merchants can arrange payment</h2><p>These instructions are shared only with merchants that have a payout due to you. Use a payment contact or contact-page URL.</p><form data-payout-profile><label>Payment contact instructions<textarea name="instructions" maxlength="2000">${escape(profile.instructions)}</textarea></label><button>Save instructions</button></form></section>`);
+            root.insertAdjacentHTML('beforeend',`<section><span class="eyebrow">PUBLISHER PAYOUTS</span><h2>How merchants can arrange payment</h2><p>These instructions are shared only with merchants that have a payout due to you. Use a payment contact or contact-page URL.</p><form data-payout-profile><label>Payment contact instructions<textarea name="instructions" maxlength="2000">${escape(profile.instructions)}</textarea></label><button>Save instructions</button></form></section>`);
             root.querySelector('[data-payout-profile]').addEventListener('submit',event => { event.preventDefault(); const form = event.currentTarget; run(form.querySelector('button'),async () => { await api('/payout-profile','POST',{instructions:new FormData(form).get('instructions')}); report('Payment instructions saved.'); }); });
         }
     };
@@ -698,18 +922,27 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     };
     const dealCard = deal => {
         const date = new Date(deal.updated_at);
+        const proofHref = deal.proof_url || `/orp/proof/${encodeURIComponent(deal.id)}`;
+        const obligationsSummary = Array.isArray(deal.obligations) && deal.obligations.length
+            ? `<div class="deal-obligations-summary" aria-label="Obligations">${deal.obligations.map(item => `<span class="obligation-chip">${escape(item)}</span>`).join('')}</div>`
+            : '';
         const approve = deal.waiting_on_you && deal.approve_url
             ? `<div class="deal-terms" data-terms-for="${escape(deal.id)}"><p class="caption">Loading the terms…</p></div><div class="actions"><button type="button" data-primary-action data-approve-url="${escape(deal.approve_url)}" data-approve-deal="${escape(deal.id)}" disabled>Approve this deal</button><a class="button secondary" href="${escape(deal.approve_url)}">Open the approval page ↗</a><p class="caption">Waiting on your ${escape(deal.waiting_step || 'approval')} step. Terms load before you can approve.</p></div>`
             : '';
-        return `<section class="deal${deal.waiting_on_you ? ' waiting' : ''}"><div class="row"><h3>${escape(deal.title || 'Untitled deal')}</h3>${pill(deal.state)}</div><p class="caption">${escape(dealRoleLabel(deal))}${deal.kind ? ` · ${escape(deal.kind)}` : ''} · updated ${escape(date.toLocaleString())}</p>${dealParties(deal)}${approve}<details class="deal-events" data-deal="${escape(deal.id)}"><summary>Timeline</summary><div class="deal-timeline"><p class="caption">Loading…</p></div></details></section>`;
+        return `<section class="deal${deal.waiting_on_you ? ' waiting' : ''}"><div class="row"><h3>${escape(deal.title || 'Untitled deal')}</h3><div class="deal-badges">${kindBadge(deal.kind)}${pill(deal.state)}</div></div><div class="deal-meta"><span>${escape(dealRoleLabel(deal))} · updated ${escape(date.toLocaleString())}</span><a class="deal-proof-link" href="${escape(proofHref)}" target="_blank" rel="noopener noreferrer">Public proof ↗</a></div>${dealParties(deal)}${obligationsSummary}${approve}<details class="deal-events" data-deal="${escape(deal.id)}"><summary>Timeline</summary><div class="deal-timeline"><p class="caption">Loading…</p></div></details></section>`;
     };
     const dealsPage = async () => {
+        busy(true);
+        root.innerHTML = skeletonStats(3) + skeletonSection(3);
         const {deals} = await api('/deals');
+        busy(false);
         const waiting = deals.filter(deal => deal.waiting_on_you);
+        const activeCount = deals.filter(deal => ['active', 'completed'].includes(String(deal.state || '').toLowerCase())).length;
+        const summaryStats = `<div class="stat-grid">${statCard('Total deals', deals.length, 'ORP negotiations')}${statCard('Needs decision', waiting.length, waiting.length ? 'Waiting on your approval' : 'Queue clear', waiting.length ? 'is-alert' : '')}${statCard('Active & completed', activeCount, 'Signed on protocol', activeCount ? 'is-live' : '')}</div>`;
         const pending = waiting.length
-            ? `<section class="deal-pending"><h2>Needs your decision</h2>${waiting.map(dealCard).join('')}</section>`
+            ? `<section class="deal-pending"><span class="eyebrow">HUMAN APPROVAL QUEUE</span><h2>Needs your decision</h2>${waiting.map(dealCard).join('')}</section>`
             : '';
-        root.innerHTML = `<section><h2>Agent deals</h2><p>These are the offers your agent proposed, accepted, or joined through the Allagio protocol. A deal waits on you only when your approval settings say so.</p>${sparkline(deals.map(deal => deal.created_at), 'Deal activity')}</section>${pending}<h2>All deals</h2>${deals.length ? deals.map(dealCard).join('') : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.')}`;
+        root.innerHTML = `${summaryStats}<section><span class="eyebrow">OPEN RAILS PROTOCOL</span><h2>Agent deals</h2><p>Offers your agent proposed, accepted, or joined through ORP. Every deal links to its public proof record and waits on you only when your approval gates say so.</p>${sparkline(deals.map(deal => deal.created_at), 'Deal activity')}</section>${pending}<h2>All deals</h2>${deals.length ? deals.map(dealCard).join('') : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.')}`;
         const termsMarkup = terms => {
             if (!terms) return '<p class="caption">Terms could not be read for this deal.</p>';
             const obligations = Array.isArray(terms.obligations) ? terms.obligations : [];
@@ -727,8 +960,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             } catch (error) {
                 slot.innerHTML = `<p class="field-error" role="alert">${escape(error.message)}</p>`;
             }
-            const button = root.querySelector(`[data-approve-deal="${CSS.escape(id)}"]`);
-            if (button) button.disabled = false;
+            root.querySelectorAll(`[data-approve-deal="${CSS.escape(id)}"]`).forEach(button => { button.disabled = false; });
         });
         root.querySelectorAll('[data-approve-url]').forEach(button => button.addEventListener('click', () => run(button, async () => {
             button.disabled = true;
@@ -772,6 +1004,19 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             showIssue(form.querySelector('button') || secret || key, 'stripe-live-key', 'Use the signing secret from your Stripe webhook endpoint. It starts with whsec_.');
         });
     });
+    const drawerOpen = document.querySelector('[data-drawer-open]');
+    const drawerClose = document.querySelector('[data-drawer-close]');
+    const drawerBackdrop = document.querySelector('[data-drawer-backdrop]');
+    const setDrawer = open => {
+        document.body.classList.toggle('drawer-open', open);
+        if (drawerOpen) drawerOpen.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (drawerBackdrop) drawerBackdrop.hidden = !open;
+    };
+    drawerOpen?.addEventListener('click', () => setDrawer(true));
+    drawerClose?.addEventListener('click', () => setDrawer(false));
+    drawerBackdrop?.addEventListener('click', () => setDrawer(false));
+    document.addEventListener?.('keydown', event => { if (event.key === 'Escape' && document.body?.classList?.contains('drawer-open')) setDrawer(false); });
+    document.querySelectorAll('.sidebar nav a').forEach(link => link.addEventListener('click', () => setDrawer(false)));
     document.querySelectorAll('nav a').forEach(link => { if (link.getAttribute('href') === location.pathname) link.setAttribute('aria-current','page'); });
     document.querySelectorAll('[data-commit-placement]').forEach(button => button.addEventListener('click',() => run(button,async () => { await api(`/placements/${button.dataset.commitPlacement}/commit`,'POST',{}); location.reload(); })));
     CheckoutStatus.remember();
@@ -779,8 +1024,10 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     root.insertAdjacentHTML('beforebegin','<div id="workspace-feedback" class="feedback" role="status" aria-live="polite"></div>');
     root.textContent = 'Loading your workspace…';
     const pages = {'/owner/products':['Products & offers',productsPage],'/owner/placements':['Placements',placementsPage],'/owner/earnings':['Earnings',earningsPage],'/owner/deals':['Deals',dealsPage],'/owner/settings':['Setup & agents',settingsPage],'/owner/review':['Offer review',reviewPage]};
-    const [title,render] = pages[location.pathname] || ['Your distribution workspace',overview];
+    const [title,render] = pages[location.pathname] || ['Overview',overview];
     document.querySelector('h1').textContent = title;
+    const topbarTitle = document.querySelector('[data-topbar-title]');
+    if (topbarTitle) topbarTitle.textContent = title;
     const boot = async () => {
         root.textContent = 'Loading your workspace…';
         try {
