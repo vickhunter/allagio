@@ -13,6 +13,7 @@ import (
 	"affilio-api/internal/chainpay"
 	"affilio-api/internal/database"
 	"affilio-api/internal/orp"
+	"affilio-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -140,7 +141,7 @@ func (h *ORPHost) Suggest(c *gin.Context) {
 		return
 	}
 	if req.AllowsAffiliate() {
-		products, productErr := h.productCandidates(c)
+		products, productErr := h.productCandidates(c, req.Text)
 		if productErr != nil {
 			h.writeProblem(c, dns, "", "", internalProblem(), true)
 			return
@@ -151,6 +152,10 @@ func (h *ORPHost) Suggest(c *gin.Context) {
 	if req.HasJoin {
 		joined, problem, _, ok = h.joinParty(c, origin, dns, req.Join)
 		if !ok {
+			if problem.Code == "join_key_scope" {
+				h.writeJoinProblem(c, joinProblemStatus(problem), []orp.JoinFailure{orp.JoinFailureFromProblem(problem)})
+				return
+			}
 			if orp.IsJoinCode(problem.Code) {
 				problem = orp.Invalid(problem.Message, problem.Field)
 			}
@@ -183,23 +188,23 @@ func (h *ORPHost) Join(c *gin.Context) {
 	origin, dns := h.origin(c)
 	body, problem, ok := readORPBody(c)
 	if !ok {
-		h.writeJoinProblem(c, []orp.JoinFailure{orp.JoinFailureFromProblem(problem)})
+		h.writeJoinProblem(c, http.StatusBadRequest, []orp.JoinFailure{orp.JoinFailureFromProblem(problem)})
 		return
 	}
 	value, problem, ok := orp.DecodeJSON(body)
 	if !ok {
-		h.writeJoinProblem(c, []orp.JoinFailure{orp.JoinFailureFromProblem(problem)})
+		h.writeJoinProblem(c, http.StatusBadRequest, []orp.JoinFailure{orp.JoinFailureFromProblem(problem)})
 		return
 	}
 	req, failures := orp.CollectJoin(value, "")
 	if len(failures) > 0 {
-		h.writeJoinProblem(c, failures)
+		h.writeJoinProblem(c, http.StatusBadRequest, failures)
 		return
 	}
 	joined, problem, reused, ok := h.joinParty(c, origin, dns, req)
 	if !ok {
 		if orp.IsJoinCode(problem.Code) {
-			h.writeJoinProblem(c, []orp.JoinFailure{orp.JoinFailureFromProblem(problem)})
+			h.writeJoinProblem(c, joinProblemStatus(problem), []orp.JoinFailure{orp.JoinFailureFromProblem(problem)})
 			return
 		}
 		h.writeProblem(c, dns, "", "", problem, true)
@@ -420,11 +425,11 @@ func (h *ORPHost) candidates(c *gin.Context) ([]orp.Candidate, error) {
 	return out, nil
 }
 
-func (h *ORPHost) productCandidates(c *gin.Context) ([]orp.Candidate, error) {
+func (h *ORPHost) productCandidates(c *gin.Context, text string) ([]orp.Candidate, error) {
 	if h.Entry == nil || h.Entry.DB == nil {
 		return nil, nil
 	}
-	rows, err := h.Entry.DB.ListSuggestProducts(c.Request.Context(), 200)
+	rows, err := h.Entry.DB.ListSuggestProducts(c.Request.Context(), text)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +450,15 @@ func (h *ORPHost) productCandidates(c *gin.Context) ([]orp.Candidate, error) {
 func (h *ORPHost) joinParty(c *gin.Context, origin, dns string, req orp.JoinRequest) (map[string]any, orp.Problem, bool, bool) {
 	if raw, presented := presentedBearer(c); presented && h.Entry != nil {
 		grant, err := h.Entry.JoinGrant(c)
-		if err != nil || grant == nil || grant.OwnerID == "" {
+		if err != nil || grant == nil || grant.OwnerID == "" || !grant.Join {
+			if req.Key != nil && h.nonJoinBearer(c) {
+				return nil, orp.Problem{
+					Status:  http.StatusForbidden,
+					Code:    "join_key_scope",
+					Field:   "Authorization",
+					Message: "A first signing key needs a join-scope token. This bearer has another scope, so that scope wins and this join does not bind a key.",
+				}, false, false
+			}
 			return nil, orp.Problem{
 				Status:  http.StatusBadRequest,
 				Code:    "join_bearer_unknown",
@@ -469,31 +482,34 @@ func (h *ORPHost) bindPartyKey(c *gin.Context, ownerID string, key map[string]an
 	if h.Entry == nil || h.Entry.DB == nil {
 		return internalProblem(), false
 	}
-	keys, err := h.Entry.DB.PartyKeys(c.Request.Context(), ownerID)
+	outcome, err := h.Entry.DB.BindFirstPartyKey(c.Request.Context(), ownerID, key)
 	if err != nil {
 		return internalProblem(), false
 	}
-	kid, _ := key["kid"].(string)
-	pub, _ := key["x"].(string)
-	if len(keys) == 0 {
-		if err = h.Entry.DB.BindPartyKey(c.Request.Context(), ownerID, key); err != nil {
-			return internalProblem(), false
-		}
+	switch outcome {
+	case "inserted", "matched":
 		return orp.Problem{}, true
+	case "held":
+		return orp.Problem{
+			Status:  http.StatusBadRequest,
+			Code:    "join_key_held",
+			Field:   "/key",
+			Message: "This party already registered a key, so that key wins. This join does not replace it and does not mint a second party.",
+		}, false
+	default:
+		return internalProblem(), false
 	}
-	for _, existing := range keys {
-		existingKid, _ := existing["kid"].(string)
-		existingPub, _ := existing["x"].(string)
-		if existingKid == kid && existingPub == pub {
-			return orp.Problem{}, true
-		}
+}
+
+// nonJoinBearer reports a bearer that names an account but is not a
+// join-scope token. A join token is handled before this runs.
+func (h *ORPHost) nonJoinBearer(c *gin.Context) bool {
+	raw, ok := presentedBearer(c)
+	if !ok || h.Entry == nil || h.Entry.DB == nil {
+		return false
 	}
-	return orp.Problem{
-		Status:  http.StatusBadRequest,
-		Code:    "join_key_held",
-		Field:   "/key",
-		Message: "This party already registered a key, so that key wins. This join does not replace it and does not mint a second party.",
-	}, false
+	grant, err := h.Entry.DB.ResolveBearer(c.Request.Context(), services.HashAPIKey(raw), raw, h.Entry.mcpResource(c))
+	return err == nil && grant != nil && !grant.Join
 }
 
 func (h *ORPHost) mint(c *gin.Context, origin, dns, agentName string, partyKey map[string]any) (map[string]any, orp.Problem, bool) {
@@ -525,8 +541,20 @@ func (h *ORPHost) clientIP(c *gin.Context) string {
 	return h.Entry.joinClientIP(c)
 }
 
-func (h *ORPHost) writeJoinProblem(c *gin.Context, failures []orp.JoinFailure) {
-	raw, err := json.Marshal(orp.JoinProblemDocument(failures))
+func joinProblemStatus(problem orp.Problem) int {
+	if problem.Status != 0 {
+		return problem.Status
+	}
+	return http.StatusBadRequest
+}
+
+func (h *ORPHost) writeJoinProblem(c *gin.Context, status int, failures []orp.JoinFailure) {
+	if status == 0 {
+		status = http.StatusBadRequest
+	}
+	doc := orp.JoinProblemDocument(failures)
+	doc["status"] = status
+	raw, err := json.Marshal(doc)
 	if err != nil {
 		raw = []byte(`{"type":"https://allagio.dev/problems/join","title":"The join request is not valid.","status":500}`)
 		c.Data(http.StatusInternalServerError, "application/problem+json", raw)
@@ -534,7 +562,7 @@ func (h *ORPHost) writeJoinProblem(c *gin.Context, failures []orp.JoinFailure) {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.Header("Access-Control-Allow-Origin", "*")
-	c.Data(http.StatusBadRequest, "application/problem+json", raw)
+	c.Data(status, "application/problem+json", raw)
 }
 
 func (h *ORPHost) writeProblem(c *gin.Context, dns, to, re string, problem orp.Problem, cors bool) {

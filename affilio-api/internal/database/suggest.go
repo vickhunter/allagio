@@ -1,6 +1,9 @@
 package database
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 // SuggestCandidate is one listed offer or active curated program a cold
 // suggest call can pitch. The draft text is not stored with it.
@@ -38,12 +41,14 @@ func (d *DB) ListSuggestCandidates(ctx context.Context, limit int) ([]SuggestCan
 	return append(offers, programs...), nil
 }
 
-// ListSuggestProducts returns registered products whose maker has an owner.
-// There is no product listing column: a registered product is listed at the
-// default. Offers and spaces are not selected.
-func (d *DB) ListSuggestProducts(ctx context.Context, limit int) ([]SuggestCandidate, error) {
-	if limit <= 0 {
-		limit = 200
+// ListSuggestProducts returns listed products whose name equals text, ignoring
+// ASCII case and surrounding space. Unlisted products stay out, including an
+// exact-name search. The match is the query, so a catalog of any size still
+// finds the name. Offers and spaces are not selected.
+func (d *DB) ListSuggestProducts(ctx context.Context, text string) ([]SuggestCandidate, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil, nil
 	}
 	rows, err := d.Pool.Query(ctx, `
 SELECT DISTINCT ON (p.id) p.id::text, p.name, COALESCE(p.tagline, ''),
@@ -53,8 +58,8 @@ SELECT DISTINCT ON (p.id) p.id::text, p.name, COALESCE(p.tagline, ''),
        o.id::text
 FROM products p
 JOIN owners o ON o.maker_id = p.maker_id
-ORDER BY p.id, p.created_at ASC
-LIMIT $1`, limit)
+WHERE p.listed AND lower(btrim(p.name)) = lower(btrim($1))
+ORDER BY p.id, p.created_at ASC`, text)
 	if err != nil {
 		return nil, err
 	}
@@ -125,4 +130,37 @@ func scanSuggest(rows interface {
 		out = append(out, item)
 	}
 	return out, rows.Err()
+}
+
+// ProductListedFlags is the owner-page listing state for this maker's products.
+func (d *DB) ProductListedFlags(ctx context.Context, makerID string) (map[string]bool, error) {
+	rows, err := d.Pool.Query(ctx, `SELECT id::text, listed FROM products WHERE maker_id=$1`, makerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var id string
+		var listed bool
+		if err := rows.Scan(&id, &listed); err != nil {
+			return nil, err
+		}
+		out[id] = listed
+	}
+	return out, rows.Err()
+}
+
+// SetProductListed turns find_partners listing on or off. Only the owner of
+// the product's maker can change it. A missing or foreign product is false.
+func (d *DB) SetProductListed(ctx context.Context, ownerID, productID string, listed bool) (bool, error) {
+	tag, err := d.Pool.Exec(ctx, `
+UPDATE products AS p
+SET listed=$3, updated_at=NOW()
+FROM owners AS o
+WHERE p.id=$2::uuid AND o.id=$1::uuid AND o.maker_id IS NOT NULL AND p.maker_id = o.maker_id`, ownerID, productID, listed)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
 }

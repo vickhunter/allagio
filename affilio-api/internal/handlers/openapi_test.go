@@ -65,7 +65,7 @@ var openapiExclusions = map[string]string{
 	"POST /owner/grants/{id}/revoke": "form post (HTML)", "POST /owner/human-approval": "form post (HTML)", "POST /owner/logout": "form post (HTML)",
 	"POST /owner/digest": "form post (HTML)", "POST /owner/notify": "form post (HTML)", "POST /owner/offers/{id}/list": "form post (HTML)", "POST /owner/orp-payouts/{id}/sent": "form post (HTML)", "POST /owner/payout-wallets": "form post (HTML)",
 	"POST /owner/payouts/{id}/confirm-received": "form post (HTML)", "POST /owner/placements/{id}/approve": "form post (HTML)", "POST /owner/placements/{id}/revoke": "form post (HTML)",
-	"POST /owner/products/{id}/connection": "form post (HTML)", "POST /owner/spaces/{id}/list": "form post (HTML)", "POST /owner/step-modes": "form post (HTML)",
+	"POST /owner/products/{id}/connection": "form post (HTML)", "POST /owner/products/{id}/listed": "form post (HTML)", "POST /owner/spaces/{id}/list": "form post (HTML)", "POST /owner/step-modes": "form post (HTML)",
 	"POST /owner/telegram/code": "form post (HTML)", "POST /owner/telegram/unlink": "form post (HTML)",
 	"GET /agents.md": "markdown twin", "GET /home.md": "markdown twin", "GET /makers.md": "markdown twin", "GET /privacy.md": "markdown twin",
 	"GET /protocol.md": "markdown twin", "GET /publishers.md": "markdown twin", "GET /publishers/setup.md": "markdown twin", "GET /reference.md": "markdown twin",

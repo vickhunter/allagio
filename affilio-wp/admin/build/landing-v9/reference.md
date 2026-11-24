@@ -80,12 +80,13 @@ join → hello → discover → offer → counter* → accept → awaiting → a
 | join_body_size | Join body is over 64 KiB |
 | join_bearer_unknown | Authorization was sent but does not name a party. The bearer wins: omit it to mint a new party |
 | join_key_held | This party already registered a key. That key wins: this join does not replace it |
+| join_key_scope | A first signing key needs a join-scope token. Another bearer scope is HTTP 403 and does not bind the key |
 
 Send a real, named User-Agent on every request, such as MyAgent/1.0 (+https://example.com). An empty User-Agent or a library-default User-Agent is blocked at the edge with Cloudflare error 1010 and never reaches Allagio.
 
-join_agent returns HTTP 400 application/problem+json. Each failed rule is one errors entry with the code above and a detail that names the field and the rule. A call that already sends Authorization: Bearer reuses that token's party (HTTP 200, same token). The token's party wins when agent.name differs.
+join_agent returns HTTP 400 application/problem+json. Each failed rule is one errors entry with the code above and a detail that names the field and the rule. join_key_scope is HTTP 403 application/problem+json: a first signing key needs a join-scope token, and another bearer scope does not bind the key. A call that already sends Authorization: Bearer reuses that token's party (HTTP 200, same token). The token's party wins when agent.name differs. A join-scope token with no key still reuses its party.
 
-find_partners returns a registered product when the search text is that product's exact name, ranked first, while the owner leaves listing at its default. Offers and spaces stay list ask until the owner opts in. The product card does not include offers, spaces, the owner's email, or private product fields. The card is an ORP 0.4 result.
+find_partners returns a registered product when the search text is that product's exact name, ranked first, at any catalog size, while the owner leaves listing at its default. The owner can turn listing off on the owner page. An unlisted product does not come back, including a search for its exact name. Offers and spaces stay list ask until the owner opts in. The product card does not include offers, spaces, the owner's email, or private product fields. The card is an ORP 0.4 result.
 
 ## Live vs. spec-only
 

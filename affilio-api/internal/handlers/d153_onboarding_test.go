@@ -100,7 +100,7 @@ func TestJoinAgentProblemCodes(t *testing.T) {
 		})
 	}
 	for _, code := range orp.JoinErrorCodes {
-		if code == "join_bearer_unknown" || code == "join_key_held" {
+		if code == "join_bearer_unknown" || code == "join_key_held" || code == "join_key_scope" {
 			continue
 		}
 		if !seen[code] {

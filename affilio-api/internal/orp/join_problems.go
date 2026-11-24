@@ -33,6 +33,7 @@ var JoinErrorCodes = []string{
 	"join_body_size",
 	"join_bearer_unknown",
 	"join_key_held",
+	"join_key_scope",
 }
 
 // JoinFailure is one failed join rule. Detail names the field and the rule
@@ -69,7 +70,7 @@ func newJoinFailure(code, field, rule string) JoinFailure {
 // POST /orp/join. Rate limits and loopback refusals are not.
 func IsJoinCode(code string) bool {
 	switch code {
-	case "join_bearer_unknown", "join_key_held":
+	case "join_bearer_unknown", "join_key_held", "join_key_scope":
 		return true
 	default:
 		return false

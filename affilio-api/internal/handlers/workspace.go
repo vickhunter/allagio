@@ -50,6 +50,7 @@ func (h *HostedHandler) mountWorkspace(public, owner *gin.RouterGroup) {
 	owner.POST("/telegram/code", h.CreateTelegramCodeForm)
 	owner.POST("/telegram/unlink", h.UnlinkTelegramForm)
 	owner.POST("/spaces/:id/list", h.ListSpaceForm)
+	owner.POST("/products/:id/listed", h.SetProductListed)
 	owner.POST("/offers/:id/list", h.ListOfferForm)
 	api := owner.Group("/api")
 	api.GET("/deals", h.OwnerDeals)

@@ -1170,6 +1170,14 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 	}
 	if h.Page != nil {
 		pageBody := `<div id="workspace-app" aria-live="polite"></div>`
+		if c.Request.URL.Path == "/owner" || c.Request.URL.Path == "/owner/settings" {
+			listing, err := h.productsListedSection(c, o)
+			if err != nil {
+				c.Status(500)
+				return
+			}
+			pageBody = string(listing) + pageBody
+		}
 		if c.Request.URL.Path == "/owner/settings" {
 			section, err := h.humanApprovalSection(c, o)
 			if err != nil {
@@ -1303,15 +1311,12 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 		}
 	}
 	if o.MakerID != "" {
-		products, err := h.DB.ListProducts(c.Request.Context(), o.MakerID)
+		listing, err := h.productsListedSection(c, o)
 		if err != nil {
 			c.Status(500)
 			return
 		}
-		body.WriteString(`<h2>Products</h2>`)
-		for _, p := range products {
-			fmt.Fprintf(&body, `<p>%s · <a href="/owner/products/%s/connection">Connect Stripe</a></p>`, template.HTMLEscapeString(p.Name), p.ID)
-		}
+		body.WriteString(string(listing))
 		makerPlacements, err := h.DB.ListMakerPlacements(c.Request.Context(), o.MakerID)
 		if err != nil {
 			c.Status(500)
