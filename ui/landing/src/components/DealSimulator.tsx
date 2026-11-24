@@ -76,6 +76,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
     else if (event.key === 'End') nextIndex = DEAL_TEMPLATES.length - 1
     if (nextIndex === null) return
     event.preventDefault()
+    if (nextIndex === currentIndex) return
     const nextTemplate = DEAL_TEMPLATES[nextIndex]
     handleSelectTemplate(nextTemplate.id)
     tabRefs.current[nextTemplate.id]?.focus()
