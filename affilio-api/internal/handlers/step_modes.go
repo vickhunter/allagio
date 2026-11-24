@@ -158,8 +158,28 @@ func signupGate(c *gin.Context, db *database.DB, owners []database.OwnerRef) (ow
 // holdDashboardStep applies the same ask and off decision as holdStep.
 // A JSON client gets that JSON body. A dashboard form gets the owner page,
 // with the reason visible, and ask is still stored on the approval queue.
+//
+// Site signup is the exception for a missing row. The caller is the signed-in
+// owner, so the form is the person. No saved step-mode row is not an ask and
+// the account is created. A saved ask still waits, and a saved off still
+// refuses. Agent calls do not use this path: they keep the missing-row ask
+// from LoadStepModes, including get_step_modes and POST /v1/agent-accounts.
 func (h *HostedHandler) holdDashboardStep(c *gin.Context, step, ownerID, siteID string, payload map[string]any) bool {
-	if strings.Contains(strings.ToLower(c.GetHeader("Content-Type")), "application/json") {
+	if step == database.StepSiteSignup {
+		saved, err := h.DB.StepModeRowExists(c.Request.Context(), ownerID, siteID)
+		if err != nil {
+			if dashboardJSON(c) {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "step mode unavailable"})
+			} else {
+				c.Status(http.StatusInternalServerError)
+			}
+			return true
+		}
+		if !saved {
+			return false
+		}
+	}
+	if dashboardJSON(c) {
 		return holdStep(c, h.DB, step, ownerID, siteID, payload)
 	}
 	modes, err := h.DB.LoadStepModes(c.Request.Context(), ownerID, siteID)
@@ -189,6 +209,10 @@ func (h *HostedHandler) holdDashboardStep(c *gin.Context, step, ownerID, siteID 
 	default:
 		return false
 	}
+}
+
+func dashboardJSON(c *gin.Context) bool {
+	return strings.Contains(strings.ToLower(c.GetHeader("Content-Type")), "application/json")
 }
 
 func (h *SitesHandler) holdRegister(c *gin.Context, req siteRegisterRequest) bool {

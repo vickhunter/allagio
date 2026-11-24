@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"affilio-api/internal/database"
 	"affilio-api/internal/entry"
 	"affilio-api/internal/services"
 )
@@ -77,6 +78,24 @@ func TestOwnerConfirmReceivedOffAndAsk(t *testing.T) {
 	approved := approveStep(t, r, approvalIDFromPage(t, asked.Body.String()))
 	if approved["result"].(map[string]any)["status"] != "received" || countRows(t, db, `SELECT COUNT(*) FROM payouts WHERE id=$1 AND received_at IS NOT NULL`, payoutID) != 1 {
 		t.Fatalf("approved receipt: %v", approved)
+	}
+}
+
+func TestOwnerSignupWithNoStepRowProceeds(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	h, r := newStepModeRouter(db, entry.LiveClaimChecker{})
+	owner, cookie := testOwnerSession(t, h, "owner-signup-fresh", "owner-signup-fresh@example.com")
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes WHERE owner_id=$1`, owner.ID) != 0 {
+		t.Fatal("brand-new owner already had a step-mode row")
+	}
+	modes, err := db.LoadStepModes(context.Background(), owner.ID, "")
+	if err != nil || modes.Get(database.StepSiteSignup) != database.ModeAsk {
+		t.Fatalf("agent read of a missing row: %+v %v", modes, err)
+	}
+	created := ownerForm(t, h, r, cookie, "/owner/accounts", url.Values{"csrf": {owner.CSRF}, "role": {"publisher"}, "domain": {"owner-signup-fresh.example"}})
+	if created.Code != http.StatusSeeOther || strings.Contains(created.Body.String(), "step_ask") || countRows(t, db, `SELECT COUNT(*) FROM sites WHERE domain='owner-signup-fresh.example'`) != 1 || countRows(t, db, `SELECT COUNT(*) FROM owners WHERE id=$1 AND site_id IS NOT NULL`, owner.ID) != 1 {
+		t.Fatalf("fresh owner signup: %d %s", created.Code, created.Body.String())
 	}
 }
 

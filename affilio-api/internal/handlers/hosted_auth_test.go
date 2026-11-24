@@ -389,8 +389,8 @@ func TestHostedPublisherApprovalAndRealHTTPMCPClient(t *testing.T) {
 		}
 	}
 	foreign, foreignCookie := testOwnerSession(t, h, "foreign-owner", "foreign@example.com")
-	if err = db.SaveStepModes(context.Background(), foreign.ID, "", database.StepModes{SiteSignup: database.ModeAuto}); err != nil {
-		t.Fatal(err)
+	if countRows(t, db, `SELECT COUNT(*) FROM agent_step_modes WHERE owner_id=$1`, foreign.ID) != 0 {
+		t.Fatal("brand-new owner already had a step-mode row")
 	}
 	create := ownerForm(t, h, r, foreignCookie, "/owner/accounts", url.Values{"csrf": {foreign.CSRF}, "role": {"publisher"}, "domain": {"other.example.com"}})
 	if create.Code != 303 {

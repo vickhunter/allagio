@@ -150,6 +150,23 @@ LIMIT 1`, ownerID, siteID).Scan(&m.SiteSignup, &m.OfferMatch, &m.PlacementPublis
 	return m.filled(), nil
 }
 
+// StepModeRowExists reports whether this owner or site has a saved step-mode row.
+// The match is the same one LoadStepModes uses: a site row, or an owner-wide row.
+// No row is not the same as a saved ask. LoadStepModes still fills a missing row as ask.
+func (d *DB) StepModeRowExists(ctx context.Context, ownerID, siteID string) (bool, error) {
+	if ownerID == "" && siteID == "" {
+		return false, nil
+	}
+	var exists bool
+	err := d.Pool.QueryRow(ctx, `
+SELECT EXISTS(
+  SELECT 1 FROM agent_step_modes
+  WHERE (NULLIF($2,'') IS NOT NULL AND site_id = NULLIF($2,'')::uuid)
+     OR (NULLIF($1,'') IS NOT NULL AND owner_id = NULLIF($1,'')::uuid AND site_id IS NULL)
+)`, ownerID, siteID).Scan(&exists)
+	return exists, err
+}
+
 // seedNewSitePublishAsk stores placement publish as ask for a site that was
 // just created, and payout as ask so money steps wait on the owner. The
 // other steps on that new site row stay auto. An existing row is left alone,
