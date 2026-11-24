@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -289,6 +291,57 @@ VALUES($1, 'Catalog Tail Exact', 'https://hidden.example', 'software', false)`, 
 	card, _ := first["product"].(map[string]any)
 	if card["id"] != tailID {
 		t.Fatalf("found %#v want %s", card, tailID)
+	}
+}
+
+func TestMigration068KeepsTwoActivePartyKeys(t *testing.T) {
+	db, cleanup := setupTestDBThrough(t, "UTC", "067_offer_review_flags.sql")
+	defer cleanup()
+	var ownerID string
+	if err := db.Pool.QueryRow(context.Background(), `
+INSERT INTO owners(issuer, subject, email, name)
+VALUES('https://offer-rails.agent', 'two-active-keys', 'two-keys@agents.invalid', 'Two Keys')
+RETURNING id::text`).Scan(&ownerID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Pool.Exec(context.Background(), `
+INSERT INTO party_keys(owner_id, kid, jwk) VALUES
+($1, 'key-a', '{"kty":"OKP","crv":"Ed25519","x":"aaaaaaaa","kid":"key-a"}'),
+($1, 'key-b', '{"kty":"OKP","crv":"Ed25519","x":"bbbbbbbb","kid":"key-b"}')`, ownerID); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join("..", "migrations", "068_product_listed.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlText := string(raw)
+	if strings.Contains(strings.ToUpper(sqlText), "DELETE FROM") || strings.Contains(sqlText, "party_keys_one_active") {
+		t.Fatal("068 deletes party keys or adds a one-active-key index")
+	}
+	if _, err = db.Pool.Exec(context.Background(), sqlText); err != nil {
+		t.Fatal(err)
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM party_keys WHERE owner_id=$1 AND revoked_at IS NULL`, ownerID) != 2 {
+		t.Fatal("migration 068 dropped or revoked an active key")
+	}
+	if countRows(t, db, `SELECT COUNT(*) FROM pg_indexes WHERE indexname='party_keys_one_active'`) != 0 {
+		t.Fatal("party_keys_one_active is present")
+	}
+	entry := &AgentEntry{DB: db, BaseURL: "http://127.0.0.1:8080", AddressKey: testAddressKey}
+	r := mountORP(entry, &ORPHost{Entry: entry})
+	rec, body := postJSON(t, r, http.MethodGet, "/orp/keys/"+ownerID, nil, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("keys %d %s", rec.Code, rec.Body.String())
+	}
+	keys, _ := body["keys"].([]any)
+	got := map[string]bool{}
+	for _, item := range keys {
+		key, _ := item.(map[string]any)
+		kid, _ := key["kid"].(string)
+		got[kid] = true
+	}
+	if !got["key-a"] || !got["key-b"] || len(keys) != 2 {
+		t.Fatalf("keys endpoint %#v", body["keys"])
 	}
 }
 

@@ -130,10 +130,11 @@ func (d *DB) BindPartyKey(ctx context.Context, ownerID string, partyKey map[stri
 }
 
 // BindFirstPartyKey stores key when the owner has no active key. The owner
-// row is locked for the check and the insert, and party_keys allows one
-// active row per owner, so two different first keys cannot both land.
-// "inserted" means this call stored it. "matched" means the active key is
-// the same kid and x. "held" means a different active key is already there.
+// row is locked for the check and the insert, so two different first keys
+// cannot both land. A party that already has active keys is left as it is:
+// the table can hold more than one, and this path does not revoke or delete.
+// "inserted" means this call stored it. "matched" means an active key is the
+// same kid and x. "held" means a different active key is already there.
 func (d *DB) BindFirstPartyKey(ctx context.Context, ownerID string, partyKey map[string]any) (string, error) {
 	raw, err := json.Marshal(partyKey)
 	if err != nil {
