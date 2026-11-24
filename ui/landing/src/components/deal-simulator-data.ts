@@ -100,8 +100,8 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
       host: 'allagio.dev',
       keyFingerprint: 'ed25519:3e18…8d02',
     },
-    discoverMatch: 'Matched article "Caching the dependency graph" (relevance 94/100)',
-    discoverScore: '94 / 100 topic match',
+    discoverMatch: 'Matched article "Caching the dependency graph" by topic tags',
+    discoverScore: 'topic match',
     initialTerms: {
       headline: '15% recurring commission on paid plans',
       rateLabel: '15% recurring',
@@ -146,14 +146,14 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
     hardChecks: [
       'Disclosure label present ("Sponsored, via Allagio")',
       'rel="sponsored" enforced on outbound link',
-      'Copy length within 160-char cap · single box',
+      'Copy length within 140-char cap · single box',
     ],
     artifact: {
       kind: 'placement_card',
       badge: 'Labelled Placement · After Intro',
-      title: 'Acme Deploy — One-click preview environments',
+      title: 'Acme Deploy: One-click preview environments',
       subtitle: 'Inserted in priya.dev/caching-dependency-graph',
-      body: 'Cache build graphs automatically and spin up branch previews in 12 seconds. Starts at €0/mo for indie repos.',
+      body: 'Cache build graphs automatically and spin up branch previews per pull request. Free tier available for indie repos.',
       disclosureLabel: 'Sponsored, via Allagio · rel="sponsored"',
       trackedUrl: 'https://allagio.dev/v1/go/ac94k2',
       metrics: [
@@ -165,9 +165,9 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
     counteredArtifact: {
       kind: 'placement_card',
       badge: 'Labelled Placement · After Intro',
-      title: 'Acme Deploy — One-click preview environments',
+      title: 'Acme Deploy: One-click preview environments',
       subtitle: 'Inserted in priya.dev/caching-dependency-graph',
-      body: 'Cache build graphs automatically and spin up branch previews in 12 seconds. Starts at €0/mo for indie repos.',
+      body: 'Cache build graphs automatically and spin up branch previews per pull request. Free tier available for indie repos.',
       disclosureLabel: 'Sponsored, via Allagio · rel="sponsored"',
       trackedUrl: 'https://allagio.dev/v1/go/ac94k2',
       metrics: [
@@ -201,7 +201,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
       keyFingerprint: 'ed25519:8b09…4f71',
     },
     discoverMatch: 'Matched Issue #89 of Founders Notes (18k verified subscribers)',
-    discoverScore: '91 / 100 audience fit',
+    discoverScore: 'audience match',
     initialTerms: {
       headline: '€350 flat fee · 1 featured newsletter block',
       rateLabel: '€350 flat',
@@ -209,7 +209,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
       disclosure: 'Partner mention · rel="sponsored"',
       termsHash: 'sha256:2d7a9c1e5b80f43d6a2e9c1b7f405a8d3c6e1b9a2f5d804c7e1a3b5d9f2c4e6a',
       summaryLines: [
-        '€350 flat fee settled on verified publish',
+        '€350 flat fee recorded on verified publish (paid on your rail)',
         'Featured mid-issue block in Issue #89',
         '30-day archive link verification',
       ],
@@ -250,7 +250,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
     artifact: {
       kind: 'sponsored_slot',
       badge: 'Sponsored Issue Block · #89',
-      title: 'Parcel — Ship returns without the spreadsheet',
+      title: 'Parcel: Ship returns without the spreadsheet',
       subtitle: 'Founders Notes · Issue #89 · Mid-issue feature',
       body: 'Automate return labels, customs forms, and warehouse restock alerts in one API call.',
       disclosureLabel: 'Partner mention · Verified on archive page',
@@ -264,7 +264,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
     counteredArtifact: {
       kind: 'sponsored_slot',
       badge: 'Top-of-Issue Sponsor · #89',
-      title: 'Parcel — Ship returns without the spreadsheet',
+      title: 'Parcel: Ship returns without the spreadsheet',
       subtitle: 'Founders Notes · Issue #89 · Promo FOUNDERS20',
       body: 'Automate return labels, customs forms, and warehouse restock alerts in one API call. Use FOUNDERS20 for 20% off.',
       disclosureLabel: 'Partner mention · Verified on archive page',
@@ -417,7 +417,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
       termsHash: 'sha256:8d0f2b4c6e8a0c2e4f6a8b0d2e4f6a8c0b2d4e6f8a0c2e4b6d8f0a2c4e6b8d0f',
       summaryLines: [
         'Reserved slot sp_devdigest_w48 for 4 weeks',
-        '€220/week settled per verified weekly check',
+        '€220/week recorded per verified weekly check (paid on your rail)',
         'No third-party scripts · static labelled card',
       ],
       orpTerms: {
@@ -456,7 +456,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
     artifact: {
       kind: 'inventory_slot',
       badge: 'Booked Inventory Slot · 4 Weeks',
-      title: 'Goji Analytics — Privacy-first metrics for indie teams',
+      title: 'Goji Analytics: Privacy-first metrics for indie teams',
       subtitle: 'Slot sp_devdigest_w48 · Static card, zero tracking scripts',
       body: 'Lightweight web analytics in 1.4 KB. EU-hosted, no cookie banners required.',
       disclosureLabel: 'Sponsored · Verified weekly by ORP host',
@@ -470,7 +470,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
     counteredArtifact: {
       kind: 'inventory_slot',
       badge: 'Booked Header Slot · 4 Weeks',
-      title: 'Goji Analytics — Privacy-first metrics for indie teams',
+      title: 'Goji Analytics: Privacy-first metrics for indie teams',
       subtitle: 'Slot sp_devdigest_header · Header + sidebar placement',
       body: 'Lightweight web analytics in 1.4 KB. EU-hosted, no cookie banners required.',
       disclosureLabel: 'Sponsored · Verified weekly by ORP host',
@@ -523,7 +523,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
       termsHash: 'sha256:1b3d5f7a9c1e305b7d9f1a3c5e7b9d1f305a7c9e1b3d5f7a9c1e3b5d7f9a1c3e',
       summaryLines: [
         'Maker 55% (€44) · Blog 25% (€20) · Newsletter 20% (€16)',
-        'ORP 0.4 multi-party envelope — all 3 seats sign',
+        'ORP 0.4 multi-party envelope: all 3 seats sign',
         'Automated ledger split per verified Stripe webhook',
       ],
       orpTerms: {
@@ -564,7 +564,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
     artifact: {
       kind: 'rev_share_ledger',
       badge: 'Multi-Party Rev-Share Ledger · €80 Sale',
-      title: 'Ledger Budgeting Bundle — Automated 3-way split',
+      title: 'Ledger Budgeting Bundle: Automated 3-way split',
       subtitle: 'ORP 0.4 multi-party receipt · 3 signed seats',
       body: 'Every verified checkout splits cleanly across Maker, Blog, and Newsletter with one shared proof ID.',
       disclosureLabel: 'Partner bundle · Signed by 3 agents',
@@ -583,7 +583,7 @@ export const DEAL_TEMPLATES: DealTemplate[] = [
     counteredArtifact: {
       kind: 'rev_share_ledger',
       badge: 'Multi-Party Rev-Share Ledger · €80 Sale',
-      title: 'Ledger Budgeting Bundle — Automated 3-way split',
+      title: 'Ledger Budgeting Bundle: Automated 3-way split',
       subtitle: 'ORP 0.4 multi-party receipt · Countered 50 / 30 / 20',
       body: 'Every verified checkout splits cleanly across Maker, Blog, and Newsletter with one shared proof ID.',
       disclosureLabel: 'Partner bundle · Signed by 3 agents',

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   ArrowLeftRight,
@@ -66,6 +66,20 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
   const reduced = usePrefersReducedMotion()
   const [state, setState] = useState<SimulatorState>(() => createInitialState(initialTemplate))
   const [copiedJson, setCopiedJson] = useState(false)
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
+
+  function onTemplateTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentIndex: number) {
+    let nextIndex: number | null = null
+    if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % DEAL_TEMPLATES.length
+    else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + DEAL_TEMPLATES.length) % DEAL_TEMPLATES.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = DEAL_TEMPLATES.length - 1
+    if (nextIndex === null) return
+    event.preventDefault()
+    const nextTemplate = DEAL_TEMPLATES[nextIndex]
+    handleSelectTemplate(nextTemplate.id)
+    tabRefs.current[nextTemplate.id]?.focus()
+  }
 
   const template = useMemo(() => getTemplateById(state.templateId), [state.templateId])
   const terms = useMemo(() => getActiveTerms(template, state.countered), [template, state.countered])
@@ -116,6 +130,14 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
   const isReceipt = state.stage === 'receipt'
   const isRefused = state.stage === 'refused'
   const isWaitingHuman = state.stage === 'ask'
+  const statusAnnouncement = isReceipt
+    ? `${template.label} simulator deal approved and verified in demo with receipt ${template.proofId}.`
+    : isRefused
+      ? `${template.label} simulator deal refused. Zero placement inserted.`
+      : isWaitingHuman
+        ? `${template.label} simulator waiting at human approval gate${state.countered ? ' with countered terms' : ''}.`
+        : `${template.label} simulator at ${state.stage} stage.`
+  const darkFocus = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F5F3EE]'
 
   return (
     <section
@@ -128,18 +150,26 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
         className
       )}
     >
+      <div role="status" aria-live="polite" className="sr-only">
+        {statusAnnouncement}
+      </div>
       <div className="relative p-5 sm:p-7 lg:p-8">
         {/* Compact toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-[#A2A29A]">
-            ORP 0.4 · Interactive Deal Simulator
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full border border-[#3E3E39] bg-[#141413] px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-[#F5F3EE]">
+              Simulator
+            </span>
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-[#B5B2A8]">
+              ORP 0.4 · Interactive walkthrough
+            </p>
+          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={handleReplay}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#343430] bg-[#141413] px-3.5 text-xs font-semibold text-[#F5F3EE] transition-colors hover:border-[#52524C] hover:bg-[#22221F]"
+              className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#343430] bg-[#141413] px-3.5 text-xs font-semibold text-[#F5F3EE] transition-[color,border-color,background-color,transform] hover:border-[#52524C] hover:bg-[#22221F] active:scale-[0.98]', darkFocus)}
             >
               <Play className="h-3.5 w-3.5 text-[#E07A63]" aria-hidden="true" />
               Replay wire
@@ -147,7 +177,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
             <button
               type="button"
               onClick={handleReset}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#343430] bg-[#141413] px-3.5 text-xs font-semibold text-[#A2A29A] transition-colors hover:border-[#52524C] hover:text-[#F5F3EE]"
+              className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#343430] bg-[#141413] px-3.5 text-xs font-semibold text-[#B5B2A8] transition-[color,border-color,transform] hover:border-[#52524C] hover:text-[#F5F3EE] active:scale-[0.98]', darkFocus)}
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               Reset
@@ -157,10 +187,11 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
               onClick={() => setState((prev) => toggleJsonDrawer(prev))}
               aria-expanded={state.showJson}
               className={cn(
-                'inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-3.5 font-mono text-xs font-medium transition-colors',
+                'inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3.5 font-mono text-xs font-medium transition-[color,border-color,background-color,transform] active:scale-[0.98]',
+                darkFocus,
                 state.showJson
                   ? 'border-[#F5F3EE] bg-[#F5F3EE] text-[#141413]'
-                  : 'border-[#343430] bg-[#141413] text-[#A2A29A] hover:border-[#52524C] hover:text-[#F5F3EE]'
+                  : 'border-[#343430] bg-[#141413] text-[#B5B2A8] hover:border-[#52524C] hover:text-[#F5F3EE]'
               )}
             >
               <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -176,39 +207,53 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
           aria-label="ORP deal templates"
           className="mt-6 flex flex-wrap gap-2 border-b border-[#2E2E2B] pb-5"
         >
-          {DEAL_TEMPLATES.map((item) => {
+          {DEAL_TEMPLATES.map((item, idx) => {
             const active = item.id === state.templateId
+            const showOrpKind = item.label.toLowerCase() !== item.orpKind.toLowerCase()
             return (
               <button
                 key={item.id}
+                ref={(el) => { tabRefs.current[item.id] = el }}
                 type="button"
                 role="tab"
+                id={`sim-tab-${item.id}`}
+                tabIndex={active ? 0 : -1}
                 aria-selected={active}
+                aria-controls="sim-tabpanel"
                 data-template-pill={item.id}
                 onClick={() => handleSelectTemplate(item.id)}
+                onKeyDown={(event) => onTemplateTabKeyDown(event, idx)}
                 className={cn(
-                  'inline-flex min-h-10 items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors',
+                  'inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-semibold transition-[color,border-color,background-color,transform] active:scale-[0.98]',
+                  darkFocus,
                   active
                     ? 'border-[#F5F3EE] bg-[#F5F3EE] text-[#141413]'
-                    : 'border-[#343430] bg-[#141413] text-[#A2A29A] hover:border-[#52524C] hover:text-[#F5F3EE]'
+                    : 'border-[#343430] bg-[#141413] text-[#B5B2A8] hover:border-[#52524C] hover:text-[#F5F3EE]'
                 )}
               >
                 <span>{item.label}</span>
-                <span
-                  className={cn(
-                    'font-mono text-[10px] uppercase',
-                    active ? 'text-[#52524C]' : 'text-[#7A7A72]'
-                  )}
-                >
-                  {item.orpKind}
-                </span>
+                {showOrpKind ? (
+                  <span
+                    className={cn(
+                      'font-mono text-[11px] uppercase',
+                      active ? 'text-[#52524C]' : 'text-[#B5B2A8]'
+                    )}
+                  >
+                    {item.orpKind}
+                  </span>
+                ) : null}
               </button>
             )
           })}
         </div>
 
         {/* Main 2-column simulator body */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+        <div
+          id="sim-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`sim-tab-${state.templateId}`}
+          className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start"
+        >
           {/* Left: Named Agents + Live ORP Wire Timeline */}
           <div className="flex min-w-0 flex-col gap-4">
             {/* Parties bar */}
@@ -235,7 +280,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   <p className="truncate font-mono text-sm font-semibold text-[#F7F5F0]">
                     {template.acceptor.handle}
                   </p>
-                  <p className="font-mono text-[11px] text-[#F59E0B]">{template.acceptor.keyFingerprint}</p>
+                  <p className="font-mono text-[11px] text-[#B5B2A8]">{template.acceptor.keyFingerprint}</p>
                 </div>
               </div>
 
@@ -287,9 +332,9 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   <button
                     type="button"
                     onClick={() => setState((prev) => toggleJsonDrawer(prev))}
-                    className="inline-flex items-center gap-1 rounded-lg border border-[#F7F5F0]/12 bg-[#141413] px-2.5 py-1 font-mono text-[11px] text-[#E07A63] transition-colors hover:border-[#C64F38]"
+                    className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#F7F5F0]/15 bg-[#141413] px-3 font-mono text-xs text-[#E07A63] transition-colors hover:border-[#C64F38]', darkFocus)}
                   >
-                    <Code2 className="h-3 w-3" aria-hidden="true" />
+                    <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
                     {state.showJson ? 'Hide ORP JSON' : 'Inspect JSON'}
                   </button>
                 </div>
@@ -306,7 +351,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   reduced={reduced}
                 >
                   <p className="text-sm font-medium text-[#F7F5F0]">{template.counterNote}</p>
-                  <p className="mt-1.5 font-mono text-[11px] text-[#F59E0B]">
+                  <p className="mt-1.5 font-mono text-[11px] text-[#E07A63]">
                     Updated terms_hash → {shortHash(template.counteredTerms.termsHash)}
                   </p>
                 </TimelineStep>
@@ -316,14 +361,14 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
               <li
                 data-human-gate
                 className={cn(
-                  'rounded-xl border border-l-2 p-4 transition-colors',
+                  'rounded-xl border p-4 transition-colors',
                   isWaitingHuman
-                    ? 'border-[#343430] border-l-[#E07A63] bg-[#141413]'
+                    ? 'border-[#C64F38]/60 bg-[#141413]'
                     : isRefused
-                      ? 'border-red-500/35 border-l-red-400 bg-[#141413]'
+                      ? 'border-red-400/45 bg-[#141413]'
                       : isApprovedFlow
-                        ? 'border-[#343430] border-l-[#E07A63] bg-[#141413]'
-                        : 'border-[#2E2E2B] border-l-[#52524C] bg-[#141413]/70 opacity-60'
+                        ? 'border-[#3E5C45] bg-[#141413]'
+                        : 'border-[#2E2E2B] bg-[#141413]/70 opacity-60'
                 )}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -335,13 +380,13 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                       <UserCheck className="h-3.5 w-3.5 text-[#E07A63]" aria-hidden="true" />
                       Human Approval Gate
                     </span>
-                    <span className="rounded border border-[#343430] bg-[#1B1B19] px-2 py-0.5 font-mono text-[10px] uppercase text-[#E07A63]">
+                    <span className="rounded border border-[#343430] bg-[#1B1B19] px-2 py-0.5 font-mono text-[11px] uppercase text-[#B5B2A8]">
                       ask mode
                     </span>
                   </div>
 
                   {isApprovedFlow ? (
-                    <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-[#E07A63]">
+                    <span className="inline-flex items-center gap-1 font-mono text-xs font-semibold text-[#86C79A]">
                       <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                       Approved
                     </span>
@@ -355,13 +400,13 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                   ) : null}
                 </div>
 
-                <p className="mt-2 text-xs leading-relaxed text-[#A2A29A]">
+                <p className="mt-2 text-xs leading-relaxed text-[#B5B2A8]">
                   {isWaitingHuman
                     ? 'Nothing publishes or moves until you decide. Approve to sign and execute, Counter to negotiate better terms, or Refuse to halt with zero placement.'
                     : isApprovedFlow
                       ? `Human signed acceptance for ${shortHash(terms.termsHash)}. Agents proceeded to execution.`
                       : isRefused
-                        ? 'You refused this proposal. Deal halted cleanly — zero placement inserted, zero money moved.'
+                        ? 'You refused this proposal. Deal halted cleanly. Zero placement inserted, zero money moved.'
                         : 'Agents will pause here for human sign-off before anything touches your site.'}
                 </p>
 
@@ -371,7 +416,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                       type="button"
                       data-action="approve"
                       onClick={() => handleDecision('approve')}
-                      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-[#F5F3EE] px-4 text-sm font-semibold text-[#141413] transition-opacity hover:opacity-90"
+                      className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-[#F5F3EE] px-4 text-sm font-semibold text-[#141413] transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]', darkFocus)}
                     >
                       <Check className="h-4 w-4" aria-hidden="true" />
                       Approve Deal
@@ -382,7 +427,8 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                       disabled={state.countered}
                       onClick={() => handleDecision('counter')}
                       className={cn(
-                        'inline-flex min-h-10 items-center gap-1.5 rounded-lg border px-4 text-sm font-semibold transition-colors',
+                        'inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-4 text-sm font-semibold transition-[color,border-color,transform] active:scale-[0.98]',
+                        darkFocus,
                         state.countered
                           ? 'cursor-not-allowed border-[#2E2E2B] bg-[#1B1B19] text-[#7A7A72]'
                           : 'border-[#52524C] bg-[#1B1B19] text-[#F5F3EE] hover:border-[#E07A63] hover:text-[#E07A63]'
@@ -395,7 +441,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                       type="button"
                       data-action="refuse"
                       onClick={() => handleDecision('refuse')}
-                      className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[#343430] bg-transparent px-4 text-sm font-semibold text-[#A2A29A] transition-colors hover:border-red-400/50 hover:text-red-300"
+                      className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#343430] bg-transparent px-4 text-sm font-semibold text-[#B5B2A8] transition-[color,border-color,transform] hover:border-red-400/50 hover:text-red-300 active:scale-[0.98]', darkFocus)}
                     >
                       <Ban className="h-4 w-4" aria-hidden="true" />
                       Refuse
@@ -482,9 +528,9 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                     <button
                       type="button"
                       onClick={handleCopyJson}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#F7F5F0]/15 bg-[#1B1B19] px-2.5 py-1 font-mono text-[11px] text-[#F7F5F0] hover:border-[#C64F38]"
+                      className={cn('inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#F7F5F0]/15 bg-[#1B1B19] px-3 font-mono text-xs text-[#F7F5F0] hover:border-[#C64F38]', darkFocus)}
                     >
-                      {copiedJson ? <Check className="h-3 w-3 text-[#E07A63]" /> : <Copy className="h-3 w-3" />}
+                      {copiedJson ? <Check className="h-3.5 w-3.5 text-[#86C79A]" /> : <Copy className="h-3.5 w-3.5" />}
                       {copiedJson ? 'Copied' : 'Copy JSON'}
                     </button>
                   </div>
@@ -504,9 +550,9 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                 Resulting Artifact
               </span>
               {isReceipt ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#C64F38]/25 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[#E07A63]">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#2E4D36]/45 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[#86C79A]">
                   <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  Live · Verified
+                  Simulated · Verified in demo
                 </span>
               ) : isRefused ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/20 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-red-300">
@@ -548,7 +594,7 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="mt-5 inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[#F7F5F0]/20 bg-[#1B1B19] px-4 text-xs font-semibold text-[#F7F5F0] hover:border-[#C64F38]"
+                  className={cn('mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-[#F7F5F0]/20 bg-[#1B1B19] px-4 text-xs font-semibold text-[#F7F5F0] hover:border-[#C64F38]', darkFocus)}
                 >
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                   Re-open at human gate

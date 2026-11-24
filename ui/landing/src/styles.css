@@ -12,7 +12,7 @@
   --rgb-surface-0:247 245 240; --rgb-surface-1:255 255 255; --rgb-surface-2:239 236 228; --rgb-surface-inv:20 20 19;
   --rgb-text-1:20 20 19; --rgb-text-2:92 91 86; --rgb-text-inv:247 245 240; --rgb-text-inv-2:170 168 160;
   --rgb-line:227 223 214; --rgb-line-strong:201 196 184;
-  --rgb-setup:198 79 56; --rgb-setup-edge:164 60 40; --rgb-setup-soft:251 240 236;   /* single brand accent: terracotta */
+  --rgb-setup:164 60 40; --rgb-setup-edge:136 48 31; --rgb-setup-soft:251 240 236;   /* single brand accent: WCAG AA terracotta */
   --rgb-maker:168 64 44; --rgb-maker-brand:198 79 56; --rgb-maker-soft:251 240 236;   /* makers = terracotta */
   --rgb-pub:92 91 86; --rgb-pub-soft:239 236 228;                                     /* publishers = warm stone */
   --rgb-moss:198 79 56; --rgb-moss-edge:164 60 40;                                    /* single public action accent */
@@ -116,7 +116,7 @@ body{margin:0;font-weight:500}
 /* One public bar, centered on a max-width track. Below 1280px the destinations sit in a labelled menu; above, a centered pill with logo left and actions right. */
 .site-bar{position:relative;display:flex;align-items:center;gap:8px;max-width:72rem;margin:0 auto;padding:4px 16px}
 .site-bar>a:first-child{flex:0 0 auto}
-.site-menu-btn{display:inline-flex;flex-shrink:0;min-height:40px;min-width:44px;align-items:center;justify-content:center;white-space:nowrap;border:1px solid rgb(var(--rgb-line-strong));border-radius:999px;background:rgb(var(--rgb-surface-1));padding:0 11px;font-size:13px;font-weight:600;margin-left:auto}
+.site-menu-btn{display:inline-flex;flex-shrink:0;min-height:44px;min-width:44px;align-items:center;justify-content:center;white-space:nowrap;border:1px solid rgb(var(--rgb-line-strong));border-radius:999px;background:rgb(var(--rgb-surface-1));padding:0 10px;font-size:13px;font-weight:600;margin-left:auto}
 .site-menu{display:none;min-width:0;align-items:center;gap:2px}
 .site-menu.is-open{display:flex;position:absolute;z-index:40;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:2px;border-bottom:1px solid rgb(var(--rgb-line));background:rgb(var(--rgb-surface-0));padding:8px 12px 12px}
 .site-menu a{display:inline-flex;min-height:44px;align-items:center}
@@ -439,14 +439,3 @@ body{margin:0;font-weight:500}
   .split{grid-template-columns:minmax(0,.9fr) minmax(280px,.8fr);align-items:center;column-gap:48px}
 }:lang(zh){--font-sans:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;--font-display:var(--font-sans);--font-mono:ui-monospace,"SF Mono",Menlo,monospace}
 :lang(hi){--font-sans:"Noto Sans Devanagari","Nirmala UI",system-ui,sans-serif;--font-display:var(--font-sans);--font-mono:ui-monospace,"SF Mono",Menlo,monospace}
-
-/* ShimmerButton (Magic UI): rotating conic border + sliding shine */
-.shimmer-button{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:14px 30px;border-radius:var(--radius);overflow:visible;text-decoration:none;transition:transform .3s ease,box-shadow .3s ease}
-.shimmer-button:hover{transform:translateY(-1px);box-shadow:0 10px 30px -12px rgb(35 39 32/.5)}
-.shimmer-button:active{transform:translateY(0)}
-.shimmer-spark{background:conic-gradient(from calc(270deg - (var(--spread) * .5)),transparent 0,var(--shimmer-color) var(--spread),transparent var(--spread));animation:spin-around var(--speed) linear infinite}
-.shimmer-base{background:var(--bg)}
-.shimmer-button::before{content:'';position:absolute;inset:0;z-index:1;border-radius:var(--radius);background:linear-gradient(-75deg,transparent 30%,rgb(255 255 255/.28) 50%,transparent 70%) 0 0/250% 250%;animation:shimmer-slide var(--speed) ease-in-out infinite;pointer-events:none}
-@keyframes spin-around{0%{transform:rotate(0)}15%,35%{transform:rotate(90deg)}65%,85%{transform:rotate(270deg)}100%{transform:rotate(360deg)}}
-@keyframes shimmer-slide{to{background-position:-200% 0}}
-@media(prefers-reduced-motion:reduce){.shimmer-spark,.shimmer-button::before{animation:none}}

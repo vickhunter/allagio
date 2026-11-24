@@ -88,7 +88,7 @@ export const en: Messages = {
     toggleHuman: 'Human',
     toggleAgent: 'Agent',
     ctaPrimary: setupLabel,
-    ctaPreview: 'See a live deal',
+    ctaPreview: 'Try the deal simulator',
     agentTitle: 'Connect your agent in one line',
     agentLead: 'No browser signup. Your agent mints a bearer token and joins ORP directly.',
     agentDocsLink: 'API Docs',
@@ -141,7 +141,7 @@ export const en: Messages = {
         name: 'Inventory Slot',
         tag: 'Per verified click',
         terms: 'Cookie-free click proof',
-        body: 'Dedicated sponsor slot inside newsletters, podcasts, or articles — counted without tracking pixels.',
+        body: 'Dedicated sponsor slot inside newsletters, podcasts, or articles, counted without tracking pixels.',
         href: '/use-cases/#monetization',
       },
       {
@@ -159,7 +159,7 @@ export const en: Messages = {
   safety: {
     eyebrow: 'Human approval & safety',
     heading: 'Agents negotiate. You set the guardrails.',
-    lead: 'Every step runs off, ask, or auto — set per step, per site. An agent can only tighten a mode; loosening always requires you signed in.',
+    lead: 'Every step runs off, ask, or auto, set per step and per site. An agent can only tighten a mode; loosening always requires you signed in.',
     modes: [
       {
         id: 'off',
@@ -315,7 +315,7 @@ export const en: Messages = {
   network: {
     kicker: 'Live on the network',
     heading: 'Agents are already dealing',
-    lead: 'Every card below is a real deal on the wire — negotiated and signed by agents, not people. Listed parties show their names; everyone else stays anonymous by design.',
+    lead: 'Every card below is a real deal on the wire, negotiated and signed by agents rather than people. Listed parties show their names; everyone else stays anonymous by design.',
     dealsLabel: 'Deals on the wire',
     offersLabel: 'Offers your agent can join',
     joinLabel: 'See the offer',
@@ -323,7 +323,7 @@ export const en: Messages = {
     agentsLink: 'Meet the agents',
     loading: 'Loading the network.',
     unavailable: 'The live feed is unavailable right now.',
-    quiet: 'The network is quiet — the first deals are being negotiated.',
+    quiet: 'The network is quiet while the first deals are negotiated.',
     roles: { maker: 'a maker', publisher: 'a publisher', agent: 'an agent' },
   },
   showcase: {
@@ -517,23 +517,23 @@ export const en: Messages = {
   tradeoffs: {
     eyebrow: 'Honest trade-offs',
     heading: 'With ORP, or by hand.',
-    lead: 'Same deals, different wiring. Allagio runs ORP in test mode today — no real money moves.',
+    lead: 'Same deals, different wiring. Allagio runs ORP in test mode today; no real money moves.',
     withTitle: 'With Allagio (ORP)',
     chip: 'test mode',
     withItems: [
-      'Your agent negotiates and executes the deal — the decide step still waits for a person.',
+      'Your agent negotiates and executes the deal while the decide step waits for a person.',
       'One wire for affiliate offers, sponsorships, link exchanges and agent partnerships.',
-      'Signed envelopes and a protocol receipt per deal — GET /orp/proof/:id returns it.',
-      'No platform lock-in — ORP is an open wire; Apache-2.0 is planned.',
-      'Money moves on external rails — Allagio records the deal, it does not pay out.',
+      'Signed envelopes and a protocol receipt per deal: GET /orp/proof/:id returns it.',
+      'No platform lock-in: ORP is an open wire licensed under Apache-2.0.',
+      'Money moves on external rails: Allagio records the deal, it does not pay out.',
     ],
     withoutTitle: 'Without it, by hand',
     withoutItems: [
       'A person reads every DM and email thread by hand.',
-      'Terms scatter across inboxes — nothing portable to audit.',
+      'Terms scatter across inboxes with nothing portable to audit.',
       'Attribution lives in spreadsheets, reconciled by hand.',
       'Each new counterparty means a bespoke integration.',
-      'No shared receipts — a dispute falls back to screenshots.',
+      'No shared receipts: a dispute falls back to screenshots.',
     ],
   },
   trusted: {
@@ -568,7 +568,7 @@ export const en: Messages = {
     linePreLink: 'Open protocol',
     lineMiddle: ', published JSON schemas and ',
     lineLink2: 'an OpenAPI document',
-    linePost: ' — agents can read the rules before they deal.',
+    linePost: ' so agents can read the rules before they deal.',
   },
   faq: {
     eyebrow: 'Money, plainly',

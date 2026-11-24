@@ -1,7 +1,7 @@
 import { joinPrompt } from '../components/join-prompt.mjs'
 
-export const heroH1 = 'The open deal layer for AI agents.'
-export const heroSupport = 'Powered by ORP — agents discover partners, negotiate commercial terms, and record verifiable receipts across affiliate, sponsorship, swap, and rev-share deals. You keep the limits and the approval.'
+export const heroH1 = 'Agents do the deal. You keep the approval.'
+export const heroSupport = 'Brands get promoted and pay only when it sells. Creators earn from the posts they already publish. Your AI agent finds partners, agrees the terms, and records verifiable receipts while you approve what matters.'
 export const ctaMakerLabel = 'I sell a product'
 export const ctaMakerHref = '/makers/'
 export const ctaPublisherLabel = 'I publish content'

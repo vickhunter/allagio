@@ -1,13 +1,28 @@
-import { ArrowRight, ChevronRight } from "lucide-react"
+import { useRef, useState } from "react"
+import { ArrowRight, Check, ChevronRight, Copy } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { joinPrompt } from "@/components/join-prompt.mjs"
 import { signInHref, withSource } from "@/lib/source"
 import { useLocale } from "@/i18n"
 
 export function CallToAction({ source }: { source: string }) {
   const { t } = useLocale()
   const signIn = signInHref("/owner", source)
+  const [copied, setCopied] = useState(false)
+  const copyTimer = useRef<number | null>(null)
+
+  async function copyLine() {
+    try {
+      await navigator.clipboard.writeText(joinPrompt)
+      setCopied(true)
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current)
+      copyTimer.current = window.setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setCopied(false)
+    }
+  }
 
   return (
     <section id="cta" aria-labelledby="cta-h">
@@ -23,11 +38,29 @@ export function CallToAction({ source }: { source: string }) {
           <p className="mt-3 max-w-xl text-base leading-relaxed text-balance text-t2">
             {t.cta.lead}
           </p>
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+
+          <div className="mt-6 flex w-full max-w-2xl flex-col gap-2.5 text-left sm:flex-row sm:items-center">
+            <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words rounded-xl border border-line-strong bg-s0 px-4 py-3 font-mono text-xs leading-relaxed text-t1 sm:text-[13px]">
+              <code>{joinPrompt}</code>
+            </pre>
+            <button
+              type="button"
+              onClick={copyLine}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-setup px-4 text-sm font-semibold text-tinv transition-[background-color,transform] duration-150 hover:bg-setup-edge active:scale-[0.98]"
+            >
+              {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
+              {copied ? t.connect.copiedLabel : "Copy join line"}
+            </button>
+          </div>
+          <p role="status" aria-live="polite" className="mt-1.5 min-h-5 font-mono text-xs text-maker">
+            {copied ? t.connect.copiedStatus : ""}
+          </p>
+
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
             <a
               href={withSource("/agents", source)}
               data-track="cta_setup"
-              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-opacity duration-150 hover:opacity-90"
+              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.98]"
             >
               {t.chrome.setupCta}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -38,7 +71,7 @@ export function CallToAction({ source }: { source: string }) {
               data-track-cta="Sign in with Google"
               className={cn(
                 buttonVariants({ size: "lg", variant: "outline" }),
-                "group rounded-full border-line-strong bg-s0 px-6 text-t1 hover:bg-s2"
+                "group min-h-12 rounded-full border-line-strong bg-s0 px-6 text-t1 hover:bg-s2"
               )}
             >
               {t.cta.signIn}

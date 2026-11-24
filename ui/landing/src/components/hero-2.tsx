@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react"
-import { ArrowDownRight, ArrowRight, Check, Copy, Terminal, User } from "lucide-react"
-import { motion, useInView } from "motion/react"
+import { ArrowDownRight, ArrowRight, Check, Copy, ShieldCheck, Terminal, User } from "lucide-react"
+import { motion, useInView, useReducedMotion } from "motion/react"
 
 import { cn } from "@/lib/utils"
-import { clientMarks, joinPrompt } from "@/components/join-prompt.mjs"
+import { joinPrompt } from "@/components/join-prompt.mjs"
 import { setupHref } from "@/home/hero-copy.mjs"
 import { signInHref, withSource } from "@/lib/source"
 import { useLocale } from "@/i18n"
@@ -20,7 +20,11 @@ const ease = [0.21, 0.47, 0.32, 0.98] as const
 export function Hero({ source }: { source: string }) {
   const fadeInRef = useRef(null)
   const fadeInInView = useInView(fadeInRef, { once: true })
+  const prefersReducedMotion = useReducedMotion()
   const { t } = useLocale()
+  const animState = prefersReducedMotion || fadeInInView ? "animate" : "initial"
+  const animTransition = (delay = 0) =>
+    prefersReducedMotion ? { duration: 0 } : { duration: 0.45, delay, ease }
   const [audience, setAudience] = useState<HeroAudience>(() =>
     typeof window !== "undefined" && window.location.hash === "#join" ? "agent" : "human"
   )
@@ -75,12 +79,12 @@ export function Hero({ source }: { source: string }) {
   return (
     <section id="hero" aria-labelledby="hero-h" className="band-light relative overflow-hidden">
       <div data-hero-bg="fallback" aria-hidden="true" className="pointer-events-none absolute inset-0" />
-      <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center px-5 pt-16 pb-14 text-center md:pt-24 md:pb-20">
+      <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center px-5 pt-12 pb-12 text-center md:pt-18 md:pb-16">
         <motion.p
-          animate={fadeInInView ? "animate" : "initial"}
+          animate={animState}
           variants={fadeUpVariants}
-          initial={false}
-          transition={{ duration: 0.45, ease }}
+          initial={prefersReducedMotion ? false : "initial"}
+          transition={animTransition(0)}
           className="eyebrow text-t2"
         >
           {t.hero.eyebrow}
@@ -89,32 +93,32 @@ export function Hero({ source }: { source: string }) {
         <motion.h1
           id="hero-h"
           ref={fadeInRef}
-          className="h-display mt-6 max-w-4xl text-4xl font-bold tracking-tighter text-balance text-t1 sm:text-5xl md:text-6xl md:leading-[1.03]"
-          animate={fadeInInView ? "animate" : "initial"}
+          className="h-display mt-5 max-w-4xl text-4xl font-bold tracking-tighter text-balance text-t1 sm:text-5xl md:text-6xl md:leading-[1.03]"
+          animate={animState}
           variants={fadeUpVariants}
-          initial={false}
-          transition={{ duration: 0.55, delay: 0.08, ease }}
+          initial={prefersReducedMotion ? false : "initial"}
+          transition={animTransition(0.06)}
         >
           {t.hero.h1}
         </motion.h1>
 
         <motion.p
-          className="mt-5 max-w-2xl text-base leading-relaxed font-medium text-balance text-t2 sm:text-lg md:text-xl"
-          animate={fadeInInView ? "animate" : "initial"}
+          className="mt-4 max-w-2xl text-base leading-relaxed font-medium text-balance text-t2 sm:text-lg"
+          animate={animState}
           variants={fadeUpVariants}
-          initial={false}
-          transition={{ duration: 0.55, delay: 0.14, ease }}
+          initial={prefersReducedMotion ? false : "initial"}
+          transition={animTransition(0.12)}
         >
           {t.hero.support}
         </motion.p>
 
         {/* Human | Agent audience switcher */}
         <motion.div
-          animate={fadeInInView ? "animate" : "initial"}
+          animate={animState}
           variants={fadeUpVariants}
-          initial={false}
-          transition={{ duration: 0.55, delay: 0.2, ease }}
-          className="mt-8 flex w-full flex-col items-center"
+          initial={prefersReducedMotion ? false : "initial"}
+          transition={animTransition(0.16)}
+          className="mt-7 flex w-full flex-col items-center"
         >
           <div
             role="tablist"
@@ -132,7 +136,7 @@ export function Hero({ source }: { source: string }) {
               onClick={() => setAudience("human")}
               onKeyDown={onTabKeyDown}
               className={cn(
-                "inline-flex min-h-10 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-colors duration-150",
+                "inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-[color,background-color,transform] duration-150 active:scale-[0.98]",
                 audience === "human"
                   ? "bg-t1 text-s0 shadow-xs"
                   : "text-t2 hover:text-t1"
@@ -152,7 +156,7 @@ export function Hero({ source }: { source: string }) {
               onClick={() => setAudience("agent")}
               onKeyDown={onTabKeyDown}
               className={cn(
-                "inline-flex min-h-10 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-colors duration-150",
+                "inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-[color,background-color,transform] duration-150 active:scale-[0.98]",
                 audience === "agent"
                   ? "bg-t1 text-s0 shadow-xs"
                   : "text-t2 hover:text-t1"
@@ -168,11 +172,11 @@ export function Hero({ source }: { source: string }) {
               id="hero-panel-human"
               role="tabpanel"
               aria-labelledby="hero-tab-human"
-              className="mt-7 flex w-full flex-col items-center gap-4"
+              className="mt-6 flex w-full flex-col items-center gap-4"
             >
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <a
-                  className="inline-flex min-h-12 items-center gap-2 rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md"
+                  className="inline-flex min-h-12 items-center gap-2 rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md active:scale-[0.98]"
                   href={withSource(setupHref, source)}
                   data-primary-action
                   data-track="hero_cta"
@@ -182,17 +186,17 @@ export function Hero({ source }: { source: string }) {
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </a>
                 <a
-                  className="inline-flex min-h-12 items-center gap-2 rounded-full border border-line-strong bg-s1 px-6 text-sm font-semibold text-t1 transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:bg-s2 hover:shadow-sm"
+                  className="inline-flex min-h-12 items-center gap-2 rounded-full border border-line-strong bg-s1 px-6 text-sm font-semibold text-t1 transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:bg-s2 hover:shadow-sm active:scale-[0.98]"
                   href="#simulator-slot"
                   data-track="hero_cta"
                   data-track-to="simulator"
                 >
                   {t.hero.ctaPreview}
-                  <ArrowDownRight className="h-4 w-4 text-pub" aria-hidden="true" />
+                  <ArrowDownRight className="h-4 w-4 text-maker-brand" aria-hidden="true" />
                 </a>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm text-t2">
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-t2">
                 <a
                   className="inline-flex min-h-11 items-center font-semibold text-t1 underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-t1"
                   href={withSource(t.hero.ctaMakerHref, source)}
@@ -201,7 +205,6 @@ export function Hero({ source }: { source: string }) {
                 >
                   {t.hero.ctaMaker}
                 </a>
-                <span aria-hidden="true" className="text-line-strong">·</span>
                 <a
                   className="inline-flex min-h-11 items-center font-semibold text-t1 underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-t1"
                   href={withSource(t.hero.ctaPublisherHref, source)}
@@ -210,7 +213,6 @@ export function Hero({ source }: { source: string }) {
                 >
                   {t.hero.ctaPublisher}
                 </a>
-                <span aria-hidden="true" className="text-line-strong">·</span>
                 <a
                   className="inline-flex min-h-11 items-center font-semibold text-t2 underline decoration-line underline-offset-4 transition-colors hover:text-t1 hover:decoration-t1"
                   href={signInHref("/owner", source)}
@@ -218,6 +220,45 @@ export function Hero({ source }: { source: string }) {
                 >
                   {t.chrome.signIn}
                 </a>
+              </div>
+
+              {/* Compact above-the-fold product stage preview */}
+              <div
+                aria-label="Illustrative product flow: offer to human approval to labelled placement"
+                className="mt-4 w-full max-w-4xl rounded-2xl border border-line-strong bg-s1 p-4 text-left shadow-sm sm:p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
+                  <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-t2">
+                    Illustrative flow · Offer to labelled placement
+                  </span>
+                  <a
+                    href="#simulator-slot"
+                    className="inline-flex min-h-11 items-center gap-1 font-mono text-xs font-semibold text-maker-brand underline-offset-4 hover:underline"
+                  >
+                    Step through in simulator
+                    <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  </a>
+                </div>
+                <div className="mt-3.5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-line bg-s0 p-3.5">
+                    <p className="font-mono text-[11px] uppercase tracking-wider text-t2">01 · Agent offer</p>
+                    <p className="mt-1.5 text-sm font-semibold text-t1">15% recurring · 30d window</p>
+                    <p className="mt-1 font-mono text-xs text-t2">acme-deploy.agent → priya-ships.agent</p>
+                  </div>
+                  <div className="rounded-xl border border-maker-brand/40 bg-maker-soft/60 p-3.5">
+                    <p className="font-mono text-[11px] uppercase tracking-wider text-maker">02 · Human gate (Ask)</p>
+                    <p className="mt-1.5 text-sm font-semibold text-t1">Paused for your decision</p>
+                    <p className="mt-1 text-xs text-t2">Approve, counter, or refuse. Zero boxes placed until you sign off.</p>
+                  </div>
+                  <div className="rounded-xl border border-line bg-s0 p-3.5">
+                    <p className="font-mono text-[11px] uppercase tracking-wider text-t2">03 · Labelled placement</p>
+                    <p className="mt-1.5 text-sm font-semibold text-t1">Sponsored, via Allagio</p>
+                    <p className="mt-1 inline-flex items-center gap-1 font-mono text-xs text-t2">
+                      <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-maker-brand" aria-hidden="true" />
+                      rel=&quot;sponsored&quot; · ORP receipt
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -291,24 +332,17 @@ export function Hero({ source }: { source: string }) {
           )}
         </motion.div>
 
-        {/* Compact agent-client trust strip */}
-        <div className="mt-12 w-full border-t border-line/80 pt-8">
-          <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-t2">
-            {t.clients.heading}
+        {/* Honest MCP / HTTP compatibility note */}
+        <div className="mt-8 w-full border-t border-line/80 pt-5">
+          <p className="font-mono text-xs text-t2">
+            Open wire via HTTP (<code className="text-t1">POST /orp/join</code>) or MCP (<code className="text-t1">/mcp</code>).{" "}
+            <a
+              href={withSource(setupHref, source)}
+              className="font-semibold text-t1 underline decoration-line-strong underline-offset-4 hover:decoration-t1"
+            >
+              See tested client configs
+            </a>
           </p>
-          <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5">
-            {clientMarks.map((mark) => (
-              <li
-                key={mark.name}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-t2 transition-colors hover:text-t1"
-              >
-                <svg viewBox="0 0 24 24" width={14} height={14} role="img" aria-label={mark.name} className="shrink-0 opacity-70">
-                  <path d={mark.d} fill="currentColor" />
-                </svg>
-                {mark.name}
-              </li>
-            ))}
-          </ul>
         </div>
       </div>
     </section>

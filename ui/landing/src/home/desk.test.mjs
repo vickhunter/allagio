@@ -11,8 +11,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 test('setup copy stays the public join line and the navigation target is the agents page', () => {
   assert.equal(joinPrompt, 'Join with POST /v1/agent-tokens and send the bearer.')
-  assert.equal(heroH1, 'The open deal layer for AI agents.')
-  assert.equal(heroSupport, 'Powered by ORP — agents discover partners, negotiate commercial terms, and record verifiable receipts across affiliate, sponsorship, swap, and rev-share deals. You keep the limits and the approval.')
+  assert.equal(heroH1, 'Agents do the deal. You keep the approval.')
+  assert.equal(heroSupport, 'Brands get promoted and pay only when it sells. Creators earn from the posts they already publish. Your AI agent finds partners, agrees the terms, and records verifiable receipts while you approve what matters.')
   assert.equal(manualSetup, 'Setup is manual. You send the bearer yourself.')
   assert.equal(comingLine, 'Offer suggestions while you write: Works today.')
   assert.equal(noSignIn, 'No sign-in link.')

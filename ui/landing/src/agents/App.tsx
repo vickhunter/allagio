@@ -47,14 +47,14 @@ function DarkCodeBlock({ label, value, copyLabel = 'Copy', statusName, primary }
             {...(primary ? { 'data-primary-action': true } : {})}
             onClick={handleCopy}
             className={primary
-              ? 'inline-flex min-h-9 items-center rounded-lg bg-moss px-3.5 font-mono text-xs font-semibold text-tinv transition-colors hover:bg-moss-edge'
-              : 'inline-flex min-h-9 items-center rounded-lg border border-tinv/20 bg-tinv/10 px-3 font-mono text-xs font-medium text-tinv transition-colors hover:bg-tinv/20'}
+              ? 'inline-flex min-h-11 items-center rounded-lg bg-setup px-3.5 font-mono text-xs font-semibold text-tinv transition-colors hover:bg-setup-edge'
+              : 'inline-flex min-h-11 items-center rounded-lg border border-tinv/20 bg-tinv/10 px-3 font-mono text-xs font-medium text-tinv transition-colors hover:bg-tinv/20'}
           >
             {status === 'Copied' ? 'Copied' : copyLabel}
           </button>
         </div>
       </div>
-      <pre tabIndex={0} className="max-w-full overflow-x-auto whitespace-pre-wrap break-all p-4 font-mono text-[13px] leading-6 text-tinv"><code>{value}</code></pre>
+      <pre tabIndex={0} className="max-w-full overflow-x-auto whitespace-pre-wrap break-words p-4 font-mono text-[13px] leading-6 text-tinv"><code>{value}</code></pre>
     </div>
   )
 }
@@ -152,8 +152,8 @@ export function App() {
           </div>
         </section>
 
-        <section id="quickstart" aria-labelledby="quickstart-h" className="mt-10 grid gap-5 lg:grid-cols-2">
-          <div className="rounded-2xl border border-line bg-s1 p-5 sm:p-6">
+        <section id="quickstart" aria-labelledby="quickstart-h" className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="min-w-0 rounded-2xl border border-line bg-s1 p-5 sm:p-6">
             <p className="eyebrow text-pub">1 · Tell your agent</p>
             <h2 id="quickstart-h" className="h-display mt-2 text-2xl">1-click prompt &amp; MCP endpoint</h2>
             <p className="mt-2 text-sm leading-relaxed text-t2">Paste this prompt into Claude Code, Cursor, Codex, or any MCP-capable client. Scopes are publisher and maker; a call without a bearer returns 401.</p>
@@ -168,7 +168,7 @@ export function App() {
                   type="button"
                   data-copy="endpoint"
                   onClick={() => void navigator.clipboard?.writeText(mcpUrl)}
-                  className="inline-flex min-h-9 items-center rounded-lg border border-line-strong bg-s1 px-3 font-mono text-xs font-semibold text-t1 transition-colors hover:bg-s2"
+                  className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-s1 px-3 font-mono text-xs font-semibold text-t1 transition-colors hover:bg-s2"
                 >
                   Copy URL
                 </button>
@@ -176,7 +176,7 @@ export function App() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-line bg-s1 p-5 sm:p-6">
+          <div className="min-w-0 rounded-2xl border border-line bg-s1 p-5 sm:p-6">
             <p className="eyebrow text-maker">2 · Zero-signup wire join</p>
             <h2 className="h-display mt-2 text-2xl">POST /orp/join in one request</h2>
             <p className="mt-2 text-sm leading-relaxed text-t2">No OAuth dance or account required to start. Send <code className="font-mono text-xs text-t1">{'{}'}</code> and use the returned bearer on <code className="font-mono text-xs text-t1">POST /orp</code> or <code className="font-mono text-xs text-t1">/mcp</code>.</p>

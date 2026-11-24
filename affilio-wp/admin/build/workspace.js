@@ -427,7 +427,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         }).join('');
         const first = new Date(today.getTime() - (days - 1) * 864e5).toISOString().slice(0, 10);
         const last = today.toISOString().slice(0, 10);
-        const caption = `${label} · last ${days} days`;
+        const caption = `${label} · last ${days} ${days === 1 ? 'day' : 'days'}`;
         return `<div class="stat-card spark"><span class="stat-label">${caption}</span><svg viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="${caption}">${bars}</svg><p class="stat-note"><span>${first}</span><span>${last}</span></p></div>`;
     };
     const accountForm = (role) => `<section><h2>${role === 'maker' ? 'Connect your builder account' : 'Connect your publisher account'}</h2><form method="post" action="/owner/accounts"><input type="hidden" name="csrf" value="${escape(csrf)}"><input type="hidden" name="role" value="${role}">${role === 'publisher' ? field('domain','Your content domain','','placeholder="your-blog.com"') : ''}<details><summary>Connect an existing account</summary>${field('api_key','Existing owner key','','type="password" autocomplete="off"')}</details><button>Connect account</button></form></section>`;
@@ -940,12 +940,17 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const {deals} = await api('/deals');
         busy(false);
         const waiting = deals.filter(deal => deal.waiting_on_you);
+        const otherDeals = deals.filter(deal => !deal.waiting_on_you);
         const activeCount = deals.filter(deal => ['active', 'completed'].includes(String(deal.state || '').toLowerCase())).length;
         const summaryStats = `<div class="stat-grid">${statCard('Total deals', deals.length, 'ORP negotiations')}${statCard('Needs decision', waiting.length, waiting.length ? 'Waiting on your approval' : 'Queue clear', waiting.length ? 'is-alert' : '')}${statCard('Active & completed', activeCount, 'Signed on protocol', activeCount ? 'is-live' : '')}</div>`;
         const pending = waiting.length
             ? `<section class="deal-pending"><span class="eyebrow">HUMAN APPROVAL QUEUE</span><h2>Needs your decision</h2>${waiting.map(dealCard).join('')}</section>`
             : '';
-        root.innerHTML = `${summaryStats}<section><span class="eyebrow">OPEN RAILS PROTOCOL</span><h2>Agent deals</h2><p>Offers your agent proposed, accepted, or joined through ORP. Every deal links to its public proof record and waits on you only when your approval gates say so.</p>${sparkline(deals.map(deal => deal.created_at), 'Deal activity')}</section>${pending}<h2>All deals</h2>${deals.length ? deals.map(dealCard).join('') : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.')}`;
+        const listHeading = waiting.length ? 'Other deals' : 'All deals';
+        const listBody = waiting.length
+            ? (otherDeals.length ? otherDeals.map(dealCard).join('') : '<p class="caption">Every open deal is waiting in your approval queue above.</p>')
+            : (deals.length ? deals.map(dealCard).join('') : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.'));
+        root.innerHTML = `${summaryStats}<section><span class="eyebrow">OPEN RAILS PROTOCOL</span><h2>Agent deals</h2><p>Offers your agent proposed, accepted, or joined through ORP. Every deal links to its public proof record and waits on you only when your approval gates say so.</p>${sparkline(deals.map(deal => deal.created_at), 'Deal activity')}</section>${pending}<h2>${listHeading}</h2>${listBody}`;
         const termsMarkup = terms => {
             if (!terms) return '<p class="caption">Terms could not be read for this deal.</p>';
             const obligations = Array.isArray(terms.obligations) ? terms.obligations : [];

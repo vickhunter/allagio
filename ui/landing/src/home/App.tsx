@@ -12,7 +12,6 @@ import {
   Radio,
   Repeat2,
   ShieldCheck,
-  Sparkles,
   Users,
   X,
   Zap,
@@ -43,7 +42,7 @@ const modeIcons = {
   auto: Zap,
 } as const
 
-const checkIcons = [ShieldCheck, FileSignature, EyeOff, Sparkles]
+const checkIcons = [ShieldCheck, FileSignature, EyeOff, Check]
 
 export function App() {
   const source = useSource()
@@ -192,62 +191,67 @@ export function App() {
             </p>
           </div>
 
-          {/* 3 Control Modes: Off / Ask / Auto */}
-          <div className="mt-10 grid gap-4 md:grid-cols-3">
-            {t.safety.modes.map((mode, idx) => {
+          {/* 3 Control Modes: Off / Ask / Auto — single segmented control bar */}
+          <div
+            aria-label="Approval modes: Off, Ask, Auto"
+            className="mt-10 grid overflow-hidden rounded-2xl border border-line-strong bg-s1 divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0"
+          >
+            {t.safety.modes.map((mode) => {
               const Icon = modeIcons[mode.id]
               const isAsk = mode.id === 'ask'
               return (
-                <article
+                <div
                   key={mode.id}
                   className={cn(
-                    'relative flex flex-col rounded-xl border p-6',
-                    isAsk
-                      ? 'border-t1 bg-s1'
-                      : 'border-line bg-s1'
+                    'flex flex-col p-6',
+                    isAsk ? 'bg-s0' : 'bg-s1'
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-2 font-mono text-xs text-t2">
-                      <span>{String(idx + 1).padStart(2, '0')}</span>
-                      <Icon className="h-4 w-4 text-t1" aria-hidden="true" />
+                    <span className="inline-flex items-center gap-2 font-display text-xl font-bold tracking-tight text-t1">
+                      <Icon className={cn('h-4 w-4', isAsk ? 'text-maker-brand' : 'text-t2')} aria-hidden="true" />
+                      {mode.name}
                     </span>
-                    <span className="font-mono text-[11px] font-medium uppercase tracking-wide text-t2">
+                    <span
+                      className={cn(
+                        'rounded-full px-2.5 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide',
+                        isAsk ? 'bg-maker-soft text-maker' : 'bg-s2 text-t2'
+                      )}
+                    >
                       {mode.badge}
                     </span>
                   </div>
-                  <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-t1">
-                    {mode.name}
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-t2">
+                  <p className="mt-3 text-sm leading-relaxed text-t2">
                     {mode.body}
                   </p>
-                </article>
+                </div>
               )
             })}
           </div>
 
-          {/* Protocol Hard Checks & Safeguards */}
-          <div className="mt-10">
+          {/* Protocol Hard Checks & Safeguards — clean ruled checklist */}
+          <div className="mt-12">
             <h3 className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-t2">
               {t.safety.checksHeading}
             </h3>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <dl className="mt-4 grid gap-x-10 border-t border-line sm:grid-cols-2">
               {t.safety.checks.map((item, i) => {
                 const Icon = checkIcons[i] ?? ShieldCheck
                 return (
-                  <article key={item.title} className="rounded-xl border border-line bg-s1 p-5">
-                    <Icon className="h-4 w-4 text-t1" aria-hidden="true" />
-                    <h4 className="mt-3 font-display text-base font-bold tracking-tight text-t1">
-                      {item.title}
-                    </h4>
-                    <p className="mt-1.5 text-sm leading-relaxed text-t2">
-                      {item.body}
-                    </p>
-                  </article>
+                  <div key={item.title} className="flex gap-3.5 border-b border-line py-5">
+                    <Icon className="mt-0.5 h-4 w-4 shrink-0 text-maker-brand" aria-hidden="true" />
+                    <div>
+                      <dt className="font-display text-base font-bold tracking-tight text-t1">
+                        {item.title}
+                      </dt>
+                      <dd className="mt-1 text-sm leading-relaxed text-t2">
+                        {item.body}
+                      </dd>
+                    </div>
+                  </div>
                 )
               })}
-            </div>
+            </dl>
           </div>
 
           {/* Compact With ORP vs By Hand strip */}

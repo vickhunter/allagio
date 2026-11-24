@@ -17,12 +17,12 @@
   --accent: #C64F38;
   --accent-soft: #FBF0EC;
   --accent-line: #ECC6BB;
-  --green: #3F5C35;
-  --green-soft: #EFECE4;
-  --green-line: #D5D0C5;
-  --amber: #8C4A27;
-  --amber-soft: #FBF0EC;
-  --amber-line: #ECC6BB;
+  --green: #2F5D3A;
+  --green-soft: #EBF3ED;
+  --green-line: #C2D8C7;
+  --amber: #8E5412;
+  --amber-soft: #FCF4E6;
+  --amber-line: #E8CF9F;
   --action: #141413;
   --action-hover: #2B2B28;
   --action-soft: #EFECE4;
@@ -146,7 +146,7 @@ button[data-primary-action], a.button[data-primary-action] {
 button[data-primary-action]:hover, a.button[data-primary-action]:hover {
   background: var(--action-hover);
   border-color: var(--action-hover);
-  box-shadow: 0 4px 14px -6px rgba(35, 82, 201, 0.6);
+  box-shadow: 0 4px 14px -6px rgba(20, 20, 19, 0.25);
 }
 button.danger, .button.danger {
   background: var(--fail);
@@ -489,14 +489,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   box-shadow: var(--shadow-sm);
 }
 .approval-strip.is-pending {
-  background: var(--accent-soft);
-  border-color: var(--accent-line);
-  border-left: 4px solid var(--accent);
+  background: var(--amber-soft);
+  border-color: var(--amber-line);
 }
 .approval-strip.is-clear {
   background: var(--green-soft);
   border-color: var(--green-line);
-  border-left: 4px solid var(--green);
 }
 .approval-strip-head {
   display: flex;
@@ -771,9 +769,8 @@ th {
 .deal { position: relative; }
 .deal h3 { margin: 0; font-size: var(--text-h3); }
 .deal.waiting {
-  border-color: var(--accent-line);
-  border-left: 4px solid var(--accent);
-  background: #FFFCFA;
+  border-color: var(--amber-line);
+  background: #FFFDFA;
 }
 .deal-pending {
   margin: 0 0 22px;
@@ -846,10 +843,10 @@ th {
 }
 .deal-terms { margin: 12px 0; }
 .deal-terms-body {
-  border-left: 3px solid var(--accent);
+  border: 1px solid var(--line-strong);
   padding: 10px 14px;
   background: var(--paper);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: var(--radius-sm);
 }
 .deal-obligations { margin: 8px 0 0; padding-left: 18px; }
 .deal-obligations li { padding: 4px 0; font-size: var(--text-small); color: var(--ink); }
@@ -957,7 +954,6 @@ th {
 
 .kill-switch-card {
   border: 1px solid var(--fail-line);
-  border-left: 4px solid var(--fail);
   background: #FFFBF9;
 }
 .kill-switch-card.is-paused {

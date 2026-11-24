@@ -51,12 +51,11 @@ function ago(iso: string, lang: Lang) {
 }
 
 function buildSandboxDeals(): WallDeal[] {
-  const now = Date.now()
   return [
     {
       kind: 'affiliate',
       state: 'active',
-      updated_at: new Date(now - 18 * 60000).toISOString(),
+      updated_at: '',
       parties: 2,
       offerer: { listed: true, name: 'Vibe Sales' },
       acceptor: { listed: false, role: 'publisher' },
@@ -64,7 +63,7 @@ function buildSandboxDeals(): WallDeal[] {
     {
       kind: 'swap',
       state: 'executed',
-      updated_at: new Date(now - 54 * 60000).toISOString(),
+      updated_at: '',
       parties: 2,
       offerer: { listed: false, role: 'publisher' },
       acceptor: { listed: false, role: 'publisher', host: 'agents.frontend.example' },
@@ -72,7 +71,7 @@ function buildSandboxDeals(): WallDeal[] {
     {
       kind: 'sponsored',
       state: 'active',
-      updated_at: new Date(now - 3 * 3600000).toISOString(),
+      updated_at: '',
       parties: 2,
       offerer: { listed: true, name: 'Goji Analytics' },
       acceptor: { listed: false, role: 'publisher' },
@@ -80,7 +79,7 @@ function buildSandboxDeals(): WallDeal[] {
     {
       kind: 'partnership',
       state: 'active',
-      updated_at: new Date(now - 6 * 3600000).toISOString(),
+      updated_at: '',
       parties: 3,
       offerer: { listed: true, name: 'Ledger App' },
       acceptor: { listed: false, role: 'publisher' },
@@ -88,7 +87,7 @@ function buildSandboxDeals(): WallDeal[] {
     {
       kind: 'link_exchange',
       state: 'awaiting',
-      updated_at: new Date(now - 11 * 3600000).toISOString(),
+      updated_at: '',
       parties: 2,
       offerer: { listed: false, role: 'agent', host: 'agents.example' },
       acceptor: { listed: true, name: 'Parcel Ops' },
@@ -96,7 +95,7 @@ function buildSandboxDeals(): WallDeal[] {
     {
       kind: 'affiliate',
       state: 'completed',
-      updated_at: new Date(now - 22 * 3600000).toISOString(),
+      updated_at: '',
       parties: 2,
       offerer: { listed: true, name: 'Acme Deploy' },
       acceptor: { listed: false, role: 'publisher' },
@@ -160,7 +159,7 @@ function DealCard({
           ) : null}
         </div>
         {sandbox ? (
-          <span className="font-mono text-[10px] uppercase tracking-wider text-t2">sandbox</span>
+          <span className="shrink-0 whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-t2">sample</span>
         ) : null}
       </div>
 
@@ -184,7 +183,7 @@ function DealCard({
         </span>
         <span className="inline-flex items-center gap-1 font-mono text-[11px]">
           <Clock aria-hidden="true" className="h-3 w-3" />
-          {ago(deal.updated_at, lang)}
+          {sandbox ? 'Sample deal' : ago(deal.updated_at, lang)}
         </span>
       </div>
     </Card>
@@ -261,9 +260,15 @@ export function NetworkWall() {
       <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
-            <p className="kicker">{copy.kicker}</p>
-            <h2 id="network-h" className="h-display mt-3 text-3xl sm:text-4xl">{copy.heading}</h2>
-            <p className="mt-4 text-lg leading-relaxed text-t2">{copy.lead}</p>
+            <p className="kicker">{showingSandbox ? 'Sample activity' : copy.kicker}</p>
+            <h2 id="network-h" className="h-display mt-3 text-3xl sm:text-4xl">
+              {showingSandbox ? 'How deals look on the wire' : copy.heading}
+            </h2>
+            <p className="mt-4 text-lg leading-relaxed text-t2">
+              {showingSandbox
+                ? 'Illustrative sample deals showing the parties, states, and ORP verification metadata recorded when agents transact.'
+                : copy.lead}
+            </p>
           </div>
 
           {!isFixtureMode ? (
@@ -277,8 +282,8 @@ export function NetworkWall() {
                 data-wall-mode="live"
                 aria-pressed={!showingSandbox}
                 onClick={() => setViewMode('live')}
-                className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 font-mono text-xs font-medium transition-colors ${
-                  !showingSandbox ? 'bg-pub text-s0' : 'text-t2 hover:text-t1'
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 font-mono text-xs font-medium transition-colors ${
+                  !showingSandbox ? 'bg-t1 text-s0' : 'text-t2 hover:text-t1'
                 }`}
               >
                 <Radio aria-hidden="true" className="h-3.5 w-3.5" />
@@ -289,7 +294,7 @@ export function NetworkWall() {
                 data-wall-mode="sandbox"
                 aria-pressed={showingSandbox}
                 onClick={() => setViewMode('sandbox')}
-                className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 font-mono text-xs font-medium transition-colors ${
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 font-mono text-xs font-medium transition-colors ${
                   showingSandbox ? 'bg-inv text-tinv' : 'text-t2 hover:text-t1'
                 }`}
               >
