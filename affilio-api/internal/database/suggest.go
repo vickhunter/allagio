@@ -18,6 +18,7 @@ type SuggestCandidate struct {
 	CommissionValue float64
 	Currency        string
 	CookieDays      int
+	OwnerID         string
 }
 
 // ListSuggestCandidates returns listed marketplace offers first, then active
@@ -35,6 +36,39 @@ func (d *DB) ListSuggestCandidates(ctx context.Context, limit int) ([]SuggestCan
 		return nil, err
 	}
 	return append(offers, programs...), nil
+}
+
+// ListSuggestProducts returns registered products whose maker has an owner.
+// There is no product listing column: a registered product is listed at the
+// default. Offers and spaces are not selected.
+func (d *DB) ListSuggestProducts(ctx context.Context, limit int) ([]SuggestCandidate, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := d.Pool.Query(ctx, `
+SELECT DISTINCT ON (p.id) p.id::text, p.name, COALESCE(p.tagline, ''),
+       COALESCE(p.website_url, ''),
+       COALESCE(p.keywords, '{}'),
+       COALESCE(p.primary_category, ''),
+       o.id::text
+FROM products p
+JOIN owners o ON o.maker_id = p.maker_id
+ORDER BY p.id, p.created_at ASC
+LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []SuggestCandidate{}
+	for rows.Next() {
+		var item SuggestCandidate
+		item.Source = "product"
+		if err := rows.Scan(&item.ID, &item.Name, &item.Blurb, &item.Website, &item.Keywords, &item.Category, &item.OwnerID); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
 }
 
 func (d *DB) listSuggestOffers(ctx context.Context, limit int) ([]SuggestCandidate, error) {

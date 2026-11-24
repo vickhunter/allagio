@@ -94,6 +94,9 @@ func (c *Client) request(method, path string, payload interface{}, authHeader, a
 		}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if problemDetails(out) {
+			return out, fmt.Errorf("%s", strings.TrimSpace(string(raw)))
+		}
 		reason, _ := out["reason"].(string)
 		message, _ := out["message"].(string)
 		if message == "" {
@@ -108,6 +111,19 @@ func (c *Client) request(method, path string, payload interface{}, authHeader, a
 		return out, fmt.Errorf("%s (%d)", message, resp.StatusCode)
 	}
 	return out, nil
+}
+
+func problemDetails(out map[string]interface{}) bool {
+	raw, ok := out["errors"].([]interface{})
+	if !ok || len(raw) == 0 {
+		return false
+	}
+	first, ok := raw[0].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	code, _ := first["code"].(string)
+	return code != ""
 }
 
 func truncate(s string, n int) string {

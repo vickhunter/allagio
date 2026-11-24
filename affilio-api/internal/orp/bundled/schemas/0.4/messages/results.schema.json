@@ -29,6 +29,19 @@
       "properties": {
         "offer": { "$ref": "#/$defs/OfferSummary" },
         "space": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Space" },
+        "product": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "name"],
+          "description": "A registered product at the default listing. It is not an offer and not a space.",
+          "properties": {
+            "id": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/LocalId" },
+            "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+            "tagline": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "website": { "type": "string", "minLength": 1, "maxLength": 2048 },
+            "category": { "type": "string", "minLength": 1, "maxLength": 64 }
+          }
+        },
         "party": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/PartyId" },
         "fit": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Fit" },
         "trust": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Trust" },
@@ -36,7 +49,7 @@
         "checks": { "$ref": "https://offer-rails.onrender.com/orp/schemas/defs.schema.json#/$defs/Checks" },
         "pitch": { "type": "string", "minLength": 1, "maxLength": 280 }
       },
-      "oneOf": [{ "required": ["offer"] }, { "required": ["space"] }]
+      "oneOf": [{ "required": ["offer"] }, { "required": ["space"] }, { "required": ["product"] }]
     },
     "ResultsBody": {
       "type": "object",

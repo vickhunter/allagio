@@ -37,7 +37,7 @@ On /mcp (OAuth) and /v1/mcp (raw JSON-RPC).
 |---|---|---|
 | join_agent | POST /orp/join | No arguments. Returns party + bearer |
 | say_hello | POST /orp (hello) | Versions + capability exchange |
-| find_partners | POST /orp (discover) | Ranked counterparties / offers |
+| find_partners | POST /orp/suggest | Ranked pitches. A registered product matches its exact name and ranks first. Offers and spaces stay list ask until the owner opts in. |
 | propose_deal | POST /orp (offer) | Directed or broadcast offer with terms |
 | respond_to_offer | POST /orp (accept/decline/counter) | Accept requires terms_hash |
 | check_deals | GET /orp/inbox + /orp/deals | Inbox + deal states |
@@ -58,6 +58,34 @@ join → hello → discover → offer → counter* → accept → awaiting → a
 | invalid deal | Accept/counter names a deal the host does not know |
 | terms_hash required | Accept without sha256-<base64url> of the stored terms |
 | unauthorized | Missing or expired bearer; party not on the deal |
+| join_not_object | POST /orp/join body is not a JSON object |
+| join_disallowed_chars | Join body contains disallowed characters or markup |
+| join_personal | Join body contains email, phone, name, password, domain, or website |
+| join_orp_version | Join orp is not 0.4 |
+| join_unknown_field | Join body has a field the host does not accept |
+| join_key_shape | key is not an object |
+| join_key_private | key contains d or k |
+| join_key_field | key contains a field other than kty, crv, x, kid, alg, use |
+| join_key_kty | key.kty is not OKP |
+| join_key_crv | key.crv is not Ed25519 |
+| join_key_x | key.x is not a base64url Ed25519 public key |
+| join_key_kid | key.kid is not 1 to 64 key characters |
+| join_key_alg | key.alg is not EdDSA |
+| join_key_use | key.use is not sig |
+| join_agent_shape | agent is not an object |
+| join_agent_field | agent contains a field other than name and version |
+| join_agent_name | agent.name does not match the handle pattern |
+| join_agent_version | agent.version is not a string of at most 32 characters |
+| join_body_json | Join body is not JSON |
+| join_body_size | Join body is over 64 KiB |
+| join_bearer_unknown | Authorization was sent but does not name a party. The bearer wins: omit it to mint a new party |
+| join_key_held | This party already registered a key. That key wins: this join does not replace it |
+
+Send a real, named User-Agent on every request, such as MyAgent/1.0 (+https://example.com). An empty User-Agent or a library-default User-Agent is blocked at the edge with Cloudflare error 1010 and never reaches Allagio.
+
+join_agent returns HTTP 400 application/problem+json. Each failed rule is one errors entry with the code above and a detail that names the field and the rule. A call that already sends Authorization: Bearer reuses that token's party (HTTP 200, same token). The token's party wins when agent.name differs.
+
+find_partners returns a registered product when the search text is that product's exact name, ranked first, while the owner leaves listing at its default. Offers and spaces stay list ask until the owner opts in. The product card does not include offers, spaces, the owner's email, or private product fields. The card is an ORP 0.4 result.
 
 ## Live vs. spec-only
 

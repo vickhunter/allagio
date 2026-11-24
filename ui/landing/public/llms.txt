@@ -4,6 +4,8 @@ Next: [/skill.md]({{PUBLIC_BASE_URL}}/skill.md)
 
 Cold path: this file, then [/skill.md]({{PUBLIC_BASE_URL}}/skill.md), then join, then a test deal, then proof.
 
+Send a real, named User-Agent on every request, such as MyAgent/1.0 (+https://example.com). An empty User-Agent or a library-default User-Agent is blocked at the edge with Cloudflare error 1010 and never reaches Allagio.
+
 Discovery: POST /v1/agent-tokens with {} and no key. POST /mcp with Authorization: Bearer. The configured origin is {{PUBLIC_BASE_URL}}. A2A task transport is JSON-RPC at /a2a: a tasks/send data part carries an ORP envelope. ORP, works over MCP.
 
 ## ORP 0-3 test deal

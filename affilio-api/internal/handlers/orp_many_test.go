@@ -2193,31 +2193,30 @@ func TestORP04JoinNamesVersion(t *testing.T) {
 	_, _, r, cleanup := newORP04(t)
 	defer cleanup()
 	want := "The message is not valid ORP 0.4. " + orp.AgentNameRule
-	rec, doc := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{
+	rec, _ := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{
 		"agent": map[string]any{"name": "Cold Agent (walk)"},
 	}, nil)
-	inner, _ := doc["body"].(map[string]any)
-	msg, _ := inner["message"].(string)
-	if rec.Code != http.StatusBadRequest || doc["orp"] != "0.4" || msg != want || inner["field"] != "/agent/name" || strings.Contains(msg, "ORP 0.3.") {
+	doc, codes := problemCodes(t, rec)
+	detail, _ := doc["detail"].(string)
+	if doc["orp"] != "0.4" || !sameCodes(codes, []string{"join_agent_name"}) || !strings.Contains(detail, want) || !strings.Contains(detail, "field /agent/name failed rule join_agent_name") || strings.Contains(detail, "ORP 0.3.") {
 		t.Fatalf("join name %d %s", rec.Code, rec.Body.String())
 	}
 	_, problem, ok := orp.ParseJoin(map[string]any{"agent": map[string]any{"name": "Cold Agent (walk)"}}, "")
 	if ok || problem.Message != want || problem.Field != "/agent/name" || strings.Contains(problem.Message, "ORP 0.3.") {
 		t.Fatalf("parse %#v ok=%v", problem, ok)
 	}
-	other, otherDoc := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{"nope": true}, nil)
-	otherInner, _ := otherDoc["body"].(map[string]any)
-	otherMsg, _ := otherInner["message"].(string)
-	if other.Code != http.StatusBadRequest || otherDoc["orp"] != "0.3" || strings.Contains(otherMsg, "ORP 0.4.") {
+	other, _ := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{"nope": true}, nil)
+	otherDoc, otherCodes := problemCodes(t, other)
+	if otherDoc["orp"] != nil || !sameCodes(otherCodes, []string{"join_unknown_field"}) || strings.Contains(other.Body.String(), "ORP 0.4.") {
 		t.Fatalf("other join %d %s", other.Code, other.Body.String())
 	}
-	versioned, versionedDoc := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{
+	versioned, _ := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{
 		"orp":   "0.4",
 		"agent": map[string]any{"name": "Cold Agent (walk)"},
 	}, nil)
-	versionedInner, _ := versionedDoc["body"].(map[string]any)
-	versionedMsg, _ := versionedInner["message"].(string)
-	if versioned.Code != http.StatusBadRequest || versionedDoc["orp"] != "0.4" || versionedMsg != want || versionedInner["field"] != "/agent/name" || versionedMsg == "The join request is not valid." || strings.Contains(versionedMsg, "ORP 0.3.") {
+	versionedDoc, versionedCodes := problemCodes(t, versioned)
+	versionedDetail, _ := versionedDoc["detail"].(string)
+	if versionedDoc["orp"] != "0.4" || !sameCodes(versionedCodes, []string{"join_agent_name"}) || !strings.Contains(versionedDetail, want) || strings.Contains(versionedDetail, "ORP 0.3.") {
 		t.Fatalf("orp 0.4 join name %d %s", versioned.Code, versioned.Body.String())
 	}
 	_, versionedProblem, versionedOK := orp.ParseJoin(map[string]any{
@@ -2227,13 +2226,12 @@ func TestORP04JoinNamesVersion(t *testing.T) {
 	if versionedOK || versionedProblem.Message != want || versionedProblem.Field != "/agent/name" {
 		t.Fatalf("parse orp %#v ok=%v", versionedProblem, versionedOK)
 	}
-	wrong, wrongDoc := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{
+	wrong, _ := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{
 		"orp":   "0.3",
 		"agent": map[string]any{"name": "Cold Agent (walk)"},
 	}, nil)
-	wrongInner, _ := wrongDoc["body"].(map[string]any)
-	wrongMsg, _ := wrongInner["message"].(string)
-	if wrong.Code != http.StatusBadRequest || wrongDoc["orp"] != "0.3" || wrongInner["field"] != "/orp" || wrongMsg != "Use 0.4." {
+	wrongDoc, wrongCodes := problemCodes(t, wrong)
+	if wrongDoc["orp"] != "0.4" || !sameCodes(wrongCodes, []string{"join_orp_version", "join_agent_name"}) || !strings.Contains(wrong.Body.String(), "Use 0.4.") || !strings.Contains(wrong.Body.String(), want) {
 		t.Fatalf("orp 0.3 join %d %s", wrong.Code, wrong.Body.String())
 	}
 	plain, plainDoc := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{"orp": "0.4"}, nil)

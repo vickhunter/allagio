@@ -71,6 +71,7 @@ type Candidate struct {
 	CommissionValue float64
 	Currency        string
 	CookieDays      int
+	OwnerID         string
 }
 
 // SuggestRequest is a credential-free suggest body.
@@ -163,67 +164,18 @@ func ParseSuggest(value any) (SuggestRequest, Problem, bool) {
 	return req, Problem{}, true
 }
 
-// ParseJoin checks a join body. An empty object is complete. Email, name,
-// domain, phone, and password are refused. key registers a public Ed25519 JWK
-// so later envelopes can carry sig.
+// ParseJoin checks a join body and returns the first failed rule. Suggest's
+// nested join uses this single ORP invalid_message. POST /orp/join uses
+// CollectJoin and returns every failure. An empty object is complete. Email,
+// name, domain, phone, and password are refused. key registers a public
+// Ed25519 JWK so later envelopes can carry sig.
 func ParseJoin(value any, prefix string) (JoinRequest, Problem, bool) {
-	if value == nil {
-		return JoinRequest{}, Invalid("The join request is not valid.", prefix), false
+	req, failures := CollectJoin(value, prefix)
+	if len(failures) == 0 {
+		return req, Problem{}, true
 	}
-	obj, ok := value.(map[string]any)
-	if !ok {
-		return JoinRequest{}, Invalid("The join request is not valid.", prefix), false
-	}
-	if found := DirtyPointer(value); found != "" {
-		field := found
-		if prefix != "" && found != "/" {
-			field = prefix + found
-		} else if prefix != "" {
-			field = prefix
-		}
-		return JoinRequest{}, Invalid("The join request contains disallowed characters or markup.", field), false
-	}
-	for key := range obj {
-		if personalJoinKeys[key] {
-			return JoinRequest{}, Invalid("Join asks for nothing personal.", prefix+"/"+escapePointer(key)), false
-		}
-		if key == "orp" {
-			version, _ := obj[key].(string)
-			if version == Version04 {
-				continue
-			}
-			return JoinRequest{}, Invalid("Use 0.4.", prefix+"/"+escapePointer(key)), false
-		}
-		if key != "agent" && key != "key" {
-			return JoinRequest{}, Invalid("The join request is not valid.", prefix+"/"+escapePointer(key)), false
-		}
-	}
-	var req JoinRequest
-	if key, present := obj["key"]; present {
-		path := prefix + "/key"
-		if prefix == "" {
-			path = "/key"
-		}
-		parsed, problem, keyOK := ParseJoinKey(key, path)
-		if !keyOK {
-			return JoinRequest{}, problem, false
-		}
-		req.Key = parsed
-	}
-	if agent, present := obj["agent"]; present {
-		path := prefix + "/agent"
-		if prefix == "" {
-			path = "/agent"
-		}
-		if problem, bad := checkAgent(agent, path); bad {
-			problem, _ = relabelVersion(Version04, problem, bad)
-			return JoinRequest{}, problem, false
-		}
-		obj := agent.(map[string]any)
-		req.AgentName, _ = obj["name"].(string)
-		req.AgentVersion, _ = obj["version"].(string)
-	}
-	return req, Problem{}, true
+	first := failures[0]
+	return JoinRequest{}, Invalid(first.Rule, first.Field), false
 }
 
 func validSpaceKind(value string) bool {
@@ -291,6 +243,11 @@ func Match(dns string, req SuggestRequest, candidates []Candidate) ([]any, strin
 		hits = append(hits, hit{item: item, score: score, name: candidate.Name})
 	}
 	sort.Slice(hits, func(i, j int) bool {
+		ie := exactProductName(hits[i].item, req.Text)
+		je := exactProductName(hits[j].item, req.Text)
+		if ie != je {
+			return ie
+		}
 		if hits[i].score != hits[j].score {
 			return hits[i].score > hits[j].score
 		}
@@ -366,7 +323,42 @@ func matchWords(text string) []string {
 	return out
 }
 
+// PromoteExactProduct moves a product whose name equals the search text
+// ahead of fresher pitches. Match already ranks it first; fresh standing
+// offers are prepended after that sort.
+func PromoteExactProduct(items []any, text string) []any {
+	if len(items) < 2 || strings.TrimSpace(text) == "" {
+		return items
+	}
+	var first, rest []any
+	for _, item := range items {
+		obj, _ := item.(map[string]any)
+		if exactProductName(obj, text) {
+			first = append(first, item)
+			continue
+		}
+		rest = append(rest, item)
+	}
+	if len(first) == 0 {
+		return items
+	}
+	return append(first, rest...)
+}
+
+func exactProductName(item map[string]any, text string) bool {
+	product, _ := item["product"].(map[string]any)
+	if product == nil {
+		return false
+	}
+	name, _ := product["name"].(string)
+	want := strings.TrimSpace(text)
+	return want != "" && strings.EqualFold(strings.TrimSpace(name), want)
+}
+
 func pitch(dns string, candidate Candidate, draft string, words []string) (map[string]any, int, bool) {
+	if candidate.Source == "product" {
+		return pitchProduct(dns, candidate, draft, words)
+	}
 	blob := strings.ToLower(strings.Join([]string{
 		candidate.Name, candidate.Company, candidate.Blurb, candidate.Category, strings.Join(candidate.Keywords, " "),
 	}, " "))
@@ -412,6 +404,88 @@ func pitch(dns string, candidate Candidate, draft string, words []string) (map[s
 		"pitch":  text,
 	}
 	return item, score, true
+}
+
+// pitchProduct is the default-on card for a registered product. It is not an
+// offer and not a space. Offers, spaces, the owner's email, and private
+// product fields stay off the card.
+func pitchProduct(dns string, candidate Candidate, draft string, words []string) (map[string]any, int, bool) {
+	name := strings.TrimSpace(candidate.Name)
+	if name == "" || utf8.RuneCountInString(name) > 255 || strings.Contains(name, "@") || DirtyPointer(name) != "" {
+		return nil, 0, false
+	}
+	if !localPattern.MatchString(candidate.ID) || candidate.OwnerID == "" {
+		return nil, 0, false
+	}
+	party := MemberParty(dns, candidate.OwnerID)
+	if !partyPattern.MatchString(party) {
+		return nil, 0, false
+	}
+	exact := strings.EqualFold(name, strings.TrimSpace(draft))
+	blob := strings.ToLower(strings.Join([]string{name, candidate.Blurb, candidate.Category, strings.Join(candidate.Keywords, " ")}, " "))
+	hits := 0
+	for _, word := range words {
+		if strings.Contains(blob, word) {
+			hits++
+		}
+	}
+	if !exact && hits == 0 {
+		return nil, 0, false
+	}
+	product := map[string]any{"id": candidate.ID, "name": name}
+	if tagline := publicCardText(candidate.Blurb, 512); tagline != "" {
+		product["tagline"] = tagline
+	}
+	if website := publicCardText(candidate.Website, 2048); website != "" && urlPattern.MatchString(website) && !strings.ContainsAny(website, " \t\r\n") {
+		product["website"] = website
+	}
+	if category := categoryOf(candidate.Category); category != "" {
+		product["category"] = category
+	}
+	score := 40 + hits*15
+	if score > 99 {
+		score = 99
+	}
+	reason := "Registered product: " + name + "."
+	if exact {
+		score = 100
+		reason = "Exact name: " + name + "."
+	}
+	if utf8.RuneCountInString(reason) > 200 {
+		reason = clipRunes(reason, 200)
+	}
+	text := "Registered product: " + name + "."
+	if tagline, _ := product["tagline"].(string); tagline != "" {
+		next := text + " " + tagline
+		if utf8.RuneCountInString(next) <= 280 {
+			text = next
+		}
+	}
+	if utf8.RuneCountInString(text) > 280 {
+		text = clipRunes(text, 280)
+	}
+	item := map[string]any{
+		"product": product,
+		"party":   party,
+		"fit": map[string]any{
+			"score":   score,
+			"reasons": []any{reason},
+		},
+		"pool":  "product",
+		"pitch": text,
+	}
+	return item, score, true
+}
+
+func publicCardText(value string, max int) string {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.Contains(value, "@") || DirtyPointer(value) != "" {
+		return ""
+	}
+	if utf8.RuneCountInString(value) > max {
+		return ""
+	}
+	return value
 }
 
 func termsOf(candidate Candidate) (map[string]any, string, bool) {

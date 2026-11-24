@@ -13,46 +13,12 @@ var kidPattern = regexp.MustCompile(`^[A-Za-z0-9_.\-]{1,64}$`)
 // ParseJoinKey checks a join key object. Only the public Ed25519 JWK fields
 // kty, crv, x, kid, alg, and use are kept. Private material is refused.
 func ParseJoinKey(value any, prefix string) (map[string]any, Problem, bool) {
-	obj, ok := value.(map[string]any)
-	if !ok {
-		return nil, Invalid("The join key is not valid.", prefix), false
+	parsed, failures := inspectJoinKey(value, prefix)
+	if len(failures) > 0 {
+		first := failures[0]
+		return nil, Invalid(first.Rule, first.Field), false
 	}
-	for key := range obj {
-		if key == "d" || key == "k" {
-			return nil, Invalid("A join key holds public material only.", prefix+"/"+escapePointer(key)), false
-		}
-		if key != "kty" && key != "crv" && key != "x" && key != "kid" && key != "alg" && key != "use" {
-			return nil, Invalid("The join key is not valid.", prefix+"/"+escapePointer(key)), false
-		}
-	}
-	if kty, _ := obj["kty"].(string); kty != "OKP" {
-		return nil, Invalid("key.kty is OKP.", prefix+"/kty"), false
-	}
-	if crv, _ := obj["crv"].(string); crv != "Ed25519" {
-		return nil, Invalid("key.crv is Ed25519.", prefix+"/crv"), false
-	}
-	x, _ := obj["x"].(string)
-	raw, err := base64.RawURLEncoding.DecodeString(x)
-	if err != nil || len(raw) != ed25519.PublicKeySize {
-		return nil, Invalid("key.x is a base64url Ed25519 public key.", prefix+"/x"), false
-	}
-	kid, _ := obj["kid"].(string)
-	if !kidPattern.MatchString(kid) {
-		return nil, Invalid("key.kid is 1 to 64 key characters.", prefix+"/kid"), false
-	}
-	if alg, present := obj["alg"]; present {
-		if text, _ := alg.(string); text != "EdDSA" {
-			return nil, Invalid("key.alg is EdDSA.", prefix+"/alg"), false
-		}
-	}
-	if use, present := obj["use"]; present {
-		if text, _ := use.(string); text != "sig" {
-			return nil, Invalid("key.use is sig.", prefix+"/use"), false
-		}
-	}
-	return map[string]any{
-		"kty": "OKP", "crv": "Ed25519", "x": x, "kid": kid, "alg": "EdDSA", "use": "sig",
-	}, Problem{}, true
+	return parsed, Problem{}, true
 }
 
 // SignedType is a message a keyed party MUST sign (E9).
@@ -89,7 +55,7 @@ func (s *Signer) PublicJWK() map[string]any {
 	pub, _ := s.Key.Public().(ed25519.PublicKey)
 	return map[string]any{
 		"kty": "OKP", "crv": "Ed25519",
-		"x": base64.RawURLEncoding.EncodeToString(pub),
+		"x":   base64.RawURLEncoding.EncodeToString(pub),
 		"kid": s.Kid, "alg": "EdDSA", "use": "sig",
 	}
 }

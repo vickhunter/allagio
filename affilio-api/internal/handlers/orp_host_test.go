@@ -186,12 +186,13 @@ func TestORPSuggestJoinAndEnvelope(t *testing.T) {
 		t.Fatalf("deals changed after invalid envelope: before %s after %s", before, again)
 	}
 
-	emailRec, emailBody := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{"email": "a@b.c"}, nil)
-	if emailRec.Code != http.StatusBadRequest || emailBody["body"].(map[string]any)["code"] != "invalid_message" || emailBody["body"].(map[string]any)["field"] != "/email" {
+	emailRec, _ := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{"email": "a@b.c"}, nil)
+	_, emailCodes := problemCodes(t, emailRec)
+	if !sameCodes(emailCodes, []string{"join_personal"}) || !strings.Contains(emailRec.Body.String(), `"/email"`) {
 		t.Fatalf("email join %d %s", emailRec.Code, emailRec.Body.String())
 	}
-	nameRec, nameBody := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{"name": "Ada"}, nil)
-	if nameRec.Code != http.StatusBadRequest || nameBody["body"].(map[string]any)["field"] != "/name" {
+	nameRec, _ := postJSON(t, r, http.MethodPost, "/orp/join", map[string]any{"name": "Ada"}, nil)
+	if nameRec.Code != http.StatusBadRequest || !strings.Contains(nameRec.Body.String(), "join_personal") || !strings.Contains(nameRec.Body.String(), `"/name"`) {
 		t.Fatalf("name join %d %s", nameRec.Code, nameRec.Body.String())
 	}
 	if countRows(t, db, `SELECT COUNT(*) FROM owners`) != owners+1 {

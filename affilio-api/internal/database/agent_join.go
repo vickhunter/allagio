@@ -116,6 +116,18 @@ RETURNING id::text, scope, expires_at`, tokenHash, prefix, out.OwnerID, agentJoi
 	return out, tx.Commit(ctx)
 }
 
+// BindPartyKey stores the first public key for a party that joined without one.
+// The caller refuses a different key when one is already registered.
+func (d *DB) BindPartyKey(ctx context.Context, ownerID string, partyKey map[string]any) error {
+	raw, err := json.Marshal(partyKey)
+	if err != nil {
+		return err
+	}
+	kid, _ := partyKey["kid"].(string)
+	_, err = d.Pool.Exec(ctx, `INSERT INTO party_keys(owner_id, kid, jwk) VALUES($1, $2, $3)`, ownerID, kid, raw)
+	return err
+}
+
 // PartyKeys lists the active signing keys bound to a party owner.
 func (d *DB) PartyKeys(ctx context.Context, ownerID string) ([]map[string]any, error) {
 	rows, err := d.Pool.Query(ctx, `SELECT jwk FROM party_keys WHERE owner_id=$1 AND revoked_at IS NULL`, ownerID)

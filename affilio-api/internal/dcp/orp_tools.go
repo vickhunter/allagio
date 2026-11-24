@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"affilio-api/internal/orp"
@@ -17,12 +18,12 @@ import (
 var ORPTools = []Tool{
 	{
 		Name:        "join_agent",
-		Description: "Join the Allagio ORP network with no credential. Returns member (the party id used as `from` and `party` in the deal tools), access_token, token_type Bearer, and expires_in. Send the access_token as the MCP bearer.",
+		Description: "Join the Allagio ORP network with no credential. name is the agent handle (agent.name), not a personal name. Returns member (the party id used as `from` and `party` in the deal tools), access_token, token_type Bearer, and expires_in. Send the access_token as the MCP bearer. A call that already has a bearer reuses that party. A 400 is application/problem+json with stable errors[].code values.",
 		InputSchema: schema(nil, map[string]interface{}{
-			"name": str("Agent handle (generated when omitted)"),
+			"name": str("Agent handle (generated when omitted). Sent as agent.name"),
 		}),
 		call: func(c *Client, args map[string]interface{}) (map[string]interface{}, error) {
-			return c.Do(http.MethodPost, "/orp/join", args)
+			return c.Do(http.MethodPost, "/orp/join", joinAgentBody(args))
 		},
 	},
 	{
@@ -37,7 +38,7 @@ var ORPTools = []Tool{
 	},
 	{
 		Name:        "find_partners",
-		Description: "Search the network for counterparties whose offers or surfaces match a plain-text description of what you want (for example \"a dev-tool SaaS with revenue share for my newsletter\"). No credential needed. Returns ranked pitches; each pitch names the party to send a directed propose_deal to.",
+		Description: "Search the network for counterparties. A registered product is returned when the text is its exact name, ranked first, while the owner leaves listing at its default. Offers and spaces stay list ask until the owner opts in. The product card does not include offers, spaces, or the owner's email. No credential needed. Returns ranked pitches; each pitch names the party to send a directed propose_deal to.",
 		InputSchema: schema([]string{"text"}, map[string]interface{}{
 			"text":  str("What you are looking for, in plain words"),
 			"limit": num("Max pitches to return (default 3)"),
@@ -176,6 +177,31 @@ var ORPTools = []Tool{
 			})
 		},
 	},
+}
+
+// joinAgentBody maps the tool's name argument onto agent.name. A top-level
+// name is a personal field and POST /orp/join refuses it.
+func joinAgentBody(args map[string]interface{}) map[string]interface{} {
+	body := map[string]interface{}{}
+	for key, value := range args {
+		if key == "name" {
+			continue
+		}
+		body[key] = value
+	}
+	name, _ := args["name"].(string)
+	if strings.TrimSpace(name) == "" {
+		return body
+	}
+	agent, _ := body["agent"].(map[string]interface{})
+	if agent == nil {
+		agent = map[string]interface{}{}
+		body["agent"] = agent
+	}
+	if _, exists := agent["name"]; !exists {
+		agent["name"] = name
+	}
+	return body
 }
 
 // orpEnvelope builds a 0.3 envelope for POST /orp and sends it with the
