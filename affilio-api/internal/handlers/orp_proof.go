@@ -36,10 +36,11 @@ func (h *ORPHost) proofFetch() proofFetchFunc {
 // terminal state. A page that cannot be read proves nothing either way, so
 // transient failures keep the obligation claimed.
 type proofVerdict struct {
-	result   string
-	found    map[string]any
-	reason   string
-	terminal bool
+	result      string
+	found       map[string]any
+	reason      string
+	terminal    bool
+	testFixture bool
 }
 
 // trackEntry is the one tracking row a place obligation mints at activate.
@@ -353,7 +354,24 @@ func (h *ORPHost) verifyProof(ctx context.Context, origin string, deal database.
 	if method == "" {
 		return nil, nil, ""
 	}
-	verdict := h.runProof(ctx, h.proofFetch(), method, fetchURL, proofURL, obligation, terms, origin, deal)
+	var verdict proofVerdict
+	if orp.OwnTestFixture(origin, proofURL, deal.ID, obligationID) {
+		// The fixture is owner-only, so the public fetcher cannot read it.
+		// A deal that did not opt in with a TEST title stays a bare claim:
+		// a failed receipt here would count against reputation.
+		if !orp.TestDeal(terms) {
+			return nil, nil, ""
+		}
+		page := orp.TestFixturePage(fixtureInput(deal, obligation, terms))
+		found, missing := proofEvidence(page, method, obligation, terms, origin, deal)
+		verdict = proofVerdict{result: "verified", found: found, terminal: true, testFixture: true}
+		if missing != "" {
+			verdict.result = "failed"
+			verdict.reason = missing
+		}
+	} else {
+		verdict = h.runProof(ctx, h.proofFetch(), method, fetchURL, proofURL, obligation, terms, origin, deal)
+	}
 	at := now.UTC().Format(time.RFC3339)
 	body := map[string]any{
 		"obligation": obligationID,
@@ -387,6 +405,9 @@ func (h *ORPHost) verifyProof(ctx context.Context, origin string, deal database.
 						next := recheckSchedule(now, keepUntil, true)
 						row["next_check"] = next.UTC().Format(time.RFC3339)
 						row["keep_until"] = keepUntil.UTC().Format(time.RFC3339)
+					}
+					if verdict.testFixture {
+						row["test_fixture"] = true
 					}
 				}
 			}
@@ -628,7 +649,12 @@ func recheckDeal(ctx context.Context, db *database.DB, dns string, deal database
 				fetchURL = resolved
 			}
 		}
-		page, status, ok := fetch(ctx, fetchURL)
+		page, status, ok := "", 0, false
+		if rendered, used := renderedTestFixture(dns, deal, terms, obligation, proofURL); used {
+			page, status, ok = rendered, http.StatusOK, true
+		} else {
+			page, status, ok = fetch(ctx, fetchURL)
+		}
 		if !ok {
 			// No evidence either way: try again tomorrow.
 			row["next_check"] = now.Add(24 * time.Hour).UTC().Format(time.RFC3339)
@@ -728,4 +754,43 @@ func recheckDeal(ctx context.Context, db *database.DB, dns string, deal database
 func str(v any) string {
 	s, _ := v.(string)
 	return s
+}
+
+// fixtureInput builds the owner-only test page from the obligation and the
+// tracking row minted for it.
+func fixtureInput(deal database.ORPDeal, obligation, terms map[string]any) orp.FixtureInput {
+	id, _ := obligation["id"].(string)
+	dest, _ := obligation["destination"].(string)
+	target, _ := obligation["target"].(string)
+	content, _ := obligation["content"].(map[string]any)
+	direct, _ := content["direct"].(bool)
+	copy, _ := content["copy"].(string)
+	var phrases []string
+	if raw, ok := content["must_include"].([]any); ok {
+		for _, item := range raw {
+			if text, ok := item.(string); ok && text != "" {
+				phrases = append(phrases, text)
+			}
+		}
+	}
+	in := orp.FixtureInput{
+		Obligation: id, Disclosure: orp.DisclosureLabel(terms), Destination: dest,
+		Direct: direct, Target: target, Copy: copy, MustInclude: phrases,
+	}
+	if entry := trackingEntry(deal, id); entry != nil {
+		in.Token = entry.Token
+		in.Code = entry.Code
+	}
+	return in
+}
+
+// renderedTestFixture is the in-process page for a TEST deal's own fixture.
+// Recheck cannot HTTP-fetch an owner-only URL.
+func renderedTestFixture(dns string, deal database.ORPDeal, terms, obligation map[string]any, proofURL string) (string, bool) {
+	host, id, ob, matched := orp.SplitTestFixture(proofURL)
+	obligationID, _ := obligation["id"].(string)
+	if !matched || !strings.EqualFold(host, dns) || id != deal.ID || ob != obligationID || !orp.TestDeal(terms) {
+		return "", false
+	}
+	return orp.TestFixturePage(fixtureInput(deal, obligation, terms)), true
 }

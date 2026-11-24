@@ -24,7 +24,8 @@ Every endpoint, every tool — copy-paste ready. The ORP wire, the MCP tools, an
 | GET | /orp/deals/{id} | Deal state, parties, obligations, waiting step |
 | POST | /orp/deals/{id}/activate | Activate an awaiting deal |
 | POST | /orp/deals/{id}/execute | Record an executed obligation |
-| GET | /orp/proof/{id} | Public proof document for a deal |
+| GET | /orp/proof/{id} | Public proof document for a deal. Names each obligation with its state, receipt, and url. |
+| GET | /orp/proof/{id}/test/{obligation} | Owner-only TEST fixture. A deal titled TEST, or starting with "TEST ", can use it as proof_url. It does not count toward reputation or earnings. |
 | POST | /orp/approve/{escalation} | On ORP 0.4, the waiting party's agent approves an ask. On a 0.3 deal this post does not approve (403, "This page does not approve."). A signed-in owner submits the form only after opting into human approval. |
 | GET | /orp/spec, /orp/schemas, /orp/examples | Protocol documents |
 

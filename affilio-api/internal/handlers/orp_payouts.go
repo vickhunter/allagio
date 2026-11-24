@@ -47,7 +47,8 @@ func (h *ORPHost) sweepPayouts(c *gin.Context, dns string) {
 			state, _ := row["state"].(string)
 			method, _ := row["method"].(string)
 			attester, _ := row["attester"].(string)
-			states = append(states, orp.ObligationState{ID: id, State: state, Method: method, Attester: attester})
+			fixture, _ := row["test_fixture"].(bool)
+			states = append(states, orp.ObligationState{ID: id, State: state, Method: method, Attester: attester, TestFixture: fixture})
 			// A verified obligation still inside its keep rechecks holds the
 			// money that depends on it until the final check passes (P6).
 			if next, _ := row["next_check"].(string); next != "" {

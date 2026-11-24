@@ -781,9 +781,12 @@ func isProductChar(c byte) bool {
 	}
 }
 
-// MintTracking mints place links that carry content.link or content.code.
-// When none exist it mints one link on the first obligation so a click can
-// still be attributed. A later return to active does not mint again.
+// MintTracking mints one tracked link for each place obligation that carries
+// content.link or content.code. When none do, it mints one link for each
+// place obligation, so both sides of a swap can prove with a tracked link.
+// When the deal has no place obligation, it mints one link on the first
+// obligation so a click can still be attributed. A later return to active
+// does not mint again.
 func MintTracking(origin, dealID string, terms map[string]any, existing []Track) []Track {
 	if len(existing) > 0 {
 		return existing
@@ -810,6 +813,26 @@ func MintTracking(origin, dealID string, terms map[string]any, existing []Track)
 			Obligation: id, Token: LocalID("tk"), Destination: dest,
 			Status: "live", Param: "via", Alias: "ref",
 		})
+	}
+	if len(out) == 0 {
+		for _, item := range raw {
+			obj, _ := item.(map[string]any)
+			if obj["action"] != "place" {
+				continue
+			}
+			id, _ := obj["id"].(string)
+			if id == "" {
+				continue
+			}
+			dest, _ := obj["destination"].(string)
+			if dest == "" {
+				dest = strings.TrimRight(origin, "/") + "/orp/proof/" + dealID
+			}
+			out = append(out, Track{
+				Obligation: id, Token: LocalID("tk"), Destination: dest,
+				Status: "live", Param: "via", Alias: "ref",
+			})
+		}
 	}
 	if len(out) == 0 && len(raw) > 0 {
 		obj, _ := raw[0].(map[string]any)

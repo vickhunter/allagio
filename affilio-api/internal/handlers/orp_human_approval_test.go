@@ -501,8 +501,8 @@ func TestServedTextDoesNotClaimPersonApprovedAgent(t *testing.T) {
 	assertNoPersonApprovedClaim(t, "fallback llms", llmsFullDocument())
 	assertNoPersonApprovedClaim(t, "cold path llms", llmsBody())
 	assertNoPersonApprovedClaim(t, "approve page", orp.ApprovePage("Notes", "Affiliate link"))
-	assertNoPersonApprovedClaim(t, "agent proof", orp.ProofPage("Affiliate link", "active", false, []orp.Approval{{By: "agent"}}))
-	page := orp.ProofPage("Affiliate link", "active", false, []orp.Approval{{By: "agent"}})
+	assertNoPersonApprovedClaim(t, "agent proof", orp.ProofPage("Affiliate link", "active", false, []orp.Approval{{By: "agent"}}, nil))
+	page := orp.ProofPage("Affiliate link", "active", false, []orp.Approval{{By: "agent"}}, nil)
 	if strings.Contains(page, "approved_by owner") || !strings.Contains(page, "An agent approved this step.") {
 		t.Fatalf("agent proof line %s", page)
 	}

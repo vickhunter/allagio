@@ -10,7 +10,8 @@ var proofPage = template.Must(template.New("proof").Parse(`<!doctype html>
 <title>Test proof</title>
 <p>{{.Label}}</p>
 <p>{{.Line}}</p>
-`))
+{{range .Obligations}}<p>obligation {{.ID}} state {{.State}} receipt {{.Receipt}} url {{.URL}}</p>
+{{end}}`))
 
 var approvePage = template.Must(template.New("approve").Parse(`<!doctype html>
 <meta charset="utf-8">
@@ -32,11 +33,20 @@ var ownerApprovePage = template.Must(template.New("owner-approve").Parse(`<!doct
 </form>
 `))
 
-// ProofPage is the public test page a proof_url receipt checks.
-// It shows the disclosure label and nothing about a person.
+// ProofObligation is one obligation line on the public proof page.
+// Receipt and URL are empty until a receipt is stored.
+type ProofObligation struct {
+	ID      string
+	State   string
+	Receipt string
+	URL     string
+}
+
+// ProofPage is the public page for a deal. It names each obligation's state,
+// receipt, and url. It shows the disclosure label and nothing about a person.
 // An active deal says so. A verified tracked link says so, which changes the
 // page from the active line. Every other state still says the deal stays awaiting.
-func ProofPage(label, state string, linkVerified bool, approvals []Approval) string {
+func ProofPage(label, state string, linkVerified bool, approvals []Approval, obligations []ProofObligation) string {
 	line := "This is a test proof. The deal stays awaiting. Allagio does not hold money."
 	if linkVerified {
 		line = "This is a test proof. The tracked link is verified. Allagio does not hold money."
@@ -45,7 +55,11 @@ func ProofPage(label, state string, linkVerified bool, approvals []Approval) str
 	}
 	line += approvalLine(approvals)
 	var b strings.Builder
-	_ = proofPage.Execute(&b, map[string]string{"Label": label, "Line": line})
+	_ = proofPage.Execute(&b, struct {
+		Label       string
+		Line        string
+		Obligations []ProofObligation
+	}{Label: label, Line: line, Obligations: obligations})
 	return b.String()
 }
 
@@ -85,5 +99,41 @@ func OwnerApprovePage(title, label, action, csrf string) string {
 	_ = ownerApprovePage.Execute(&b, map[string]string{
 		"Title": title, "Label": label, "Action": action, "CSRF": csrf,
 	})
+	return b.String()
+}
+
+// FixtureInput is what the owner-only test page renders for one obligation.
+// The host builds it from the stored terms and the minted tracking row.
+type FixtureInput struct {
+	Obligation  string
+	Disclosure  string
+	Destination string
+	Token       string
+	Code        string
+	Direct      bool
+	Target      string
+	Copy        string
+	MustInclude []string
+}
+
+var testFixturePage = template.Must(template.New("fixture").Parse(`<!doctype html>
+<meta charset="utf-8">
+<title>TEST proof fixture</title>
+<p>TEST. This page is a test fixture for obligation {{.Obligation}}. It does not count toward reputation or earnings.</p>
+<p>{{.Disclosure}}</p>
+{{if .Token}}<p><a href="/go/{{.Token}}">tracked link</a></p>{{end}}
+{{if .Code}}<p>{{.Code}}</p>{{end}}
+{{if .Direct}}<p><a href="{{.Destination}}" rel="sponsored nofollow">direct link</a></p>{{end}}
+{{if .Target}}<p>{{.Target}}</p>{{end}}
+{{if .Copy}}<p>{{.Copy}}</p>{{end}}
+{{range .MustInclude}}<p>{{.}}</p>{{end}}
+`))
+
+// TestFixturePage renders an obligation's required elements and marks the
+// page as a test. A click on the rendered link is not what verifies the deal:
+// execute reads this page in-process for a TEST deal only.
+func TestFixturePage(in FixtureInput) string {
+	var b strings.Builder
+	_ = testFixturePage.Execute(&b, in)
 	return b.String()
 }

@@ -27,7 +27,7 @@ var openapiReceiverPrefix = map[string]map[string]string{
 		"public": "", "owner": "/owner", "api": "/owner/api",
 		"maker": "/owner/api", "publisher": "/owner/api", "review": "/owner/api/review",
 	},
-	"internal/handlers/demo.go":       {"public": ""},
+	"internal/handlers/demo.go":        {"public": ""},
 	"internal/handlers/agent_entry.go": {"r": ""},
 	"internal/handlers/orp_host.go":    {"r": ""},
 	"internal/handlers/orp_deal.go":    {"r": ""},
@@ -39,7 +39,7 @@ var openapiReceiverPrefix = map[string]map[string]string{
 // endpoints. HEAD is skipped wholesale: it mirrors GET. Non-literal paths
 // (constants, concat) are listed in openapiConstantRoutes instead.
 var openapiExclusions = map[string]string{
-	"Any /mcp":      "documented as POST /mcp",
+	"Any /mcp":           "documented as POST /mcp",
 	"POST /orp/monetize": "constant path — see openapiConstantRoutes",
 
 	"GET /": "landing page (HTML)", "GET /agents": "landing page (HTML)", "GET /agents/": "landing page (HTML)",
@@ -51,13 +51,14 @@ var openapiExclusions = map[string]string{
 	"GET /privacy": "legal page (HTML)", "GET /privacy/": "legal page (HTML)",
 	"GET /terms": "legal page (HTML)", "GET /terms/": "legal page (HTML)",
 	"GET /reference": "docs page (HTML)", "GET /reference/": "docs page (HTML)",
-	"GET /docs": "Scalar API reference (HTML)",
+	"GET /docs":         "Scalar API reference (HTML)",
 	"GET /claim/{code}": "claim page (HTML)", "POST /claim/{code}": "claim form post (HTML)",
 	"GET /orp/approve/{id}": "human approval page (HTML)", "POST /orp/approve/{id}": "human approval form post (HTML)",
-	"GET /orp/proof/{id}": "proof page (HTML)",
-	"GET /device": "device page (HTML)", "POST /device": "device form post (HTML)",
+	"GET /orp/proof/{id}":                   "proof page (HTML)",
+	"GET /orp/proof/{id}/test/{obligation}": "test proof fixture (HTML)",
+	"GET /device":                           "device page (HTML)", "POST /device": "device form post (HTML)",
 	"GET /oauth/authorize": "consent page (HTML)",
-	"GET /auth/login": "sign-in redirect", "GET /auth/callback": "sign-in callback",
+	"GET /auth/login":      "sign-in redirect", "GET /auth/callback": "sign-in callback",
 	"GET /demo": "demo page (HTML)", "GET /demo/{page}": "demo page (HTML)", "POST /demo/operator": "demo form post (HTML)",
 	"GET /owner": "dashboard page (HTML)", "GET /owner/connect-site": "dashboard page (HTML)", "GET /owner/placements/{id}": "dashboard page (HTML)", "GET /owner/products/{id}/connection": "dashboard page (HTML)",
 	"POST /owner/accounts": "form post (HTML)", "POST /owner/authorize": "form post (HTML)", "POST /owner/connect-site": "form post (HTML)",

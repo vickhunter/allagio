@@ -25,18 +25,24 @@ type PlannedPayout struct {
 // ObligationState is the stored state row of one deal obligation. Method is
 // the receipt method that verified it and Attester the party that attested,
 // both empty for other methods (P3: an attestation releases only the
-// attester's own money).
+// attester's own money). TestFixture is a host test page: that receipt
+// never releases earnings.
 type ObligationState struct {
-	ID       string
-	State    string
-	Method   string
-	Attester string
+	ID          string
+	State       string
+	Method      string
+	Attester    string
+	TestFixture bool
 }
 
 // done reports whether the obligation counts as finished for this payer. A
 // waived row always counts; a verified row counts for everyone except when
-// it was verified by attestation, which counts only for the attester.
+// it was verified by attestation, which counts only for the attester. A
+// test-fixture receipt never counts.
 func (row ObligationState) done(payer string) bool {
+	if row.TestFixture {
+		return false
+	}
 	if row.State == "waived" {
 		return true
 	}

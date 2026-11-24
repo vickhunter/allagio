@@ -24,6 +24,7 @@ func mountORPDeals(h *ORPHost, r gin.IRouter) {
 	r.GET("/orp/deals/:id", h.Deal)
 	r.POST("/orp/deals/:id/activate", h.Activate)
 	r.GET("/orp/proof/:id", h.Proof)
+	r.GET("/orp/proof/:id/test/:obligation", h.TestProof)
 	r.GET("/orp/approve/:id", h.Approve)
 	r.POST("/orp/approve/:id", h.ApprovePost)
 	r.GET("/go/:token", h.Go)
@@ -136,7 +137,96 @@ func (h *ORPHost) Proof(c *gin.Context) {
 			}
 		}
 	}
-	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms), deal.State, linkObligationVerified(deal.Obligations), approvals))
+	writeHTML(c, http.StatusOK, orp.ProofPage(orp.DisclosureLabel(terms), deal.State, linkObligationVerified(deal.Obligations), approvals, proofObligations(deal.Obligations)))
+}
+
+// TestProof is the owner-only fixture for one obligation. It renders the
+// elements a proof_url check looks for and says it is a test. Execute accepts
+// this URL only when the deal title is TEST or starts with "TEST ".
+func (h *ORPHost) TestProof(c *gin.Context) {
+	deal, found, err := h.Entry.DB.GetORPDeal(c.Request.Context(), c.Param("id"))
+	if err != nil || !found {
+		writeHTML(c, http.StatusNotFound, "not found")
+		return
+	}
+	terms, err := decodeObject(deal.Terms)
+	if err != nil {
+		writeHTML(c, http.StatusNotFound, "not found")
+		return
+	}
+	obligation := orp.ObligationMap(terms, c.Param("obligation"))
+	if obligation == nil {
+		writeHTML(c, http.StatusNotFound, "not found")
+		return
+	}
+	switch h.fixtureAccess(c, deal) {
+	case http.StatusUnauthorized:
+		writeHTML(c, http.StatusUnauthorized, "unauthorized")
+	case http.StatusNotFound:
+		writeHTML(c, http.StatusNotFound, "not found")
+	default:
+		writeHTML(c, http.StatusOK, orp.TestFixturePage(fixtureInput(deal, obligation, terms)))
+	}
+}
+
+// fixtureAccess is 200 when the bearer or the signed-in owner sits on the
+// deal, 401 when no credential or a bad bearer is presented, and 404 when
+// the credential is valid and belongs to someone else.
+func (h *ORPHost) fixtureAccess(c *gin.Context, deal database.ORPDeal) int {
+	if h.Entry != nil {
+		grant, err := h.Entry.JoinGrant(c)
+		if err == nil && grant != nil && grant.OwnerID != "" {
+			if dealHasOwner(deal, grant.OwnerID) {
+				return http.StatusOK
+			}
+			return http.StatusNotFound
+		}
+		if err != nil && !errors.Is(err, errNoBearer) {
+			return http.StatusUnauthorized
+		}
+	}
+	owner, ok := h.signedInOwner(c)
+	if !ok || owner == nil {
+		return http.StatusUnauthorized
+	}
+	if dealHasOwner(deal, owner.ID) {
+		return http.StatusOK
+	}
+	return http.StatusNotFound
+}
+
+func proofObligations(raw json.RawMessage) []orp.ProofObligation {
+	var rows []map[string]any
+	if json.Unmarshal(raw, &rows) != nil {
+		return nil
+	}
+	out := make([]orp.ProofObligation, 0, len(rows))
+	for _, row := range rows {
+		id, _ := row["id"].(string)
+		state, _ := row["state"].(string)
+		if state == "" {
+			state = "pending"
+		}
+		receipt, _ := row["receipt"].(string)
+		pageURL, _ := row["url"].(string)
+		out = append(out, orp.ProofObligation{ID: id, State: state, Receipt: receipt, URL: pageURL})
+	}
+	return out
+}
+
+// stripTestFixture drops the host-only flag before a deal is sent. The
+// stored row keeps it so reputation and payouts can see it.
+func stripTestFixture(value any) {
+	rows, ok := value.([]any)
+	if !ok {
+		return
+	}
+	for _, item := range rows {
+		row, ok := item.(map[string]any)
+		if ok {
+			delete(row, "test_fixture")
+		}
+	}
 }
 
 func linkObligationVerified(raw json.RawMessage) bool {
@@ -1378,6 +1468,7 @@ func dealBody(deal database.ORPDeal, origin string, now time.Time) (map[string]a
 		if err = json.Unmarshal(deal.Obligations, &obligations); err != nil {
 			return nil, err
 		}
+		stripTestFixture(obligations)
 		body["obligations"] = obligations
 	}
 	if len(deal.Waiting) > 0 && string(deal.Waiting) != "null" {

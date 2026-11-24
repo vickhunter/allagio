@@ -255,14 +255,28 @@ func (h *ORPHost) repEvents(ctx context.Context, subject string) ([]orp.RepEvent
 		if err := json.Unmarshal(deal.Obligations, &rows); err != nil {
 			continue
 		}
+		// Stored rows keep id and state. The role lives on the terms, which
+		// is what a verified proof_url has to be scored against.
+		terms, _ := decodeObject(deal.Terms)
 		for _, row := range rows {
 			by, _ := row["by"].(string)
+			if by == "" {
+				id, _ := row["id"].(string)
+				if ob := orp.ObligationMap(terms, id); ob != nil {
+					by, _ = ob["by"].(string)
+				}
+			}
 			if obligorOf(deal, by) != subject {
 				continue
 			}
 			// P7: an attestation carries no public evidence, so it never
 			// enters a reputation event — not even as a zero-weight one.
+			// A host test fixture is the same: it can verify a TEST deal
+			// and it never moves reputation.
 			if method, _ := row["method"].(string); method == "attestation" {
+				continue
+			}
+			if fixture, _ := row["test_fixture"].(bool); fixture {
 				continue
 			}
 			for _, cp := range cps {

@@ -895,6 +895,7 @@ func (h *ORPHost) manySnapshot(dns, viewer, re string, deal database.ORPDeal, no
 		if err = json.Unmarshal(deal.Obligations, &obligations); err != nil {
 			return nil, err
 		}
+		stripTestFixture(obligations)
 		body["obligations"] = obligations
 	}
 	if len(doc.Tracking) > 0 {
