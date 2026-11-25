@@ -439,7 +439,14 @@ export function DealSimulator({ initialTemplate = 'affiliate', className }: Deal
           </div>
 
           <dl className="mt-5 grid grid-cols-3 divide-x divide-line border-t border-line pt-4 text-left">
-            {artifact.metrics.map((m, idx) => (
+            {(isRefused
+              ? [
+                  { label: 'Status', value: 'Refused' },
+                  { label: 'Placement', value: 'None' },
+                  { label: 'Cash moved', value: '$0' },
+                ]
+              : artifact.metrics
+            ).map((m, idx) => (
               <div key={m.label} className={idx > 0 ? 'pl-3' : ''}>
                 <dt className="text-[11px] font-medium text-t2">{m.label}</dt>
                 <dd className="tabular mt-0.5 text-sm font-semibold text-t1">{m.value}</dd>
