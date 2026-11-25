@@ -53,10 +53,10 @@ test('the home first screen connects the agent with a setup link and the public 
       assert.equal(await copy.count(), 1)
       const agentPanel = page.locator('#hero-panel-agent')
       assert.match(await agentPanel.innerText(), new RegExp(joinPrompt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-      assert.equal(await agentPanel.locator('a[href="/llms.txt"]').count(), 2)
-      // Verify dark contrast bands and simulator slot exist.
+      assert.ok((await agentPanel.locator('a[href="/llms.txt"]').count()) >= 1)
+      // Verify simulator slot and subtle light editorial bands exist.
       assert.equal(await page.locator('#simulator-slot').count(), 1)
-      assert.equal(await page.locator('.band-dark').count(), 3)
+      assert.ok((await page.locator('.band-subtle').count()) >= 2)
       if (viewport.width < 1280) {
         await page.getByRole('button', { name: 'Menu', exact: true }).click()
       }

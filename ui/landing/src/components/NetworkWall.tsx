@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeftRight, ArrowRight, ArrowUpRight, Bot, CheckCircle2, Clock, FlaskConical, Radio, ShieldCheck, Users } from 'lucide-react'
+import { ArrowLeftRight, ArrowRight, ArrowUpRight, Clock, FlaskConical, Radio, ShieldCheck, Users } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { useLocale, type Lang } from '@/i18n'
@@ -11,7 +11,6 @@ import {
   listRecentDeals,
   partyText,
   wantsDealsFixtures,
-  type Face,
   type WallDeal,
   type WallOffer,
 } from '@/lib/network-wall.mjs'
@@ -33,10 +32,6 @@ const KIND_LABELS: Record<string, { label: string; variant: 'pub' | 'maker' | 's
 function getKindMeta(kind: string): { label: string; variant: 'pub' | 'maker' | 'setup' | 'neutral' } {
   const key = (kind || '').toLowerCase()
   return KIND_LABELS[key] ?? { label: kind.replace(/_/g, ' '), variant: 'pub' }
-}
-
-function stateVariant(state: string): 'maker' | 'pub' | 'neutral' {
-  return ACTIVE.has(state) ? 'pub' : 'neutral'
 }
 
 function ago(iso: string, lang: Lang) {
@@ -103,24 +98,7 @@ function buildSandboxDeals(): WallDeal[] {
   ]
 }
 
-function PartyChip({ face, roles, roleLabel }: { face: Face; roles: Record<string, string>; roleLabel: string }) {
-  const { text, named } = partyText(face, roles)
-  return (
-    <div className="min-w-0 flex-1 rounded-xl border border-line bg-s0/80 px-3 py-2">
-      <p className="font-mono text-[10px] uppercase tracking-wider text-t2">{roleLabel}</p>
-      <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm">
-        {named ? (
-          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-pub" />
-        ) : (
-          <Bot aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-t2" />
-        )}
-        <span className={`min-w-0 truncate ${named ? 'font-semibold text-t1' : 'text-t2'}`}>{text}</span>
-      </p>
-    </div>
-  )
-}
-
-function DealCard({
+function DealRow({
   deal,
   roles,
   lang,
@@ -134,59 +112,56 @@ function DealCard({
   const kindMeta = getKindMeta(deal.kind)
   const isActive = ACTIVE.has(deal.state)
   const isReciprocal = RECIPROCAL_KINDS.has((deal.kind || '').toLowerCase())
+  const offerer = partyText(deal.offerer, roles)
+  const acceptor = partyText(deal.acceptor, roles)
 
   return (
-    <Card
-      className="group relative flex h-full flex-col gap-3.5 overflow-hidden p-5 transition-colors hover:border-line-strong"
+    <li
       data-deal-card
       data-deal-sandbox={sandbox ? 'true' : 'false'}
+      className="grid items-center gap-3 px-5 py-4 transition-colors hover:bg-s1 sm:grid-cols-12"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={kindMeta.variant}>{kindMeta.label}</Badge>
-          <Badge variant={stateVariant(deal.state)}>
-            <span
-              aria-hidden="true"
-              className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-pub' : 'bg-t2'}`}
-            />
-            {deal.state}
-          </Badge>
-          {deal.parties > 2 ? (
-            <Badge variant="neutral">
-              <Users aria-hidden="true" className="h-3 w-3" />
-              {deal.parties} parties
-            </Badge>
-          ) : null}
+      <div className="min-w-0 sm:col-span-5">
+        <div className="flex items-center gap-2 text-sm">
+          <span className={`truncate ${offerer.named ? 'font-semibold text-t1' : 'text-t2'}`}>{offerer.text}</span>
+          <span aria-hidden="true" className="shrink-0 text-t2">
+            {isReciprocal ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5" />}
+          </span>
+          <span className={`truncate ${acceptor.named ? 'font-semibold text-t1' : 'text-t2'}`}>{acceptor.text}</span>
         </div>
-        {sandbox ? (
-          <span className="shrink-0 whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-t2">sample</span>
+        <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-t2">
+          <ShieldCheck aria-hidden="true" className={`h-3.5 w-3.5 ${isActive ? 'text-[#166534]' : 'text-t2'}`} />
+          {isActive ? 'Agent-signed · ORP verified' : 'Agent-signed · Pending gate'}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
+        <span className="text-xs font-medium text-t1">{kindMeta.label}</span>
+        {deal.parties > 2 ? (
+          <span className="inline-flex items-center gap-1 text-xs text-t2">
+            <Users aria-hidden="true" className="h-3 w-3" />
+            {deal.parties} parties
+          </span>
         ) : null}
       </div>
 
-      {/* Party-to-party deal flow */}
-      <div className="flex items-center gap-2">
-        <PartyChip face={deal.offerer} roles={roles} roleLabel="Offerer" />
-        <div
-          aria-hidden="true"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line bg-s2/70 text-t1"
+      <div className="sm:col-span-2">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ${
+            isActive ? 'bg-[#DCFCE7] text-[#166534]' : 'bg-[#FEF3C7] text-[#92400E]'
+          }`}
         >
-          {isReciprocal ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5" />}
-        </div>
-        <PartyChip face={deal.acceptor} roles={roles} roleLabel="Acceptor" />
+          {deal.state}
+        </span>
       </div>
 
-      {/* Verification indicator & timestamp */}
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs text-t2">
-        <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-t1">
-          <ShieldCheck aria-hidden="true" className={`h-3.5 w-3.5 ${isActive ? 'text-pub' : 'text-t2'}`} />
-          {isActive ? 'Agent-signed · ORP verified' : 'Agent-signed · Pending gate'}
-        </span>
-        <span className="inline-flex items-center gap-1 font-mono text-[11px]">
+      <div className="flex items-center justify-between gap-2 text-xs text-t2 sm:col-span-2 sm:justify-end">
+        <span className="inline-flex items-center gap-1">
           <Clock aria-hidden="true" className="h-3 w-3" />
           {sandbox ? 'Sample deal' : ago(deal.updated_at, lang)}
         </span>
       </div>
-    </Card>
+    </li>
   )
 }
 
@@ -312,18 +287,18 @@ export function NetworkWall() {
         ) : null}
 
         <div className="mt-10 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-t2">{copy.dealsLabel}</h3>
+          <h3 className="text-sm font-semibold text-t1">{copy.dealsLabel}</h3>
           {showingSandbox ? (
             <span
               data-sandbox-banner
-              className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-s1 px-3 py-1 font-mono text-xs text-t1"
+              className="inline-flex items-center gap-1.5 rounded-md border border-line bg-s0 px-2.5 py-1 text-xs font-medium text-t2"
             >
               <FlaskConical aria-hidden="true" className="h-3.5 w-3.5 text-maker" />
               Sample network activity (sandbox)
             </span>
           ) : liveRows.length > 0 ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-pub/30 bg-pub-soft px-3 py-1 font-mono text-xs text-pub">
-              <Radio aria-hidden="true" className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-line bg-s0 px-2.5 py-1 text-xs font-medium text-t1">
+              <Radio aria-hidden="true" className="h-3.5 w-3.5 text-[#166534]" />
               {liveRows.length} live on the wire
             </span>
           ) : null}
@@ -340,11 +315,9 @@ export function NetworkWall() {
         ) : null}
 
         {displayRows.length > 0 ? (
-          <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-4 divide-y divide-line overflow-hidden rounded-xl border border-line bg-s0">
             {displayRows.map((deal, i) => (
-              <li key={`${deal.kind}-${deal.updated_at}-${i}`} className="min-w-0">
-                <DealCard deal={deal} roles={roles} lang={lang} sandbox={showingSandbox} />
-              </li>
+              <DealRow key={`${deal.kind}-${deal.updated_at}-${i}`} deal={deal} roles={roles} lang={lang} sandbox={showingSandbox} />
             ))}
           </ul>
         ) : null}

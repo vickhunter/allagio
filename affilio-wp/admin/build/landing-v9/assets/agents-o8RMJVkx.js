@@ -1,4 +1,4 @@
-import{G as e,J as t,K as n,Y as r,d as i,l as a,t as o,v as s}from"./Page-CuhJRvMq.js";import{a as c,c as l,i as u,l as d,n as f,o as p,r as m,s as h,t as g,u as _}from"./facts-n2QWZPcP.js";var v=r(t(),1),y=i(),b=[`claude`,`cursor`,`codex`,`generic`],x=`curl -fsS -X POST "${h.replace(/\/mcp$/,``)}/orp/join" \\
+import{G as e,J as t,K as n,Y as r,d as i,l as a,t as o,v as s}from"./Page-B4FsAGbT.js";import{a as c,c as l,i as u,l as d,n as f,o as p,r as m,s as h,t as g,u as _}from"./facts-Ckck3huQ.js";var v=r(t(),1),y=i(),b=[`claude`,`cursor`,`codex`,`generic`],x=`curl -fsS -X POST "${h.replace(/\/mcp$/,``)}/orp/join" \\
   -H "Content-Type: application/json" \\
   -d '{}'`,S=`{
   "party": "pty_01j…",

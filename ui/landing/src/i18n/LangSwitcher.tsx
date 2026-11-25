@@ -12,7 +12,7 @@ export function LangSwitcher({ className }: { className?: string }) {
       onChange={(event) => setLang(event.target.value as Lang)}
       data-track="lang_switch"
       className={cn(
-        'min-h-11 cursor-pointer rounded-full border border-line bg-s1 px-2.5 text-[13px] font-semibold text-t1 transition-colors duration-150 hover:bg-s2',
+        'min-h-11 cursor-pointer rounded-lg border border-line bg-s0 px-2.5 text-[13px] font-medium text-t1 transition-colors duration-150 hover:bg-s1',
         className
       )}
     >

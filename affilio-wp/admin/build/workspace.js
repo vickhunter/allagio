@@ -419,11 +419,15 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const buckets = Array(days).fill(0);
         stamps.forEach(t => { const i = Math.min(days - 1, days - 1 - Math.floor((today - t) / 864e5)); if (i >= 0) buckets[i]++; });
         const max = Math.max(1, ...buckets);
-        const bw = 100 / days;
+        const slots = Math.max(days, 10);
+        const slotWidth = 100 / slots;
+        const barWidth = Math.min(slotWidth * 0.65, 6);
+        const offset = (slots - days) * slotWidth;
         const bars = buckets.map((n, i) => {
             const day = new Date(today.getTime() - (days - 1 - i) * 864e5).toISOString().slice(0, 10);
-            const height = (n / max) * 34;
-            return `<rect x="${(i * bw).toFixed(2)}" y="${(40 - height).toFixed(2)}" width="${(bw - 0.4).toFixed(2)}" height="${Math.max(height, n ? 1 : 0.4).toFixed(2)}" rx="0.4"${n ? '' : ' class="spark-empty"'}><title>${n} on ${day}</title></rect>`;
+            const height = (n / max) * 32;
+            const x = offset + i * slotWidth + (slotWidth - barWidth) / 2;
+            return `<rect x="${x.toFixed(2)}" y="${(40 - height).toFixed(2)}" width="${barWidth.toFixed(2)}" height="${Math.max(height, n ? 2 : 1).toFixed(2)}" rx="0.8"${n ? '' : ' class="spark-empty"'}><title>${n} on ${day}</title></rect>`;
         }).join('');
         const first = new Date(today.getTime() - (days - 1) * 864e5).toISOString().slice(0, 10);
         const last = today.toISOString().slice(0, 10);
@@ -944,13 +948,13 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const activeCount = deals.filter(deal => ['active', 'completed'].includes(String(deal.state || '').toLowerCase())).length;
         const summaryStats = `<div class="stat-grid">${statCard('Total deals', deals.length, 'ORP negotiations')}${statCard('Needs decision', waiting.length, waiting.length ? 'Waiting on your approval' : 'Queue clear', waiting.length ? 'is-alert' : '')}${statCard('Active & completed', activeCount, 'Signed on protocol', activeCount ? 'is-live' : '')}</div>`;
         const pending = waiting.length
-            ? `<section class="deal-pending"><span class="eyebrow">HUMAN APPROVAL QUEUE</span><h2>Needs your decision</h2>${waiting.map(dealCard).join('')}</section>`
+            ? `<section class="deal-pending"><h2>Needs your decision</h2>${waiting.map(dealCard).join('')}</section>`
             : '';
         const listHeading = waiting.length ? 'Other deals' : 'All deals';
         const listBody = waiting.length
             ? (otherDeals.length ? otherDeals.map(dealCard).join('') : '<p class="caption">Every open deal is waiting in your approval queue above.</p>')
             : (deals.length ? deals.map(dealCard).join('') : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.'));
-        root.innerHTML = `${summaryStats}<section><span class="eyebrow">OPEN RAILS PROTOCOL</span><h2>Agent deals</h2><p>Offers your agent proposed, accepted, or joined through ORP. Every deal links to its public proof record and waits on you only when your approval gates say so.</p>${sparkline(deals.map(deal => deal.created_at), 'Deal activity')}</section>${pending}<h2>${listHeading}</h2>${listBody}`;
+        root.innerHTML = `${summaryStats}<section><h2>Agent deals</h2><p>Offers your agent proposed, accepted, or joined through ORP. Every deal links to its public proof record and waits on you only when your approval gates say so.</p>${sparkline(deals.map(deal => deal.created_at), 'Deal activity')}</section>${pending}<h2>${listHeading}</h2>${listBody}`;
         const termsMarkup = terms => {
             if (!terms) return '<p class="caption">Terms could not be read for this deal.</p>';
             const obligations = Array.isArray(terms.obligations) ? terms.obligations : [];
