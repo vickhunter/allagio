@@ -99,7 +99,7 @@ const EXAMPLE_CHIPS: ExampleChip[] = [
   },
 ]
 
-const outlineClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line-strong bg-s0 px-5 text-center font-semibold text-t1 transition-colors duration-150 hover:bg-s2 disabled:text-t1 sm:w-auto'
+const outlineClass = 'inline-flex min-h-11 w-full items-center justify-center rounded-md border border-line-strong bg-s0 px-4 text-center text-sm font-semibold text-t1 transition-colors duration-150 hover:bg-s2 disabled:text-t1 sm:w-auto'
 const barWidth = ['w-full', 'w-11/12', 'w-4/5', 'w-3/4']
 
 function wait(ms: number) {
@@ -177,14 +177,14 @@ function OfferCard({ offer, label }: { offer: VerifiedOffer; label: string }) {
   return (
     <div
       data-offer
-      className="my-1.5 overflow-hidden rounded-xl border-2 border-pub bg-pub-soft/85 p-4 shadow-xs"
+      className="my-1.5 overflow-hidden rounded-lg border border-pub/50 bg-pub-soft/60 p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-pub">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-pub">
           <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
           {label}
         </span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-pub/30 bg-s1 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-pub">
+        <span className="inline-flex items-center gap-1 rounded-md border border-pub/30 bg-s1 px-2 py-0.5 font-mono text-[11px] font-medium text-pub">
           <ShieldCheck aria-hidden="true" className="h-3 w-3" />
           Verified match
         </span>
@@ -394,7 +394,7 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
   }
 
   return (
-    <div data-post-preview data-preview-state={view} className="min-w-0 max-w-full rounded-2xl border border-line bg-s1 p-5">
+    <div data-post-preview data-preview-state={view} className="min-w-0 max-w-full rounded-lg border border-line bg-s1 p-5">
       <form noValidate onSubmit={onSubmit} className="grid gap-3">
         <label htmlFor={id} className="scroll-mt-24 text-[15px] font-semibold text-t1">{t.preview.label}</label>
         <Input
@@ -411,10 +411,10 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
           aria-invalid={errorCode === 400}
           aria-describedby={`${id}-public ${id}-status`}
           onChange={(event) => setUrl(event.target.value)}
-          className="min-h-12 min-w-0 bg-s0"
+          className="min-h-11 min-w-0 rounded-md bg-s0"
         />
         <div className="flex flex-wrap items-center gap-2" aria-label="Try an example URL">
-          <span className="font-mono text-[11px] uppercase tracking-wider text-t2">Try an example:</span>
+          <span className="text-xs text-t2">Try an example:</span>
           {EXAMPLE_CHIPS.map((chip) => {
             const Icon = chip.icon
             const active = url.trim() === chip.url
@@ -425,10 +425,10 @@ export function PostPreview({ titleLevel = 3 }: { titleLevel?: 2 | 3 }) {
                 data-example-chip={chip.id}
                 disabled={phase === 'loading' || paused}
                 onClick={() => handleExampleClick(chip)}
-                className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors ${
+                className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors ${
                   active
                     ? 'border-pub bg-pub-soft text-pub'
-                    : 'border-line-strong bg-s0 text-t1 hover:border-pub hover:bg-pub-soft/50'
+                    : 'border-line-strong bg-s0 text-t1 hover:border-t1 hover:bg-s2'
                 }`}
               >
                 <Icon aria-hidden="true" className="h-3.5 w-3.5" />

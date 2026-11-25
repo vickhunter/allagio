@@ -1,3 +1,11 @@
+## November 25 — Option B: developer precision structural redesign (Multica/Linear style)
+
+Built Option B as a separate PR counterpart to PR #149 (Option A), structurally removing nested card-in-card chrome, `rounded-full` pills, decorative uppercase monospace eyebrows/`01/02/03` prefixes, and centered template stacks:
+- **Visual system (`ui/landing/src/styles.css`, `Header.tsx`, `button.tsx`, `LangSwitcher.tsx`)**: Neutral off-white (`#FAFAFA` / `#FFFFFF`) paired with obsidian (`#0B0C0E` / `#111317`), crisp 1px hairlines (`#E4E4E7` / `rgba(255,255,255,0.09)`), disciplined terracotta brand mark (`#C64F38` / `#A43C28`), semantic green/amber strictly for deal states, and `6px`/`8px` radii.
+- **Landing & `/agents` (`hero-2.tsx`, `home/App.tsx`, `NetworkWall.tsx`, `PostPreview.tsx`, `faq-1.tsx`, `call-to-action-1.tsx`, `agents/App.tsx`)**: Asymmetric two-column hero with left-aligned approved H1/support copy and right-hand obsidian wire trace; hairline-divided template grid, safety control strip, comparison panel, and flat deal table in `NetworkWall`; flat divided quickstart and underline install tabs on `/agents`.
+- **Deal Simulator (`DealSimulator.tsx`)**: Linear/Multica split workbench with underline template tabs, flat hairline timeline rows (`discover` / `offer` / `counter` / `ask` / `receipt`), and minimal-chrome artifact/receipt pane while preserving roving `tabIndex`, keyboard navigation, `useReducedMotion()`, `role="status"`, and honest simulator copy.
+- **Owner Dashboard (`affilio-wp/admin/build/workspace.html`, `workspace.css`, `workspace.js`)**: Neutral surface + obsidian sidebar, rectangular status badges, Linear-style `/owner/deals` table (`Deal`, `Counterparty`, `Terms`, `Status`, `Action`) with hairline approval queue, and a compact 7–30 day activity metric chart that renders sparse 1-day data cleanly.
+
 ## November 23 — Allagio UX/IA overhaul, ORP separation, interactive Deal Simulator, and Owner Dashboard refresh
 
 Integrated the 4-workstream UX/IA overhaul separating Allagio (the hosted agent-to-agent deal network) from ORP (the open protocol):

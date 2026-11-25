@@ -15,11 +15,10 @@
   <aside class="sidebar" id="workspace-sidebar">
     <div class="sidebar-sticky">
       <div class="sidebar-head">
-        <a class="brand" href="/"><svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 9.6 C 8.8 9.6 11.6 9.6 14.8 15.2" stroke-width="3.6"/><path d="M2.4 22.4 C 8.8 22.4 11.6 22.4 14.8 16.8" stroke-width="3.6"/><path d="M14.2 16 H 29.4" stroke-width="3.8"/></g><circle cx="17.2" cy="16" r="5" fill="#141413"/><circle cx="17.2" cy="16" r="4.15" fill="#D85A42"/></svg>Allagio</a>
+        <a class="brand" href="/"><svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M2.4 9.6 C 8.8 9.6 11.6 9.6 14.8 15.2" stroke-width="3.6"/><path d="M2.4 22.4 C 8.8 22.4 11.6 22.4 14.8 16.8" stroke-width="3.6"/><path d="M14.2 16 H 29.4" stroke-width="3.8"/></g><circle cx="17.2" cy="16" r="5" fill="#0B0C0E"/><circle cx="17.2" cy="16" r="4.15" fill="#C64F38"/></svg>Allagio</a>
         <button type="button" class="drawer-close" data-drawer-close aria-label="Close navigation">&times;</button>
       </div>
       <div class="sidebar-body">
-        <span class="eyebrow sidebar-kicker">AGENT CONTROL PLANE</span>
         <nav aria-label="Workspace">
           <a href="/owner"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Overview</a>
           <a href="/owner/products"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 5.5 8 2.5l5.5 3v5L8 13.5l-5.5-3v-5Z"/><path d="M8 8.5v5M2.5 5.5 8 8.5l5.5-3"/></svg>Products &amp; offers</a>
@@ -30,12 +29,11 @@
           {{if .Operator}}<a href="/owner/review"><svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 8.5 6.2 11.5 13 4.5"/></svg>Offer review</a>{{end}}
         </nav>
         <div class="sidebar-note">
-          <span class="eyebrow">HUMAN-IN-THE-LOOP</span>
           <p>Agents negotiate the deal.<br>You hold the approval.</p>
         </div>
         <footer>
           {{if .Name}}<span class="sidebar-owner">{{.Name}}</span>{{end}}
-          <span class="pill sidebar-pill">Early access</span>
+          <span class="sidebar-meta">Early access</span>
         </footer>
       </div>
     </div>
@@ -49,13 +47,11 @@
         <span class="topbar-title" data-topbar-title>{{.Title}}</span>
       </div>
       <div class="topbar-right">
-        <span class="topbar-badge"><span class="live-dot" aria-hidden="true"></span>ORP Control Plane</span>
         <a href="/">Home ↗</a>
       </div>
     </header>
     <main id="main">
       <div class="page-heading">
-        <span class="eyebrow">ALLAGIO · CONTROL PLANE</span>
         <h1>{{.Title}}</h1>
         {{if .Message}}<p>{{.Message}}</p>{{end}}
       </div>

@@ -51,47 +51,45 @@ export function App() {
 
   return (
     <Page page="home">
-      {/* Band 1: Light Editorial Hero + Human | Agent toggle + Client Strip */}
+      {/* Band 1: Asymmetric Developer-Precision Hero */}
       <Hero source={source} />
 
-      {/* Band 2: Dark Contrast Band — Interactive ORP Deal Simulator */}
+      {/* Band 2: Obsidian Contrast Band — Interactive ORP Deal Simulator */}
       <section
         id="showcase"
         aria-labelledby="showcase-h"
         className="band-dark relative scroll-mt-20 border-t border-line"
       >
-        <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <div className="max-w-2xl">
-            <p className="eyebrow">{t.showcaseBand.eyebrow}</p>
             <h2
               id="showcase-h"
-              className="h-display mt-3 text-3xl font-bold tracking-tighter text-balance text-t1 sm:text-4xl md:text-5xl"
+              className="h-display text-3xl font-bold tracking-tighter text-balance text-t1 sm:text-4xl"
             >
               {t.showcaseBand.heading}
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-t2 sm:text-lg">
+            <p className="mt-3 text-base leading-relaxed text-t2">
               {t.showcaseBand.lead}
             </p>
           </div>
-          <div id="simulator-slot" className="mt-10 scroll-mt-24">
+          <div id="simulator-slot" className="mt-8 scroll-mt-24">
             <DealSimulator />
           </div>
         </div>
       </section>
 
-      {/* Band 3: Light Editorial Band — Deal Templates */}
+      {/* Band 3: Light Architectural Band — Deal Templates (1px hairline grid) */}
       <section id="templates" aria-labelledby="templates-h" className="band-light border-t border-line">
-        <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div className="max-w-2xl">
-              <p className="eyebrow">{t.templates.eyebrow}</p>
               <h2
                 id="templates-h"
-                className="h-display mt-3 text-3xl font-bold tracking-tighter text-balance text-t1 sm:text-4xl md:text-5xl"
+                className="h-display text-3xl font-bold tracking-tighter text-balance text-t1 sm:text-4xl"
               >
                 {t.templates.heading}
               </h2>
-              <p className="mt-4 text-base leading-relaxed text-t2 sm:text-lg">
+              <p className="mt-3 text-base leading-relaxed text-t2">
                 {t.templates.lead}
               </p>
             </div>
@@ -114,8 +112,8 @@ export function App() {
             </div>
           </div>
 
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {t.templates.items.map((item, i) => {
+          <div className="mt-10 grid overflow-hidden rounded-lg border-t border-l border-line sm:grid-cols-2 lg:grid-cols-3">
+            {t.templates.items.map((item) => {
               const Icon = templateIcons[item.id] ?? Code2
               return (
                 <a
@@ -123,26 +121,23 @@ export function App() {
                   href={withSource(item.href, source)}
                   data-track="template_card"
                   data-track-to={item.id}
-                  className="group relative flex flex-col justify-between rounded-xl border border-line bg-s1 p-6 text-left transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-s0"
+                  className="group relative flex flex-col justify-between border-r border-b border-line bg-s1 p-6 text-left transition-colors duration-150 hover:bg-s0"
                 >
                   <div>
                     <div className="flex items-center justify-between gap-3">
-                      <span className="inline-flex items-center gap-2 font-mono text-xs text-t2">
-                        <span>{String(i + 1).padStart(2, '0')}</span>
-                        <Icon className="h-4 w-4 text-t1" aria-hidden="true" />
-                      </span>
+                      <Icon className="h-4 w-4 text-maker-brand" aria-hidden="true" />
                       <span className="font-mono text-[11px] font-medium text-t2">
                         {item.tag}
                       </span>
                     </div>
-                    <h3 className="mt-4 font-display text-xl font-bold tracking-tight text-t1">
+                    <h3 className="mt-4 font-display text-lg font-bold tracking-tight text-t1">
                       {item.name}
                     </h3>
                     <p className="mt-2 text-sm leading-relaxed text-t2">
                       {item.body}
                     </p>
                   </div>
-                  <div className="mt-5 flex items-center justify-between border-t border-line/80 pt-3.5">
+                  <div className="mt-5 flex items-center justify-between border-t border-line pt-3">
                     <span className="font-mono text-xs font-medium text-t1">{item.terms}</span>
                     <ArrowUpRight
                       className="h-4 w-4 text-t2 transition-transform duration-150 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-t1"
@@ -156,14 +151,14 @@ export function App() {
         </div>
       </section>
 
-      {/* Band 4: Dark Contrast Band — Live Proof (NetworkWall + PostPreview) */}
+      {/* Band 4: Obsidian Contrast Band — Live Proof (NetworkWall + PostPreview) */}
       <div id="live-proof" className="band-dark relative border-t border-line">
         <div className="relative">
           <NetworkWall />
-          <section id="post-preview" aria-labelledby="preview-h" className="scroll-mt-24 mx-auto max-w-6xl px-5 pb-16 pt-2 md:pb-24">
+          <section id="post-preview" aria-labelledby="preview-h" className="mx-auto max-w-6xl scroll-mt-24 px-5 pb-16 pt-2 md:pb-20">
             <div className="flex items-center gap-4">
               <span className="h-px flex-1 bg-line" aria-hidden="true" />
-              <span id="preview-h" className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-t2">
+              <span id="preview-h" className="text-xs font-semibold text-t2">
                 {t.previewSection.tryLabel}
               </span>
               <span className="h-px flex-1 bg-line" aria-hidden="true" />
@@ -175,26 +170,25 @@ export function App() {
         </div>
       </div>
 
-      {/* Band 5: Light Editorial Band — Human Approval & Safety */}
+      {/* Band 5: Light Band — Human Approval & Safety */}
       <section id="limits" aria-labelledby="limits-h" className="band-light border-t border-line">
-        <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
+        <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
           <div className="max-w-2xl">
-            <p className="eyebrow">{t.safety.eyebrow}</p>
             <h2
               id="limits-h"
-              className="h-display mt-3 text-3xl font-bold tracking-tighter text-balance text-t1 sm:text-4xl md:text-5xl"
+              className="h-display text-3xl font-bold tracking-tighter text-balance text-t1 sm:text-4xl"
             >
               {t.safety.heading}
             </h2>
-            <p className="mt-4 text-base leading-relaxed text-t2 sm:text-lg">
+            <p className="mt-3 text-base leading-relaxed text-t2">
               {t.safety.lead}
             </p>
           </div>
 
-          {/* 3 Control Modes: Off / Ask / Auto — single segmented control bar */}
+          {/* 3 Control Modes: Off / Ask / Auto — flat hairline-divided strip */}
           <div
             aria-label="Approval modes: Off, Ask, Auto"
-            className="mt-10 grid overflow-hidden rounded-2xl border border-line-strong bg-s1 divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0"
+            className="mt-8 grid overflow-hidden rounded-lg border border-line bg-s1 divide-y divide-line md:grid-cols-3 md:divide-x md:divide-y-0"
           >
             {t.safety.modes.map((mode) => {
               const Icon = modeIcons[mode.id]
@@ -208,20 +202,22 @@ export function App() {
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-2 font-display text-xl font-bold tracking-tight text-t1">
+                    <span className="inline-flex items-center gap-2 font-display text-lg font-bold tracking-tight text-t1">
                       <Icon className={cn('h-4 w-4', isAsk ? 'text-maker-brand' : 'text-t2')} aria-hidden="true" />
                       {mode.name}
                     </span>
                     <span
                       className={cn(
-                        'rounded-full px-2.5 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wide',
-                        isAsk ? 'bg-maker-soft text-maker' : 'bg-s2 text-t2'
+                        'rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                        isAsk
+                          ? 'border-maker-brand/30 bg-maker-soft text-maker'
+                          : 'border-line bg-s2 text-t2'
                       )}
                     >
                       {mode.badge}
                     </span>
                   </div>
-                  <p className="mt-3 text-sm leading-relaxed text-t2">
+                  <p className="mt-2.5 text-sm leading-relaxed text-t2">
                     {mode.body}
                   </p>
                 </div>
@@ -231,10 +227,10 @@ export function App() {
 
           {/* Protocol Hard Checks & Safeguards — clean ruled checklist */}
           <div className="mt-12">
-            <h3 className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-t2">
+            <h3 className="text-sm font-semibold text-t1">
               {t.safety.checksHeading}
             </h3>
-            <dl className="mt-4 grid gap-x-10 border-t border-line sm:grid-cols-2">
+            <dl className="mt-3 grid gap-x-10 border-t border-line sm:grid-cols-2">
               {t.safety.checks.map((item, i) => {
                 const Icon = checkIcons[i] ?? ShieldCheck
                 return (
@@ -254,12 +250,12 @@ export function App() {
             </dl>
           </div>
 
-          {/* Compact With ORP vs By Hand strip */}
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
-            <article className="rounded-2xl border border-pub/40 bg-s1 p-6">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-display text-lg font-bold text-t1">{t.tradeoffs.withTitle}</h3>
-                <span className="rounded-full bg-pub-soft px-2 py-0.5 font-mono text-[11px] uppercase tracking-wide text-pub">
+          {/* Hairline-divided With ORP vs By Hand comparison */}
+          <div className="mt-10 grid overflow-hidden rounded-lg border border-line bg-s1 divide-y divide-line md:grid-cols-2 md:divide-x md:divide-y-0">
+            <article className="p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-display text-base font-bold text-t1">{t.tradeoffs.withTitle}</h3>
+                <span className="rounded-md border border-pub/25 bg-pub-soft px-2 py-0.5 text-[11px] font-medium text-pub">
                   {t.tradeoffs.chip}
                 </span>
               </div>
@@ -272,8 +268,8 @@ export function App() {
                 ))}
               </ul>
             </article>
-            <article className="rounded-2xl border border-line bg-s2/60 p-6">
-              <h3 className="font-display text-lg font-bold text-t1">{t.tradeoffs.withoutTitle}</h3>
+            <article className="bg-s0/70 p-6">
+              <h3 className="font-display text-base font-bold text-t1">{t.tradeoffs.withoutTitle}</h3>
               <ul className="mt-4 space-y-2.5">
                 {t.tradeoffs.withoutItems.slice(0, 3).map((item) => (
                   <li key={item} className="flex gap-2.5 text-sm leading-relaxed text-t2">
@@ -298,7 +294,7 @@ export function App() {
         </div>
       </section>
 
-      {/* Band 6: Warm Surface — FAQ + Final CTA (+ optional WordPress plugin link) + Padova Footer */}
+      {/* Band 6: Neutral Surface — FAQ + Final CTA */}
       <div className="band-warm border-t border-line">
         <FAQ />
       </div>

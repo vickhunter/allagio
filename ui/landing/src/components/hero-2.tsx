@@ -11,7 +11,7 @@ import { useLocale } from "@/i18n"
 type HeroAudience = "human" | "agent"
 
 const fadeUpVariants = {
-  initial: { opacity: 0, y: 20 },
+  initial: { opacity: 0, y: 12 },
   animate: { opacity: 1, y: 0 },
 }
 
@@ -24,7 +24,7 @@ export function Hero({ source }: { source: string }) {
   const { t } = useLocale()
   const animState = prefersReducedMotion || fadeInInView ? "animate" : "initial"
   const animTransition = (delay = 0) =>
-    prefersReducedMotion ? { duration: 0 } : { duration: 0.45, delay, ease }
+    prefersReducedMotion ? { duration: 0 } : { duration: 0.38, delay, ease }
   const [audience, setAudience] = useState<HeroAudience>(() =>
     typeof window !== "undefined" && window.location.hash === "#join" ? "agent" : "human"
   )
@@ -77,265 +77,298 @@ export function Hero({ source }: { source: string }) {
   }
 
   return (
-    <section id="hero" aria-labelledby="hero-h" className="band-light relative overflow-hidden">
+    <section id="hero" aria-labelledby="hero-h" className="band-light relative overflow-x-clip">
       <div data-hero-bg="fallback" aria-hidden="true" className="pointer-events-none absolute inset-0" />
-      <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center px-5 pt-12 pb-12 text-center md:pt-18 md:pb-16">
-        <motion.p
-          animate={animState}
-          variants={fadeUpVariants}
-          initial={prefersReducedMotion ? false : "initial"}
-          transition={animTransition(0)}
-          className="eyebrow text-t2"
-        >
-          {t.hero.eyebrow}
-        </motion.p>
-
-        <motion.h1
-          id="hero-h"
-          ref={fadeInRef}
-          className="h-display mt-5 max-w-4xl text-4xl font-bold tracking-tighter text-balance text-t1 sm:text-5xl md:text-6xl md:leading-[1.03]"
-          animate={animState}
-          variants={fadeUpVariants}
-          initial={prefersReducedMotion ? false : "initial"}
-          transition={animTransition(0.06)}
-        >
-          {t.hero.h1}
-        </motion.h1>
-
-        <motion.p
-          className="mt-4 max-w-2xl text-base leading-relaxed font-medium text-balance text-t2 sm:text-lg"
-          animate={animState}
-          variants={fadeUpVariants}
-          initial={prefersReducedMotion ? false : "initial"}
-          transition={animTransition(0.12)}
-        >
-          {t.hero.support}
-        </motion.p>
-
-        {/* Human | Agent audience switcher */}
-        <motion.div
-          animate={animState}
-          variants={fadeUpVariants}
-          initial={prefersReducedMotion ? false : "initial"}
-          transition={animTransition(0.16)}
-          className="mt-7 flex w-full flex-col items-center"
-        >
-          <div
-            role="tablist"
-            aria-label={t.hero.toggleLabel}
-            className="inline-flex items-center rounded-full border border-line-strong bg-s1 p-1 shadow-xs"
-          >
-            <button
-              ref={humanTabRef}
-              type="button"
-              role="tab"
-              id="hero-tab-human"
-              tabIndex={audience === "human" ? 0 : -1}
-              aria-selected={audience === "human"}
-              aria-controls="hero-panel-human"
-              onClick={() => setAudience("human")}
-              onKeyDown={onTabKeyDown}
-              className={cn(
-                "inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-[color,background-color,transform] duration-150 active:scale-[0.98]",
-                audience === "human"
-                  ? "bg-t1 text-s0 shadow-xs"
-                  : "text-t2 hover:text-t1"
-              )}
+      <div className="relative z-10 mx-auto max-w-6xl px-5 pt-10 pb-12 md:pt-16 md:pb-16">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] lg:items-start lg:gap-12">
+          {/* Left column: left-aligned developer-precision typography & controls */}
+          <div className="min-w-0 text-left">
+            <motion.h1
+              id="hero-h"
+              ref={fadeInRef}
+              className="h-display max-w-[16ch] text-4xl font-bold tracking-[-0.04em] text-balance text-t1 sm:text-5xl lg:text-[56px] lg:leading-[1.03]"
+              animate={animState}
+              variants={fadeUpVariants}
+              initial={prefersReducedMotion ? false : "initial"}
+              transition={animTransition(0)}
             >
-              <User className="h-4 w-4" aria-hidden="true" />
-              {t.hero.toggleHuman}
-            </button>
-            <button
-              ref={agentTabRef}
-              type="button"
-              role="tab"
-              id="hero-tab-agent"
-              tabIndex={audience === "agent" ? 0 : -1}
-              aria-selected={audience === "agent"}
-              aria-controls="hero-panel-agent"
-              onClick={() => setAudience("agent")}
-              onKeyDown={onTabKeyDown}
-              className={cn(
-                "inline-flex min-h-11 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-[color,background-color,transform] duration-150 active:scale-[0.98]",
-                audience === "agent"
-                  ? "bg-t1 text-s0 shadow-xs"
-                  : "text-t2 hover:text-t1"
-              )}
+              {t.hero.h1}
+            </motion.h1>
+
+            <motion.p
+              className="mt-5 max-w-[54ch] text-base leading-relaxed font-normal text-t2 sm:text-[17px]"
+              animate={animState}
+              variants={fadeUpVariants}
+              initial={prefersReducedMotion ? false : "initial"}
+              transition={animTransition(0.05)}
             >
-              <Terminal className="h-4 w-4" aria-hidden="true" />
-              {t.hero.toggleAgent}
-            </button>
-          </div>
+              {t.hero.support}
+            </motion.p>
 
-          {audience === "human" ? (
-            <div
-              id="hero-panel-human"
-              role="tabpanel"
-              aria-labelledby="hero-tab-human"
-              className="mt-6 flex w-full flex-col items-center gap-4"
+            {/* Segmented Human | Agent switcher — crisp 6px radii */}
+            <motion.div
+              animate={animState}
+              variants={fadeUpVariants}
+              initial={prefersReducedMotion ? false : "initial"}
+              transition={animTransition(0.1)}
+              className="mt-7"
             >
-              <div className="flex flex-wrap items-center justify-center gap-3">
-                <a
-                  className="inline-flex min-h-12 items-center gap-2 rounded-full bg-t1 px-6 text-sm font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md active:scale-[0.98]"
-                  href={withSource(setupHref, source)}
-                  data-primary-action
-                  data-track="hero_cta"
-                  data-track-to="agents"
-                >
-                  {t.hero.ctaPrimary}
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </a>
-                <a
-                  className="inline-flex min-h-12 items-center gap-2 rounded-full border border-line-strong bg-s1 px-6 text-sm font-semibold text-t1 transition-[transform,box-shadow,background-color] duration-150 hover:-translate-y-px hover:bg-s2 hover:shadow-sm active:scale-[0.98]"
-                  href="#simulator-slot"
-                  data-track="hero_cta"
-                  data-track-to="simulator"
-                >
-                  {t.hero.ctaPreview}
-                  <ArrowDownRight className="h-4 w-4 text-maker-brand" aria-hidden="true" />
-                </a>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-t2">
-                <a
-                  className="inline-flex min-h-11 items-center font-semibold text-t1 underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-t1"
-                  href={withSource(t.hero.ctaMakerHref, source)}
-                  data-track="hero_cta"
-                  data-track-to="makers"
-                >
-                  {t.hero.ctaMaker}
-                </a>
-                <a
-                  className="inline-flex min-h-11 items-center font-semibold text-t1 underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-t1"
-                  href={withSource(t.hero.ctaPublisherHref, source)}
-                  data-track="hero_cta"
-                  data-track-to="publishers"
-                >
-                  {t.hero.ctaPublisher}
-                </a>
-                <a
-                  className="inline-flex min-h-11 items-center font-semibold text-t2 underline decoration-line underline-offset-4 transition-colors hover:text-t1 hover:decoration-t1"
-                  href={signInHref("/owner", source)}
-                  data-track="hero_signin"
-                >
-                  {t.chrome.signIn}
-                </a>
-              </div>
-
-              {/* Compact above-the-fold product stage preview */}
               <div
-                aria-label="Illustrative product flow: offer to human approval to labelled placement"
-                className="mt-4 w-full max-w-4xl rounded-2xl border border-line-strong bg-s1 p-4 text-left shadow-sm sm:p-5"
+                role="tablist"
+                aria-label={t.hero.toggleLabel}
+                className="inline-flex items-center rounded-md border border-line bg-s2 p-0.5"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
-                  <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-t2">
-                    Illustrative flow · Offer to labelled placement
-                  </span>
-                  <a
-                    href="#simulator-slot"
-                    className="inline-flex min-h-11 items-center gap-1 font-mono text-xs font-semibold text-maker-brand underline-offset-4 hover:underline"
-                  >
-                    Step through in simulator
-                    <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />
-                  </a>
-                </div>
-                <div className="mt-3.5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-line bg-s0 p-3.5">
-                    <p className="font-mono text-[11px] uppercase tracking-wider text-t2">01 · Agent offer</p>
-                    <p className="mt-1.5 text-sm font-semibold text-t1">15% recurring · 30d window</p>
-                    <p className="mt-1 font-mono text-xs text-t2">acme-deploy.agent → priya-ships.agent</p>
-                  </div>
-                  <div className="rounded-xl border border-maker-brand/40 bg-maker-soft/60 p-3.5">
-                    <p className="font-mono text-[11px] uppercase tracking-wider text-maker">02 · Human gate (Ask)</p>
-                    <p className="mt-1.5 text-sm font-semibold text-t1">Paused for your decision</p>
-                    <p className="mt-1 text-xs text-t2">Approve, counter, or refuse. Zero boxes placed until you sign off.</p>
-                  </div>
-                  <div className="rounded-xl border border-line bg-s0 p-3.5">
-                    <p className="font-mono text-[11px] uppercase tracking-wider text-t2">03 · Labelled placement</p>
-                    <p className="mt-1.5 text-sm font-semibold text-t1">Sponsored, via Allagio</p>
-                    <p className="mt-1 inline-flex items-center gap-1 font-mono text-xs text-t2">
-                      <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-maker-brand" aria-hidden="true" />
-                      rel=&quot;sponsored&quot; · ORP receipt
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div
-              id="hero-panel-agent"
-              data-join-prompt=""
-              role="tabpanel"
-              aria-labelledby="hero-tab-agent"
-              className="band-dark relative mt-7 w-full max-w-[46rem] overflow-hidden rounded-2xl border border-line-strong p-5 text-left shadow-xl sm:p-6"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-pub/80" aria-hidden="true" />
-                  <span className="font-mono text-xs font-medium text-t1">{t.hero.agentTitle}</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
-                  <span className="rounded-md bg-pub-soft px-2 py-0.5 text-pub">POST /orp/join</span>
-                  <span className="rounded-md bg-s2 px-2 py-0.5 text-t2">/mcp</span>
-                  <a href="/llms.txt" className="rounded-md bg-s2 px-2 py-0.5 text-t1 underline-offset-2 hover:underline">llms.txt</a>
-                </div>
-              </div>
-
-              <p className="mt-3 text-sm leading-relaxed text-t2">{t.hero.agentLead}</p>
-
-              <div id="join" className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words rounded-xl border border-line bg-s1 px-3.5 py-3 font-mono text-xs leading-relaxed text-t1 sm:text-[13px]">
-                  <code>{joinPrompt}</code>
-                </pre>
                 <button
+                  ref={humanTabRef}
                   type="button"
-                  onClick={copyQuickstart}
+                  role="tab"
+                  id="hero-tab-human"
+                  tabIndex={audience === "human" ? 0 : -1}
+                  aria-selected={audience === "human"}
+                  aria-controls="hero-panel-human"
+                  onClick={() => setAudience("human")}
+                  onKeyDown={onTabKeyDown}
                   className={cn(
-                    "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition-colors duration-150",
-                    copied
-                      ? "bg-pub text-s0"
-                      : "bg-t1 text-s0 hover:bg-t1/90"
+                    "inline-flex min-h-11 items-center gap-2 rounded-[5px] px-4 text-sm font-semibold transition-colors duration-150",
+                    audience === "human"
+                      ? "bg-s1 text-t1 shadow-2xs"
+                      : "text-t2 hover:text-t1"
                   )}
                 >
-                  {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
-                  {copied ? t.connect.copiedLabel : t.connect.copyLabel}
+                  <User className="h-4 w-4" aria-hidden="true" />
+                  {t.hero.toggleHuman}
+                </button>
+                <button
+                  ref={agentTabRef}
+                  type="button"
+                  role="tab"
+                  id="hero-tab-agent"
+                  tabIndex={audience === "agent" ? 0 : -1}
+                  aria-selected={audience === "agent"}
+                  aria-controls="hero-panel-agent"
+                  onClick={() => setAudience("agent")}
+                  onKeyDown={onTabKeyDown}
+                  className={cn(
+                    "inline-flex min-h-11 items-center gap-2 rounded-[5px] px-4 text-sm font-semibold transition-colors duration-150",
+                    audience === "agent"
+                      ? "bg-s1 text-t1 shadow-2xs"
+                      : "text-t2 hover:text-t1"
+                  )}
+                >
+                  <Terminal className="h-4 w-4" aria-hidden="true" />
+                  {t.hero.toggleAgent}
                 </button>
               </div>
-              <p role="status" aria-live="polite" className="mt-1.5 min-h-5 font-mono text-xs text-pub">
-                {copied ? t.connect.copiedStatus : ""}
-              </p>
 
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3 text-xs font-semibold">
-                <a href="/llms.txt" className="inline-flex min-h-9 items-center text-pub underline underline-offset-4 hover:no-underline">
-                  llms.txt
-                </a>
-                <a href="/docs" className="inline-flex min-h-9 items-center text-t1 underline underline-offset-4 hover:no-underline">
-                  {t.hero.agentDocsLink}
-                </a>
-                <a href={withSource(setupHref, source)} className="inline-flex min-h-9 items-center text-t2 underline underline-offset-4 hover:text-t1 hover:no-underline">
-                  {t.hero.agentGuideLink}
-                </a>
+              {audience === "human" ? (
+                <div
+                  id="hero-panel-human"
+                  role="tabpanel"
+                  aria-labelledby="hero-tab-human"
+                  className="mt-5 flex flex-col gap-4"
+                >
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <a
+                      className="inline-flex min-h-11 items-center gap-2 rounded-md bg-t1 px-5 text-sm font-semibold text-s0 transition-colors duration-150 hover:bg-t1/90"
+                      href={withSource(setupHref, source)}
+                      data-primary-action
+                      data-track="hero_cta"
+                      data-track-to="agents"
+                    >
+                      {t.hero.ctaPrimary}
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                    <a
+                      className="inline-flex min-h-11 items-center gap-2 rounded-md border border-line-strong bg-s1 px-4 text-sm font-semibold text-t1 transition-colors duration-150 hover:bg-s2"
+                      href="#simulator-slot"
+                      data-track="hero_cta"
+                      data-track-to="simulator"
+                    >
+                      {t.hero.ctaPreview}
+                      <ArrowDownRight className="h-4 w-4 text-maker-brand" aria-hidden="true" />
+                    </a>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-t2">
+                    <a
+                      className="inline-flex min-h-11 items-center font-medium text-t1 underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-t1"
+                      href={withSource(t.hero.ctaMakerHref, source)}
+                      data-track="hero_cta"
+                      data-track-to="makers"
+                    >
+                      {t.hero.ctaMaker}
+                    </a>
+                    <a
+                      className="inline-flex min-h-11 items-center font-medium text-t1 underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-t1"
+                      href={withSource(t.hero.ctaPublisherHref, source)}
+                      data-track="hero_cta"
+                      data-track-to="publishers"
+                    >
+                      {t.hero.ctaPublisher}
+                    </a>
+                    <a
+                      className="inline-flex min-h-11 items-center font-medium text-t2 underline decoration-line underline-offset-4 transition-colors hover:text-t1 hover:decoration-t1"
+                      href={signInHref("/owner", source)}
+                      data-track="hero_signin"
+                    >
+                      {t.chrome.signIn}
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  id="hero-panel-agent"
+                  data-join-prompt=""
+                  role="tabpanel"
+                  aria-labelledby="hero-tab-agent"
+                  className="band-dark relative mt-5 w-full overflow-hidden rounded-lg border border-line-strong text-left"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-pub" aria-hidden="true" />
+                      <span className="font-mono text-xs font-medium text-t1">{t.hero.agentTitle}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 font-mono text-[11px]">
+                      <span className="rounded bg-s2 px-2 py-0.5 text-t1">POST /orp/join</span>
+                      <span className="rounded bg-s2 px-2 py-0.5 text-t2">/mcp</span>
+                      <a href="/llms.txt" className="rounded bg-s2 px-2 py-0.5 text-t1 underline-offset-2 hover:underline">llms.txt</a>
+                    </div>
+                  </div>
+
+                  <div className="p-4">
+                    <p className="text-sm leading-relaxed text-t2">{t.hero.agentLead}</p>
+
+                    <div id="join" className="mt-3.5 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                      <pre className="min-w-0 flex-1 whitespace-pre-wrap break-words rounded-md border border-line bg-s1 px-3.5 py-2.5 font-mono text-xs leading-relaxed text-t1 sm:text-[13px]">
+                        <code>{joinPrompt}</code>
+                      </pre>
+                      <button
+                        type="button"
+                        onClick={copyQuickstart}
+                        className={cn(
+                          "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition-colors duration-150",
+                          copied
+                            ? "bg-pub text-s0"
+                            : "bg-t1 text-s0 hover:bg-t1/90"
+                        )}
+                      >
+                        {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
+                        {copied ? t.connect.copiedLabel : t.connect.copyLabel}
+                      </button>
+                    </div>
+                    <p role="status" aria-live="polite" className="mt-1.5 min-h-5 font-mono text-xs text-pub">
+                      {copied ? t.connect.copiedStatus : ""}
+                    </p>
+
+                    <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3 text-xs font-semibold">
+                      <a href="/llms.txt" className="inline-flex min-h-9 items-center text-t1 underline decoration-line-strong underline-offset-4 hover:decoration-t1">
+                        llms.txt
+                      </a>
+                      <a href="/docs" className="inline-flex min-h-9 items-center text-t1 underline decoration-line-strong underline-offset-4 hover:decoration-t1">
+                        {t.hero.agentDocsLink}
+                      </a>
+                      <a href={withSource(setupHref, source)} className="inline-flex min-h-9 items-center text-t2 underline decoration-line underline-offset-4 hover:text-t1">
+                        {t.hero.agentGuideLink}
+                      </a>
+                    </div>
+
+                    <details className="mt-2 border-t border-line pt-2 text-xs text-t2">
+                      <summary className="inline-flex min-h-10 cursor-pointer items-center font-semibold text-t1">
+                        {t.connect.summary}
+                      </summary>
+                      <ol className="mt-2 list-decimal space-y-1 pl-4 font-mono text-[12px] text-t2">
+                        {t.connect.steps.map((step) => (
+                          <li key={step}>{step}</li>
+                        ))}
+                      </ol>
+                      <p className="mt-2 text-xs text-t2">{t.connect.noSignIn}</p>
+                    </details>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+
+          {/* Right column: razor-sharp obsidian wire trace preview (flat hairline rows, zero nested cards) */}
+          <div
+            aria-label="Wire trace preview: offer to human approval to labelled placement"
+            className="min-w-0 overflow-hidden rounded-lg border border-[#23262E] bg-[#0B0C0E] text-[#FAFAFA]"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.09] bg-[#111317] px-4 py-2.5">
+              <div className="flex items-center gap-2 font-mono text-xs text-[#A1A1AA]">
+                <span className="h-2 w-2 rounded-full bg-[#C64F38]" aria-hidden="true" />
+                <span className="text-[#FAFAFA]">orp/0.4</span>
+                <span>·</span>
+                <span>wire trace</span>
               </div>
-
-              <details className="mt-2 border-t border-line pt-2 text-xs text-t2">
-                <summary className="inline-flex min-h-10 cursor-pointer items-center font-semibold text-t1">
-                  {t.connect.summary}
-                </summary>
-                <ol className="mt-2 space-y-1 pl-4 font-mono text-[12px] text-t2 list-decimal">
-                  {t.connect.steps.map((step) => (
-                    <li key={step}>{step}</li>
-                  ))}
-                </ol>
-                <p className="mt-2 text-xs text-t2">{t.connect.noSignIn}</p>
-              </details>
+              <a
+                href="#simulator-slot"
+                className="inline-flex min-h-9 items-center gap-1 font-mono text-xs font-medium text-[#E07A63] underline-offset-4 hover:underline"
+              >
+                Step through in simulator
+                <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
             </div>
-          )}
-        </motion.div>
 
-        {/* Honest MCP / HTTP compatibility note */}
-        <div className="mt-8 w-full border-t border-line/80 pt-5">
-          <p className="font-mono text-xs text-t2">
-            Open wire via HTTP (<code className="text-t1">POST /orp/join</code>) or MCP (<code className="text-t1">/mcp</code>).{" "}
+            <ol className="divide-y divide-white/[0.09]">
+              <li className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 px-4 py-3.5">
+                <div className="font-mono text-xs text-[#A1A1AA]">
+                  <span className="text-[#FAFAFA]">offer</span>
+                  <span className="mt-0.5 block text-[11px] text-[#71717A]">POST /orp</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[#FAFAFA]">15% recurring · 30d window</p>
+                  <p className="mt-0.5 truncate font-mono text-xs text-[#A1A1AA]">
+                    acme-deploy.agent → priya-ships.agent
+                  </p>
+                </div>
+              </li>
+
+              <li className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 bg-[#111317]/60 px-4 py-3.5">
+                <div className="font-mono text-xs">
+                  <span className="inline-flex items-center gap-1.5 text-[#FBBF24]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#FBBF24]" aria-hidden="true" />
+                    ask
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-[#71717A]">human gate</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[#FAFAFA]">Paused for your decision</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-[#A1A1AA]">
+                    Approve, counter, or refuse. Zero placements published until you sign off.
+                  </p>
+                </div>
+              </li>
+
+              <li className="grid grid-cols-[78px_minmax(0,1fr)] gap-3 px-4 py-3.5">
+                <div className="font-mono text-xs">
+                  <span className="inline-flex items-center gap-1.5 text-[#4ADE80]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#4ADE80]" aria-hidden="true" />
+                    receipt
+                  </span>
+                  <span className="mt-0.5 block text-[11px] text-[#71717A]">verified</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[#FAFAFA]">Sponsored, via Allagio</p>
+                  <p className="mt-0.5 inline-flex items-center gap-1.5 font-mono text-xs text-[#A1A1AA]">
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#4ADE80]" aria-hidden="true" />
+                    rel=&quot;sponsored&quot; · GET /orp/proof/prf_8f2a…
+                  </p>
+                </div>
+              </li>
+            </ol>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.09] bg-[#111317] px-4 py-2.5 font-mono text-[11px] text-[#A1A1AA]">
+              <span>sha256:9f4c2b8a1d7e…e41b02</span>
+              <span className="text-[#71717A]">Demo trace · Try interactive simulator below</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Honest wire compatibility footer strip */}
+        <div className="mt-10 border-t border-line pt-4">
+          <p className="text-xs text-t2">
+            Open wire via HTTP (<code className="font-mono text-t1">POST /orp/join</code>) or MCP (<code className="font-mono text-t1">/mcp</code>).{" "}
             <a
               href={withSource(setupHref, source)}
               className="font-semibold text-t1 underline decoration-line-strong underline-offset-4 hover:decoration-t1"

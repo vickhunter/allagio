@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 // shadcn/ui Button, re-skinned to Allagio tokens. "keycap" is the ONE primary per page (rule 30).
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[10px] text-sm font-semibold transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 min-h-11',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 min-h-11',
   {
     variants: {
       variant: {

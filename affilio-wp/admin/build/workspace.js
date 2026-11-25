@@ -412,23 +412,26 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const today = new Date(); today.setUTCHours(0,0,0,0);
         const stamps = (dates || []).map(value => new Date(value)).filter(t => !isNaN(t));
         if (!stamps.length) return '';
-        // The APIs cap their lists (50 records), so days before the oldest
-        // returned record have no data — shrink the window instead of
-        // showing false empty bars there.
-        const days = Math.min(30, Math.max(1, Math.ceil((today - Math.min(...stamps)) / 864e5) + 1));
+        // Minimum 7-day window so sparse 1-day activity renders as a crisp bar
+        // beside baseline ticks instead of a 100%-wide solid slab.
+        const rawDays = Math.ceil((today - Math.min(...stamps)) / 864e5) + 1;
+        const days = Math.min(30, Math.max(7, rawDays));
         const buckets = Array(days).fill(0);
         stamps.forEach(t => { const i = Math.min(days - 1, days - 1 - Math.floor((today - t) / 864e5)); if (i >= 0) buckets[i]++; });
         const max = Math.max(1, ...buckets);
-        const bw = 100 / days;
+        const slot = 140 / days;
+        const barW = Math.max(3, Math.min(12, slot - 2.5));
         const bars = buckets.map((n, i) => {
             const day = new Date(today.getTime() - (days - 1 - i) * 864e5).toISOString().slice(0, 10);
-            const height = (n / max) * 34;
-            return `<rect x="${(i * bw).toFixed(2)}" y="${(40 - height).toFixed(2)}" width="${(bw - 0.4).toFixed(2)}" height="${Math.max(height, n ? 1 : 0.4).toFixed(2)}" rx="0.4"${n ? '' : ' class="spark-empty"'}><title>${n} on ${day}</title></rect>`;
+            const height = n ? Math.max(4, (n / max) * 24) : 2;
+            const x = i * slot + (slot - barW) / 2;
+            return `<rect x="${x.toFixed(1)}" y="${(26 - height).toFixed(1)}" width="${barW.toFixed(1)}" height="${height.toFixed(1)}" rx="1"${n ? '' : ' class="spark-empty"'}><title>${n} on ${day}</title></rect>`;
         }).join('');
-        const first = new Date(today.getTime() - (days - 1) * 864e5).toISOString().slice(0, 10);
         const last = today.toISOString().slice(0, 10);
-        const caption = `${label} · last ${days} ${days === 1 ? 'day' : 'days'}`;
-        return `<div class="stat-card spark"><span class="stat-label">${caption}</span><svg viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="${caption}">${bars}</svg><p class="stat-note"><span>${first}</span><span>${last}</span></p></div>`;
+        const rangeText = rawDays <= 1
+            ? `${stamps.length} on ${last}`
+            : `${stamps.length} in last ${days} days`;
+        return `<div class="activity-metric"><div class="activity-metric-meta"><span class="activity-metric-label">${escape(label)}</span><span class="activity-metric-range">${escape(rangeText)}</span></div><svg viewBox="0 0 140 28" role="img" aria-label="${escape(label)}: ${escape(rangeText)}">${bars}</svg></div>`;
     };
     const accountForm = (role) => `<section><h2>${role === 'maker' ? 'Connect your builder account' : 'Connect your publisher account'}</h2><form method="post" action="/owner/accounts"><input type="hidden" name="csrf" value="${escape(csrf)}"><input type="hidden" name="role" value="${role}">${role === 'publisher' ? field('domain','Your content domain','','placeholder="your-blog.com"') : ''}<details><summary>Connect an existing account</summary>${field('api_key','Existing owner key','','type="password" autocomplete="off"')}</details><button>Connect account</button></form></section>`;
     const commission = offer => offer.commission_type === 'percentage' ? `${offer.commission_value}% of the first purchase` : `${money(offer.commission_value,offer.currency || offer.commission_currency)} per first purchase`;
@@ -468,8 +471,8 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         ].join('');
 
         const approvalStrip = pendingCount > 0
-            ? `<section class="approval-strip is-pending" aria-label="Pending approvals"><div class="approval-strip-head"><div><span class="eyebrow">ACTION NEEDED · HUMAN APPROVAL</span><h2>${pendingCount} ${pendingCount === 1 ? 'item waits' : 'items wait'} for your sign-off</h2></div><a class="button secondary" href="/owner/deals">Open deals inbox ↗</a></div><ul class="approval-list">${approvalRows}</ul></section>`
-            : `<section class="approval-strip is-clear" aria-label="Pending approvals"><div class="approval-strip-head"><div><span class="eyebrow">APPROVAL QUEUE · CLEAR</span><h2>No deals or placements waiting for your sign-off</h2></div><div class="actions"><a class="button secondary" href="/owner/deals">View deals</a><a class="button secondary" href="/owner/settings#step-modes">Autonomy rules</a></div></div></section>`;
+            ? `<section class="approval-strip is-pending" aria-label="Pending approvals"><div class="approval-strip-head"><div><h2>${pendingCount} ${pendingCount === 1 ? 'item waits' : 'items wait'} for your sign-off</h2></div><a class="button secondary" href="/owner/deals">Open deals inbox ↗</a></div><ul class="approval-list">${approvalRows}</ul></section>`
+            : `<section class="approval-strip is-clear" aria-label="Pending approvals"><div class="approval-strip-head"><div><h2>No deals or placements waiting for your sign-off</h2></div><div class="actions"><a class="button secondary" href="/owner/deals">View deals</a><a class="button secondary" href="/owner/settings#step-modes">Autonomy rules</a></div></div></section>`;
 
         const activeDeals = deals.filter(d => !['declined', 'revoked', 'failed'].includes(String(d.state || '').toLowerCase())).length;
         const gateActive = approvalSteps.includes('ask');
@@ -529,14 +532,14 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
             })),
         ].sort((a, b) => new Date(b.ts || 0) - new Date(a.ts || 0)).slice(0, 5);
 
-        const recentSection = `<section><div class="row"><div><span class="eyebrow">RECENT ACTIVITY</span><h2>Latest agent negotiations &amp; placements</h2></div><a class="button secondary" href="/owner/deals">All deals ↗</a></div>${recentItems.length
+        const recentSection = `<section><div class="row"><div><h2>Latest agent negotiations &amp; placements</h2></div><a class="button secondary" href="/owner/deals">All deals ↗</a></div>${recentItems.length
             ? `<ul class="activity-list">${recentItems.map(item => `<li class="activity-item"><div><a class="activity-title" href="${escape(item.href)}">${escape(item.title)}</a><p class="caption" style="margin:2px 0 0">${escape(item.meta)}${item.ts ? ` · ${escape(new Date(item.ts).toLocaleString())}` : ''}</p></div><div class="deal-badges">${item.badge}${item.status}</div></li>`).join('')}</ul>`
             : empty('No deal activity yet.', 'Connect an agent in Setup &amp; agents or register a product to start negotiating deals.')}</section>`;
 
         const rail = session.maker ? railMarkup(pickFocus(products, offers), false) : '';
 
         busy(false);
-        root.innerHTML = `${approvalStrip}${kpis}${recentSection}${rail}<div class="grid"><section><span class="eyebrow">BUILDERS</span><h2>Give your product an offer.</h2><p>Connect your existing agent, verify readiness and publish standing terms that publisher agents can negotiate.</p><a class="button" data-primary-action href="${makerHref}">${makerLabel} ↗</a></section><section><span class="eyebrow">PUBLISHERS</span><h2>Approve every placement.</h2><p>Match articles to relevant products, enforce hard disclosure checks and keep final sign-off on what ships.</p><a class="button secondary" href="${session.publisher ? '/owner/placements' : '/owner/settings'}">${session.publisher ? 'Open placements' : 'Connect your content'} ↗</a></section></div><section><span class="eyebrow">AGENT HANDOFF</span><h2>One setup. Your own agent.</h2><p>Run this command in your repository to install the Allagio skill and connect your agent over MCP.</p>${copyCommand(session.install_command)}<p class="caption">Node 20+ · Codex CLI handoff · Cursor and Claude Code configuration</p></section>`;
+        root.innerHTML = `${approvalStrip}${kpis}${recentSection}${rail}<div class="grid"><section><h2>Give your product an offer.</h2><p>Connect your existing agent, verify readiness and publish standing terms that publisher agents can negotiate.</p><a class="button" data-primary-action href="${makerHref}">${makerLabel} ↗</a></section><section><h2>Approve every placement.</h2><p>Match articles to relevant products, enforce hard disclosure checks and keep final sign-off on what ships.</p><a class="button secondary" href="${session.publisher ? '/owner/placements' : '/owner/settings'}">${session.publisher ? 'Open placements' : 'Connect your content'} ↗</a></section></div><section><h2>One setup. Your own agent.</h2><p>Run this command in your repository to install the Allagio skill and connect your agent over MCP.</p>${copyCommand(session.install_command)}<p class="caption">Node 20+ · Codex CLI handoff · Cursor and Claude Code configuration</p></section>`;
     };
     const productForm = (product, primaryRegister, registered) => `<section><h2>${product ? 'Edit product' : 'Register a product'}</h2><form data-product="${escape(product?.id || '')}"><div class="form-grid">${field('name','Product name',product?.name,'required maxlength="255"')}${field('website_url','Website',product?.website_url,'type="url" required maxlength="512"')}${field('tagline','What does it help people do?',product?.tagline,'required maxlength="512"',true)}${field('docs_url','Documentation URL',product?.docs_url,'type="url"')}${field('pricing_url','Pricing URL',product?.pricing_url,'type="url"')}${field('primary_category','Category',product?.primary_category,'placeholder="developer tools" autocomplete="off"')}${field('keywords','Topics, separated by commas',(product?.keywords || []).join(', '),'placeholder="postgres, monitoring, debugging" autocomplete="off"')}</div><p class="caption">Your product stays private until its offer is submitted and listed.</p><button ${!product && primaryRegister ? 'data-primary-action' : 'class="secondary"'}>${product ? 'Save changes' : 'Register product'}</button>${product ? '<button type="button" class="secondary" data-cancel-edit>Cancel</button>' : ''}${registered ? '<p id="product-registered" class="success" role="status" tabindex="-1">Product registered. It is in your list.</p>' : ''}</form></section>`;
     const productsPage = async (options = {}) => {
@@ -916,23 +919,32 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         root.querySelector('[data-batch]').addEventListener('submit',event => { event.preventDefault(); const form = event.currentTarget; run(form.querySelector('button'),async () => { const data = await api('/review/payouts/batch','POST',{min_payout:Number(new FormData(form).get('minimum')),include_test_mode:false}); report(`${data.payouts.length} payout batches prepared. No money was transferred.`); }); });
         root.querySelectorAll('[data-review]').forEach(button => button.addEventListener('click',() => run(button,async () => { await api(`/review/offers/${button.dataset.review}/${button.dataset.decision}`,'POST',{}); await reviewPage(); })));
     };
-    const dealRoleLabel = deal => deal.role === 'offerer' ? 'Your agent offered this deal' : deal.role === 'acceptor' ? 'Your agent accepted this deal' : 'Your agent holds a seat';
-    const dealParties = deal => {
+    const dealRoleLabel = deal => deal.role === 'offerer' ? 'Proposed by your agent' : deal.role === 'acceptor' ? 'Accepted by your agent' : 'Seat held by your agent';
+    const dealPartiesText = deal => {
         if (deal.parties && deal.parties.length) {
-            return `<p class="deal-parties">${deal.parties.map(party => `<span class="deal-party${party.you ? ' you' : ''}">${escape(party.id)}${party.role ? ` · ${escape(party.role)}` : ''}</span>`).join('')}</p>`;
+            return deal.parties.map(party => `${party.you ? '<span class="you-tag">' : ''}${escape(party.id)}${party.role ? ` (${escape(party.role)})` : ''}${party.you ? '</span>' : ''}`).join(' · ');
         }
-        return deal.counterparty ? `<p class="deal-parties"><span class="deal-party">${escape(deal.counterparty)}</span></p>` : '';
+        return deal.counterparty ? escape(deal.counterparty) : '—';
     };
-    const dealCard = deal => {
+    const dealTermsText = deal => {
+        const kind = deal.kind ? `<span class="deal-kind-inline">${escape(deal.kind)}</span>` : '';
+        const obs = Array.isArray(deal.obligations) && deal.obligations.length
+            ? ` · ${escape(deal.obligations.slice(0, 2).join(', '))}`
+            : '';
+        return `${kind}${obs}` || '—';
+    };
+    const dealQueueItem = deal => {
         const date = new Date(deal.updated_at);
         const proofHref = deal.proof_url || `/orp/proof/${encodeURIComponent(deal.id)}`;
-        const obligationsSummary = Array.isArray(deal.obligations) && deal.obligations.length
-            ? `<div class="deal-obligations-summary" aria-label="Obligations">${deal.obligations.map(item => `<span class="obligation-chip">${escape(item)}</span>`).join('')}</div>`
-            : '';
-        const approve = deal.waiting_on_you && deal.approve_url
+        const approve = deal.approve_url
             ? `<div class="deal-terms" data-terms-for="${escape(deal.id)}"><p class="caption">Loading the terms…</p></div><div class="actions"><button type="button" data-primary-action data-approve-url="${escape(deal.approve_url)}" data-approve-deal="${escape(deal.id)}" disabled>Approve this deal</button><a class="button secondary" href="${escape(deal.approve_url)}">Open the approval page ↗</a><p class="caption">Waiting on your ${escape(deal.waiting_step || 'approval')} step. Terms load before you can approve.</p></div>`
             : '';
-        return `<section class="deal${deal.waiting_on_you ? ' waiting' : ''}"><div class="row"><h3>${escape(deal.title || 'Untitled deal')}</h3><div class="deal-badges">${kindBadge(deal.kind)}${pill(deal.state)}</div></div><div class="deal-meta"><span>${escape(dealRoleLabel(deal))} · updated ${escape(date.toLocaleString())}</span><a class="deal-proof-link" href="${escape(proofHref)}" target="_blank" rel="noopener noreferrer">Public proof ↗</a></div>${dealParties(deal)}${obligationsSummary}${approve}<details class="deal-events" data-deal="${escape(deal.id)}"><summary>Timeline</summary><div class="deal-timeline"><p class="caption">Loading…</p></div></details></section>`;
+        return `<li class="deal-queue-item"><div class="deal-queue-top"><div><h3>${escape(deal.title || 'Untitled deal')}</h3><p class="deal-queue-sub">${escape(dealRoleLabel(deal))} · ${dealPartiesText(deal)} · updated ${escape(date.toLocaleDateString())}</p></div><div class="deal-cell-actions">${pill(deal.state)}<a class="deal-proof-link" href="${escape(proofHref)}" target="_blank" rel="noopener noreferrer">Public proof ↗</a></div></div>${approve}<details class="deal-events" data-deal="${escape(deal.id)}"><summary>Timeline</summary><div class="deal-timeline"><p class="caption">Loading…</p></div></details></li>`;
+    };
+    const dealTableRow = deal => {
+        const date = new Date(deal.updated_at);
+        const proofHref = deal.proof_url || `/orp/proof/${encodeURIComponent(deal.id)}`;
+        return `<li class="deal-row"><div class="deal-row-grid"><div class="deal-cell-title"><strong>${escape(deal.title || 'Untitled deal')}</strong><span>${escape(dealRoleLabel(deal))} · ${escape(date.toLocaleDateString())}</span></div><div class="deal-cell-party">${dealPartiesText(deal)}</div><div class="deal-cell-terms">${dealTermsText(deal)}</div><div class="deal-cell-status">${pill(deal.state)}</div><div class="deal-cell-actions"><a class="deal-proof-link" href="${escape(proofHref)}" target="_blank" rel="noopener noreferrer">Public proof ↗</a></div></div><details class="deal-events" data-deal="${escape(deal.id)}"><summary>Timeline</summary><div class="deal-timeline"><p class="caption">Loading…</p></div></details></li>`;
     };
     const dealsPage = async () => {
         busy(true);
@@ -944,13 +956,16 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const activeCount = deals.filter(deal => ['active', 'completed'].includes(String(deal.state || '').toLowerCase())).length;
         const summaryStats = `<div class="stat-grid">${statCard('Total deals', deals.length, 'ORP negotiations')}${statCard('Needs decision', waiting.length, waiting.length ? 'Waiting on your approval' : 'Queue clear', waiting.length ? 'is-alert' : '')}${statCard('Active & completed', activeCount, 'Signed on protocol', activeCount ? 'is-live' : '')}</div>`;
         const pending = waiting.length
-            ? `<section class="deal-pending"><span class="eyebrow">HUMAN APPROVAL QUEUE</span><h2>Needs your decision</h2>${waiting.map(dealCard).join('')}</section>`
+            ? `<div class="deal-pending"><div class="deal-pending-head"><h2>Needs your decision</h2>${pill(`${waiting.length} waiting`)}</div><ul class="deal-queue-list">${waiting.map(dealQueueItem).join('')}</ul></div>`
             : '';
+        const tableRows = waiting.length ? otherDeals : deals;
         const listHeading = waiting.length ? 'Other deals' : 'All deals';
-        const listBody = waiting.length
-            ? (otherDeals.length ? otherDeals.map(dealCard).join('') : '<p class="caption">Every open deal is waiting in your approval queue above.</p>')
-            : (deals.length ? deals.map(dealCard).join('') : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.'));
-        root.innerHTML = `${summaryStats}<section><span class="eyebrow">OPEN RAILS PROTOCOL</span><h2>Agent deals</h2><p>Offers your agent proposed, accepted, or joined through ORP. Every deal links to its public proof record and waits on you only when your approval gates say so.</p>${sparkline(deals.map(deal => deal.created_at), 'Deal activity')}</section>${pending}<h2>${listHeading}</h2>${listBody}`;
+        const listBody = tableRows.length
+            ? `<div class="deals-table-wrap"><div class="deals-table-head" aria-hidden="true"><span>Deal</span><span>Counterparty</span><span>Terms</span><span>Status</span><span style="text-align:right">Action</span></div><ul class="deals-table-body">${tableRows.map(dealTableRow).join('')}</ul></div>`
+            : (waiting.length
+                ? '<p class="caption">Every open deal is waiting in your approval queue above.</p>'
+                : empty('No deals yet.','When your agent negotiates a deal it appears here. Start an agent from Setup &amp; agents.'));
+        root.innerHTML = `${summaryStats}<div class="deals-header-row"><div class="deals-header-copy"><h2>Agent deals</h2><p>Offers your agent proposed, accepted, or joined through ORP. Every deal links to its public proof record.</p></div>${sparkline(deals.map(deal => deal.created_at), 'Deal activity')}</div>${pending}<h2>${listHeading}</h2>${listBody}`;
         const termsMarkup = terms => {
             if (!terms) return '<p class="caption">Terms could not be read for this deal.</p>';
             const obligations = Array.isArray(terms.obligations) ? terms.obligations : [];

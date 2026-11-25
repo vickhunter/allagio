@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeftRight, ArrowRight, ArrowUpRight, Bot, CheckCircle2, Clock, FlaskConical, Radio, ShieldCheck, Users } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
+import { ArrowLeftRight, ArrowRight, ArrowUpRight, Bot, CheckCircle2, FlaskConical, Radio, ShieldCheck, Users } from 'lucide-react'
 import { useLocale, type Lang } from '@/i18n'
 import { useSource, withSource } from '@/lib/source'
 import {
@@ -19,24 +17,20 @@ import {
 const ACTIVE = new Set(['active', 'completed', 'executed'])
 const RECIPROCAL_KINDS = new Set(['swap', 'link_exchange', 'traffic_swap'])
 
-const KIND_LABELS: Record<string, { label: string; variant: 'pub' | 'maker' | 'setup' | 'neutral' }> = {
-  affiliate: { label: 'Affiliate', variant: 'pub' },
-  sponsored: { label: 'Sponsored', variant: 'maker' },
-  swap: { label: 'Cross-Post Swap', variant: 'setup' },
-  link_exchange: { label: 'Link Exchange', variant: 'setup' },
-  traffic_swap: { label: 'Traffic Swap', variant: 'setup' },
-  partnership: { label: 'Rev-Share', variant: 'maker' },
-  cross_sell: { label: 'Cross-Sell', variant: 'pub' },
-  repost: { label: 'Repost', variant: 'neutral' },
+const KIND_LABELS: Record<string, string> = {
+  affiliate: 'Affiliate',
+  sponsored: 'Sponsored',
+  swap: 'Cross-Post Swap',
+  link_exchange: 'Link Exchange',
+  traffic_swap: 'Traffic Swap',
+  partnership: 'Rev-Share',
+  cross_sell: 'Cross-Sell',
+  repost: 'Repost',
 }
 
-function getKindMeta(kind: string): { label: string; variant: 'pub' | 'maker' | 'setup' | 'neutral' } {
+function getKindLabel(kind: string): string {
   const key = (kind || '').toLowerCase()
-  return KIND_LABELS[key] ?? { label: kind.replace(/_/g, ' '), variant: 'pub' }
-}
-
-function stateVariant(state: string): 'maker' | 'pub' | 'neutral' {
-  return ACTIVE.has(state) ? 'pub' : 'neutral'
+  return KIND_LABELS[key] ?? kind.replace(/_/g, ' ')
 }
 
 function ago(iso: string, lang: Lang) {
@@ -103,24 +97,21 @@ function buildSandboxDeals(): WallDeal[] {
   ]
 }
 
-function PartyChip({ face, roles, roleLabel }: { face: Face; roles: Record<string, string>; roleLabel: string }) {
+function PartyInline({ face, roles }: { face: Face; roles: Record<string, string> }) {
   const { text, named } = partyText(face, roles)
   return (
-    <div className="min-w-0 flex-1 rounded-xl border border-line bg-s0/80 px-3 py-2">
-      <p className="font-mono text-[10px] uppercase tracking-wider text-t2">{roleLabel}</p>
-      <p className="mt-0.5 flex items-center gap-1.5 truncate text-sm">
-        {named ? (
-          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-pub" />
-        ) : (
-          <Bot aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-t2" />
-        )}
-        <span className={`min-w-0 truncate ${named ? 'font-semibold text-t1' : 'text-t2'}`}>{text}</span>
-      </p>
-    </div>
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      {named ? (
+        <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-pub" />
+      ) : (
+        <Bot aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-t2" />
+      )}
+      <span className={`truncate ${named ? 'font-medium text-t1' : 'text-t2'}`}>{text}</span>
+    </span>
   )
 }
 
-function DealCard({
+function DealRow({
   deal,
   roles,
   lang,
@@ -131,87 +122,85 @@ function DealCard({
   lang: Lang
   sandbox?: boolean
 }) {
-  const kindMeta = getKindMeta(deal.kind)
+  const kindLabel = getKindLabel(deal.kind)
   const isActive = ACTIVE.has(deal.state)
   const isReciprocal = RECIPROCAL_KINDS.has((deal.kind || '').toLowerCase())
 
   return (
-    <Card
-      className="group relative flex h-full flex-col gap-3.5 overflow-hidden p-5 transition-colors hover:border-line-strong"
+    <li
       data-deal-card
       data-deal-sandbox={sandbox ? 'true' : 'false'}
+      className="grid gap-2 px-4 py-3.5 transition-colors hover:bg-s2/40 md:grid-cols-[132px_minmax(0,1fr)_180px_110px_100px] md:items-center md:gap-4"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant={kindMeta.variant}>{kindMeta.label}</Badge>
-          <Badge variant={stateVariant(deal.state)}>
-            <span
-              aria-hidden="true"
-              className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-pub' : 'bg-t2'}`}
-            />
-            {deal.state}
-          </Badge>
-          {deal.parties > 2 ? (
-            <Badge variant="neutral">
-              <Users aria-hidden="true" className="h-3 w-3" />
-              {deal.parties} parties
-            </Badge>
-          ) : null}
-        </div>
-        {sandbox ? (
-          <span className="shrink-0 whitespace-nowrap font-mono text-[10px] uppercase tracking-wider text-t2">sample</span>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold text-t1">{kindLabel}</span>
+        {deal.parties > 2 ? (
+          <span className="inline-flex items-center gap-1 font-mono text-[11px] text-t2">
+            <Users aria-hidden="true" className="h-3 w-3" />
+            {deal.parties}
+          </span>
         ) : null}
       </div>
 
-      {/* Party-to-party deal flow */}
-      <div className="flex items-center gap-2">
-        <PartyChip face={deal.offerer} roles={roles} roleLabel="Offerer" />
-        <div
-          aria-hidden="true"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line bg-s2/70 text-t1"
-        >
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+        <PartyInline face={deal.offerer} roles={roles} />
+        <span className="text-t2" aria-hidden="true">
           {isReciprocal ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5" />}
-        </div>
-        <PartyChip face={deal.acceptor} roles={roles} roleLabel="Acceptor" />
+        </span>
+        <PartyInline face={deal.acceptor} roles={roles} />
       </div>
 
-      {/* Verification indicator & timestamp */}
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs text-t2">
+      <div className="inline-flex items-center gap-1.5 font-mono text-[11px] text-t2">
+        <ShieldCheck aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-pub' : 'text-maker'}`} />
+        <span>{isActive ? 'ORP verified' : 'Pending gate'}</span>
+      </div>
+
+      <div>
         <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-t1">
-          <ShieldCheck aria-hidden="true" className={`h-3.5 w-3.5 ${isActive ? 'text-pub' : 'text-t2'}`} />
-          {isActive ? 'Agent-signed · ORP verified' : 'Agent-signed · Pending gate'}
-        </span>
-        <span className="inline-flex items-center gap-1 font-mono text-[11px]">
-          <Clock aria-hidden="true" className="h-3 w-3" />
-          {sandbox ? 'Sample deal' : ago(deal.updated_at, lang)}
+          <span
+            aria-hidden="true"
+            className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-pub' : 'bg-maker'}`}
+          />
+          {deal.state}
         </span>
       </div>
-    </Card>
+
+      <div className="font-mono text-[11px] text-t2 md:text-right">
+        {sandbox ? 'Sample deal' : ago(deal.updated_at, lang)}
+      </div>
+    </li>
   )
 }
 
-function OfferCard({ offer, joinLabel }: { offer: WallOffer; joinLabel: string }) {
+function OfferCell({ offer, joinLabel }: { offer: WallOffer; joinLabel: string }) {
   const commission = commissionText(offer)
   return (
-    <Card className="flex h-full flex-col gap-2.5 p-5 transition-colors hover:border-line-strong" data-offer-card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          {offer.primary_category ? (
-            <p className="font-mono text-[10px] uppercase tracking-wider text-t2">{offer.primary_category}</p>
+    <li
+      data-offer-card
+      className="flex min-w-0 flex-col justify-between gap-2.5 border-r border-b border-line bg-s1 p-5 transition-colors hover:bg-s2/40"
+    >
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            {offer.primary_category ? (
+              <p className="text-xs text-t2">{offer.primary_category}</p>
+            ) : null}
+            <h4 className="mt-0.5 truncate font-display text-base font-bold text-t1">{offer.product_name}</h4>
+          </div>
+          {commission ? (
+            <span className="shrink-0 font-mono text-xs font-semibold text-maker-brand">{commission}</span>
           ) : null}
-          <h3 className="mt-0.5 min-w-0 truncate font-display text-lg font-semibold text-t1">{offer.product_name}</h3>
         </div>
-        {commission ? <Badge variant="maker">{commission}</Badge> : null}
+        <p className="mt-2 text-sm leading-relaxed text-t2">{offer.product_tagline}</p>
       </div>
-      <p className="min-w-0 text-sm leading-relaxed text-t2">{offer.product_tagline}</p>
       <a
-        className="mt-auto inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-t1 underline underline-offset-4 hover:text-pub"
+        className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-t1 underline decoration-line-strong underline-offset-4 hover:decoration-t1"
         href={offer.website_url}
       >
         {joinLabel}
         <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
       </a>
-    </Card>
+    </li>
   )
 }
 
@@ -256,17 +245,16 @@ export function NetworkWall() {
   const displayRows = showingSandbox ? sandboxDeals : liveRows
 
   return (
-    <section id="network" aria-labelledby="network-h" className="border-t border-line bg-s2/40">
+    <section id="network" aria-labelledby="network-h">
       <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
-            <p className="kicker">{showingSandbox ? 'Sample activity' : copy.kicker}</p>
-            <h2 id="network-h" className="h-display mt-3 text-3xl sm:text-4xl">
+            <h2 id="network-h" className="h-display text-3xl sm:text-4xl">
               {showingSandbox ? 'How deals look on the wire' : copy.heading}
             </h2>
-            <p className="mt-4 text-lg leading-relaxed text-t2">
+            <p className="mt-3 text-base leading-relaxed text-t2">
               {showingSandbox
-                ? 'Illustrative sample deals showing the parties, states, and ORP verification metadata recorded when agents transact.'
+                ? 'Sample activity illustrating the parties, states, and ORP verification metadata recorded when agents transact.'
                 : copy.lead}
             </p>
           </div>
@@ -275,14 +263,14 @@ export function NetworkWall() {
             <div
               role="group"
               aria-label="Network activity source"
-              className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-line bg-s1 p-1 self-start md:self-auto"
+              className="inline-flex shrink-0 items-center gap-0.5 self-start rounded-md border border-line bg-s1 p-0.5 md:self-auto"
             >
               <button
                 type="button"
                 data-wall-mode="live"
                 aria-pressed={!showingSandbox}
                 onClick={() => setViewMode('live')}
-                className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 font-mono text-xs font-medium transition-colors ${
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-[5px] px-3 text-xs font-medium transition-colors ${
                   !showingSandbox ? 'bg-t1 text-s0' : 'text-t2 hover:text-t1'
                 }`}
               >
@@ -294,8 +282,8 @@ export function NetworkWall() {
                 data-wall-mode="sandbox"
                 aria-pressed={showingSandbox}
                 onClick={() => setViewMode('sandbox')}
-                className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 font-mono text-xs font-medium transition-colors ${
-                  showingSandbox ? 'bg-inv text-tinv' : 'text-t2 hover:text-t1'
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-[5px] px-3 text-xs font-medium transition-colors ${
+                  showingSandbox ? 'bg-s2 text-t1' : 'text-t2 hover:text-t1'
                 }`}
               >
                 <FlaskConical aria-hidden="true" className="h-3.5 w-3.5" />
@@ -311,18 +299,18 @@ export function NetworkWall() {
           </p>
         ) : null}
 
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-t2">{copy.dealsLabel}</h3>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-t1">{copy.dealsLabel}</h3>
           {showingSandbox ? (
             <span
               data-sandbox-banner
-              className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-s1 px-3 py-1 font-mono text-xs text-t1"
+              className="inline-flex items-center gap-1.5 rounded-md border border-line bg-s1 px-2.5 py-1 text-xs text-t2"
             >
               <FlaskConical aria-hidden="true" className="h-3.5 w-3.5 text-maker" />
               Sample network activity (sandbox)
             </span>
           ) : liveRows.length > 0 ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-pub/30 bg-pub-soft px-3 py-1 font-mono text-xs text-pub">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-pub/30 bg-pub-soft px-2.5 py-1 font-mono text-xs text-pub">
               <Radio aria-hidden="true" className="h-3.5 w-3.5" />
               {liveRows.length} live on the wire
             </span>
@@ -330,47 +318,55 @@ export function NetworkWall() {
         </div>
 
         {!showingSandbox && deals === 'loading' ? (
-          <p className="mt-4 text-t2" role="status">{copy.loading}</p>
+          <p className="mt-4 text-sm text-t2" role="status">{copy.loading}</p>
         ) : null}
         {!showingSandbox && deals === 'error' ? (
-          <p className="mt-4 text-t1" role="alert">{copy.unavailable}</p>
+          <p className="mt-4 text-sm text-t1" role="alert">{copy.unavailable}</p>
         ) : null}
         {!showingSandbox && Array.isArray(deals) && liveRows.length === 0 ? (
-          <p className="mt-4 text-t1" role="status">{copy.quiet}</p>
+          <p className="mt-4 text-sm text-t1" role="status">{copy.quiet}</p>
         ) : null}
 
         {displayRows.length > 0 ? (
-          <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {displayRows.map((deal, i) => (
-              <li key={`${deal.kind}-${deal.updated_at}-${i}`} className="min-w-0">
-                <DealCard deal={deal} roles={roles} lang={lang} sandbox={showingSandbox} />
-              </li>
-            ))}
-          </ul>
+          <div className="mt-3 overflow-hidden rounded-lg border border-line bg-s1">
+            <div
+              aria-hidden="true"
+              className="hidden border-b border-line bg-s2/50 px-4 py-2 text-xs font-medium text-t2 md:grid md:grid-cols-[132px_minmax(0,1fr)_180px_110px_100px] md:gap-4"
+            >
+              <span>Kind</span>
+              <span>Counterparties</span>
+              <span>Verification</span>
+              <span>Status</span>
+              <span className="text-right">Record</span>
+            </div>
+            <ul className="divide-y divide-line">
+              {displayRows.map((deal, i) => (
+                <DealRow key={`${deal.kind}-${deal.updated_at}-${i}`} deal={deal} roles={roles} lang={lang} sandbox={showingSandbox} />
+              ))}
+            </ul>
+          </div>
         ) : null}
 
         {offers.length > 0 ? (
           <>
-            <h3 className="mt-12 text-sm font-semibold uppercase tracking-[0.12em] text-t2">{copy.offersLabel}</h3>
-            <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <h3 className="mt-12 text-sm font-semibold text-t1">{copy.offersLabel}</h3>
+            <ul className="mt-3 grid grid-cols-1 overflow-hidden rounded-lg border-t border-l border-line sm:grid-cols-2 lg:grid-cols-3">
               {offers.slice(0, 6).map((offer) => (
-                <li key={offer.offer_id} className="min-w-0">
-                  <OfferCard offer={offer} joinLabel={copy.joinLabel} />
-                </li>
+                <OfferCell key={offer.offer_id} offer={offer} joinLabel={copy.joinLabel} />
               ))}
             </ul>
           </>
         ) : null}
 
-        <p className="mt-8 flex flex-wrap gap-4 text-sm">
+        <p className="mt-8 flex flex-wrap gap-5 text-sm">
           <a
-            className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4"
+            className="inline-flex min-h-11 items-center font-semibold underline decoration-line-strong underline-offset-4 hover:decoration-t1"
             href={withSource('/makers/', source)}
           >
             {copy.directoryLink}
           </a>
           <a
-            className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4"
+            className="inline-flex min-h-11 items-center font-semibold underline decoration-line-strong underline-offset-4 hover:decoration-t1"
             href={withSource('/agents', source)}
           >
             {copy.agentsLink}
