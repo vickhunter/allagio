@@ -18,21 +18,25 @@ const orpJoinResponse = `{
   "limits": { "open_deals": 5, "messages_per_minute": 30 }
 }`
 
+async function copyWithFallback(value: string): Promise<string> {
+  try {
+    await navigator.clipboard.writeText(value)
+    return 'Copied'
+  } catch {
+    const area = document.createElement('textarea')
+    area.value = value
+    document.body.appendChild(area)
+    area.select()
+    const ok = document.execCommand('copy')
+    area.remove()
+    return ok ? 'Copied' : 'Select and copy'
+  }
+}
+
 function DarkCodeBlock({ label, value, copyLabel = 'Copy', statusName, primary }: { label: string; value: string; copyLabel?: string; statusName: string; primary?: boolean }) {
   const [status, setStatus] = useState('')
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setStatus('Copied')
-    } catch {
-      const area = document.createElement('textarea')
-      area.value = value
-      document.body.appendChild(area)
-      area.select()
-      const ok = document.execCommand('copy')
-      area.remove()
-      setStatus(ok ? 'Copied' : 'Select and copy')
-    }
+    setStatus(await copyWithFallback(value))
     window.setTimeout(() => setStatus(''), 2000)
   }
   return (
@@ -132,6 +136,11 @@ function InstallTabs() {
 
 export function App() {
   const source = useSource()
+  const [endpointStatus, setEndpointStatus] = useState('')
+  const handleCopyEndpoint = async () => {
+    setEndpointStatus(await copyWithFallback(mcpUrl))
+    window.setTimeout(() => setEndpointStatus(''), 2000)
+  }
   const publisherTools = tools.filter((tool) => !tool.maker)
   const makerTools = tools.filter((tool) => tool.maker)
 
@@ -162,14 +171,19 @@ export function App() {
                   <p className="text-xs font-medium text-t2">MCP endpoint</p>
                   <p className="mt-0.5 break-all font-mono text-sm font-medium text-t1" data-mcp-url>{mcpUrl}</p>
                 </div>
-                <button
-                  type="button"
-                  data-copy="endpoint"
-                  onClick={() => void navigator.clipboard?.writeText(mcpUrl)}
-                  className="inline-flex min-h-11 items-center rounded-md border border-line-strong bg-s1 px-3 font-mono text-xs font-semibold text-t1 transition-colors hover:bg-s2"
-                >
-                  Copy URL
-                </button>
+                <div className="flex items-center gap-2">
+                  <span role="status" aria-live="polite" data-copy-status="endpoint" className={endpointStatus ? 'font-mono text-[11px] text-pub' : 'sr-only'}>
+                    {endpointStatus}
+                  </span>
+                  <button
+                    type="button"
+                    data-copy="endpoint"
+                    onClick={handleCopyEndpoint}
+                    className="inline-flex min-h-11 items-center rounded-md border border-line-strong bg-s1 px-3 font-mono text-xs font-semibold text-t1 transition-colors hover:bg-s2"
+                  >
+                    {endpointStatus === 'Copied' ? 'Copied' : 'Copy URL'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
