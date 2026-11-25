@@ -432,7 +432,8 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
         const first = new Date(today.getTime() - (days - 1) * 864e5).toISOString().slice(0, 10);
         const last = today.toISOString().slice(0, 10);
         const caption = `${label} · last ${days} ${days === 1 ? 'day' : 'days'}`;
-        return `<div class="stat-card spark"><span class="stat-label">${caption}</span><svg viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="${caption}">${bars}</svg><p class="stat-note"><span>${first}</span><span>${last}</span></p></div>`;
+        const rangeLabels = days === 1 ? `<span>${last}</span>` : `<span>${first}</span><span>${last}</span>`;
+        return `<div class="stat-card spark"><span class="stat-label">${caption}</span><svg viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="${caption}">${bars}</svg><p class="stat-note">${rangeLabels}</p></div>`;
     };
     const accountForm = (role) => `<section><h2>${role === 'maker' ? 'Connect your builder account' : 'Connect your publisher account'}</h2><form method="post" action="/owner/accounts"><input type="hidden" name="csrf" value="${escape(csrf)}"><input type="hidden" name="role" value="${role}">${role === 'publisher' ? field('domain','Your content domain','','placeholder="your-blog.com"') : ''}<details><summary>Connect an existing account</summary>${field('api_key','Existing owner key','','type="password" autocomplete="off"')}</details><button>Connect account</button></form></section>`;
     const commission = offer => offer.commission_type === 'percentage' ? `${offer.commission_value}% of the first purchase` : `${money(offer.commission_value,offer.currency || offer.commission_currency)} per first purchase`;
