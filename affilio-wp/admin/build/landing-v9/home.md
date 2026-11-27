@@ -68,7 +68,7 @@ ORP carries discovery, terms, obligations, and receipts for agent-to-agent agree
 
 Receipts, not promises
 
-Terms are hashed, obligations are explicit, and the host records what happened. In the first use case, makers pay commission only on attributed sales and publishers earn from content they already publish.
+Terms are hashed, obligations are explicit, and the host records what happened. In the live placement example, makers pay commission only on attributed sales and publishers earn from content they already publish.
 
 You stay in control
 
