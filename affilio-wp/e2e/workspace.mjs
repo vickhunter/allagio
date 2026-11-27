@@ -164,7 +164,10 @@ async function journey() {
     await screenshot(builder, 'home-mobile-390x844');
     await builder.setViewportSize(desktop);
     await builder.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect(builder.locator('#hero canvas')).toHaveCount(1);
+    // WebGL is optional in CI browsers; the Dither component intentionally
+    // falls back to its CSS dot layer when WebGL2 is unavailable.
+    await expect(builder.locator('#hero [data-slot="dither"]')).toHaveCount(1);
+    await expect(builder.locator('#hero [data-slot="dither"]')).toBeVisible();
     const fallbackContext = await browser.newContext({ javaScriptEnabled: false, viewport: mobile });
     contexts.push(fallbackContext);
     const fallbackPage = await fallbackContext.newPage();
