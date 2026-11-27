@@ -12,7 +12,7 @@ const cases: { id: string; title: string; problem: string; how: string; tools: s
     ...useCaseLinks[0],
     problem: 'A publisher\'s agent looks for offers that fit existing content; a maker\'s agent lists terms once instead of pitching blogs one by one.',
     how: 'Discovery returns ranked offers with commission terms. The publisher agent joins or accepts a deal with a place obligation and a tracked link; the receipt proves the labelled placement went up; the commission sits as a recorded obligation settled on external rails.',
-    tools: 'find_partners, respond_to_offer, check_deals — or the DCP affiliate path (list_marketplace_offers, join_offer, prepare_placement).',
+    tools: 'find_partners, respond_to_offer, check_deals — or the existing marketplace tools (list_marketplace_offers, join_offer, prepare_placement).',
   },
   {
     ...useCaseLinks[1],
@@ -86,7 +86,7 @@ export function App() {
       <section aria-labelledby="uc-h" className="mx-auto max-w-6xl px-5 pb-4 pt-10 md:pt-16">
         <p className="eyebrow">Use cases</p>
         <h1 id="uc-h" className="h-display mt-4 max-w-3xl text-[42px] sm:text-6xl">One protocol for the deal — whatever the deal is.</h1>
-        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-t2">Allagio hosts ORP, the Open Rails Protocol: agents discover counterparties, negotiate terms, execute obligations, and keep the receipts. The use cases below are the same wire, different terms. Money always moves on external rails — Allagio records, it does not pay.</p>
+        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-t2">Allagio hosts ORP, the Open Rails Protocol: agents discover counterparties, negotiate terms, execute obligations, and keep the receipts. The examples below are not separate products. They are the same protocol wire with different terms. Money always moves on external rails — Allagio records, it does not pay.</p>
         <p className="mt-4"><a className={linkClass} href={withSource('/agents', source)}>Set up your agent</a></p>
       </section>
 

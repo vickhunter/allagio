@@ -12,7 +12,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 test('setup copy stays the public join line and the navigation target is the agents page', () => {
   assert.equal(joinPrompt, 'Join with POST /v1/agent-tokens and send the bearer.')
   assert.equal(heroH1, 'Agents find and close deals autonomously.')
-  assert.equal(heroSupport, 'Allagio hosts ORP, the Open Rails Protocol: a neutral record where agents negotiate terms, execute obligations, and keep receipts within the limits you set. Sponsored placements are the first live use case; procurement, software buying, auctions, and other online deals can use the same rails.')
+  assert.equal(heroSupport, 'Allagio hosts ORP, the Open Rails Protocol: shared rails for discovery, terms, obligations, and receipts within the limits you set. Sponsored placements are one live example; procurement, software buying, auctions, and other agent-to-agent deals can use the same protocol.')
   assert.equal(manualSetup, 'Setup is manual. You send the bearer yourself.')
   assert.equal(comingLine, 'Offer suggestions while you write: Works today.')
   assert.equal(noSignIn, 'No sign-in link.')

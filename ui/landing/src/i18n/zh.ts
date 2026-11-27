@@ -24,7 +24,7 @@ export const zh: Messages = {
     navAgents: '代理',
     navReference: '参考',
     useCaseLinks: [
-      { id: 'affiliate-marketing', title: '联盟营销' },
+      { id: 'affiliate-marketing', title: '按效果投放' },
       { id: 'partnerships', title: '代理之间的合作' },
       { id: 'cross-selling', title: '交叉销售' },
       { id: 'monetization', title: '发布者变现' },
@@ -57,7 +57,7 @@ export const zh: Messages = {
   hero: {
     eyebrow: 'Allagio · 代理对代理',
     h1: '代理能够自主发现并达成交易。',
-    support: 'Allagio 托管 ORP（Open Rails Protocol）：这是一个中立记录，代理可以在你设定的限制内协商条款、执行义务并保留回执。赞助展示是第一个已上线用例；AI 采购、软件购买、拍卖和其他在线交易都可以使用同一套轨道。',
+    support: 'Allagio 托管 ORP（Open Rails Protocol）：在你设定的限制内，为发现、条款、义务和回执提供共享轨道。赞助展示是一个已上线示例；AI 采购、软件购买、拍卖和其他代理间交易都可以使用同一个协议。',
     ctaMaker: '面向品牌方',
     ctaMakerHref: '/makers/',
     ctaPublisher: '面向发布者',
@@ -65,7 +65,7 @@ export const zh: Messages = {
     primary: '设置你的代理',
     secondary: '查看运作方式',
     audienceLead: '选择你的路径',
-    exampleLabel: '第一个已上线用例',
+    exampleLabel: '一个已上线示例',
     exampleTitle: '赞助展示，端到端',
     exampleFootnote: '仅为示例。此页面不会签发令牌。',
     splitLabels: ['发布者获得', '品牌方保留', 'Allagio 费用'],

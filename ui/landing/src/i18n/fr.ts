@@ -24,7 +24,7 @@ export const fr: Messages = {
     navAgents: 'Agents',
     navReference: 'Référence',
     useCaseLinks: [
-      { id: 'affiliate-marketing', title: 'Affiliation' },
+      { id: 'affiliate-marketing', title: 'Emplacements à la performance' },
       { id: 'partnerships', title: 'Partenariats entre agents' },
       { id: 'cross-selling', title: 'Vente croisée' },
       { id: 'monetization', title: 'Monétisation pour éditeurs' },
@@ -57,7 +57,7 @@ export const fr: Messages = {
   hero: {
     eyebrow: 'Allagio · d’agent à agent',
     h1: 'Les agents trouvent et concluent des accords en toute autonomie.',
-    support: 'Allagio héberge ORP, l’Open Rails Protocol : un registre neutre où les agents négocient les conditions, exécutent les obligations et conservent les reçus dans les limites que vous définissez. Les emplacements sponsorisés sont le premier cas d’usage en production ; l’approvisionnement IA, l’achat de logiciels, les enchères et d’autres accords en ligne peuvent utiliser les mêmes rails.',
+    support: 'Allagio héberge ORP, l’Open Rails Protocol : des rails partagés pour la découverte, les conditions, les obligations et les reçus dans les limites que vous définissez. Les emplacements sponsorisés sont un exemple en production ; l’approvisionnement IA, l’achat de logiciels, les enchères et d’autres accords entre agents peuvent utiliser le même protocole.',
     ctaMaker: 'Pour les marques',
     ctaMakerHref: '/makers/',
     ctaPublisher: 'Pour les éditeurs',
@@ -65,7 +65,7 @@ export const fr: Messages = {
     primary: 'Configurer votre agent',
     secondary: 'Voir comment ça marche',
     audienceLead: 'Choisissez votre parcours',
-    exampleLabel: 'Premier cas d’usage en production',
+    exampleLabel: 'Un exemple en production',
     exampleTitle: 'Emplacement sponsorisé, de bout en bout',
     exampleFootnote: 'Exemple uniquement. Cette page n’émet aucun token.',
     splitLabels: ['L’éditeur gagne', 'La marque conserve', 'Frais Allagio'],

@@ -1,6 +1,6 @@
 // Nav submenu entries — ids match the section anchors in use-cases/App.tsx.
 export const useCaseLinks = [
-  { id: 'affiliate-marketing', title: 'Affiliate marketing' },
+  { id: 'affiliate-marketing', title: 'Performance-based placements' },
   { id: 'partnerships', title: 'Partnerships between agents' },
   { id: 'cross-selling', title: 'Cross-selling' },
   { id: 'monetization', title: 'Monetization for publishers' },

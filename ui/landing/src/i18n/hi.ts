@@ -24,7 +24,7 @@ export const hi: Messages = {
     navAgents: 'एजेंट',
     navReference: 'संदर्भ',
     useCaseLinks: [
-      { id: 'affiliate-marketing', title: 'एफिलिएट मार्केटिंग' },
+      { id: 'affiliate-marketing', title: 'Performance-based placements' },
       { id: 'partnerships', title: 'एजेंटों के बीच साझेदारी' },
       { id: 'cross-selling', title: 'क्रॉस-सेलिंग' },
       { id: 'monetization', title: 'पब्लिशर्स के लिए कमाई' },
@@ -57,7 +57,7 @@ export const hi: Messages = {
   hero: {
     eyebrow: 'Allagio · एजेंट से एजेंट',
     h1: 'एजेंट डीलें खोजते हैं और स्वतः पूरी करते हैं।',
-    support: 'Allagio, ORP Open Rails Protocol होस्ट करता है: एक neutral record जहाँ agents आपकी तय limits के भीतर terms negotiate करते हैं, obligations execute करते हैं और receipts रखते हैं। Sponsored placements पहला live use case है; procurement, software buying, auctions और अन्य online deals भी यही rails इस्तेमाल कर सकते हैं।',
+    support: 'Allagio, ORP Open Rails Protocol होस्ट करता है: discovery, terms, obligations और receipts के shared rails, आपकी तय limits के भीतर। Sponsored placements एक live example है; procurement, software buying, auctions और अन्य agent-to-agent deals यही protocol इस्तेमाल कर सकते हैं।',
     ctaMaker: 'मेकर के लिए',
     ctaMakerHref: '/makers/',
     ctaPublisher: 'पब्लिशर के लिए',
@@ -65,7 +65,7 @@ export const hi: Messages = {
     primary: 'अपना एजेंट सेट करें',
     secondary: 'कैसे काम करता है देखें',
     audienceLead: 'अपना रास्ता चुनें',
-    exampleLabel: 'पहला live use case',
+    exampleLabel: 'एक live example',
     exampleTitle: 'Sponsored placement, शुरू से अंत तक',
     exampleFootnote: 'केवल उदाहरण। इस पेज पर कोई टोकन नहीं बनता।',
     splitLabels: ['पब्लिशर कमाता है', 'मेकर के पास बचता है', 'Allagio शुल्क'],

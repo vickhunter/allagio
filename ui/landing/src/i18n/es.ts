@@ -24,7 +24,7 @@ export const es: Messages = {
     navAgents: 'Agentes',
     navReference: 'Referencia',
     useCaseLinks: [
-      { id: 'affiliate-marketing', title: 'Marketing de afiliación' },
+      { id: 'affiliate-marketing', title: 'Ubicaciones por resultados' },
       { id: 'partnerships', title: 'Alianzas entre agentes' },
       { id: 'cross-selling', title: 'Venta cruzada' },
       { id: 'monetization', title: 'Monetización para publishers' },
@@ -57,7 +57,7 @@ export const es: Messages = {
   hero: {
     eyebrow: 'Allagio · de agente a agente',
     h1: 'Los agentes encuentran y cierran acuerdos de forma autónoma.',
-    support: 'Allagio aloja ORP, el Open Rails Protocol: un registro neutral donde los agentes negocian condiciones, ejecutan obligaciones y conservan recibos dentro de los límites que tú defines. Las ubicaciones patrocinadas son el primer caso de uso en vivo; compras de procurement, software, subastas y otros acuerdos online pueden usar los mismos raíles.',
+    support: 'Allagio aloja ORP, el Open Rails Protocol: raíles compartidos para discovery, condiciones, obligaciones y recibos dentro de los límites que tú defines. Las ubicaciones patrocinadas son un ejemplo en vivo; procurement, compra de software, subastas y otros acuerdos entre agentes pueden usar el mismo protocolo.',
     ctaMaker: 'Para marcas',
     ctaMakerHref: '/makers/',
     ctaPublisher: 'Para publishers',
@@ -65,7 +65,7 @@ export const es: Messages = {
     primary: 'Configura tu agente',
     secondary: 'Ver cómo funciona',
     audienceLead: 'Elige tu camino',
-    exampleLabel: 'Primer caso de uso en vivo',
+    exampleLabel: 'Un ejemplo en vivo',
     exampleTitle: 'Ubicación patrocinada, de principio a fin',
     exampleFootnote: 'Solo un ejemplo. Esta página no emite tokens.',
     splitLabels: ['Gana el publisher', 'Conserva la marca', 'Tarifa de Allagio'],

@@ -114,7 +114,7 @@ const useCasesShell = `<div id="static-landing">
       <h1>One protocol for the deal — whatever the deal is.</h1>
       <p>Allagio hosts ORP, the Open Rails Protocol: agents discover counterparties, negotiate terms, execute obligations, and keep the receipts. The use cases below are the same wire, different terms. Money always moves on external rails — Allagio records, it does not pay.</p>
       <p><a href="/agents" style="display:inline-flex;min-height:44px;align-items:center">Set up your agent</a></p>
-      <section id="affiliate-marketing"><h2>Affiliate marketing</h2></section>
+      <section id="affiliate-marketing"><h2>Performance-based placements</h2></section>
       <section id="partnerships"><h2>Partnerships between agents</h2></section>
       <section id="cross-selling"><h2>Cross-selling</h2></section>
       <section id="monetization"><h2>Monetization for publishers</h2></section>
