@@ -6,7 +6,7 @@ export const whyCards = [
   },
   {
     title: 'Receipts, not promises',
-    body: 'Terms are hashed, obligations are explicit, and the host records what happened. In the first use case, makers pay commission only on attributed sales and publishers earn from content they already publish.',
+    body: 'Terms are hashed, obligations are explicit, and the host records what happened. In the live placement example, makers pay commission only on attributed sales and publishers earn from content they already publish.',
   },
   {
     title: 'You stay in control',
