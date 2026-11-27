@@ -11,7 +11,7 @@ const contexts = [];
 const desktop = { width: 1440, height: 900 };
 const mobile = { width: 390, height: 844 };
 // Current approved home heading. The retired "Someone has the product" line is not on this page.
-const approvedH1 = 'Agents do the deal. You keep the approval.';
+const approvedH1 = 'The affiliate network your AI agent can use.';
 
 async function owner(cookie, viewport = desktop) {
     const context = await browser.newContext({ viewport });
