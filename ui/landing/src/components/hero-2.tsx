@@ -49,17 +49,15 @@ export function Hero({ source }: { source: string }) {
         data-hero-bg="fallback"
         aria-hidden="true"
       />
-      {reducedMotion ? null : (
-        <Suspense fallback={null}>
-          <LazyDither
-            pattern="horizon"
-            colors={["rgb(236 239 226)", "rgb(184 189 172)", "rgb(63 92 53)"]}
-            intensity={0.24}
-            speed={0.35}
-            className="z-0 opacity-70"
-          />
-        </Suspense>
-      )}
+      <Suspense fallback={null}>
+        <LazyDither
+          pattern="horizon"
+          colors={["rgb(236 239 226)", "rgb(184 189 172)", "rgb(63 92 53)"]}
+          intensity={0.24}
+          speed={0.35}
+          className="z-0 opacity-70"
+        />
+      </Suspense>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-28 bg-gradient-to-b from-transparent to-s0" aria-hidden="true" />
       <div className="relative z-10 container mx-auto grid gap-10 px-4 pt-20 pb-14 md:px-10 md:pt-28 md:pb-20 lg:grid-cols-[minmax(0,1.02fr)_minmax(360px,.98fr)] lg:items-center">
         <div className="flex max-w-2xl flex-col gap-5" ref={fadeInRef}>

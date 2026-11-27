@@ -155,9 +155,9 @@ async function journey() {
     await screenshot(builder, 'home-desktop-1440x900');
     await noHorizontalOverflow(builder);
     await builder.emulateMedia({ reducedMotion: 'reduce' });
-    // The hero's RetroGrid unmounts under reduced motion; the section
-    // background grid further down the page intentionally stays.
-    await expect(builder.locator('#hero canvas')).toHaveCount(0);
+    // The Dither canvas stays present under reduced motion; the component
+    // stops animating internally instead of removing the visual layer.
+    await expect(builder.locator('#hero canvas')).toHaveCount(1);
     await expect(builder.locator('[data-hero-bg="fallback"]')).toBeVisible();
     await revealGoogleSignIn(builder);
     await builder.setViewportSize(mobile);
