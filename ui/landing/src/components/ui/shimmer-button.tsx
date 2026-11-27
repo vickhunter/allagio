@@ -17,7 +17,7 @@ export function ShimmerButton({
   shimmerSize = "0.05em",
   shimmerDuration = "3s",
   borderRadius = "100px",
-  background = "var(--ink)",
+  background = "rgb(35 39 32)",
   className,
   children,
   style,
