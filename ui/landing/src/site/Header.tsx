@@ -72,7 +72,7 @@ export function Header({ page }: { page: PageKey }) {
               {t.chrome.navUseCases}
               <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 text-t2 transition-transform duration-150 group-hover:rotate-180 group-focus-within:rotate-180" />
             </a>
-            <div className="mt-1 w-full rounded-xl border border-line bg-white p-1.5 shadow-sm xl:invisible xl:absolute xl:left-1/2 xl:top-full xl:z-40 xl:mt-0 xl:w-64 xl:-translate-x-1/2 xl:translate-y-1 xl:opacity-0 xl:shadow-lg xl:transition-all xl:duration-150 xl:group-focus-within:visible xl:group-focus-within:translate-y-0 xl:group-focus-within:opacity-100 xl:group-hover:visible xl:group-hover:translate-y-0 xl:group-hover:opacity-100">
+            <div className="site-menu-submenu mt-1 w-full rounded-xl border border-line bg-white p-1.5 shadow-sm xl:invisible xl:absolute xl:left-1/2 xl:top-full xl:z-40 xl:mt-0 xl:w-64 xl:-translate-x-1/2 xl:translate-y-1 xl:opacity-0 xl:shadow-lg xl:transition-all xl:duration-150 xl:group-focus-within:visible xl:group-focus-within:translate-y-0 xl:group-focus-within:opacity-100 xl:group-hover:visible xl:group-hover:translate-y-0 xl:group-hover:opacity-100">
               {t.chrome.useCaseLinks.map((item) => (
                 <a
                   key={item.id}
