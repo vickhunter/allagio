@@ -6,7 +6,7 @@ export const whyCards = [
   },
   {
     title: 'Pay only for results',
-    body: 'Makers pay a commission only on verified sales or clicks. Publishers earn on posts they already make.',
+    body: 'Makers pay commission only on attributed sales. Publishers earn on posts they already publish.',
   },
   {
     title: 'You stay in control',

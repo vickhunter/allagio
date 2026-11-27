@@ -53,12 +53,19 @@ export const fr: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · d’agent à agent',
-    h1: 'Les agents font l’affaire. Vous gardez l’approbation.',
-    support: 'Les marques sont promues et ne paient qu’à la vente. Les créateurs gagnent sur les contenus déjà publiés. Votre agent IA trouve les partenaires, négocie les conditions et place l’offre — vous approuvez l’essentiel.',
-    ctaMaker: 'Je vends un produit',
+    h1: 'Le réseau d’affiliation que votre agent IA peut utiliser.',
+    support: 'Votre agent IA utilise Allagio pour trouver des partenaires, négocier les conditions et préparer un emplacement sponsorisé et identifié. Vos règles d’approbation décident de ce qui est publié. Les marques paient une commission uniquement sur les ventes attribuées ; les éditeurs gagnent sur leurs contenus déjà publiés.',
+    ctaMaker: 'Pour les marques',
     ctaMakerHref: '/makers/',
-    ctaPublisher: 'Je publie du contenu',
+    ctaPublisher: 'Pour les éditeurs',
     ctaPublisherHref: '/publishers/',
+    primary: 'Configurer votre agent',
+    secondary: 'Voir comment ça marche',
+    audienceLead: 'Choisissez votre parcours',
+    exampleLabel: 'Accord d’exemple',
+    exampleTitle: 'Une publication, une offre identifiée',
+    exampleFootnote: 'Exemple uniquement. Cette page n’émet aucun token.',
+    splitLabels: ['L’éditeur gagne', 'La marque conserve', 'Frais Allagio'],
   },
   clients: {
     heading: 'Fonctionne dans les agents que vous utilisez déjà.',
@@ -73,7 +80,7 @@ export const fr: Messages = {
       },
       {
         title: 'Payez au résultat',
-        body: 'Les marques versent une commission uniquement sur des ventes ou clics vérifiés. Les éditeurs gagnent sur leurs publications existantes.',
+        body: 'Les marques versent une commission uniquement sur les ventes attribuées. Les éditeurs gagnent sur leurs publications existantes.',
       },
       {
         title: 'Vous gardez le contrôle',

@@ -135,7 +135,7 @@
         '<div class="rail-line" aria-hidden="true">' +
           '<div class="station"><span class="flag">Agent</span><strong data-test="agent-source">' + esc(srcName) + '</strong></div>' +
           '<div class="track mid"></div>' +
-          '<div class="station mid"><span class="flag">Offer Rails</span><strong>Signed in</strong></div>' +
+          '<div class="station mid"><span class="flag">Allagio</span><strong>Signed in</strong></div>' +
           '<div class="track"></div>' +
           '<div class="station"><span class="flag">' + (primary === 'publisher' ? 'Site' : 'Project') + '</span><strong data-test="project-name">' + esc(project.name || 'Not found yet') + '</strong></div>' +
         '</div>' +

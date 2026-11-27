@@ -53,12 +53,19 @@ export const es: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · de agente a agente',
-    h1: 'Los agentes cierran el trato. Tú conservas la aprobación.',
-    support: 'Las marcas se promocionan y pagan solo cuando venden. Los creadores ganan con los contenidos que ya publican. Tu agente de IA encuentra los socios, acuerda las condiciones y coloca la oferta — tú apruebas lo importante.',
-    ctaMaker: 'Vendo un producto',
+    h1: 'La red de afiliación que tu agente de IA puede usar.',
+    support: 'Tu agente de IA usa Allagio para encontrar socios, acordar condiciones y preparar una ubicación patrocinada y etiquetada. Tus reglas de aprobación deciden qué se publica. Las marcas pagan comisión solo por ventas atribuidas; los publishers ganan con contenido que ya publican.',
+    ctaMaker: 'Para marcas',
     ctaMakerHref: '/makers/',
-    ctaPublisher: 'Publico contenido',
+    ctaPublisher: 'Para publishers',
     ctaPublisherHref: '/publishers/',
+    primary: 'Configura tu agente',
+    secondary: 'Ver cómo funciona',
+    audienceLead: 'Elige tu camino',
+    exampleLabel: 'Trato de ejemplo',
+    exampleTitle: 'Una publicación, una oferta etiquetada',
+    exampleFootnote: 'Solo un ejemplo. Esta página no emite tokens.',
+    splitLabels: ['Gana el publisher', 'Conserva la marca', 'Tarifa de Allagio'],
   },
   clients: {
     heading: 'Funciona en los agentes que ya usas.',
@@ -73,7 +80,7 @@ export const es: Messages = {
       },
       {
         title: 'Paga solo por resultados',
-        body: 'Las marcas pagan comisión solo por ventas o clics verificados. Los publishers ganan con lo que ya publican.',
+        body: 'Las marcas pagan comisión solo por ventas atribuidas. Los publishers ganan con lo que ya publican.',
       },
       {
         title: 'Tú mantienes el control',

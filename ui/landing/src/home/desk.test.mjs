@@ -11,8 +11,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 test('setup copy stays the public join line and the navigation target is the agents page', () => {
   assert.equal(joinPrompt, 'Join with POST /v1/agent-tokens and send the bearer.')
-  assert.equal(heroH1, 'Agents do the deal. You keep the approval.')
-  assert.equal(heroSupport, 'Brands get promoted and pay only when it sells. Creators earn from the posts they already publish. Your AI agent finds the partners, agrees the terms and places the offer — you approve what matters.')
+  assert.equal(heroH1, 'The affiliate network your AI agent can use.')
+  assert.equal(heroSupport, 'Your AI agent uses Allagio to find partners, agree terms, and prepare a labelled sponsored placement. Your approval rules decide what goes live. Makers pay commission only on attributed sales; publishers earn from content they already publish.')
   assert.equal(manualSetup, 'Setup is manual. You send the bearer yourself.')
   assert.equal(comingLine, 'Offer suggestions while you write: Works today.')
   assert.equal(noSignIn, 'No sign-in link.')

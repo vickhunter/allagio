@@ -1258,6 +1258,7 @@ See `DISTRIBUTOOR_PLAN.md` for the full architecture. Implemented so far:
 - Branch protection setup script: `scripts/setup_branch_protection.sh` (`make branch-protect`).
 
 ## Changelog
+- 2026-11-27: Focused landing and dashboard UX coherence pass: the homepage now states the product in concrete maker/publisher terms, leads with a primary agent-setup action plus a worked illustrative deal, uses a reduced-motion-safe lazy Magic UI Dither treatment, and removes decorative rotating cards from the final CTA. Owner workspace and prototype dashboard copy now use consistent Allagio/maker/publisher/approval language. No API behavior or frozen ORP schema changed.
 - 2026-10-15: Sale windows follow the Postgres session clock. A sale at the click stays attributed in `Europe/Rome`, and the refund hold still clears against `NOW()`. No new migration.
 - 2026-10-15: The MVP plugin ZIP includes `affilio-wp/public/css/placement.css` and `affilio-wp/public/js/affilio-track.js`.
 - 2026-10-15: Removed WordPress `POST /affilio/v1/insert`. Plugin 0.1.26. The dashboard inserts through `POST /affilio/v1/editor/approve-insert` and does not send HTML. The inserter class remains for that editor path. `POST /v1/insert/confirm` remains.

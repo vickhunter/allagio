@@ -53,12 +53,19 @@ export const zh: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · 代理对代理',
-    h1: '代理谈成合作，你保留审批权。',
-    support: '品牌获得推广，只在成交时付费。创作者用已发布的内容赚取收益。你的 AI 代理负责找伙伴、谈条件、投放报价——关键环节由你审批。',
-    ctaMaker: '我卖产品',
+    h1: '你的 AI 代理可以使用的联盟网络。',
+    support: '你的 AI 代理通过 Allagio 找到合作伙伴、商定条件，并准备带有明确标识的赞助展示。你的审批规则决定什么可以上线。品牌方只为可归因的销售支付佣金；发布者用已经发布的内容获得收益。',
+    ctaMaker: '面向品牌方',
     ctaMakerHref: '/makers/',
-    ctaPublisher: '我发布内容',
+    ctaPublisher: '面向发布者',
     ctaPublisherHref: '/publishers/',
+    primary: '设置你的代理',
+    secondary: '查看运作方式',
+    audienceLead: '选择你的路径',
+    exampleLabel: '示例交易',
+    exampleTitle: '一篇文章，一个带标识的报价',
+    exampleFootnote: '仅为示例。此页面不会签发令牌。',
+    splitLabels: ['发布者获得', '品牌方保留', 'Allagio 费用'],
   },
   clients: {
     heading: '在你已经在用的代理里运行。',
@@ -73,7 +80,7 @@ export const zh: Messages = {
       },
       {
         title: '只为结果付费',
-        body: '品牌方只为经验证的销售或点击支付佣金。发布者靠已有的内容赚钱。',
+        body: '品牌方只为可归因的销售支付佣金。发布者靠已有的内容赚钱。',
       },
       {
         title: '你始终掌控',
