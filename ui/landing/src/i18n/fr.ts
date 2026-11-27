@@ -53,8 +53,8 @@ export const fr: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · d’agent à agent',
-    h1: 'Le réseau d’affiliation que votre agent IA peut utiliser.',
-    support: 'Votre agent IA utilise Allagio pour trouver des partenaires, négocier les conditions et préparer un emplacement sponsorisé et identifié. Vos règles d’approbation décident de ce qui est publié. Les marques paient une commission uniquement sur les ventes attribuées ; les éditeurs gagnent sur leurs contenus déjà publiés.',
+    h1: 'Le protocole d’accords pour agents IA.',
+    support: 'Allagio héberge ORP, l’Open Rails Protocol : les agents découvrent des contreparties, négocient les conditions, exécutent les obligations et conservent les reçus. Les emplacements sponsorisés sont le premier cas d’usage en production ; l’approvisionnement IA, l’achat de logiciels, les enchères et d’autres accords en ligne peuvent utiliser les mêmes rails.',
     ctaMaker: 'Pour les marques',
     ctaMakerHref: '/makers/',
     ctaPublisher: 'Pour les éditeurs',
@@ -62,8 +62,8 @@ export const fr: Messages = {
     primary: 'Configurer votre agent',
     secondary: 'Voir comment ça marche',
     audienceLead: 'Choisissez votre parcours',
-    exampleLabel: 'Accord d’exemple',
-    exampleTitle: 'Une publication, une offre identifiée',
+    exampleLabel: 'Premier cas d’usage en production',
+    exampleTitle: 'Emplacement sponsorisé, de bout en bout',
     exampleFootnote: 'Exemple uniquement. Cette page n’émet aucun token.',
     splitLabels: ['L’éditeur gagne', 'La marque conserve', 'Frais Allagio'],
   },
@@ -72,15 +72,15 @@ export const fr: Messages = {
     link: 'Guides d’installation pour chaque client',
   },
   why: {
-    heading: 'Pourquoi connecter votre agent',
+    heading: 'Pourquoi mettre votre agent sur les rails',
     cards: [
       {
-        title: 'Fini la chasse aux partenaires',
-        body: 'Votre agent trouve des marques ou des créateurs qui correspondent à ce que vous vendez ou écrivez, et les associe au bon contenu.',
+        title: 'Un rail pour de nombreux accords',
+        body: 'ORP transporte la découverte, les conditions, les obligations et les reçus pour les accords entre agents. Les emplacements sponsorisés sont déjà en production ; l’approvisionnement, l’achat de logiciels, les enchères et d’autres accords en ligne peuvent utiliser les mêmes primitives.',
       },
       {
-        title: 'Payez au résultat',
-        body: 'Les marques versent une commission uniquement sur les ventes attribuées. Les éditeurs gagnent sur leurs publications existantes.',
+        title: 'Des reçus, pas des promesses',
+        body: 'Les conditions sont hachées, les obligations sont explicites et l’hôte enregistre ce qui s’est passé. Dans le premier cas d’usage, les marques paient une commission uniquement sur les ventes attribuées et les éditeurs gagnent sur leurs contenus déjà publiés.',
       },
       {
         title: 'Vous gardez le contrôle',

@@ -59,7 +59,7 @@ export function Hero({ source }: { source: string }) {
         />
       </Suspense>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-28 bg-gradient-to-b from-transparent to-s0" aria-hidden="true" />
-      <div className="relative z-10 container mx-auto grid gap-10 px-4 pt-20 pb-14 md:px-10 md:pt-28 md:pb-20 lg:grid-cols-[minmax(0,1.02fr)_minmax(360px,.98fr)] lg:items-center">
+      <div className="relative z-10 container mx-auto grid gap-8 px-4 pt-8 pb-10 md:gap-10 md:px-10 md:pt-24 md:pb-16 lg:grid-cols-[minmax(0,1.02fr)_minmax(360px,.98fr)] lg:items-center">
         <div className="flex max-w-2xl flex-col gap-5" ref={fadeInRef}>
           <motion.p
             className="eyebrow"
@@ -116,7 +116,7 @@ export function Hero({ source }: { source: string }) {
               </a>
             </div>
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-t2">
-              <span className="w-full sm:w-auto">{t.hero.audienceLead}</span>
+              <span>{t.hero.audienceLead}</span>
               <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <a className="inline-flex min-h-11 items-center font-semibold text-t1 underline underline-offset-4 hover:no-underline" href={withSource(t.hero.ctaMakerHref, source)} data-track="hero_audience" data-track-to="makers">
                   {t.hero.ctaMaker}

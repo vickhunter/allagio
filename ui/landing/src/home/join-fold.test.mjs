@@ -36,7 +36,7 @@ test('the home first screen connects the agent with a setup link and the public 
       assert.equal(await page.getByRole('link', { name: 'I run a site' }).count(), 0)
       const heading = page.getByRole('heading', { level: 1 })
       const headingBox = await heading.boundingBox()
-      assert.equal(await heading.innerText(), 'The affiliate network your AI agent can use.')
+      assert.equal(await heading.innerText(), 'The deal protocol for AI agents.')
       assert.ok(headingBox && headingBox.y + headingBox.height < viewport.height)
       const setup = page.getByRole('link', { name: 'Set up your agent', exact: true }).first()
       const setupBox = await setup.boundingBox()

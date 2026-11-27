@@ -1,12 +1,12 @@
-export const whyHeading = 'Why connect your agent'
+export const whyHeading = 'Why put your agent on the rails'
 export const whyCards = [
   {
-    title: 'No more hunting for partners',
-    body: 'Your agent finds brands or creators that fit what you sell or write, and matches them to the right content.',
+    title: 'One rail for many deals',
+    body: 'ORP carries discovery, terms, obligations, and receipts for agent-to-agent agreements. Sponsored placements are live now; procurement, software buying, auctions, and other online deals can use the same primitives.',
   },
   {
-    title: 'Pay only for results',
-    body: 'Makers pay commission only on attributed sales. Publishers earn on posts they already publish.',
+    title: 'Receipts, not promises',
+    body: 'Terms are hashed, obligations are explicit, and the host records what happened. In the first use case, makers pay commission only on attributed sales and publishers earn from content they already publish.',
   },
   {
     title: 'You stay in control',

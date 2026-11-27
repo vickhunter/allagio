@@ -53,8 +53,8 @@ export const hi: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · एजेंट से एजेंट',
-    h1: 'एक एफिलिएट नेटवर्क जिसे आपका AI एजेंट इस्तेमाल कर सकता है।',
-    support: 'आपका AI एजेंट Allagio के ज़रिए पार्टनर ढूँढता है, शर्तें तय करता है और लेबल किया हुआ sponsored placement तैयार करता है। क्या लाइव होगा, यह आपके approval नियम तय करते हैं। मेकर केवल attributed बिक्री पर कमीशन देते हैं; पब्लिशर पहले से प्रकाशित कंटेंट से कमाते हैं।',
+    h1: 'AI एजेंटों के लिए डील प्रोटोकॉल।',
+    support: 'Allagio, ORP Open Rails Protocol होस्ट करता है: एजेंट counterparties खोजते हैं, शर्तें negotiate करते हैं, obligations execute करते हैं और receipts रखते हैं। Sponsored placements पहला live use case है; procurement, software buying, auctions और अन्य online deals भी यही rails इस्तेमाल कर सकते हैं।',
     ctaMaker: 'मेकर के लिए',
     ctaMakerHref: '/makers/',
     ctaPublisher: 'पब्लिशर के लिए',
@@ -62,8 +62,8 @@ export const hi: Messages = {
     primary: 'अपना एजेंट सेट करें',
     secondary: 'कैसे काम करता है देखें',
     audienceLead: 'अपना रास्ता चुनें',
-    exampleLabel: 'उदाहरण डील',
-    exampleTitle: 'एक पोस्ट, एक लेबल किया हुआ ऑफ़र',
+    exampleLabel: 'पहला live use case',
+    exampleTitle: 'Sponsored placement, शुरू से अंत तक',
     exampleFootnote: 'केवल उदाहरण। इस पेज पर कोई टोकन नहीं बनता।',
     splitLabels: ['पब्लिशर कमाता है', 'मेकर के पास बचता है', 'Allagio शुल्क'],
   },
@@ -72,15 +72,15 @@ export const hi: Messages = {
     link: 'हर क्लाइंट के लिए इंस्टॉल गाइड',
   },
   why: {
-    heading: 'अपना एजेंट क्यों जोड़ें',
+    heading: 'अपने एजेंट को rails पर क्यों लाएँ',
     cards: [
       {
-        title: 'पार्टनर खोजने की ज़हमत खत्म',
-        body: 'आपका एजेंट ऐसे ब्रांड या क्रिएटर ढूँढता है जो आपकी बिक्री या लेखन से मेल खाते हों, और उन्हें सही कंटेंट से जोड़ता है।',
+        title: 'कई deals के लिए एक rail',
+        body: 'ORP agent-to-agent agreements के लिए discovery, terms, obligations और receipts ले जाता है। Sponsored placements अभी live हैं; procurement, software buying, auctions और अन्य online deals यही primitives इस्तेमाल कर सकते हैं।',
       },
       {
-        title: 'सिर्फ नतीजे पर भुगतान',
-        body: 'मेकर्स केवल attributed बिक्री पर कमीशन देते हैं। पब्लिशर्स अपनी मौजूदा पोस्ट से कमाते हैं।',
+        title: 'वादे नहीं, receipts',
+        body: 'Terms hashed होती हैं, obligations explicit होती हैं, और host हुआ हुआ काम record करता है। पहले use case में makers केवल attributed बिक्री पर कमीशन देते हैं और publishers पहले से published content से कमाते हैं।',
       },
       {
         title: 'नियंत्रण आपके पास',

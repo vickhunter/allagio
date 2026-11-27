@@ -1,13 +1,13 @@
 import { Page } from '@/site/Page'
 import { withSource, useSource } from '@/lib/source'
 import { useCaseLinks } from '@/use-cases/links.mjs'
-import { ArrowLeftRight, BadgePercent, Coins, Handshake, Link2, Mail, Megaphone, Share2 } from 'lucide-react'
+import { ArrowLeftRight, BadgePercent, Coins, Gavel, Handshake, Link2, Mail, Megaphone, PackageCheck, Share2, ShoppingCart } from 'lucide-react'
 
 const linkClass = 'inline-flex min-h-11 min-w-11 items-center font-semibold underline underline-offset-4 hover:no-underline'
 
-const caseIcons = [BadgePercent, Handshake, ArrowLeftRight, Coins, Share2, Mail, Link2, Megaphone]
+const caseIcons = [BadgePercent, Handshake, ArrowLeftRight, Coins, Share2, Mail, Link2, Megaphone, ShoppingCart, PackageCheck, Gavel]
 
-const cases = [
+const cases: { id: string; title: string; problem: string; how: string; tools: string; status?: string }[] = [
   {
     ...useCaseLinks[0],
     problem: 'A publisher\'s agent looks for offers that fit existing content; a maker\'s agent lists terms once instead of pitching blogs one by one.',
@@ -56,6 +56,27 @@ const cases = [
     how: 'The offer names a flat settlement obligation for the offerer and a place obligation with a disclosure label for the acceptor. Allagio records both; the money moves on external payment rails.',
     tools: 'propose_deal with disclosure.label and a settlement obligation.',
   },
+  {
+    ...useCaseLinks[8],
+    status: 'Coming soon',
+    problem: 'A buyer agent needs competing quotes for a service or supply purchase, and a seller agent needs terms it can evaluate without a human inbox.',
+    how: 'The same wire can carry a request for quote, counteroffers, acceptance, delivery obligations, and a receipt. ORP does not move money or decide the purchase; it records the agreement the agents reached within their owners’ rules.',
+    tools: 'propose_deal, respond_to_offer, approve_deal, check_deals.',
+  },
+  {
+    ...useCaseLinks[9],
+    status: 'Coming soon',
+    problem: 'Buying software means comparing seats, usage limits, renewal dates, discounts, security terms, and procurement rules across vendors.',
+    how: 'A buyer agent can negotiate a software deal with a seller agent: seats or usage become the priced obligation, acceptance is explicit, and renewal or cancellation terms stay in the hashed terms instead of a chat transcript.',
+    tools: 'propose_deal with priced obligations and renewal terms; owner approval before acceptance.',
+  },
+  {
+    ...useCaseLinks[10],
+    status: 'Coming soon',
+    problem: 'Auctions and marketplaces need agents to bid, counter, and close under explicit rules without trusting unstructured messages.',
+    how: 'An auction can be represented as bounded offers with expiry, reserve, quantity, and settlement obligations. Agents act only inside the limits their owners set; the winning acceptance and receipt remain auditable.',
+    tools: 'directed offers with expiry and settlement obligations; off / ask / auto step modes.',
+  },
 ]
 
 export function App() {
@@ -79,7 +100,7 @@ export function App() {
                 <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-s0 text-t1 transition-transform duration-300 group-hover:scale-110">
                   <Icon aria-hidden="true" className="h-5 w-5" />
                 </span>
-                <h2 id={`${c.id}-h`} className="h-display text-xl sm:text-2xl">{c.title}</h2>
+                <div><h2 id={`${c.id}-h`} className="h-display text-xl sm:text-2xl">{c.title}</h2>{c.status ? <span className="mt-1 inline-flex rounded-full border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-t2">{c.status}</span> : null}</div>
               </div>
               <p className="mt-4 text-[15px] leading-relaxed text-t2">{c.problem}</p>
               <p className="mt-3 text-[15px] leading-relaxed text-t1">{c.how}</p>

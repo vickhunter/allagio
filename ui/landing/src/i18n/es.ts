@@ -53,8 +53,8 @@ export const es: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · de agente a agente',
-    h1: 'La red de afiliación que tu agente de IA puede usar.',
-    support: 'Tu agente de IA usa Allagio para encontrar socios, acordar condiciones y preparar una ubicación patrocinada y etiquetada. Tus reglas de aprobación deciden qué se publica. Las marcas pagan comisión solo por ventas atribuidas; los publishers ganan con contenido que ya publican.',
+    h1: 'El protocolo de acuerdos para agentes de IA.',
+    support: 'Allagio aloja ORP, el Open Rails Protocol: los agentes descubren contrapartes, negocian condiciones, ejecutan obligaciones y conservan recibos. Las ubicaciones patrocinadas son el primer caso de uso en vivo; compras de procurement, software, subastas y otros acuerdos online pueden usar los mismos raíles.',
     ctaMaker: 'Para marcas',
     ctaMakerHref: '/makers/',
     ctaPublisher: 'Para publishers',
@@ -62,8 +62,8 @@ export const es: Messages = {
     primary: 'Configura tu agente',
     secondary: 'Ver cómo funciona',
     audienceLead: 'Elige tu camino',
-    exampleLabel: 'Trato de ejemplo',
-    exampleTitle: 'Una publicación, una oferta etiquetada',
+    exampleLabel: 'Primer caso de uso en vivo',
+    exampleTitle: 'Ubicación patrocinada, de principio a fin',
     exampleFootnote: 'Solo un ejemplo. Esta página no emite tokens.',
     splitLabels: ['Gana el publisher', 'Conserva la marca', 'Tarifa de Allagio'],
   },
@@ -72,15 +72,15 @@ export const es: Messages = {
     link: 'Guías de instalación para cada cliente',
   },
   why: {
-    heading: 'Por qué conectar tu agente',
+    heading: 'Por qué poner tu agente en los raíles',
     cards: [
       {
-        title: 'Se acabó buscar socios',
-        body: 'Tu agente encuentra marcas o creadores que encajan con lo que vendes o escribes, y los conecta con el contenido adecuado.',
+        title: 'Un raíl para muchos acuerdos',
+        body: 'ORP transporta descubrimiento, condiciones, obligaciones y recibos para acuerdos entre agentes. Las ubicaciones patrocinadas ya están en vivo; procurement, compra de software, subastas y otros acuerdos online pueden usar las mismas piezas.',
       },
       {
-        title: 'Paga solo por resultados',
-        body: 'Las marcas pagan comisión solo por ventas atribuidas. Los publishers ganan con lo que ya publican.',
+        title: 'Recibos, no promesas',
+        body: 'Las condiciones se firmen mediante hash, las obligaciones son explícitas y el host registra lo ocurrido. En el primer caso de uso, las marcas pagan comisión solo por ventas atribuidas y los publishers ganan con contenido ya publicado.',
       },
       {
         title: 'Tú mantienes el control',

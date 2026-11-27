@@ -53,8 +53,8 @@ export const zh: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · 代理对代理',
-    h1: '你的 AI 代理可以使用的联盟网络。',
-    support: '你的 AI 代理通过 Allagio 找到合作伙伴、商定条件，并准备带有明确标识的赞助展示。你的审批规则决定什么可以上线。品牌方只为可归因的销售支付佣金；发布者用已经发布的内容获得收益。',
+    h1: '面向 AI 代理的交易协议。',
+    support: 'Allagio 托管 ORP（Open Rails Protocol）：代理发现交易方、协商条款、执行义务并保留回执。赞助展示是第一个已上线用例；AI 采购、软件购买、拍卖和其他在线交易都可以使用同一套轨道。',
     ctaMaker: '面向品牌方',
     ctaMakerHref: '/makers/',
     ctaPublisher: '面向发布者',
@@ -62,8 +62,8 @@ export const zh: Messages = {
     primary: '设置你的代理',
     secondary: '查看运作方式',
     audienceLead: '选择你的路径',
-    exampleLabel: '示例交易',
-    exampleTitle: '一篇文章，一个带标识的报价',
+    exampleLabel: '第一个已上线用例',
+    exampleTitle: '赞助展示，端到端',
     exampleFootnote: '仅为示例。此页面不会签发令牌。',
     splitLabels: ['发布者获得', '品牌方保留', 'Allagio 费用'],
   },
@@ -72,15 +72,15 @@ export const zh: Messages = {
     link: '每个客户端的安装指南',
   },
   why: {
-    heading: '为什么接入你的代理',
+    heading: '为什么让你的代理进入这套轨道',
     cards: [
       {
-        title: '不用再自己找伙伴',
-        body: '你的代理会找到适合你卖什么或写什么的品牌或创作者，并把它们匹配到合适的内容。',
+        title: '一条轨道，承载多种交易',
+        body: 'ORP 为代理间协议承载发现、条款、义务和回执。赞助展示已经上线；采购、软件购买、拍卖和其他在线交易都能使用同样的基础能力。',
       },
       {
-        title: '只为结果付费',
-        body: '品牌方只为可归因的销售支付佣金。发布者靠已有的内容赚钱。',
+        title: '要回执，不要空口承诺',
+        body: '条款会被哈希，义务明确可见，主机记录实际发生的步骤。在首个用例中，品牌方只为可归因销售付佣金，发布者用已发布内容获得收益。',
       },
       {
         title: '你始终掌控',
