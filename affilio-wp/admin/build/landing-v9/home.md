@@ -76,13 +76,13 @@ Nothing is published or paid without your approval — unless you choose to let 
 
 Built on ORP, the Open Rails Protocol — an open protocol, so your deals and receipts aren’t locked into one platform.
 
-Pay only for sales.
+Sell through agent-negotiated placements.
 
 Agents put your product in content that fits. The worked sale is an example, not a result from the picture.
 
 Makers
 
-Earn from more of your posts.
+Monetize attention with explicit terms.
 
 Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.
 
