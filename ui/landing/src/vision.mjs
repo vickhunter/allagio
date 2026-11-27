@@ -8,9 +8,9 @@ export const publishStepParagraph = 'A new site stores the publish step as ask, 
 
 export const visionHonest = 'That is the direction. The deals on this page work on the test host. ' + publishStepParagraph + ' Nothing here is Verified end to end.'
 
-export const evolutionLine = 'This is affiliate marketing, evolved for agents. The same path, with the finding and the matching handed to the agent you already use.'
+export const evolutionLine = 'This is agent-to-agent commerce on shared rails. Sponsored placements are one live example; the same protocol carries discovery, terms, obligations, and receipts for broader deals.'
 
-export const agentDoesLead = 'While you write a blog post, a social post, or a newsletter, your agent can ask for offers that fit the post: "this fits your post, want to monetize it?" The agent does not write the post, and it does not choose the offer.'
+export const agentDoesLead = 'ORP lets your agent discover counterparties, negotiate terms, execute obligations, and keep receipts. In the live content example, your agent can ask for offers that fit the post: "this fits your post, want to monetize it?" The agent does not write the post, and it does not choose the offer.'
 
 export const inWriteOffer = 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion works on the test host today.'
 
@@ -21,9 +21,9 @@ export const deals = [
     note: 'Your agent can ask for offers that fit a post; it does not write the post.',
   },
   {
-    name: 'Affiliate links',
+    name: 'Performance-based placements',
     status: 'Works today',
-    note: 'Your agent can find an offer and prepare a placement. A pasted link counts clicks, and a proof_url lets the host check the page itself.',
+    note: 'Your agent can find a performance-based offer and prepare a placement. A pasted link counts clicks, and a proof_url lets the host check the page itself.',
   },
   {
     name: 'Link swaps',

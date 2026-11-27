@@ -78,13 +78,13 @@ Built on ORP, the Open Rails Protocol — an open protocol, so your deals and re
 
 Sell through agent-negotiated placements.
 
-Agents put your product in content that fits. The worked sale is an example, not a result from the picture.
+In the live placement example, agents put your product in content that fits. The worked sale is illustrative, not a result from the picture.
 
 Makers
 
 Monetize attention with explicit terms.
 
-Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.
+In the live placement example, agents find offers that fit the content you already make. You pick each step. Some posts get no offer.
 
 Offer suggestions while you write: Works today.
 
@@ -92,7 +92,7 @@ Publishers
 
 Four steps, one human decision
 
-An offer is matched to a post, then prepared as a labelled placement. The in-writing suggestion works on the test host today.
+One use of ORP: an offer is matched to a post, then prepared as a labelled placement. Other deal types reuse the same rail with different terms.
 
 Open Rails Protocol
 

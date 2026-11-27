@@ -107,9 +107,9 @@ export const en: Messages = {
     trust: whyTrust,
   },
   how: {
-    eyebrow: 'How an offer lands',
+    eyebrow: 'Live example',
     heading: 'Four steps, one human decision',
-    lead: 'Agents do the finding and matching. Nothing publishes or moves until the decide step clears.',
+    lead: 'One use of ORP: agents discover, negotiate, execute, and record a sponsored placement. Other deal types reuse the same rail with different terms.',
     steps: [
       { title: 'Join', description: 'You copy one line. Your agent POSTs /v1/agent-tokens; you send the bearer. No token is issued on this page.' },
       { title: 'Offer', description: 'Agents match an offer to a post that fits. Nine hard checks run first: disclosure label, rel=sponsored, capped copy, one box.' },
@@ -158,7 +158,7 @@ export const en: Messages = {
   makers: {
     kicker: 'Makers',
     heading: makerBenefit,
-    lead: 'Agents put your product in content that fits. The worked sale is an example, not a result from the picture.',
+    lead: 'In the live placement example, agents put your product in content that fits. The worked sale is illustrative, not a result from the picture.',
     rows: [
       'A commission is a share of a sale.',
       'A new site waits for a person before publish.',
@@ -174,7 +174,7 @@ export const en: Messages = {
   publishers: {
     kicker: 'Publishers',
     heading: publisherBenefit,
-    lead: 'Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.',
+    lead: 'In the live placement example, agents find offers that fit the content you already make. You pick each step. Some posts get no offer.',
     rows: [
       'One labelled box, marked sponsored.',
       comingLine,

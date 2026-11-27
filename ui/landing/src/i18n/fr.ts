@@ -93,9 +93,9 @@ export const fr: Messages = {
     trust: 'Bâti sur ORP, l’Open Rails Protocol — un protocole ouvert, pour que vos accords et reçus ne soient pas enfermés dans une seule plateforme.',
   },
   how: {
-    eyebrow: 'Comment une offre arrive',
+    eyebrow: 'Exemple en production',
     heading: 'Quatre étapes, une décision humaine',
-    lead: 'Les agents trouvent et associent. Rien n’est publié ni modifié tant que l’étape de décision ne l’autorise pas.',
+    lead: 'Un usage d’ORP : les agents découvrent, négocient, exécutent et enregistrent un placement sponsorisé. Les autres types d’accords réutilisent le même rail avec des termes différents.',
     steps: [
       { title: 'Rejoindre', description: 'Vous copiez une ligne. Votre agent fait POST /v1/agent-tokens ; vous envoyez le bearer. Cette page n’émet aucun token.' },
       { title: 'Offrir', description: 'Les agents associent une offre à une publication qui convient vraiment. Neuf contrôles stricts d’abord : mention de divulgation, rel=sponsored, texte court, un seul encadré.' },
@@ -154,7 +154,7 @@ export const fr: Messages = {
   makers: {
     kicker: 'Pour les marques',
     heading: 'Payez seulement quand ça vend.',
-    lead: 'Les agents placent votre produit dans un contenu qui correspond. La vente illustrée est un exemple, pas un résultat réel.',
+    lead: 'Dans l’exemple de placement en production, les agents placent votre produit dans un contenu qui correspond. La vente illustrée est indicative, pas un résultat réel.',
     rows: [
       'La commission est une part de la vente.',
       'Un nouveau site attend un humain avant de publier.',
@@ -170,7 +170,7 @@ export const fr: Messages = {
   publishers: {
     kicker: 'Pour les créateurs',
     heading: 'Monétisez davantage de vos publications.',
-    lead: 'Les agents trouvent des offres qui correspondent à votre contenu existant. Vous choisissez chaque étape. Certaines publications ne reçoivent aucune offre.',
+    lead: 'Dans l’exemple de placement en production, les agents trouvent des offres qui correspondent à votre contenu existant. Vous choisissez chaque étape. Certaines publications ne reçoivent aucune offre.',
     rows: [
       'Un encadré étiqueté, marqué comme sponsorisé.',
       'Suggestions d’offres pendant que vous écrivez : disponible.',

@@ -119,7 +119,7 @@ body{margin:0;font-weight:500}
 .site-menu{display:none;min-width:0;align-items:center;gap:2px}
 .site-menu.is-open{display:flex;position:absolute;z-index:40;top:100%;left:0;right:0;max-height:calc(100dvh - 58px);overflow-y:auto;overscroll-behavior:contain;flex-direction:column;align-items:stretch;gap:2px;border-bottom:1px solid rgb(var(--rgb-line));background:rgb(var(--rgb-surface-0));padding:8px 12px 12px}
 .site-menu a{display:inline-flex;min-height:44px;align-items:center}
-.site-menu .site-menu-sub-link{display:block;min-height:0}
+.site-menu .site-menu-sub-link{display:flex;min-height:44px;align-items:center}
 @layer base {
   main [id]{scroll-margin-top:5rem}
 }

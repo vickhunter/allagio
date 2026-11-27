@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { deals, inWriteOffer, receiptExample, receiptLabel, youPageLead } from './vision.mjs'
 
-const working = ['Suggest an offer while you write', 'Affiliate links', 'Link swaps', 'Cross-sells', 'Upsells', 'Reposts']
+const working = ['Suggest an offer while you write', 'Performance-based placements', 'Link swaps', 'Cross-sells', 'Upsells', 'Reposts']
 
 test('deal labels stay honest', () => {
   for (const deal of deals) {

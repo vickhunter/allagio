@@ -93,9 +93,9 @@ export const es: Messages = {
     trust: 'Construido sobre ORP, el Open Rails Protocol — un protocolo abierto, para que tus tratos y recibos no queden atrapados en una sola plataforma.',
   },
   how: {
-    eyebrow: 'Cómo aterriza una oferta',
+    eyebrow: 'Ejemplo en vivo',
     heading: 'Cuatro pasos, una decisión humana',
-    lead: 'Los agentes buscan y emparejan. Nada se publica ni cambia hasta que el paso de decisión lo permite.',
+    lead: 'Un uso de ORP: los agentes descubren, negocian, ejecutan y registran una colocación patrocinada. Otros tipos de acuerdos reutilizan el mismo riel con términos distintos.',
     steps: [
       { title: 'Unirse', description: 'Copias una línea. Tu agente hace POST /v1/agent-tokens; tú envías el bearer. Esta página no emite tokens.' },
       { title: 'Ofertar', description: 'Los agentes emparejan una oferta con una publicación que realmente encaja. Nueve comprobaciones duras primero: etiqueta de divulgación, rel=sponsored, texto corto, un solo recuadro.' },
@@ -170,7 +170,7 @@ export const es: Messages = {
   publishers: {
     kicker: 'Para creadores',
     heading: 'Monetiza más de tus publicaciones.',
-    lead: 'Los agentes encuentran ofertas que encajan con lo que ya publicas. Tú eliges cada paso. Algunas publicaciones no reciben oferta.',
+    lead: 'En el ejemplo de colocación en vivo, los agentes encuentran ofertas que encajan con lo que ya publicas. Tú eliges cada paso. Algunas publicaciones no reciben oferta.',
     rows: [
       'Un recuadro etiquetado, marcado como patrocinado.',
       'Sugerencias de ofertas mientras escribes: próximamente.',

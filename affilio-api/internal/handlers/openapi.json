@@ -3013,6 +3013,29 @@
         }
       }
     },
+    "/v1/directory/publishers": {
+      "get": {
+        "tags": [
+          "Marketplace & directory"
+        ],
+        "summary": "Public publisher directory",
+        "responses": {
+          "200": {
+            "description": "Publisher cards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Directory unavailable"
+          }
+        }
+      }
+    },
     "/v1/listing-cards": {
       "post": {
         "tags": [

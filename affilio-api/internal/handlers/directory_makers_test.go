@@ -84,6 +84,28 @@ VALUES('off_dir2', $1::uuid, 'orp:example.test/' || $2, $3, 'sha256-y', 3, NOW()
 	}
 }
 
+func TestDirectoryPublishersEmptyWhenDatabaseAnswers(t *testing.T) {
+	db, cleanup := setupTestDB(t)
+	defer cleanup()
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	(&HostedHandler{DB: db}).Mount(r)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/directory/publishers", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d %s", rec.Code, rec.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	items, ok := body["items"].([]any)
+	if !ok || len(items) != 0 || body["next_cursor"] != nil || body["total"] != float64(0) {
+		t.Fatalf("empty list %#v", body)
+	}
+}
+
 func TestDirectoryMakersClosedPoolIsUnavailable(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	cleanup()

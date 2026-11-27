@@ -93,9 +93,9 @@ export const zh: Messages = {
     trust: '基于 ORP（Open Rails Protocol，开放轨道协议）构建——一个开放协议，你的交易和回执不会被锁定在单一平台上。',
   },
   how: {
-    eyebrow: '报价如何落地',
+    eyebrow: '已上线示例',
     heading: '四个步骤，一次人工决定',
-    lead: '查找和匹配交给代理。在“决定”步骤放行之前，不会发布或变动任何内容。',
+    lead: 'ORP 的一种用途：代理发现、协商、执行并记录赞助展示。其他交易类型会用不同条款复用同一套轨道。',
     steps: [
       { title: '加入', description: '你复制一行指令。你的代理调用 POST /v1/agent-tokens；由你发送 bearer。此页面不签发令牌。' },
       { title: '报价', description: '代理把报价匹配到真正契合的文章。先跑九项硬性检查：披露标签、rel=sponsored、文案长度限制、每篇一个框。' },

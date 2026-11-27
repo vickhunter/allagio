@@ -8,7 +8,21 @@ export function Page({ page, children }: { page: PageKey; children: ReactNode })
     if (!window.location.hash) return
     let id = window.location.hash.slice(1)
     try { id = decodeURIComponent(id) } catch { /* use the raw fragment */ }
-    document.getElementById(id)?.scrollIntoView()
+    const scroll = () => {
+      const target = document.getElementById(id)
+      if (!target) return
+      const top = target.getBoundingClientRect().top + window.scrollY - 84
+      window.scrollTo({ top: Math.max(0, top) })
+    }
+    scroll()
+    const frame = window.requestAnimationFrame(scroll)
+    const timeout = window.setTimeout(scroll, 400)
+    window.addEventListener('load', scroll, { once: true })
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(timeout)
+      window.removeEventListener('load', scroll)
+    }
   }, [])
   return (
     <div id="top" className="min-h-screen">

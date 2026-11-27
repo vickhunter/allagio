@@ -17,7 +17,7 @@ export const deskContent = samplePreview.title
 export const deskPlacement = `${slotLabel(samplePreview.slot)}. Disclosure label. rel="sponsored".`
 export const deskAsk = 'A new site stores the publish step as ask. This picture is not a live result.'
 export const deskMcp = 'Works over MCP. A2A support is not implemented.'
-export const howLead = 'An offer is matched to a post, then prepared as a labelled placement. The in-writing suggestion works on the test host today.'
+export const howLead = 'One use of ORP: an offer is matched to a post, then prepared as a labelled placement. Other deal types reuse the same rail with different terms.'
 export const makerBenefit = 'Sell through agent-negotiated placements.'
 export const publisherBenefit = 'Monetize attention with explicit terms.'
 
