@@ -1,1 +1,0 @@
-import{d as e,l as t}from"./Page-DDpeFpjp.js";import{n,t as r}from"./Document-CROYTyvX.js";var i=e();function a(){return(0,i.jsx)(r,{title:n.title,lede:n.lede,sections:n.sections,otherHref:`/terms`,otherLabel:`Read the terms draft`})}t(`privacy`,(0,i.jsx)(a,{}));

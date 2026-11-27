@@ -72,14 +72,14 @@ export function Header({ page }: { page: PageKey }) {
               {t.chrome.navUseCases}
               <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 text-t2 transition-transform duration-150 group-hover:rotate-180 group-focus-within:rotate-180" />
             </a>
-            <div className="invisible absolute left-1/2 top-full z-40 hidden w-64 -translate-x-1/2 translate-y-1 rounded-xl border border-line bg-white p-1.5 opacity-0 shadow-lg transition-all duration-150 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 xl:block">
+            <div className="mt-1 w-full rounded-xl border border-line bg-white p-1.5 shadow-sm xl:invisible xl:absolute xl:left-1/2 xl:top-full xl:z-40 xl:mt-0 xl:w-64 xl:-translate-x-1/2 xl:translate-y-1 xl:opacity-0 xl:shadow-lg xl:transition-all xl:duration-150 xl:group-focus-within:visible xl:group-focus-within:translate-y-0 xl:group-focus-within:opacity-100 xl:group-hover:visible xl:group-hover:translate-y-0 xl:group-hover:opacity-100">
               {t.chrome.useCaseLinks.map((item) => (
                 <a
                   key={item.id}
                   href={withSource(`/use-cases/#${item.id}`, source)}
                   data-track="nav_click"
                   data-track-to={`use-cases-${item.id}`}
-                  className="block rounded-lg px-3 py-2 text-[13px] font-medium text-t1 transition-colors hover:bg-s2"
+                  className="site-menu-sub-link block rounded-lg px-3 py-2 text-[13px] font-medium text-t1 transition-colors hover:bg-s2"
                 >
                   {item.title}
                 </a>

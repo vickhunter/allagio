@@ -649,7 +649,7 @@ function offerRailsFindEmptyState(result, context, surfaceURL) {
     };
     const settingsPage = async () => {
         const {grants} = await api('/agents');
-        const skillURL = location.origin + '/SKILL.md';
+        const skillURL = location.origin + '/skill.md';
         let skillNote = 'Coming soon. This skill file is not published yet.';
         try {
             const skill = await fetch(skillURL);

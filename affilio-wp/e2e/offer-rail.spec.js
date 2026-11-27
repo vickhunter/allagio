@@ -728,8 +728,8 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     await frame(page, `after-overview-${viewport.width}`);
     await page.goto(base + '/owner/settings');
     await expect(page.getByRole('heading', { name: 'Setup & agents', level: 1 })).toBeVisible();
-    await expect(page.locator('.agent-line pre')).toHaveText(`Read ${base}/SKILL.md and connect this site to Allagio`);
-    await expect(page.locator('[data-skill-status]')).toContainText('Coming soon');
+    await expect(page.locator('.agent-line pre')).toHaveText(`Read ${base}/skill.md and connect this site to Allagio`);
+    await expect(page.locator('[data-skill-status]')).toContainText('available');
     await expect(page.locator('[data-rail-plain]')).toHaveText('Your referral offer is saved. Next: submit it to list it.');
     const humans = page.locator('.task-list');
     await expect(humans).toContainText('Checkout is optional');
@@ -738,11 +738,11 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     await expect(page.locator('.setup-command pre')).toHaveCount(1);
     const copy = page.getByRole('button', { name: 'Copy line', exact: true });
     await expect(copy).toBeEnabled();
-    await expect(copy).toHaveClass(/secondary/);
+    await expect(copy).not.toHaveClass(/secondary/);
     await expect(copy).not.toHaveAttribute('data-primary-action');
     await copy.click();
     await expect(page.locator('.agent-line .copy-status')).toHaveText('Copied. Paste it to your agent.');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`Read ${base}/SKILL.md and connect this site to Allagio`);
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`Read ${base}/skill.md and connect this site to Allagio`);
     await fits(page);
     await frame(page, `after-setup-${viewport.width}`);
     await shotD020(page, `after-setup-${viewport.width}`);
