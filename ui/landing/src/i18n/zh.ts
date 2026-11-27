@@ -32,6 +32,9 @@ export const zh: Messages = {
       { id: 'newsletter-promotion', title: 'Newsletter 与博客推广' },
       { id: 'link-exchanges', title: '链接交换' },
       { id: 'sponsorships', title: '赞助' },
+      { id: 'ai-procurement', title: 'AI 采购' },
+      { id: 'software-buying', title: '软件采购' },
+      { id: 'auctions', title: '拍卖' },
     ],
     commands: {
       home: '首页',

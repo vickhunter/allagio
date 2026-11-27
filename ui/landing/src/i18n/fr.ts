@@ -32,6 +32,9 @@ export const fr: Messages = {
       { id: 'newsletter-promotion', title: 'Promotion de newsletters et blogs' },
       { id: 'link-exchanges', title: "Échanges de liens" },
       { id: 'sponsorships', title: 'Sponsoring' },
+      { id: 'ai-procurement', title: 'Achats par IA' },
+      { id: 'software-buying', title: 'Achat de logiciels' },
+      { id: 'auctions', title: 'Enchères' },
     ],
     commands: {
       home: 'Accueil',

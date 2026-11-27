@@ -122,6 +122,9 @@ const useCasesShell = `<div id="static-landing">
       <section id="newsletter-promotion"><h2>Newsletter and blog promotion</h2></section>
       <section id="link-exchanges"><h2>Link exchanges</h2></section>
       <section id="sponsorships"><h2>Sponsorships</h2></section>
+      <section id="ai-procurement"><h2>AI procurement</h2></section>
+      <section id="software-buying"><h2>Software buying</h2></section>
+      <section id="auctions"><h2>Auctions</h2></section>
     </main>
   </div>`
 

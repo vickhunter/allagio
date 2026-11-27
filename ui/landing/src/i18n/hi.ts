@@ -32,6 +32,9 @@ export const hi: Messages = {
       { id: 'newsletter-promotion', title: 'न्यूज़लैटर और ब्लॉग प्रमोशन' },
       { id: 'link-exchanges', title: 'लिंक आदान-प्रदान' },
       { id: 'sponsorships', title: 'प्रायोजन' },
+      { id: 'ai-procurement', title: 'AI procurement' },
+      { id: 'software-buying', title: 'सॉफ़्टवेयर खरीद' },
+      { id: 'auctions', title: 'नीलामी' },
     ],
     commands: {
       home: 'होम',
