@@ -124,6 +124,7 @@ async function handle(req, res) {
     return send(res, 200, { ok: true });
   }
   if (pathname === '/owner/api/session') return send(res, 200, session);
+  if (pathname === '/skill.md') return send(res, 200, fs.readFileSync(path.join(build, 'landing-v9/skill.md')), 'text/markdown; charset=utf-8');
   if (pathname === '/health') {
     state.healthHits += 1;
     if (state.healthMode === 'never') return send(res, 503, { error: 'asleep' });
