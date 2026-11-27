@@ -178,7 +178,7 @@ test.describe('public landing contrast and tap targets', () => {
       const page = await context.newPage();
       await page.goto(landing.base + '/landing', { waitUntil: 'networkidle' });
       // The home h1 is the approved line. Contrast and tap-target checks below stay.
-      await expect(page.getByRole('heading', { name: 'The deal protocol for AI agents.', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Agents find and close deals autonomously.', exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Copy setup prompt', exact: true })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Set up your agent', exact: true }).first()).toBeVisible();
       await expect(page.locator('#how')).toHaveCount(1);

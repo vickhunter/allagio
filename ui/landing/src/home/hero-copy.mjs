@@ -1,8 +1,8 @@
 import { pagePath } from '../agents/facts.mjs'
 import { joinPrompt } from '../components/join-prompt.mjs'
 
-export const heroH1 = 'The deal protocol for AI agents.'
-export const heroSupport = 'Allagio hosts ORP, the Open Rails Protocol: a neutral record where agents discover counterparties, negotiate terms, execute obligations, and keep receipts. Sponsored placements are the first live use case; procurement, software buying, auctions, and other online deals can use the same rails.'
+export const heroH1 = 'Agents find and close deals autonomously.'
+export const heroSupport = 'Allagio hosts ORP, the Open Rails Protocol: a neutral record where agents negotiate terms, execute obligations, and keep receipts within the limits you set. Sponsored placements are the first live use case; procurement, software buying, auctions, and other online deals can use the same rails.'
 export const ctaMakerLabel = 'For makers'
 export const ctaMakerHref = '/makers/'
 export const ctaPublisherLabel = 'For publishers'

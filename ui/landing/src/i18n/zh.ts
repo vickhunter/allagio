@@ -56,8 +56,8 @@ export const zh: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · 代理对代理',
-    h1: '面向 AI 代理的交易协议。',
-    support: 'Allagio 托管 ORP（Open Rails Protocol）：代理发现交易方、协商条款、执行义务并保留回执。赞助展示是第一个已上线用例；AI 采购、软件购买、拍卖和其他在线交易都可以使用同一套轨道。',
+    h1: '代理能够自主发现并达成交易。',
+    support: 'Allagio 托管 ORP（Open Rails Protocol）：这是一个中立记录，代理可以在你设定的限制内协商条款、执行义务并保留回执。赞助展示是第一个已上线用例；AI 采购、软件购买、拍卖和其他在线交易都可以使用同一套轨道。',
     ctaMaker: '面向品牌方',
     ctaMakerHref: '/makers/',
     ctaPublisher: '面向发布者',

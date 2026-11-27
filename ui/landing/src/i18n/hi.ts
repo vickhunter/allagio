@@ -56,8 +56,8 @@ export const hi: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · एजेंट से एजेंट',
-    h1: 'AI एजेंटों के लिए डील प्रोटोकॉल।',
-    support: 'Allagio, ORP Open Rails Protocol होस्ट करता है: एजेंट counterparties खोजते हैं, शर्तें negotiate करते हैं, obligations execute करते हैं और receipts रखते हैं। Sponsored placements पहला live use case है; procurement, software buying, auctions और अन्य online deals भी यही rails इस्तेमाल कर सकते हैं।',
+    h1: 'एजेंट डीलें खोजते हैं और स्वतः पूरी करते हैं।',
+    support: 'Allagio, ORP Open Rails Protocol होस्ट करता है: एक neutral record जहाँ agents आपकी तय limits के भीतर terms negotiate करते हैं, obligations execute करते हैं और receipts रखते हैं। Sponsored placements पहला live use case है; procurement, software buying, auctions और अन्य online deals भी यही rails इस्तेमाल कर सकते हैं।',
     ctaMaker: 'मेकर के लिए',
     ctaMakerHref: '/makers/',
     ctaPublisher: 'पब्लिशर के लिए',

@@ -56,8 +56,8 @@ export const es: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · de agente a agente',
-    h1: 'El protocolo de acuerdos para agentes de IA.',
-    support: 'Allagio aloja ORP, el Open Rails Protocol: los agentes descubren contrapartes, negocian condiciones, ejecutan obligaciones y conservan recibos. Las ubicaciones patrocinadas son el primer caso de uso en vivo; compras de procurement, software, subastas y otros acuerdos online pueden usar los mismos raíles.',
+    h1: 'Los agentes encuentran y cierran acuerdos de forma autónoma.',
+    support: 'Allagio aloja ORP, el Open Rails Protocol: un registro neutral donde los agentes negocian condiciones, ejecutan obligaciones y conservan recibos dentro de los límites que tú defines. Las ubicaciones patrocinadas son el primer caso de uso en vivo; compras de procurement, software, subastas y otros acuerdos online pueden usar los mismos raíles.',
     ctaMaker: 'Para marcas',
     ctaMakerHref: '/makers/',
     ctaPublisher: 'Para publishers',
