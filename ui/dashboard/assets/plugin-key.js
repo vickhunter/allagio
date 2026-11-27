@@ -5,7 +5,7 @@
   'use strict';
   var OR = (window.OfferRails = window.OfferRails || {});
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  var WHERE = 'Allagio › Settings › Plugin key';
+  var WHERE = 'Offer Rails › Settings › Plugin key';
 
   // The shown-once block. opts: {key, prefix, site, continueLabel, intro}
   function onceHTML(o) {
