@@ -49,9 +49,6 @@ export function App() {
   return (
     <Page page="home">
       <Hero source={source} />
-      <Why />
-      <ClientStrip />
-      <NetworkWall />
 
       <div className="border-t border-line bg-s2/40">
         <FeatureSection source={source} />
@@ -59,6 +56,10 @@ export function App() {
           <ConnectionCard />
         </div>
       </div>
+
+      <Why />
+      <ClientStrip />
+      <NetworkWall />
 
       <section id="rails" aria-labelledby="rails-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">

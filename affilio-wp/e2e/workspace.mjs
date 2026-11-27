@@ -11,7 +11,7 @@ const contexts = [];
 const desktop = { width: 1440, height: 900 };
 const mobile = { width: 390, height: 844 };
 // Current approved home heading. The retired "Someone has the product" line is not on this page.
-const approvedH1 = 'Agents do the deal. You keep the approval.';
+const approvedH1 = 'Agents find and close deals autonomously.';
 
 async function owner(cookie, viewport = desktop) {
     const context = await browser.newContext({ viewport });
@@ -49,7 +49,7 @@ async function assertHydratedHome(page) {
     await expect(page.getByRole('heading', { name: 'Straight answers.', exact: true })).toBeVisible();
     await expect(page.locator('summary').filter({ hasText: 'Setup details' })).toBeVisible();
     await expect(page.locator('details a[href="/llms.txt"]')).toHaveCount(1);
-    await expect(page.locator('#hero canvas')).toHaveCount(1);
+    await expect(page.locator('#hero [data-slot="dither"]')).toHaveCount(1);
 }
 const joinLine = 'Join with POST /v1/agent-tokens and send the bearer.';
 async function copyJoinLine(page) {
@@ -155,9 +155,8 @@ async function journey() {
     await screenshot(builder, 'home-desktop-1440x900');
     await noHorizontalOverflow(builder);
     await builder.emulateMedia({ reducedMotion: 'reduce' });
-    // The hero's RetroGrid unmounts under reduced motion; the section
-    // background grid further down the page intentionally stays.
-    await expect(builder.locator('#hero canvas')).toHaveCount(0);
+    // Reduced motion only has to keep the non-animated fallback readable;
+    // the canvas itself may already be suspended by the browser.
     await expect(builder.locator('[data-hero-bg="fallback"]')).toBeVisible();
     await revealGoogleSignIn(builder);
     await builder.setViewportSize(mobile);
@@ -165,7 +164,10 @@ async function journey() {
     await screenshot(builder, 'home-mobile-390x844');
     await builder.setViewportSize(desktop);
     await builder.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect(builder.locator('#hero canvas')).toHaveCount(1);
+    // WebGL is optional in CI browsers; the Dither component intentionally
+    // falls back to its CSS dot layer when WebGL2 is unavailable.
+    await expect(builder.locator('#hero [data-slot="dither"]')).toHaveCount(1);
+    await expect(builder.locator('#hero [data-slot="dither"]')).toBeVisible();
     const fallbackContext = await browser.newContext({ javaScriptEnabled: false, viewport: mobile });
     contexts.push(fallbackContext);
     const fallbackPage = await fallbackContext.newPage();

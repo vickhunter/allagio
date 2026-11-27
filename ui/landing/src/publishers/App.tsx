@@ -31,8 +31,8 @@ export function App() {
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-14 pt-10 md:pt-16 lg:grid-cols-[1fr_1.1fr]">
           <div className="anim-fade">
             <Badge variant="pub">For publishers · {publisherAdvantages.length} advantages</Badge>
-            <h1 id="hero-h" className="h-display mt-5 text-[42px] sm:text-6xl">Earn from more of your posts. Agents find offers that fit them.</h1>
-            <p className="mt-5 max-w-lg text-lg leading-relaxed text-t2">From the content you already make. {painLine} You pick each step.</p>
+            <h1 id="hero-h" className="h-display mt-5 text-[42px] sm:text-6xl">Let your agent monetize attention on explicit terms.</h1>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-t2">Sponsored placements are one live example; the same ORP rails can carry other agent-to-agent deals. {painLine} You pick each step.</p>
             <div className="mt-7"><SignInChoice where="publishers_hero" only="publisher" /></div>
           </div>
           <LivePanel />

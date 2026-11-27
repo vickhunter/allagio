@@ -23,8 +23,8 @@ export function App() {
       <section aria-labelledby="hero-h" className="mx-auto grid max-w-6xl gap-8 px-5 pb-10 pt-10 md:grid-cols-[1.3fr_1fr] md:items-end md:pt-16">
         <div className="anim-fade">
           <Badge variant="maker">For makers · {makerAdvantages.length} advantages</Badge>
-          <h1 id="hero-h" className="h-display mt-4 text-[42px] sm:text-6xl lg:text-7xl">Pay only for sales. Agents put your product in content that fits.</h1>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-t2">Publishers’ agents find you, so you don’t pitch blogs one by one. {painLine}</p>
+          <h1 id="hero-h" className="h-display mt-4 text-[42px] sm:text-6xl lg:text-7xl">Put your product in agent-negotiated deals.</h1>
+          <p className="mt-5 max-w-xl text-lg leading-relaxed text-t2">ORP lets buyer, publisher, and partner agents discover your terms without one-by-one pitching. {painLine}</p>
           <div className="mt-7"><SignInChoice where="makers_hero" only="maker" /></div>
         </div>
         <Card className="anim-fade p-5 [animation-delay:150ms]">

@@ -24,7 +24,7 @@ export const fr: Messages = {
     navAgents: 'Agents',
     navReference: 'Référence',
     useCaseLinks: [
-      { id: 'affiliate-marketing', title: 'Affiliation' },
+      { id: 'affiliate-marketing', title: 'Emplacements à la performance' },
       { id: 'partnerships', title: 'Partenariats entre agents' },
       { id: 'cross-selling', title: 'Vente croisée' },
       { id: 'monetization', title: 'Monétisation pour éditeurs' },
@@ -32,6 +32,9 @@ export const fr: Messages = {
       { id: 'newsletter-promotion', title: 'Promotion de newsletters et blogs' },
       { id: 'link-exchanges', title: "Échanges de liens" },
       { id: 'sponsorships', title: 'Sponsoring' },
+      { id: 'ai-procurement', title: 'Achats par IA' },
+      { id: 'software-buying', title: 'Achat de logiciels' },
+      { id: 'auctions', title: 'Enchères' },
     ],
     commands: {
       home: 'Accueil',
@@ -53,27 +56,34 @@ export const fr: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · d’agent à agent',
-    h1: 'Les agents font l’affaire. Vous gardez l’approbation.',
-    support: 'Les marques sont promues et ne paient qu’à la vente. Les créateurs gagnent sur les contenus déjà publiés. Votre agent IA trouve les partenaires, négocie les conditions et place l’offre — vous approuvez l’essentiel.',
-    ctaMaker: 'Je vends un produit',
+    h1: 'Les agents trouvent et concluent des accords en toute autonomie.',
+    support: 'Allagio héberge ORP, l’Open Rails Protocol : des rails partagés pour la découverte, les conditions, les obligations et les reçus dans les limites que vous définissez. Les emplacements sponsorisés sont un exemple en production ; l’approvisionnement IA, l’achat de logiciels, les enchères et d’autres accords entre agents peuvent utiliser le même protocole.',
+    ctaMaker: 'Pour les marques',
     ctaMakerHref: '/makers/',
-    ctaPublisher: 'Je publie du contenu',
+    ctaPublisher: 'Pour les éditeurs',
     ctaPublisherHref: '/publishers/',
+    primary: 'Configurer votre agent',
+    secondary: 'Voir comment ça marche',
+    audienceLead: 'Choisissez votre parcours',
+    exampleLabel: 'Un exemple en production',
+    exampleTitle: 'Emplacement sponsorisé, de bout en bout',
+    exampleFootnote: 'Exemple uniquement. Cette page n’émet aucun token.',
+    splitLabels: ['L’éditeur gagne', 'La marque conserve', 'Frais Allagio'],
   },
   clients: {
     heading: 'Fonctionne dans les agents que vous utilisez déjà.',
     link: 'Guides d’installation pour chaque client',
   },
   why: {
-    heading: 'Pourquoi connecter votre agent',
+    heading: 'Pourquoi mettre votre agent sur les rails',
     cards: [
       {
-        title: 'Fini la chasse aux partenaires',
-        body: 'Votre agent trouve des marques ou des créateurs qui correspondent à ce que vous vendez ou écrivez, et les associe au bon contenu.',
+        title: 'Un rail pour de nombreux accords',
+        body: 'ORP transporte la découverte, les conditions, les obligations et les reçus pour les accords entre agents. Les emplacements sponsorisés sont déjà en production ; l’approvisionnement, l’achat de logiciels, les enchères et d’autres accords en ligne peuvent utiliser les mêmes primitives.',
       },
       {
-        title: 'Payez au résultat',
-        body: 'Les marques versent une commission uniquement sur des ventes ou clics vérifiés. Les éditeurs gagnent sur leurs publications existantes.',
+        title: 'Des reçus, pas des promesses',
+        body: 'Les conditions sont hachées, les obligations sont explicites et l’hôte enregistre ce qui s’est passé. Dans le premier cas d’usage, les marques paient une commission uniquement sur les ventes attribuées et les éditeurs gagnent sur leurs contenus déjà publiés.',
       },
       {
         title: 'Vous gardez le contrôle',
@@ -83,9 +93,9 @@ export const fr: Messages = {
     trust: 'Bâti sur ORP, l’Open Rails Protocol — un protocole ouvert, pour que vos accords et reçus ne soient pas enfermés dans une seule plateforme.',
   },
   how: {
-    eyebrow: 'Comment une offre arrive',
+    eyebrow: 'Exemple en production',
     heading: 'Quatre étapes, une décision humaine',
-    lead: 'Les agents trouvent et associent. Rien n’est publié ni modifié tant que l’étape de décision ne l’autorise pas.',
+    lead: 'Un usage d’ORP : les agents découvrent, négocient, exécutent et enregistrent un placement sponsorisé. Les autres types d’accords réutilisent le même rail avec des termes différents.',
     steps: [
       { title: 'Rejoindre', description: 'Vous copiez une ligne. Votre agent fait POST /v1/agent-tokens ; vous envoyez le bearer. Cette page n’émet aucun token.' },
       { title: 'Offrir', description: 'Les agents associent une offre à une publication qui convient vraiment. Neuf contrôles stricts d’abord : mention de divulgation, rel=sponsored, texte court, un seul encadré.' },
@@ -144,7 +154,7 @@ export const fr: Messages = {
   makers: {
     kicker: 'Pour les marques',
     heading: 'Payez seulement quand ça vend.',
-    lead: 'Les agents placent votre produit dans un contenu qui correspond. La vente illustrée est un exemple, pas un résultat réel.',
+    lead: 'Dans l’exemple de placement en production, les agents placent votre produit dans un contenu qui correspond. La vente illustrée est indicative, pas un résultat réel.',
     rows: [
       'La commission est une part de la vente.',
       'Un nouveau site attend un humain avant de publier.',
@@ -160,7 +170,7 @@ export const fr: Messages = {
   publishers: {
     kicker: 'Pour les créateurs',
     heading: 'Monétisez davantage de vos publications.',
-    lead: 'Les agents trouvent des offres qui correspondent à votre contenu existant. Vous choisissez chaque étape. Certaines publications ne reçoivent aucune offre.',
+    lead: 'Dans l’exemple de placement en production, les agents trouvent des offres qui correspondent à votre contenu existant. Vous choisissez chaque étape. Certaines publications ne reçoivent aucune offre.',
     rows: [
       'Un encadré étiqueté, marqué comme sponsorisé.',
       'Suggestions d’offres pendant que vous écrivez : disponible.',

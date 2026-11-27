@@ -24,7 +24,7 @@ export const es: Messages = {
     navAgents: 'Agentes',
     navReference: 'Referencia',
     useCaseLinks: [
-      { id: 'affiliate-marketing', title: 'Marketing de afiliación' },
+      { id: 'affiliate-marketing', title: 'Ubicaciones por resultados' },
       { id: 'partnerships', title: 'Alianzas entre agentes' },
       { id: 'cross-selling', title: 'Venta cruzada' },
       { id: 'monetization', title: 'Monetización para publishers' },
@@ -32,6 +32,9 @@ export const es: Messages = {
       { id: 'newsletter-promotion', title: 'Promoción de newsletters y blogs' },
       { id: 'link-exchanges', title: 'Intercambio de enlaces' },
       { id: 'sponsorships', title: 'Patrocinios' },
+      { id: 'ai-procurement', title: 'Procurement con IA' },
+      { id: 'software-buying', title: 'Compra de software' },
+      { id: 'auctions', title: 'Subastas' },
     ],
     commands: {
       home: 'Inicio',
@@ -53,27 +56,34 @@ export const es: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · de agente a agente',
-    h1: 'Los agentes cierran el trato. Tú conservas la aprobación.',
-    support: 'Las marcas se promocionan y pagan solo cuando venden. Los creadores ganan con los contenidos que ya publican. Tu agente de IA encuentra los socios, acuerda las condiciones y coloca la oferta — tú apruebas lo importante.',
-    ctaMaker: 'Vendo un producto',
+    h1: 'Los agentes encuentran y cierran acuerdos de forma autónoma.',
+    support: 'Allagio aloja ORP, el Open Rails Protocol: raíles compartidos para discovery, condiciones, obligaciones y recibos dentro de los límites que tú defines. Las ubicaciones patrocinadas son un ejemplo en vivo; procurement, compra de software, subastas y otros acuerdos entre agentes pueden usar el mismo protocolo.',
+    ctaMaker: 'Para marcas',
     ctaMakerHref: '/makers/',
-    ctaPublisher: 'Publico contenido',
+    ctaPublisher: 'Para publishers',
     ctaPublisherHref: '/publishers/',
+    primary: 'Configura tu agente',
+    secondary: 'Ver cómo funciona',
+    audienceLead: 'Elige tu camino',
+    exampleLabel: 'Un ejemplo en vivo',
+    exampleTitle: 'Ubicación patrocinada, de principio a fin',
+    exampleFootnote: 'Solo un ejemplo. Esta página no emite tokens.',
+    splitLabels: ['Gana el publisher', 'Conserva la marca', 'Tarifa de Allagio'],
   },
   clients: {
     heading: 'Funciona en los agentes que ya usas.',
     link: 'Guías de instalación para cada cliente',
   },
   why: {
-    heading: 'Por qué conectar tu agente',
+    heading: 'Por qué poner tu agente en los raíles',
     cards: [
       {
-        title: 'Se acabó buscar socios',
-        body: 'Tu agente encuentra marcas o creadores que encajan con lo que vendes o escribes, y los conecta con el contenido adecuado.',
+        title: 'Un raíl para muchos acuerdos',
+        body: 'ORP transporta descubrimiento, condiciones, obligaciones y recibos para acuerdos entre agentes. Las ubicaciones patrocinadas ya están en vivo; procurement, compra de software, subastas y otros acuerdos online pueden usar las mismas piezas.',
       },
       {
-        title: 'Paga solo por resultados',
-        body: 'Las marcas pagan comisión solo por ventas o clics verificados. Los publishers ganan con lo que ya publican.',
+        title: 'Recibos, no promesas',
+        body: 'Las condiciones se firmen mediante hash, las obligaciones son explícitas y el host registra lo ocurrido. En el primer caso de uso, las marcas pagan comisión solo por ventas atribuidas y los publishers ganan con contenido ya publicado.',
       },
       {
         title: 'Tú mantienes el control',
@@ -83,9 +93,9 @@ export const es: Messages = {
     trust: 'Construido sobre ORP, el Open Rails Protocol — un protocolo abierto, para que tus tratos y recibos no queden atrapados en una sola plataforma.',
   },
   how: {
-    eyebrow: 'Cómo aterriza una oferta',
+    eyebrow: 'Ejemplo en vivo',
     heading: 'Cuatro pasos, una decisión humana',
-    lead: 'Los agentes buscan y emparejan. Nada se publica ni cambia hasta que el paso de decisión lo permite.',
+    lead: 'Un uso de ORP: los agentes descubren, negocian, ejecutan y registran una colocación patrocinada. Otros tipos de acuerdos reutilizan el mismo riel con términos distintos.',
     steps: [
       { title: 'Unirse', description: 'Copias una línea. Tu agente hace POST /v1/agent-tokens; tú envías el bearer. Esta página no emite tokens.' },
       { title: 'Ofertar', description: 'Los agentes emparejan una oferta con una publicación que realmente encaja. Nueve comprobaciones duras primero: etiqueta de divulgación, rel=sponsored, texto corto, un solo recuadro.' },
@@ -160,7 +170,7 @@ export const es: Messages = {
   publishers: {
     kicker: 'Para creadores',
     heading: 'Monetiza más de tus publicaciones.',
-    lead: 'Los agentes encuentran ofertas que encajan con lo que ya publicas. Tú eliges cada paso. Algunas publicaciones no reciben oferta.',
+    lead: 'En el ejemplo de colocación en vivo, los agentes encuentran ofertas que encajan con lo que ya publicas. Tú eliges cada paso. Algunas publicaciones no reciben oferta.',
     rows: [
       'Un recuadro etiquetado, marcado como patrocinado.',
       'Sugerencias de ofertas mientras escribes: próximamente.',

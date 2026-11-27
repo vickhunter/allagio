@@ -124,6 +124,7 @@ async function handle(req, res) {
     return send(res, 200, { ok: true });
   }
   if (pathname === '/owner/api/session') return send(res, 200, session);
+  if (pathname === '/skill.md') return send(res, 200, fs.readFileSync(path.join(build, 'landing-v9/skill.md')), 'text/markdown; charset=utf-8');
   if (pathname === '/health') {
     state.healthHits += 1;
     if (state.healthMode === 'never') return send(res, 503, { error: 'asleep' });
@@ -715,7 +716,7 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     const page = await context.newPage();
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(base + '/landing');
-    await expect(page.getByRole('heading', { name: 'Agents do the deal. You keep the approval.', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Agents find and close deals autonomously.', exact: true })).toBeVisible();
     await expect(page.locator('[data-primary-action]')).toHaveCount(1);
     await fits(page);
     await frame(page, `after-landing-${viewport.width}`);
@@ -728,8 +729,8 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     await frame(page, `after-overview-${viewport.width}`);
     await page.goto(base + '/owner/settings');
     await expect(page.getByRole('heading', { name: 'Setup & agents', level: 1 })).toBeVisible();
-    await expect(page.locator('.agent-line pre')).toHaveText(`Read ${base}/SKILL.md and connect this site to Allagio`);
-    await expect(page.locator('[data-skill-status]')).toContainText('Coming soon');
+    await expect(page.locator('.agent-line pre')).toHaveText(`Read ${base}/skill.md and connect this site to Allagio`);
+    await expect(page.locator('[data-skill-status]')).toContainText('available');
     await expect(page.locator('[data-rail-plain]')).toHaveText('Your referral offer is saved. Next: submit it to list it.');
     const humans = page.locator('.task-list');
     await expect(humans).toContainText('Checkout is optional');
@@ -738,11 +739,11 @@ test('setup and agents, landing, and overview', async ({ browser }) => {
     await expect(page.locator('.setup-command pre')).toHaveCount(1);
     const copy = page.getByRole('button', { name: 'Copy line', exact: true });
     await expect(copy).toBeEnabled();
-    await expect(copy).toHaveClass(/secondary/);
+    await expect(copy).not.toHaveClass(/secondary/);
     await expect(copy).not.toHaveAttribute('data-primary-action');
     await copy.click();
     await expect(page.locator('.agent-line .copy-status')).toHaveText('Copied. Paste it to your agent.');
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`Read ${base}/SKILL.md and connect this site to Allagio`);
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`Read ${base}/skill.md and connect this site to Allagio`);
     await fits(page);
     await frame(page, `after-setup-${viewport.width}`);
     await shotD020(page, `after-setup-${viewport.width}`);
@@ -1252,7 +1253,7 @@ test('landing still renders at both widths', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
     const page = await context.newPage();
     await page.goto(base + '/landing');
-    await expect(page.getByRole('heading', { name: 'Agents do the deal. You keep the approval.', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Agents find and close deals autonomously.', exact: true })).toBeVisible();
     await fits(page);
     await shot(page, `audit-landing-${viewport.tag}`);
     await context.close();

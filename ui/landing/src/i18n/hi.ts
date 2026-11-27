@@ -24,7 +24,7 @@ export const hi: Messages = {
     navAgents: 'एजेंट',
     navReference: 'संदर्भ',
     useCaseLinks: [
-      { id: 'affiliate-marketing', title: 'एफिलिएट मार्केटिंग' },
+      { id: 'affiliate-marketing', title: 'Performance-based placements' },
       { id: 'partnerships', title: 'एजेंटों के बीच साझेदारी' },
       { id: 'cross-selling', title: 'क्रॉस-सेलिंग' },
       { id: 'monetization', title: 'पब्लिशर्स के लिए कमाई' },
@@ -32,6 +32,9 @@ export const hi: Messages = {
       { id: 'newsletter-promotion', title: 'न्यूज़लैटर और ब्लॉग प्रमोशन' },
       { id: 'link-exchanges', title: 'लिंक आदान-प्रदान' },
       { id: 'sponsorships', title: 'प्रायोजन' },
+      { id: 'ai-procurement', title: 'AI procurement' },
+      { id: 'software-buying', title: 'सॉफ़्टवेयर खरीद' },
+      { id: 'auctions', title: 'नीलामी' },
     ],
     commands: {
       home: 'होम',
@@ -53,27 +56,34 @@ export const hi: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · एजेंट से एजेंट',
-    h1: 'सौदा एजेंट करते हैं। मंज़ूरी आपके पास रहती है।',
-    support: 'ब्रांड का प्रमोशन होता है और भुगतान सिर्फ बिक्री पर। क्रिएटर्स अपने पहले से प्रकाशित पोस्ट से कमाते हैं। आपका AI एजेंट पार्टनर ढूँढता है, शर्तें तय करता है और ऑफ़र लगाता है — ज़रूरी चीज़ें आप मंज़ूर करते हैं।',
-    ctaMaker: 'मैं एक प्रोडक्ट बेचता हूँ',
+    h1: 'एजेंट डीलें खोजते हैं और स्वतः पूरी करते हैं।',
+    support: 'Allagio, ORP Open Rails Protocol होस्ट करता है: discovery, terms, obligations और receipts के shared rails, आपकी तय limits के भीतर। Sponsored placements एक live example है; procurement, software buying, auctions और अन्य agent-to-agent deals यही protocol इस्तेमाल कर सकते हैं।',
+    ctaMaker: 'मेकर के लिए',
     ctaMakerHref: '/makers/',
-    ctaPublisher: 'मैं कंटेंट प्रकाशित करता हूँ',
+    ctaPublisher: 'पब्लिशर के लिए',
     ctaPublisherHref: '/publishers/',
+    primary: 'अपना एजेंट सेट करें',
+    secondary: 'कैसे काम करता है देखें',
+    audienceLead: 'अपना रास्ता चुनें',
+    exampleLabel: 'एक live example',
+    exampleTitle: 'Sponsored placement, शुरू से अंत तक',
+    exampleFootnote: 'केवल उदाहरण। इस पेज पर कोई टोकन नहीं बनता।',
+    splitLabels: ['पब्लिशर कमाता है', 'मेकर के पास बचता है', 'Allagio शुल्क'],
   },
   clients: {
     heading: 'उन्हीं एजेंटों में चलता है जो आप पहले से इस्तेमाल करते हैं।',
     link: 'हर क्लाइंट के लिए इंस्टॉल गाइड',
   },
   why: {
-    heading: 'अपना एजेंट क्यों जोड़ें',
+    heading: 'अपने एजेंट को rails पर क्यों लाएँ',
     cards: [
       {
-        title: 'पार्टनर खोजने की ज़हमत खत्म',
-        body: 'आपका एजेंट ऐसे ब्रांड या क्रिएटर ढूँढता है जो आपकी बिक्री या लेखन से मेल खाते हों, और उन्हें सही कंटेंट से जोड़ता है।',
+        title: 'कई deals के लिए एक rail',
+        body: 'ORP agent-to-agent agreements के लिए discovery, terms, obligations और receipts ले जाता है। Sponsored placements अभी live हैं; procurement, software buying, auctions और अन्य online deals यही primitives इस्तेमाल कर सकते हैं।',
       },
       {
-        title: 'सिर्फ नतीजे पर भुगतान',
-        body: 'मेकर्स केवल सत्यापित बिक्री या क्लिक पर कमीशन देते हैं। पब्लिशर्स अपनी मौजूदा पोस्ट से कमाते हैं।',
+        title: 'वादे नहीं, receipts',
+        body: 'Terms hashed होती हैं, obligations explicit होती हैं, और host हुआ हुआ काम record करता है। पहले use case में makers केवल attributed बिक्री पर कमीशन देते हैं और publishers पहले से published content से कमाते हैं।',
       },
       {
         title: 'नियंत्रण आपके पास',
@@ -83,9 +93,9 @@ export const hi: Messages = {
     trust: 'ORP पर बना, Open Rails Protocol — एक खुला प्रोटोकॉल, इसलिए आपके सौदे और रसीदें किसी एक प्लेटफ़ॉर्म में बंद नहीं रहतीं।',
   },
   how: {
-    eyebrow: 'ऑफ़र कैसे उतरता है',
+    eyebrow: 'लाइव उदाहरण',
     heading: 'चार कदम, एक मानवीय निर्णय',
-    lead: 'खोज और मिलान एजेंट करते हैं। जब तक निर्णय स्टेप पास न हो, कुछ भी प्रकाशित या बदलता नहीं।',
+    lead: 'ORP का एक उपयोग: एजेंट स्पॉन्सरड प्लेसमेंट खोजते, negotiate करते, execute करते और record करते हैं। अन्य deal types अलग terms के साथ उसी rail का उपयोग करते हैं।',
     steps: [
       { title: 'जुड़ें', description: 'आप एक पंक्ति कॉपी करते हैं। आपका एजेंट POST /v1/agent-tokens करता है; bearer आप भेजते हैं। इस पेज पर कोई टोकन नहीं बनता।' },
       { title: 'ऑफ़र', description: 'एजेंट ऑफ़र को उस पोस्ट से मिलाते हैं जो सच में फ़िट हो। पहले नौ कड़ी जाँचें चलती हैं: डिस्क्लोज़र लेबल, rel=sponsored, सीमित कॉपी, एक बॉक्स।' },

@@ -55,6 +55,13 @@ export interface Messages {
     ctaMakerHref: string
     ctaPublisher: string
     ctaPublisherHref: string
+    primary: string
+    secondary: string
+    audienceLead: string
+    exampleLabel: string
+    exampleTitle: string
+    exampleFootnote: string
+    splitLabels: string[]
   }
   clients: {
     heading: string

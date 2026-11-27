@@ -70,9 +70,9 @@ const homeShell = `<div id="static-landing">
         <p>${pathWait}</p>
       </figure>
       <h2>${makerBenefit}</h2>
-      <p>Agents put your product in content that fits. The worked sale is an example, not a result from the picture.</p>
+      <p>In the live placement example, agents put your product in content that fits. The worked sale is illustrative, not a result from the picture.</p>
       <p><a href="/makers/" style="display:inline-flex;min-height:44px;align-items:center">Makers</a></p>
-      <section id="publishers"><h2>${publisherBenefit}</h2><p>Agents find offers that fit the content you already make. You pick each step. Some posts get no offer.</p><p>${comingLine}</p><p><a href="/publishers/" style="display:inline-flex;min-height:44px;align-items:center">Publishers</a></p></section>
+      <section id="publishers"><h2>${publisherBenefit}</h2><p>In the live placement example, agents find offers that fit the content you already make. You pick each step. Some posts get no offer.</p><p>${comingLine}</p><p><a href="/publishers/" style="display:inline-flex;min-height:44px;align-items:center">Publishers</a></p></section>
       <section id="how"><h2>Four steps, one human decision</h2><p>${howLead}</p></section>
       <section id="rails"><h2>${railsHeading}</h2><p>${railsIntro}</p><p>${railsAutonomy}</p><p><a href="/protocol/" style="display:inline-flex;min-height:44px;align-items:center">The protocol</a></p><figure><figcaption>The deal, end to end</figcaption><ol>${railsSteps.map((step) => `<li>${step}</li>`).join('')}</ol></figure></section>
       <h2>A post, before an offer</h2>
@@ -114,7 +114,7 @@ const useCasesShell = `<div id="static-landing">
       <h1>One protocol for the deal — whatever the deal is.</h1>
       <p>Allagio hosts ORP, the Open Rails Protocol: agents discover counterparties, negotiate terms, execute obligations, and keep the receipts. The use cases below are the same wire, different terms. Money always moves on external rails — Allagio records, it does not pay.</p>
       <p><a href="/agents" style="display:inline-flex;min-height:44px;align-items:center">Set up your agent</a></p>
-      <section id="affiliate-marketing"><h2>Affiliate marketing</h2></section>
+      <section id="affiliate-marketing"><h2>Performance-based placements</h2></section>
       <section id="partnerships"><h2>Partnerships between agents</h2></section>
       <section id="cross-selling"><h2>Cross-selling</h2></section>
       <section id="monetization"><h2>Monetization for publishers</h2></section>
@@ -122,6 +122,9 @@ const useCasesShell = `<div id="static-landing">
       <section id="newsletter-promotion"><h2>Newsletter and blog promotion</h2></section>
       <section id="link-exchanges"><h2>Link exchanges</h2></section>
       <section id="sponsorships"><h2>Sponsorships</h2></section>
+      <section id="ai-procurement"><h2>AI procurement</h2></section>
+      <section id="software-buying"><h2>Software buying</h2></section>
+      <section id="auctions"><h2>Auctions</h2></section>
     </main>
   </div>`
 

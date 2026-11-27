@@ -154,6 +154,7 @@ func (h *HostedHandler) Mount(r *gin.Engine) {
 	// Directory is an API. It stays off the public page group so a miss is
 	// JSON, and a failed load is not the empty list.
 	r.GET("/v1/directory/makers", h.DirectoryMakers)
+	r.GET("/v1/directory/publishers", h.DirectoryPublishers)
 	// Gin redirects an extra trailing slash before group middleware, and it
 	// refuses a second /privacy/ route, so /privacy// never reaches headers().
 	// Serve a cleaned /privacy or /terms here. Other routes keep a one-slash redirect.
@@ -1203,7 +1204,7 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 			}
 			pageBody = string(section) + string(modesSection) + string(notifySection) + string(spacesSection) + string(offersSection) + string(payoutsSection) + pageBody
 		}
-		h.render(c, "Your distribution workspace", "", template.HTML(pageBody))
+		h.render(c, "Your Allagio workspace", "", template.HTML(pageBody))
 		return
 	}
 	csrf := template.HTMLEscapeString(o.CSRF)
@@ -1332,5 +1333,5 @@ func (h *HostedHandler) Dashboard(c *gin.Context) {
 		fmt.Fprintf(&body, `<section>%s · %s · until %s<form method="post" action="/owner/grants/%s/revoke"><input type="hidden" name="csrf" value="%s"><button>Disconnect agent</button></form></section>`, template.HTMLEscapeString(g.ClientName), template.HTMLEscapeString(g.Scope), g.ExpiresAt.Format(time.RFC3339), g.ID, csrf)
 	}
 	fmt.Fprintf(&body, `<form method="post" action="/owner/logout"><input type="hidden" name="csrf" value="%s"><button>Sign out</button></form>`, csrf)
-	h.render(c, "Your distribution workspace", "", template.HTML(body.String()))
+	h.render(c, "Your Allagio workspace", "", template.HTML(body.String()))
 }

@@ -24,7 +24,7 @@ export const zh: Messages = {
     navAgents: '代理',
     navReference: '参考',
     useCaseLinks: [
-      { id: 'affiliate-marketing', title: '联盟营销' },
+      { id: 'affiliate-marketing', title: '按效果投放' },
       { id: 'partnerships', title: '代理之间的合作' },
       { id: 'cross-selling', title: '交叉销售' },
       { id: 'monetization', title: '发布者变现' },
@@ -32,6 +32,9 @@ export const zh: Messages = {
       { id: 'newsletter-promotion', title: 'Newsletter 与博客推广' },
       { id: 'link-exchanges', title: '链接交换' },
       { id: 'sponsorships', title: '赞助' },
+      { id: 'ai-procurement', title: 'AI 采购' },
+      { id: 'software-buying', title: '软件采购' },
+      { id: 'auctions', title: '拍卖' },
     ],
     commands: {
       home: '首页',
@@ -53,27 +56,34 @@ export const zh: Messages = {
   },
   hero: {
     eyebrow: 'Allagio · 代理对代理',
-    h1: '代理谈成合作，你保留审批权。',
-    support: '品牌获得推广，只在成交时付费。创作者用已发布的内容赚取收益。你的 AI 代理负责找伙伴、谈条件、投放报价——关键环节由你审批。',
-    ctaMaker: '我卖产品',
+    h1: '代理能够自主发现并达成交易。',
+    support: 'Allagio 托管 ORP（Open Rails Protocol）：在你设定的限制内，为发现、条款、义务和回执提供共享轨道。赞助展示是一个已上线示例；AI 采购、软件购买、拍卖和其他代理间交易都可以使用同一个协议。',
+    ctaMaker: '面向品牌方',
     ctaMakerHref: '/makers/',
-    ctaPublisher: '我发布内容',
+    ctaPublisher: '面向发布者',
     ctaPublisherHref: '/publishers/',
+    primary: '设置你的代理',
+    secondary: '查看运作方式',
+    audienceLead: '选择你的路径',
+    exampleLabel: '一个已上线示例',
+    exampleTitle: '赞助展示，端到端',
+    exampleFootnote: '仅为示例。此页面不会签发令牌。',
+    splitLabels: ['发布者获得', '品牌方保留', 'Allagio 费用'],
   },
   clients: {
     heading: '在你已经在用的代理里运行。',
     link: '每个客户端的安装指南',
   },
   why: {
-    heading: '为什么接入你的代理',
+    heading: '为什么让你的代理进入这套轨道',
     cards: [
       {
-        title: '不用再自己找伙伴',
-        body: '你的代理会找到适合你卖什么或写什么的品牌或创作者，并把它们匹配到合适的内容。',
+        title: '一条轨道，承载多种交易',
+        body: 'ORP 为代理间协议承载发现、条款、义务和回执。赞助展示已经上线；采购、软件购买、拍卖和其他在线交易都能使用同样的基础能力。',
       },
       {
-        title: '只为结果付费',
-        body: '品牌方只为经验证的销售或点击支付佣金。发布者靠已有的内容赚钱。',
+        title: '要回执，不要空口承诺',
+        body: '条款会被哈希，义务明确可见，主机记录实际发生的步骤。在首个用例中，品牌方只为可归因销售付佣金，发布者用已发布内容获得收益。',
       },
       {
         title: '你始终掌控',
@@ -83,9 +93,9 @@ export const zh: Messages = {
     trust: '基于 ORP（Open Rails Protocol，开放轨道协议）构建——一个开放协议，你的交易和回执不会被锁定在单一平台上。',
   },
   how: {
-    eyebrow: '报价如何落地',
+    eyebrow: '已上线示例',
     heading: '四个步骤，一次人工决定',
-    lead: '查找和匹配交给代理。在“决定”步骤放行之前，不会发布或变动任何内容。',
+    lead: 'ORP 的一种用途：代理发现、协商、执行并记录赞助展示。其他交易类型会用不同条款复用同一套轨道。',
     steps: [
       { title: '加入', description: '你复制一行指令。你的代理调用 POST /v1/agent-tokens；由你发送 bearer。此页面不签发令牌。' },
       { title: '报价', description: '代理把报价匹配到真正契合的文章。先跑九项硬性检查：披露标签、rel=sponsored、文案长度限制、每篇一个框。' },

@@ -139,7 +139,7 @@
 
   // ---------------- BLIP: the team mascot, a blinking text cursor. Empty states only. ----------------
   function blip(label) {
-    return '<svg class="blip" viewBox="0 0 44 44" role="img" aria-label="' + esc(label || 'BLIP, the Offer Rails cursor, waiting') + '" data-test="blip">' +
+    return '<svg class="blip" viewBox="0 0 44 44" role="img" aria-label="' + esc(label || 'BLIP, the Allagio cursor, waiting') + '" data-test="blip">' +
       '<rect x="6" y="36" width="32" height="3" rx="1.5" style="fill:rgb(var(--rgb-line-strong))"/>' +
       '<g class="blip-bar"><rect x="16" y="5" width="12" height="29" rx="3" style="fill:rgb(var(--rgb-digest))"/>' +
       '<circle cx="20" cy="13" r="1.8" style="fill:rgb(var(--rgb-surface-1))"/><circle cx="24.5" cy="13" r="1.8" style="fill:rgb(var(--rgb-surface-1))"/></g>' +

@@ -71,6 +71,24 @@ func (h *HostedHandler) DirectoryMakers(c *gin.Context) {
 	})
 }
 
+// DirectoryPublishers is GET /v1/directory/publishers. ORP spaces are
+// agent-discovery records, not public directory listings: discovery strips
+// their locators before showing them to another party. Until a public
+// publisher-listing consent record exists, the healthy public list is empty
+// rather than a missing route or a leaked locator.
+func (h *HostedHandler) DirectoryPublishers(c *gin.Context) {
+	if err := directoryMakersReady(c.Request.Context(), h.DB); err != nil {
+		log.Printf("directory publishers unavailable: %v", err)
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "directory unavailable"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"items":       []any{},
+		"next_cursor": nil,
+		"total":       0,
+	})
+}
+
 func directoryMakersReady(ctx context.Context, db *database.DB) error {
 	if db == nil || db.Pool == nil {
 		return errors.New("directory unavailable")

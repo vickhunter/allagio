@@ -2,7 +2,7 @@ import { orderedSurfaces, surfaceStatus, type Surface } from '@/surfaces.mjs'
 
 function Row({ item, notes }: { item: Surface; notes: boolean }) {
   const name = item.href
-    ? <a className="font-semibold underline underline-offset-4" href={item.href}>{item.name}</a>
+    ? <a className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4" href={item.href}>{item.name}</a>
     : <span className="font-semibold">{item.name}</span>
   return (
     <li className="flex min-h-11 flex-col justify-center gap-1 rounded-xl border border-line bg-s1 px-4 py-3 text-sm">
