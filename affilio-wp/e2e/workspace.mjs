@@ -49,7 +49,7 @@ async function assertHydratedHome(page) {
     await expect(page.getByRole('heading', { name: 'Straight answers.', exact: true })).toBeVisible();
     await expect(page.locator('summary').filter({ hasText: 'Setup details' })).toBeVisible();
     await expect(page.locator('details a[href="/llms.txt"]')).toHaveCount(1);
-    await expect(page.locator('#hero canvas')).toHaveCount(1);
+    await expect(page.locator('#hero [data-slot="dither"]')).toHaveCount(1);
 }
 const joinLine = 'Join with POST /v1/agent-tokens and send the bearer.';
 async function copyJoinLine(page) {
