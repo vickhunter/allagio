@@ -9,6 +9,7 @@ const browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-
 const errors = [];
 const contexts = [];
 const desktop = { width: 1440, height: 900 };
+const tablet = { width: 768, height: 1024 };
 const mobile = { width: 390, height: 844 };
 // Current approved home heading. The retired "Someone has the product" line is not on this page.
 const approvedH1 = 'Agents find and close deals autonomously.';
@@ -35,18 +36,21 @@ async function assertApprovedHeading(page) {
 }
 async function assertHydratedHome(page) {
     await assertApprovedHeading(page);
-    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
-    for (const name of ['Your limits', 'Makers', 'Publishers', 'Protocol', 'Agents']) {
-        await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name, exact: true })).toBeVisible();
+    const nav = page.getByRole('navigation', { name: 'Main' });
+    await expect(nav).toBeVisible();
+    for (const name of ['Makers', 'Publishers', 'Use cases', 'Protocol']) {
+        await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
     }
+    await expect(page.getByRole('banner').getByRole('link', { name: 'Set up your agent', exact: true })).toHaveAttribute('href', '/landing-v9/agents/');
     await expect(page.getByRole('link', { name: 'Sign in', exact: true }).first()).toBeVisible();
     await expect(page.locator('#hero')).toBeVisible();
     await expect(page.locator('#vision')).toBeVisible();
-    await expect(page.getByRole('region', { name: 'What your agent does' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'What you keep control of' })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'What it replaces' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Any content. Any partnership.', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Straight answers.', exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'What agents can do today' })).toBeVisible();
+    const approvals = page.getByRole('region', { name: 'You choose what needs approval' });
+    await expect(approvals.getByRole('link', { name: 'Read the approval rules' })).toHaveAttribute('href', '/you/#approvals');
+    await expect(page.getByRole('region', { name: 'Skip repeated signups and cold outreach' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'How a sponsored placement works', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Fees, privacy, and reversals', exact: true })).toBeVisible();
     await expect(page.locator('summary').filter({ hasText: 'Setup details' })).toBeVisible();
     await expect(page.locator('details a[href="/llms.txt"]')).toHaveCount(1);
     await expect(page.locator('#hero [data-slot="dither"]')).toHaveCount(1);
@@ -68,8 +72,10 @@ async function assertStaticHome(page) {
     await expect(page.locator('#hero')).toBeVisible();
     await expect(page.locator('#how')).toBeVisible();
     await expect(page.locator('#publishers')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'You send the bearer yourself.', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Four steps, one human decision', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Give your agent the setup prompt', exact: true })).toBeVisible();
+    await expect(page.getByText('Setup is manual. You send the bearer yourself. This page does not issue a token.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'How a sponsored placement works', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'You choose what needs approval', exact: true })).toBeVisible();
 }
 async function assertWorkspaceChrome(page) {
     const nav = page.getByRole('navigation', { name: 'Workspace' });
@@ -189,6 +195,12 @@ async function journey() {
     await assertWorkspaceChrome(builder);
     await expect(builder.getByRole('heading', { level: 1, name: 'Setup & agents', exact: true })).toBeVisible();
     await expect(builder.getByRole('heading', { name: 'Connect your existing agent', exact: true })).toBeVisible();
+    for (const viewport of [tablet, mobile]) {
+        await builder.setViewportSize(viewport);
+        await expect(builder.getByRole('button', { name: 'Copy command', exact: true })).toBeVisible();
+        await noHorizontalOverflow(builder);
+    }
+    await builder.setViewportSize(desktop);
     const command = await builder.locator('.setup-command pre').textContent();
     await builder.getByRole('button', { name: 'Copy command', exact: true }).click();
     await expect(builder.locator('.setup-command .copy-status')).toContainText('Copied.');
