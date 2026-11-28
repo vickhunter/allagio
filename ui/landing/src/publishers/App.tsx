@@ -9,7 +9,7 @@ import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { runsLead, runsTitle } from '@/surfaces.mjs'
-import { example, faq, joinLine, painLine, publisherAdvantages } from '@/content'
+import { example, faq, joinLine, publisherAdvantages } from '@/content'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
 import { DirectorySection } from '@/directory/Directory'
@@ -30,9 +30,9 @@ export function App() {
       <section aria-labelledby="hero-h" className="relative isolate overflow-hidden border-b border-line">
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-14 pt-10 md:pt-16 lg:grid-cols-[1fr_1.1fr]">
           <div className="anim-fade">
-            <Badge variant="pub">For publishers · {publisherAdvantages.length} advantages</Badge>
-            <h1 id="hero-h" className="h-display mt-5 text-[42px] sm:text-6xl">Let your agent monetize attention on explicit terms.</h1>
-            <p className="mt-5 max-w-lg text-lg leading-relaxed text-t2">Sponsored placements are one live example; the same ORP rails can carry other agent-to-agent deals. {painLine} You pick each step.</p>
+            <Badge variant="pub">For publishers</Badge>
+            <h1 id="hero-h" className="h-display mt-5 text-[42px] sm:text-6xl">Find sponsors that fit what you write</h1>
+            <p className="mt-5 max-w-lg text-lg leading-relaxed text-t2">Give your agent a post and ask for relevant offers. Review the proposed mention, where it appears, and what you’d earn before you publish.</p>
             <div className="mt-7"><SignInChoice where="publishers_hero" only="publisher" /></div>
           </div>
           <LivePanel />
@@ -42,8 +42,8 @@ export function App() {
       <DirectorySection kind="publisher" />
 
       <section aria-labelledby="adv-h" className="mx-auto max-w-6xl px-5 py-16 md:py-20">
-        <p className="eyebrow">Every publisher advantage</p>
-        <h2 id="adv-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">{featured.t}. {featured.b}</h2>
+        <h2 id="adv-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">{featured.t}</h2>
+        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">{featured.b}</p>
         <ol className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {rest.map((a, i) => (
             <li key={a.k} className="rounded-2xl border border-line bg-s1 p-5 transition-colors duration-150 hover:border-pub">
@@ -67,11 +67,11 @@ export function App() {
 
       <section id="faq" aria-labelledby="faq-h" className="border-t border-line">
         <div className="mx-auto grid max-w-6xl gap-8 px-5 py-16 md:grid-cols-[1fr_2fr] md:py-20">
-          <div><p className="eyebrow">Publishers ask</p><h2 id="faq-h" className="h-display mt-3 text-3xl sm:text-4xl">Before you ask.</h2><Blip className="mt-8 hidden md:inline-flex" say="Undo is one tap. I checked." /></div>
+          <div><h2 id="faq-h" className="h-display mt-3 text-3xl sm:text-4xl">Publisher questions</h2><Blip className="mt-8 hidden md:inline-flex" say="Undo is one tap. I checked." /></div>
           <Accordion tone="pub" items={[faq[3], faq[1], faq[2], faq[4], faq[0]]} />
         </div>
       </section>
-      <JoinSection role="publisher" title="Get on the first train." sub={joinLine} />
+      <JoinSection role="publisher" title="Connect your publishing site" sub={joinLine} />
     </Page>
   )
 }

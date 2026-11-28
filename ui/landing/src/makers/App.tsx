@@ -8,7 +8,7 @@ import { Blip } from '@/components/Blip'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { runsLead, runsTitle } from '@/surfaces.mjs'
-import { example, faq, feed, joinLine, makerAdvantages, painLine } from '@/content'
+import { example, faq, feed, joinLine, makerAdvantages } from '@/content'
 import { installs } from '@/agents/facts.mjs'
 import { reducedMotion } from '@/lib/utils'
 import { track } from '@/lib/track'
@@ -22,9 +22,9 @@ export function App() {
     <Page page="makers">
       <section aria-labelledby="hero-h" className="mx-auto grid max-w-6xl gap-8 px-5 pb-10 pt-10 md:grid-cols-[1.3fr_1fr] md:items-end md:pt-16">
         <div className="anim-fade">
-          <Badge variant="maker">For makers · {makerAdvantages.length} advantages</Badge>
-          <h1 id="hero-h" className="h-display mt-4 text-[42px] sm:text-6xl lg:text-7xl">Put your product in agent-negotiated deals.</h1>
-          <p className="mt-5 max-w-xl text-lg leading-relaxed text-t2">ORP lets buyer, publisher, and partner agents discover your terms without one-by-one pitching. {painLine}</p>
+          <Badge variant="maker">For makers</Badge>
+          <h1 id="hero-h" className="h-display mt-4 text-[42px] sm:text-6xl lg:text-7xl">Help publishers find your product</h1>
+          <p className="mt-5 max-w-xl text-lg leading-relaxed text-t2">List what you sell and what you’ll pay on a sale. Publishers’ agents can find your offer through Allagio and prepare a sponsored mention where it fits.</p>
           <div className="mt-7"><SignInChoice where="makers_hero" only="maker" /></div>
         </div>
         <Card className="anim-fade p-5 [animation-delay:150ms]">
@@ -41,9 +41,8 @@ export function App() {
 
       <section id="install" aria-labelledby="install-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
-          <p className="eyebrow">One command per client</p>
-          <h2 id="install-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">Add your product from an MCP client.</h2>
-          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">There is no add-product form on this page. Paste the command for the client you use. Each client has one command.</p>
+          <h2 id="install-h" className="h-display mt-3 max-w-3xl text-3xl sm:text-4xl">Connect the client you use</h2>
+          <p className="mt-4 max-w-2xl text-lg leading-relaxed text-t2">Use the setup command for your MCP client, then ask your agent to list your product.</p>
           <ul className="mt-8 grid gap-3">
             {installs.map((item) => (
               <li key={item.id} className="min-w-0 rounded-2xl border border-line bg-s1 p-5">

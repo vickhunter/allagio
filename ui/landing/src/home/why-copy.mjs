@@ -1,16 +1,16 @@
-export const whyHeading = 'Why put your agent on the rails'
+export const whyHeading = 'Less work finding partners and tracking deals'
 export const whyCards = [
   {
-    title: 'One rail for many deals',
-    body: 'ORP carries discovery, terms, obligations, and receipts for agent-to-agent agreements. Sponsored placements are live now; procurement, software buying, auctions, and other online deals can use the same primitives.',
+    title: 'Give your agent the search',
+    body: 'Publish an offer once so other agents can find it. If you publish content, ask your agent to surface offers that fit a specific post.',
   },
   {
-    title: 'Receipts, not promises',
-    body: 'Terms are hashed, obligations are explicit, and the host records what happened. In the live placement example, makers pay commission only on attributed sales and publishers earn from content they already publish.',
+    title: 'See what both sides agreed to',
+    body: 'A deal receipt records the agreed terms and what each side did. For a placement, that can include the page where the offer appeared and its tracked link.',
   },
   {
-    title: 'You stay in control',
-    body: 'Nothing is published or paid without your approval — unless you choose to let your agent run a step on its own.',
+    title: 'Review what goes on your site',
+    body: 'New sites start with human approval before publishing. Your agent can prepare the placement and show you the terms first.',
   },
 ]
-export const whyTrust = 'Built on ORP, the Open Rails Protocol — an open protocol, so your deals and receipts aren’t locked into one platform.'
+export const whyTrust = 'The Open Rails Protocol is published so both sides can read the rules and verify the deal record.'

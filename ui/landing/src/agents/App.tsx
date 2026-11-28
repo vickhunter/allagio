@@ -5,16 +5,15 @@ import { Page } from '@/site/Page'
 
 const primaryClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-t1 px-5 font-semibold text-s0 transition-colors duration-150 hover:bg-[rgb(60_66_55)] sm:w-auto'
 const secondaryClass = 'inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-line-strong bg-s1 px-5 font-semibold text-t1 transition-colors duration-150 hover:bg-s2 sm:w-auto'
-const sectionClass = 'mt-6 scroll-mt-48 md:scroll-mt-24'
+const sectionClass = 'mt-6'
 
 const toc = [
-  { href: '#agents-hero', label: 'Hero' },
-  { href: '#tell', label: 'Tell your agent' },
+  { href: '#tell', label: 'Setup prompt' },
   { href: '#install', label: 'Install' },
-  { href: '#steps', label: 'Steps' },
+  { href: '#steps', label: 'API steps' },
   { href: '#device', label: 'Device sign-in' },
-  { href: '#alone', label: 'Alone today' },
-  { href: '#modes', label: 'Modes' },
+  { href: '#alone', label: 'What works today' },
+  { href: '#modes', label: 'Approval modes' },
   { href: '#tools', label: 'Tools' },
   { href: '#limits', label: 'Limits' },
 ]
@@ -133,25 +132,24 @@ export function App() {
   const signup = orderedSteps[0]
   return (
     <Page page="agents">
-      <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] md:grid-cols-[11rem_minmax(0,1fr)] md:gap-8">
-        <nav id="on-this-page" aria-label="On this page" className="sticky top-32 z-20 min-w-0 border-b border-line bg-s0/95 px-5 py-2 backdrop-blur md:top-20 md:self-start md:border-0 md:bg-transparent md:px-5 md:py-12">
-          <p className="eyebrow mb-3 hidden md:block">On this page</p>
-          <div className="flex min-w-0 gap-2 overflow-x-auto md:flex-col md:overflow-visible">
+      <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] md:grid-cols-[11rem_minmax(0,1fr)] md:gap-x-8">
+        <section id="agents-hero" aria-labelledby="agents-h" className="min-w-0 px-5 pt-8 md:col-start-2 md:pt-12">
+          <p className="eyebrow">MCP server</p>
+          <h1 id="agents-h" className="h-display mt-3 text-[40px] sm:text-6xl">Connect your agent to Allagio</h1>
+          <p className="mt-4 text-lg leading-relaxed text-t2">Copy the setup prompt below or add the Allagio MCP server to your client. Once connected, your agent can find offers and prepare a placement for review.</p>
+          <p className="mt-4 break-all font-mono text-[15px] text-t1" data-mcp-url>{mcpUrl}</p>
+          <p className="mt-2 text-[15px] leading-relaxed text-t2">Scopes are publisher and maker. A call with no bearer is 401.</p>
+          <CopyButton value={mcpUrl} label="Copy endpoint" statusName="endpoint" primary />
+        </section>
+        <nav id="on-this-page" aria-labelledby="agents-contents-h" className="min-w-0 border-y border-line px-5 py-4 md:sticky md:top-20 md:col-start-1 md:row-start-2 md:max-h-[calc(100svh-6rem)] md:self-start md:overflow-y-auto md:border-0">
+          <h2 id="agents-contents-h" className="mb-2 text-sm font-semibold text-t2">On this page</h2>
+          <div className="flex flex-wrap gap-2 md:flex-col md:gap-0">
             {toc.map((item) => (
-              <a key={item.href} href={item.href} className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-line bg-s1 px-3 text-sm font-semibold text-t1 md:w-full md:justify-start md:rounded-lg md:border-0 md:bg-transparent md:px-2">{item.label}</a>
+              <a key={item.href} href={item.href} className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-t1 underline decoration-line-strong underline-offset-4 hover:bg-s2 hover:decoration-current">{item.label}</a>
             ))}
           </div>
         </nav>
-        <div className="min-w-0 px-5 pb-8 pt-6 md:pt-12">
-          <section id="agents-hero" aria-labelledby="agents-h" className={sectionClass}>
-            <p className="eyebrow">MCP server</p>
-            <h1 id="agents-h" className="h-display mt-3 text-[40px] sm:text-6xl">Find an offer, preview the page, place it.</h1>
-            <p className="mt-4 text-lg leading-relaxed text-t2">Allagio is an MCP server. Three steps. {publishStepParagraph} A chat answer is never a paid placement.</p>
-            <p className="mt-4 break-all font-mono text-[15px] text-t1" data-mcp-url>{mcpUrl}</p>
-            <p className="mt-2 text-[15px] leading-relaxed text-t2">Scopes are publisher and maker. A call with no bearer is 401.</p>
-            <CopyButton value={mcpUrl} label="Copy endpoint" statusName="endpoint" primary />
-          </section>
-
+        <div className="min-w-0 px-5 pb-8 md:col-start-2 md:row-start-2">
           <section id="tell" aria-labelledby="tell-h" className={sectionClass}>
             <h2 id="tell-h" className="h-display text-2xl sm:text-3xl">Tell your agent</h2>
             <pre className="mt-3 max-w-full overflow-x-auto whitespace-pre-wrap break-all rounded-2xl border border-line bg-s1 p-4 font-mono text-[13px] leading-relaxed text-t1">{agentPrompt}</pre>
@@ -162,7 +160,7 @@ export function App() {
             <h2 id="install-h" className="h-display text-2xl sm:text-3xl">Install</h2>
             <InstallTabs />
             <p className="mt-3 text-[15px] leading-relaxed text-t2">{installCheck}</p>
-            <p className="text-[15px] leading-relaxed text-t2">{signInNote}</p>
+            <p className="wrap-anywhere text-[15px] leading-relaxed text-t2">{signInNote}</p>
           </section>
 
           <section id="steps" data-d063-steps aria-labelledby="steps-h" className={sectionClass}>

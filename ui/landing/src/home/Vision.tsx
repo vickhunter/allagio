@@ -24,8 +24,11 @@ export function Vision() {
             </li>
           ))}
         </ul>
+        <p className="mt-3 text-sm text-t2">
+          <a className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4 hover:no-underline" href="/use-cases/">{t.chrome.navUseCases}</a>
+        </p>
       </section>
-      <section aria-labelledby="keep-h">
+      <section id="approval-rules" aria-labelledby="keep-h">
         <h2 id="keep-h" className="font-display text-2xl font-bold tracking-tight">{t.vision.keepHeading}</h2>
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
           {t.vision.keep.map((item) => (
@@ -36,7 +39,7 @@ export function Vision() {
           ))}
         </ul>
         <p className="mt-3 text-sm text-t2">
-          <a className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4 hover:no-underline" href={withSource('/you/', source)}>{t.vision.keepLink}</a>
+          <a className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4 hover:no-underline" href={withSource('/you/#approvals', source)}>{t.vision.keepLink}</a>
         </p>
       </section>
       <section aria-labelledby="replaces-h">

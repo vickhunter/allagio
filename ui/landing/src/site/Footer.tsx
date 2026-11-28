@@ -45,7 +45,6 @@ export function Footer() {
             <p>{t.footer.people}</p>
             <a href={withSource('/makers/', source)}>{t.footer.forMakers}</a>
             <a href={withSource('/publishers/', source)}>{t.footer.forPublishers}</a>
-            <a href={withSource('/you/', source)}>{t.footer.yourLimits}</a>
           </nav>
           <nav aria-label="Paper" className="foot-cols">
             <p>{t.footer.paper}</p>

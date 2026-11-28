@@ -7,7 +7,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const chrome = ['/usr/local/bin/google-chrome', '/usr/bin/google-chrome'].find((path) => existsSync(path))
+const chrome = [process.env.CHROME_BIN, '/usr/local/bin/google-chrome', '/usr/bin/google-chrome'].find((path) => path && existsSync(path))
 const emptyText = 'No makers listed yet. Yours can be first. Add your product below. That step needs an MCP client.'
 const errorText = 'The list could not load.'
 

@@ -1,3 +1,7 @@
+## November 28 — clearer Allagio setup and approval rules
+
+The public landing explains the ORP deal flow and distinguishes content partnerships in test mode from upcoming workflows. Setup links lead to the agent guide. The homepage explains approval rules inline and links to the existing detailed reference. The guide’s contents links scroll with the content on phones and sit in a separate sidebar on larger screens, and section links honor the same header clearance on direct visits and in-page navigation. The public pages use warmer paper tones and keep the existing interactive examples.
+
 ## November 28 — ORP-first landing consistency and device-layout fixes
 
 The landing copy now frames sponsored placements consistently as one live ORP example rather than the product boundary: the how-it-works lead, maker/publisher sections, and agent-capability copy point back to the shared discovery/terms/obligations/receipts rail, with localized copy updated in en/es/fr/hi/zh. `GET /v1/directory/publishers` now answers a valid empty public list when the database is healthy instead of 404ing; ORP spaces remain agent-discovery records and are not exposed as public directory entries because discovery deliberately strips their locators. Tablet hash navigation uses explicit sticky-header-aware scrolling, mobile/tablet use-case submenu rows meet the 44px touch-target size, desktop use-case dropdowns scroll within short viewports, and surface links such as Newsletter are full-height tap targets.

@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { signInHref, withSource } from "@/lib/source"
 import { useLocale } from "@/i18n"
+import { setupHref } from "@/home/hero-copy.mjs"
 
 export function CallToAction({ source }: { source: string }) {
   const { t } = useLocale()
@@ -14,7 +15,6 @@ export function CallToAction({ source }: { source: string }) {
       <div className="container mx-auto flex w-full flex-col items-center justify-center p-4 md:p-10">
         <div className="relative flex w-full flex-col items-center justify-center overflow-hidden rounded-3xl border border-line bg-s1 p-10">
           <div className="z-10 flex flex-col items-center text-center">
-            <p className="eyebrow">{t.cta.eyebrow}</p>
             <h2
               id="cta-h"
               className="h-display mt-3 max-w-xl text-3xl font-semibold tracking-tighter text-balance text-t1 sm:text-4xl"
@@ -25,8 +25,8 @@ export function CallToAction({ source }: { source: string }) {
               {t.cta.lead}
             </p>
             <div className="mt-5 flex flex-col items-center gap-3">
-              <ShimmerButton href="#join" className="text-base font-medium">
-                {t.cta.primary}
+              <ShimmerButton href={withSource(setupHref, source)} className="text-base font-medium" data-track="secondary_click" data-track-to="agents">
+                {t.chrome.setupCta}
               </ShimmerButton>
               <div className="flex flex-wrap items-center justify-center gap-4">
                 <a
@@ -45,12 +45,10 @@ export function CallToAction({ source }: { source: string }) {
                   />
                 </a>
                 <a
-                  href={withSource("/agents/", source)}
-                  data-track="secondary_click"
-                  data-track-to="agents"
+                  href="#join"
                   className="inline-flex min-h-11 items-center font-semibold text-t2 underline underline-offset-4 hover:no-underline"
                 >
-                  {t.cta.setup}
+                  {t.cta.primary}
                 </a>
               </div>
             </div>

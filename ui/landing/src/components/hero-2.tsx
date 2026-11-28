@@ -1,9 +1,7 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react"
 import { motion, useInView } from "motion/react"
 
-import { cn } from "@/lib/utils"
 import { BorderBeam } from "@/components/ui/border-beam"
-import { RetroGrid } from "@/components/ui/retro-grid"
 import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { JoinPrompt, joinPrompt } from "@/components/join-prompt.mjs"
 import { example } from "@/content"
@@ -47,16 +45,13 @@ export function Hero({ source }: { source: string }) {
   return (
     <section id="hero" aria-labelledby="hero-h" className="relative overflow-hidden">
       <div
-        className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_72%_54%_at_50%_100%,var(--color-pub-soft),transparent)]"
+        className="pointer-events-none absolute inset-0 z-0 bg-s0"
         data-hero-bg="fallback"
         aria-hidden="true"
       />
-      {reducedMotion ? null : <RetroGrid className="z-0 opacity-80" opacity={0.32} lightLineColor="rgb(63 92 53)" />}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-28 bg-gradient-to-b from-transparent to-s0" aria-hidden="true" />
-
       <div className="relative z-10 container mx-auto flex flex-col items-center px-4 pt-10 pb-8 text-center md:px-10 md:pt-24 md:pb-10" ref={fadeInRef}>
         <motion.p
-          className="eyebrow rounded-full border border-line bg-s0/72 px-3 py-1 backdrop-blur"
+          className="eyebrow"
           animate={fadeInInView ? "animate" : "initial"}
           variants={fadeUpVariants}
           initial={false}
@@ -66,7 +61,7 @@ export function Hero({ source }: { source: string }) {
         </motion.p>
         <motion.h1
           id="hero-h"
-          className="h-display mt-5 max-w-4xl from-foreground to-foreground/68 bg-linear-to-br from-30% bg-clip-text text-4xl leading-[1.04] font-semibold tracking-tighter text-balance text-transparent sm:text-5xl md:text-7xl"
+          className="h-display editorial-title mt-5 max-w-4xl text-5xl leading-[.98] text-balance text-t1 sm:text-6xl md:text-8xl"
           animate={fadeInInView ? "animate" : "initial"}
           variants={fadeUpVariants}
           initial={false}
@@ -75,7 +70,7 @@ export function Hero({ source }: { source: string }) {
           {t.hero.h1}
         </motion.h1>
         <motion.p
-          className="mt-5 max-w-2xl text-base font-medium tracking-tight text-balance text-t2 sm:text-lg md:text-xl"
+          className="mt-5 max-w-[36rem] text-base leading-relaxed text-pretty text-t2 sm:text-lg"
           animate={fadeInInView ? "animate" : "initial"}
           variants={fadeUpVariants}
           initial={false}
@@ -111,7 +106,6 @@ export function Hero({ source }: { source: string }) {
             </a>
           </div>
           <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-t2">
-            <span>{t.hero.audienceLead}</span>
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <a className="inline-flex min-h-11 items-center font-semibold text-t1 underline underline-offset-4 hover:no-underline" href={withSource(t.hero.ctaMakerHref, source)} data-track="hero_audience" data-track-to="makers">
                 {t.hero.ctaMaker}
@@ -128,20 +122,20 @@ export function Hero({ source }: { source: string }) {
       <div className="relative z-10 container mx-auto px-4 pb-12 md:px-10 md:pb-20">
         <motion.aside
           aria-labelledby="hero-example-h"
-          className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-line bg-s1/88 shadow-xl shadow-pub/5 backdrop-blur"
+          className="relative mx-auto max-w-4xl overflow-hidden rounded-2xl border border-line bg-s1"
           initial={reducedMotion ? false : { opacity: 0, y: 24 }}
           animate={fadeInInView ? { opacity: 1, y: 0 } : undefined}
           transition={{ duration: 0.6, delay: 0.25, ease }}
         >
-          <Suspense fallback={null}>
+          {reducedMotion ? null : <Suspense fallback={null}>
             <LazyDither
               pattern="orbit"
-              colors={["rgb(236 239 226)", "rgb(184 189 172)", "rgb(63 92 53)"]}
+              colors={["rgb(248 245 238)", "rgb(221 214 202)", "rgb(167 157 141)"]}
               intensity={0.13}
               speed={0.24}
               className="z-0 opacity-35"
             />
-          </Suspense>
+          </Suspense>}
           <div className="relative z-10">
             <div className="border-b border-line bg-s0/72 px-5 py-4 text-left">
               <p className="eyebrow">{t.hero.exampleLabel}</p>
@@ -171,34 +165,26 @@ export function Hero({ source }: { source: string }) {
             </div>
             <p className="border-t border-line px-5 py-3 text-left text-xs leading-relaxed text-t2">{t.hero.exampleFootnote}</p>
           </div>
-          {reducedMotion ? null : <BorderBeam size={120} duration={9} borderWidth={1.2} colorFrom="rgb(63 92 53)" colorTo="rgb(198 79 56)" />}
         </motion.aside>
       </div>
     </section>
   )
 }
 
-// The manual-bearer setup card, rendered below the fold on the homepage (the
-// hero leads with what the deal does; this is the how). Content unchanged.
-export function ConnectionCard() {
+export function ConnectionCard({ source }: { source: string }) {
   const { t } = useLocale()
   return (
     <div className="relative mx-auto w-full max-w-4xl">
-      <div
-        className={cn(
-          "absolute inset-0 bottom-1/2 h-full w-full transform-gpu blur-[120px] filter",
-          "bg-[linear-gradient(to_bottom,var(--color-pub-soft),transparent_30%)]"
-        )}
-        aria-hidden="true"
-      />
-      <div className="relative overflow-hidden rounded-2xl border border-line bg-card/80 shadow-sm backdrop-blur-sm">
+      <div className="relative overflow-hidden rounded-2xl border border-line bg-card">
         <div className="grid gap-6 p-6 text-left md:grid-cols-[minmax(0,1fr)_minmax(280px,.85fr)] md:p-8">
-          <div className="flex flex-col justify-center gap-3">
-            <p className="eyebrow">{t.connect.eyebrow}</p>
+          <div id="join" className="flex flex-col justify-center gap-3">
             <h2 className="h-display text-2xl font-semibold tracking-tight text-t1 md:text-3xl">
               {t.connect.heading}
             </h2>
             <p className="text-base leading-relaxed text-t2">{t.connect.lead}</p>
+            <a href={withSource(setupHref, source)} className="inline-flex min-h-11 self-start items-center font-semibold text-t1 underline underline-offset-4 hover:no-underline">
+              {t.chrome.setupCta}
+            </a>
             <details className="setup-details mt-2">
               <summary>{t.connect.summary}</summary>
               <p>{t.connect.joinLead}</p>
@@ -211,7 +197,7 @@ export function ConnectionCard() {
               ))}
               <p>{t.connect.noSignIn}</p>
             </details>
-            <div id="join" className="mt-2">
+            <div className="mt-2">
               <JoinPrompt
                 line={false}
                 copyLabel={t.connect.copyLabel}
@@ -223,7 +209,6 @@ export function ConnectionCard() {
           <SetupSequence />
         </div>
         <BorderBeam size={160} />
-        <BorderBeam size={160} delay={7} />
       </div>
     </div>
   )

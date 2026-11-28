@@ -31,12 +31,10 @@ export interface Messages {
     language: string
     signIn: string
     setupCta: string
-    navYourLimits: string
     navMakers: string
     navPublishers: string
     navUseCases: string
     navProtocol: string
-    navAgents: string
     navReference: string
     useCaseLinks: { id: string; title: string }[]
     commands: Record<'home' | 'maker' | 'publisher' | 'protocol' | 'you' | 'reference' | 'agents' | 'faq' | 'join', string>
@@ -257,7 +255,6 @@ export interface Messages {
     howItWorks: string
     forMakers: string
     forPublishers: string
-    yourLimits: string
     protocol: string
     reference: string
     privacy: string

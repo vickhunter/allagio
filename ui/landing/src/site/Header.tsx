@@ -9,17 +9,17 @@ import { ChevronDown } from 'lucide-react'
 export type PageKey = 'home' | 'makers' | 'publishers' | 'protocol' | 'setup' | 'legal' | 'agents' | 'you' | 'use-cases' | 'reference' | 'missing'
 export const siteCommands: Command[] = [
   { id: 'home', label: 'Home', keys: 'h', href: '/' },
-  { id: 'maker', label: 'Makers: every advantage', keys: 'm', href: '/makers/' },
-  { id: 'publisher', label: 'Publishers: every advantage', keys: 'p', href: '/publishers/' },
+  { id: 'maker', label: 'For makers', keys: 'm', href: '/makers/' },
+  { id: 'publisher', label: 'For publishers', keys: 'p', href: '/publishers/' },
   { id: 'protocol', label: 'Protocol', href: '/protocol/' },
-  { id: 'you', label: 'Your limits', href: '/you/' },
+  { id: 'you', label: 'Approval rules', href: '/#approval-rules' },
   { id: 'reference', label: 'Reference', href: '/reference' },
   { id: 'agents', label: 'MCP and setup', href: '/landing-v9/agents/' },
   { id: 'faq', label: 'Money and FAQ', href: '#faq' },
   { id: 'join', label: 'Join', keys: 'j', href: '#join' },
 ]
 
-// Shared header. Centered 3-zone bar: logo left, pill nav centered on wide screens,
+// Shared header. Centered 3-zone bar: logo left, nav centered on wide screens,
 // sign-in + primary CTA right. Below 1280px the destinations sit in a labelled menu.
 export function Header({ page }: { page: PageKey }) {
   const source = useSource()
@@ -56,14 +56,13 @@ export function Header({ page }: { page: PageKey }) {
       className={`inline-flex min-h-11 min-w-11 items-center whitespace-nowrap rounded-full px-3 text-t1 transition-colors duration-150 hover:bg-s2 ${current === key ? 'bg-s2 font-semibold' : ''}`}>{label}</a>
   )
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-s0/85 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-line bg-s0">
       <div className="site-bar">
         <Logo />
         <button ref={menuRef} type="button" className="site-menu-btn" aria-expanded={open} aria-controls="site-menu" onClick={() => setOpen((value) => !value)}>
           {open ? t.chrome.menuClose : t.chrome.menu}
         </button>
         <nav ref={navRef} id="site-menu" aria-label="Main" className={open ? 'site-menu is-open text-sm' : 'site-menu text-sm'} onClick={(event) => { if ((event.target as HTMLElement).closest('a')) setOpen(false) }}>
-          {link('/you/', t.chrome.navYourLimits, 'you')}
           {link('/makers/', t.chrome.navMakers, 'makers')}
           {link('/publishers/', t.chrome.navPublishers, 'publishers')}
           <div className="group relative">
@@ -72,7 +71,7 @@ export function Header({ page }: { page: PageKey }) {
               {t.chrome.navUseCases}
               <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 text-t2 transition-transform duration-150 group-hover:rotate-180 group-focus-within:rotate-180" />
             </a>
-            <div className="site-menu-submenu mt-1 w-full rounded-xl border border-line bg-white p-1.5 shadow-sm xl:invisible xl:absolute xl:left-1/2 xl:top-full xl:z-40 xl:mt-0 xl:w-64 xl:-translate-x-1/2 xl:translate-y-1 xl:opacity-0 xl:shadow-lg xl:transition-all xl:duration-150 xl:group-focus-within:visible xl:group-focus-within:translate-y-0 xl:group-focus-within:opacity-100 xl:group-hover:visible xl:group-hover:translate-y-0 xl:group-hover:opacity-100">
+            <div className="site-menu-submenu mt-1 w-full rounded-xl border border-line bg-s1 p-1.5 shadow-sm xl:invisible xl:absolute xl:left-1/2 xl:top-full xl:z-40 xl:mt-0 xl:w-64 xl:-translate-x-1/2 xl:translate-y-1 xl:opacity-0 xl:shadow-lg xl:transition-all xl:duration-150 xl:group-focus-within:visible xl:group-focus-within:translate-y-0 xl:group-focus-within:opacity-100 xl:group-hover:visible xl:group-hover:translate-y-0 xl:group-hover:opacity-100">
               {t.chrome.useCaseLinks.map((item) => (
                 <a
                   key={item.id}
@@ -87,7 +86,6 @@ export function Header({ page }: { page: PageKey }) {
             </div>
           </div>
           {link('/protocol/', t.chrome.navProtocol, 'protocol')}
-          {link('/agents', t.chrome.navAgents, 'agents')}
           <span className="xl:hidden">{link('/reference', t.chrome.navReference, 'reference')}</span>
           <span className="sm:hidden">
             <a href={signInHref('/owner', source)} data-track="nav_signin"
@@ -97,11 +95,11 @@ export function Header({ page }: { page: PageKey }) {
             <LangSwitcher />
           </span>
         </nav>
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+        <div className="flex min-w-0 items-center gap-1.5 sm:shrink-0 sm:gap-2">
           <LangSwitcher className="hidden sm:inline-flex" />
           <CommandPalette commands={commands.map((command) => ({ ...command, href: command.href.startsWith('#') ? command.href : withSource(command.href, source) }))} />
           <a href={signInHref('/owner', source)} data-track="nav_signin" className="hidden min-h-11 items-center whitespace-nowrap rounded-full px-3 text-[13px] font-semibold text-t2 transition-colors duration-150 hover:bg-s2 hover:text-t1 sm:inline-flex">{t.chrome.signIn}</a>
-          <a href={withSource('/landing-v9/agents/', source)} data-track="nav_cta" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full bg-t1 px-4 text-[13px] font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md">{t.chrome.setupCta}</a>
+          <a href={withSource('/landing-v9/agents/', source)} data-track="nav_cta" className="inline-flex min-h-11 items-center rounded-full bg-t1 px-2.5 text-center text-[13px] leading-tight font-semibold text-s0 transition-[transform,box-shadow] duration-150 hover:-translate-y-px hover:shadow-md sm:px-4 sm:whitespace-nowrap">{t.chrome.setupCta}</a>
         </div>
       </div>
     </header>

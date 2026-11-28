@@ -16,7 +16,7 @@ test('the footer sign-off sentence is pinned', () => {
   const en = readFileSync(resolve(landing, 'src/i18n/en.ts'), 'utf8')
   assert.equal(source.includes('workingName'), false)
   assert.equal(en.includes('workingName'), false)
-  assert.match(en, /Your agent finds partners, agrees the terms and places the offer\./)
+  assert.match(en, /Allagio hosts the Open Rails Protocol for deals between agents\. Built in Padova\./)
 })
 
 test('the agents page title is Allagio', () => {
