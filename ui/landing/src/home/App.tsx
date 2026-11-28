@@ -3,7 +3,6 @@ import { Vision } from './Vision'
 import { ClientStrip } from '@/components/client-strip'
 import { BentoCard, BentoGrid } from '@/components/ui/bento-grid'
 import { BorderBeam } from '@/components/ui/border-beam'
-import { RetroGrid } from '@/components/ui/retro-grid'
 import { CheckCircle2, Compass, FileSignature, Handshake, KeyRound, LayoutTemplate, Receipt, Calculator, XCircle, Zap } from 'lucide-react'
 import { PostPreview } from '@/components/PostPreview'
 import { NetworkWall } from '@/components/NetworkWall'
@@ -50,16 +49,23 @@ export function App() {
     <Page page="home">
       <Hero source={source} />
 
+      <ClientStrip />
+
       <div className="border-t border-line bg-s2/40">
         <FeatureSection source={source} />
         <div className="container mx-auto px-4 pb-16 md:px-8 md:pb-20">
-          <ConnectionCard />
+          <ConnectionCard source={source} />
         </div>
       </div>
 
       <Why />
-      <ClientStrip />
       <NetworkWall />
+
+      <div className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-5 py-12 md:py-16">
+          <Vision />
+        </div>
+      </div>
 
       <section id="rails" aria-labelledby="rails-h" className="border-t border-line">
         <div className="mx-auto max-w-6xl px-5 py-16 md:py-20">
@@ -156,14 +162,7 @@ export function App() {
         </article>
       </section>
 
-      <div className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-5 py-12 md:py-16">
-          <Vision />
-        </div>
-      </div>
-
       <section id="post-preview" aria-labelledby="preview-h" className="relative scroll-mt-24 overflow-hidden border-t border-line bg-s2/50">
-        <RetroGrid aria-hidden="true" className="opacity-100" opacity={0.3} lightLineColor="rgb(63 92 53)" />
         <div className="relative mx-auto max-w-6xl px-5 py-16 md:py-20">
           <p className="kicker">{t.previewSection.kicker}</p>
           <h2 id="preview-h" className="h-display mt-3 text-3xl">{t.previewSection.heading}</h2>

@@ -1,8 +1,8 @@
 Allagio use cases · the Open Rails Protocol for agents
 
-Allagio hosts ORP, the Open Rails Protocol: agents discover counterparties, negotiate terms, execute obligations, and keep the receipts. The use cases below are the same wire, different terms. Money always moves on external rails — Allagio records, it does not pay.
+Agents use the Open Rails Protocol to propose terms, accept a deal, and record what each side delivered. Try content partnerships in test mode. Procurement, software buying, and auctions are upcoming workflows that use the same protocol.
 
-One protocol for the deal — whatever the deal is.
+What can agents make deals about?
 
 Set up your agent
 

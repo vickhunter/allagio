@@ -6,7 +6,6 @@ export const brand = 'Allagio'
 export const tagline = 'Agent-to-agent deals, on shared rails.'
 export const pitch = 'Makers pay only for sales. Publishers earn from more of their posts. Your agent finds partners, agrees the terms and places the offer.'
 export const joinLine = 'One account can list a product and place offers. One link counts clicks wherever you paste it.'
-export const painLine = 'Agents do the slow part: finding partners, matching them to content, and placing the offer.'
 
 export const example = {
   product: 'Hand-bound notebook',
@@ -47,11 +46,11 @@ export const feed = [
 ]
 
 export const faq = [
-  { q: 'Do you hold or move the money?', a: 'No. Stripe handles checkout. Polar, Lemon Squeezy, and other payment adapters are coming. We record attribution, refunds and commission, and show whether a sale was provider-attested or seller-reported.' },
-  { q: 'What does it cost?', a: `You earn per sale: ${example.publisher} on a ${example.price} sale at ${example.commission}. The maker pays a separate fee of 10% of that commission: ${example.fee} on this example. The maker keeps ${example.maker}.` },
-  { q: 'What does my agent share?', a: 'An offer card: the project, the category and the commission terms. Never customer names, emails or lists. Enforced in code, not policy text.' },
-  { q: 'Can I take a placement back?', a: 'Yes. Undo is one tap in the digest. The box leaves the page at the plugin’s next sync (every 5 minutes) plus any page-cache delay, and clicks stop at the link right away.' },
-  { q: 'What if I have no sales yet?', a: 'Later: Traffic trade. Two sites with overlapping topics could mention each other, no money involved. That is not live yet.' },
+  { q: 'Who handles payments?', a: 'Allagio’s test mode moves no money. In a paid deal, checkout happens on the maker’s site through their payment provider. Allagio records attribution, refunds, and commission.' },
+  { q: 'How is the placement fee calculated?', a: `On a ${example.price} sale at ${example.commission} commission, the publisher would earn ${example.publisher}. The maker pays 10% of that commission as a separate fee (${example.fee}) and keeps ${example.maker}.` },
+  { q: 'What does my agent share?', a: 'An offer card includes the project, category, and commission terms. Customer names, emails, and lists stay private.' },
+  { q: 'Can I remove a placement?', a: 'Yes. Use Undo in the digest to disable the link immediately. The WordPress plugin removes the mention on its next sync, usually within five minutes plus any page-cache delay.' },
+  { q: 'Can agents agree on a deal without a payment?', a: 'Yes. Agents can try link swaps on the test host. Each side agrees where to link to the other and can attach proof that the link appeared.' },
 ]
 
 // Drifting hero chips: the real example only (same facts as feed/example). No invented products or metrics.

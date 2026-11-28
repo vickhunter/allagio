@@ -7,11 +7,12 @@
 @font-face{font-family:"Archivo Rail";src:url(/landing-v9/fonts/archivo-700.woff2) format("woff2");font-weight:700;font-display:swap}
 @font-face{font-family:"Plex Mono Rail";src:url(/landing-v9/fonts/ibm-plex-mono-400.woff2) format("woff2");font-weight:400;font-display:swap}
 @font-face{font-family:"Plex Mono Rail";src:url(/landing-v9/fonts/ibm-plex-mono-500.woff2) format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"Instrument Serif";src:url(/landing-v9/fonts/instrument-serif-400.woff2) format("woff2");font-weight:400;font-display:swap}
 
 :root{
-  --rgb-surface-0:247 247 239; --rgb-surface-1:253 253 247; --rgb-surface-2:236 239 226; --rgb-surface-inv:35 39 32;
-  --rgb-text-1:35 39 32; --rgb-text-2:92 98 87; --rgb-text-inv:247 247 239; --rgb-text-inv-2:206 211 194;
-  --rgb-line:221 224 211; --rgb-line-strong:184 189 172;
+  --rgb-surface-0:248 245 238; --rgb-surface-1:255 252 247; --rgb-surface-2:239 233 222; --rgb-surface-inv:35 39 32;
+  --rgb-text-1:35 39 32; --rgb-text-2:89 84 76; --rgb-text-inv:248 245 238; --rgb-text-inv-2:217 211 199;
+  --rgb-line:221 214 202; --rgb-line-strong:167 157 141;
   --rgb-setup:35 82 201; --rgb-setup-edge:26 61 150; --rgb-setup-soft:232 237 250;   /* action / next step */
   --rgb-maker:168 64 44; --rgb-maker-brand:198 79 56; --rgb-maker-soft:248 234 228;   /* makers = digest terracotta */
   --rgb-pub:63 92 53; --rgb-pub-soft:230 238 223;                                       /* publishers = approvals olive */
@@ -57,6 +58,11 @@ body{margin:0;font-weight:500}
 ::selection{background:rgb(var(--rgb-setup-soft))}
 :focus-visible{outline:2px solid rgb(var(--rgb-setup));outline-offset:3px;border-radius:6px}
 .h-display{font-family:var(--font-display);font-weight:700;letter-spacing:-.035em;line-height:1.02}
+.editorial-title:lang(en),.editorial-title:lang(es),.editorial-title:lang(fr){
+  font-family:"Instrument Serif",Georgia,serif;
+  font-weight:400;
+  letter-spacing:-.025em;
+}
 .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgb(var(--rgb-text-2))}
 .tabular{font-variant-numeric:tabular-nums}
 
@@ -134,7 +140,7 @@ body{margin:0;font-weight:500}
   .site-bar>a:first-child{justify-self:start}
   .site-bar>:last-child{justify-self:end}
   .site-menu-btn{display:none}
-  .site-menu,.site-menu.is-open{position:static;display:flex;flex-direction:row;align-items:center;justify-self:center;gap:2px;border:1px solid rgb(var(--rgb-line));border-radius:999px;background:rgb(var(--rgb-surface-1));padding:3px;box-shadow:0 1px 3px rgb(var(--rgb-text-1)/.06)}
+  .site-menu,.site-menu.is-open{position:static;display:flex;flex-direction:row;align-items:center;justify-self:center;gap:2px;border:0;background:transparent;padding:0;overflow:visible}
 }
 
 /* D-128 setup hero. Warm paper, one moss action, a short manual sequence. */

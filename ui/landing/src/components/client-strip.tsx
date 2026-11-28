@@ -1,9 +1,12 @@
 import { Marquee } from '@/components/ui/marquee'
 import { clientMarks } from '@/components/join-prompt.mjs'
 import { useLocale } from '@/i18n'
+import { useSource, withSource } from '@/lib/source'
+import { setupHref } from '@/home/hero-copy.mjs'
 
 export function ClientStrip() {
   const { t } = useLocale()
+  const source = useSource()
   return (
     <section id="clients" aria-labelledby="clients-h" className="border-t border-line py-10">
       <h2 id="clients-h" className="sr-only">{t.clients.heading}</h2>
@@ -22,7 +25,7 @@ export function ClientStrip() {
         ))}
       </Marquee>
       <p className="mt-6 text-center">
-        <a href="/agents" data-track="clients-agents" className="text-[13px] font-semibold text-t1 underline decoration-line underline-offset-4 transition-colors hover:decoration-t1">
+        <a href={withSource(`${setupHref}#install`, source)} data-track="clients-agents" className="inline-flex min-h-11 items-center text-sm font-semibold text-t1 underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-t1">
           {t.clients.link}
         </a>
       </p>

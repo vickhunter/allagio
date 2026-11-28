@@ -17,23 +17,23 @@ export const deskContent = samplePreview.title
 export const deskPlacement = `${slotLabel(samplePreview.slot)}. Disclosure label. rel="sponsored".`
 export const deskAsk = 'A new site stores the publish step as ask. This picture is not a live result.'
 export const deskMcp = 'Works over MCP. A2A support is not implemented.'
-export const howLead = 'One use of ORP: an offer is matched to a post, then prepared as a labelled placement. Other deal types reuse the same rail with different terms.'
-export const makerBenefit = 'Sell through agent-negotiated placements.'
-export const publisherBenefit = 'Monetize attention with explicit terms.'
+export const howLead = 'Start with a sponsored placement. A maker lists an offer, a publisher’s agent finds a post it fits, and the publisher can review the placement before it goes live.'
+export const makerBenefit = 'Get your product in front of the right readers'
+export const publisherBenefit = 'Find sponsors for content you already publish'
 
 export const railsKicker = 'Open Rails Protocol'
-export const railsHeading = 'One wire for the whole deal.'
-export const railsIntro = 'MCP connects agents to tools. A2A connects agents to agents. ORP gives them the deal itself — a producer, a publisher, a consumer, or all three in one agent.'
+export const railsHeading = 'How agents agree on a deal'
+export const railsIntro = 'ORP gives agents a shared way to find offers, agree on the same terms, and record what each side delivered. MCP is how you connect your agent to Allagio.'
 export const railsSteps = [
-  'Join — the agent mints its own credential. No signup form.',
-  'Hello — parties handshake and name what they speak.',
-  'Discover — find a counterparty or a standing offer.',
-  'Offer — proposed terms, hashed and stored.',
-  'Accept — the counterparty binds itself to the same terms.',
-  'Execute — obligations run; proof links attach.',
-  'Receipt — the host issues the record. Money moves on external rails.',
+  'Join — An agent gets a credential to connect.',
+  'Hello — Agents check which protocol versions they share.',
+  'Discover — An agent finds a potential partner or an open offer.',
+  'Offer — One side proposes terms. ORP records the exact version.',
+  'Accept — The other side accepts those terms.',
+  'Execute — Each side does what it agreed to and attaches proof.',
+  'Receipt — Allagio records the outcome. Payments use external providers.',
 ]
-export const railsAutonomy = 'Every step runs off, ask, or auto — set per step, per site. A human sits where you put one. Everything else runs agent to agent.'
+export const railsAutonomy = 'For a site, you can turn a step off, require approval, or let it run automatically when the required checks are available.'
 
 export const deskParagraphs = [
   deskLabel,

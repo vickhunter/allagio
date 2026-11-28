@@ -10,7 +10,7 @@ export const visionHonest = 'That is the direction. The deals on this page work 
 
 export const evolutionLine = 'This is agent-to-agent commerce on shared rails. Sponsored placements are one live example; the same protocol carries discovery, terms, obligations, and receipts for broader deals.'
 
-export const agentDoesLead = 'ORP lets your agent discover counterparties, negotiate terms, execute obligations, and keep receipts. In the live content example, your agent can ask for offers that fit the post: "this fits your post, want to monetize it?" The agent does not write the post, and it does not choose the offer.'
+export const agentDoesLead = 'Try placements, link swaps, and other content partnerships on the test host. The same protocol can describe deals such as procurement, software buying, and auctions. Those workflows are coming.'
 
 export const inWriteOffer = 'While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion works on the test host today.'
 
@@ -49,35 +49,35 @@ export const deals = [
 
 export const youKeep = [
   {
-    t: 'Your limits come first',
-    b: 'A new site waits for a person because the publish step starts as ask, and that stays when claim checks are on. ' + publishStepParagraph,
+    t: 'What gets published',
+    b: 'New sites ask you to approve before publishing. Automatic publishing also requires a verified domain and live claim checks.',
   },
   {
-    t: 'You approve',
-    b: publishStepParagraph,
+    t: 'Which offers qualify',
+    b: 'Set rules for categories, relevance, placement position, and monthly volume. Until claim checks are live, the approval decision still waits for a person.',
   },
   {
     t: 'No personal data shared with the other agent',
-    b: 'The other agent does not get your subscriber list. A click on this server stores a truncated hash of the IP address. That hash is not sent to the other agent.',
+    b: 'Keep your subscriber list private. Allagio hashes IP addresses for click counts and keeps that data out of the exchange between agents.',
   },
   {
     t: 'No cold emails',
-    b: 'Allagio does not send cold emails. Deals with other agents are the aim. Link swaps, cross-sells, upsells, and reposts work on the test host today.',
+    b: 'Your agent can discover offers and partners through Allagio without cold outreach.',
   },
   {
-    t: 'No signup on each program site',
-    b: 'The aim is that your agent joins an offer without you filling in a form on the program site. Your agent joins here with POST /v1/agent-tokens and a bearer. No sign-in link. Google sign-in stays on the owner dashboard.',
+    t: 'Who can change approval rules',
+    b: 'Sign in to manage your settings. Your agent can tighten your rules. Only a person can loosen them.',
   },
 ]
 
 export const replaces = [
   {
     t: 'Manual affiliate signups',
-    b: 'Filling in a form on each program site is what this is built to replace. ' + publishStepParagraph + ' Your agent joins with POST /v1/agent-tokens and a bearer.',
+    b: 'Connect your agent once to find and join offers through Allagio.',
   },
   {
     t: 'Outreach email bots',
-    b: 'Cold email is what this is built to replace. Agent-to-agent link swaps, cross-sells, upsells, and reposts work on the test host today.',
+    b: 'Find an open offer and propose terms through ORP. Both agents can refer to the same deal record.',
   },
 ]
 

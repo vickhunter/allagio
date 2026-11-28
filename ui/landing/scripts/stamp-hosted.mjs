@@ -1,9 +1,9 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { howLead, makerBenefit, publisherBenefit, railsAutonomy, railsHeading, railsIntro, railsKicker, railsSteps } from '../src/home/desk-copy.mjs'
+import { howLead, makerBenefit, publisherBenefit, railsAutonomy, railsHeading, railsIntro, railsSteps } from '../src/home/desk-copy.mjs'
 import { joinLead, joinPrompt } from '../src/components/join-prompt.mjs'
 import { comingLine, ctaMakerHref, ctaMakerLabel, ctaPublisherHref, ctaPublisherLabel, heroH1, heroSupport, manualSetup, noSignIn, pathAgent, pathAgentNote, pathBearer, pathBearerNote, pathCaption, pathMcp, pathSend, pathWait, setupHref, setupLabel, staticSetupSteps } from '../src/home/hero-copy.mjs'
 import { whyCards, whyHeading, whyTrust } from '../src/home/why-copy.mjs'
-import { publishStepParagraph } from '../src/vision.mjs'
+import { agentDoesLead, publishStepParagraph, youKeep } from '../src/vision.mjs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -14,12 +14,13 @@ const assets = resolve(build, 'landing-v9')
 
 const meta = `<meta name="or-install" content="{{if .InstallerReady}}{{.InstallCommand}}{{else}}{{end}}">
     <meta name="or-plugin" content="{{if .PluginReady}}1{{else}}0{{end}}">`
-const shell = `<div id="static-landing">
+const audienceShell = (heading, intro) => `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
-      <h1>While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion works on the test host today.</h1>
+      <h1>${heading}</h1>
+      <p>${intro}</p>
       <p>Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.</p>
-      <p><a href="/you/" style="display:inline-flex;min-height:44px;align-items:center">Your limits</a></p>
+      <p><a href="/#approval-rules" style="display:inline-flex;min-height:44px;align-items:center">Approval rules</a></p>
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
       <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
       <p><a href="/downloads/offer-rails.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
@@ -38,7 +39,7 @@ const homeShell = `<div id="static-landing">
         <p><a href="${ctaPublisherHref}" style="display:inline-flex;min-height:44px;align-items:center">${ctaPublisherLabel}</a></p>
         <p><a href="/auth/login?return_to=%2Fowner" style="display:inline-flex;min-height:44px;align-items:center">Sign in</a></p>
         <p><a href="${setupHref}" style="display:inline-flex;min-height:44px;align-items:center">${setupLabel}</a></p>
-        <details>
+        <details id="join">
           <summary>Setup details</summary>
           <p>${joinLead}</p>
           <p>${joinPrompt}</p>
@@ -54,10 +55,9 @@ const homeShell = `<div id="static-landing">
       </section>
       <p>Manual setup</p>
       <p>MCP</p>
-      <p>Your limits</p>
-      <p>You approve</p>
+      <p>Approval rules</p>
       <p>Labelled placement</p>
-      <h2>You send the bearer yourself.</h2>
+      <h2>Give your agent the setup prompt</h2>
       <p>${manualSetup} This page does not issue a token.</p>
       <figure>
         <p>${pathCaption}</p>
@@ -70,16 +70,17 @@ const homeShell = `<div id="static-landing">
         <p>${pathWait}</p>
       </figure>
       <h2>${makerBenefit}</h2>
-      <p>In the live placement example, agents put your product in content that fits. The worked sale is illustrative, not a result from the picture.</p>
+      <p>List your terms once. Publishers’ agents can find your offer when it fits something they’re writing.</p>
       <p><a href="/makers/" style="display:inline-flex;min-height:44px;align-items:center">Makers</a></p>
-      <section id="publishers"><h2>${publisherBenefit}</h2><p>In the live placement example, agents find offers that fit the content you already make. You pick each step. Some posts get no offer.</p><p>${comingLine}</p><p><a href="/publishers/" style="display:inline-flex;min-height:44px;align-items:center">Publishers</a></p></section>
-      <section id="how"><h2>Four steps, one human decision</h2><p>${howLead}</p></section>
-      <section id="rails"><h2>${railsHeading}</h2><p>${railsIntro}</p><p>${railsAutonomy}</p><p><a href="/protocol/" style="display:inline-flex;min-height:44px;align-items:center">The protocol</a></p><figure><figcaption>The deal, end to end</figcaption><ol>${railsSteps.map((step) => `<li>${step}</li>`).join('')}</ol></figure></section>
-      <h2>A post, before an offer</h2>
-      <p>Nothing is inserted. Some posts get no offer.</p>
-      <h2>A labelled placement you can refuse</h2>
-      <p>One box, marked sponsored. Prepare waits until you approve.</p>
-      <p><a href="/you/" style="display:inline-flex;min-height:44px;align-items:center">Your limits</a></p>
+      <section id="publishers"><h2>${publisherBenefit}</h2><p>Ask your agent for offers that fit a post. Review the proposed mention and commission before you publish.</p><p>${comingLine}</p><p><a href="/publishers/" style="display:inline-flex;min-height:44px;align-items:center">Publishers</a></p></section>
+      <section id="how"><h2>How a sponsored placement works</h2><p>${howLead}</p></section>
+      <section id="approval-rules"><h2>You choose what needs approval</h2>${youKeep.map(({ t, b }) => `<h3>${t}</h3><p>${b}</p>`).join('')}<p><a href="/you/#approvals" style="display:inline-flex;min-height:44px;align-items:center">Read the approval rules</a></p></section>
+      <section><h2>What agents can do today</h2><p>${agentDoesLead}</p><p><a href="/use-cases/" style="display:inline-flex;min-height:44px;align-items:center">Use cases</a></p></section>
+      <section id="rails"><h2>${railsHeading}</h2><p>${railsIntro}</p><p>${railsAutonomy}</p><p><a href="/protocol/" style="display:inline-flex;min-height:44px;align-items:center">Read the ORP specification</a></p><figure><figcaption>The deal, end to end</figcaption><ol>${railsSteps.map((step) => `<li>${step}</li>`).join('')}</ol></figure></section>
+      <h2>No relevant offer</h2>
+      <p>When nothing fits, your post stays as it is.</p>
+      <h2>An offer that fits</h2>
+      <p>Review the proposed copy, its position, and the commission before you publish.</p>
       <p><a data-primary-action href="/auth/login?return_to=%2Fowner%3Fsetup%3Dmaker" style="display:inline-flex;min-height:44px;align-items:center">Sign in with Google</a></p>
       <p><a href="/owner/settings" style="display:inline-flex;min-height:44px;align-items:center">MCP and setup</a></p>
       <p><a href="/downloads/offer-rails.zip" style="display:inline-flex;min-height:44px;align-items:center">{{if .PluginReady}}Download WordPress plugin{{else}}The WordPress plugin download is prepared with the hosted package.{{end}}</a></p>
@@ -111,8 +112,8 @@ const protocolShell = `<div id="static-landing">
 const useCasesShell = `<div id="static-landing">
     <a class="skip" href="#main" style="position:absolute;left:-999px">Skip to content</a>
     <main id="main">
-      <h1>One protocol for the deal — whatever the deal is.</h1>
-      <p>Allagio hosts ORP, the Open Rails Protocol: agents discover counterparties, negotiate terms, execute obligations, and keep the receipts. The use cases below are the same wire, different terms. Money always moves on external rails — Allagio records, it does not pay.</p>
+      <h1>What can agents make deals about?</h1>
+      <p>Agents use the Open Rails Protocol to propose terms, accept a deal, and record what each side delivered. Try content partnerships in test mode. Procurement, software buying, and auctions are upcoming workflows that use the same protocol.</p>
       <p><a href="/agents" style="display:inline-flex;min-height:44px;align-items:center">Set up your agent</a></p>
       <section id="affiliate-marketing"><h2>Performance-based placements</h2></section>
       <section id="partnerships"><h2>Partnerships between agents</h2></section>
@@ -179,7 +180,7 @@ const hideShellWhenJs = '<style>@media (scripting:enabled){#static-landing{displ
 // reach /privacy, /terms or the docs, which also fails the readiness markers.
 const shellFooter = `<footer><nav aria-label="Site"><a href="/makers/">Makers</a> <a href="/publishers/">Publishers</a> <a href="/protocol/">Protocol</a> <a href="/agents">Agents</a> <a href="/use-cases/">Use cases</a> <a href="/llms.txt">llms.txt</a> <a href="/privacy">Privacy</a> <a href="/terms">Terms</a></nav></footer>`
 
-function stamp(file, fallback = shell) {
+function stamp(file, fallback) {
   let html = readFileSync(file, 'utf8')
   if (!html.includes('name="or-install"')) html = html.replace('</head>', `    ${meta}\n    ${hideShellWhenJs}\n  </head>`)
   if (!html.includes('id="static-landing"')) {
@@ -210,8 +211,14 @@ rmSync(resolve(assets, 'protocol'), { recursive: true, force: true })
 rmSync(resolve(assets, 'you'), { recursive: true, force: true })
 
 writeFileSync(resolve(build, 'home.html'), stamp(resolve(dist, 'index.html'), homeShell))
-writeFileSync(resolve(build, 'makers.html'), stamp(resolve(dist, 'makers/index.html')))
-writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers/index.html')))
+writeFileSync(resolve(build, 'makers.html'), stamp(resolve(dist, 'makers/index.html'), audienceShell(
+  'Help publishers find your product',
+  'List what you sell and what you’ll pay on a sale. Publishers’ agents can find your offer through Allagio and prepare a sponsored mention where it fits.',
+)))
+writeFileSync(resolve(build, 'publishers.html'), stamp(resolve(dist, 'publishers/index.html'), audienceShell(
+  'Find sponsors that fit what you write',
+  'Give your agent a post and ask for relevant offers. Review the proposed mention, where it appears, and what you’d earn before you publish.',
+)))
 writeFileSync(resolve(build, 'publishers-setup.html'), stamp(resolve(dist, 'publishers/setup/index.html'), setupShell))
 writeFileSync(resolve(build, 'protocol.html'), stamp(resolve(dist, 'protocol/index.html'), protocolShell))
 writeFileSync(resolve(build, 'you.html'), stamp(resolve(dist, 'you/index.html'), youShell))

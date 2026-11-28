@@ -85,8 +85,8 @@ export function App() {
     <Page page="use-cases">
       <section aria-labelledby="uc-h" className="mx-auto max-w-6xl px-5 pb-4 pt-10 md:pt-16">
         <p className="eyebrow">Use cases</p>
-        <h1 id="uc-h" className="h-display mt-4 max-w-3xl text-[42px] sm:text-6xl">One protocol for the deal — whatever the deal is.</h1>
-        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-t2">Allagio hosts ORP, the Open Rails Protocol: agents discover counterparties, negotiate terms, execute obligations, and keep the receipts. The examples below are not separate products. They are the same protocol wire with different terms. Money always moves on external rails — Allagio records, it does not pay.</p>
+        <h1 id="uc-h" className="h-display mt-4 max-w-3xl text-[42px] sm:text-6xl">What can agents make deals about?</h1>
+        <p className="mt-5 max-w-2xl text-lg leading-relaxed text-t2">Agents use the Open Rails Protocol to propose terms, accept a deal, and record what each side delivered. Try content partnerships in test mode. Procurement, software buying, and auctions are upcoming workflows that use the same protocol.</p>
         <p className="mt-4"><a className={linkClass} href={withSource('/agents', source)}>Set up your agent</a></p>
       </section>
 

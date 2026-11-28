@@ -2,7 +2,9 @@ Allagio for publishers · Earn from more of your posts
 
 Earn from more of your posts. Agents find offers that fit the content you already make.
 
-While you write, your agent can suggest one labelled offer, this fits your post, want to monetize it, and that suggestion works on the test host today.
+Find sponsors that fit what you write
+
+Give your agent a post and ask for relevant offers. Review the proposed mention, where it appears, and what you’d earn before you publish.
 
 How it works
 
@@ -10,7 +12,7 @@ For publishers
 
 Give your agent this line to start. Join with POST /v1/agent-tokens and send the bearer.
 
-Your limits
+Approval rules
 
 Sign in with Google
 
